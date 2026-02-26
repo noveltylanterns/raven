@@ -398,14 +398,12 @@ $_SESSION['_raven_extension_permission_masks'] = $extensionPermissionState;
 $_SESSION['_raven_enabled_extensions'] = array_keys($enabledExtensions);
 
 // Build dedicated nav links by extension type.
-$systemExtensionDirectories = ['database'];
 $extensionNavItems = [];
 $systemExtensionNavItems = [];
 foreach ($enabledExtensionManifests as $directoryName => $manifest) {
     $type = strtolower(trim((string) ($manifest['type'] ?? 'basic')));
     $isSystemType = $type === 'system'
-        || !empty($manifest['system_extension'])
-        || in_array($directoryName, $systemExtensionDirectories, true);
+        || !empty($manifest['system_extension']);
     $requiredPermissionBit = (int) ($extensionPermissionState[$directoryName] ?? PanelAccess::PANEL_LOGIN);
     if (!in_array($requiredPermissionBit, $allowedExtensionPermissionBits, true)) {
         $requiredPermissionBit = PanelAccess::PANEL_LOGIN;
@@ -792,8 +790,7 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
     }
     $type = strtolower(trim((string) ($manifest['type'] ?? 'basic')));
     $isSystemType = $type === 'system'
-        || !empty($manifest['system_extension'])
-        || in_array($extensionName, $systemExtensionDirectories, true);
+        || !empty($manifest['system_extension']);
     $requiredPermissionBit = (int) ($extensionPermissionState[$extensionName] ?? PanelAccess::PANEL_LOGIN);
     if (!in_array($requiredPermissionBit, $allowedExtensionPermissionBits, true)) {
         $requiredPermissionBit = PanelAccess::PANEL_LOGIN;
