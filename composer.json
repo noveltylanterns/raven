@@ -43,9 +43,6 @@
       "Raven\\": "private/src/"
     }
   },
-  "scripts": {
-    "check-config-sync": "php debug/check-config-sync.php"
-  },
   "config": {
     "vendor-dir": "composer",
     "sort-packages": true
