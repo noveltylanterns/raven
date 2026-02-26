@@ -1,6 +1,6 @@
 # Example Grackle Config
 
-If you are running [Grackle](https://github.com/humphreyboagart/grackle) and already have your SSL certificates set up, you should be able to drop this config in:
+If you are running [Grackle](https://github.com/humphreyboagart/grackle) and already have your SSL certificates set up, you should be able to drop this config in `/etc/nginx/active/USERNAME.conf` and run `grackle reset-web` to align your web environment:
 
 
 ```
