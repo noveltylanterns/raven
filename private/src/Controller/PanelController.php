@@ -30,6 +30,7 @@ use Raven\Repository\PageRepository;
 use Raven\Repository\RedirectRepository;
 use Raven\Repository\SignupFormRepository;
 use Raven\Repository\TagRepository;
+use Raven\Repository\TaxonomyRepository;
 use Raven\Repository\UserRepository;
 
 use function Raven\Core\Support\redirect;
@@ -77,6 +78,7 @@ final class PanelController
     private ContactFormRepository $contactForms;
     private SignupFormRepository $signupForms;
     private TagRepository $tags;
+    private TaxonomyRepository $taxonomy;
     private UserRepository $users;
 
     public function __construct(
@@ -95,6 +97,7 @@ final class PanelController
         ContactFormRepository $contactForms,
         SignupFormRepository $signupForms,
         TagRepository $tags,
+        TaxonomyRepository $taxonomy,
         UserRepository $users
     ) {
         $this->view = $view;
@@ -112,6 +115,7 @@ final class PanelController
         $this->contactForms = $contactForms;
         $this->signupForms = $signupForms;
         $this->tags = $tags;
+        $this->taxonomy = $taxonomy;
         $this->users = $users;
     }
 
@@ -8419,8 +8423,18 @@ MARKDOWN;
         $canManageGroups = $this->auth->canManageGroups();
         $pagesForRouting = $this->pages->listAllForRouting();
         $channelLandingMap = $this->channelLandingMapFromPagesForRouting($pagesForRouting);
+        $taxonomyRoutingOptions = $this->taxonomy->listRoutingOptions();
+        $channelRoutingOptions = is_array($taxonomyRoutingOptions['channels'] ?? null)
+            ? $taxonomyRoutingOptions['channels']
+            : [];
+        $categoryRoutingOptions = is_array($taxonomyRoutingOptions['categories'] ?? null)
+            ? $taxonomyRoutingOptions['categories']
+            : [];
+        $tagRoutingOptions = is_array($taxonomyRoutingOptions['tags'] ?? null)
+            ? $taxonomyRoutingOptions['tags']
+            : [];
 
-        foreach ($this->channels->listOptions() as $channel) {
+        foreach ($channelRoutingOptions as $channel) {
             $channelId = (int) ($channel['id'] ?? 0);
             $channelSlug = trim((string) ($channel['slug'] ?? ''));
             if ($channelId <= 0 || $channelSlug === '') {
@@ -8500,7 +8514,7 @@ MARKDOWN;
         }
 
         if ($categoryPrefix !== '') {
-            foreach ($this->categories->listOptions() as $category) {
+            foreach ($categoryRoutingOptions as $category) {
                 $categoryId = (int) ($category['id'] ?? 0);
                 $categorySlug = trim((string) ($category['slug'] ?? ''));
                 if ($categoryId <= 0 || $categorySlug === '') {
@@ -8530,7 +8544,7 @@ MARKDOWN;
         }
 
         if ($tagPrefix !== '') {
-            foreach ($this->tags->listOptions() as $tag) {
+            foreach ($tagRoutingOptions as $tag) {
                 $tagId = (int) ($tag['id'] ?? 0);
                 $tagSlug = trim((string) ($tag['slug'] ?? ''));
                 if ($tagId <= 0 || $tagSlug === '') {

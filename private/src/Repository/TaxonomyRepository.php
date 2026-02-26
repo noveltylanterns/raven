@@ -132,6 +132,75 @@ final class TaxonomyRepository
     }
 
     /**
+     * Returns routing-option sets for channels/categories/tags in one query.
+     *
+     * @return array{
+     *   channels: array<int, array{id: int, name: string, slug: string}>,
+     *   categories: array<int, array{id: int, name: string, slug: string}>,
+     *   tags: array<int, array{id: int, name: string, slug: string}>
+     * }
+     */
+    public function listRoutingOptions(): array
+    {
+        $channels = $this->table('channels');
+        $categories = $this->table('categories');
+        $tags = $this->table('tags');
+
+        $stmt = $this->db->prepare(
+            'SELECT option_type, id, name, slug
+             FROM (
+                 SELECT \'channel\' AS option_type, id, name, slug
+                 FROM ' . $channels . '
+                 UNION ALL
+                 SELECT \'category\' AS option_type, id, name, slug
+                 FROM ' . $categories . '
+                 UNION ALL
+                 SELECT \'tag\' AS option_type, id, name, slug
+                 FROM ' . $tags . '
+             ) options
+             ORDER BY option_type ASC, name ASC, id ASC'
+        );
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $result = [
+            'channels' => [],
+            'categories' => [],
+            'tags' => [],
+        ];
+
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $name = (string) ($row['name'] ?? '');
+            $slug = (string) ($row['slug'] ?? '');
+            if ($id <= 0 || $slug === '') {
+                continue;
+            }
+
+            $entry = [
+                'id' => $id,
+                'name' => $name,
+                'slug' => $slug,
+            ];
+
+            $optionType = strtolower(trim((string) ($row['option_type'] ?? '')));
+            if ($optionType === 'channel') {
+                $result['channels'][] = $entry;
+                continue;
+            }
+            if ($optionType === 'category') {
+                $result['categories'][] = $entry;
+                continue;
+            }
+            if ($optionType === 'tag') {
+                $result['tags'][] = $entry;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Maps logical taxonomy table names into backend-specific names.
      */
     private function table(string $table): string

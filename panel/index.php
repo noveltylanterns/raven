@@ -48,6 +48,7 @@ $panelController = new PanelController(
     $app['contact_forms'],
     $app['signup_forms'],
     $app['tags'],
+    $app['taxonomy'],
     $app['users']
 );
 
