@@ -269,13 +269,30 @@ $requiresForceRun = $status !== 'outdated';
       syncCustomRepoVisibility();
     };
 
+    var syncAllUpdaterFields = function () {
+      syncSourceValue();
+      syncCustomRepoValue();
+    };
+
     sourceSelect.addEventListener('change', syncSourceValue);
     if (customRepoInput instanceof HTMLInputElement) {
       customRepoInput.addEventListener('input', syncCustomRepoValue);
       customRepoInput.addEventListener('change', syncCustomRepoValue);
     }
-    syncSourceValue();
-    syncCustomRepoValue();
+    syncAllUpdaterFields();
+
+    var allUpdaterForms = document.querySelectorAll(
+      'form[action$="/updates/check"], form[action$="/updates/dry-run"], form[action$="/updates/run"]'
+    );
+    allUpdaterForms.forEach(function (formNode) {
+      if (!(formNode instanceof HTMLFormElement)) {
+        return;
+      }
+
+      formNode.addEventListener('submit', function () {
+        syncAllUpdaterFields();
+      });
+    });
 
     var runForms = document.querySelectorAll('form[action$="/updates/run"]');
     runForms.forEach(function (formNode) {
