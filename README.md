@@ -20,7 +20,7 @@ I told Codex to go liberal on the inline comments and produce human-readable cod
 1) Upload the package to your webhost, with the contents of `public/` going into your web root. *(May be called `public_html/` on some systems.)*
 2) Run `composer install` in the application root to pull in Composer dependencies.
 3) Go to your-domain.com/install.php
-4) Fill out the form, select your database type *(currently supports SQLite, MySQL & PgSQL)* and create your admin user.
+4) Fill out the form, configure your database driver, and create your first admin user.
 5) Verify your site works, and delete `install.php`, and start creating content.
 6) ???????
 7) PROFIT!!!
