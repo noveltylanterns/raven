@@ -172,6 +172,31 @@ final class TaxonomyRepository
         ];
 
         foreach ($rows as $row) {
+            $optionType = strtolower(trim((string) ($row['option_type'] ?? '')));
+
+            if ($optionType === 'shortcode') {
+                $extension = strtolower(trim((string) ($row['extension_name'] ?? '')));
+                $label = trim((string) ($row['name'] ?? ''));
+                $shortcode = trim((string) ($row['shortcode'] ?? ''));
+                $shortcode = str_replace(["\r", "\n", "\0"], '', $shortcode);
+                if (
+                    preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $extension) !== 1
+                    || $label === ''
+                    || $shortcode === ''
+                    || !str_starts_with($shortcode, '[')
+                    || !str_ends_with($shortcode, ']')
+                ) {
+                    continue;
+                }
+
+                $result['shortcodes'][] = [
+                    'extension' => $extension,
+                    'label' => $label,
+                    'shortcode' => $shortcode,
+                ];
+                continue;
+            }
+
             $id = (int) ($row['id'] ?? 0);
             $name = (string) ($row['name'] ?? '');
             $slug = (string) ($row['slug'] ?? '');
@@ -292,39 +317,8 @@ final class TaxonomyRepository
         ];
 
         foreach ($rows as $row) {
-            $id = (int) ($row['id'] ?? 0);
-            $name = (string) ($row['name'] ?? '');
-            $slug = (string) ($row['slug'] ?? '');
-            if ($id <= 0 || $slug === '') {
-                continue;
-            }
-
-            $entry = [
-                'id' => $id,
-                'name' => $name,
-                'slug' => $slug,
-            ];
-            $isAssigned = (int) ($row['is_assigned'] ?? 0) === 1;
             $optionType = strtolower(trim((string) ($row['option_type'] ?? '')));
 
-            if ($optionType === 'channel') {
-                $result['channels'][] = $entry;
-                continue;
-            }
-            if ($optionType === 'category') {
-                $result['categories'][] = $entry;
-                if ($isAssigned) {
-                    $result['assigned_categories'][] = $entry;
-                }
-                continue;
-            }
-            if ($optionType === 'tag') {
-                $result['tags'][] = $entry;
-                if ($isAssigned) {
-                    $result['assigned_tags'][] = $entry;
-                }
-                continue;
-            }
             if ($optionType === 'shortcode') {
                 $extension = strtolower(trim((string) ($row['extension_name'] ?? '')));
                 $label = trim((string) ($row['name'] ?? ''));
@@ -345,6 +339,39 @@ final class TaxonomyRepository
                     'label' => $label,
                     'shortcode' => $shortcode,
                 ];
+                continue;
+            }
+
+            $id = (int) ($row['id'] ?? 0);
+            $name = (string) ($row['name'] ?? '');
+            $slug = (string) ($row['slug'] ?? '');
+            if ($id <= 0 || $slug === '') {
+                continue;
+            }
+
+            $entry = [
+                'id' => $id,
+                'name' => $name,
+                'slug' => $slug,
+            ];
+            $isAssigned = (int) ($row['is_assigned'] ?? 0) === 1;
+
+            if ($optionType === 'channel') {
+                $result['channels'][] = $entry;
+                continue;
+            }
+            if ($optionType === 'category') {
+                $result['categories'][] = $entry;
+                if ($isAssigned) {
+                    $result['assigned_categories'][] = $entry;
+                }
+                continue;
+            }
+            if ($optionType === 'tag') {
+                $result['tags'][] = $entry;
+                if ($isAssigned) {
+                    $result['assigned_tags'][] = $entry;
+                }
             }
         }
 

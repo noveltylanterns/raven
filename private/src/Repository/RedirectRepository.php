@@ -182,6 +182,125 @@ final class RedirectRepository
     }
 
     /**
+     * Returns redirect-editor data (optional redirect row + channel options) in one query.
+     *
+     * @return array{
+     *   redirect: array<string, mixed>|null,
+     *   channels: array<int, array{id: int, name: string, slug: string}>
+     * }
+     */
+    public function editFormData(?int $id = null): array
+    {
+        $channels = $this->table('channels');
+        $redirects = $this->table('redirects');
+
+        $sql = 'SELECT row_type,
+                       option_id,
+                       option_name,
+                       option_slug,
+                       redirect_id,
+                       redirect_title,
+                       redirect_description,
+                       redirect_slug,
+                       redirect_channel_id,
+                       redirect_is_active,
+                       redirect_target_url,
+                       redirect_created_at,
+                       redirect_updated_at,
+                       redirect_channel_slug,
+                       redirect_channel_name
+                FROM (
+                    SELECT
+                        \'channel\' AS row_type,
+                        c.id AS option_id,
+                        c.name AS option_name,
+                        c.slug AS option_slug,
+                        NULL AS redirect_id,
+                        NULL AS redirect_title,
+                        NULL AS redirect_description,
+                        NULL AS redirect_slug,
+                        NULL AS redirect_channel_id,
+                        NULL AS redirect_is_active,
+                        NULL AS redirect_target_url,
+                        NULL AS redirect_created_at,
+                        NULL AS redirect_updated_at,
+                        NULL AS redirect_channel_slug,
+                        NULL AS redirect_channel_name
+                    FROM ' . $channels . ' c
+                    UNION ALL
+                    SELECT
+                        \'redirect\' AS row_type,
+                        NULL AS option_id,
+                        NULL AS option_name,
+                        NULL AS option_slug,
+                        r.id AS redirect_id,
+                        r.title AS redirect_title,
+                        r.description AS redirect_description,
+                        r.slug AS redirect_slug,
+                        r.channel_id AS redirect_channel_id,
+                        r.is_active AS redirect_is_active,
+                        r.target_url AS redirect_target_url,
+                        r.created_at AS redirect_created_at,
+                        r.updated_at AS redirect_updated_at,
+                        rc.slug AS redirect_channel_slug,
+                        rc.name AS redirect_channel_name
+                    FROM ' . $redirects . ' r
+                    LEFT JOIN ' . $channels . ' rc ON rc.id = r.channel_id
+                    WHERE r.id = :id
+                ) editor_rows
+                ORDER BY
+                    CASE WHEN row_type = \'channel\' THEN 0 ELSE 1 END,
+                    option_name ASC,
+                    option_id ASC';
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':id' => $id !== null && $id > 0 ? $id : 0]);
+        $rows = $stmt->fetchAll() ?: [];
+
+        $channelOptions = [];
+        $redirectRow = null;
+        foreach ($rows as $row) {
+            $rowType = strtolower(trim((string) ($row['row_type'] ?? '')));
+            if ($rowType === 'channel') {
+                $optionId = (int) ($row['option_id'] ?? 0);
+                $optionSlug = (string) ($row['option_slug'] ?? '');
+                if ($optionId > 0 && $optionSlug !== '') {
+                    $channelOptions[] = [
+                        'id' => $optionId,
+                        'name' => (string) ($row['option_name'] ?? ''),
+                        'slug' => $optionSlug,
+                    ];
+                }
+                continue;
+            }
+
+            if ($rowType === 'redirect' && $redirectRow === null) {
+                $redirectId = (int) ($row['redirect_id'] ?? 0);
+                if ($redirectId > 0) {
+                    $redirectRow = [
+                        'id' => $redirectId,
+                        'title' => (string) ($row['redirect_title'] ?? ''),
+                        'description' => (string) ($row['redirect_description'] ?? ''),
+                        'slug' => (string) ($row['redirect_slug'] ?? ''),
+                        'channel_id' => $row['redirect_channel_id'] !== null ? (int) $row['redirect_channel_id'] : null,
+                        'is_active' => (int) ($row['redirect_is_active'] ?? 0),
+                        'target_url' => (string) ($row['redirect_target_url'] ?? ''),
+                        'created_at' => (string) ($row['redirect_created_at'] ?? ''),
+                        'updated_at' => (string) ($row['redirect_updated_at'] ?? ''),
+                        'channel_slug' => (string) ($row['redirect_channel_slug'] ?? ''),
+                        'channel_name' => (string) ($row['redirect_channel_name'] ?? ''),
+                    ];
+                }
+            }
+        }
+
+        return [
+            'redirect' => $redirectRow,
+            'channels' => $channelOptions,
+        ];
+    }
+
+    /**
      * Resolves one active redirect for public URL matching.
      *
      * @return array<string, mixed>|null

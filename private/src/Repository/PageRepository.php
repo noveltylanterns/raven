@@ -438,6 +438,75 @@ final class PageRepository
     }
 
     /**
+     * Returns page-edit payload with page row and gallery rows in one query.
+     *
+     * @return array{page: array<string, mixed>, gallery_images: array<int, array<string, mixed>>}|null
+     */
+    public function editFormDataById(int $id): ?array
+    {
+        $pages = $this->table('pages');
+        $channels = $this->table('channels');
+        $images = $this->table('page_images');
+        $variants = $this->table('page_image_variants');
+
+        $stmt = $this->db->prepare(
+            'SELECT
+                p.*,
+                c.slug AS channel_slug,
+                i.id AS image_id,
+                i.page_id AS image_page_id,
+                i.storage_target AS image_storage_target,
+                i.original_filename AS image_original_filename,
+                i.stored_filename AS image_stored_filename,
+                i.stored_path AS image_stored_path,
+                i.mime_type AS image_mime_type,
+                i.extension AS image_extension,
+                i.byte_size AS image_byte_size,
+                i.width AS image_width,
+                i.height AS image_height,
+                i.hash_sha256 AS image_hash_sha256,
+                i.status AS image_status,
+                i.sort_order AS image_sort_order,
+                i.is_cover AS image_is_cover,
+                i.is_preview AS image_is_preview,
+                i.include_in_gallery AS image_include_in_gallery,
+                i.alt_text AS image_alt_text,
+                i.title_text AS image_title_text,
+                i.caption AS image_caption,
+                i.credit AS image_credit,
+                i.license AS image_license,
+                i.focal_x AS image_focal_x,
+                i.focal_y AS image_focal_y,
+                i.created_at AS image_created_at,
+                i.updated_at AS image_updated_at,
+                v.variant_key AS variant_key,
+                v.stored_filename AS variant_stored_filename,
+                v.stored_path AS variant_stored_path,
+                v.mime_type AS variant_mime_type,
+                v.extension AS variant_extension,
+                v.byte_size AS variant_byte_size,
+                v.width AS variant_width,
+                v.height AS variant_height
+             FROM ' . $pages . ' p
+             LEFT JOIN ' . $channels . ' c ON c.id = p.channel_id
+             LEFT JOIN ' . $images . ' i ON i.page_id = p.id
+             LEFT JOIN ' . $variants . ' v ON v.image_id = i.id
+             WHERE p.id = :id
+             ORDER BY i.sort_order ASC, i.id ASC, v.variant_key ASC'
+        );
+        $stmt->execute([':id' => $id]);
+        $rows = $stmt->fetchAll() ?: [];
+        if ($rows === []) {
+            return null;
+        }
+
+        return [
+            'page' => $this->hydratePageRow($this->stripEditorMediaColumns($rows[0])),
+            'gallery_images' => $this->hydrateEditorGalleryRows($rows),
+        ];
+    }
+
+    /**
      * Creates or updates page row from panel form payload.
      *
      * @param array<string, mixed> $data
@@ -995,6 +1064,114 @@ final class PageRepository
         }
 
         return $blocks;
+    }
+
+    /**
+     * Drops media-join columns from combined page-editor row.
+     *
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function stripEditorMediaColumns(array $row): array
+    {
+        foreach (array_keys($row) as $column) {
+            $name = (string) $column;
+            if (str_starts_with($name, 'image_') || str_starts_with($name, 'variant_')) {
+                unset($row[$name]);
+            }
+        }
+
+        return $row;
+    }
+
+    /**
+     * Hydrates page-editor image/variant rows from combined query output.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function hydrateEditorGalleryRows(array $rows): array
+    {
+        if ($rows === []) {
+            return [];
+        }
+
+        $imagesById = [];
+        $orderedImageIds = [];
+        foreach ($rows as $row) {
+            $imageId = (int) ($row['image_id'] ?? 0);
+            if ($imageId < 1) {
+                continue;
+            }
+
+            if (!isset($imagesById[$imageId])) {
+                $storedPath = (string) ($row['image_stored_path'] ?? '');
+                $imagesById[$imageId] = [
+                    'id' => $imageId,
+                    'page_id' => (int) ($row['image_page_id'] ?? 0),
+                    'storage_target' => (string) ($row['image_storage_target'] ?? ''),
+                    'original_filename' => (string) ($row['image_original_filename'] ?? ''),
+                    'stored_filename' => (string) ($row['image_stored_filename'] ?? ''),
+                    'stored_path' => $storedPath,
+                    'url' => $this->publicUrlFromStoredPath($storedPath),
+                    'mime_type' => (string) ($row['image_mime_type'] ?? ''),
+                    'extension' => (string) ($row['image_extension'] ?? ''),
+                    'byte_size' => (int) ($row['image_byte_size'] ?? 0),
+                    'width' => (int) ($row['image_width'] ?? 0),
+                    'height' => (int) ($row['image_height'] ?? 0),
+                    'hash_sha256' => (string) ($row['image_hash_sha256'] ?? ''),
+                    'status' => (string) ($row['image_status'] ?? ''),
+                    'sort_order' => (int) ($row['image_sort_order'] ?? 0),
+                    'is_cover' => (int) ($row['image_is_cover'] ?? 0) === 1,
+                    'is_preview' => (int) ($row['image_is_preview'] ?? 0) === 1,
+                    'include_in_gallery' => (int) ($row['image_include_in_gallery'] ?? 1) === 1,
+                    'alt_text' => (string) ($row['image_alt_text'] ?? ''),
+                    'title_text' => (string) ($row['image_title_text'] ?? ''),
+                    'caption' => (string) ($row['image_caption'] ?? ''),
+                    'credit' => (string) ($row['image_credit'] ?? ''),
+                    'license' => (string) ($row['image_license'] ?? ''),
+                    'focal_x' => $row['image_focal_x'] === null ? null : (float) $row['image_focal_x'],
+                    'focal_y' => $row['image_focal_y'] === null ? null : (float) $row['image_focal_y'],
+                    'created_at' => (string) ($row['image_created_at'] ?? ''),
+                    'updated_at' => (string) ($row['image_updated_at'] ?? ''),
+                    'variants' => [],
+                ];
+                $orderedImageIds[] = $imageId;
+            }
+
+            $variantKey = trim((string) ($row['variant_key'] ?? ''));
+            if ($variantKey === '') {
+                continue;
+            }
+
+            $variantStoredPath = (string) ($row['variant_stored_path'] ?? '');
+            $imagesById[$imageId]['variants'][$variantKey] = [
+                'variant_key' => $variantKey,
+                'stored_filename' => (string) ($row['variant_stored_filename'] ?? ''),
+                'stored_path' => $variantStoredPath,
+                'url' => $this->publicUrlFromStoredPath($variantStoredPath),
+                'mime_type' => (string) ($row['variant_mime_type'] ?? ''),
+                'extension' => (string) ($row['variant_extension'] ?? ''),
+                'byte_size' => (int) ($row['variant_byte_size'] ?? 0),
+                'width' => (int) ($row['variant_width'] ?? 0),
+                'height' => (int) ($row['variant_height'] ?? 0),
+            ];
+        }
+
+        $result = [];
+        foreach ($orderedImageIds as $imageId) {
+            $result[] = $imagesById[$imageId];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Converts one stored relative path into a public URL path.
+     */
+    private function publicUrlFromStoredPath(string $storedPath): string
+    {
+        return '/' . ltrim($storedPath, '/');
     }
 
     /**

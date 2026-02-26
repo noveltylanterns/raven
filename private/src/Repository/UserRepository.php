@@ -179,120 +179,171 @@ final class UserRepository
         $safeLimit = max(1, $limit);
         $safeOffset = max(0, $offset);
         $usersTable = $this->authTable('users');
-        $users = [];
+        $groups = $this->groupTable('groups');
+        $userGroups = $this->groupTable('user_groups');
         $total = 0;
 
         if ($normalizedGroupFilter === '') {
-            $stmt = $this->authDb->prepare(
-                'SELECT id, username, display_name, email, theme, avatar_path, COUNT(*) OVER() AS total_rows
-                 FROM ' . $usersTable . '
-                 ORDER BY id ASC
-                 LIMIT :limit OFFSET :offset'
+            $stmt = $this->appDb->prepare(
+                'WITH page_users AS (
+                     SELECT u.id,
+                            u.username,
+                            u.display_name,
+                            u.email,
+                            u.theme,
+                            u.avatar_path,
+                            COUNT(*) OVER() AS total_rows
+                     FROM ' . $usersTable . ' u
+                     ORDER BY u.id ASC
+                     LIMIT :limit OFFSET :offset
+                 )
+                 SELECT pu.id AS user_id,
+                        pu.username,
+                        pu.display_name,
+                        pu.email,
+                        pu.theme,
+                        pu.avatar_path,
+                        pu.total_rows,
+                        g.id AS group_id,
+                        g.name AS group_name,
+                        g.slug AS group_slug,
+                        g.permission_mask AS group_permission_mask,
+                        g.is_stock AS group_is_stock,
+                        CASE WHEN ug.user_id IS NULL THEN 0 ELSE 1 END AS group_selected
+                 FROM ' . $groups . ' g
+                 LEFT JOIN page_users pu ON 1 = 1
+                 LEFT JOIN ' . $userGroups . ' ug
+                   ON ug.group_id = g.id
+                  AND ug.user_id = pu.id
+                 ORDER BY COALESCE(pu.id, 0) ASC, g.id ASC'
             );
             $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
             $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
-            $stmt->execute();
-            $users = $stmt->fetchAll() ?: [];
         } else {
-            $groups = $this->groupTable('groups');
-            $userGroups = $this->groupTable('user_groups');
             $stmt = $this->appDb->prepare(
                 'WITH filtered_user_ids AS (
                      SELECT DISTINCT ug.user_id
                      FROM ' . $userGroups . ' ug
-                     INNER JOIN ' . $groups . ' g ON g.id = ug.group_id
-                     WHERE LOWER(g.name) = :group_name
+                     INNER JOIN ' . $groups . ' gf ON gf.id = ug.group_id
+                     WHERE LOWER(gf.name) = :group_name
+                 ),
+                 page_users AS (
+                     SELECT u.id,
+                            u.username,
+                            u.display_name,
+                            u.email,
+                            u.theme,
+                            u.avatar_path,
+                            COUNT(*) OVER() AS total_rows
+                     FROM ' . $usersTable . ' u
+                     INNER JOIN filtered_user_ids f ON f.user_id = u.id
+                     ORDER BY u.id ASC
+                     LIMIT :limit OFFSET :offset
                  )
-                 SELECT user_id, COUNT(*) OVER() AS total_rows
-                 FROM filtered_user_ids
-                 ORDER BY user_id ASC
-                 LIMIT :limit OFFSET :offset'
+                 SELECT pu.id AS user_id,
+                        pu.username,
+                        pu.display_name,
+                        pu.email,
+                        pu.theme,
+                        pu.avatar_path,
+                        pu.total_rows,
+                        g.id AS group_id,
+                        g.name AS group_name,
+                        g.slug AS group_slug,
+                        g.permission_mask AS group_permission_mask,
+                        g.is_stock AS group_is_stock,
+                        CASE WHEN ug.user_id IS NULL THEN 0 ELSE 1 END AS group_selected
+                 FROM ' . $groups . ' g
+                 LEFT JOIN page_users pu ON 1 = 1
+                 LEFT JOIN ' . $userGroups . ' ug
+                   ON ug.group_id = g.id
+                  AND ug.user_id = pu.id
+                 ORDER BY COALESCE(pu.id, 0) ASC, g.id ASC'
             );
             $stmt->bindValue(':group_name', $normalizedGroupFilter, PDO::PARAM_STR);
             $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
             $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
-            $stmt->execute();
-            $idRows = $stmt->fetchAll() ?: [];
-            $userIds = [];
-            foreach ($idRows as $row) {
+        }
+
+        $stmt->execute();
+        $rows = $stmt->fetchAll() ?: [];
+
+        $usersById = [];
+        /** @var array<int, array<int, array{name: string, permission_mask: int}>> $groupMap */
+        $groupMap = [];
+        $groupOptionsById = [];
+        foreach ($rows as $row) {
+            $groupId = (int) ($row['group_id'] ?? 0);
+            if ($groupId > 0 && !isset($groupOptionsById[$groupId])) {
+                $groupOptionsById[$groupId] = [
+                    'id' => $groupId,
+                    'name' => (string) ($row['group_name'] ?? ''),
+                    'slug' => (string) ($row['group_slug'] ?? ''),
+                    'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
+                    'is_stock' => (int) ($row['group_is_stock'] ?? 0),
+                ];
+            }
+
+            $userId = (int) ($row['user_id'] ?? 0);
+            if ($userId < 1) {
+                continue;
+            }
+
+            if (!isset($usersById[$userId])) {
                 if ($total === 0) {
                     $total = (int) ($row['total_rows'] ?? 0);
                 }
 
-                $userId = (int) ($row['user_id'] ?? 0);
-                if ($userId > 0) {
-                    $userIds[$userId] = $userId;
-                }
-            }
-            $userIds = array_values($userIds);
-
-            // Offset can target an empty page while rows still exist; recover accurate total.
-            if ($userIds === [] && $safeOffset > 0) {
-                $total = $this->countForPanel($normalizedGroupFilter);
-            }
-
-            if ($userIds === []) {
-                $groupsAndOptions = $this->groupEntriesAndOptionsForUserIds([]);
-                return [
-                    'rows' => [],
-                    'total' => $total,
-                    'group_options' => $groupsAndOptions['group_options'],
+                $usersById[$userId] = [
+                    'id' => $userId,
+                    'username' => (string) ($row['username'] ?? ''),
+                    'display_name' => (string) ($row['display_name'] ?? ''),
+                    'email' => (string) ($row['email'] ?? ''),
+                    'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
+                    'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
+                        ? (string) $row['avatar_path']
+                        : null,
                 ];
             }
 
-            $placeholders = [];
-            $params = [];
-            foreach ($userIds as $index => $userId) {
-                $placeholder = ':user_id_' . $index;
-                $placeholders[] = $placeholder;
-                $params[$placeholder] = $userId;
-            }
-
-            $userStmt = $this->authDb->prepare(
-                'SELECT id, username, display_name, email, theme, avatar_path
-                 FROM ' . $usersTable . '
-                 WHERE id IN (' . implode(', ', $placeholders) . ')
-                 ORDER BY id ASC'
-            );
-            $userStmt->execute($params);
-            $users = $userStmt->fetchAll() ?: [];
-        }
-
-        $userIds = [];
-        foreach ($users as $row) {
-            if ($total === 0) {
-                $total = (int) ($row['total_rows'] ?? 0);
-            }
-
-            $userId = (int) ($row['id'] ?? 0);
-            if ($userId > 0) {
-                $userIds[$userId] = $userId;
+            if ($groupId > 0 && (int) ($row['group_selected'] ?? 0) === 1) {
+                $groupMap[$userId] ??= [];
+                $groupMap[$userId][] = [
+                    'name' => (string) ($row['group_name'] ?? ''),
+                    'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
+                ];
             }
         }
-        $userIds = array_values($userIds);
 
         // Offset can target an empty page while rows still exist; recover accurate total.
-        if ($userIds === [] && $safeOffset > 0) {
+        if ($usersById === [] && $safeOffset > 0) {
             $total = $this->countForPanel($normalizedGroupFilter !== '' ? $normalizedGroupFilter : null);
         }
 
-        if ($userIds === []) {
-            $groupsAndOptions = $this->groupEntriesAndOptionsForUserIds([]);
-            return [
-                'rows' => [],
-                'total' => $total,
-                'group_options' => $groupsAndOptions['group_options'],
-            ];
-        }
+        $groupOptions = array_values($groupOptionsById);
+        usort(
+            $groupOptions,
+            static function (array $a, array $b): int {
+                $aIsStock = (int) ($a['is_stock'] ?? 0);
+                $bIsStock = (int) ($b['is_stock'] ?? 0);
+                if ($aIsStock !== $bIsStock) {
+                    return $bIsStock <=> $aIsStock;
+                }
 
-        $groupsAndOptions = $this->groupEntriesAndOptionsForUserIds($userIds);
-        /** @var array<int, array<int, array{name: string, permission_mask: int}>> $groupMap */
-        $groupMap = $groupsAndOptions['group_map'];
+                $aName = strtolower(trim((string) ($a['name'] ?? '')));
+                $bName = strtolower(trim((string) ($b['name'] ?? '')));
+                if ($aName !== $bName) {
+                    return $aName <=> $bName;
+                }
+
+                return ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0));
+            }
+        );
 
         return [
-            'rows' => $this->hydratePanelUsers($users, $groupMap),
+            'rows' => $this->hydratePanelUsers(array_values($usersById), $groupMap),
             'total' => $total,
-            'group_options' => $groupsAndOptions['group_options'],
+            'group_options' => $groupOptions,
         ];
     }
 
@@ -330,6 +381,96 @@ final class UserRepository
                 ? (string) $row['avatar_path']
                 : null,
             'group_ids' => $groupIds,
+        ];
+    }
+
+    /**
+     * Returns user-edit form data with one combined query in edit mode.
+     *
+     * @return array{
+     *   user: array<string, mixed>|null,
+     *   group_options: array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>
+     * }
+     */
+    public function editFormData(?int $id): array
+    {
+        if ($id === null || $id < 1) {
+            $groupPayload = $this->groupEntriesAndOptionsForUserIds([]);
+            return [
+                'user' => null,
+                'group_options' => $groupPayload['group_options'],
+            ];
+        }
+
+        $users = $this->appAuthTable('users');
+        $groups = $this->groupTable('groups');
+        $userGroups = $this->groupTable('user_groups');
+
+        $stmt = $this->appDb->prepare(
+            'SELECT u.id AS user_id,
+                    u.username,
+                    u.display_name,
+                    u.email,
+                    u.theme,
+                    u.avatar_path,
+                    g.id AS group_id,
+                    g.name AS group_name,
+                    g.slug AS group_slug,
+                    g.permission_mask AS group_permission_mask,
+                    g.is_stock AS group_is_stock,
+                    CASE WHEN ug.user_id IS NULL THEN 0 ELSE 1 END AS group_selected
+             FROM ' . $users . ' u
+             LEFT JOIN ' . $groups . ' g ON 1 = 1
+             LEFT JOIN ' . $userGroups . ' ug
+               ON ug.user_id = u.id
+              AND ug.group_id = g.id
+             WHERE u.id = :id
+             ORDER BY g.is_stock DESC, LOWER(g.name) ASC, g.id ASC'
+        );
+        $stmt->execute([':id' => $id]);
+        $rows = $stmt->fetchAll() ?: [];
+        if ($rows === []) {
+            return [
+                'user' => null,
+                'group_options' => [],
+            ];
+        }
+
+        $first = $rows[0];
+        $selectedGroupIds = [];
+        $groupOptions = [];
+        foreach ($rows as $row) {
+            $groupId = (int) ($row['group_id'] ?? 0);
+            if ($groupId < 1) {
+                continue;
+            }
+
+            $groupOptions[] = [
+                'id' => $groupId,
+                'name' => (string) ($row['group_name'] ?? ''),
+                'slug' => (string) ($row['group_slug'] ?? ''),
+                'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
+                'is_stock' => (int) ($row['group_is_stock'] ?? 0),
+            ];
+
+            if ((int) ($row['group_selected'] ?? 0) === 1) {
+                $selectedGroupIds[$groupId] = $groupId;
+            }
+        }
+
+        return [
+            'user' => [
+                'id' => (int) ($first['user_id'] ?? 0),
+                'username' => (string) ($first['username'] ?? ''),
+                'display_name' => (string) ($first['display_name'] ?? ''),
+                'email' => (string) ($first['email'] ?? ''),
+                'theme' => (string) (($first['theme'] ?? '') !== '' ? $first['theme'] : 'default'),
+                'avatar_path' => isset($first['avatar_path']) && $first['avatar_path'] !== ''
+                    ? (string) $first['avatar_path']
+                    : null,
+                'group_ids' => array_values($selectedGroupIds),
+            ],
+            'group_options' => $groupOptions,
         ];
     }
 
@@ -995,6 +1136,18 @@ final class UserRepository
     {
         // Auth tables use same prefix rules as other shared-db tables.
         return $this->prefix . $table;
+    }
+
+    /**
+     * Maps auth table names for usage through app connection.
+     */
+    private function appAuthTable(string $table): string
+    {
+        if ($this->driver !== 'sqlite') {
+            return $this->prefix . $table;
+        }
+
+        return 'auth.' . $table;
     }
 
     /**

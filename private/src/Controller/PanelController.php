@@ -217,7 +217,15 @@ final class PanelController
         }
 
         // Null id means create mode; numeric id means edit mode.
-        $page = $id !== null ? $this->pages->findById($id) : null;
+        $page = null;
+        $galleryImages = [];
+        if ($id !== null) {
+            $editData = $this->pages->editFormDataById($id);
+            if (is_array($editData)) {
+                $page = is_array($editData['page'] ?? null) ? $editData['page'] : null;
+                $galleryImages = is_array($editData['gallery_images'] ?? null) ? $editData['gallery_images'] : [];
+            }
+        }
         // Load channel/category/tag options and page assignments in one query.
         $taxonomyData = $this->taxonomy->listPageEditorTaxonomyData($id ?? 0);
         $channelOptions = is_array($taxonomyData['channels'] ?? null) ? $taxonomyData['channels'] : [];
@@ -226,7 +234,6 @@ final class PanelController
         $assignedCategories = is_array($taxonomyData['assigned_categories'] ?? null) ? $taxonomyData['assigned_categories'] : [];
         $assignedTags = is_array($taxonomyData['assigned_tags'] ?? null) ? $taxonomyData['assigned_tags'] : [];
         $preloadedShortcodes = is_array($taxonomyData['shortcodes'] ?? null) ? $taxonomyData['shortcodes'] : [];
-        $galleryImages = $id !== null ? $this->pageImages->listForPage($id) : [];
 
         $this->view->render('panel/pages/edit', [
             'site' => $this->siteData(),
@@ -1417,20 +1424,19 @@ final class PanelController
             return;
         }
 
-        $redirectRow = null;
-        if ($id !== null) {
-            $redirectRow = $this->redirects->findById($id);
+        $editorData = $this->redirects->editFormData($id);
+        $redirectRow = is_array($editorData['redirect'] ?? null) ? $editorData['redirect'] : null;
+        $channelOptions = is_array($editorData['channels'] ?? null) ? $editorData['channels'] : [];
 
-            if ($redirectRow === null) {
-                $this->flash('error', 'Redirect not found.');
-                redirect($this->panelUrl('/redirects'));
-            }
+        if ($id !== null && $redirectRow === null) {
+            $this->flash('error', 'Redirect not found.');
+            redirect($this->panelUrl('/redirects'));
         }
 
         $this->view->render('panel/redirects/edit', [
             'site' => $this->siteData(),
             'redirectRow' => $redirectRow,
-            'channelOptions' => $this->channels->listOptions(),
+            'channelOptions' => $channelOptions,
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'error' => $this->pullFlash('error'),
@@ -1637,15 +1643,14 @@ final class PanelController
             return;
         }
 
-        $user = null;
-        if ($id !== null) {
-            $user = $this->users->findById($id);
-
-            if ($user === null) {
-                $this->flash('error', 'User not found.');
-                redirect($this->panelUrl('/users'));
-            }
+        $editData = $this->users->editFormData($id);
+        $user = is_array($editData['user'] ?? null) ? $editData['user'] : null;
+        if ($id !== null && $user === null) {
+            $this->flash('error', 'User not found.');
+            redirect($this->panelUrl('/users'));
         }
+        $groupOptions = is_array($editData['group_options'] ?? null) ? $editData['group_options'] : [];
+        $actorIsSuperAdmin = $this->auth->isSuperAdmin();
 
         $this->view->render('panel/users/edit', [
             'site' => $this->siteData(),
@@ -1653,11 +1658,11 @@ final class PanelController
             'profileRoutePrefix' => $this->profileRoutePrefix(),
             'profileRoutesEnabled' => $this->profileRoutesEnabledForRoutingTable(),
             'avatarUploadLimitsNote' => $this->avatarUploadLimitsNote(),
-            'groupOptions' => $this->groups->listOptions(),
+            'groupOptions' => $groupOptions,
             // Only existing Super Admin users can assign users into Super Admin group.
-            'canAssignSuperAdmin' => $this->auth->isSuperAdmin(),
+            'canAssignSuperAdmin' => $actorIsSuperAdmin,
             // Groups that include Manage System Configuration are assignable by Super Admin only.
-            'canAssignConfigurationGroups' => $this->auth->isSuperAdmin(),
+            'canAssignConfigurationGroups' => $actorIsSuperAdmin,
             'themeOptions' => ['default', 'light', 'dark'],
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
