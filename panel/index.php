@@ -45,8 +45,6 @@ $panelController = new PanelController(
     $app['groups'],
     $app['pages'],
     $app['redirects'],
-    $app['contact_forms'],
-    $app['signup_forms'],
     $app['tags'],
     $app['taxonomy'],
     $app['users']

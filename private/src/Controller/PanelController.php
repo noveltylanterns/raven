@@ -18,7 +18,6 @@ use Raven\Core\Config;
 use Raven\Core\Media\PageImageManager;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Repository\CategoryRepository;
-use Raven\Repository\ContactFormRepository;
 use Raven\Core\Security\AvatarValidator;
 use Raven\Core\Security\Csrf;
 use Raven\Core\Security\InputSanitizer;
@@ -28,7 +27,6 @@ use Raven\Repository\GroupRepository;
 use Raven\Repository\PageImageRepository;
 use Raven\Repository\PageRepository;
 use Raven\Repository\RedirectRepository;
-use Raven\Repository\SignupFormRepository;
 use Raven\Repository\TagRepository;
 use Raven\Repository\TaxonomyRepository;
 use Raven\Repository\UserRepository;
@@ -75,8 +73,6 @@ final class PanelController
     private GroupRepository $groups;
     private PageRepository $pages;
     private RedirectRepository $redirects;
-    private ContactFormRepository $contactForms;
-    private SignupFormRepository $signupForms;
     private TagRepository $tags;
     private TaxonomyRepository $taxonomy;
     private UserRepository $users;
@@ -94,8 +90,6 @@ final class PanelController
         GroupRepository $groups,
         PageRepository $pages,
         RedirectRepository $redirects,
-        ContactFormRepository $contactForms,
-        SignupFormRepository $signupForms,
         TagRepository $tags,
         TaxonomyRepository $taxonomy,
         UserRepository $users
@@ -112,8 +106,6 @@ final class PanelController
         $this->groups = $groups;
         $this->pages = $pages;
         $this->redirects = $redirects;
-        $this->contactForms = $contactForms;
-        $this->signupForms = $signupForms;
         $this->tags = $tags;
         $this->taxonomy = $taxonomy;
         $this->users = $users;
@@ -226,8 +218,11 @@ final class PanelController
 
         // Null id means create mode; numeric id means edit mode.
         $page = $id !== null ? $this->pages->findById($id) : null;
-        $categoryOptions = $this->categories->listOptions();
-        $tagOptions = $this->tags->listOptions();
+        // Load channel/category/tag options in one taxonomy query.
+        $taxonomyOptions = $this->taxonomy->listRoutingOptions();
+        $channelOptions = is_array($taxonomyOptions['channels'] ?? null) ? $taxonomyOptions['channels'] : [];
+        $categoryOptions = is_array($taxonomyOptions['categories'] ?? null) ? $taxonomyOptions['categories'] : [];
+        $tagOptions = is_array($taxonomyOptions['tags'] ?? null) ? $taxonomyOptions['tags'] : [];
 
         // Existing assignments are loaded only in edit mode.
         $assignedCategories = $id !== null ? $this->pages->assignedCategoriesForPage($id) : [];
@@ -237,7 +232,7 @@ final class PanelController
         $this->view->render('panel/pages/edit', [
             'site' => $this->siteData(),
             'page' => $page,
-            'channelOptions' => $this->channels->listOptions(),
+            'channelOptions' => $channelOptions,
             'categoryOptions' => $categoryOptions,
             'tagOptions' => $tagOptions,
             'assignedCategories' => $assignedCategories,
@@ -6755,7 +6750,7 @@ final class PanelController
     {
         $enabledMap = $this->loadExtensionStateMap();
         $items = array_merge(
-            $this->extensionFormShortcodesForEditor($enabledMap),
+            $this->centralizedExtensionShortcodesForEditor($enabledMap),
             $this->extensionProvidedShortcodesForEditor($enabledMap)
         );
 
@@ -6777,66 +6772,40 @@ final class PanelController
     }
 
     /**
-     * Builds insertable shortcode items for stock form-based extensions.
+     * Loads centralized extension shortcode entries from taxonomy storage.
      *
      * @param array<string, bool> $enabledMap
      * @return array<int, array{extension: string, label: string, shortcode: string}>
      */
-    private function extensionFormShortcodesForEditor(array $enabledMap): array
+    private function centralizedExtensionShortcodesForEditor(array $enabledMap): array
     {
-        $extensionDefinitions = [
-            'contact' => [
-                'shortcode_type' => 'contact',
-                'label_prefix' => 'Contact Forms',
-            ],
-            'signups' => [
-                'shortcode_type' => 'signups',
-                'label_prefix' => 'Signup Sheets',
-            ],
-        ];
-
+        $registryRows = $this->taxonomy->listShortcodesForEditor();
         $items = [];
-        foreach ($extensionDefinitions as $extensionName => $definition) {
-            if (empty($enabledMap[$extensionName])) {
+        foreach ($registryRows as $row) {
+            $extensionName = strtolower(trim((string) ($row['extension'] ?? '')));
+            if ($extensionName === '' || empty($enabledMap[$extensionName])) {
                 continue;
             }
 
-            foreach ($this->extensionFormsForEditor($extensionName) as $form) {
-                $slug = $this->input->slug((string) ($form['slug'] ?? ''));
-                $name = $this->input->text((string) ($form['name'] ?? ''), 160);
-                $enabled = (bool) ($form['enabled'] ?? false);
-                if ($slug === null || $name === '' || !$enabled) {
-                    continue;
-                }
-
-                $shortcodeType = (string) ($definition['shortcode_type'] ?? '');
-                if ($shortcodeType === '') {
-                    continue;
-                }
-
-                $items[] = [
-                    'extension' => $extensionName,
-                    'label' => (string) ($definition['label_prefix'] ?? 'Extension') . ': ' . $name,
-                    'shortcode' => '[' . $shortcodeType . ' slug="' . $slug . '"]',
-                ];
+            $label = $this->input->text((string) ($row['label'] ?? ''), 180);
+            $shortcode = trim((string) ($row['shortcode'] ?? ''));
+            $shortcode = str_replace(["\r", "\n", "\0"], '', $shortcode);
+            if ($label === '' || $shortcode === '') {
+                continue;
             }
+
+            if (!str_starts_with($shortcode, '[') || !str_ends_with($shortcode, ']')) {
+                continue;
+            }
+
+            $items[] = [
+                'extension' => $extensionName,
+                'label' => $label,
+                'shortcode' => $shortcode,
+            ];
         }
 
         return $items;
-    }
-
-    /**
-     * Loads one extension forms list used by the page editor shortcode menu.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    private function extensionFormsForEditor(string $extensionName): array
-    {
-        return match ($extensionName) {
-            'contact' => $this->contactForms->listAll(),
-            'signups' => $this->signupForms->listAll(),
-            default => [],
-        };
     }
 
     /**

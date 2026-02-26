@@ -26,6 +26,7 @@ final class SchemaManager
     {
         // App schema first so auth/group seeding can rely on group tables.
         $this->ensureAppSchema($appDb, $driver, $prefix);
+        $this->ensureShortcodeRegistryBackfill($appDb, $driver, $prefix);
         $this->removeLegacyDebugSettingsStore($appDb, $driver, $prefix);
         // Consolidate legacy SQLite split files into shared taxonomy/extensions storage.
         $this->ensureSqliteStorageConsolidation($appDb, $driver);
@@ -131,6 +132,17 @@ final class SchemaManager
                 target_url TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
+            )');
+
+            $db->exec('CREATE TABLE IF NOT EXISTS taxonomy.shortcodes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                extension_name TEXT NOT NULL,
+                label TEXT NOT NULL,
+                shortcode TEXT NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE (extension_name, shortcode)
             )');
 
             $db->exec('CREATE TABLE IF NOT EXISTS main.page_categories (
@@ -280,6 +292,8 @@ final class SchemaManager
             // For attached DBs, qualify index name with schema alias and keep table unqualified.
             $db->exec('CREATE INDEX IF NOT EXISTS taxonomy.idx_redirects_slug ON redirects (slug)');
             $db->exec('CREATE INDEX IF NOT EXISTS taxonomy.idx_redirects_channel_id ON redirects (channel_id)');
+            $db->exec('CREATE INDEX IF NOT EXISTS taxonomy.idx_shortcodes_extension_name ON shortcodes (extension_name)');
+            $db->exec('CREATE INDEX IF NOT EXISTS taxonomy.idx_shortcodes_sort_order ON shortcodes (extension_name, sort_order, id)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_page_images_page_id ON page_images (page_id)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_page_images_sort_order ON page_images (page_id, sort_order)');
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS extensions.uniq_ext_contact_slug ON ext_contact (slug)');
@@ -374,6 +388,19 @@ final class SchemaManager
                 updated_at DATETIME NOT NULL,
                 INDEX idx_' . $prefix . 'redirects_slug (slug),
                 INDEX idx_' . $prefix . 'redirects_channel_id (channel_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'shortcodes (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                extension_name VARCHAR(120) NOT NULL,
+                label VARCHAR(255) NOT NULL,
+                shortcode TEXT NOT NULL,
+                sort_order INT UNSIGNED NOT NULL DEFAULT 1,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                UNIQUE KEY uniq_' . $prefix . 'shortcodes_extension_shortcode (extension_name, shortcode(255)),
+                INDEX idx_' . $prefix . 'shortcodes_extension_name (extension_name),
+                INDEX idx_' . $prefix . 'shortcodes_sort_order (extension_name, sort_order, id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'page_categories (
@@ -612,6 +639,19 @@ final class SchemaManager
         )');
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'redirects_slug ON ' . $prefix . 'redirects (slug)');
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'redirects_channel_id ON ' . $prefix . 'redirects (channel_id)');
+
+        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'shortcodes (
+            id BIGSERIAL PRIMARY KEY,
+            extension_name VARCHAR(120) NOT NULL,
+            label VARCHAR(255) NOT NULL,
+            shortcode TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NOT NULL,
+            updated_at TIMESTAMP NOT NULL
+        )');
+        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $prefix . 'shortcodes_extension_shortcode ON ' . $prefix . 'shortcodes (extension_name, shortcode)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'shortcodes_extension_name ON ' . $prefix . 'shortcodes (extension_name)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'shortcodes_sort_order ON ' . $prefix . 'shortcodes (extension_name, sort_order, id)');
 
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'page_categories (
             page_id BIGINT NOT NULL,
@@ -1792,6 +1832,101 @@ final class SchemaManager
     }
 
     /**
+     * Backfills centralized shortcode registry rows from stock form extensions.
+     */
+    private function ensureShortcodeRegistryBackfill(PDO $db, string $driver, string $prefix): void
+    {
+        $shortcodesTable = $this->table($driver, $prefix, 'shortcodes');
+        $contactTable = $this->table($driver, $prefix, 'ext_contact');
+        $signupsTable = $this->table($driver, $prefix, 'ext_signups');
+        $now = gmdate('Y-m-d H:i:s');
+        $safeNow = str_replace("'", "''", $now);
+
+        if ($driver === 'sqlite') {
+            $db->exec(
+                "INSERT OR IGNORE INTO {$shortcodesTable} (extension_name, label, shortcode, sort_order, created_at, updated_at)
+                 SELECT
+                     'contact' AS extension_name,
+                     'Contact Forms: ' || c.name AS label,
+                     '[contact slug=\"' || c.slug || '\"]' AS shortcode,
+                     c.id AS sort_order,
+                     COALESCE(c.created_at, '{$safeNow}') AS created_at,
+                     COALESCE(c.updated_at, '{$safeNow}') AS updated_at
+                 FROM {$contactTable} c
+                 WHERE c.enabled = 1"
+            );
+            $db->exec(
+                "INSERT OR IGNORE INTO {$shortcodesTable} (extension_name, label, shortcode, sort_order, created_at, updated_at)
+                 SELECT
+                     'signups' AS extension_name,
+                     'Signup Sheets: ' || s.name AS label,
+                     '[signups slug=\"' || s.slug || '\"]' AS shortcode,
+                     s.id AS sort_order,
+                     COALESCE(s.created_at, '{$safeNow}') AS created_at,
+                     COALESCE(s.updated_at, '{$safeNow}') AS updated_at
+                 FROM {$signupsTable} s
+                 WHERE s.enabled = 1"
+            );
+            return;
+        }
+
+        if ($driver === 'mysql') {
+            $db->exec(
+                "INSERT IGNORE INTO {$shortcodesTable} (extension_name, label, shortcode, sort_order, created_at, updated_at)
+                 SELECT
+                     'contact' AS extension_name,
+                     CONCAT('Contact Forms: ', c.name) AS label,
+                     CONCAT('[contact slug=\"', c.slug, '\"]') AS shortcode,
+                     c.id AS sort_order,
+                     COALESCE(c.created_at, '{$safeNow}') AS created_at,
+                     COALESCE(c.updated_at, '{$safeNow}') AS updated_at
+                 FROM {$contactTable} c
+                 WHERE c.enabled = 1"
+            );
+            $db->exec(
+                "INSERT IGNORE INTO {$shortcodesTable} (extension_name, label, shortcode, sort_order, created_at, updated_at)
+                 SELECT
+                     'signups' AS extension_name,
+                     CONCAT('Signup Sheets: ', s.name) AS label,
+                     CONCAT('[signups slug=\"', s.slug, '\"]') AS shortcode,
+                     s.id AS sort_order,
+                     COALESCE(s.created_at, '{$safeNow}') AS created_at,
+                     COALESCE(s.updated_at, '{$safeNow}') AS updated_at
+                 FROM {$signupsTable} s
+                 WHERE s.enabled = 1"
+            );
+            return;
+        }
+
+        $db->exec(
+            "INSERT INTO {$shortcodesTable} (extension_name, label, shortcode, sort_order, created_at, updated_at)
+             SELECT
+                 'contact' AS extension_name,
+                 'Contact Forms: ' || c.name AS label,
+                 '[contact slug=\"' || c.slug || '\"]' AS shortcode,
+                 c.id AS sort_order,
+                 COALESCE(c.created_at, '{$safeNow}') AS created_at,
+                 COALESCE(c.updated_at, '{$safeNow}') AS updated_at
+             FROM {$contactTable} c
+             WHERE c.enabled = 1
+             ON CONFLICT (extension_name, shortcode) DO NOTHING"
+        );
+        $db->exec(
+            "INSERT INTO {$shortcodesTable} (extension_name, label, shortcode, sort_order, created_at, updated_at)
+             SELECT
+                 'signups' AS extension_name,
+                 'Signup Sheets: ' || s.name AS label,
+                 '[signups slug=\"' || s.slug || '\"]' AS shortcode,
+                 s.id AS sort_order,
+                 COALESCE(s.created_at, '{$safeNow}') AS created_at,
+                 COALESCE(s.updated_at, '{$safeNow}') AS updated_at
+             FROM {$signupsTable} s
+             WHERE s.enabled = 1
+             ON CONFLICT (extension_name, shortcode) DO NOTHING"
+        );
+    }
+
+    /**
      * Consolidates legacy SQLite module files into shared taxonomy/extensions DBs.
      */
     private function ensureSqliteStorageConsolidation(PDO $db, string $driver): void
@@ -2097,6 +2232,7 @@ final class SchemaManager
             'categories' => 'taxonomy.categories',
             'tags' => 'taxonomy.tags',
             'redirects' => 'taxonomy.redirects',
+            'shortcodes' => 'taxonomy.shortcodes',
             'page_categories' => 'main.page_categories',
             'page_tags' => 'main.page_tags',
             'page_images' => 'main.page_images',

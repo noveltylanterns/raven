@@ -12,6 +12,7 @@ declare(strict_types=1);
 use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Routing\Router;
 use Raven\Repository\SignupFormRepository;
+use Raven\Repository\TaxonomyRepository;
 use Raven\Repository\WaitlistSignupRepository;
 
 use function Raven\Core\Support\redirect;
@@ -43,15 +44,20 @@ return static function (Router $router, array $context): void {
     /** @var callable(): string $currentUserTheme */
     $currentUserTheme = $context['currentUserTheme'] ?? static fn (): string => 'default';
 
-    if (!isset($app['root'], $app['view'], $app['config'], $app['csrf'], $app['signup_forms'], $app['signup_submissions'])) {
+    if (!isset($app['root'], $app['view'], $app['config'], $app['csrf'], $app['signup_forms'], $app['signup_submissions'], $app['taxonomy'])) {
         return;
     }
 
-    if (!$app['signup_forms'] instanceof SignupFormRepository || !$app['signup_submissions'] instanceof WaitlistSignupRepository) {
+    if (
+        !$app['signup_forms'] instanceof SignupFormRepository
+        || !$app['signup_submissions'] instanceof WaitlistSignupRepository
+        || !$app['taxonomy'] instanceof TaxonomyRepository
+    ) {
         return;
     }
     $signupFormsRepository = $app['signup_forms'];
     $signupsRepository = $app['signup_submissions'];
+    $taxonomyRepository = $app['taxonomy'];
 
     $extensionRoot = rtrim((string) $app['root'], '/') . '/private/ext/signups';
     $extensionManifestFile = $extensionRoot . '/extension.json';
@@ -197,8 +203,29 @@ return static function (Router $router, array $context): void {
      *   }>
      * }> $forms
      */
-    $saveForms = static function (array $forms) use ($signupFormsRepository): void {
+    $saveForms = static function (array $forms) use ($signupFormsRepository, $taxonomyRepository): void {
         $signupFormsRepository->replaceAll($forms);
+
+        $shortcodeItems = [];
+        foreach ($forms as $form) {
+            $enabled = !empty($form['enabled']);
+            $name = trim((string) ($form['name'] ?? ''));
+            $slug = strtolower(trim((string) ($form['slug'] ?? '')));
+            if (
+                !$enabled
+                || $name === ''
+                || preg_match('/^[a-z0-9][a-z0-9_-]*$/', $slug) !== 1
+            ) {
+                continue;
+            }
+
+            $shortcodeItems[] = [
+                'label' => 'Signup Sheets: ' . $name,
+                'shortcode' => '[signups slug="' . $slug . '"]',
+            ];
+        }
+
+        $taxonomyRepository->replaceShortcodesForExtension('signups', $shortcodeItems);
     };
 
     /**

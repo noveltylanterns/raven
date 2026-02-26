@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace Raven\Repository;
 
 use PDO;
+use PDOException;
+use RuntimeException;
 
 /**
  * Small repository for channel/category/tag public lookups.
@@ -201,6 +203,136 @@ final class TaxonomyRepository
     }
 
     /**
+     * Returns centralized extension shortcode entries for the page editor menu.
+     *
+     * @return array<int, array{extension: string, label: string, shortcode: string}>
+     */
+    public function listShortcodesForEditor(): array
+    {
+        $table = $this->table('shortcodes');
+
+        try {
+            $stmt = $this->db->prepare(
+                'SELECT extension_name, label, shortcode
+                 FROM ' . $table . '
+                 ORDER BY extension_name ASC, sort_order ASC, label ASC, id ASC'
+            );
+            $stmt->execute();
+        } catch (PDOException) {
+            return [];
+        }
+
+        /** @var array<int, array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll() ?: [];
+        $items = [];
+        foreach ($rows as $row) {
+            $extension = strtolower(trim((string) ($row['extension_name'] ?? '')));
+            $label = trim((string) ($row['label'] ?? ''));
+            $shortcode = trim((string) ($row['shortcode'] ?? ''));
+            $shortcode = str_replace(["\r", "\n", "\0"], '', $shortcode);
+            if (
+                preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $extension) !== 1
+                || $label === ''
+                || $shortcode === ''
+                || !str_starts_with($shortcode, '[')
+                || !str_ends_with($shortcode, ']')
+            ) {
+                continue;
+            }
+
+            $items[] = [
+                'extension' => $extension,
+                'label' => $label,
+                'shortcode' => $shortcode,
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * Replaces all centralized shortcode entries for one extension.
+     *
+     * @param array<int, array{label?: mixed, shortcode?: mixed}> $items
+     */
+    public function replaceShortcodesForExtension(string $extensionName, array $items): void
+    {
+        $normalizedExtension = strtolower(trim($extensionName));
+        if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $normalizedExtension) !== 1) {
+            throw new RuntimeException('Invalid extension name for shortcode registry.');
+        }
+
+        $normalizedItems = [];
+        $dedupe = [];
+        $sortOrder = 1;
+        foreach ($items as $item) {
+            $label = trim((string) ($item['label'] ?? ''));
+            $shortcode = trim((string) ($item['shortcode'] ?? ''));
+            $shortcode = str_replace(["\r", "\n", "\0"], '', $shortcode);
+            if (
+                $label === ''
+                || $shortcode === ''
+                || !str_starts_with($shortcode, '[')
+                || !str_ends_with($shortcode, ']')
+            ) {
+                continue;
+            }
+
+            $dedupeKey = strtolower($shortcode);
+            if (isset($dedupe[$dedupeKey])) {
+                continue;
+            }
+            $dedupe[$dedupeKey] = true;
+
+            $normalizedItems[] = [
+                'label' => $label,
+                'shortcode' => $shortcode,
+                'sort_order' => $sortOrder++,
+            ];
+        }
+
+        $table = $this->table('shortcodes');
+        $now = gmdate('Y-m-d H:i:s');
+
+        $this->db->beginTransaction();
+        try {
+            $delete = $this->db->prepare(
+                'DELETE FROM ' . $table . '
+                 WHERE extension_name = :extension_name'
+            );
+            $delete->execute([':extension_name' => $normalizedExtension]);
+
+            if ($normalizedItems !== []) {
+                $insert = $this->db->prepare(
+                    'INSERT INTO ' . $table . '
+                     (extension_name, label, shortcode, sort_order, created_at, updated_at)
+                     VALUES
+                     (:extension_name, :label, :shortcode, :sort_order, :created_at, :updated_at)'
+                );
+
+                foreach ($normalizedItems as $item) {
+                    $insert->execute([
+                        ':extension_name' => $normalizedExtension,
+                        ':label' => $item['label'],
+                        ':shortcode' => $item['shortcode'],
+                        ':sort_order' => $item['sort_order'],
+                        ':created_at' => $now,
+                        ':updated_at' => $now,
+                    ]);
+                }
+            }
+
+            $this->db->commit();
+        } catch (\Throwable $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+
+            throw new RuntimeException('Failed to update shortcode registry.');
+        }
+    }
+
+    /**
      * Maps logical taxonomy table names into backend-specific names.
      */
     private function table(string $table): string
@@ -215,6 +347,7 @@ final class TaxonomyRepository
             'channels' => 'taxonomy.channels',
             'categories' => 'taxonomy.categories',
             'tags' => 'taxonomy.tags',
+            'shortcodes' => 'taxonomy.shortcodes',
             default => 'main.' . $table,
         };
     }

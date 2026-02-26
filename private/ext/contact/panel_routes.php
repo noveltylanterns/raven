@@ -13,6 +13,7 @@ use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Routing\Router;
 use Raven\Repository\ContactFormRepository;
 use Raven\Repository\ContactSubmissionRepository;
+use Raven\Repository\TaxonomyRepository;
 
 use function Raven\Core\Support\redirect;
 
@@ -43,15 +44,20 @@ return static function (Router $router, array $context): void {
     /** @var callable(): string $currentUserTheme */
     $currentUserTheme = $context['currentUserTheme'] ?? static fn (): string => 'default';
 
-    if (!isset($app['root'], $app['view'], $app['config'], $app['csrf'], $app['contact_forms'], $app['contact_submissions'])) {
+    if (!isset($app['root'], $app['view'], $app['config'], $app['csrf'], $app['contact_forms'], $app['contact_submissions'], $app['taxonomy'])) {
         return;
     }
 
-    if (!$app['contact_forms'] instanceof ContactFormRepository || !$app['contact_submissions'] instanceof ContactSubmissionRepository) {
+    if (
+        !$app['contact_forms'] instanceof ContactFormRepository
+        || !$app['contact_submissions'] instanceof ContactSubmissionRepository
+        || !$app['taxonomy'] instanceof TaxonomyRepository
+    ) {
         return;
     }
     $contactFormsRepository = $app['contact_forms'];
     $contactSubmissionsRepository = $app['contact_submissions'];
+    $taxonomyRepository = $app['taxonomy'];
 
     $extensionRoot = rtrim((string) $app['root'], '/') . '/private/ext/contact';
     $extensionManifestFile = $extensionRoot . '/extension.json';
@@ -204,8 +210,29 @@ return static function (Router $router, array $context): void {
      *   }>
      * }> $forms
      */
-    $saveForms = static function (array $forms) use ($contactFormsRepository): void {
+    $saveForms = static function (array $forms) use ($contactFormsRepository, $taxonomyRepository): void {
         $contactFormsRepository->replaceAll($forms);
+
+        $shortcodeItems = [];
+        foreach ($forms as $form) {
+            $enabled = !empty($form['enabled']);
+            $name = trim((string) ($form['name'] ?? ''));
+            $slug = strtolower(trim((string) ($form['slug'] ?? '')));
+            if (
+                !$enabled
+                || $name === ''
+                || preg_match('/^[a-z0-9][a-z0-9_-]*$/', $slug) !== 1
+            ) {
+                continue;
+            }
+
+            $shortcodeItems[] = [
+                'label' => 'Contact Forms: ' . $name,
+                'shortcode' => '[contact slug="' . $slug . '"]',
+            ];
+        }
+
+        $taxonomyRepository->replaceShortcodesForExtension('contact', $shortcodeItems);
     };
 
     /**
