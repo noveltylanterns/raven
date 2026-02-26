@@ -114,11 +114,9 @@ return static function (Router $router, array $context): void {
     $sqliteCanonicalFiles = static function (): array {
         return [
             'pages' => 'pages.db',
-            'users' => 'users.db',
-            'groups' => 'groups.db',
+            'auth' => 'auth.db',
             'taxonomy' => 'taxonomy.db',
             'extensions' => 'extensions.db',
-            'login_failures' => 'login_failures.db',
         ];
     };
 
@@ -516,6 +514,11 @@ return static function (Router $router, array $context): void {
                         }
 
                         $canonicalKey = $canonicalByFile[strtolower($filename)] ?? '';
+                        if ($canonicalKey === '') {
+                            // Selector should only expose configured canonical SQLite files.
+                            continue;
+                        }
+
                         $canonicalLabel = $canonicalKey !== ''
                             ? ucwords(str_replace(['_', '-'], ' ', $canonicalKey))
                             : '';

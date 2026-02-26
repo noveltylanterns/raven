@@ -741,9 +741,9 @@ final class GroupRepository
 
         // SQLite mode: resolve to attached database aliases.
         return match ($table) {
-            'groups' => 'groups.groups',
-            'user_groups' => 'groups.user_groups',
-            default => 'groups.' . $table,
+            'groups' => 'auth.groups',
+            'user_groups' => 'auth.user_groups',
+            default => 'auth.' . $table,
         };
     }
 }

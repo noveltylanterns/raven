@@ -981,9 +981,9 @@ final class AuthService
     {
         if ($this->driver === 'sqlite') {
             return match ($base) {
-                'groups' => 'groups.groups',
-                'user_groups' => 'groups.user_groups',
-                default => 'groups.' . $base,
+                'groups' => 'auth.groups',
+                'user_groups' => 'auth.user_groups',
+                default => 'auth.' . $base,
             };
         }
 
@@ -996,7 +996,7 @@ final class AuthService
     private function loginFailureTable(): string
     {
         if ($this->driver === 'sqlite') {
-            return 'login_failures.login_failures';
+            return 'auth.login_failures';
         }
 
         return $this->prefix . 'login_failures';

@@ -60,8 +60,7 @@ final class ConnectionFactory
     /**
      * Returns the app-data connection.
      *
-     * SQLite mode opens `pages.db` and attaches required side databases,
-     * including extension datasets and security buckets.
+     * SQLite mode opens `pages.db` and attaches required side databases.
      */
     public function createAppConnection(): PDO
     {
@@ -70,10 +69,9 @@ final class ConnectionFactory
         if ($driver === 'sqlite') {
             $pdo = $this->newSqliteConnection($this->sqlitePath('pages'), 'app');
             $this->attachSqliteDatabases($pdo, [
-                'groups',
+                'auth',
                 'taxonomy',
                 'extensions',
-                'login_failures',
             ]);
             return $pdo;
         }
@@ -89,7 +87,7 @@ final class ConnectionFactory
         $driver = $this->getDriver();
 
         if ($driver === 'sqlite') {
-            return $this->newSqliteConnection($this->sqlitePath('users'), 'auth');
+            return $this->newSqliteConnection($this->sqlitePath('auth'), 'auth');
         }
 
         return $this->newServerConnection($driver, 'auth');
@@ -197,11 +195,9 @@ final class ConnectionFactory
     {
         return [
             'pages' => 'pages.db',
-            'users' => 'users.db',
-            'groups' => 'groups.db',
+            'auth' => 'auth.db',
             'taxonomy' => 'taxonomy.db',
             'extensions' => 'extensions.db',
-            'login_failures' => 'login_failures.db',
         ];
     }
 

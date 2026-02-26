@@ -47,11 +47,9 @@ function raven_database_manager_sqlite_files_map(): array
 {
     return [
         'pages' => 'pages.db',
-        'users' => 'users.db',
-        'groups' => 'groups.db',
+        'auth' => 'auth.db',
         'taxonomy' => 'taxonomy.db',
         'extensions' => 'extensions.db',
-        'login_failures' => 'login_failures.db',
     ];
 }
 

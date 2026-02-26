@@ -44,6 +44,7 @@ final class SchemaManager
         $this->ensurePanelPerformanceIndexes($appDb, $driver, $prefix);
         // Auth schema must exist before user/group relationship seeding.
         $this->ensureAuthSchema($authDb, $driver, $prefix);
+        $this->ensureSqliteAuthStorageConsolidation($authDb, $driver);
         $this->ensureStockGroups($appDb, $driver, $prefix);
         $this->ensureSeedPages($appDb, $driver, $prefix);
     }
@@ -188,7 +189,7 @@ final class SchemaManager
                 UNIQUE (image_id, variant_key)
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS groups.groups (
+            $db->exec('CREATE TABLE IF NOT EXISTS auth.groups (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
                 slug TEXT NOT NULL,
@@ -198,7 +199,7 @@ final class SchemaManager
                 created_at TEXT NOT NULL
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS groups.user_groups (
+            $db->exec('CREATE TABLE IF NOT EXISTS auth.user_groups (
                 user_id INTEGER NOT NULL,
                 group_id INTEGER NOT NULL,
                 PRIMARY KEY (user_id, group_id)
@@ -258,7 +259,7 @@ final class SchemaManager
                 created_at TEXT NOT NULL
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS login_failures.login_failures (
+            $db->exec('CREATE TABLE IF NOT EXISTS auth.login_failures (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 bucket_hash TEXT NOT NULL UNIQUE,
                 username_normalized TEXT NOT NULL,
@@ -286,9 +287,9 @@ final class SchemaManager
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS extensions.uniq_ext_signups_slug ON ext_signups (slug)');
             $db->exec('CREATE INDEX IF NOT EXISTS extensions.idx_ext_signups_submissions_form_slug_created_at ON ext_signups_submissions (form_slug, created_at DESC)');
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS extensions.uniq_ext_signups_submissions_form_slug_email ON ext_signups_submissions (form_slug, email)');
-            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS login_failures.uniq_login_failures_bucket_hash ON login_failures (bucket_hash)');
-            $db->exec('CREATE INDEX IF NOT EXISTS login_failures.idx_login_failures_locked_until ON login_failures (locked_until)');
-            $db->exec('CREATE INDEX IF NOT EXISTS login_failures.idx_login_failures_last_failed_at ON login_failures (last_failed_at)');
+            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS auth.uniq_login_failures_bucket_hash ON login_failures (bucket_hash)');
+            $db->exec('CREATE INDEX IF NOT EXISTS auth.idx_login_failures_locked_until ON login_failures (locked_until)');
+            $db->exec('CREATE INDEX IF NOT EXISTS auth.idx_login_failures_last_failed_at ON login_failures (last_failed_at)');
             return;
         }
 
@@ -1304,13 +1305,13 @@ final class SchemaManager
         $groupsTable = $this->table($driver, $prefix, 'groups');
 
         if ($driver === 'sqlite') {
-            if (!$this->appColumnExistsSqlite($db, 'groups.groups', 'slug')) {
-                $db->exec('ALTER TABLE groups.groups ADD COLUMN slug TEXT NULL');
+            if (!$this->appColumnExistsSqlite($db, 'auth.groups', 'slug')) {
+                $db->exec('ALTER TABLE auth.groups ADD COLUMN slug TEXT NULL');
             }
-            if (!$this->appColumnExistsSqlite($db, 'groups.groups', 'route_enabled')) {
-                $db->exec('ALTER TABLE groups.groups ADD COLUMN route_enabled INTEGER NOT NULL DEFAULT 0');
+            if (!$this->appColumnExistsSqlite($db, 'auth.groups', 'route_enabled')) {
+                $db->exec('ALTER TABLE auth.groups ADD COLUMN route_enabled INTEGER NOT NULL DEFAULT 0');
             }
-            $db->exec('CREATE INDEX IF NOT EXISTS groups.idx_groups_slug ON groups (slug)');
+            $db->exec('CREATE INDEX IF NOT EXISTS auth.idx_groups_slug ON groups (slug)');
         } elseif ($driver === 'mysql') {
             if (!$this->appColumnExistsMySql($db, $groupsTable, 'slug')) {
                 $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN slug VARCHAR(160) NULL AFTER name');
@@ -1338,8 +1339,8 @@ final class SchemaManager
             if ($legacyDefaultEnabled) {
                 $db->beginTransaction();
                 try {
-                    $db->exec('ALTER TABLE groups.groups RENAME TO groups_legacy_route_default');
-                    $db->exec('CREATE TABLE groups.groups (
+                    $db->exec('ALTER TABLE auth.groups RENAME TO groups_legacy_route_default');
+                    $db->exec('CREATE TABLE auth.groups (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         name TEXT NOT NULL UNIQUE,
                         slug TEXT NOT NULL,
@@ -1349,11 +1350,11 @@ final class SchemaManager
                         created_at TEXT NOT NULL
                     )');
                     $db->exec(
-                        'INSERT INTO groups.groups (id, name, slug, route_enabled, permission_mask, is_stock, created_at)
+                        'INSERT INTO auth.groups (id, name, slug, route_enabled, permission_mask, is_stock, created_at)
                          SELECT id, name, slug, route_enabled, permission_mask, is_stock, created_at
-                         FROM groups.groups_legacy_route_default'
+                         FROM auth.groups_legacy_route_default'
                     );
-                    $db->exec('DROP TABLE groups.groups_legacy_route_default');
+                    $db->exec('DROP TABLE auth.groups_legacy_route_default');
                     $db->commit();
                 } catch (\Throwable $exception) {
                     if ($db->inTransaction()) {
@@ -1438,7 +1439,7 @@ final class SchemaManager
     private function groupRouteEnabledDefaultIsEnabled(PDO $db, string $driver, string $groupsTable): bool
     {
         if ($driver === 'sqlite') {
-            $createSql = $this->sqliteTableCreateSql($db, 'groups', 'groups');
+            $createSql = $this->sqliteTableCreateSql($db, 'auth', 'groups');
             if (!is_string($createSql)) {
                 return false;
             }
@@ -1596,7 +1597,7 @@ final class SchemaManager
         if ($driver === 'sqlite') {
             $db->exec('CREATE INDEX IF NOT EXISTS idx_page_categories_category_id ON page_categories (category_id, page_id)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_page_tags_tag_id ON page_tags (tag_id, page_id)');
-            $db->exec('CREATE INDEX IF NOT EXISTS groups.idx_user_groups_group_id ON user_groups (group_id, user_id)');
+            $db->exec('CREATE INDEX IF NOT EXISTS auth.idx_user_groups_group_id ON user_groups (group_id, user_id)');
             $db->exec('CREATE INDEX IF NOT EXISTS taxonomy.idx_redirects_lookup ON redirects (slug, channel_id, is_active)');
             return;
         }
@@ -1841,6 +1842,9 @@ final class SchemaManager
             ['file' => 'categories.db', 'source_table' => 'categories', 'target_table' => 'taxonomy.categories'],
             ['file' => 'tags.db', 'source_table' => 'tags', 'target_table' => 'taxonomy.tags'],
             ['file' => 'redirects.db', 'source_table' => 'redirects', 'target_table' => 'taxonomy.redirects'],
+            ['file' => 'groups.db', 'source_table' => 'groups', 'target_table' => 'auth.groups'],
+            ['file' => 'groups.db', 'source_table' => 'user_groups', 'target_table' => 'auth.user_groups'],
+            ['file' => 'login_failures.db', 'source_table' => 'login_failures', 'target_table' => 'auth.login_failures'],
             ['file' => 'ext_contact.db', 'source_table' => 'ext_contact', 'target_table' => 'extensions.ext_contact'],
             ['file' => 'ext_contact_submissions.db', 'source_table' => 'ext_contact_submissions', 'target_table' => 'extensions.ext_contact_submissions'],
             ['file' => 'ext_signups.db', 'source_table' => 'ext_signups', 'target_table' => 'extensions.ext_signups'],
@@ -1850,6 +1854,40 @@ final class SchemaManager
         foreach ($legacyMigrations as $migration) {
             $this->migrateSqliteLegacyFileTable(
                 $db,
+                $basePath,
+                (string) ($migration['file'] ?? ''),
+                (string) ($migration['source_table'] ?? ''),
+                (string) ($migration['target_table'] ?? '')
+            );
+        }
+    }
+
+    /**
+     * Consolidates legacy SQLite auth storage into `auth.db`.
+     */
+    private function ensureSqliteAuthStorageConsolidation(PDO $authDb, string $driver): void
+    {
+        if ($driver !== 'sqlite') {
+            return;
+        }
+
+        $mainPath = $this->sqliteMainDatabasePath($authDb);
+        if ($mainPath === null) {
+            return;
+        }
+
+        $basePath = dirname($mainPath);
+        if (!is_dir($basePath)) {
+            return;
+        }
+
+        $legacyMigrations = [
+            ['file' => 'users.db', 'source_table' => 'users', 'target_table' => 'main.users'],
+        ];
+
+        foreach ($legacyMigrations as $migration) {
+            $this->migrateSqliteLegacyFileTable(
+                $authDb,
                 $basePath,
                 (string) ($migration['file'] ?? ''),
                 (string) ($migration['source_table'] ?? ''),
@@ -2063,13 +2101,13 @@ final class SchemaManager
             'page_tags' => 'main.page_tags',
             'page_images' => 'main.page_images',
             'page_image_variants' => 'main.page_image_variants',
-            'groups' => 'groups.groups',
-            'user_groups' => 'groups.user_groups',
+            'groups' => 'auth.groups',
+            'user_groups' => 'auth.user_groups',
             'ext_contact' => 'extensions.ext_contact',
             'ext_contact_submissions' => 'extensions.ext_contact_submissions',
             'ext_signups' => 'extensions.ext_signups',
             'ext_signups_submissions' => 'extensions.ext_signups_submissions',
-            'login_failures' => 'login_failures.login_failures',
+            'login_failures' => 'auth.login_failures',
             default => 'main.' . $table,
         };
     }
