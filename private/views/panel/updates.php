@@ -307,17 +307,26 @@ $requiresForceRun = $status !== 'outdated';
     });
 
     <?php if ($requiresForceRun): ?>
-      if (!window.bootstrap || typeof window.bootstrap.Modal !== 'function') {
-        return;
-      }
-
       var modalNode = document.getElementById('updaterForceRunModal');
       var confirmButton = document.getElementById('updaterForceRunConfirm');
-      if (!(modalNode instanceof HTMLElement) || !(confirmButton instanceof HTMLButtonElement)) {
-        return;
+      var modal = null;
+      var canUseModal = false;
+      if (
+        modalNode instanceof HTMLElement &&
+        confirmButton instanceof HTMLButtonElement &&
+        window.bootstrap &&
+        window.bootstrap.Modal &&
+        typeof window.bootstrap.Modal.getOrCreateInstance === 'function'
+      ) {
+        modal = window.bootstrap.Modal.getOrCreateInstance(modalNode);
+        canUseModal = true;
       }
-
-      var modal = window.bootstrap.Modal.getOrCreateInstance(modalNode);
+      var forceRunWarning = <?= json_encode(
+          'Current status is ' . ucfirst($status) . '. '
+          . ($statusMessage !== '' ? $statusMessage . ' ' : '')
+          . 'Running anyway will fetch upstream, hard-reset tracked files, and clean untracked non-ignored files. '
+          . 'Do you want to run the updater anyway?'
+      ) ?>;
       var pendingRunForm = null;
       runForms.forEach(function (formNode) {
         if (!(formNode instanceof HTMLFormElement)) {
@@ -332,9 +341,31 @@ $requiresForceRun = $status !== 'outdated';
 
           event.preventDefault();
           pendingRunForm = formNode;
-          modal.show();
+          if (canUseModal && modal !== null) {
+            modal.show();
+            return;
+          }
+
+          if (window.confirm(forceRunWarning) !== true) {
+            pendingRunForm = null;
+            return;
+          }
+
+          if (!(pendingRunForm instanceof HTMLFormElement)) {
+            return;
+          }
+
+          var fallbackForceField = pendingRunForm.querySelector('input[type="hidden"][data-updater-force-run="1"]');
+          if (fallbackForceField instanceof HTMLInputElement) {
+            fallbackForceField.value = '1';
+          }
+          pendingRunForm.submit();
         });
       });
+
+      if (!(confirmButton instanceof HTMLButtonElement) || modal === null) {
+        return;
+      }
 
       confirmButton.addEventListener('click', function () {
         if (!(pendingRunForm instanceof HTMLFormElement)) {
