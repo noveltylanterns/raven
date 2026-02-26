@@ -417,13 +417,18 @@ return static function (Router $router, array $context): void {
         $perPage = 50;
 
         try {
-            $totalSignups = $signupsRepository->countByFormSlug($slug, $searchQuery);
+            $offset = ($page - 1) * $perPage;
+            $pageResult = $signupsRepository->listPageByFormSlug($slug, $perPage, $offset, $searchQuery);
+            $totalSignups = (int) ($pageResult['total'] ?? 0);
+            $signups = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
             $totalPages = max(1, (int) ceil($totalSignups / $perPage));
+
             if ($totalSignups > 0 && $page > $totalPages) {
                 $page = $totalPages;
+                $offset = ($page - 1) * $perPage;
+                $pageResult = $signupsRepository->listPageByFormSlug($slug, $perPage, $offset, $searchQuery);
+                $signups = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
             }
-            $offset = ($page - 1) * $perPage;
-            $signups = $signupsRepository->listByFormSlug($slug, $perPage, $offset, $searchQuery);
         } catch (RuntimeException $exception) {
             $flash('error', $exception->getMessage());
             redirect($indexPath);

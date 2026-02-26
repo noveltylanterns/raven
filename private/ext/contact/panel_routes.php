@@ -481,13 +481,18 @@ return static function (Router $router, array $context): void {
         $perPage = 50;
 
         try {
-            $totalSubmissions = $contactSubmissionsRepository->countByFormSlug($slug, $searchQuery);
+            $offset = ($page - 1) * $perPage;
+            $pageResult = $contactSubmissionsRepository->listPageByFormSlug($slug, $perPage, $offset, $searchQuery);
+            $totalSubmissions = (int) ($pageResult['total'] ?? 0);
+            $submissions = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
             $totalPages = max(1, (int) ceil($totalSubmissions / $perPage));
+
             if ($totalSubmissions > 0 && $page > $totalPages) {
                 $page = $totalPages;
+                $offset = ($page - 1) * $perPage;
+                $pageResult = $contactSubmissionsRepository->listPageByFormSlug($slug, $perPage, $offset, $searchQuery);
+                $submissions = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
             }
-            $offset = ($page - 1) * $perPage;
-            $submissions = $contactSubmissionsRepository->listByFormSlug($slug, $perPage, $offset, $searchQuery);
         } catch (RuntimeException $exception) {
             $flash('error', $exception->getMessage());
             redirect($indexPath);

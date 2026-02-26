@@ -121,10 +121,13 @@ final class PanelController
     public function dashboard(): void
     {
         $this->requirePanelLogin();
+        $panelIdentity = $this->panelIdentityFromSession();
 
         $this->view->render('panel/dashboard', [
             'site' => $this->siteData(),
-            'user' => $this->auth->userSummary(),
+            'user' => [
+                'email' => (string) ($panelIdentity['email'] ?? ''),
+            ],
             'canManageUsers' => $this->auth->canManageUsers(),
             'canManageGroups' => $this->auth->canManageGroups(),
             'canManageConfiguration' => $this->auth->canManageConfiguration(),
@@ -5448,12 +5451,36 @@ final class PanelController
         $_SESSION['raven_panel_identity'] = [
             'display_name' => trim((string) ($preferences['display_name'] ?? '')),
             'username' => trim((string) ($preferences['username'] ?? '')),
+            'email' => trim((string) ($preferences['email'] ?? '')),
         ];
         $_SESSION['_raven_can_manage_content'] = $this->auth->canManageContent();
         $_SESSION['_raven_can_manage_taxonomy'] = $this->auth->canManageTaxonomy();
         $_SESSION['_raven_can_manage_users'] = $this->auth->canManageUsers();
         $_SESSION['_raven_can_manage_groups'] = $this->auth->canManageGroups();
         $_SESSION['_raven_can_manage_configuration'] = $this->auth->canManageConfiguration();
+    }
+
+    /**
+     * Returns normalized panel identity from session cache.
+     *
+     * @return array{display_name: string, username: string, email: string}
+     */
+    private function panelIdentityFromSession(): array
+    {
+        $raw = $_SESSION['raven_panel_identity'] ?? null;
+        if (!is_array($raw)) {
+            return [
+                'display_name' => '',
+                'username' => '',
+                'email' => '',
+            ];
+        }
+
+        return [
+            'display_name' => trim((string) ($raw['display_name'] ?? '')),
+            'username' => trim((string) ($raw['username'] ?? '')),
+            'email' => trim((string) ($raw['email'] ?? '')),
+        ];
     }
 
     /**

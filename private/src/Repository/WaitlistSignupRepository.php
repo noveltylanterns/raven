@@ -181,6 +181,95 @@ final class WaitlistSignupRepository
     }
 
     /**
+     * Returns one paginated signup-submissions page plus total count in one query.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     */
+    public function listPageByFormSlug(string $formSlug, int $limit, int $offset, string $search = ''): array
+    {
+        $table = $this->table('ext_signups_submissions');
+        $safeLimit = max(1, $limit);
+        $safeOffset = max(0, $offset);
+
+        $pageParams = [
+            ':page_form_slug' => $formSlug,
+        ];
+        $countParams = [
+            ':count_form_slug' => $formSlug,
+        ];
+
+        $pageSearchClause = $this->searchClause($search, $pageParams, 'page_search');
+        $countSearchClause = $this->searchClause($search, $countParams, 'count_search');
+
+        $sql = 'SELECT page_rows.id,
+                       page_rows.form_slug,
+                       page_rows.form_target,
+                       page_rows.email,
+                       page_rows.display_name,
+                       page_rows.country,
+                       page_rows.additional_fields_json,
+                       page_rows.source_url,
+                       page_rows.ip_address,
+                       page_rows.hostname,
+                       page_rows.user_agent,
+                       page_rows.created_at,
+                       totals.total_rows
+                FROM (
+                    SELECT id, form_slug, form_target, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+                    FROM ' . $table . '
+                    WHERE form_slug = :page_form_slug'
+                    . $pageSearchClause
+                    . ' ORDER BY created_at DESC, id DESC
+                    LIMIT :limit OFFSET :offset
+                ) AS page_rows
+                CROSS JOIN (
+                    SELECT COUNT(*) AS total_rows
+                    FROM ' . $table . '
+                    WHERE form_slug = :count_form_slug'
+                    . $countSearchClause
+                . ') AS totals';
+
+        try {
+            $stmt = $this->db->prepare($sql);
+
+            foreach ($pageParams as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            foreach ($countParams as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+
+            $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
+            $stmt->execute();
+
+            $rows = $stmt->fetchAll() ?: [];
+            $total = 0;
+            $resultRows = [];
+            foreach ($rows as $row) {
+                if ($total === 0) {
+                    $total = (int) ($row['total_rows'] ?? 0);
+                }
+
+                unset($row['total_rows']);
+                $resultRows[] = $row;
+            }
+
+            // Offset can target an empty page while total rows still exist; recover accurate totals.
+            if ($resultRows === [] && $safeOffset > 0) {
+                $total = $this->countByFormSlug($formSlug, $search);
+            }
+
+            return [
+                'rows' => $resultRows,
+                'total' => $total,
+            ];
+        } catch (PDOException $exception) {
+            throw new RuntimeException('Failed to load signup submissions.');
+        }
+    }
+
+    /**
      * Returns all matching signups for CSV export.
      *
      * @return array<int, array<string, mixed>>
@@ -310,21 +399,21 @@ final class WaitlistSignupRepository
      *
      * @param array<string, mixed> $params
      */
-    private function searchClause(string $search, array &$params): string
+    private function searchClause(string $search, array &$params, string $placeholderName = 'search'): string
     {
         $search = strtolower(trim($search));
         if ($search === '') {
             return '';
         }
 
-        $params[':search'] = '%' . $search . '%';
+        $params[':' . $placeholderName] = '%' . $search . '%';
 
         return ' AND (
-                    LOWER(email) LIKE :search
-                    OR LOWER(display_name) LIKE :search
-                    OR LOWER(country) LIKE :search
-                    OR LOWER(COALESCE(additional_fields_json, \'\')) LIKE :search
-                    OR LOWER(COALESCE(source_url, \'\')) LIKE :search
+                    LOWER(email) LIKE :' . $placeholderName . '
+                    OR LOWER(display_name) LIKE :' . $placeholderName . '
+                    OR LOWER(country) LIKE :' . $placeholderName . '
+                    OR LOWER(COALESCE(additional_fields_json, \'\')) LIKE :' . $placeholderName . '
+                    OR LOWER(COALESCE(source_url, \'\')) LIKE :' . $placeholderName . '
                  )';
     }
 
