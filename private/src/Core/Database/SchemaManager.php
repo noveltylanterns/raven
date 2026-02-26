@@ -13,6 +13,7 @@ namespace Raven\Core\Database;
 
 use PDO;
 use Raven\Core\Auth\PanelAccess;
+use RuntimeException;
 
 /**
  * Creates or updates minimal schema required by Raven.
@@ -800,25 +801,23 @@ final class SchemaManager
     }
 
     /**
-     * Ensures Delight Auth schema is present. Uses package SQL when available,
-     * with a fallback compatible minimal schema when dependency files are absent.
+     * Ensures Delight Auth schema is present from installed dependency SQL.
      */
     private function ensureAuthSchema(PDO $authDb, string $driver, string $prefix): void
     {
         if (!$this->authUsersTableExists($authDb, $driver, $prefix)) {
             $schema = $this->loadDelightSchema($driver);
 
-            if ($schema !== null) {
-                // Prefix auth tables in shared-DB modes for namespace isolation.
-                if ($driver !== 'sqlite' && $prefix !== '') {
-                    $schema = $this->applyAuthPrefix($schema, $prefix);
-                }
-
-                $this->executeSqlBatch($authDb, $schema);
-            } else {
-                // Keep local bootstrap resilient even when dependency SQL files are absent.
-                $this->createFallbackAuthSchema($authDb, $driver, $driver === 'sqlite' ? '' : $prefix);
+            if ($schema === null) {
+                throw new RuntimeException('Delight Auth SQL schema files are missing. Install composer dependencies before bootstrap.');
             }
+
+            // Prefix auth tables in shared-DB modes for namespace isolation.
+            if ($driver !== 'sqlite' && $prefix !== '') {
+                $schema = $this->applyAuthPrefix($schema, $prefix);
+            }
+
+            $this->executeSqlBatch($authDb, $schema);
         }
 
         // Profile columns are required by User Preferences and may be missing
@@ -2188,160 +2187,4 @@ final class SchemaManager
             || str_contains($message, 'relation') && str_contains($message, 'exists');
     }
 
-    /**
-     * Fallback auth schema used when dependency SQL files are unavailable.
-     */
-    private function createFallbackAuthSchema(PDO $db, string $driver, string $prefix): void
-    {
-        if ($driver === 'sqlite') {
-            // Fallback mirrors Delight auth core table layout closely enough for wrapper usage.
-            $db->exec('CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email VARCHAR(249) NOT NULL UNIQUE,
-                password VARCHAR(255) NOT NULL,
-                username VARCHAR(100) NULL,
-                status INTEGER NOT NULL DEFAULT 0,
-                verified INTEGER NOT NULL DEFAULT 0,
-                resettable INTEGER NOT NULL DEFAULT 1,
-                roles_mask INTEGER NOT NULL DEFAULT 0,
-                registered INTEGER NOT NULL,
-                last_login INTEGER NULL,
-                force_logout INTEGER NOT NULL DEFAULT 0
-            )');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS users_confirmations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                email VARCHAR(249) NOT NULL,
-                selector VARCHAR(16) NOT NULL,
-                token VARCHAR(255) NOT NULL,
-                expires INTEGER NOT NULL
-            )');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS users_remembered (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user INTEGER NOT NULL,
-                selector VARCHAR(24) NOT NULL,
-                token VARCHAR(255) NOT NULL,
-                expires INTEGER NOT NULL
-            )');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS users_resets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user INTEGER NOT NULL,
-                selector VARCHAR(20) NOT NULL,
-                token VARCHAR(255) NOT NULL,
-                expires INTEGER NOT NULL
-            )');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS users_throttling (
-                bucket VARCHAR(44) PRIMARY KEY,
-                tokens FLOAT NOT NULL,
-                replenished_at INTEGER NOT NULL,
-                expires_at INTEGER NOT NULL
-            )');
-
-            return;
-        }
-
-        $usersTable = $prefix . 'users';
-
-        if ($driver === 'mysql') {
-            // Use InnoDB + utf8mb4 for broad compatibility with existing app tables.
-            $db->exec('CREATE TABLE IF NOT EXISTS ' . $usersTable . ' (
-                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                email VARCHAR(249) NOT NULL UNIQUE,
-                password VARCHAR(255) NOT NULL,
-                username VARCHAR(100) NULL,
-                status INT UNSIGNED NOT NULL DEFAULT 0,
-                verified TINYINT(1) NOT NULL DEFAULT 0,
-                resettable TINYINT(1) NOT NULL DEFAULT 1,
-                roles_mask INT UNSIGNED NOT NULL DEFAULT 0,
-                registered INT UNSIGNED NOT NULL,
-                last_login INT UNSIGNED NULL,
-                force_logout INT UNSIGNED NOT NULL DEFAULT 0
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'users_confirmations (
-                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                user_id BIGINT UNSIGNED NOT NULL,
-                email VARCHAR(249) NOT NULL,
-                selector VARCHAR(16) NOT NULL,
-                token VARCHAR(255) NOT NULL,
-                expires INT UNSIGNED NOT NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'users_remembered (
-                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                user BIGINT UNSIGNED NOT NULL,
-                selector VARCHAR(24) NOT NULL,
-                token VARCHAR(255) NOT NULL,
-                expires INT UNSIGNED NOT NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'users_resets (
-                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                user BIGINT UNSIGNED NOT NULL,
-                selector VARCHAR(20) NOT NULL,
-                token VARCHAR(255) NOT NULL,
-                expires INT UNSIGNED NOT NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'users_throttling (
-                bucket VARCHAR(44) PRIMARY KEY,
-                tokens DOUBLE NOT NULL,
-                replenished_at INT UNSIGNED NOT NULL,
-                expires_at INT UNSIGNED NOT NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-
-            return;
-        }
-
-        // PostgreSQL fallback schema.
-        $db->exec('CREATE TABLE IF NOT EXISTS ' . $usersTable . ' (
-            id BIGSERIAL PRIMARY KEY,
-            email VARCHAR(249) NOT NULL UNIQUE,
-            password VARCHAR(255) NOT NULL,
-            username VARCHAR(100) NULL,
-            status BIGINT NOT NULL DEFAULT 0,
-            verified SMALLINT NOT NULL DEFAULT 0,
-            resettable SMALLINT NOT NULL DEFAULT 1,
-            roles_mask BIGINT NOT NULL DEFAULT 0,
-            registered BIGINT NOT NULL,
-            last_login BIGINT NULL,
-            force_logout BIGINT NOT NULL DEFAULT 0
-        )');
-
-        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'users_confirmations (
-            id BIGSERIAL PRIMARY KEY,
-            user_id BIGINT NOT NULL,
-            email VARCHAR(249) NOT NULL,
-            selector VARCHAR(16) NOT NULL,
-            token VARCHAR(255) NOT NULL,
-            expires BIGINT NOT NULL
-        )');
-
-        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'users_remembered (
-            id BIGSERIAL PRIMARY KEY,
-            user BIGINT NOT NULL,
-            selector VARCHAR(24) NOT NULL,
-            token VARCHAR(255) NOT NULL,
-            expires BIGINT NOT NULL
-        )');
-
-        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'users_resets (
-            id BIGSERIAL PRIMARY KEY,
-            user BIGINT NOT NULL,
-            selector VARCHAR(20) NOT NULL,
-            token VARCHAR(255) NOT NULL,
-            expires BIGINT NOT NULL
-        )');
-
-        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'users_throttling (
-            bucket VARCHAR(44) PRIMARY KEY,
-            tokens DOUBLE PRECISION NOT NULL,
-            replenished_at BIGINT NOT NULL,
-            expires_at BIGINT NOT NULL
-        )');
-    }
 }

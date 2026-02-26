@@ -12,9 +12,10 @@ declare(strict_types=1);
 namespace Raven\Core\Auth;
 
 use PDO;
+use RuntimeException;
 
 /**
- * Authentication facade that prefers Delight Auth when available, and exposes
+ * Authentication facade backed by Delight Auth, and exposes
  * Raven group/permission helpers used by panel authorization gates.
  */
 final class AuthService
@@ -31,8 +32,8 @@ final class AuthService
     /** Table prefix for mysql/pgsql modes. */
     private string $prefix;
 
-    /** Delight Auth instance, when dependency is installed. */
-    private mixed $auth = null;
+    /** Delight Auth instance. */
+    private mixed $auth;
 
     /**
      * Request-local cache for user group lookups.
@@ -78,48 +79,27 @@ final class AuthService
     /**
      * Attempts credential login using username as the login identifier.
      *
-     * For Delight Auth, this method resolves username -> email first because
-     * the package's `login` method authenticates by email. In fallback mode,
-     * it verifies credentials directly against username.
+     * Delight Auth `login` authenticates by email, so username is resolved to
+     * email before login call.
      *
      * @return array{ok: bool, message: string}
      */
     public function attemptLoginByUsername(string $username, string $password): array
     {
-        if ($this->auth !== null) {
-            try {
-                $email = $this->emailByUsername($username);
+        try {
+            $email = $this->emailByUsername($username);
 
-                if ($email === null) {
-                    return ['ok' => false, 'message' => 'Invalid credentials.'];
-                }
-
-                // Delight Auth requires email for login; we resolved it by username.
-                $this->auth->login($email, $password);
-                return ['ok' => true, 'message' => 'Login successful.'];
-            } catch (\Throwable) {
-                // Keep login errors generic so auth backend details are not disclosed to users.
+            if ($email === null) {
                 return ['ok' => false, 'message' => 'Invalid credentials.'];
             }
-        }
 
-        // Fallback login if Delight package cannot be loaded in this environment.
-        $stmt = $this->authDb->prepare(
-            'SELECT id, password
-             FROM ' . $this->authTable('users') . '
-             WHERE username = :username
-             LIMIT 1'
-        );
-        $stmt->execute([':username' => $username]);
-        $row = $stmt->fetch();
-
-        if (!$row || !password_verify($password, (string) $row['password'])) {
+            // Delight Auth requires email for login; we resolved it by username.
+            $this->auth->login($email, $password);
+            return ['ok' => true, 'message' => 'Login successful.'];
+        } catch (\Throwable) {
+            // Keep login errors generic so auth backend details are not disclosed to users.
             return ['ok' => false, 'message' => 'Invalid credentials.'];
         }
-
-        $_SESSION['raven_user_id'] = (int) $row['id'];
-
-        return ['ok' => true, 'message' => 'Login successful (fallback mode).'];
     }
 
     /**
@@ -409,15 +389,8 @@ final class AuthService
      */
     public function logout(): void
     {
-        if ($this->auth !== null) {
-            $this->auth->logOut();
-            // Clear panel identity cache used by shared layout headings.
-            unset($_SESSION['raven_panel_identity']);
-            $this->clearPermissionCaches();
-            return;
-        }
-
-        unset($_SESSION['raven_user_id']);
+        $this->auth->logOut();
+        // Clear panel identity cache used by shared layout headings.
         unset($_SESSION['raven_panel_identity']);
         $this->clearPermissionCaches();
     }
@@ -427,11 +400,7 @@ final class AuthService
      */
     public function isLoggedIn(): bool
     {
-        if ($this->auth !== null) {
-            return $this->auth->isLoggedIn();
-        }
-
-        return isset($_SESSION['raven_user_id']) && (int) $_SESSION['raven_user_id'] > 0;
+        return $this->auth->isLoggedIn();
     }
 
     /**
@@ -443,11 +412,8 @@ final class AuthService
             return null;
         }
 
-        if ($this->auth !== null) {
-            return (int) $this->auth->getUserId();
-        }
-
-        return (int) ($_SESSION['raven_user_id'] ?? 0);
+        $userId = (int) $this->auth->getUserId();
+        return $userId > 0 ? $userId : null;
     }
 
     /**
@@ -599,7 +565,6 @@ final class AuthService
         ];
 
         if ($password !== null && $password !== '') {
-            // Persist modern password hash for both Delight and fallback modes.
             $fields[] = 'password = :password';
             $params[':password'] = password_hash($password, PASSWORD_DEFAULT);
         }
@@ -1003,12 +968,12 @@ final class AuthService
     }
 
     /**
-     * Initializes Delight Auth object when class is present.
+     * Initializes Delight Auth object.
      */
     private function bootstrapDelightAuth(): void
     {
         if (!class_exists('Delight\\Auth\\Auth')) {
-            return;
+            throw new RuntimeException('Delight Auth dependency is missing. Install composer dependencies before running Raven.');
         }
 
         try {
@@ -1018,8 +983,8 @@ final class AuthService
             } else {
                 $this->auth = new \Delight\Auth\Auth($this->authDb);
             }
-        } catch (\Throwable) {
-            $this->auth = null;
+        } catch (\Throwable $exception) {
+            throw new RuntimeException('Failed to initialize Delight Auth runtime.', 0, $exception);
         }
     }
 }
