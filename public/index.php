@@ -238,6 +238,14 @@ $router->add('GET', '/', static function () use ($controller): void {
 // - extensionDirectory: enabled extension folder name
 $enabledPublicExtensions = ExtensionRegistry::enabledDirectories((string) ($app['root'] ?? dirname(__DIR__)), true);
 foreach ($enabledPublicExtensions as $extensionName) {
+    $manifest = ExtensionRegistry::readManifest((string) ($app['root'] ?? dirname(__DIR__)), $extensionName);
+    if (is_array($manifest)) {
+        $type = strtolower(trim((string) ($manifest['type'] ?? 'basic')));
+        if ($type === 'helper') {
+            continue;
+        }
+    }
+
     $routesFile = $app['root'] . '/private/ext/' . $extensionName . '/public_routes.php';
     if (!is_file($routesFile)) {
         continue;

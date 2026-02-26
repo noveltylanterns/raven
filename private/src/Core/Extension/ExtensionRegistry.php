@@ -145,7 +145,7 @@ final class ExtensionRegistry
         }
 
         $type = strtolower(trim((string) ($decoded['type'] ?? 'basic')));
-        if (!in_array($type, ['basic', 'system'], true)) {
+        if (!in_array($type, ['basic', 'system', 'helper'], true)) {
             $type = 'basic';
         }
 
@@ -156,6 +156,12 @@ final class ExtensionRegistry
 
         $panelSection = strtolower(trim((string) ($decoded['panel_section'] ?? '')));
         if ($panelSection !== '' && preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $panelSection) !== 1) {
+            $panelSection = '';
+        }
+
+        if ($type === 'helper') {
+            // Helper extensions are intentionally non-routable/invisible in panel nav.
+            $panelPath = '';
             $panelSection = '';
         }
 

@@ -50,7 +50,7 @@ Last updated: 2026-02-26
 - Optional fields commonly used:
 - `version` (string)
 - `description` (string)
-- `type` (`basic` or `system`; `system` routes/nav are treated like System-category tools)
+- `type` (`basic`, `system`, or `helper`; `system` routes/nav are treated like System-category tools, `helper` is non-routable/invisible)
 - `author` (string; displayed in Extension Manager)
 - `homepage` (URL; used for Extension Manager author links)
 - `panel_path` (string path segment used for Extensions nav link target)
@@ -61,6 +61,7 @@ Last updated: 2026-02-26
 ## Extension Type And Nav Placement
 - `type: "basic"` extensions are extension-category tools and can appear under the panel `Extensions` nav category.
 - `type: "system"` extensions are treated as System-category tools and are listed alphabetically in `System`.
+- `type: "helper"` extensions are non-routable helper modules; they do not appear in panel nav and should not expose panel/public routes/views.
 - System-category extension links require `Manage System Configuration`; unauthorized users must not see or access them.
 - Basic extension panel pages enforce the extension's configured permission mask from `private/ext/.state.php` (`permissions` map).
 
@@ -202,7 +203,10 @@ Last updated: 2026-02-26
 - Exception: captcha provider scripts (`hcaptcha`/`recaptcha`) are allowed only for public-facing forms that actually render captcha widgets.
 
 ## Extension Upload/Packaging Rules
-- Extension Manager can generate a new extension scaffold directly in `private/ext/{name}/` (starter `extension.json`, `panel_routes.php`, and `views/panel_index.php`; generated header card pulls version/author/description/docs URL from `extension.json`).
+- Extension Manager can generate a new extension scaffold directly in `private/ext/{name}/`:
+- helper scaffold: `extension.json`, `bootstrap.php`, `schema.php`, `shortcodes.php`
+- basic/system scaffold: `extension.json`, `bootstrap.php`, `panel_routes.php`, `public_routes.php`, `schema.php`, `shortcodes.php`, `views/panel_index.php`
+- generated header card pulls version/author/description/docs URL from `extension.json`.
 - The same modal can optionally generate `private/ext/{name}/AGENTS.md` with extension-local guidance and a backlink to this file for missing/global context.
 - Uploads are ZIP-only through Extension Manager.
 - ZIP upload size limit is 50MB.

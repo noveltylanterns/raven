@@ -156,6 +156,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                             <select id="extension_type" name="type" class="form-select">
                                 <option value="basic" selected>basic</option>
                                 <option value="system">system</option>
+                                <option value="helper">helper</option>
                             </select>
                         </div>
                         <div class="col-md-4">
@@ -180,28 +181,6 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                 placeholder="Team or company"
                             >
                         </div>
-                        <div class="col-md-6">
-                            <label for="extension_panel_path" class="form-label">Panel Path</label>
-                            <input
-                                id="extension_panel_path"
-                                type="text"
-                                name="panel_path"
-                                class="form-control"
-                                maxlength="120"
-                                placeholder="my-extension"
-                            >
-                        </div>
-                        <div class="col-md-6">
-                            <label for="extension_panel_section" class="form-label">Panel Section</label>
-                            <input
-                                id="extension_panel_section"
-                                type="text"
-                                name="panel_section"
-                                class="form-control"
-                                maxlength="64"
-                                placeholder="my_extension"
-                            >
-                        </div>
                         <div class="col-12">
                             <label for="extension_homepage" class="form-label">Homepage URL</label>
                             <input
@@ -224,7 +203,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                 placeholder="Describe what this extension does."
                             ></textarea>
                             <div class="form-text">
-                                Generates <code>extension.json</code>, <code>panel_routes.php</code>, and <code>views/panel_index.php</code>.
+                                Generates <code>extension.json</code>, <code>bootstrap.php</code>, <code>schema.php</code>, and <code>shortcodes.php</code>. Non-helper types also generate <code>panel_routes.php</code>, <code>public_routes.php</code>, and <code>views/panel_index.php</code>.
                             </div>
                         </div>
                         <div class="col-12">

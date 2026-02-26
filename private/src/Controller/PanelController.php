@@ -3335,7 +3335,7 @@ final class PanelController
         }
 
         $type = strtolower(trim($this->input->text($post['type'] ?? null, 20)));
-        if (!in_array($type, ['basic', 'system'], true)) {
+        if (!in_array($type, ['basic', 'system', 'helper'], true)) {
             $type = 'basic';
         }
 
@@ -3364,25 +3364,8 @@ final class PanelController
             $homepage = $homepageRaw;
         }
 
-        $panelPath = strtolower(trim($this->input->text($post['panel_path'] ?? null, 120)));
-        if ($panelPath === '') {
-            $panelPath = $extensionName;
-        }
-        if (preg_match('/^[a-z0-9][a-z0-9_\/-]*$/', $panelPath) !== 1) {
-            $this->flash('error', 'Panel path may contain only letters, numbers, underscores, slashes, and dashes.');
-            redirect($this->panelUrl('/extensions'));
-        }
-
-        $panelSection = strtolower(trim($this->input->text($post['panel_section'] ?? null, 64)));
-        if ($panelSection === '') {
-            $panelSectionSeed = str_replace('/', '_', $panelPath);
-            $panelSection = preg_replace('/[^a-z0-9_-]+/', '_', $panelSectionSeed) ?? '';
-            $panelSection = trim($panelSection, '_-');
-        }
-        if ($panelSection === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $panelSection) !== 1) {
-            $this->flash('error', 'Panel section must use lowercase letters, numbers, underscores, or dashes.');
-            redirect($this->panelUrl('/extensions'));
-        }
+        $panelPath = $extensionName;
+        $panelSection = $extensionName;
         $generateAgentsFile = isset($post['generate_agents']) && (string) $post['generate_agents'] === '1';
 
         try {
@@ -3431,10 +3414,23 @@ final class PanelController
             redirect($this->panelUrl('/extensions'));
         }
 
+        $createdFiles = ['extension.json', 'bootstrap.php', 'schema.php', 'shortcodes.php'];
+        if ($type !== 'helper') {
+            $createdFiles = array_merge($createdFiles, ['panel_routes.php', 'public_routes.php', 'views/panel_index.php']);
+        }
+        $createdList = $createdFiles[0] ?? 'extension.json';
+        if (count($createdFiles) === 2) {
+            $createdList = $createdFiles[0] . ' and ' . $createdFiles[1];
+        } elseif (count($createdFiles) > 2) {
+            $createdList = implode(', ', array_slice($createdFiles, 0, -1))
+                . ', and '
+                . $createdFiles[count($createdFiles) - 1];
+        }
+
         $this->flash(
             'success',
             'Extension scaffold created at private/ext/' . $extensionName
-            . '/ with extension.json, panel_routes.php, and views/panel_index.php'
+            . '/ with ' . $createdList
             . ($generateAgentsFile ? ', plus AGENTS.md.' : '.')
         );
         redirect($this->panelUrl('/extensions'));
@@ -6863,7 +6859,11 @@ final class PanelController
             $extensions[] = [
                 'directory' => $entry,
                 'type' => (string) ($manifest['type'] ?? 'basic'),
-                'panel_path' => $manifest['panel_path'] !== '' ? $manifest['panel_path'] : $entry,
+                'panel_path' => (
+                    ((string) ($manifest['type'] ?? 'basic')) === 'helper'
+                        ? ''
+                        : ($manifest['panel_path'] !== '' ? $manifest['panel_path'] : $entry)
+                ),
                 'name' => $manifest['name'] !== '' ? $manifest['name'] : $entry,
                 'version' => $manifest['version'],
                 'description' => $manifest['description'],
@@ -6984,8 +6984,11 @@ final class PanelController
         }
 
         $type = strtolower(trim((string) ($decoded['type'] ?? 'basic')));
-        if (!in_array($type, ['basic', 'system'], true)) {
+        if (!in_array($type, ['basic', 'system', 'helper'], true)) {
             $type = 'basic';
+        }
+        if ($type === 'helper') {
+            $panelPath = '';
         }
 
         $author = $this->input->text((string) ($decoded['author'] ?? ''), 120);
@@ -7408,35 +7411,64 @@ final class PanelController
      */
     private function createExtensionSkeleton(string $extensionPath, array $meta, bool $generateAgentsFile = false): void
     {
+        $type = strtolower(trim((string) ($meta['type'] ?? 'basic')));
+        $isHelperType = $type === 'helper';
         if (!mkdir($extensionPath, 0700, true) && !is_dir($extensionPath)) {
             throw new \RuntimeException('Failed to create extension directory.');
         }
 
         $viewsPath = $extensionPath . '/views';
-        if (!mkdir($viewsPath, 0700, true) && !is_dir($viewsPath)) {
+        if (!$isHelperType && !mkdir($viewsPath, 0700, true) && !is_dir($viewsPath)) {
             throw new \RuntimeException('Failed to create extension views directory.');
         }
 
         $manifestPath = $extensionPath . '/extension.json';
+        $bootstrapPath = $extensionPath . '/bootstrap.php';
         $routesPath = $extensionPath . '/panel_routes.php';
+        $publicRoutesPath = $extensionPath . '/public_routes.php';
+        $schemaPath = $extensionPath . '/schema.php';
+        $shortcodesPath = $extensionPath . '/shortcodes.php';
         $panelIndexViewPath = $viewsPath . '/panel_index.php';
         $agentsFilePath = $extensionPath . '/AGENTS.md';
 
         $manifestContent = $this->renderExtensionManifestJson($meta);
-        $routesContent = $this->renderExtensionRoutesSkeleton($meta);
-        $viewContent = $this->renderExtensionPanelViewSkeleton($meta);
+        $bootstrapContent = $this->renderExtensionBootstrapSkeleton($meta);
+        $schemaContent = $this->renderExtensionSchemaSkeleton($meta);
+        $shortcodesContent = $this->renderExtensionShortcodesSkeleton($meta);
         $agentsContent = $this->renderExtensionAgentsSkeleton($meta);
 
         if (file_put_contents($manifestPath, $manifestContent, LOCK_EX) === false) {
             throw new \RuntimeException('Failed to write extension.json.');
         }
 
-        if (file_put_contents($routesPath, $routesContent, LOCK_EX) === false) {
-            throw new \RuntimeException('Failed to write panel_routes.php.');
+        if (file_put_contents($bootstrapPath, $bootstrapContent, LOCK_EX) === false) {
+            throw new \RuntimeException('Failed to write bootstrap.php.');
         }
 
-        if (file_put_contents($panelIndexViewPath, $viewContent, LOCK_EX) === false) {
-            throw new \RuntimeException('Failed to write views/panel_index.php.');
+        if (file_put_contents($schemaPath, $schemaContent, LOCK_EX) === false) {
+            throw new \RuntimeException('Failed to write schema.php.');
+        }
+
+        if (file_put_contents($shortcodesPath, $shortcodesContent, LOCK_EX) === false) {
+            throw new \RuntimeException('Failed to write shortcodes.php.');
+        }
+
+        if (!$isHelperType) {
+            $routesContent = $this->renderExtensionRoutesSkeleton($meta);
+            $publicRoutesContent = $this->renderExtensionPublicRoutesSkeleton($meta);
+            $viewContent = $this->renderExtensionPanelViewSkeleton($meta);
+
+            if (file_put_contents($routesPath, $routesContent, LOCK_EX) === false) {
+                throw new \RuntimeException('Failed to write panel_routes.php.');
+            }
+
+            if (file_put_contents($publicRoutesPath, $publicRoutesContent, LOCK_EX) === false) {
+                throw new \RuntimeException('Failed to write public_routes.php.');
+            }
+
+            if (file_put_contents($panelIndexViewPath, $viewContent, LOCK_EX) === false) {
+                throw new \RuntimeException('Failed to write views/panel_index.php.');
+            }
         }
         if ($generateAgentsFile && file_put_contents($agentsFilePath, $agentsContent, LOCK_EX) === false) {
             throw new \RuntimeException('Failed to write AGENTS.md.');
@@ -7444,10 +7476,16 @@ final class PanelController
 
         // Keep scaffold file modes aligned with private-directory policy.
         @chmod($extensionPath, 0700);
-        @chmod($viewsPath, 0700);
         @chmod($manifestPath, 0600);
-        @chmod($routesPath, 0600);
-        @chmod($panelIndexViewPath, 0600);
+        @chmod($bootstrapPath, 0600);
+        @chmod($schemaPath, 0600);
+        @chmod($shortcodesPath, 0600);
+        if (!$isHelperType) {
+            @chmod($viewsPath, 0700);
+            @chmod($routesPath, 0600);
+            @chmod($publicRoutesPath, 0600);
+            @chmod($panelIndexViewPath, 0600);
+        }
         if ($generateAgentsFile) {
             @chmod($agentsFilePath, 0600);
         }
@@ -7484,8 +7522,11 @@ final class PanelController
             $manifest['homepage'] = $meta['homepage'];
         }
 
-        $manifest['panel_path'] = $meta['panel_path'];
-        $manifest['panel_section'] = $meta['panel_section'];
+        $type = strtolower(trim((string) ($meta['type'] ?? 'basic')));
+        if ($type !== 'helper') {
+            $manifest['panel_path'] = $meta['panel_path'];
+            $manifest['panel_section'] = $meta['panel_section'];
+        }
 
         $encoded = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if (!is_string($encoded) || $encoded === '') {
@@ -7493,6 +7534,65 @@ final class PanelController
         }
 
         return $encoded . "\n";
+    }
+
+    /**
+     * Returns generated `bootstrap.php` scaffold content.
+     *
+     * @param array{
+     *   directory: string,
+     *   name: string
+     * } $meta
+     */
+    private function renderExtensionBootstrapSkeleton(array $meta): string
+    {
+        $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
+        $directoryLiteral = var_export($meta['directory'], true);
+        $content = <<<'PHP'
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/ext/__DIRECTORY__/bootstrap.php
+ * __NAME_DOC__ extension service bootstrap provider.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+/**
+ * Registers extension-owned services into shared app container.
+ *
+ * @param array<string, mixed> $app
+ */
+return static function (array &$app): void {
+    $extensionKey = __DIRECTORY_LITERAL__;
+
+    /** @var mixed $rawExtensionServices */
+    $rawExtensionServices = $app['extension_services'] ?? [];
+    if (!is_array($rawExtensionServices)) {
+        $rawExtensionServices = [];
+    }
+
+    /** @var mixed $rawServices */
+    $rawServices = $rawExtensionServices[$extensionKey] ?? [];
+    if (!is_array($rawServices)) {
+        $rawServices = [];
+    }
+
+    // Register extension services here, for example:
+    // $rawServices['repository'] = new MyRepository(...);
+
+    $rawExtensionServices[$extensionKey] = $rawServices;
+    $app['extension_services'] = $rawExtensionServices;
+};
+PHP;
+
+        return str_replace(
+            ['__DIRECTORY__', '__NAME_DOC__', '__DIRECTORY_LITERAL__'],
+            [$meta['directory'], $nameForDoc, $directoryLiteral],
+            $content
+        ) . "\n";
     }
 
     /**
@@ -7665,6 +7765,155 @@ PHP;
     }
 
     /**
+     * Returns generated `public_routes.php` scaffold content.
+     *
+     * @param array{
+     *   directory: string,
+     *   name: string
+     * } $meta
+     */
+    private function renderExtensionPublicRoutesSkeleton(array $meta): string
+    {
+        $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
+        $content = <<<'PHP'
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/ext/__DIRECTORY__/public_routes.php
+ * __NAME_DOC__ extension public route registration.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+use Raven\Core\Routing\Router;
+
+/**
+ * Registers extension routes into the public router.
+ *
+ * @param array{
+ *   app: array<string, mixed>,
+ *   controller: object,
+ *   input: mixed,
+ *   extensionDirectory: string
+ * } $context
+ */
+return static function (Router $router, array $context): void {
+    // Add public extension routes here. Keep routes extension-owned and avoid core edits.
+    // Example:
+    // $router->add('GET', '/my-extension', static function () use ($context): void { ... });
+};
+PHP;
+
+        return str_replace(
+            ['__DIRECTORY__', '__NAME_DOC__'],
+            [$meta['directory'], $nameForDoc],
+            $content
+        ) . "\n";
+    }
+
+    /**
+     * Returns generated `schema.php` scaffold content.
+     *
+     * @param array{
+     *   directory: string,
+     *   name: string
+     * } $meta
+     */
+    private function renderExtensionSchemaSkeleton(array $meta): string
+    {
+        $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
+        $content = <<<'PHP'
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/ext/__DIRECTORY__/schema.php
+ * __NAME_DOC__ extension schema provider.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+/**
+ * Ensures extension-owned schema changes (tables/columns/indexes).
+ *
+ * @param array<string, mixed> $context
+ */
+return static function (array $context): void {
+    if (
+        !isset($context['db'], $context['driver'], $context['table'])
+        || !$context['db'] instanceof \PDO
+        || !is_callable($context['table'])
+    ) {
+        return;
+    }
+
+    $db = $context['db'];
+    $driver = (string) $context['driver'];
+    $tableResolver = $context['table'];
+
+    // Resolve one logical table to the active backend:
+    // $table = $tableResolver('ext___DIRECTORY__');
+    //
+    // Keep schema operations idempotent. This provider runs on bootstrap/install.
+    //
+    // Example:
+    // if ($driver === 'sqlite') {
+    //     $db->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (...)');
+    // }
+};
+PHP;
+
+        return str_replace(
+            ['__DIRECTORY__', '__NAME_DOC__'],
+            [$meta['directory'], $nameForDoc],
+            $content
+        ) . "\n";
+    }
+
+    /**
+     * Returns generated `shortcodes.php` scaffold content.
+     *
+     * @param array{
+     *   directory: string,
+     *   name: string
+     * } $meta
+     */
+    private function renderExtensionShortcodesSkeleton(array $meta): string
+    {
+        $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
+        $content = <<<'PHP'
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/ext/__DIRECTORY__/shortcodes.php
+ * __NAME_DOC__ extension shortcode provider.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+/**
+ * Returns editor-insertable shortcode entries.
+ *
+ * @return array<int, array{label: string, shortcode: string}>
+ */
+return static function (): array {
+    return [];
+};
+PHP;
+
+        return str_replace(
+            ['__DIRECTORY__', '__NAME_DOC__'],
+            [$meta['directory'], $nameForDoc],
+            $content
+        ) . "\n";
+    }
+
+    /**
      * Returns generated `views/panel_index.php` scaffold content.
      *
      * @param array{
@@ -7727,7 +7976,11 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
             This is the generated starter page for <code><?= e((string) ($extensionMeta['directory'] ?? '')) ?></code>.
         </p>
         <p class="mb-0">
-            Edit <code>private/ext/__DIRECTORY__/panel_routes.php</code> and
+            Edit <code>private/ext/__DIRECTORY__/bootstrap.php</code>,
+            <code>private/ext/__DIRECTORY__/panel_routes.php</code>,
+            <code>private/ext/__DIRECTORY__/public_routes.php</code>,
+            <code>private/ext/__DIRECTORY__/schema.php</code>,
+            <code>private/ext/__DIRECTORY__/shortcodes.php</code>, and
             <code>private/ext/__DIRECTORY__/views/panel_index.php</code> to build this extension.
         </p>
     </div>
@@ -7746,7 +7999,8 @@ PHP;
      *
      * @param array{
      *   name: string,
-     *   directory: string
+     *   directory: string,
+     *   type: string
      * } $meta
      */
     private function renderExtensionAgentsSkeleton(array $meta): string
@@ -7758,6 +8012,22 @@ PHP;
 
         $directory = trim((string) ($meta['directory'] ?? ''));
         $directory = $directory !== '' ? $directory : 'example_extension';
+        $type = strtolower(trim((string) ($meta['type'] ?? 'basic')));
+        $isHelperType = $type === 'helper';
+        $starterFiles = [
+            '- `extension.json`',
+            '- `bootstrap.php`',
+            '- `schema.php`',
+            '- `shortcodes.php`',
+        ];
+        if (!$isHelperType) {
+            $starterFiles = array_merge($starterFiles, [
+                '- `panel_routes.php`',
+                '- `public_routes.php`',
+                '- `views/panel_index.php`',
+            ]);
+        }
+        $starterFilesMarkdown = implode("\n", $starterFiles);
 
         $content = <<<'MARKDOWN'
 # __NAME__ Extension Guide
@@ -7778,9 +8048,7 @@ For Raven-wide extension contracts not restated here, use:
 
 ## Starter Files
 
-- `extension.json`
-- `panel_routes.php`
-- `views/panel_index.php`
+__STARTER_FILES__
 
 ## Update Discipline
 
@@ -7788,8 +8056,8 @@ For Raven-wide extension contracts not restated here, use:
 MARKDOWN;
 
         return str_replace(
-            ['__NAME__', '__DIRECTORY__'],
-            [$name, $directory],
+            ['__NAME__', '__DIRECTORY__', '__STARTER_FILES__'],
+            [$name, $directory, $starterFilesMarkdown],
             $content
         ) . "\n";
     }

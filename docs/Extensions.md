@@ -15,8 +15,12 @@ An extension is a self-contained feature package under:
 At minimum, each extension needs:
 
 - `extension.json` (required manifest)
+- optional `bootstrap.php` (service provider)
+- optional `schema.php` (schema provider)
 - optional `panel_routes.php` (panel route registrar)
-- optional `views/` (extension-owned panel templates)
+- optional `public_routes.php` (public route registrar)
+- optional `shortcodes.php` (page editor shortcode provider)
+- optional `views/` (extension-owned panel templates; panel-routable types only)
 - optional extension-local state files when needed by your extension
 
 ## 2) How Extensions Are Loaded
@@ -26,7 +30,7 @@ Core panel bootstrap (`panel/index.php`) does this:
 1. Reads extension enablement state from `private/ext/.state.php` (or `.state.php.dist` fallback).
 2. Validates extension directory names and manifests.
 3. Builds nav items from manifest fields (`name`, `type`, `panel_path`, `panel_section`).
-4. Loads `panel_routes.php` for enabled, valid extensions.
+4. Loads optional extension providers (`bootstrap.php`, `schema.php`, route registrars) for enabled, valid extensions.
 5. Injects a context object (`app`, `panelUrl`, `requirePanelLogin`, etc.) for route registration.
 
 ## 3) Enablement And Permission Model
@@ -44,6 +48,7 @@ Types:
 
 - `basic`: appears in Extensions nav (when authorized)
 - `system`: appears under System nav and requires system configuration access
+- `helper`: no panel/public routes or views; invisible helper module for internal services
 
 ## 4) Data Boundaries (Important)
 
@@ -99,15 +104,19 @@ Also:
 
 1. Create `private/ext/{slug}/`.
 2. Add `extension.json` first.
-3. Add `panel_routes.php` if panel pages are needed.
-4. Add `views/` templates if needed.
-5. Add extension-local state files only when necessary.
-6. Enable extension in Extension Manager.
-7. Verify permission masks, nav placement, CSRF-protected actions, and failure behavior.
+3. Add `bootstrap.php` and `schema.php` for service/storage behavior.
+4. Add `panel_routes.php` + `views/` only when panel pages are needed.
+5. Add `public_routes.php` only when public endpoints are needed.
+6. Add `shortcodes.php` only when editor shortcode insertion is needed.
+7. Add extension-local state files only when necessary.
+8. Enable extension in Extension Manager.
+9. Verify permission masks, nav placement, CSRF-protected actions, and failure behavior.
 
 Alternative bootstrap path:
 
-- Use Extension Manager -> **Create New Extension** to generate a starter scaffold (`extension.json`, `panel_routes.php`, `views/panel_index.php`), then customize from there.
+- Use Extension Manager -> **Create New Extension** to generate a starter scaffold.
+- `helper`: `extension.json`, `bootstrap.php`, `schema.php`, `shortcodes.php`
+- `basic`/`system`: `extension.json`, `bootstrap.php`, `schema.php`, `panel_routes.php`, `public_routes.php`, `shortcodes.php`, `views/panel_index.php`
 - Optional in that same modal: `Generate AGENTS.md?` to create `private/ext/{slug}/AGENTS.md` with extension-local guidance that points back to [private/ext/AGENTS.md](../private/ext/AGENTS.md) for missing context.
 
 ### Extension Manager Panel Options
@@ -123,11 +132,10 @@ Create modal (`Create New Extension`):
 
 - `Extension Name`
 - `Directory Slug`
+- `Directory Slug` auto-fills panel path and panel section for non-helper extensions
 - `Type`
 - `Version`
 - `Author`
-- `Panel Path`
-- `Panel Section`
 - `Homepage URL`
 - `Description`
 - `Generate AGENTS.md?`
@@ -144,7 +152,7 @@ Common manifest fields:
 - `name` (required)
 - `version`
 - `description`
-- `type` (`basic` or `system`)
+- `type` (`basic`, `system`, or `helper`)
 - `author`
 - `homepage`
 - `panel_path`

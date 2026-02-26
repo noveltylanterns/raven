@@ -402,6 +402,10 @@ $extensionNavItems = [];
 $systemExtensionNavItems = [];
 foreach ($enabledExtensionManifests as $directoryName => $manifest) {
     $type = strtolower(trim((string) ($manifest['type'] ?? 'basic')));
+    $isHelperType = $type === 'helper';
+    if ($isHelperType) {
+        continue;
+    }
     $isSystemType = $type === 'system'
         || !empty($manifest['system_extension']);
     $requiredPermissionBit = (int) ($extensionPermissionState[$directoryName] ?? PanelAccess::PANEL_LOGIN);
@@ -789,6 +793,10 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
         ];
     }
     $type = strtolower(trim((string) ($manifest['type'] ?? 'basic')));
+    $isHelperType = $type === 'helper';
+    if ($isHelperType) {
+        continue;
+    }
     $isSystemType = $type === 'system'
         || !empty($manifest['system_extension']);
     $requiredPermissionBit = (int) ($extensionPermissionState[$extensionName] ?? PanelAccess::PANEL_LOGIN);
