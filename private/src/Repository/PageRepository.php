@@ -344,14 +344,11 @@ final class PageRepository
     public function listAllForRouting(): array
     {
         $pages = $this->table('pages');
-        $channels = $this->table('channels');
 
         $stmt = $this->db->prepare(
-            'SELECT p.id, p.title, p.slug, p.is_published, p.published_at,
-                    c.id AS channel_id, c.slug AS channel_slug, c.name AS channel_name
+            'SELECT p.id, p.title, p.slug, p.is_published, p.published_at, p.channel_id
              FROM ' . $pages . ' p
-             LEFT JOIN ' . $channels . ' c ON c.id = p.channel_id
-             ORDER BY COALESCE(c.slug, \'\') ASC, p.slug ASC, p.id ASC'
+             ORDER BY COALESCE(p.channel_id, 0) ASC, p.slug ASC, p.id ASC'
         );
         $stmt->execute();
 

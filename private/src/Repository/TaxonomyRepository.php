@@ -228,6 +228,188 @@ final class TaxonomyRepository
     }
 
     /**
+     * Returns routing inventory taxonomy data in one query.
+     *
+     * @return array{
+     *   channels: array<int, array{id: int, name: string, slug: string}>,
+     *   categories: array<int, array{id: int, name: string, slug: string}>,
+     *   tags: array<int, array{id: int, name: string, slug: string}>,
+     *   redirects: array<int, array<string, mixed>>
+     * }
+     */
+    public function listRoutingInventoryData(
+        bool $includeCategories = true,
+        bool $includeTags = true,
+        bool $includeRedirects = true
+    ): array {
+        $channels = $this->table('channels');
+        $categories = $this->table('categories');
+        $tags = $this->table('tags');
+        $redirects = $this->table('redirects');
+
+        $parts = [];
+        $parts[] = 'SELECT
+                        \'channel\' AS row_type,
+                        c.id AS option_id,
+                        c.name AS option_name,
+                        c.slug AS option_slug,
+                        NULL AS redirect_id,
+                        NULL AS redirect_title,
+                        NULL AS redirect_description,
+                        NULL AS redirect_slug,
+                        NULL AS redirect_channel_id,
+                        NULL AS redirect_channel_slug,
+                        NULL AS redirect_channel_name,
+                        NULL AS redirect_is_active,
+                        NULL AS redirect_target_url
+                    FROM ' . $channels . ' c';
+
+        if ($includeCategories) {
+            $parts[] = 'SELECT
+                            \'category\' AS row_type,
+                            c.id AS option_id,
+                            c.name AS option_name,
+                            c.slug AS option_slug,
+                            NULL AS redirect_id,
+                            NULL AS redirect_title,
+                            NULL AS redirect_description,
+                            NULL AS redirect_slug,
+                            NULL AS redirect_channel_id,
+                            NULL AS redirect_channel_slug,
+                            NULL AS redirect_channel_name,
+                            NULL AS redirect_is_active,
+                            NULL AS redirect_target_url
+                        FROM ' . $categories . ' c';
+        }
+
+        if ($includeTags) {
+            $parts[] = 'SELECT
+                            \'tag\' AS row_type,
+                            t.id AS option_id,
+                            t.name AS option_name,
+                            t.slug AS option_slug,
+                            NULL AS redirect_id,
+                            NULL AS redirect_title,
+                            NULL AS redirect_description,
+                            NULL AS redirect_slug,
+                            NULL AS redirect_channel_id,
+                            NULL AS redirect_channel_slug,
+                            NULL AS redirect_channel_name,
+                            NULL AS redirect_is_active,
+                            NULL AS redirect_target_url
+                        FROM ' . $tags . ' t';
+        }
+
+        if ($includeRedirects) {
+            $parts[] = 'SELECT
+                            \'redirect\' AS row_type,
+                            NULL AS option_id,
+                            NULL AS option_name,
+                            NULL AS option_slug,
+                            r.id AS redirect_id,
+                            r.title AS redirect_title,
+                            r.description AS redirect_description,
+                            r.slug AS redirect_slug,
+                            r.channel_id AS redirect_channel_id,
+                            c.slug AS redirect_channel_slug,
+                            c.name AS redirect_channel_name,
+                            r.is_active AS redirect_is_active,
+                            r.target_url AS redirect_target_url
+                        FROM ' . $redirects . ' r
+                        LEFT JOIN ' . $channels . ' c ON c.id = r.channel_id';
+        }
+
+        $stmt = $this->db->prepare(
+            'SELECT
+                row_type,
+                option_id,
+                option_name,
+                option_slug,
+                redirect_id,
+                redirect_title,
+                redirect_description,
+                redirect_slug,
+                redirect_channel_id,
+                redirect_channel_slug,
+                redirect_channel_name,
+                redirect_is_active,
+                redirect_target_url
+             FROM (
+                 ' . implode(' UNION ALL ', $parts) . '
+             ) inventory_rows
+             ORDER BY
+                CASE row_type
+                    WHEN \'channel\' THEN 0
+                    WHEN \'category\' THEN 1
+                    WHEN \'tag\' THEN 2
+                    ELSE 3
+                END ASC,
+                option_name ASC,
+                option_id ASC,
+                redirect_id ASC'
+        );
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $result = [
+            'channels' => [],
+            'categories' => [],
+            'tags' => [],
+            'redirects' => [],
+        ];
+
+        foreach ($rows as $row) {
+            $rowType = strtolower(trim((string) ($row['row_type'] ?? '')));
+            if ($rowType === 'redirect') {
+                $redirectId = (int) ($row['redirect_id'] ?? 0);
+                $redirectSlug = trim((string) ($row['redirect_slug'] ?? ''));
+                if ($redirectId <= 0 || $redirectSlug === '') {
+                    continue;
+                }
+
+                $result['redirects'][] = [
+                    'id' => $redirectId,
+                    'title' => (string) ($row['redirect_title'] ?? ''),
+                    'description' => (string) ($row['redirect_description'] ?? ''),
+                    'slug' => $redirectSlug,
+                    'channel_id' => $row['redirect_channel_id'] !== null ? (int) $row['redirect_channel_id'] : null,
+                    'channel_slug' => (string) ($row['redirect_channel_slug'] ?? ''),
+                    'channel_name' => (string) ($row['redirect_channel_name'] ?? ''),
+                    'is_active' => (int) ($row['redirect_is_active'] ?? 0),
+                    'target_url' => (string) ($row['redirect_target_url'] ?? ''),
+                ];
+                continue;
+            }
+
+            $id = (int) ($row['option_id'] ?? 0);
+            $slug = trim((string) ($row['option_slug'] ?? ''));
+            if ($id <= 0 || $slug === '') {
+                continue;
+            }
+
+            $entry = [
+                'id' => $id,
+                'name' => (string) ($row['option_name'] ?? ''),
+                'slug' => $slug,
+            ];
+
+            if ($rowType === 'channel') {
+                $result['channels'][] = $entry;
+                continue;
+            }
+            if ($rowType === 'category') {
+                $result['categories'][] = $entry;
+                continue;
+            }
+            if ($rowType === 'tag') {
+                $result['tags'][] = $entry;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Returns page-editor taxonomy options and assigned category/tag rows in one query.
      *
      * @return array{
@@ -523,6 +705,7 @@ final class TaxonomyRepository
             'channels' => 'taxonomy.channels',
             'categories' => 'taxonomy.categories',
             'tags' => 'taxonomy.tags',
+            'redirects' => 'taxonomy.redirects',
             'shortcodes' => 'taxonomy.shortcodes',
             default => 'main.' . $table,
         };

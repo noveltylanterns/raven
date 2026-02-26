@@ -8395,18 +8395,48 @@ MARKDOWN;
         $canManageTaxonomy = $this->auth->canManageTaxonomy();
         $canManageUsers = $this->auth->canManageUsers();
         $canManageGroups = $this->auth->canManageGroups();
+        $groupRoutingEnabled = $groupRoutesEnabled && $groupPrefix !== '';
+        $userRoutingEnabled = $profileRoutesEnabled && $profilePrefix !== '';
+        $routingAuthData = $this->users->listRoutingData($groupRoutingEnabled, $userRoutingEnabled);
+        $routingGroups = is_array($routingAuthData['groups'] ?? null) ? $routingAuthData['groups'] : [];
+        $routingUsers = is_array($routingAuthData['users'] ?? null) ? $routingAuthData['users'] : [];
+        $categoryRoutesEnabled = $categoryPrefix !== '';
+        $tagRoutesEnabled = $tagPrefix !== '';
+        $taxonomyRoutingData = $this->taxonomy->listRoutingInventoryData(
+            $categoryRoutesEnabled,
+            $tagRoutesEnabled,
+            true
+        );
+        $channelRoutingOptions = is_array($taxonomyRoutingData['channels'] ?? null)
+            ? $taxonomyRoutingData['channels']
+            : [];
+        $categoryRoutingOptions = is_array($taxonomyRoutingData['categories'] ?? null)
+            ? $taxonomyRoutingData['categories']
+            : [];
+        $tagRoutingOptions = is_array($taxonomyRoutingData['tags'] ?? null)
+            ? $taxonomyRoutingData['tags']
+            : [];
+        $redirectRoutingRows = is_array($taxonomyRoutingData['redirects'] ?? null)
+            ? $taxonomyRoutingData['redirects']
+            : [];
         $pagesForRouting = $this->pages->listAllForRouting();
+        $channelsById = [];
+        foreach ($channelRoutingOptions as $channelOption) {
+            $channelId = (int) ($channelOption['id'] ?? 0);
+            if ($channelId > 0) {
+                $channelsById[$channelId] = [
+                    'slug' => (string) ($channelOption['slug'] ?? ''),
+                    'name' => (string) ($channelOption['name'] ?? ''),
+                ];
+            }
+        }
+        foreach ($pagesForRouting as &$pageForRouting) {
+            $channelId = (int) ($pageForRouting['channel_id'] ?? 0);
+            $pageForRouting['channel_slug'] = (string) ($channelsById[$channelId]['slug'] ?? '');
+            $pageForRouting['channel_name'] = (string) ($channelsById[$channelId]['name'] ?? '');
+        }
+        unset($pageForRouting);
         $channelLandingMap = $this->channelLandingMapFromPagesForRouting($pagesForRouting);
-        $taxonomyRoutingOptions = $this->taxonomy->listRoutingOptions();
-        $channelRoutingOptions = is_array($taxonomyRoutingOptions['channels'] ?? null)
-            ? $taxonomyRoutingOptions['channels']
-            : [];
-        $categoryRoutingOptions = is_array($taxonomyRoutingOptions['categories'] ?? null)
-            ? $taxonomyRoutingOptions['categories']
-            : [];
-        $tagRoutingOptions = is_array($taxonomyRoutingOptions['tags'] ?? null)
-            ? $taxonomyRoutingOptions['tags']
-            : [];
 
         foreach ($channelRoutingOptions as $channel) {
             $channelId = (int) ($channel['id'] ?? 0);
@@ -8487,7 +8517,7 @@ MARKDOWN;
             ];
         }
 
-        if ($categoryPrefix !== '') {
+        if ($categoryRoutesEnabled) {
             foreach ($categoryRoutingOptions as $category) {
                 $categoryId = (int) ($category['id'] ?? 0);
                 $categorySlug = trim((string) ($category['slug'] ?? ''));
@@ -8517,7 +8547,7 @@ MARKDOWN;
             }
         }
 
-        if ($tagPrefix !== '') {
+        if ($tagRoutesEnabled) {
             foreach ($tagRoutingOptions as $tag) {
                 $tagId = (int) ($tag['id'] ?? 0);
                 $tagSlug = trim((string) ($tag['slug'] ?? ''));
@@ -8545,8 +8575,8 @@ MARKDOWN;
             }
         }
 
-        if ($groupRoutesEnabled && $groupPrefix !== '') {
-            foreach ($this->groups->listAll() as $group) {
+        if ($groupRoutingEnabled) {
+            foreach ($routingGroups as $group) {
                 $groupId = (int) ($group['id'] ?? 0);
                 $groupName = trim((string) ($group['name'] ?? ''));
                 if ($groupId <= 0 || $groupName === '') {
@@ -8593,8 +8623,8 @@ MARKDOWN;
             }
         }
 
-        if ($profileRoutesEnabled && $profilePrefix !== '') {
-            foreach ($this->users->listAll() as $user) {
+        if ($userRoutingEnabled) {
+            foreach ($routingUsers as $user) {
                 $userId = (int) ($user['id'] ?? 0);
                 $username = $this->input->username((string) ($user['username'] ?? ''));
                 if ($userId <= 0 || $username === null) {
@@ -8632,7 +8662,7 @@ MARKDOWN;
             }
         }
 
-        foreach ($this->redirects->listAll() as $redirect) {
+        foreach ($redirectRoutingRows as $redirect) {
             $redirectId = (int) ($redirect['id'] ?? 0);
             $redirectSlug = trim((string) ($redirect['slug'] ?? ''));
             if ($redirectId <= 0 || $redirectSlug === '') {
