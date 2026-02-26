@@ -50,9 +50,9 @@ Packagist: [noveltylanterns/raven](https://packagist.org/packages/noveltylantern
 
 ## Roadmap
 
-- **0.8.0 (Current)**: Initial public release with basic panel & extension system.
-- **0.9.0 (Next)**: Expanded theming system.
-- **1.0.0 (Immediate Goal)**: First round UI polish, bug sweep, hardening & optimization.
+- **0.8 (Current)**: Initial public release with basic panel & extension system.
+- **0.9 (Next)**: Expanded theming system.
+- **1.0 (Immediate Goal)**: First round UI polish, bug sweep, hardening & optimization.
 
 
 ## Caveats
