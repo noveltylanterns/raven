@@ -643,13 +643,4 @@ return static function (Router $router, array $context): void {
     $router->add('GET', '/database/externals/jush/{file}', $serveJushAsset);
     $router->add('GET', '/database/externals/jush/modules/{file}', $serveJushModule);
 
-    // Compatibility routes for the direct extension web path form.
-    $router->add('GET', '/ext/database/adminer', $serveAdminerRuntime);
-    $router->add('POST', '/ext/database/adminer', $serveAdminerRuntime);
-    $router->add('GET', '/ext/database/adminer/index.php', $serveAdminerRuntime);
-    $router->add('POST', '/ext/database/adminer/index.php', $serveAdminerRuntime);
-    $router->add('GET', '/ext/database/adminer/asset', $serveAdminerAssetByQuery);
-    $router->add('GET', '/ext/database/adminer/static/{file}', $serveAdminerStatic);
-    $router->add('GET', '/ext/database/externals/jush/{file}', $serveJushAsset);
-    $router->add('GET', '/ext/database/externals/jush/modules/{file}', $serveJushModule);
 };

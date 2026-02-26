@@ -18,9 +18,6 @@ namespace Raven\Core\Auth;
  */
 final class PanelAccess
 {
-    /** Legacy bit used by historical "Manage Own Preferences" capability. */
-    private const LEGACY_MANAGE_SELF_BIT = 32;
-
     /** Allows access to public-site mode frontend routes/content. */
     public const VIEW_PUBLIC_SITE = 128;
 
@@ -121,8 +118,7 @@ final class PanelAccess
      */
     public static function canLoginPanel(int $mask): bool
     {
-        // Backward-compatible support for stored legacy MANAGE_SELF-only masks.
-        return (bool) ($mask & (self::PANEL_LOGIN | self::LEGACY_MANAGE_SELF_BIT));
+        return (bool) ($mask & self::PANEL_LOGIN);
     }
 
     /**

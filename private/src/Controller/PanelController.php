@@ -2508,7 +2508,7 @@ final class PanelController
             return;
         }
 
-        $configSnapshot = $this->migrateMediaFilesizeConfigToKilobytes($this->config->all());
+        $configSnapshot = $this->config->all();
         $configSnapshot = $this->removeSqliteDatabaseFilesConfig($configSnapshot);
         $configSnapshot = $this->ensureTaxonomyRoutePrefixConfig($configSnapshot);
         $configSnapshot = $this->ensurePublicProfileConfig($configSnapshot);
@@ -2560,7 +2560,7 @@ final class PanelController
             redirect($this->configurationUrlForTab($activeConfigTab));
         }
 
-        $currentConfig = $this->migrateMediaFilesizeConfigToKilobytes($this->config->all());
+        $currentConfig = $this->config->all();
         $currentConfig = $this->removeSqliteDatabaseFilesConfig($currentConfig);
         $currentConfig = $this->ensureTaxonomyRoutePrefixConfig($currentConfig);
         $currentConfig = $this->ensurePublicProfileConfig($currentConfig);
@@ -4306,47 +4306,6 @@ final class PanelController
     }
 
     /**
-     * Migrates legacy `*_max_filesize_bytes` config keys to `*_max_filesize_kb`.
-     *
-     * @param array<string, mixed> $config
-     * @return array<string, mixed>
-     */
-    private function migrateMediaFilesizeConfigToKilobytes(array $config): array
-    {
-        $media = $config['media'] ?? null;
-        if (!is_array($media)) {
-            return $config;
-        }
-
-        $targets = ['images', 'avatars'];
-
-        foreach ($targets as $target) {
-            $section = $media[$target] ?? null;
-            if (!is_array($section)) {
-                continue;
-            }
-
-            $hasKilobytes = array_key_exists('max_filesize_kb', $section);
-            $hasLegacyBytes = array_key_exists('max_filesize_bytes', $section);
-
-            if (!$hasKilobytes && $hasLegacyBytes) {
-                $legacyBytes = max(1, (int) $section['max_filesize_bytes']);
-                // Round up so legacy byte values never become more restrictive after migration.
-                $section['max_filesize_kb'] = (int) ceil($legacyBytes / 1024);
-            }
-
-            if ($hasLegacyBytes) {
-                unset($section['max_filesize_bytes']);
-            }
-
-            $media[$target] = $section;
-        }
-
-        $config['media'] = $media;
-        return $config;
-    }
-
-    /**
      * Removes SQLite file map from user-managed config payload.
      *
      * SQLite filenames are core-managed and intentionally not stored in
@@ -4449,8 +4408,7 @@ final class PanelController
         }
 
         if (!array_key_exists('profile_mode', $session)) {
-            $legacyEnabled = (bool) ($session['profiles_enabled'] ?? false);
-            $session['profile_mode'] = $legacyEnabled ? 'public_full' : 'disabled';
+            $session['profile_mode'] = 'disabled';
         } else {
             $rawProfileMode = strtolower(trim((string) ($session['profile_mode'] ?? '')));
             if (!in_array($rawProfileMode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
@@ -4458,8 +4416,6 @@ final class PanelController
             }
             $session['profile_mode'] = $rawProfileMode;
         }
-
-        unset($session['profiles_enabled']);
 
         if (!array_key_exists('cookie_domain', $session)) {
             $session['cookie_domain'] = '';
@@ -4758,7 +4714,7 @@ final class PanelController
     }
 
     /**
-     * Resolves one media max-filesize limit in bytes, with legacy fallback support.
+     * Resolves one media max-filesize limit in bytes.
      */
     private function resolveMediaMaxFilesizeBytes(string $target, int $defaultBytes): int
     {
@@ -4776,8 +4732,7 @@ final class PanelController
             }
         }
 
-        $legacyBytes = (int) $this->config->get('media.' . $target . '.max_filesize_bytes', $defaultBytes);
-        return max(1, $legacyBytes);
+        return max(1, $defaultBytes);
     }
 
     /**
@@ -5443,13 +5398,10 @@ final class PanelController
 
         $requestPath = $normalize($requestPath);
         $configuredPanel = $normalize((string) $this->config->get('panel.path', 'panel'));
-        $legacyPanel = '/panel';
 
         $allowedPaths = [
             $configuredPanel,
             $configuredPanel . '/login',
-            $legacyPanel,
-            $legacyPanel . '/login',
         ];
 
         return in_array($requestPath, $allowedPaths, true);
@@ -6223,15 +6175,7 @@ final class PanelController
     }
 
     /**
-     * Returns legacy updater cache PHP path for one-time fallback reads.
-     */
-    private function legacyUpdaterStateFilePath(): string
-    {
-        return dirname(__DIR__, 2) . '/tmp/updater_state.php';
-    }
-
-    /**
-     * Loads updater state payload from JSON with legacy PHP fallback.
+     * Loads updater state payload from JSON cache.
      *
      * @return array<string, mixed>|null
      */
@@ -6248,23 +6192,7 @@ final class PanelController
                 }
             }
         }
-
-        $legacyPath = $this->legacyUpdaterStateFilePath();
-        if (!is_file($legacyPath)) {
-            return null;
-        }
-
-        if (function_exists('opcache_invalidate')) {
-            @opcache_invalidate($legacyPath, true);
-        }
-
-        /** @var mixed $legacy */
-        $legacy = require $legacyPath;
-        if (!is_array($legacy)) {
-            return null;
-        }
-
-        return $legacy;
+        return null;
     }
 
     /**
@@ -7107,14 +7035,6 @@ final class PanelController
     }
 
     /**
-     * Returns absolute path to extension state template file.
-     */
-    private function extensionsStateTemplateFilePath(): string
-    {
-        return $this->extensionsBasePath() . '/.state.php.dist';
-    }
-
-    /**
      * Ensures extension base directory exists.
      */
     private function ensureExtensionsDirectory(): void
@@ -7157,9 +7077,7 @@ final class PanelController
     private function loadExtensionStateData(): array
     {
         $statePath = $this->extensionsStateFilePath();
-        $templatePath = $this->extensionsStateTemplateFilePath();
-        $sourcePath = is_file($statePath) ? $statePath : $templatePath;
-        if (!is_file($sourcePath)) {
+        if (!is_file($statePath)) {
             return [
                 'enabled' => [],
                 'permissions' => [],
@@ -7167,13 +7085,13 @@ final class PanelController
         }
 
         // Force fresh reads when PHP opcache uses delayed timestamp revalidation.
-        clearstatcache(true, $sourcePath);
+        clearstatcache(true, $statePath);
         if (function_exists('opcache_invalidate')) {
-            @opcache_invalidate($sourcePath, true);
+            @opcache_invalidate($statePath, true);
         }
 
         /** @var mixed $loaded */
-        $loaded = require $sourcePath;
+        $loaded = require $statePath;
         if (!is_array($loaded)) {
             return [
                 'enabled' => [],

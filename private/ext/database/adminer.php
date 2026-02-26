@@ -348,15 +348,6 @@ if (!function_exists('adminer_object')) {
                         }
                     }
 
-                    // Support selection from legacy key names used by some Adminer links.
-                    $selectedLegacy = trim((string) ($_GET['database'] ?? ''));
-                    if ($selectedLegacy !== '') {
-                        $allowed = $GLOBALS['_raven_adminer_sqlite_databases'] ?? [];
-                        if (is_array($allowed) && in_array($selectedLegacy, $allowed, true)) {
-                            return $selectedLegacy;
-                        }
-                    }
-
                     $selectedFromAuth = trim((string) ($_POST['auth']['db'] ?? ''));
                     if ($selectedFromAuth !== '') {
                         $allowed = $GLOBALS['_raven_adminer_sqlite_databases'] ?? [];

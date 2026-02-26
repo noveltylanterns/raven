@@ -1085,8 +1085,6 @@ final class PageRepository
         $rawExtended = (string) ($row['extended'] ?? '');
         $extendedBlocks = $this->decodeExtendedBlocks($rawExtended);
         $row['extended_blocks'] = $extendedBlocks;
-        // Preserve a flat field for compatibility with templates still reading `$page['extended']`.
-        $row['extended'] = $extendedBlocks === [] ? '' : implode("\n\n", $extendedBlocks);
 
         return $row;
     }

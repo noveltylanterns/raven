@@ -50,24 +50,13 @@ if ($requestPath === '/install.php') {
  * Early panel handoff:
  * When the web server routes all requests through this public front
  * controller, forward panel-prefixed URLs into `panel/index.php`.
- *
- * Supports both:
- * - configured panel prefix (`/{panel_path}`)
- * - legacy `/panel` prefix
  */
 $rawConfig = require $configPath;
 $configuredPanelPath = trim((string) ($rawConfig['panel']['path'] ?? 'panel'), '/');
 $configuredPanelPrefix = '/' . $configuredPanelPath;
-$panelPrefixes = array_values(array_unique(array_filter([
-    $configuredPanelPath !== '' ? $configuredPanelPrefix : null,
-    '/panel',
-])));
-
-foreach ($panelPrefixes as $panelPrefix) {
-    if ($requestPath === $panelPrefix || str_starts_with($requestPath, $panelPrefix . '/')) {
-        require dirname(__DIR__) . '/panel/index.php';
-        exit;
-    }
+if ($configuredPanelPath !== '' && ($requestPath === $configuredPanelPrefix || str_starts_with($requestPath, $configuredPanelPrefix . '/'))) {
+    require dirname(__DIR__) . '/panel/index.php';
+    exit;
 }
 
 $app = require dirname(__DIR__) . '/private/bootstrap.php';

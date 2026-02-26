@@ -31,9 +31,10 @@ Last updated: 2026-02-18
 - State structure:
 - `enabled`: `{extension_directory => true}`
 - `permissions`: `{extension_directory => panel_permission_bit}` for basic extensions
+- Installer seeds `private/ext/.state.php` from `.state.php.dist` during install.
 - Extensions are enabled only when:
 - extension directory exists
-- directory is listed enabled in `.state.php` (or `.state.php.dist` fallback when `.state.php` is missing)
+- directory is listed enabled in `.state.php`
 - extension manifest is valid
 - Stock extensions are disabled by default in `.state.php.dist` unless explicitly changed.
 

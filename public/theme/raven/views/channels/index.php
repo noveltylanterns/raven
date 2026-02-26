@@ -31,12 +31,6 @@ use function Raven\Core\Support\e;
     <div><?= (string) $page['content'] ?></div>
     <?php
     $extendedBlocks = is_array($page['extended_blocks'] ?? null) ? $page['extended_blocks'] : [];
-    if ($extendedBlocks === []) {
-        $fallbackExtended = trim((string) ($page['extended'] ?? ''));
-        if ($fallbackExtended !== '') {
-            $extendedBlocks = [$fallbackExtended];
-        }
-    }
     ?>
     <?php if ($extendedBlocks !== []): ?>
         <?php foreach ($extendedBlocks as $blockIndex => $extendedBlock): ?>

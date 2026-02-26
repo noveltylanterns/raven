@@ -102,12 +102,6 @@ if (is_array($rawExtendedBlocks)) {
         $extendedBlocks[] = $value;
     }
 }
-if ($extendedBlocks === []) {
-    $fallbackExtended = trim((string) ($page['extended'] ?? ''));
-    if ($fallbackExtended !== '') {
-        $extendedBlocks[] = $fallbackExtended;
-    }
-}
 $pageTitle = trim((string) ($page['title'] ?? ''));
 ?>
 <div class="card mb-3">

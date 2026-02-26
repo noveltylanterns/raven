@@ -52,14 +52,9 @@ $panelController = new PanelController(
 
 /**
  * Normalizes request path into panel-internal path.
- *
- * This supports both:
- * - direct `/panel/...` style requests
- * - alias-mounted `/{panel_path}/...` requests
  */
 $requestedPath = request_path();
 $configuredPanelPrefix = '/' . trim((string) $app['config']->get('panel.path', 'panel'), '/');
-$legacyPanelPrefix = '/panel';
 
 $internalPath = $requestedPath;
 
@@ -67,10 +62,6 @@ if ($requestedPath === $configuredPanelPrefix) {
     $internalPath = '/';
 } elseif (str_starts_with($requestedPath, $configuredPanelPrefix . '/')) {
     $internalPath = substr($requestedPath, strlen($configuredPanelPrefix));
-} elseif ($requestedPath === $legacyPanelPrefix) {
-    $internalPath = '/';
-} elseif (str_starts_with($requestedPath, $legacyPanelPrefix . '/')) {
-    $internalPath = substr($requestedPath, strlen($legacyPanelPrefix));
 }
 
 /**
@@ -259,27 +250,22 @@ $extensionPanelPermissionOptions = static function (): array {
 /**
  * Returns enabled extension directory map from `private/ext/.state.php`.
  *
- * Falls back to `private/ext/.state.php.dist` when runtime state file does not
- * exist yet (for example before installer initialization).
- *
  * @return array<string, bool>
  */
 $loadEnabledExtensionState = static function () use ($app): array {
     $statePath = $app['root'] . '/private/ext/.state.php';
-    $templatePath = $app['root'] . '/private/ext/.state.php.dist';
-    $sourcePath = is_file($statePath) ? $statePath : $templatePath;
-    if (!is_file($sourcePath)) {
+    if (!is_file($statePath)) {
         return [];
     }
 
     // Read the latest state immediately after panel toggles.
-    clearstatcache(true, $sourcePath);
+    clearstatcache(true, $statePath);
     if (function_exists('opcache_invalidate')) {
-        @opcache_invalidate($sourcePath, true);
+        @opcache_invalidate($statePath, true);
     }
 
     /** @var mixed $rawState */
-    $rawState = require $sourcePath;
+    $rawState = require $statePath;
     if (!is_array($rawState)) {
         return [];
     }
@@ -314,19 +300,17 @@ $loadEnabledExtensionState = static function () use ($app): array {
  */
 $loadExtensionPermissionState = static function () use ($app, $extensionPanelPermissionOptions): array {
     $statePath = $app['root'] . '/private/ext/.state.php';
-    $templatePath = $app['root'] . '/private/ext/.state.php.dist';
-    $sourcePath = is_file($statePath) ? $statePath : $templatePath;
-    if (!is_file($sourcePath)) {
+    if (!is_file($statePath)) {
         return [];
     }
 
-    clearstatcache(true, $sourcePath);
+    clearstatcache(true, $statePath);
     if (function_exists('opcache_invalidate')) {
-        @opcache_invalidate($sourcePath, true);
+        @opcache_invalidate($statePath, true);
     }
 
     /** @var mixed $rawState */
-    $rawState = require $sourcePath;
+    $rawState = require $statePath;
     if (!is_array($rawState)) {
         return [];
     }

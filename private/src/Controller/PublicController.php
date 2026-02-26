@@ -1181,8 +1181,7 @@ final class PublicController
     {
         $rawBlocks = $page['extended_blocks'] ?? null;
         if (!is_array($rawBlocks)) {
-            $fallback = trim((string) ($page['extended'] ?? ''));
-            $rawBlocks = $fallback !== '' ? [$fallback] : [];
+            $rawBlocks = [];
         }
 
         $renderedBlocks = [];
@@ -1200,7 +1199,6 @@ final class PublicController
         }
 
         $page['extended_blocks'] = $renderedBlocks;
-        $page['extended'] = $renderedBlocks === [] ? '' : implode("\n\n", $renderedBlocks);
         return $page;
     }
 
@@ -2356,14 +2354,12 @@ final class PublicController
     private function isExtensionEnabled(string $extensionName): bool
     {
         $statePath = dirname(__DIR__, 2) . '/ext/.state.php';
-        $templatePath = dirname(__DIR__, 2) . '/ext/.state.php.dist';
-        $sourcePath = is_file($statePath) ? $statePath : $templatePath;
-        if (!is_file($sourcePath)) {
+        if (!is_file($statePath)) {
             return false;
         }
 
         /** @var mixed $state */
-        $state = require $sourcePath;
+        $state = require $statePath;
         if (!is_array($state)) {
             return false;
         }

@@ -363,7 +363,7 @@ final class PageImageManager
     }
 
     /**
-     * Resolves max upload size in bytes with legacy `max_filesize_bytes` fallback.
+     * Resolves max upload size in bytes.
      */
     private function maxUploadFilesizeBytes(): int
     {
@@ -381,7 +381,7 @@ final class PageImageManager
             }
         }
 
-        return max(1, (int) $this->config->get('media.images.max_filesize_bytes', 10485760));
+        return 10485760;
     }
 
     /**
