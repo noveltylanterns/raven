@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Raven\Core\Support;
 
+use RuntimeException;
+
 /**
  * Provides normalized country option labels for signup-related features.
  */
@@ -47,8 +49,7 @@ final class CountryOptions
     {
         $options = self::fromIntlResourceBundle();
         if ($options === []) {
-            // Fallback keeps legacy behavior when ext-intl is unavailable.
-            $options = self::fallbackOptions();
+            throw new RuntimeException('Country options require ext-intl with ICU region data.');
         }
 
         if ($includeOther) {
@@ -108,25 +109,4 @@ final class CountryOptions
         return $options;
     }
 
-    /**
-     * Legacy subset fallback when ICU country data is unavailable at runtime.
-     *
-     * @return array<string, string>
-     */
-    private static function fallbackOptions(): array
-    {
-        return [
-            'us' => 'United States',
-            'ca' => 'Canada',
-            'gb' => 'United Kingdom',
-            'au' => 'Australia',
-            'de' => 'Germany',
-            'fr' => 'France',
-            'in' => 'India',
-            'jp' => 'Japan',
-            'mx' => 'Mexico',
-            'br' => 'Brazil',
-            'za' => 'South Africa',
-        ];
-    }
 }

@@ -42,9 +42,6 @@ final class PanelAccess
     /** Allows system configuration management (Configuration, Extensions, Updates). */
     public const MANAGE_CONFIGURATION = 16;
 
-    /** @deprecated Merged into PANEL_LOGIN for panel minimum access behavior. */
-    public const MANAGE_SELF = self::PANEL_LOGIN;
-
     /**
      * Returns required stock groups.
      *
