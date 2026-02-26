@@ -896,13 +896,17 @@ $router->add('GET', '/routing/export', static function () use ($panelController)
     $panelController->routingExport();
 });
 
-// Update System routes (status check + guarded run scaffold).
+// Update System routes.
 $router->add('GET', '/updates', static function () use ($panelController): void {
     $panelController->updates();
 });
 
 $router->add('POST', '/updates/check', static function () use ($panelController): void {
     $panelController->updatesCheck($_POST);
+});
+
+$router->add('POST', '/updates/dry-run', static function () use ($panelController): void {
+    $panelController->updatesDryRun($_POST);
 });
 
 $router->add('POST', '/updates/run', static function () use ($panelController): void {

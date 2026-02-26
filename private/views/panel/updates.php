@@ -17,6 +17,7 @@ declare(strict_types=1);
 /** @var string|null $flashError */
 /** @var array{
  *   source_key: string,
+ *   custom_repo: string,
  *   source_repo: string,
  *   current_version: string,
  *   current_revision: string,
@@ -39,6 +40,7 @@ $latestVersion = (string) ($updateStatus['latest_version'] ?? '');
 $latestRevision = (string) ($updateStatus['latest_revision'] ?? '');
 $statusMessage = (string) ($updateStatus['message'] ?? '');
 $sourceKey = (string) ($updateStatus['source_key'] ?? '');
+$customRepo = (string) ($updateStatus['custom_repo'] ?? '');
 $localBranch = (string) ($updateStatus['local_branch'] ?? '');
 
 $badgeClass = 'text-bg-secondary';
@@ -52,8 +54,6 @@ if ($status === 'current') {
     $badgeClass = 'text-bg-danger';
 }
 
-$canRunUpdater = $status === 'outdated';
-
 $currentSeries = '<unknown>';
 if (preg_match('/^\s*v?(\d+)\.(\d+)/i', $currentVersion, $currentSeriesMatch) === 1) {
     $currentSeries = $currentSeriesMatch[1] . '.' . $currentSeriesMatch[2];
@@ -63,6 +63,8 @@ $latestSeries = '<unknown>';
 if (preg_match('/^\s*v?(\d+)\.(\d+)/i', $latestVersion, $latestSeriesMatch) === 1) {
     $latestSeries = $latestSeriesMatch[1] . '.' . $latestSeriesMatch[2];
 }
+
+$requiresForceRun = $status !== 'outdated';
 ?>
 <div class="card mb-3">
     <div class="card-body">
@@ -92,6 +94,16 @@ if (preg_match('/^\s*v?(\d+)\.(\d+)/i', $latestVersion, $latestSeriesMatch) === 
                 <?php endforeach; ?>
             </select>
         </div>
+        <div class="mt-2 d-none" id="updater-custom-repo-wrap">
+            <label for="updater-custom-repo" class="form-label mb-1">Custom Git Repo</label>
+            <input
+                id="updater-custom-repo"
+                type="text"
+                class="form-control form-control-sm"
+                value="<?= e($customRepo) ?>"
+                placeholder="https://git.example.com/owner/repo.git or git@example.com:owner/repo.git"
+            >
+        </div>
     </div>
 </div>
 
@@ -99,17 +111,26 @@ if (preg_match('/^\s*v?(\d+)\.(\d+)/i', $latestVersion, $latestSeriesMatch) === 
     <form method="post" action="<?= e($panelBase) ?>/updates/check" class="m-0">
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
+        <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
         <button type="submit" class="btn btn-primary btn-sm">Check for Updates</button>
+    </form>
+
+    <form method="post" action="<?= e($panelBase) ?>/updates/dry-run" class="m-0">
+        <?= $csrfField ?>
+        <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
+        <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
+        <button type="submit" class="btn btn-secondary btn-sm">Dry Run</button>
     </form>
 
     <form method="post" action="<?= e($panelBase) ?>/updates/run" class="m-0">
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
+        <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
+        <input type="hidden" name="force_run" value="0" data-updater-force-run="1">
         <button
             type="submit"
-            class="btn btn-warning btn-sm"
-            <?= $canRunUpdater ? '' : 'disabled' ?>
-            title="<?= $canRunUpdater ? 'Run updater' : 'Updater can run only when a newer revision is detected.' ?>"
+            class="btn btn-warning btn-sm js-updater-run-button"
+            title="Run updater"
         >
             Run Updater
         </button>
@@ -160,22 +181,53 @@ if (preg_match('/^\s*v?(\d+)\.(\d+)/i', $latestVersion, $latestSeriesMatch) === 
     <form method="post" action="<?= e($panelBase) ?>/updates/check" class="m-0">
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
+        <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
         <button type="submit" class="btn btn-primary btn-sm">Check for Updates</button>
+    </form>
+
+    <form method="post" action="<?= e($panelBase) ?>/updates/dry-run" class="m-0">
+        <?= $csrfField ?>
+        <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
+        <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
+        <button type="submit" class="btn btn-secondary btn-sm">Dry Run</button>
     </form>
 
     <form method="post" action="<?= e($panelBase) ?>/updates/run" class="m-0">
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
+        <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
+        <input type="hidden" name="force_run" value="0" data-updater-force-run="1">
         <button
             type="submit"
-            class="btn btn-warning btn-sm"
-            <?= $canRunUpdater ? '' : 'disabled' ?>
-            title="<?= $canRunUpdater ? 'Run updater' : 'Updater can run only when a newer revision is detected.' ?>"
+            class="btn btn-warning btn-sm js-updater-run-button"
+            title="Run updater"
         >
             Run Updater
         </button>
     </form>
 </div>
+
+<?php if ($requiresForceRun): ?>
+    <div class="modal fade" id="updaterForceRunModal" tabindex="-1" aria-labelledby="updaterForceRunModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5 mb-0" id="updaterForceRunModalLabel">Force Run Updater?</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Current status is <strong><?= e(ucfirst($status)) ?></strong>.</p>
+                    <p class="mb-2"><?= e($statusMessage !== '' ? $statusMessage : 'Updater status is not marked as Outdated.') ?></p>
+                    <p class="mb-0 text-danger">Running anyway will fetch upstream, hard-reset tracked files, and clean untracked non-ignored files.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-warning btn-sm" id="updaterForceRunConfirm">Run Updater Anyway</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
 
 <script>
   (function () {
@@ -183,17 +235,102 @@ if (preg_match('/^\s*v?(\d+)\.(\d+)/i', $latestVersion, $latestSeriesMatch) === 
     if (!(sourceSelect instanceof HTMLSelectElement)) {
       return;
     }
+    var customRepoWrap = document.getElementById('updater-custom-repo-wrap');
+    var customRepoInput = document.getElementById('updater-custom-repo');
+    var customRepoKey = '<?= e('custom-git-repo') ?>';
 
     var hiddenInputs = document.querySelectorAll('input[type="hidden"][data-updater-source-key="1"]');
+    var hiddenCustomRepoInputs = document.querySelectorAll('input[type="hidden"][data-updater-custom-repo="1"]');
+    var syncCustomRepoValue = function () {
+      var value = customRepoInput instanceof HTMLInputElement ? customRepoInput.value : '';
+      hiddenCustomRepoInputs.forEach(function (node) {
+        if (node instanceof HTMLInputElement) {
+          node.value = value;
+        }
+      });
+    };
+
+    var syncCustomRepoVisibility = function () {
+      var isCustom = sourceSelect.value === customRepoKey;
+      if (customRepoWrap instanceof HTMLElement) {
+        customRepoWrap.classList.toggle('d-none', !isCustom);
+      }
+      if (customRepoInput instanceof HTMLInputElement) {
+        customRepoInput.disabled = !isCustom;
+      }
+    };
+
     var syncSourceValue = function () {
       hiddenInputs.forEach(function (node) {
         if (node instanceof HTMLInputElement) {
           node.value = sourceSelect.value;
         }
       });
+      syncCustomRepoVisibility();
     };
 
     sourceSelect.addEventListener('change', syncSourceValue);
+    if (customRepoInput instanceof HTMLInputElement) {
+      customRepoInput.addEventListener('input', syncCustomRepoValue);
+      customRepoInput.addEventListener('change', syncCustomRepoValue);
+    }
     syncSourceValue();
+    syncCustomRepoValue();
+
+    var runForms = document.querySelectorAll('form[action$="/updates/run"]');
+    runForms.forEach(function (formNode) {
+      if (!(formNode instanceof HTMLFormElement)) {
+        return;
+      }
+
+      var forceField = formNode.querySelector('input[type="hidden"][data-updater-force-run="1"]');
+      if (forceField instanceof HTMLInputElement) {
+        forceField.value = '0';
+      }
+    });
+
+    <?php if ($requiresForceRun): ?>
+      if (!window.bootstrap || typeof window.bootstrap.Modal !== 'function') {
+        return;
+      }
+
+      var modalNode = document.getElementById('updaterForceRunModal');
+      var confirmButton = document.getElementById('updaterForceRunConfirm');
+      if (!(modalNode instanceof HTMLElement) || !(confirmButton instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      var modal = window.bootstrap.Modal.getOrCreateInstance(modalNode);
+      var pendingRunForm = null;
+      runForms.forEach(function (formNode) {
+        if (!(formNode instanceof HTMLFormElement)) {
+          return;
+        }
+
+        formNode.addEventListener('submit', function (event) {
+          var forceField = formNode.querySelector('input[type="hidden"][data-updater-force-run="1"]');
+          if (forceField instanceof HTMLInputElement && forceField.value === '1') {
+            return;
+          }
+
+          event.preventDefault();
+          pendingRunForm = formNode;
+          modal.show();
+        });
+      });
+
+      confirmButton.addEventListener('click', function () {
+        if (!(pendingRunForm instanceof HTMLFormElement)) {
+          return;
+        }
+
+        var forceField = pendingRunForm.querySelector('input[type="hidden"][data-updater-force-run="1"]');
+        if (forceField instanceof HTMLInputElement) {
+          forceField.value = '1';
+        }
+        modal.hide();
+        pendingRunForm.submit();
+      });
+    <?php endif; ?>
   })();
 </script>

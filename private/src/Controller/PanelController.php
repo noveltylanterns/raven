@@ -41,16 +41,21 @@ final class PanelController
 {
     /** Default updater-source key used by the Update System scaffold. */
     private const UPDATE_SOURCE_DEFAULT = 'github-noveltylanterns-raven';
+    private const UPDATE_SOURCE_CUSTOM = 'custom-git-repo';
+
+    /** Default upstream branch used by updater fetch/reset operations. */
+    private const UPDATE_SOURCE_DEFAULT_BRANCH = 'main';
 
     /**
      * Updater sources keyed for panel dropdown selection.
      *
-     * @var array<string, array{label: string, repo: string, latest_api: string, version_api: string, compare_api: string}>
+     * @var array<string, array{label: string, repo: string, git_url: string, latest_api: string, version_api: string, compare_api: string}>
      */
     private const UPDATE_SOURCES = [
         'github-noveltylanterns-raven' => [
             'label' => 'GitHub: noveltylanterns/raven',
             'repo' => 'https://github.com/noveltylanterns/raven',
+            'git_url' => 'https://github.com/noveltylanterns/raven.git',
             'latest_api' => 'https://api.github.com/repos/noveltylanterns/raven/commits?per_page=1',
             'version_api' => 'https://api.github.com/repos/noveltylanterns/raven/contents/composer.json',
             'compare_api' => 'https://api.github.com/repos/noveltylanterns/raven/compare',
@@ -2656,7 +2661,16 @@ final class PanelController
         }
 
         $sourceKey = $this->input->text((string) ($post['source_key'] ?? ''), 120);
-        $status = $this->checkForUpdates($sourceKey);
+        $customRepo = $this->input->text((string) ($post['custom_repo'] ?? ''), 500);
+        if ($sourceKey === '') {
+            $cachedStatus = $this->loadUpdaterStatus();
+            $sourceKey = (string) ($cachedStatus['source_key'] ?? '');
+            if ($customRepo === '') {
+                $customRepo = (string) ($cachedStatus['custom_repo'] ?? '');
+            }
+        }
+
+        $status = $this->checkForUpdates($sourceKey, $customRepo);
         $statusType = (string) ($status['status'] ?? 'unknown');
 
         if ($statusType === 'current') {
@@ -2673,10 +2687,56 @@ final class PanelController
     }
 
     /**
-     * Runs the updater workflow entrypoint.
+     * Performs updater dry-run preview without changing local files.
      *
-     * This currently enforces safety checks and intentionally stops short of
-     * filesystem replacement until Raven has a validated upstream release flow.
+     * @param array<string, mixed> $post
+     */
+    public function updatesDryRun(array $post): void
+    {
+        $this->requirePanelLogin();
+
+        if (!$this->auth->canManageConfiguration()) {
+            $this->forbidden('Manage System Configuration permission is required for this section.');
+            return;
+        }
+
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flash('error', 'Invalid CSRF token.');
+            redirect($this->panelUrl('/updates'));
+        }
+
+        $sourceKey = $this->input->text((string) ($post['source_key'] ?? ''), 120);
+        $customRepo = $this->input->text((string) ($post['custom_repo'] ?? ''), 500);
+        if ($sourceKey === '') {
+            $cachedStatus = $this->loadUpdaterStatus();
+            $sourceKey = (string) ($cachedStatus['source_key'] ?? '');
+            if ($customRepo === '') {
+                $customRepo = (string) ($cachedStatus['custom_repo'] ?? '');
+            }
+        }
+
+        $source = $this->resolveUpdateSource($sourceKey, $customRepo);
+        if ((string) ($source['error'] ?? '') !== '') {
+            $this->flash('error', (string) $source['error']);
+            redirect($this->panelUrl('/updates'));
+        }
+
+        $dryRun = $this->performUpdaterDryRun(
+            (string) ($source['git_url'] ?? ''),
+            self::UPDATE_SOURCE_DEFAULT_BRANCH
+        );
+
+        if (($dryRun['error'] ?? '') !== '') {
+            $this->flash('error', 'Updater dry run failed: ' . (string) $dryRun['error']);
+            redirect($this->panelUrl('/updates'));
+        }
+
+        $this->flash('success', (string) ($dryRun['summary'] ?? 'Updater dry run completed.'));
+        redirect($this->panelUrl('/updates'));
+    }
+
+    /**
+     * Runs the updater workflow entrypoint.
      *
      * @param array<string, mixed> $post
      */
@@ -2696,27 +2756,54 @@ final class PanelController
 
         // Re-check before run so "current" refusal is based on the latest known upstream state.
         $sourceKey = $this->input->text((string) ($post['source_key'] ?? ''), 120);
+        $customRepo = $this->input->text((string) ($post['custom_repo'] ?? ''), 500);
         if ($sourceKey === '') {
             $cachedStatus = $this->loadUpdaterStatus();
             $sourceKey = (string) ($cachedStatus['source_key'] ?? '');
+            if ($customRepo === '') {
+                $customRepo = (string) ($cachedStatus['custom_repo'] ?? '');
+            }
         }
-        $status = $this->checkForUpdates($sourceKey);
-
-        if ((string) ($status['status'] ?? '') === 'current') {
-            $this->flash('error', 'Updater refused: this install is already current.');
+        $source = $this->resolveUpdateSource($sourceKey, $customRepo);
+        if ((string) ($source['error'] ?? '') !== '') {
+            $this->flash('error', (string) $source['error']);
             redirect($this->panelUrl('/updates'));
         }
 
-        if ((string) ($status['status'] ?? '') !== 'outdated') {
-            $this->flash('error', (string) ($status['message'] ?? 'Unable to determine update status.'));
+        $forceRun = $this->input->text((string) ($post['force_run'] ?? ''), 10) === '1';
+        $status = $this->checkForUpdates($sourceKey, $customRepo);
+        $statusType = strtolower((string) ($status['status'] ?? 'unknown'));
+
+        if ($statusType !== 'outdated' && !$forceRun) {
+            $this->flash(
+                'error',
+                'Updater requires explicit confirmation for this status: '
+                . ($status['message'] ?? 'Unable to determine update state.')
+            );
             redirect($this->panelUrl('/updates'));
         }
 
-        $this->flash(
-            'error',
-            'Updater scaffold is in place, but automatic file replacement is not enabled yet.'
-            . ' This will be activated once Raven upstream publishing and validation are finalized.'
+        $reinstallError = $this->performUpdaterReinstall(
+            (string) ($source['git_url'] ?? ''),
+            self::UPDATE_SOURCE_DEFAULT_BRANCH
         );
+        if ($reinstallError !== null) {
+            $this->flash('error', 'Updater failed: ' . $reinstallError);
+            redirect($this->panelUrl('/updates'));
+        }
+
+        // Refresh updater status after reinstall so panel reflects post-run state.
+        $refreshedStatus = $this->checkForUpdates($sourceKey, $customRepo);
+        $refreshedState = strtolower((string) ($refreshedStatus['status'] ?? 'unknown'));
+        if ($refreshedState === 'current') {
+            $this->flash('success', 'Updater completed successfully. System now matches upstream.');
+        } else {
+            $this->flash(
+                'success',
+                'Updater completed. Current status: ' . ucfirst($refreshedState !== '' ? $refreshedState : 'unknown') . '.'
+            );
+        }
+
         redirect($this->panelUrl('/updates'));
     }
 
@@ -5670,6 +5757,12 @@ final class PanelController
             ];
         }
 
+        $options[] = [
+            'key' => self::UPDATE_SOURCE_CUSTOM,
+            'label' => 'Custom Git Repo',
+            'repo' => '',
+        ];
+
         return $options;
     }
 
@@ -5677,12 +5770,54 @@ final class PanelController
      * Resolves a requested updater source key to a valid source definition.
      *
      * @param string|null $sourceKey
+     * @param string|null $customRepoInput
      *
-     * @return array{key: string, label: string, repo: string, latest_api: string, version_api: string, compare_api: string}
+     * @return array{
+     *   key: string,
+     *   label: string,
+     *   repo: string,
+     *   git_url: string,
+     *   latest_api: string,
+     *   version_api: string,
+     *   compare_api: string,
+     *   custom_repo: string,
+     *   error: string
+     * }
      */
-    private function resolveUpdateSource(?string $sourceKey): array
+    private function resolveUpdateSource(?string $sourceKey, ?string $customRepoInput = null): array
     {
         $normalizedKey = $this->input->text($sourceKey, 120);
+        if ($normalizedKey === self::UPDATE_SOURCE_CUSTOM) {
+            $rawCustomRepo = $this->input->text($customRepoInput, 500);
+            $customRepo = $this->normalizeCustomGitRemote($rawCustomRepo);
+
+            if ($customRepo === null) {
+                return [
+                    'key' => self::UPDATE_SOURCE_CUSTOM,
+                    'label' => 'Custom Git Repo',
+                    'repo' => '',
+                    'git_url' => '',
+                    'latest_api' => '',
+                    'version_api' => '',
+                    'compare_api' => '',
+                    'custom_repo' => $rawCustomRepo,
+                    'error' => 'Custom upstream source must be a valid Git remote URL.',
+                ];
+            }
+
+            return [
+                'key' => self::UPDATE_SOURCE_CUSTOM,
+                'label' => 'Custom Git Repo',
+                'repo' => $customRepo,
+                'git_url' => $customRepo,
+                'latest_api' => '',
+                'version_api' => '',
+                'compare_api' => '',
+                'custom_repo' => $customRepo,
+                'error' => '',
+            ];
+        }
+
         if (!array_key_exists($normalizedKey, self::UPDATE_SOURCES)) {
             $normalizedKey = self::UPDATE_SOURCE_DEFAULT;
         }
@@ -5693,9 +5828,12 @@ final class PanelController
             'key' => $normalizedKey,
             'label' => (string) ($source['label'] ?? ''),
             'repo' => (string) ($source['repo'] ?? ''),
+            'git_url' => (string) ($source['git_url'] ?? ''),
             'latest_api' => (string) ($source['latest_api'] ?? ''),
             'version_api' => (string) ($source['version_api'] ?? ''),
             'compare_api' => (string) ($source['compare_api'] ?? ''),
+            'custom_repo' => '',
+            'error' => '',
         ];
     }
 
@@ -5703,9 +5841,11 @@ final class PanelController
      * Performs a remote update check and persists status for the Updates page.
      *
      * @param string|null $sourceKey
+     * @param string|null $customRepoInput
      *
      * @return array{
      *   source_key: string,
+     *   custom_repo: string,
      *   source_repo: string,
      *   current_version: string,
      *   current_revision: string,
@@ -5717,17 +5857,42 @@ final class PanelController
      *   local_branch: string
      * }
      */
-    private function checkForUpdates(?string $sourceKey = null): array
+    private function checkForUpdates(?string $sourceKey = null, ?string $customRepoInput = null): array
     {
-        $source = $this->resolveUpdateSource($sourceKey);
+        $source = $this->resolveUpdateSource($sourceKey, $customRepoInput);
         $currentVersion = $this->detectLocalComposerVersion() ?? '';
         $currentRevision = $this->detectLocalRevision() ?? '';
-        $latestVersion = $this->fetchLatestRemoteComposerVersion((string) $source['version_api']) ?? '';
-        $latestRevision = $this->fetchLatestRemoteRevision((string) $source['latest_api']);
         $checkedAt = gmdate('Y-m-d H:i:s');
+
+        $latestVersion = '';
+        $latestRevision = null;
+        $remoteRelation = null;
+
+        if ((string) ($source['key'] ?? '') === self::UPDATE_SOURCE_CUSTOM) {
+            $gitSourceState = $this->fetchGitRemoteSourceState(
+                (string) ($source['git_url'] ?? ''),
+                self::UPDATE_SOURCE_DEFAULT_BRANCH
+            );
+            $latestRevision = $gitSourceState['latest_revision'] !== '' ? (string) $gitSourceState['latest_revision'] : null;
+            $remoteRelation = $gitSourceState['relation'] !== '' ? (string) $gitSourceState['relation'] : null;
+            if ($latestRevision === null) {
+                $source['error'] = (string) ($gitSourceState['error'] ?? 'Unable to fetch latest revision from upstream repository.');
+            }
+        } else {
+            $latestVersion = $this->fetchLatestRemoteComposerVersion((string) $source['version_api']) ?? '';
+            $latestRevision = $this->fetchLatestRemoteRevision((string) $source['latest_api']);
+            if ($latestRevision !== null) {
+                $remoteRelation = $this->fetchRemoteRevisionRelationship(
+                    (string) $source['compare_api'],
+                    $latestRevision,
+                    $currentRevision
+                );
+            }
+        }
 
         $status = [
             'source_key' => (string) $source['key'],
+            'custom_repo' => (string) ($source['custom_repo'] ?? ''),
             'source_repo' => (string) $source['repo'],
             'current_version' => $currentVersion,
             'current_revision' => $currentRevision,
@@ -5738,6 +5903,14 @@ final class PanelController
             'checked_at' => $checkedAt,
             'local_branch' => $this->detectLocalBranch() ?? '',
         ];
+
+        if ((string) ($source['error'] ?? '') !== '') {
+            $status['status'] = 'error';
+            $status['message'] = (string) $source['error'];
+            $status['message'] = $this->appendUpdaterLastCheckedSuffix($status['message'], $checkedAt);
+            $this->saveUpdaterStatus($status);
+            return $status;
+        }
 
         if ($latestRevision === null) {
             $status['status'] = 'error';
@@ -5754,12 +5927,6 @@ final class PanelController
             $this->saveUpdaterStatus($status);
             return $status;
         }
-
-        $remoteRelation = $this->fetchRemoteRevisionRelationship(
-            (string) $source['compare_api'],
-            $latestRevision,
-            $currentRevision
-        );
 
         if ($remoteRelation === 'identical') {
             $status['status'] = 'current';
@@ -5824,6 +5991,7 @@ final class PanelController
      *
      * @return array{
      *   source_key: string,
+     *   custom_repo: string,
      *   source_repo: string,
      *   current_version: string,
      *   current_revision: string,
@@ -5837,9 +6005,10 @@ final class PanelController
      */
     private function loadUpdaterStatus(): array
     {
-        $source = $this->resolveUpdateSource(null);
+        $source = $this->resolveUpdateSource(null, null);
         $default = [
             'source_key' => (string) $source['key'],
+            'custom_repo' => (string) ($source['custom_repo'] ?? ''),
             'source_repo' => (string) $source['repo'],
             'current_version' => $this->detectLocalComposerVersion() ?? '',
             'current_revision' => $this->detectLocalRevision() ?? '',
@@ -5863,10 +6032,12 @@ final class PanelController
         }
 
         $sourceKey = $this->input->text((string) ($loaded['source_key'] ?? ''), 120);
-        $source = $this->resolveUpdateSource($sourceKey);
+        $customRepo = $this->input->text((string) ($loaded['custom_repo'] ?? ''), 500);
+        $source = $this->resolveUpdateSource($sourceKey, $customRepo);
 
         $status = [
             'source_key' => (string) $source['key'],
+            'custom_repo' => (string) ($source['custom_repo'] ?? ''),
             'source_repo' => (string) $source['repo'],
             'current_version' => $this->input->text((string) ($loaded['current_version'] ?? ''), 50),
             'current_revision' => $this->input->text((string) ($loaded['current_revision'] ?? ''), 80),
@@ -6058,6 +6229,304 @@ final class PanelController
 
         $message = preg_replace('/\s*\(Last Checked:\s*[^)]+\)\s*$/i', '', $message) ?? $message;
         return $message . ' (Last Checked: ' . $checkedAt . ' UTC)';
+    }
+
+    /**
+     * Normalizes one custom git-remote input and returns canonical URL/token.
+     */
+    private function normalizeCustomGitRemote(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '' || preg_match('/\s/', $value)) {
+            return null;
+        }
+
+        if (preg_match('#^(https?|ssh|git)://#i', $value) === 1) {
+            return $value;
+        }
+
+        if (preg_match('#^git@[^:\s]+:[^\s]+$#', $value) === 1) {
+            return $value;
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolves latest revision + relationship for arbitrary git remotes.
+     *
+     * @return array{latest_revision: string, relation: string, error: string}
+     */
+    private function fetchGitRemoteSourceState(string $gitUrl, string $branch): array
+    {
+        $gitUrl = trim($gitUrl);
+        $branch = trim($branch);
+        if ($gitUrl === '' || $branch === '') {
+            return [
+                'latest_revision' => '',
+                'relation' => '',
+                'error' => 'Custom upstream source must provide both git URL and branch.',
+            ];
+        }
+
+        $latestRevision = '';
+        $output = '';
+
+        // Read remote branch hash directly; works across Git servers.
+        if (!$this->runGitCommand(['ls-remote', '--heads', $gitUrl, 'refs/heads/' . $branch], $output)) {
+            return [
+                'latest_revision' => '',
+                'relation' => '',
+                'error' => 'Unable to query remote branch revision.',
+            ];
+        }
+
+        $lines = array_filter(
+            array_map('trim', explode("\n", $output)),
+            static fn (string $line): bool => $line !== ''
+        );
+        if ($lines === []) {
+            return [
+                'latest_revision' => '',
+                'relation' => '',
+                'error' => 'Remote branch was not found on the configured git source.',
+            ];
+        }
+
+        $firstLine = (string) array_values($lines)[0];
+        $parts = preg_split('/\s+/', $firstLine);
+        if (!is_array($parts) || $parts === []) {
+            return [
+                'latest_revision' => '',
+                'relation' => '',
+                'error' => 'Remote branch revision could not be parsed.',
+            ];
+        }
+
+        $candidate = strtolower(trim((string) ($parts[0] ?? '')));
+        if (!$this->isValidRevisionHash($candidate)) {
+            return [
+                'latest_revision' => '',
+                'relation' => '',
+                'error' => 'Remote branch revision is invalid.',
+            ];
+        }
+        $latestRevision = $candidate;
+
+        // Fetch one depth-limited copy so we can compare ancestry locally.
+        if (!$this->runGitCommand(['fetch', '--prune', '--depth=1', $gitUrl, $branch], $output)) {
+            return [
+                'latest_revision' => $latestRevision,
+                'relation' => '',
+                'error' => 'Remote branch fetched revision could not be compared.',
+            ];
+        }
+
+        $fetchHeadHash = '';
+        if ($this->runGitCommand(['rev-parse', 'FETCH_HEAD'], $output)) {
+            $fetchHeadHash = strtolower(trim($output));
+        }
+
+        if ($fetchHeadHash !== '' && $this->isValidRevisionHash($fetchHeadHash)) {
+            $latestRevision = $fetchHeadHash;
+        }
+
+        $currentRevision = $this->detectLocalRevision() ?? '';
+        if ($currentRevision !== '' && strcasecmp($currentRevision, $latestRevision) === 0) {
+            return [
+                'latest_revision' => $latestRevision,
+                'relation' => 'identical',
+                'error' => '',
+            ];
+        }
+
+        $exitCode = 0;
+        $this->runGitCommand(['merge-base', '--is-ancestor', 'HEAD', 'FETCH_HEAD'], $output, $exitCode);
+        if ($exitCode === 0) {
+            return [
+                'latest_revision' => $latestRevision,
+                'relation' => 'behind',
+                'error' => '',
+            ];
+        }
+
+        $this->runGitCommand(['merge-base', '--is-ancestor', 'FETCH_HEAD', 'HEAD'], $output, $exitCode);
+        if ($exitCode === 0) {
+            return [
+                'latest_revision' => $latestRevision,
+                'relation' => 'ahead',
+                'error' => '',
+            ];
+        }
+
+        return [
+            'latest_revision' => $latestRevision,
+            'relation' => 'diverged',
+            'error' => '',
+        ];
+    }
+
+    /**
+     * Reinstalls tracked project files from upstream while preserving ignored paths.
+     *
+     * This performs:
+     * 1) `git fetch <source> <branch>`
+     * 2) `git reset --hard FETCH_HEAD`
+     * 3) `git clean -fd` (removes untracked non-ignored paths only)
+     */
+    private function performUpdaterReinstall(string $gitUrl, string $branch): ?string
+    {
+        $root = dirname(__DIR__, 3);
+        if (!is_dir($root . '/.git')) {
+            return 'Updater reinstall requires a local Git repository.';
+        }
+
+        $gitUrl = trim($gitUrl);
+        if ($gitUrl === '') {
+            return 'No upstream Git URL is configured for this update source.';
+        }
+
+        $branch = trim($branch);
+        if ($branch === '' || !preg_match('/^[A-Za-z0-9._\\/-]+$/', $branch)) {
+            return 'Updater branch name is invalid.';
+        }
+
+        $output = '';
+        if (!$this->runGitCommand(['fetch', '--prune', '--depth=1', $gitUrl, $branch], $output)) {
+            return 'Failed to fetch upstream branch. ' . $output;
+        }
+
+        if (!$this->runGitCommand(['reset', '--hard', 'FETCH_HEAD'], $output)) {
+            return 'Failed to reset working tree to fetched upstream revision. ' . $output;
+        }
+
+        if (!$this->runGitCommand(['clean', '-fd'], $output)) {
+            return 'Failed to clean untracked non-ignored files. ' . $output;
+        }
+
+        return null;
+    }
+
+    /**
+     * Runs updater dry-run preview and returns one-line summary.
+     *
+     * @return array{summary?: string, error?: string}
+     */
+    private function performUpdaterDryRun(string $gitUrl, string $branch): array
+    {
+        $root = dirname(__DIR__, 3);
+        if (!is_dir($root . '/.git')) {
+            return ['error' => 'Updater dry run requires a local Git repository.'];
+        }
+
+        $gitUrl = trim($gitUrl);
+        if ($gitUrl === '') {
+            return ['error' => 'No upstream Git URL is configured for this update source.'];
+        }
+
+        $branch = trim($branch);
+        if ($branch === '' || !preg_match('/^[A-Za-z0-9._\\/-]+$/', $branch)) {
+            return ['error' => 'Updater branch name is invalid.'];
+        }
+
+        $output = '';
+        if (!$this->runGitCommand(['fetch', '--prune', '--depth=1', $gitUrl, $branch], $output)) {
+            return ['error' => 'Failed to fetch upstream branch. ' . $output];
+        }
+
+        $fetchedRevision = '';
+        if ($this->runGitCommand(['rev-parse', '--short', 'FETCH_HEAD'], $output)) {
+            $fetchedRevision = trim($output);
+        }
+
+        $shortStat = '';
+        if ($this->runGitCommand(['diff', '--shortstat', 'HEAD', 'FETCH_HEAD'], $output)) {
+            $shortStat = trim($output);
+        }
+        if ($shortStat === '') {
+            $shortStat = 'No tracked file changes.';
+        }
+
+        $changedFileCount = 0;
+        if ($this->runGitCommand(['diff', '--name-only', 'HEAD', 'FETCH_HEAD'], $output)) {
+            $lines = array_filter(
+                array_map('trim', explode("\n", $output)),
+                static fn (string $line): bool => $line !== ''
+            );
+            $changedFileCount = count($lines);
+        }
+
+        $cleanCount = 0;
+        $cleanPreview = [];
+        if ($this->runGitCommand(['clean', '-fdn'], $output)) {
+            $lines = array_map('trim', explode("\n", $output));
+            foreach ($lines as $line) {
+                if (!str_starts_with($line, 'Would remove ')) {
+                    continue;
+                }
+
+                $cleanCount++;
+                if (count($cleanPreview) < 3) {
+                    $cleanPreview[] = trim(substr($line, strlen('Would remove ')));
+                }
+            }
+        }
+
+        $summaryParts = ['Dry run complete.'];
+        if ($fetchedRevision !== '') {
+            $summaryParts[] = 'Fetched: ' . $fetchedRevision . '.';
+        }
+        $summaryParts[] = 'Tracked changes: ' . $shortStat;
+        $summaryParts[] = 'Changed files: ' . $changedFileCount . '.';
+        $summaryParts[] = 'Untracked non-ignored removals: ' . $cleanCount . '.';
+
+        if ($cleanPreview !== []) {
+            $summaryParts[] = 'Preview: ' . implode(', ', $cleanPreview) . ($cleanCount > 3 ? ', ...' : '') . '.';
+        }
+
+        return ['summary' => implode(' ', $summaryParts)];
+    }
+
+    /**
+     * Executes one Git command in repository root and returns success/failure.
+     *
+     * @param array<int, string> $arguments
+     */
+    private function runGitCommand(array $arguments, string &$output, ?int &$exitCode = null): bool
+    {
+        $root = dirname(__DIR__, 3);
+        $command = array_merge(['git', '-C', $root], $arguments);
+        $descriptorSpec = [
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $process = @proc_open($command, $descriptorSpec, $pipes);
+        if (!is_resource($process)) {
+            $output = 'Unable to start Git process.';
+            return false;
+        }
+
+        $stdout = '';
+        $stderr = '';
+        if (isset($pipes[1]) && is_resource($pipes[1])) {
+            $stdout = (string) stream_get_contents($pipes[1]);
+            fclose($pipes[1]);
+        }
+        if (isset($pipes[2]) && is_resource($pipes[2])) {
+            $stderr = (string) stream_get_contents($pipes[2]);
+            fclose($pipes[2]);
+        }
+
+        $resultCode = proc_close($process);
+        $combined = trim(trim($stdout) . PHP_EOL . trim($stderr));
+        if (mb_strlen($combined) > 1200) {
+            $combined = mb_substr($combined, 0, 1200);
+        }
+        $output = $combined;
+        $exitCode = $resultCode;
+
+        return $resultCode === 0;
     }
 
     /**
