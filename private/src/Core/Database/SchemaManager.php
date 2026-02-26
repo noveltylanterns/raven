@@ -27,10 +27,6 @@ final class SchemaManager
         // App schema first so auth/group seeding can rely on group tables.
         $this->ensureAppSchema($appDb, $driver, $prefix);
         $this->ensureShortcodeRegistryBackfill($appDb, $driver, $prefix);
-        $this->removeLegacyDebugSettingsStore($appDb, $driver, $prefix);
-        // Consolidate legacy SQLite split files into shared taxonomy/extensions storage.
-        $this->ensureSqliteStorageConsolidation($appDb, $driver);
-        // Incremental column migrations are kept separate for easier backfills.
         $this->ensurePageExtendedColumn($appDb, $driver, $prefix);
         $this->ensurePageDescriptionColumn($appDb, $driver, $prefix);
         $this->ensurePageGalleryEnabledColumn($appDb, $driver, $prefix);
@@ -45,7 +41,6 @@ final class SchemaManager
         $this->ensurePanelPerformanceIndexes($appDb, $driver, $prefix);
         // Auth schema must exist before user/group relationship seeding.
         $this->ensureAuthSchema($authDb, $driver, $prefix);
-        $this->ensureSqliteAuthStorageConsolidation($authDb, $driver);
         $this->ensureStockGroups($appDb, $driver, $prefix);
         $this->ensureSeedPages($appDb, $driver, $prefix);
     }
@@ -893,33 +888,6 @@ final class SchemaManager
         $this->ensureStockGroupId($db, $driver, $prefix, 'banned', 6);
         $this->ensureStockGroupId($db, $driver, $prefix, 'validating', 7);
 
-        // One-time-compatible migration for newly introduced taxonomy bit:
-        // upgrade only groups still on exact historical stock defaults, so
-        // admin-customized masks remain untouched.
-        $legacyMasks = [
-            'super' => 63, // old default before MANAGE_TAXONOMY bit existed
-            'admin' => 39, // old default before MANAGE_TAXONOMY bit existed
-        ];
-        $taxonomyBit = PanelAccess::MANAGE_TAXONOMY;
-
-        $migrate = $db->prepare(
-            'UPDATE ' . $groupsTable . '
-             SET permission_mask = :new_mask
-             WHERE LOWER(slug) = :slug
-               AND is_stock = 1
-               AND permission_mask = :old_mask'
-        );
-
-        foreach ($legacyMasks as $groupSlug => $legacyMask) {
-            $migrate->execute([
-                ':new_mask' => ($legacyMask | $taxonomyBit),
-                ':slug' => $groupSlug,
-                ':old_mask' => $legacyMask,
-            ]);
-        }
-
-        // One-time-compatible migration for public-site access bits:
-        // update only exact historical stock defaults so custom masks persist.
         $stockMaskBySlug = [];
         foreach ($stockGroups as $stockGroup) {
             $slug = strtolower(trim((string) ($stockGroup['slug'] ?? '')));
@@ -931,31 +899,6 @@ final class SchemaManager
             }
 
             $stockMaskBySlug[$slug] = (int) ($stockGroup['permission_mask'] ?? 0);
-        }
-
-        $legacyMasksWithoutSiteViewBits = [
-            'super' => [63, 127, 255, 511],
-            'admin' => [39, 103, 247, 487],
-            'editor' => [35, 163, 419],
-            'user' => [32, 160, 416],
-            'guest' => [0, 128, 160],
-            'validating' => [0, 128, 160],
-            'banned' => [0, 128, 160, 256, 384],
-        ];
-
-        foreach ($legacyMasksWithoutSiteViewBits as $groupSlug => $legacyMasksForGroup) {
-            $targetMask = $stockMaskBySlug[$groupSlug] ?? null;
-            if ($targetMask === null) {
-                continue;
-            }
-
-            foreach ($legacyMasksForGroup as $legacyMask) {
-                $migrate->execute([
-                    ':new_mask' => $targetMask,
-                    ':slug' => $groupSlug,
-                    ':old_mask' => $legacyMask,
-                ]);
-            }
         }
 
         // Super Admin must always carry full panel capability mask.
@@ -1121,33 +1064,13 @@ final class SchemaManager
     }
 
     /**
-     * Renames legacy `excerpt` column to `description` and removes old column.
-     *
-     * For unreleased Raven builds, `description` is the canonical schema name.
+     * Ensures page `description` column exists.
      */
     private function ensurePageDescriptionColumn(PDO $db, string $driver, string $prefix): void
     {
         if ($driver === 'sqlite') {
-            // SQLite migration supports rename + add; drop is version-gated below.
-            $hasDescription = $this->appColumnExistsSqlite($db, 'pages', 'description');
-            $hasExcerpt = $this->appColumnExistsSqlite($db, 'pages', 'excerpt');
-
-            if (!$hasDescription && $hasExcerpt) {
-                $db->exec('ALTER TABLE pages RENAME COLUMN excerpt TO description');
-                return;
-            }
-
-            if (!$hasDescription) {
+            if (!$this->appColumnExistsSqlite($db, 'pages', 'description')) {
                 $db->exec('ALTER TABLE pages ADD COLUMN description TEXT NULL');
-                return;
-            }
-
-            if ($hasExcerpt) {
-                // Keep values if both columns exist from intermediate/dev states.
-                $db->exec('UPDATE pages SET description = excerpt WHERE (description IS NULL OR description = \'\') AND excerpt IS NOT NULL');
-                if ($this->sqliteSupportsDropColumn()) {
-                    $db->exec('ALTER TABLE pages DROP COLUMN excerpt');
-                }
             }
 
             return;
@@ -1156,44 +1079,15 @@ final class SchemaManager
         $pagesTable = $prefix . 'pages';
 
         if ($driver === 'mysql') {
-            // MySQL can rename in-place via CHANGE COLUMN.
-            $hasDescription = $this->appColumnExistsMySql($db, $pagesTable, 'description');
-            $hasExcerpt = $this->appColumnExistsMySql($db, $pagesTable, 'excerpt');
-
-            if (!$hasDescription && $hasExcerpt) {
-                $db->exec('ALTER TABLE ' . $pagesTable . ' CHANGE COLUMN excerpt description TEXT NULL');
-                return;
-            }
-
-            if (!$hasDescription) {
+            if (!$this->appColumnExistsMySql($db, $pagesTable, 'description')) {
                 $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN description TEXT NULL');
-                return;
-            }
-
-            if ($hasExcerpt) {
-                $db->exec('UPDATE ' . $pagesTable . ' SET description = excerpt WHERE (description IS NULL OR description = \'\') AND excerpt IS NOT NULL');
-                $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN excerpt');
             }
 
             return;
         }
 
-        $hasDescription = $this->appColumnExistsPgSql($db, $pagesTable, 'description');
-        $hasExcerpt = $this->appColumnExistsPgSql($db, $pagesTable, 'excerpt');
-
-        if (!$hasDescription && $hasExcerpt) {
-            $db->exec('ALTER TABLE ' . $pagesTable . ' RENAME COLUMN excerpt TO description');
-            return;
-        }
-
-        if (!$hasDescription) {
+        if (!$this->appColumnExistsPgSql($db, $pagesTable, 'description')) {
             $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN description TEXT NULL');
-            return;
-        }
-
-        if ($hasExcerpt) {
-            $db->exec('UPDATE ' . $pagesTable . ' SET description = excerpt WHERE (description IS NULL OR description = \'\') AND excerpt IS NOT NULL');
-            $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN excerpt');
         }
     }
 
@@ -1232,10 +1126,6 @@ final class SchemaManager
 
     /**
      * Enforces page slug uniqueness by URL path scope instead of globally.
-     *
-     * Scope rules:
-     * - root pages: unique by `slug` where `channel_id IS NULL`
-     * - channel pages: unique by `(channel_id, slug)` where `channel_id IS NOT NULL`
      */
     private function ensurePageSlugScopeUniqueness(PDO $db, string $driver, string $prefix): void
     {
@@ -1247,11 +1137,6 @@ final class SchemaManager
         $pagesTable = $prefix . 'pages';
 
         if ($driver === 'mysql') {
-            // Remove legacy global unique(slug) indexes so slug reuse across channels is possible.
-            foreach ($this->mySqlUniqueSingleColumnIndexes($db, $pagesTable, 'slug') as $indexName) {
-                $db->exec('ALTER TABLE ' . $pagesTable . ' DROP INDEX ' . $indexName);
-            }
-
             if (!$this->mySqlIndexExists($db, $pagesTable, 'uniq_' . $prefix . 'pages_channel_slug')) {
                 $db->exec(
                     'ALTER TABLE ' . $pagesTable . '
@@ -1260,14 +1145,6 @@ final class SchemaManager
             }
 
             return;
-        }
-
-        // PostgreSQL: drop legacy global slug unique constraints and add scoped partial unique indexes.
-        foreach ($this->pgSqlUniqueSingleColumnConstraints($db, $pagesTable, 'slug') as $constraintName) {
-            $db->exec(
-                'ALTER TABLE ' . $this->quotePgIdentifier($pagesTable) . '
-                 DROP CONSTRAINT IF EXISTS ' . $this->quotePgIdentifier($constraintName)
-            );
         }
 
         if (!$this->pgSqlIndexExists($db, $pagesTable, 'uniq_' . $prefix . 'pages_root_slug')) {
@@ -1288,49 +1165,10 @@ final class SchemaManager
     }
 
     /**
-     * Rebuilds legacy SQLite `pages` table when slug was globally unique.
+     * Ensures SQLite page-scope indexes exist.
      */
     private function ensurePageSlugScopeUniquenessSqlite(PDO $db): void
     {
-        $createSql = $this->sqliteTableCreateSql($db, 'main', 'pages');
-        if ($createSql !== null && preg_match('/\bslug\s+text\s+not\s+null\s+unique\b/i', $createSql) === 1) {
-            $db->beginTransaction();
-
-            try {
-                // Rename legacy table first, then recreate with scoped uniqueness indexes.
-                $db->exec('ALTER TABLE main.pages RENAME TO pages_legacy_slug_scope');
-                $db->exec('CREATE TABLE main.pages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    title TEXT NOT NULL,
-                    slug TEXT NOT NULL,
-                    content TEXT NOT NULL DEFAULT \'\',
-                    extended TEXT NULL,
-                    description TEXT NULL,
-                    gallery_enabled INTEGER NOT NULL DEFAULT 0,
-                    channel_id INTEGER NULL,
-                    is_published INTEGER NOT NULL DEFAULT 1,
-                    published_at TEXT NULL,
-                    author_user_id INTEGER NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )');
-                $db->exec(
-                    'INSERT INTO main.pages
-                     (id, title, slug, content, extended, description, gallery_enabled, channel_id, is_published, published_at, author_user_id, created_at, updated_at)
-                     SELECT id, title, slug, content, extended, description, gallery_enabled, channel_id, is_published, published_at, author_user_id, created_at, updated_at
-                     FROM main.pages_legacy_slug_scope'
-                );
-                $db->exec('DROP TABLE main.pages_legacy_slug_scope');
-                $db->commit();
-            } catch (\Throwable $exception) {
-                if ($db->inTransaction()) {
-                    $db->rollBack();
-                }
-
-                throw $exception;
-            }
-        }
-
         $db->exec('CREATE INDEX IF NOT EXISTS idx_pages_published_at ON pages (published_at DESC)');
         $db->exec('CREATE INDEX IF NOT EXISTS idx_pages_channel_id ON pages (channel_id)');
         $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_pages_root_slug_unique ON pages (slug) WHERE channel_id IS NULL');
@@ -1338,7 +1176,7 @@ final class SchemaManager
     }
 
     /**
-     * Adds per-group routing columns and normalizes legacy rows.
+     * Ensures group-route fields and normalizes stored group slugs/route flags.
      */
     private function ensureGroupRoutingColumns(PDO $db, string $driver, string $prefix): void
     {
@@ -1372,45 +1210,6 @@ final class SchemaManager
             if (!$this->pgSqlIndexExists($db, $groupsTable, 'idx_' . $prefix . 'groups_slug')) {
                 $db->exec('CREATE INDEX idx_' . $prefix . 'groups_slug ON ' . $this->quotePgIdentifier($groupsTable) . ' (slug)');
             }
-        }
-
-        $legacyDefaultEnabled = $this->groupRouteEnabledDefaultIsEnabled($db, $driver, $groupsTable);
-        if ($driver === 'sqlite') {
-            if ($legacyDefaultEnabled) {
-                $db->beginTransaction();
-                try {
-                    $db->exec('ALTER TABLE auth.groups RENAME TO groups_legacy_route_default');
-                    $db->exec('CREATE TABLE auth.groups (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        name TEXT NOT NULL UNIQUE,
-                        slug TEXT NOT NULL,
-                        route_enabled INTEGER NOT NULL DEFAULT 0,
-                        permission_mask INTEGER NOT NULL DEFAULT 0,
-                        is_stock INTEGER NOT NULL DEFAULT 0,
-                        created_at TEXT NOT NULL
-                    )');
-                    $db->exec(
-                        'INSERT INTO auth.groups (id, name, slug, route_enabled, permission_mask, is_stock, created_at)
-                         SELECT id, name, slug, route_enabled, permission_mask, is_stock, created_at
-                         FROM auth.groups_legacy_route_default'
-                    );
-                    $db->exec('DROP TABLE auth.groups_legacy_route_default');
-                    $db->commit();
-                } catch (\Throwable $exception) {
-                    if ($db->inTransaction()) {
-                        $db->rollBack();
-                    }
-                    throw $exception;
-                }
-            }
-        } elseif ($driver === 'mysql') {
-            $db->exec('ALTER TABLE ' . $groupsTable . ' ALTER COLUMN route_enabled SET DEFAULT 0');
-        } else {
-            $db->exec('ALTER TABLE ' . $groupsTable . ' ALTER COLUMN route_enabled SET DEFAULT 0');
-        }
-
-        if ($legacyDefaultEnabled) {
-            $db->exec('UPDATE ' . $groupsTable . ' SET route_enabled = 0 WHERE route_enabled = 1');
         }
 
         $rows = $db->query(
@@ -1471,55 +1270,6 @@ final class SchemaManager
                 ':id' => $groupId,
             ]);
         }
-    }
-
-    /**
-     * Returns true when group `route_enabled` column default is legacy enabled value.
-     */
-    private function groupRouteEnabledDefaultIsEnabled(PDO $db, string $driver, string $groupsTable): bool
-    {
-        if ($driver === 'sqlite') {
-            $createSql = $this->sqliteTableCreateSql($db, 'auth', 'groups');
-            if (!is_string($createSql)) {
-                return false;
-            }
-
-            return preg_match('/route_enabled\s+integer\s+not\s+null\s+default\s+1\b/i', $createSql) === 1;
-        }
-
-        if ($driver === 'mysql') {
-            $stmt = $db->prepare(
-                'SELECT column_default
-                 FROM information_schema.columns
-                 WHERE table_schema = DATABASE()
-                   AND table_name = :table_name
-                   AND column_name = :column_name
-                 LIMIT 1'
-            );
-            $stmt->execute([
-                ':table_name' => $groupsTable,
-                ':column_name' => 'route_enabled',
-            ]);
-
-            $default = $stmt->fetchColumn();
-            return $default !== false && (string) $default === '1';
-        }
-
-        $stmt = $db->prepare(
-            'SELECT column_default
-             FROM information_schema.columns
-             WHERE table_schema = current_schema()
-               AND table_name = :table_name
-               AND column_name = :column_name
-             LIMIT 1'
-        );
-        $stmt->execute([
-            ':table_name' => $groupsTable,
-            ':column_name' => 'route_enabled',
-        ]);
-
-        $default = $stmt->fetchColumn();
-        return $default !== false && trim((string) $default, "' ") === '1';
     }
 
     /**
@@ -1924,297 +1674,6 @@ final class SchemaManager
              WHERE s.enabled = 1
              ON CONFLICT (extension_name, shortcode) DO NOTHING"
         );
-    }
-
-    /**
-     * Consolidates legacy SQLite module files into shared taxonomy/extensions DBs.
-     */
-    private function ensureSqliteStorageConsolidation(PDO $db, string $driver): void
-    {
-        if ($driver !== 'sqlite') {
-            return;
-        }
-
-        $redirectsTable = $this->table($driver, '', 'redirects');
-        if ($this->sqliteTableExists($db, 'main', 'redirects')) {
-            // Legacy builds stored redirects in pages.db (`main.redirects`).
-            $legacyHasDescription = $this->appColumnExistsSqlite($db, 'main.redirects', 'description');
-            if ($legacyHasDescription) {
-                $db->exec(
-                    'INSERT OR IGNORE INTO ' . $redirectsTable . ' (id, title, description, slug, channel_id, is_active, target_url, created_at, updated_at)
-                     SELECT m.id, m.title, m.description, m.slug, m.channel_id, m.is_active, m.target_url, m.created_at, m.updated_at
-                     FROM main.redirects m
-                     WHERE NOT EXISTS (
-                         SELECT 1 FROM ' . $redirectsTable . ' r WHERE r.id = m.id
-                     )'
-                );
-            } else {
-                $db->exec(
-                    'INSERT OR IGNORE INTO ' . $redirectsTable . ' (id, title, slug, channel_id, is_active, target_url, created_at, updated_at)
-                     SELECT m.id, m.title, m.slug, m.channel_id, m.is_active, m.target_url, m.created_at, m.updated_at
-                     FROM main.redirects m
-                     WHERE NOT EXISTS (
-                         SELECT 1 FROM ' . $redirectsTable . ' r WHERE r.id = m.id
-                     )'
-                );
-            }
-
-            $db->exec('DROP TABLE IF EXISTS main.redirects');
-        }
-
-        $mainPath = $this->sqliteMainDatabasePath($db);
-        if ($mainPath === null) {
-            return;
-        }
-
-        $basePath = dirname($mainPath);
-        if (!is_dir($basePath)) {
-            return;
-        }
-
-        $legacyMigrations = [
-            ['file' => 'channels.db', 'source_table' => 'channels', 'target_table' => 'taxonomy.channels'],
-            ['file' => 'categories.db', 'source_table' => 'categories', 'target_table' => 'taxonomy.categories'],
-            ['file' => 'tags.db', 'source_table' => 'tags', 'target_table' => 'taxonomy.tags'],
-            ['file' => 'redirects.db', 'source_table' => 'redirects', 'target_table' => 'taxonomy.redirects'],
-            ['file' => 'groups.db', 'source_table' => 'groups', 'target_table' => 'auth.groups'],
-            ['file' => 'groups.db', 'source_table' => 'user_groups', 'target_table' => 'auth.user_groups'],
-            ['file' => 'login_failures.db', 'source_table' => 'login_failures', 'target_table' => 'auth.login_failures'],
-            ['file' => 'ext_contact.db', 'source_table' => 'ext_contact', 'target_table' => 'extensions.ext_contact'],
-            ['file' => 'ext_contact_submissions.db', 'source_table' => 'ext_contact_submissions', 'target_table' => 'extensions.ext_contact_submissions'],
-            ['file' => 'ext_signups.db', 'source_table' => 'ext_signups', 'target_table' => 'extensions.ext_signups'],
-            ['file' => 'ext_signups_submissions.db', 'source_table' => 'ext_signups_submissions', 'target_table' => 'extensions.ext_signups_submissions'],
-        ];
-
-        foreach ($legacyMigrations as $migration) {
-            $this->migrateSqliteLegacyFileTable(
-                $db,
-                $basePath,
-                (string) ($migration['file'] ?? ''),
-                (string) ($migration['source_table'] ?? ''),
-                (string) ($migration['target_table'] ?? '')
-            );
-        }
-    }
-
-    /**
-     * Consolidates legacy SQLite auth storage into `auth.db`.
-     */
-    private function ensureSqliteAuthStorageConsolidation(PDO $authDb, string $driver): void
-    {
-        if ($driver !== 'sqlite') {
-            return;
-        }
-
-        $mainPath = $this->sqliteMainDatabasePath($authDb);
-        if ($mainPath === null) {
-            return;
-        }
-
-        $basePath = dirname($mainPath);
-        if (!is_dir($basePath)) {
-            return;
-        }
-
-        $legacyMigrations = [
-            ['file' => 'users.db', 'source_table' => 'users', 'target_table' => 'main.users'],
-        ];
-
-        foreach ($legacyMigrations as $migration) {
-            $this->migrateSqliteLegacyFileTable(
-                $authDb,
-                $basePath,
-                (string) ($migration['file'] ?? ''),
-                (string) ($migration['source_table'] ?? ''),
-                (string) ($migration['target_table'] ?? '')
-            );
-        }
-    }
-
-    private function sqliteMainDatabasePath(PDO $db): ?string
-    {
-        $statement = $db->query('PRAGMA database_list');
-        if ($statement === false) {
-            return null;
-        }
-
-        $rows = $statement->fetchAll();
-        foreach ($rows as $row) {
-            $name = strtolower(trim((string) ($row['name'] ?? '')));
-            if ($name !== 'main') {
-                continue;
-            }
-
-            $path = trim((string) ($row['file'] ?? ''));
-            return $path === '' ? null : $path;
-        }
-
-        return null;
-    }
-
-    private function migrateSqliteLegacyFileTable(
-        PDO $db,
-        string $basePath,
-        string $legacyFile,
-        string $legacyTable,
-        string $targetTable
-    ): void {
-        $legacyFile = trim($legacyFile);
-        $legacyTable = trim($legacyTable);
-        $targetTable = trim($targetTable);
-        if ($legacyFile === '' || $legacyTable === '' || $targetTable === '') {
-            return;
-        }
-
-        if (!preg_match('/^[a-z_][a-z0-9_]*$/i', $legacyTable)) {
-            return;
-        }
-
-        $target = $this->parseSqliteQualifiedTable($targetTable);
-        if ($target === null) {
-            return;
-        }
-
-        if (!$this->sqliteTableExists($db, $target['schema'], $target['table'])) {
-            return;
-        }
-
-        $legacyPath = rtrim($basePath, '/') . '/' . ltrim($legacyFile, '/');
-        if (!is_file($legacyPath)) {
-            return;
-        }
-
-        $alias = 'raven_legacy_migrate';
-        $safePath = str_replace("'", "''", $legacyPath);
-
-        try {
-            $db->exec('DETACH DATABASE ' . $alias);
-        } catch (\Throwable) {
-            // No-op: alias may not be attached yet.
-        }
-
-        $db->exec("ATTACH DATABASE '{$safePath}' AS {$alias}");
-
-        try {
-            if (!$this->sqliteTableExists($db, $alias, $legacyTable)) {
-                return;
-            }
-
-            $sourceColumns = $this->sqliteTableColumns($db, $alias, $legacyTable);
-            $targetColumns = $this->sqliteTableColumns($db, $target['schema'], $target['table']);
-            if ($sourceColumns === [] || $targetColumns === []) {
-                return;
-            }
-
-            $now = gmdate('Y-m-d H:i:s');
-            $safeNow = str_replace("'", "''", $now);
-            $insertColumns = [];
-            $selectExpressions = [];
-            foreach ($targetColumns as $column) {
-                if (in_array($column, $sourceColumns, true)) {
-                    $insertColumns[] = $column;
-                    $selectExpressions[] = 's.' . $column;
-                    continue;
-                }
-
-                if (in_array($column, ['created_at', 'updated_at'], true)) {
-                    $insertColumns[] = $column;
-                    $selectExpressions[] = "'" . $safeNow . "'";
-                }
-            }
-
-            if ($insertColumns === []) {
-                return;
-            }
-
-            $insertColumnsSql = implode(', ', $insertColumns);
-            $selectColumnsSql = implode(', ', $selectExpressions);
-
-            $sql = 'INSERT OR IGNORE INTO ' . $targetTable . ' (' . $insertColumnsSql . ') '
-                . 'SELECT ' . $selectColumnsSql . ' '
-                . 'FROM ' . $alias . '.' . $legacyTable . ' s';
-
-            if (in_array('id', $insertColumns, true)) {
-                $sql .= ' WHERE NOT EXISTS (SELECT 1 FROM ' . $targetTable . ' t WHERE t.id = s.id)';
-            }
-
-            $db->exec($sql);
-        } finally {
-            try {
-                $db->exec('DETACH DATABASE ' . $alias);
-            } catch (\Throwable) {
-                // No-op: avoid surfacing detach errors from legacy migration path.
-            }
-        }
-    }
-
-    /**
-     * @return array{schema: string, table: string}|null
-     */
-    private function parseSqliteQualifiedTable(string $qualifiedTable): ?array
-    {
-        if (!str_contains($qualifiedTable, '.')) {
-            return null;
-        }
-
-        [$schema, $table] = explode('.', $qualifiedTable, 2);
-        $schema = trim($schema);
-        $table = trim($table);
-        if (
-            preg_match('/^[a-z_][a-z0-9_]*$/i', $schema) !== 1
-            || preg_match('/^[a-z_][a-z0-9_]*$/i', $table) !== 1
-        ) {
-            return null;
-        }
-
-        return [
-            'schema' => $schema,
-            'table' => $table,
-        ];
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function sqliteTableColumns(PDO $db, string $schema, string $table): array
-    {
-        if (
-            preg_match('/^[a-z_][a-z0-9_]*$/i', $schema) !== 1
-            || preg_match('/^[a-z_][a-z0-9_]*$/i', $table) !== 1
-        ) {
-            return [];
-        }
-
-        $statement = $db->query('PRAGMA ' . $schema . '.table_info(' . $table . ')');
-        if ($statement === false) {
-            return [];
-        }
-
-        $columns = [];
-        $rows = $statement->fetchAll();
-        foreach ($rows as $row) {
-            $name = trim((string) ($row['name'] ?? ''));
-            if ($name === '' || preg_match('/^[a-z_][a-z0-9_]*$/i', $name) !== 1) {
-                continue;
-            }
-
-            $columns[] = $name;
-        }
-
-        return $columns;
-    }
-
-    /**
-     * Removes legacy debug-settings table now that debug options live in config.php.
-     */
-    private function removeLegacyDebugSettingsStore(PDO $db, string $driver, string $prefix): void
-    {
-        if ($driver === 'sqlite') {
-            $db->exec('DROP TABLE IF EXISTS main.ext_debug_settings');
-            return;
-        }
-
-        $db->exec('DROP TABLE IF EXISTS ' . $prefix . 'ext_debug_settings');
     }
 
     /**
@@ -2631,76 +2090,6 @@ final class SchemaManager
     }
 
     /**
-     * Returns raw CREATE TABLE SQL for one SQLite table.
-     */
-    private function sqliteTableCreateSql(PDO $db, string $schema, string $table): ?string
-    {
-        if (!preg_match('/^[a-z_][a-z0-9_]*$/', $schema) || !preg_match('/^[a-z_][a-z0-9_]*$/', $table)) {
-            return null;
-        }
-
-        $stmt = $db->prepare(
-            'SELECT sql
-             FROM ' . $schema . '.sqlite_master
-             WHERE type = :type
-               AND name = :name
-             LIMIT 1'
-        );
-        $stmt->execute([
-            ':type' => 'table',
-            ':name' => $table,
-        ]);
-
-        $sql = $stmt->fetchColumn();
-        return is_string($sql) ? $sql : null;
-    }
-
-    /**
-     * Returns MySQL unique index names that contain exactly one target column.
-     *
-     * @return array<int, string>
-     */
-    private function mySqlUniqueSingleColumnIndexes(PDO $db, string $table, string $column): array
-    {
-        $stmt = $db->prepare(
-            'SELECT s.index_name
-             FROM information_schema.statistics s
-             INNER JOIN (
-                 SELECT index_name, COUNT(*) AS column_count, MAX(non_unique) AS non_unique
-                 FROM information_schema.statistics
-                 WHERE table_schema = DATABASE()
-                   AND table_name = :table_name_inner
-                 GROUP BY index_name
-             ) i ON i.index_name = s.index_name
-             WHERE s.table_schema = DATABASE()
-               AND s.table_name = :table_name_outer
-               AND s.column_name = :column_name
-               AND s.seq_in_index = 1
-               AND i.column_count = 1
-               AND i.non_unique = 0
-               AND s.index_name <> :primary_key_name'
-        );
-        $stmt->execute([
-            ':table_name_inner' => $table,
-            ':table_name_outer' => $table,
-            ':column_name' => $column,
-            ':primary_key_name' => 'PRIMARY',
-        ]);
-
-        $rows = $stmt->fetchAll() ?: [];
-        $indexes = [];
-
-        foreach ($rows as $row) {
-            $indexName = trim((string) ($row['index_name'] ?? ''));
-            if ($indexName !== '') {
-                $indexes[] = $indexName;
-            }
-        }
-
-        return array_values(array_unique($indexes));
-    }
-
-    /**
      * Returns true when a MySQL table already has one named index.
      */
     private function mySqlIndexExists(PDO $db, string $table, string $indexName): bool
@@ -2719,47 +2108,6 @@ final class SchemaManager
         ]);
 
         return $stmt->fetchColumn() !== false;
-    }
-
-    /**
-     * Returns PostgreSQL UNIQUE constraint names defined on one single column.
-     *
-     * @return array<int, string>
-     */
-    private function pgSqlUniqueSingleColumnConstraints(PDO $db, string $table, string $column): array
-    {
-        $stmt = $db->prepare(
-            'SELECT tc.constraint_name
-             FROM information_schema.table_constraints tc
-             INNER JOIN information_schema.key_column_usage kcu
-                 ON tc.constraint_name = kcu.constraint_name
-                AND tc.table_schema = kcu.table_schema
-                AND tc.table_name = kcu.table_name
-             WHERE tc.table_schema = current_schema()
-               AND tc.table_name = :table_name
-               AND tc.constraint_type = :constraint_type
-             GROUP BY tc.constraint_name
-             HAVING COUNT(*) = 1
-                AND MIN(kcu.column_name) = :column_name
-                AND MAX(kcu.column_name) = :column_name'
-        );
-        $stmt->execute([
-            ':table_name' => $table,
-            ':constraint_type' => 'UNIQUE',
-            ':column_name' => $column,
-        ]);
-
-        $rows = $stmt->fetchAll() ?: [];
-        $constraints = [];
-
-        foreach ($rows as $row) {
-            $constraintName = trim((string) ($row['constraint_name'] ?? ''));
-            if ($constraintName !== '') {
-                $constraints[] = $constraintName;
-            }
-        }
-
-        return array_values(array_unique($constraints));
     }
 
     /**
