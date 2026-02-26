@@ -49,16 +49,13 @@ final class PanelController
     /**
      * Updater sources keyed for panel dropdown selection.
      *
-     * @var array<string, array{label: string, repo: string, git_url: string, latest_api: string, version_api: string, compare_api: string}>
+     * @var array<string, array{label: string, repo: string, git_url: string}>
      */
     private const UPDATE_SOURCES = [
         'github-noveltylanterns-raven' => [
             'label' => 'GitHub: noveltylanterns/raven',
             'repo' => 'https://github.com/noveltylanterns/raven',
             'git_url' => 'https://github.com/noveltylanterns/raven.git',
-            'latest_api' => 'https://api.github.com/repos/noveltylanterns/raven/commits?per_page=1',
-            'version_api' => 'https://api.github.com/repos/noveltylanterns/raven/contents/composer.json',
-            'compare_api' => 'https://api.github.com/repos/noveltylanterns/raven/compare',
         ],
     ];
 
@@ -5777,9 +5774,6 @@ final class PanelController
      *   label: string,
      *   repo: string,
      *   git_url: string,
-     *   latest_api: string,
-     *   version_api: string,
-     *   compare_api: string,
      *   custom_repo: string,
      *   error: string
      * }
@@ -5797,9 +5791,6 @@ final class PanelController
                     'label' => 'Custom Git Repo',
                     'repo' => '',
                     'git_url' => '',
-                    'latest_api' => '',
-                    'version_api' => '',
-                    'compare_api' => '',
                     'custom_repo' => $rawCustomRepo,
                     'error' => 'Custom upstream source must be a valid Git remote URL.',
                 ];
@@ -5810,9 +5801,6 @@ final class PanelController
                 'label' => 'Custom Git Repo',
                 'repo' => $customRepo,
                 'git_url' => $customRepo,
-                'latest_api' => '',
-                'version_api' => '',
-                'compare_api' => '',
                 'custom_repo' => $customRepo,
                 'error' => '',
             ];
@@ -5829,9 +5817,6 @@ final class PanelController
             'label' => (string) ($source['label'] ?? ''),
             'repo' => (string) ($source['repo'] ?? ''),
             'git_url' => (string) ($source['git_url'] ?? ''),
-            'latest_api' => (string) ($source['latest_api'] ?? ''),
-            'version_api' => (string) ($source['version_api'] ?? ''),
-            'compare_api' => (string) ($source['compare_api'] ?? ''),
             'custom_repo' => '',
             'error' => '',
         ];
@@ -5868,26 +5853,15 @@ final class PanelController
         $latestRevision = null;
         $remoteRelation = null;
 
-        if ((string) ($source['key'] ?? '') === self::UPDATE_SOURCE_CUSTOM) {
-            $gitSourceState = $this->fetchGitRemoteSourceState(
-                (string) ($source['git_url'] ?? ''),
-                self::UPDATE_SOURCE_DEFAULT_BRANCH
-            );
-            $latestRevision = $gitSourceState['latest_revision'] !== '' ? (string) $gitSourceState['latest_revision'] : null;
-            $remoteRelation = $gitSourceState['relation'] !== '' ? (string) $gitSourceState['relation'] : null;
-            if ($latestRevision === null) {
-                $source['error'] = (string) ($gitSourceState['error'] ?? 'Unable to fetch latest revision from upstream repository.');
-            }
-        } else {
-            $latestVersion = $this->fetchLatestRemoteComposerVersion((string) $source['version_api']) ?? '';
-            $latestRevision = $this->fetchLatestRemoteRevision((string) $source['latest_api']);
-            if ($latestRevision !== null) {
-                $remoteRelation = $this->fetchRemoteRevisionRelationship(
-                    (string) $source['compare_api'],
-                    $latestRevision,
-                    $currentRevision
-                );
-            }
+        $gitSourceState = $this->fetchGitRemoteSourceState(
+            (string) ($source['git_url'] ?? ''),
+            self::UPDATE_SOURCE_DEFAULT_BRANCH
+        );
+        $latestVersion = (string) ($gitSourceState['latest_version'] ?? '');
+        $latestRevision = $gitSourceState['latest_revision'] !== '' ? (string) $gitSourceState['latest_revision'] : null;
+        $remoteRelation = $gitSourceState['relation'] !== '' ? (string) $gitSourceState['relation'] : null;
+        if ($latestRevision === null) {
+            $source['error'] = (string) ($gitSourceState['error'] ?? 'Unable to fetch latest revision from upstream repository.');
         }
 
         $status = [
@@ -5960,7 +5934,7 @@ final class PanelController
             return $status;
         }
 
-        // Fallback when compare API cannot resolve relationship.
+        // Fallback when git ancestry cannot resolve relationship.
         $versionRelation = $this->compareVersionStrings($currentVersion, $latestVersion);
         if ($versionRelation > 0) {
             $status['status'] = 'diverged';
@@ -6129,94 +6103,6 @@ final class PanelController
     }
 
     /**
-     * Reads latest upstream revision hash from GitHub API.
-     */
-    private function fetchLatestRemoteRevision(string $apiUrl): ?string
-    {
-        if (trim($apiUrl) === '') {
-            return null;
-        }
-
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'timeout' => 8,
-                'header' => [
-                    'Accept: application/vnd.github+json',
-                    'User-Agent: Raven-Updater',
-                ],
-            ],
-        ]);
-
-        $raw = @file_get_contents($apiUrl, false, $context);
-        if ($raw === false || trim($raw) === '') {
-            return null;
-        }
-
-        /** @var mixed $decoded */
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded) || $decoded === []) {
-            return null;
-        }
-
-        $row = $decoded[0] ?? null;
-        if (!is_array($row)) {
-            return null;
-        }
-
-        $sha = strtolower($this->input->text((string) ($row['sha'] ?? ''), 64));
-        if (!$this->isValidRevisionHash($sha)) {
-            return null;
-        }
-
-        return $sha;
-    }
-
-    /**
-     * Reads commit relationship from GitHub compare API.
-     *
-     * Returns one of: `identical`, `ahead`, `behind`, `diverged`, or null.
-     */
-    private function fetchRemoteRevisionRelationship(string $compareApiUrl, string $baseRevision, string $headRevision): ?string
-    {
-        if (trim($compareApiUrl) === '') {
-            return null;
-        }
-
-        $baseRevision = strtolower($this->input->text($baseRevision, 64));
-        $headRevision = strtolower($this->input->text($headRevision, 64));
-        if (!$this->isValidRevisionHash($baseRevision) || !$this->isValidRevisionHash($headRevision)) {
-            return null;
-        }
-
-        $url = rtrim($compareApiUrl, '/') . '/' . rawurlencode($baseRevision) . '...' . rawurlencode($headRevision);
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'timeout' => 8,
-                'header' => [
-                    'Accept: application/vnd.github+json',
-                    'User-Agent: Raven-Updater',
-                ],
-            ],
-        ]);
-
-        $raw = @file_get_contents($url, false, $context);
-        if ($raw === false || trim($raw) === '') {
-            return null;
-        }
-
-        /** @var mixed $decoded */
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            return null;
-        }
-
-        $status = strtolower($this->input->text((string) ($decoded['status'] ?? ''), 20));
-        return in_array($status, ['identical', 'ahead', 'behind', 'diverged'], true) ? $status : null;
-    }
-
-    /**
      * Compares semantic versions using major/minor/patch.
      *
      * Returns -1 when current<latest, 0 when equal/unknown, 1 when current>latest.
@@ -6289,7 +6175,7 @@ final class PanelController
     /**
      * Resolves latest revision + relationship for arbitrary git remotes.
      *
-     * @return array{latest_revision: string, relation: string, error: string}
+     * @return array{latest_revision: string, latest_version: string, relation: string, error: string}
      */
     private function fetchGitRemoteSourceState(string $gitUrl, string $branch): array
     {
@@ -6298,6 +6184,7 @@ final class PanelController
         if ($gitUrl === '' || $branch === '') {
             return [
                 'latest_revision' => '',
+                'latest_version' => '',
                 'relation' => '',
                 'error' => 'Custom upstream source must provide both git URL and branch.',
             ];
@@ -6310,6 +6197,7 @@ final class PanelController
         if (!$this->runGitCommand(['ls-remote', '--heads', $gitUrl, 'refs/heads/' . $branch], $output)) {
             return [
                 'latest_revision' => '',
+                'latest_version' => '',
                 'relation' => '',
                 'error' => 'Unable to query remote branch revision.',
             ];
@@ -6322,6 +6210,7 @@ final class PanelController
         if ($lines === []) {
             return [
                 'latest_revision' => '',
+                'latest_version' => '',
                 'relation' => '',
                 'error' => 'Remote branch was not found on the configured git source.',
             ];
@@ -6332,6 +6221,7 @@ final class PanelController
         if (!is_array($parts) || $parts === []) {
             return [
                 'latest_revision' => '',
+                'latest_version' => '',
                 'relation' => '',
                 'error' => 'Remote branch revision could not be parsed.',
             ];
@@ -6341,6 +6231,7 @@ final class PanelController
         if (!$this->isValidRevisionHash($candidate)) {
             return [
                 'latest_revision' => '',
+                'latest_version' => '',
                 'relation' => '',
                 'error' => 'Remote branch revision is invalid.',
             ];
@@ -6351,6 +6242,7 @@ final class PanelController
         if (!$this->runGitCommand(['fetch', '--prune', '--depth=1', $gitUrl, $branch], $output)) {
             return [
                 'latest_revision' => $latestRevision,
+                'latest_version' => '',
                 'relation' => '',
                 'error' => 'Remote branch fetched revision could not be compared.',
             ];
@@ -6365,10 +6257,23 @@ final class PanelController
             $latestRevision = $fetchHeadHash;
         }
 
+        $latestVersion = '';
+        if ($this->runGitCommand(['show', 'FETCH_HEAD:composer.json'], $output)) {
+            /** @var mixed $composerDecoded */
+            $composerDecoded = json_decode($output, true);
+            if (is_array($composerDecoded)) {
+                $parsedVersion = $this->input->text((string) ($composerDecoded['version'] ?? ''), 50);
+                if ($parsedVersion !== '') {
+                    $latestVersion = $parsedVersion;
+                }
+            }
+        }
+
         $currentRevision = $this->detectLocalRevision() ?? '';
         if ($currentRevision !== '' && strcasecmp($currentRevision, $latestRevision) === 0) {
             return [
                 'latest_revision' => $latestRevision,
+                'latest_version' => $latestVersion,
                 'relation' => 'identical',
                 'error' => '',
             ];
@@ -6379,6 +6284,7 @@ final class PanelController
         if ($exitCode === 0) {
             return [
                 'latest_revision' => $latestRevision,
+                'latest_version' => $latestVersion,
                 'relation' => 'behind',
                 'error' => '',
             ];
@@ -6388,6 +6294,7 @@ final class PanelController
         if ($exitCode === 0) {
             return [
                 'latest_revision' => $latestRevision,
+                'latest_version' => $latestVersion,
                 'relation' => 'ahead',
                 'error' => '',
             ];
@@ -6395,6 +6302,7 @@ final class PanelController
 
         return [
             'latest_revision' => $latestRevision,
+            'latest_version' => $latestVersion,
             'relation' => 'diverged',
             'error' => '',
         ];
@@ -6561,62 +6469,6 @@ final class PanelController
         $exitCode = $resultCode;
 
         return $resultCode === 0;
-    }
-
-    /**
-     * Reads latest upstream package version from GitHub composer.json contents.
-     */
-    private function fetchLatestRemoteComposerVersion(string $apiUrl): ?string
-    {
-        if (trim($apiUrl) === '') {
-            return null;
-        }
-
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'timeout' => 8,
-                'header' => [
-                    'Accept: application/vnd.github+json',
-                    'User-Agent: Raven-Updater',
-                ],
-            ],
-        ]);
-
-        $raw = @file_get_contents($apiUrl, false, $context);
-        if ($raw === false || trim($raw) === '') {
-            return null;
-        }
-
-        /** @var mixed $decoded */
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            return null;
-        }
-
-        $encodedContent = (string) ($decoded['content'] ?? '');
-        if ($encodedContent === '') {
-            return null;
-        }
-
-        $cleanBase64 = preg_replace('/\s+/', '', $encodedContent) ?? '';
-        if ($cleanBase64 === '') {
-            return null;
-        }
-
-        $composerRaw = base64_decode($cleanBase64, true);
-        if (!is_string($composerRaw) || trim($composerRaw) === '') {
-            return null;
-        }
-
-        /** @var mixed $composerDecoded */
-        $composerDecoded = json_decode($composerRaw, true);
-        if (!is_array($composerDecoded)) {
-            return null;
-        }
-
-        $version = $this->input->text((string) ($composerDecoded['version'] ?? ''), 50);
-        return $version !== '' ? $version : null;
     }
 
     /**
