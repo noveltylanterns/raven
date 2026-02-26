@@ -112,14 +112,14 @@ $requiresForceRun = $status !== 'outdated';
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
         <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
-        <button type="submit" class="btn btn-primary btn-sm">Check for Updates</button>
+        <button type="submit" class="btn btn-primary">Check for Updates</button>
     </form>
 
     <form method="post" action="<?= e($panelBase) ?>/updates/dry-run" class="m-0">
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
         <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
-        <button type="submit" class="btn btn-secondary btn-sm">Dry Run</button>
+        <button type="submit" class="btn btn-secondary">Dry Run</button>
     </form>
 
     <form method="post" action="<?= e($panelBase) ?>/updates/run" class="m-0">
@@ -129,7 +129,7 @@ $requiresForceRun = $status !== 'outdated';
         <input type="hidden" name="force_run" value="0" data-updater-force-run="1">
         <button
             type="submit"
-            class="btn btn-warning btn-sm js-updater-run-button"
+            class="btn btn-warning js-updater-run-button"
             title="Run updater"
         >
             Run Updater
@@ -182,14 +182,14 @@ $requiresForceRun = $status !== 'outdated';
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
         <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
-        <button type="submit" class="btn btn-primary btn-sm">Check for Updates</button>
+        <button type="submit" class="btn btn-primary">Check for Updates</button>
     </form>
 
     <form method="post" action="<?= e($panelBase) ?>/updates/dry-run" class="m-0">
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
         <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
-        <button type="submit" class="btn btn-secondary btn-sm">Dry Run</button>
+        <button type="submit" class="btn btn-secondary">Dry Run</button>
     </form>
 
     <form method="post" action="<?= e($panelBase) ?>/updates/run" class="m-0">
@@ -199,7 +199,7 @@ $requiresForceRun = $status !== 'outdated';
         <input type="hidden" name="force_run" value="0" data-updater-force-run="1">
         <button
             type="submit"
-            class="btn btn-warning btn-sm js-updater-run-button"
+            class="btn btn-warning js-updater-run-button"
             title="Run updater"
         >
             Run Updater
@@ -221,8 +221,8 @@ $requiresForceRun = $status !== 'outdated';
                     <p class="mb-0 text-danger">Running anyway will fetch upstream, hard-reset tracked files, and clean untracked non-ignored files.</p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-warning btn-sm" id="updaterForceRunConfirm">Run Updater Anyway</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-warning" id="updaterForceRunConfirm">Run Updater Anyway</button>
                 </div>
             </div>
         </div>
