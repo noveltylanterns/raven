@@ -58,10 +58,13 @@ final class GroupRepository
 
         $stmt = $this->db->prepare(
             'SELECT g.id, g.name, g.slug, g.route_enabled, g.permission_mask, g.is_stock, g.created_at,
-                    COUNT(ug.user_id) AS member_count
+                    COALESCE(ug.member_count, 0) AS member_count
              FROM ' . $groups . ' g
-             LEFT JOIN ' . $userGroups . ' ug ON ug.group_id = g.id
-             GROUP BY g.id, g.name, g.slug, g.route_enabled, g.permission_mask, g.is_stock, g.created_at
+             LEFT JOIN (
+                 SELECT group_id, COUNT(*) AS member_count
+                 FROM ' . $userGroups . '
+                 GROUP BY group_id
+             ) ug ON ug.group_id = g.id
              ORDER BY g.id ASC'
         );
         // LEFT JOIN keeps groups with zero members visible in admin listings.

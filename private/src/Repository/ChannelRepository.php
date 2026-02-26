@@ -46,18 +46,67 @@ final class ChannelRepository
             'SELECT c.id, c.name, c.slug, c.description, c.created_at,
                     c.cover_image_path, c.cover_image_sm_path, c.cover_image_md_path, c.cover_image_lg_path,
                     c.preview_image_path, c.preview_image_sm_path, c.preview_image_md_path, c.preview_image_lg_path,
-                    COUNT(p.id) AS page_count
+                    COALESCE(pc.page_count, 0) AS page_count
              FROM ' . $channels . ' c
-             LEFT JOIN ' . $pages . ' p ON p.channel_id = c.id
-             GROUP BY c.id, c.name, c.slug, c.description, c.created_at,
-                      c.cover_image_path, c.cover_image_sm_path, c.cover_image_md_path, c.cover_image_lg_path,
-                      c.preview_image_path, c.preview_image_sm_path, c.preview_image_md_path, c.preview_image_lg_path
+             LEFT JOIN (
+                 SELECT channel_id, COUNT(*) AS page_count
+                 FROM ' . $pages . '
+                 WHERE channel_id IS NOT NULL
+                 GROUP BY channel_id
+             ) pc ON pc.channel_id = c.id
              ORDER BY c.name ASC, c.id ASC'
         );
         // LEFT JOIN keeps channels with zero pages visible in admin listings.
         $stmt->execute();
 
         return $stmt->fetchAll() ?: [];
+    }
+
+    /**
+     * Returns minimal channel options for panel select controls.
+     *
+     * @return array<int, array{id: int, name: string, slug: string}>
+     */
+    public function listOptions(): array
+    {
+        $channels = $this->table('channels');
+
+        $stmt = $this->db->prepare(
+            'SELECT id, name, slug
+             FROM ' . $channels . '
+             ORDER BY name ASC, id ASC'
+        );
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $result = [];
+        foreach ($rows as $row) {
+            $result[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'name' => (string) ($row['name'] ?? ''),
+                'slug' => (string) ($row['slug'] ?? ''),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Returns true when one channel exists by slug.
+     */
+    public function slugExists(string $slug): bool
+    {
+        $channels = $this->table('channels');
+
+        $stmt = $this->db->prepare(
+            'SELECT 1
+             FROM ' . $channels . '
+             WHERE slug = :slug
+             LIMIT 1'
+        );
+        $stmt->execute([':slug' => $slug]);
+
+        return $stmt->fetchColumn() !== false;
     }
 
     /**

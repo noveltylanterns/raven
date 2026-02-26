@@ -200,8 +200,8 @@ final class PanelController
 
         // Null id means create mode; numeric id means edit mode.
         $page = $id !== null ? $this->pages->findById($id) : null;
-        $categoryOptions = $this->categories->listAll();
-        $tagOptions = $this->tags->listAll();
+        $categoryOptions = $this->categories->listOptions();
+        $tagOptions = $this->tags->listOptions();
 
         // Existing assignments are loaded only in edit mode.
         $assignedCategories = $id !== null ? $this->pages->assignedCategoriesForPage($id) : [];
@@ -211,7 +211,7 @@ final class PanelController
         $this->view->render('panel/pages/edit', [
             'site' => $this->siteData(),
             'page' => $page,
-            'channelOptions' => $this->channels->listAll(),
+            'channelOptions' => $this->channels->listOptions(),
             'categoryOptions' => $categoryOptions,
             'tagOptions' => $tagOptions,
             'assignedCategories' => $assignedCategories,
@@ -286,17 +286,8 @@ final class PanelController
         }
 
         // Only keep ids that currently exist, preventing stale/manual post values.
-        $validCategoryIds = array_map(
-            static fn (array $category): int => (int) $category['id'],
-            $this->categories->listAll()
-        );
-        $validTagIds = array_map(
-            static fn (array $tag): int => (int) $tag['id'],
-            $this->tags->listAll()
-        );
-
-        $categoryIds = array_values(array_unique(array_intersect($categoryIds, $validCategoryIds)));
-        $tagIds = array_values(array_unique(array_intersect($tagIds, $validTagIds)));
+        $categoryIds = $this->categories->existingIds($categoryIds);
+        $tagIds = $this->tags->existingIds($tagIds);
 
         if ($title === '' || $slug === null) {
             $this->flash('error', 'Title and valid slug are required.');
@@ -1371,7 +1362,7 @@ final class PanelController
         $this->view->render('panel/redirects/edit', [
             'site' => $this->siteData(),
             'redirectRow' => $redirectRow,
-            'channelOptions' => $this->channels->listAll(),
+            'channelOptions' => $this->channels->listOptions(),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'error' => $this->pullFlash('error'),
@@ -1423,11 +1414,7 @@ final class PanelController
         }
 
         // Channel dropdown should only post known channel slugs.
-        $validChannelSlugs = array_map(
-            static fn (array $channel): string => (string) ($channel['slug'] ?? ''),
-            $this->channels->listAll()
-        );
-        if ($channelSlug !== null && !in_array($channelSlug, $validChannelSlugs, true)) {
+        if ($channelSlug !== null && !$this->channels->slugExists($channelSlug)) {
             $this->flash('error', 'Selected channel does not exist.');
             redirect($this->panelUrl('/redirects/edit' . ($id !== null ? '/' . $id : '')));
         }
@@ -8255,23 +8242,24 @@ MARKDOWN;
         $canManageTaxonomy = $this->auth->canManageTaxonomy();
         $canManageUsers = $this->auth->canManageUsers();
         $canManageGroups = $this->auth->canManageGroups();
+        $channelLandingMap = $this->pages->channelHomepagesForRouting();
 
-        foreach ($this->channels->listAll() as $channel) {
+        foreach ($this->channels->listOptions() as $channel) {
             $channelId = (int) ($channel['id'] ?? 0);
             $channelSlug = trim((string) ($channel['slug'] ?? ''));
             if ($channelId <= 0 || $channelSlug === '') {
                 continue;
             }
 
-            $landingPage = $this->pages->findChannelHomepage($channelSlug);
-            $landingSlug = trim((string) ($landingPage['slug'] ?? ''));
-            $statusKey = $landingPage === null ? 'missing' : 'active';
-            $statusLabel = $landingPage === null
-                ? ($channelIndexTemplateExists ? 'Missing Index' : 'Missing Template')
-                : 'Active';
-            $notes = $landingPage === null
-                ? 'No published channel landing page found (requires slug home or index).'
-                : ('Channel landing resolves using slug "' . $landingSlug . '".');
+            $landingSlug = trim((string) ($channelLandingMap[$channelSlug] ?? ''));
+            $hasLanding = $landingSlug !== '';
+            $statusKey = $hasLanding ? 'active' : 'missing';
+            $statusLabel = $hasLanding
+                ? 'Active'
+                : ($channelIndexTemplateExists ? 'Missing Index' : 'Missing Template');
+            $notes = $hasLanding
+                ? ('Channel landing resolves using slug "' . $landingSlug . '".')
+                : 'No published channel landing page found (requires slug home or index).';
             if (in_array($channelSlug, $reservedPrefixes, true)) {
                 $notes = 'Reserved prefix; this channel route is not publicly reachable.';
             }
@@ -8336,7 +8324,7 @@ MARKDOWN;
         }
 
         if ($categoryPrefix !== '') {
-            foreach ($this->categories->listAll() as $category) {
+            foreach ($this->categories->listOptions() as $category) {
                 $categoryId = (int) ($category['id'] ?? 0);
                 $categorySlug = trim((string) ($category['slug'] ?? ''));
                 if ($categoryId <= 0 || $categorySlug === '') {
@@ -8366,7 +8354,7 @@ MARKDOWN;
         }
 
         if ($tagPrefix !== '') {
-            foreach ($this->tags->listAll() as $tag) {
+            foreach ($this->tags->listOptions() as $tag) {
                 $tagId = (int) ($tag['id'] ?? 0);
                 $tagSlug = trim((string) ($tag['slug'] ?? ''));
                 if ($tagId <= 0 || $tagSlug === '') {

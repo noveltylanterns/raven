@@ -41,6 +41,7 @@ final class SchemaManager
         $this->ensureSignupsSubmissionHostnameColumn($appDb, $driver, $prefix);
         $this->ensureGroupRoutingColumns($appDb, $driver, $prefix);
         $this->ensureTaxonomyImageColumns($appDb, $driver, $prefix);
+        $this->ensurePanelPerformanceIndexes($appDb, $driver, $prefix);
         // Auth schema must exist before user/group relationship seeding.
         $this->ensureAuthSchema($authDb, $driver, $prefix);
         $this->ensureStockGroups($appDb, $driver, $prefix);
@@ -1584,6 +1585,79 @@ final class SchemaManager
 
                 $db->exec('UPDATE ' . $physicalTable . ' SET ' . $column . ' = NULL WHERE ' . $column . ' = \'\'');
             }
+        }
+    }
+
+    /**
+     * Ensures high-impact panel query indexes used by list/filter workloads.
+     */
+    private function ensurePanelPerformanceIndexes(PDO $db, string $driver, string $prefix): void
+    {
+        if ($driver === 'sqlite') {
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_page_categories_category_id ON page_categories (category_id, page_id)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_page_tags_tag_id ON page_tags (tag_id, page_id)');
+            $db->exec('CREATE INDEX IF NOT EXISTS groups.idx_user_groups_group_id ON user_groups (group_id, user_id)');
+            $db->exec('CREATE INDEX IF NOT EXISTS taxonomy.idx_redirects_lookup ON redirects (slug, channel_id, is_active)');
+            return;
+        }
+
+        $pageCategoriesTable = $prefix . 'page_categories';
+        $pageTagsTable = $prefix . 'page_tags';
+        $userGroupsTable = $prefix . 'user_groups';
+        $redirectsTable = $prefix . 'redirects';
+
+        if ($driver === 'mysql') {
+            if (!$this->mySqlIndexExists($db, $pageCategoriesTable, 'idx_' . $prefix . 'page_categories_category_id')) {
+                $db->exec(
+                    'ALTER TABLE ' . $pageCategoriesTable . '
+                     ADD INDEX idx_' . $prefix . 'page_categories_category_id (category_id, page_id)'
+                );
+            }
+            if (!$this->mySqlIndexExists($db, $pageTagsTable, 'idx_' . $prefix . 'page_tags_tag_id')) {
+                $db->exec(
+                    'ALTER TABLE ' . $pageTagsTable . '
+                     ADD INDEX idx_' . $prefix . 'page_tags_tag_id (tag_id, page_id)'
+                );
+            }
+            if (!$this->mySqlIndexExists($db, $userGroupsTable, 'idx_' . $prefix . 'user_groups_group_id')) {
+                $db->exec(
+                    'ALTER TABLE ' . $userGroupsTable . '
+                     ADD INDEX idx_' . $prefix . 'user_groups_group_id (group_id, user_id)'
+                );
+            }
+            if (!$this->mySqlIndexExists($db, $redirectsTable, 'idx_' . $prefix . 'redirects_lookup')) {
+                $db->exec(
+                    'ALTER TABLE ' . $redirectsTable . '
+                     ADD INDEX idx_' . $prefix . 'redirects_lookup (slug, channel_id, is_active)'
+                );
+            }
+
+            return;
+        }
+
+        if (!$this->pgSqlIndexExists($db, $pageCategoriesTable, 'idx_' . $prefix . 'page_categories_category_id')) {
+            $db->exec(
+                'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'page_categories_category_id
+                 ON ' . $this->quotePgIdentifier($pageCategoriesTable) . ' (category_id, page_id)'
+            );
+        }
+        if (!$this->pgSqlIndexExists($db, $pageTagsTable, 'idx_' . $prefix . 'page_tags_tag_id')) {
+            $db->exec(
+                'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'page_tags_tag_id
+                 ON ' . $this->quotePgIdentifier($pageTagsTable) . ' (tag_id, page_id)'
+            );
+        }
+        if (!$this->pgSqlIndexExists($db, $userGroupsTable, 'idx_' . $prefix . 'user_groups_group_id')) {
+            $db->exec(
+                'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'user_groups_group_id
+                 ON ' . $this->quotePgIdentifier($userGroupsTable) . ' (group_id, user_id)'
+            );
+        }
+        if (!$this->pgSqlIndexExists($db, $redirectsTable, 'idx_' . $prefix . 'redirects_lookup')) {
+            $db->exec(
+                'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'redirects_lookup
+                 ON ' . $this->quotePgIdentifier($redirectsTable) . ' (slug, channel_id, is_active)'
+            );
         }
     }
 

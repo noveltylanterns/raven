@@ -46,18 +46,89 @@ final class TagRepository
             'SELECT t.id, t.name, t.slug, t.description, t.created_at,
                     t.cover_image_path, t.cover_image_sm_path, t.cover_image_md_path, t.cover_image_lg_path,
                     t.preview_image_path, t.preview_image_sm_path, t.preview_image_md_path, t.preview_image_lg_path,
-                    COUNT(pt.page_id) AS page_count
+                    COALESCE(pt.page_count, 0) AS page_count
              FROM ' . $tags . ' t
-             LEFT JOIN ' . $pageTags . ' pt ON pt.tag_id = t.id
-             GROUP BY t.id, t.name, t.slug, t.description, t.created_at,
-                      t.cover_image_path, t.cover_image_sm_path, t.cover_image_md_path, t.cover_image_lg_path,
-                      t.preview_image_path, t.preview_image_sm_path, t.preview_image_md_path, t.preview_image_lg_path
+             LEFT JOIN (
+                 SELECT tag_id, COUNT(*) AS page_count
+                 FROM ' . $pageTags . '
+                 GROUP BY tag_id
+             ) pt ON pt.tag_id = t.id
              ORDER BY t.name ASC, t.id ASC'
         );
         // LEFT JOIN keeps tags with zero linked pages visible in admin listings.
         $stmt->execute();
 
         return $stmt->fetchAll() ?: [];
+    }
+
+    /**
+     * Returns minimal tag options for panel select controls.
+     *
+     * @return array<int, array{id: int, name: string, slug: string}>
+     */
+    public function listOptions(): array
+    {
+        $tags = $this->table('tags');
+
+        $stmt = $this->db->prepare(
+            'SELECT id, name, slug
+             FROM ' . $tags . '
+             ORDER BY name ASC, id ASC'
+        );
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $result = [];
+        foreach ($rows as $row) {
+            $result[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'name' => (string) ($row['name'] ?? ''),
+                'slug' => (string) ($row['slug'] ?? ''),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Returns only ids that currently exist in storage.
+     *
+     * @param array<int> $ids
+     * @return array<int>
+     */
+    public function existingIds(array $ids): array
+    {
+        $normalizedIds = [];
+        foreach ($ids as $id) {
+            $value = (int) $id;
+            if ($value > 0) {
+                $normalizedIds[$value] = $value;
+            }
+        }
+
+        if ($normalizedIds === []) {
+            return [];
+        }
+
+        $tags = $this->table('tags');
+        $placeholders = implode(', ', array_fill(0, count($normalizedIds), '?'));
+        $stmt = $this->db->prepare(
+            'SELECT id
+             FROM ' . $tags . '
+             WHERE id IN (' . $placeholders . ')'
+        );
+        $stmt->execute(array_values($normalizedIds));
+
+        $rows = $stmt->fetchAll() ?: [];
+        $existing = [];
+        foreach ($rows as $row) {
+            $value = (int) ($row['id'] ?? 0);
+            if ($value > 0) {
+                $existing[$value] = $value;
+            }
+        }
+
+        return array_values($existing);
     }
 
     /**

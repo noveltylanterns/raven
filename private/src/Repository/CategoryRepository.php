@@ -46,18 +46,89 @@ final class CategoryRepository
             'SELECT c.id, c.name, c.slug, c.description, c.created_at,
                     c.cover_image_path, c.cover_image_sm_path, c.cover_image_md_path, c.cover_image_lg_path,
                     c.preview_image_path, c.preview_image_sm_path, c.preview_image_md_path, c.preview_image_lg_path,
-                    COUNT(pc.page_id) AS page_count
+                    COALESCE(pc.page_count, 0) AS page_count
              FROM ' . $categories . ' c
-             LEFT JOIN ' . $pageCategories . ' pc ON pc.category_id = c.id
-             GROUP BY c.id, c.name, c.slug, c.description, c.created_at,
-                      c.cover_image_path, c.cover_image_sm_path, c.cover_image_md_path, c.cover_image_lg_path,
-                      c.preview_image_path, c.preview_image_sm_path, c.preview_image_md_path, c.preview_image_lg_path
+             LEFT JOIN (
+                 SELECT category_id, COUNT(*) AS page_count
+                 FROM ' . $pageCategories . '
+                 GROUP BY category_id
+             ) pc ON pc.category_id = c.id
              ORDER BY c.name ASC, c.id ASC'
         );
         // LEFT JOIN keeps categories with zero linked pages visible in admin listings.
         $stmt->execute();
 
         return $stmt->fetchAll() ?: [];
+    }
+
+    /**
+     * Returns minimal category options for panel select controls.
+     *
+     * @return array<int, array{id: int, name: string, slug: string}>
+     */
+    public function listOptions(): array
+    {
+        $categories = $this->table('categories');
+
+        $stmt = $this->db->prepare(
+            'SELECT id, name, slug
+             FROM ' . $categories . '
+             ORDER BY name ASC, id ASC'
+        );
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $result = [];
+        foreach ($rows as $row) {
+            $result[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'name' => (string) ($row['name'] ?? ''),
+                'slug' => (string) ($row['slug'] ?? ''),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Returns only ids that currently exist in storage.
+     *
+     * @param array<int> $ids
+     * @return array<int>
+     */
+    public function existingIds(array $ids): array
+    {
+        $normalizedIds = [];
+        foreach ($ids as $id) {
+            $value = (int) $id;
+            if ($value > 0) {
+                $normalizedIds[$value] = $value;
+            }
+        }
+
+        if ($normalizedIds === []) {
+            return [];
+        }
+
+        $categories = $this->table('categories');
+        $placeholders = implode(', ', array_fill(0, count($normalizedIds), '?'));
+        $stmt = $this->db->prepare(
+            'SELECT id
+             FROM ' . $categories . '
+             WHERE id IN (' . $placeholders . ')'
+        );
+        $stmt->execute(array_values($normalizedIds));
+
+        $rows = $stmt->fetchAll() ?: [];
+        $existing = [];
+        foreach ($rows as $row) {
+            $value = (int) ($row['id'] ?? 0);
+            if ($value > 0) {
+                $existing[$value] = $value;
+            }
+        }
+
+        return array_values($existing);
     }
 
     /**

@@ -199,6 +199,56 @@ final class PageRepository
     }
 
     /**
+     * Returns one landing-page slug map keyed by channel slug for routing inventory.
+     *
+     * Landing priority per channel:
+     * - `home` first
+     * - fallback `index`
+     *
+     * @return array<string, string>
+     */
+    public function channelHomepagesForRouting(): array
+    {
+        $pages = $this->table('pages');
+        $channels = $this->table('channels');
+
+        $stmt = $this->db->prepare(
+            'SELECT c.slug AS channel_slug,
+                    (
+                        SELECT p.slug
+                        FROM ' . $pages . ' p
+                        WHERE p.channel_id = c.id
+                          AND p.is_published = :is_published
+                          AND p.slug IN (:slug_home, :slug_index)
+                        ORDER BY CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
+                                 p.published_at DESC
+                        LIMIT 1
+                    ) AS landing_slug
+             FROM ' . $channels . ' c
+             ORDER BY c.id ASC'
+        );
+        $stmt->execute([
+            ':is_published' => 1,
+            ':slug_home' => 'home',
+            ':slug_index' => 'index',
+            ':slug_home_order' => 'home',
+        ]);
+
+        $rows = $stmt->fetchAll() ?: [];
+        $result = [];
+        foreach ($rows as $row) {
+            $channelSlug = trim((string) ($row['channel_slug'] ?? ''));
+            if ($channelSlug === '') {
+                continue;
+            }
+
+            $result[$channelSlug] = trim((string) ($row['landing_slug'] ?? ''));
+        }
+
+        return $result;
+    }
+
+    /**
      * Returns one page by id for panel edit form.
      *
      * @return array<string, mixed>|null
