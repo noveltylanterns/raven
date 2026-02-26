@@ -6025,6 +6025,10 @@ final class PanelController
             return $default;
         }
 
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($statePath, true);
+        }
+
         /** @var mixed $loaded */
         $loaded = require $statePath;
         if (!is_array($loaded)) {
@@ -6083,7 +6087,11 @@ final class PanelController
         $content .= "declare(strict_types=1);\n\n";
         $content .= "return " . $export . ";\n";
 
-        @file_put_contents($this->updaterStateFilePath(), $content, LOCK_EX);
+        $statePath = $this->updaterStateFilePath();
+        @file_put_contents($statePath, $content, LOCK_EX);
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($statePath, true);
+        }
     }
 
     /**
