@@ -37,7 +37,6 @@ $currentVersion = (string) ($updateStatus['current_version'] ?? '');
 $currentRevision = (string) ($updateStatus['current_revision'] ?? '');
 $latestVersion = (string) ($updateStatus['latest_version'] ?? '');
 $latestRevision = (string) ($updateStatus['latest_revision'] ?? '');
-$checkedAt = (string) ($updateStatus['checked_at'] ?? '');
 $statusMessage = (string) ($updateStatus['message'] ?? '');
 $sourceKey = (string) ($updateStatus['source_key'] ?? '');
 $localBranch = (string) ($updateStatus['local_branch'] ?? '');
@@ -147,9 +146,9 @@ if (preg_match('/^\s*v?(\d+)\.(\d+)/i', $latestVersion, $latestSeriesMatch) === 
                 <label class="form-label h6">Local Branch</label>
                 <div><code><?= e($localBranch !== '' ? $localBranch : '<unknown>') ?></code></div>
             </div>
-            <div class="col-12">
-                <label class="form-label h6">Last Checked (UTC)</label>
-                <div><?= e($checkedAt !== '' ? $checkedAt : 'Never') ?></div>
+            <div class="col-12 col-md-6">
+                <label class="form-label h6">Default Branch</label>
+                <div><code>main</code></div>
             </div>
         </div>
     </div>

@@ -5751,7 +5751,8 @@ final class PanelController
 
         if (strcasecmp($currentRevision, $latestRevision) === 0) {
             $status['status'] = 'current';
-            $status['message'] = 'This install matches the latest upstream revision.';
+            $status['message'] = 'This install matches the latest upstream revision.'
+                . ' (Last Checked: ' . $checkedAt . ' UTC)';
             $this->saveUpdaterStatus($status);
             return $status;
         }
