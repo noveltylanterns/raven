@@ -248,13 +248,45 @@ final class PageImageRepository
         $variants = $this->table('page_image_variants');
 
         $stmt = $this->db->prepare(
-            'SELECT id, page_id, storage_target, original_filename, stored_filename, stored_path,
-                    mime_type, extension, byte_size, width, height, hash_sha256,
-                    status, sort_order, is_cover, is_preview, include_in_gallery, alt_text, title_text, caption, credit, license,
-                    focal_x, focal_y, created_at, updated_at
-             FROM ' . $images . '
-             WHERE page_id = :page_id
-             ORDER BY sort_order ASC, id ASC'
+            'SELECT
+                i.id,
+                i.page_id,
+                i.storage_target,
+                i.original_filename,
+                i.stored_filename,
+                i.stored_path AS image_stored_path,
+                i.mime_type,
+                i.extension,
+                i.byte_size,
+                i.width,
+                i.height,
+                i.hash_sha256,
+                i.status,
+                i.sort_order,
+                i.is_cover,
+                i.is_preview,
+                i.include_in_gallery,
+                i.alt_text,
+                i.title_text,
+                i.caption,
+                i.credit,
+                i.license,
+                i.focal_x,
+                i.focal_y,
+                i.created_at,
+                i.updated_at,
+                v.variant_key,
+                v.stored_filename AS variant_stored_filename,
+                v.stored_path AS variant_stored_path,
+                v.mime_type AS variant_mime_type,
+                v.extension AS variant_extension,
+                v.byte_size AS variant_byte_size,
+                v.width AS variant_width,
+                v.height AS variant_height
+             FROM ' . $images . ' i
+             LEFT JOIN ' . $variants . ' v ON v.image_id = i.id
+             WHERE i.page_id = :page_id
+             ORDER BY i.sort_order ASC, i.id ASC, v.variant_key ASC'
         );
         $stmt->execute([':page_id' => $pageId]);
         $rows = $stmt->fetchAll() ?: [];
@@ -263,62 +295,73 @@ final class PageImageRepository
             return [];
         }
 
-        $imageIds = array_map(static fn (array $row): int => (int) $row['id'], $rows);
-        $variantRows = $this->listVariantsByImageIds($imageIds, $variants);
+        $imagesById = [];
+        $orderedImageIds = [];
+        foreach ($rows as $row) {
+            $imageId = (int) $row['id'];
+            if ($imageId < 1) {
+                continue;
+            }
 
-        $variantMap = [];
-        foreach ($variantRows as $variantRow) {
-            $imageId = (int) $variantRow['image_id'];
-            $key = (string) $variantRow['variant_key'];
+            if (!isset($imagesById[$imageId])) {
+                $storedPath = (string) ($row['image_stored_path'] ?? '');
+                $imagesById[$imageId] = [
+                    'id' => $imageId,
+                    'page_id' => (int) ($row['page_id'] ?? 0),
+                    'storage_target' => (string) ($row['storage_target'] ?? ''),
+                    'original_filename' => (string) ($row['original_filename'] ?? ''),
+                    'stored_filename' => (string) ($row['stored_filename'] ?? ''),
+                    'stored_path' => $storedPath,
+                    'url' => $this->publicUrlFromStoredPath($storedPath),
+                    'mime_type' => (string) ($row['mime_type'] ?? ''),
+                    'extension' => (string) ($row['extension'] ?? ''),
+                    'byte_size' => (int) ($row['byte_size'] ?? 0),
+                    'width' => (int) ($row['width'] ?? 0),
+                    'height' => (int) ($row['height'] ?? 0),
+                    'hash_sha256' => (string) ($row['hash_sha256'] ?? ''),
+                    'status' => (string) ($row['status'] ?? ''),
+                    'sort_order' => (int) ($row['sort_order'] ?? 0),
+                    'is_cover' => (int) ($row['is_cover'] ?? 0) === 1,
+                    'is_preview' => (int) ($row['is_preview'] ?? 0) === 1,
+                    'include_in_gallery' => (int) ($row['include_in_gallery'] ?? 1) === 1,
+                    'alt_text' => (string) ($row['alt_text'] ?? ''),
+                    'title_text' => (string) ($row['title_text'] ?? ''),
+                    'caption' => (string) ($row['caption'] ?? ''),
+                    'credit' => (string) ($row['credit'] ?? ''),
+                    'license' => (string) ($row['license'] ?? ''),
+                    'focal_x' => $row['focal_x'] === null ? null : (float) $row['focal_x'],
+                    'focal_y' => $row['focal_y'] === null ? null : (float) $row['focal_y'],
+                    'created_at' => (string) ($row['created_at'] ?? ''),
+                    'updated_at' => (string) ($row['updated_at'] ?? ''),
+                    'variants' => [],
+                ];
+                $orderedImageIds[] = $imageId;
+            }
 
-            $variantMap[$imageId][$key] = [
-                'variant_key' => $key,
-                'stored_filename' => (string) $variantRow['stored_filename'],
-                'stored_path' => (string) $variantRow['stored_path'],
-                'url' => $this->publicUrlFromStoredPath((string) $variantRow['stored_path']),
-                'mime_type' => (string) $variantRow['mime_type'],
-                'extension' => (string) $variantRow['extension'],
-                'byte_size' => (int) $variantRow['byte_size'],
-                'width' => (int) $variantRow['width'],
-                'height' => (int) $variantRow['height'],
+            $variantKey = trim((string) ($row['variant_key'] ?? ''));
+            if ($variantKey === '') {
+                continue;
+            }
+
+            $variantStoredPath = (string) ($row['variant_stored_path'] ?? '');
+            $imagesById[$imageId]['variants'][$variantKey] = [
+                'variant_key' => $variantKey,
+                'stored_filename' => (string) ($row['variant_stored_filename'] ?? ''),
+                'stored_path' => $variantStoredPath,
+                'url' => $this->publicUrlFromStoredPath($variantStoredPath),
+                'mime_type' => (string) ($row['variant_mime_type'] ?? ''),
+                'extension' => (string) ($row['variant_extension'] ?? ''),
+                'byte_size' => (int) ($row['variant_byte_size'] ?? 0),
+                'width' => (int) ($row['variant_width'] ?? 0),
+                'height' => (int) ($row['variant_height'] ?? 0),
             ];
         }
 
         $result = [];
-        foreach ($rows as $row) {
-            $imageId = (int) $row['id'];
-            $storedPath = (string) $row['stored_path'];
-
-            $result[] = [
-                'id' => $imageId,
-                'page_id' => (int) $row['page_id'],
-                'storage_target' => (string) $row['storage_target'],
-                'original_filename' => (string) $row['original_filename'],
-                'stored_filename' => (string) $row['stored_filename'],
-                'stored_path' => $storedPath,
-                'url' => $this->publicUrlFromStoredPath($storedPath),
-                'mime_type' => (string) $row['mime_type'],
-                'extension' => (string) $row['extension'],
-                'byte_size' => (int) $row['byte_size'],
-                'width' => (int) $row['width'],
-                'height' => (int) $row['height'],
-                'hash_sha256' => (string) $row['hash_sha256'],
-                'status' => (string) $row['status'],
-                'sort_order' => (int) $row['sort_order'],
-                'is_cover' => (int) $row['is_cover'] === 1,
-                'is_preview' => (int) ($row['is_preview'] ?? 0) === 1,
-                'include_in_gallery' => (int) ($row['include_in_gallery'] ?? 1) === 1,
-                'alt_text' => (string) ($row['alt_text'] ?? ''),
-                'title_text' => (string) ($row['title_text'] ?? ''),
-                'caption' => (string) ($row['caption'] ?? ''),
-                'credit' => (string) ($row['credit'] ?? ''),
-                'license' => (string) ($row['license'] ?? ''),
-                'focal_x' => $row['focal_x'] === null ? null : (float) $row['focal_x'],
-                'focal_y' => $row['focal_y'] === null ? null : (float) $row['focal_y'],
-                'created_at' => (string) $row['created_at'],
-                'updated_at' => (string) $row['updated_at'],
-                'variants' => $variantMap[$imageId] ?? [],
-            ];
+        foreach ($orderedImageIds as $imageId) {
+            if (isset($imagesById[$imageId])) {
+                $result[] = $imagesById[$imageId];
+            }
         }
 
         return $result;

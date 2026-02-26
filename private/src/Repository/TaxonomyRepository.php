@@ -203,6 +203,97 @@ final class TaxonomyRepository
     }
 
     /**
+     * Returns page-editor taxonomy options and assigned category/tag rows in one query.
+     *
+     * @return array{
+     *   channels: array<int, array{id: int, name: string, slug: string}>,
+     *   categories: array<int, array{id: int, name: string, slug: string}>,
+     *   tags: array<int, array{id: int, name: string, slug: string}>,
+     *   assigned_categories: array<int, array{id: int, name: string, slug: string}>,
+     *   assigned_tags: array<int, array{id: int, name: string, slug: string}>
+     * }
+     */
+    public function listPageEditorTaxonomyData(int $pageId): array
+    {
+        $channels = $this->table('channels');
+        $categories = $this->table('categories');
+        $tags = $this->table('tags');
+        $pageCategories = $this->table('page_categories');
+        $pageTags = $this->table('page_tags');
+        $normalizedPageId = max(0, $pageId);
+
+        $stmt = $this->db->prepare(
+            'SELECT option_type, id, name, slug, is_assigned
+             FROM (
+                 SELECT \'channel\' AS option_type, c.id, c.name, c.slug, 0 AS is_assigned
+                 FROM ' . $channels . ' c
+                 UNION ALL
+                 SELECT \'category\' AS option_type, c.id, c.name, c.slug,
+                        CASE WHEN pc.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned
+                 FROM ' . $categories . ' c
+                 LEFT JOIN ' . $pageCategories . ' pc
+                    ON pc.category_id = c.id
+                   AND pc.page_id = ?
+                 UNION ALL
+                 SELECT \'tag\' AS option_type, t.id, t.name, t.slug,
+                        CASE WHEN pt.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned
+                 FROM ' . $tags . ' t
+                 LEFT JOIN ' . $pageTags . ' pt
+                    ON pt.tag_id = t.id
+                   AND pt.page_id = ?
+             ) options
+             ORDER BY option_type ASC, name ASC, id ASC'
+        );
+        $stmt->execute([$normalizedPageId, $normalizedPageId]);
+
+        $rows = $stmt->fetchAll() ?: [];
+        $result = [
+            'channels' => [],
+            'categories' => [],
+            'tags' => [],
+            'assigned_categories' => [],
+            'assigned_tags' => [],
+        ];
+
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $name = (string) ($row['name'] ?? '');
+            $slug = (string) ($row['slug'] ?? '');
+            if ($id <= 0 || $slug === '') {
+                continue;
+            }
+
+            $entry = [
+                'id' => $id,
+                'name' => $name,
+                'slug' => $slug,
+            ];
+            $isAssigned = (int) ($row['is_assigned'] ?? 0) === 1;
+            $optionType = strtolower(trim((string) ($row['option_type'] ?? '')));
+
+            if ($optionType === 'channel') {
+                $result['channels'][] = $entry;
+                continue;
+            }
+            if ($optionType === 'category') {
+                $result['categories'][] = $entry;
+                if ($isAssigned) {
+                    $result['assigned_categories'][] = $entry;
+                }
+                continue;
+            }
+            if ($optionType === 'tag') {
+                $result['tags'][] = $entry;
+                if ($isAssigned) {
+                    $result['assigned_tags'][] = $entry;
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Returns centralized extension shortcode entries for the page editor menu.
      *
      * @return array<int, array{extension: string, label: string, shortcode: string}>

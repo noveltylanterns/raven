@@ -218,15 +218,13 @@ final class PanelController
 
         // Null id means create mode; numeric id means edit mode.
         $page = $id !== null ? $this->pages->findById($id) : null;
-        // Load channel/category/tag options in one taxonomy query.
-        $taxonomyOptions = $this->taxonomy->listRoutingOptions();
-        $channelOptions = is_array($taxonomyOptions['channels'] ?? null) ? $taxonomyOptions['channels'] : [];
-        $categoryOptions = is_array($taxonomyOptions['categories'] ?? null) ? $taxonomyOptions['categories'] : [];
-        $tagOptions = is_array($taxonomyOptions['tags'] ?? null) ? $taxonomyOptions['tags'] : [];
-
-        // Existing assignments are loaded only in edit mode.
-        $assignedCategories = $id !== null ? $this->pages->assignedCategoriesForPage($id) : [];
-        $assignedTags = $id !== null ? $this->pages->assignedTagsForPage($id) : [];
+        // Load channel/category/tag options and page assignments in one query.
+        $taxonomyData = $this->taxonomy->listPageEditorTaxonomyData($id ?? 0);
+        $channelOptions = is_array($taxonomyData['channels'] ?? null) ? $taxonomyData['channels'] : [];
+        $categoryOptions = is_array($taxonomyData['categories'] ?? null) ? $taxonomyData['categories'] : [];
+        $tagOptions = is_array($taxonomyData['tags'] ?? null) ? $taxonomyData['tags'] : [];
+        $assignedCategories = is_array($taxonomyData['assigned_categories'] ?? null) ? $taxonomyData['assigned_categories'] : [];
+        $assignedTags = is_array($taxonomyData['assigned_tags'] ?? null) ? $taxonomyData['assigned_tags'] : [];
         $galleryImages = $id !== null ? $this->pageImages->listForPage($id) : [];
 
         $this->view->render('panel/pages/edit', [
