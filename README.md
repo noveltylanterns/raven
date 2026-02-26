@@ -45,6 +45,8 @@ Documentation Index: [docs/README.md](docs/README.md)
 
 Official Site: [raven.lanterns.io](https://raven.lanterns.io)
 
+Packagist: [noveltylanterns/raven](https://packagist.org/packages/noveltylanterns/raven)
+
 
 ## Roadmap
 
