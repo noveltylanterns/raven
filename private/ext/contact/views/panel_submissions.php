@@ -40,6 +40,7 @@ $baseHasQuery = str_contains($basePaginationPath, '?');
 $baseSeparator = $baseHasQuery ? '&' : '?';
 $submissionsSearchId = 'contact-submissions-filter-search';
 $submissionsTableId = 'contact-submissions-table';
+$submissionsBodyId = $submissionsTableId . '-body';
 $submissionsCountId = 'contact-submissions-filter-count';
 $submissionsEmptyId = 'contact-submissions-filter-empty';
 ?>
@@ -102,22 +103,20 @@ $submissionsEmptyId = 'contact-submissions-filter-empty';
                 <table id="<?= e($submissionsTableId) ?>" class="table table-sm align-middle mb-0">
                     <thead>
                     <tr>
+                        <th scope="col" class="text-center" style="width: 1%;"><span class="visually-hidden">State</span></th>
                         <th scope="col">Sender</th>
-                        <th scope="col">Message</th>
-                        <th scope="col">Additional</th>
-                        <th scope="col">Source</th>
-                        <th scope="col">IP Address</th>
+                        <th scope="col">Email</th>
                         <th scope="col">Submitted</th>
                         <th scope="col" class="text-center">Actions</th>
                     </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="<?= e($submissionsBodyId) ?>">
                     <?php foreach ($submissions as $submission): ?>
                         <?php
                         $submissionId = (int) ($submission['id'] ?? 0);
+                        $detailsId = 'contact-submission-details-' . $submissionId;
                         $ipAddress = trim((string) ($submission['ip_address'] ?? ''));
                         $hostname = trim((string) ($submission['hostname'] ?? ''));
-                        $hostnameTooltip = $hostname !== '' ? $hostname : 'Hostname not available.';
                         $sourceUrl = trim((string) ($submission['source_url'] ?? ''));
                         $senderName = trim((string) ($submission['sender_name'] ?? ''));
                         $senderEmail = trim((string) ($submission['sender_email'] ?? ''));
@@ -157,50 +156,32 @@ $submissionsEmptyId = 'contact-submissions-filter-empty';
                             $sourceUrl,
                             $ipAddress,
                             $hostname,
+                            trim((string) ($submission['user_agent'] ?? '')),
                             implode(' ', $additionalSearchValues),
                             (string) ($submission['created_at'] ?? ''),
                         ]);
                         ?>
-                        <tr data-filter-search="<?= e($searchableText) ?>">
-                            <td>
-                                <div><strong><?= e($senderName) ?></strong></div>
-                                <div><code><?= e($senderEmail) ?></code></div>
+                        <tr
+                            data-summary-row="1"
+                            data-details-id="<?= e($detailsId) ?>"
+                            data-filter-search="<?= e($searchableText) ?>"
+                            tabindex="0"
+                            role="button"
+                            aria-expanded="false"
+                            aria-controls="<?= e($detailsId) ?>"
+                            style="cursor: pointer;"
+                        >
+                            <td class="text-center">
+                                <i class="bi bi-chevron-down js-row-state-icon" aria-hidden="true"></i>
                             </td>
                             <td>
-                                <?php if ($messageText === ''): ?>
-                                    <span class="text-muted">-</span>
-                                <?php else: ?>
-                                    <div class="small" style="max-width: 320px; white-space: pre-wrap;"><?= e($messageText) ?></div>
-                                <?php endif; ?>
+                                <strong><?= e($senderName !== '' ? $senderName : '-') ?></strong>
                             </td>
                             <td>
-                                <?php if ($additionalFieldsList === []): ?>
+                                <?php if ($senderEmail === ''): ?>
                                     <span class="text-muted">-</span>
                                 <?php else: ?>
-                                    <?php foreach ($additionalFieldsList as $field): ?>
-                                        <div class="small"><strong><?= e((string) $field['label']) ?>:</strong> <?= e((string) $field['value']) ?></div>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <?php if ($sourceUrl === ''): ?>
-                                    <span class="text-muted">-</span>
-                                <?php else: ?>
-                                    <a href="<?= e($sourceUrl) ?>" target="_blank" rel="noreferrer noopener">
-                                        <?= e($sourceUrl) ?>
-                                    </a>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <?php if ($ipAddress === ''): ?>
-                                    <span class="text-muted">-</span>
-                                <?php else: ?>
-                                    <span
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="<?= e($hostnameTooltip) ?>"
-                                        style="cursor: help;"
-                                    ><?= e($ipAddress) ?></span>
+                                    <code><?= e($senderEmail) ?></code>
                                 <?php endif; ?>
                             </td>
                             <td><?= e((string) ($submission['created_at'] ?? '')) ?></td>
@@ -216,6 +197,50 @@ $submissionsEmptyId = 'contact-submissions-filter-empty';
                                         <span class="visually-hidden">Delete</span>
                                     </button>
                                 </form>
+                            </td>
+                        </tr>
+                        <tr data-details-row-for="<?= e($detailsId) ?>">
+                            <td colspan="5" class="p-0 border-0">
+                                <div
+                                    id="<?= e($detailsId) ?>"
+                                    class="collapse js-contact-submission-details"
+                                    data-bs-parent="#<?= e($submissionsBodyId) ?>"
+                                >
+                                    <div class="p-3 mb-0 border-bottom">
+                                        <div class="row g-3">
+                                            <div class="col-12 col-xl-6">
+                                                <h6 class="mb-2">Full Message</h6>
+                                                <?php if ($messageText === ''): ?>
+                                                    <p class="text-muted mb-0">No message body provided.</p>
+                                                <?php else: ?>
+                                                    <div class="small mb-0" style="white-space: pre-wrap;"><?= e($messageText) ?></div>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="col-12 col-xl-6">
+                                                <h6 class="mb-2">Submission Details</h6>
+                                                <div class="small mb-1">
+                                                    <strong>Source:</strong>
+                                                    <?php if ($sourceUrl === ''): ?>
+                                                        <span class="text-muted">-</span>
+                                                    <?php else: ?>
+                                                        <a href="<?= e($sourceUrl) ?>" target="_blank" rel="noreferrer noopener"><?= e($sourceUrl) ?></a>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div class="small mb-1"><strong>IP Address:</strong> <?= e($ipAddress !== '' ? $ipAddress : '-') ?></div>
+                                                <div class="small mb-1"><strong>Hostname:</strong> <?= e($hostname !== '' ? $hostname : '-') ?></div>
+                                                <div class="small mb-0" style="word-break: break-word;"><strong>User Agent:</strong> <?= e(trim((string) ($submission['user_agent'] ?? '')) !== '' ? (string) $submission['user_agent'] : '-') ?></div>
+                                            </div>
+                                            <?php if ($additionalFieldsList !== []): ?>
+                                                <div class="col-12">
+                                                    <h6 class="mb-2">Additional Fields</h6>
+                                                    <?php foreach ($additionalFieldsList as $field): ?>
+                                                        <div class="small"><strong><?= e((string) $field['label']) ?>:</strong> <?= e((string) $field['value']) ?></div>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -257,12 +282,45 @@ $submissionsEmptyId = 'contact-submissions-filter-empty';
     </form>
 </div>
 
+<style>
+  #<?= e($submissionsTableId) ?> tbody tr[data-details-row-for]:hover > td {
+    background-color: transparent !important;
+  }
+</style>
+
 <script>
   (function () {
     var table = document.getElementById('<?= e($submissionsTableId) ?>');
     var searchInput = document.getElementById('<?= e($submissionsSearchId) ?>');
     var countLabel = document.getElementById('<?= e($submissionsCountId) ?>');
     var emptyMessage = document.getElementById('<?= e($submissionsEmptyId) ?>');
+    var summaryRows = [];
+
+    function hasBootstrapCollapse() {
+      return !!(window.bootstrap && typeof window.bootstrap.Collapse === 'function');
+    }
+
+    function setRowState(row, isExpanded) {
+      row.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+      var stateIcon = row.querySelector('.js-row-state-icon');
+      if (stateIcon instanceof HTMLElement) {
+        stateIcon.classList.toggle('bi-chevron-up', isExpanded);
+        stateIcon.classList.toggle('bi-chevron-down', !isExpanded);
+      }
+    }
+
+    function closeDetailsPanel(panel) {
+      if (!(panel instanceof HTMLElement)) {
+        return;
+      }
+
+      if (hasBootstrapCollapse()) {
+        window.bootstrap.Collapse.getOrCreateInstance(panel, { toggle: false }).hide();
+        return;
+      }
+
+      panel.classList.remove('show');
+    }
 
     function normalize(value) {
       return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -270,16 +328,32 @@ $submissionsEmptyId = 'contact-submissions-filter-empty';
 
     if (table instanceof HTMLTableElement && searchInput instanceof HTMLInputElement) {
       var rows = table.tBodies.length > 0 ? Array.prototype.slice.call(table.tBodies[0].rows) : [];
-      var totalRows = rows.length;
+      summaryRows = rows.filter(function (row) {
+        return row.getAttribute('data-summary-row') === '1';
+      });
+      var totalRows = summaryRows.length;
 
       var applyFilters = function () {
         var query = normalize(searchInput.value);
         var visibleRows = 0;
 
-        rows.forEach(function (row) {
+        summaryRows.forEach(function (row) {
           var haystack = normalize(row.getAttribute('data-filter-search') || row.textContent || '');
           var visible = query === '' || haystack.indexOf(query) !== -1;
+          var detailsId = String(row.getAttribute('data-details-id') || '');
+          var detailsRow = detailsId === '' ? null : table.querySelector('tr[data-details-row-for="' + detailsId + '"]');
+
           row.classList.toggle('d-none', !visible);
+          if (detailsRow) {
+            detailsRow.classList.toggle('d-none', !visible);
+          }
+
+          if (!visible && detailsRow) {
+            var detailsPanel = detailsRow.querySelector('.js-contact-submission-details');
+            closeDetailsPanel(detailsPanel);
+            setRowState(row, false);
+          }
+
           if (visible) {
             visibleRows += 1;
           }
@@ -300,13 +374,78 @@ $submissionsEmptyId = 'contact-submissions-filter-empty';
       countLabel.textContent = 'Showing <?= (int) count($submissions) ?> of <?= (int) count($submissions) ?> submissions on this page.';
     }
 
-    if (!window.bootstrap || typeof window.bootstrap.Tooltip !== 'function') {
-      return;
+    function bindBootstrapCollapseStateSync() {
+      if (!hasBootstrapCollapse()) {
+        return;
+      }
+
+      summaryRows.forEach(function (row) {
+        var detailsId = String(row.getAttribute('data-details-id') || '');
+        if (detailsId === '') {
+          return;
+        }
+
+        var detailsPanel = document.getElementById(detailsId);
+        if (!(detailsPanel instanceof HTMLElement)) {
+          return;
+        }
+
+        if (detailsPanel.getAttribute('data-raven-collapse-sync') === '1') {
+          return;
+        }
+
+        detailsPanel.setAttribute('data-raven-collapse-sync', '1');
+        detailsPanel.addEventListener('show.bs.collapse', function () {
+          setRowState(row, true);
+        });
+        detailsPanel.addEventListener('hide.bs.collapse', function () {
+          setRowState(row, false);
+        });
+      });
     }
 
-    var elements = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-    elements.forEach(function (element) {
-      window.bootstrap.Tooltip.getOrCreateInstance(element);
+    summaryRows.forEach(function (row) {
+      var detailsId = String(row.getAttribute('data-details-id') || '');
+      if (detailsId === '') {
+        return;
+      }
+
+      var detailsPanel = document.getElementById(detailsId);
+      if (!(detailsPanel instanceof HTMLElement)) {
+        return;
+      }
+
+      var togglePanel = function () {
+        if (hasBootstrapCollapse()) {
+          bindBootstrapCollapseStateSync();
+          window.bootstrap.Collapse.getOrCreateInstance(detailsPanel, { toggle: false }).toggle();
+          return;
+        }
+
+        detailsPanel.classList.toggle('show');
+        setRowState(row, detailsPanel.classList.contains('show'));
+      };
+
+      row.addEventListener('click', function (event) {
+        var target = event.target;
+        if (target instanceof Element && target.closest('a, button, input, select, textarea, label, form')) {
+          return;
+        }
+        togglePanel();
+      });
+
+      row.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+          return;
+        }
+        event.preventDefault();
+        togglePanel();
+      });
+
+      setRowState(row, detailsPanel.classList.contains('show'));
     });
+
+    bindBootstrapCollapseStateSync();
+    window.addEventListener('load', bindBootstrapCollapseStateSync);
   })();
 </script>
