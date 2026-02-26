@@ -12,6 +12,7 @@ declare(strict_types=1);
 use Raven\Controller\PublicController;
 use Raven\Core\Debug\DebugToolbarRenderer;
 use Raven\Core\Debug\RequestProfiler;
+use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Routing\Router;
 
 use function Raven\Core\Support\request_path;
@@ -154,12 +155,9 @@ $controller = new PublicController(
     $app['redirects'],
     $app['taxonomy'],
     $app['users'],
-    $app['contact_forms'] ?? null,
-    $app['contact_submissions'] ?? null,
-    $app['signup_forms'] ?? null,
     $app['input'],
     $app['csrf'],
-    $app['signup_submissions'] ?? null
+    is_array($app['extension_services'] ?? null) ? (array) $app['extension_services'] : []
 );
 
 $input = $app['input'];
@@ -227,29 +225,37 @@ $router->add('GET', '/', static function () use ($controller): void {
     $controller->home();
 });
 
-// Public signup-sheet submit endpoint used by embedded [signups] shortcodes.
-$router->add('POST', '/signups/submit/{slug}', static function (array $params) use ($controller, $input): void {
-    $slug = $input->slug($params['slug'] ?? null);
-
-    if ($slug === null) {
-        $controller->notFound();
-        return;
+// Extension public route registration.
+//
+// Each enabled extension can optionally provide `private/ext/{name}/public_routes.php`
+// that returns a callable with signature:
+//   function (Router $router, array $context): void
+//
+// Context keys:
+// - app: container array from bootstrap
+// - controller: PublicController instance
+// - input: InputSanitizer instance
+// - extensionDirectory: enabled extension folder name
+$enabledPublicExtensions = ExtensionRegistry::enabledDirectories((string) ($app['root'] ?? dirname(__DIR__)), true);
+foreach ($enabledPublicExtensions as $extensionName) {
+    $routesFile = $app['root'] . '/private/ext/' . $extensionName . '/public_routes.php';
+    if (!is_file($routesFile)) {
+        continue;
     }
 
-    $controller->submitWaitlist($slug);
-});
-
-// Public contact form submit endpoint used by embedded [contact] shortcodes.
-$router->add('POST', '/contact-form/submit/{slug}', static function (array $params) use ($controller, $input): void {
-    $slug = $input->slug($params['slug'] ?? null);
-
-    if ($slug === null) {
-        $controller->notFound();
-        return;
+    /** @var mixed $registrar */
+    $registrar = require $routesFile;
+    if (!is_callable($registrar)) {
+        continue;
     }
 
-    $controller->submitContactForm($slug);
-});
+    $registrar($router, [
+        'app' => $app,
+        'controller' => $controller,
+        'input' => $input,
+        'extensionDirectory' => $extensionName,
+    ]);
+}
 
 // Category routes with optional page number path segment.
 if ($categoryPrefix !== '') {

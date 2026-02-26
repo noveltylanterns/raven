@@ -13,6 +13,7 @@ namespace Raven\Core\Database;
 
 use PDO;
 use Raven\Core\Auth\PanelAccess;
+use Raven\Core\Extension\ExtensionRegistry;
 use RuntimeException;
 
 /**
@@ -27,19 +28,16 @@ final class SchemaManager
     {
         // App schema first so auth/group seeding can rely on group tables.
         $this->ensureAppSchema($appDb, $driver, $prefix);
-        $this->ensureShortcodeRegistryBackfill($appDb, $driver, $prefix);
         $this->ensurePageExtendedColumn($appDb, $driver, $prefix);
         $this->ensurePageDescriptionColumn($appDb, $driver, $prefix);
         $this->ensurePageGalleryEnabledColumn($appDb, $driver, $prefix);
         $this->ensurePageSlugScopeUniqueness($appDb, $driver, $prefix);
         $this->ensurePageImageDisplayColumns($appDb, $driver, $prefix);
         $this->ensureRedirectDescriptionColumn($appDb, $driver, $prefix);
-        $this->ensureContactFormSaveMailLocallyColumn($appDb, $driver, $prefix);
-        $this->ensureSignupsSubmissionAdditionalFieldsColumn($appDb, $driver, $prefix);
-        $this->ensureSignupsSubmissionHostnameColumn($appDb, $driver, $prefix);
         $this->ensureGroupRoutingColumns($appDb, $driver, $prefix);
         $this->ensureTaxonomyImageColumns($appDb, $driver, $prefix);
         $this->ensurePanelPerformanceIndexes($appDb, $driver, $prefix);
+        $this->ensureEnabledExtensionSchemas($appDb, $driver, $prefix);
         // Auth schema must exist before user/group relationship seeding.
         $this->ensureAuthSchema($authDb, $driver, $prefix);
         $this->ensureStockGroups($appDb, $driver, $prefix);
@@ -213,58 +211,6 @@ final class SchemaManager
                 PRIMARY KEY (user_id, group_id)
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS extensions.ext_contact (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                slug TEXT NOT NULL UNIQUE,
-                enabled INTEGER NOT NULL DEFAULT 1,
-                save_mail_locally INTEGER NOT NULL DEFAULT 1,
-                destination TEXT NOT NULL DEFAULT \'\',
-                cc TEXT NOT NULL DEFAULT \'\',
-                bcc TEXT NOT NULL DEFAULT \'\',
-                additional_fields_json TEXT NOT NULL DEFAULT \'[]\',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS extensions.ext_contact_submissions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                form_slug TEXT NOT NULL,
-                sender_name TEXT NOT NULL,
-                sender_email TEXT NOT NULL,
-                message_text TEXT NOT NULL,
-                additional_fields_json TEXT NOT NULL DEFAULT \'[]\',
-                source_url TEXT NOT NULL DEFAULT \'\',
-                ip_address TEXT NULL,
-                hostname TEXT NULL,
-                user_agent TEXT NULL,
-                created_at TEXT NOT NULL
-            )');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS extensions.ext_signups (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                slug TEXT NOT NULL UNIQUE,
-                enabled INTEGER NOT NULL DEFAULT 1,
-                additional_fields_json TEXT NOT NULL DEFAULT \'[]\',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS extensions.ext_signups_submissions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                form_slug TEXT NOT NULL,
-                email TEXT NOT NULL,
-                display_name TEXT NOT NULL,
-                country TEXT NOT NULL,
-                additional_fields_json TEXT NOT NULL DEFAULT \'[]\',
-                source_url TEXT NOT NULL DEFAULT \'\',
-                ip_address TEXT NULL,
-                hostname TEXT NULL,
-                user_agent TEXT NULL,
-                created_at TEXT NOT NULL
-            )');
-
             $db->exec('CREATE TABLE IF NOT EXISTS auth.login_failures (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 bucket_hash TEXT NOT NULL UNIQUE,
@@ -290,11 +236,6 @@ final class SchemaManager
             $db->exec('CREATE INDEX IF NOT EXISTS taxonomy.idx_shortcodes_sort_order ON shortcodes (extension_name, sort_order, id)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_page_images_page_id ON page_images (page_id)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_page_images_sort_order ON page_images (page_id, sort_order)');
-            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS extensions.uniq_ext_contact_slug ON ext_contact (slug)');
-            $db->exec('CREATE INDEX IF NOT EXISTS extensions.idx_ext_contact_submissions_form_slug_created_at ON ext_contact_submissions (form_slug, created_at DESC)');
-            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS extensions.uniq_ext_signups_slug ON ext_signups (slug)');
-            $db->exec('CREATE INDEX IF NOT EXISTS extensions.idx_ext_signups_submissions_form_slug_created_at ON ext_signups_submissions (form_slug, created_at DESC)');
-            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS extensions.uniq_ext_signups_submissions_form_slug_email ON ext_signups_submissions (form_slug, email)');
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS auth.uniq_login_failures_bucket_hash ON login_failures (bucket_hash)');
             $db->exec('CREATE INDEX IF NOT EXISTS auth.idx_login_failures_locked_until ON login_failures (locked_until)');
             $db->exec('CREATE INDEX IF NOT EXISTS auth.idx_login_failures_last_failed_at ON login_failures (last_failed_at)');
@@ -470,63 +411,6 @@ final class SchemaManager
                 user_id BIGINT UNSIGNED NOT NULL,
                 group_id BIGINT UNSIGNED NOT NULL,
                 PRIMARY KEY (user_id, group_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'ext_contact (
-                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                slug VARCHAR(160) NOT NULL,
-                enabled TINYINT(1) NOT NULL DEFAULT 1,
-                save_mail_locally TINYINT(1) NOT NULL DEFAULT 1,
-                destination TEXT NOT NULL,
-                cc TEXT NOT NULL,
-                bcc TEXT NOT NULL,
-                additional_fields_json TEXT NOT NULL,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL,
-                UNIQUE KEY uniq_' . $prefix . 'ext_contact_slug (slug)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'ext_contact_submissions (
-                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                form_slug VARCHAR(160) NOT NULL,
-                sender_name VARCHAR(255) NOT NULL,
-                sender_email VARCHAR(254) NOT NULL,
-                message_text MEDIUMTEXT NOT NULL,
-                additional_fields_json TEXT NOT NULL,
-                source_url VARCHAR(2048) NOT NULL DEFAULT \'\',
-                ip_address VARCHAR(45) NULL,
-                hostname VARCHAR(255) NULL,
-                user_agent VARCHAR(500) NULL,
-                created_at DATETIME NOT NULL,
-                INDEX idx_' . $prefix . 'ext_contact_submissions_form_slug_created_at (form_slug, created_at)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'ext_signups (
-                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                slug VARCHAR(160) NOT NULL,
-                enabled TINYINT(1) NOT NULL DEFAULT 1,
-                additional_fields_json TEXT NOT NULL,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL,
-                UNIQUE KEY uniq_' . $prefix . 'ext_signups_slug (slug)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-
-            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'ext_signups_submissions (
-                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                form_slug VARCHAR(160) NOT NULL,
-                email VARCHAR(254) NOT NULL,
-                display_name VARCHAR(255) NOT NULL,
-                country VARCHAR(16) NOT NULL,
-                additional_fields_json TEXT NOT NULL,
-                source_url VARCHAR(2048) NOT NULL DEFAULT \'\',
-                ip_address VARCHAR(45) NULL,
-                hostname VARCHAR(255) NULL,
-                user_agent VARCHAR(500) NULL,
-                created_at DATETIME NOT NULL,
-                UNIQUE KEY uniq_' . $prefix . 'ext_signups_submissions_form_slug_email (form_slug, email),
-                INDEX idx_' . $prefix . 'ext_signups_submissions_form_slug_created_at (form_slug, created_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'login_failures (
@@ -719,63 +603,6 @@ final class SchemaManager
             group_id BIGINT NOT NULL,
             PRIMARY KEY (user_id, group_id)
         )');
-
-        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'ext_contact (
-            id BIGSERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            slug VARCHAR(160) NOT NULL,
-            enabled SMALLINT NOT NULL DEFAULT 1,
-            save_mail_locally SMALLINT NOT NULL DEFAULT 1,
-            destination TEXT NOT NULL DEFAULT \'\',
-            cc TEXT NOT NULL DEFAULT \'\',
-            bcc TEXT NOT NULL DEFAULT \'\',
-            additional_fields_json TEXT NOT NULL DEFAULT \'[]\',
-            created_at TIMESTAMP NOT NULL,
-            updated_at TIMESTAMP NOT NULL
-        )');
-        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $prefix . 'ext_contact_slug ON ' . $prefix . 'ext_contact (slug)');
-
-        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'ext_contact_submissions (
-            id BIGSERIAL PRIMARY KEY,
-            form_slug VARCHAR(160) NOT NULL,
-            sender_name VARCHAR(255) NOT NULL,
-            sender_email VARCHAR(254) NOT NULL,
-            message_text TEXT NOT NULL,
-            additional_fields_json TEXT NOT NULL DEFAULT \'[]\',
-            source_url VARCHAR(2048) NOT NULL DEFAULT \'\',
-            ip_address VARCHAR(45) NULL,
-            hostname VARCHAR(255) NULL,
-            user_agent VARCHAR(500) NULL,
-            created_at TIMESTAMP NOT NULL
-        )');
-        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'ext_contact_submissions_form_slug_created_at ON ' . $prefix . 'ext_contact_submissions (form_slug, created_at DESC)');
-
-        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'ext_signups (
-            id BIGSERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            slug VARCHAR(160) NOT NULL,
-            enabled SMALLINT NOT NULL DEFAULT 1,
-            additional_fields_json TEXT NOT NULL DEFAULT \'[]\',
-            created_at TIMESTAMP NOT NULL,
-            updated_at TIMESTAMP NOT NULL
-        )');
-        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $prefix . 'ext_signups_slug ON ' . $prefix . 'ext_signups (slug)');
-
-        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'ext_signups_submissions (
-            id BIGSERIAL PRIMARY KEY,
-            form_slug VARCHAR(160) NOT NULL,
-            email VARCHAR(254) NOT NULL,
-            display_name VARCHAR(255) NOT NULL,
-            country VARCHAR(16) NOT NULL,
-            additional_fields_json TEXT NOT NULL DEFAULT \'[]\',
-            source_url VARCHAR(2048) NOT NULL DEFAULT \'\',
-            ip_address VARCHAR(45) NULL,
-            hostname VARCHAR(255) NULL,
-            user_agent VARCHAR(500) NULL,
-            created_at TIMESTAMP NOT NULL
-        )');
-        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $prefix . 'ext_signups_submissions_form_slug_email ON ' . $prefix . 'ext_signups_submissions (form_slug, email)');
-        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'ext_signups_submissions_form_slug_created_at ON ' . $prefix . 'ext_signups_submissions (form_slug, created_at DESC)');
 
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'login_failures (
             id BIGSERIAL PRIMARY KEY,
@@ -1475,198 +1302,38 @@ final class SchemaManager
     }
 
     /**
-     * Adds contact-form local-save toggle column when missing.
+     * Executes extension-owned schema providers for enabled extensions.
      */
-    private function ensureContactFormSaveMailLocallyColumn(PDO $db, string $driver, string $prefix): void
+    private function ensureEnabledExtensionSchemas(PDO $db, string $driver, string $prefix): void
     {
-        if ($driver === 'sqlite') {
-            $contactTable = $this->table($driver, $prefix, 'ext_contact');
-            if (!$this->appColumnExistsSqlite($db, $contactTable, 'save_mail_locally')) {
-                $db->exec('ALTER TABLE ' . $contactTable . ' ADD COLUMN save_mail_locally INTEGER NOT NULL DEFAULT 1');
+        $root = dirname(__DIR__, 4);
+        foreach (ExtensionRegistry::enabledDirectories($root, true) as $directory) {
+            $schemaPath = $root . '/private/ext/' . $directory . '/schema.php';
+            if (!is_file($schemaPath)) {
+                continue;
             }
 
-            $db->exec('UPDATE ' . $contactTable . ' SET save_mail_locally = 1 WHERE save_mail_locally IS NULL');
-            return;
-        }
-
-        $contactTable = $prefix . 'ext_contact';
-
-        if ($driver === 'mysql') {
-            if (!$this->appColumnExistsMySql($db, $contactTable, 'save_mail_locally')) {
-                $db->exec('ALTER TABLE ' . $contactTable . ' ADD COLUMN save_mail_locally TINYINT(1) NOT NULL DEFAULT 1');
+            /** @var mixed $provider */
+            $provider = require $schemaPath;
+            if (!is_callable($provider)) {
+                error_log('Raven extension schema provider is invalid for extension "' . $directory . '".');
+                continue;
             }
 
-            $db->exec('UPDATE ' . $contactTable . ' SET save_mail_locally = 1 WHERE save_mail_locally IS NULL');
-            return;
-        }
-
-        if (!$this->appColumnExistsPgSql($db, $contactTable, 'save_mail_locally')) {
-            $db->exec('ALTER TABLE ' . $contactTable . ' ADD COLUMN save_mail_locally SMALLINT NOT NULL DEFAULT 1');
-        }
-
-        $db->exec('UPDATE ' . $contactTable . ' SET save_mail_locally = 1 WHERE save_mail_locally IS NULL');
-    }
-
-    /**
-     * Adds signup submission additional-fields payload storage column when missing.
-     */
-    private function ensureSignupsSubmissionAdditionalFieldsColumn(PDO $db, string $driver, string $prefix): void
-    {
-        if ($driver === 'sqlite') {
-            $signupsTable = $this->table($driver, $prefix, 'ext_signups_submissions');
-            if (!$this->appColumnExistsSqlite($db, $signupsTable, 'additional_fields_json')) {
-                $db->exec('ALTER TABLE ' . $signupsTable . ' ADD COLUMN additional_fields_json TEXT NOT NULL DEFAULT \'[]\'');
+            try {
+                $provider([
+                    'db' => $db,
+                    'driver' => $driver,
+                    'prefix' => $prefix,
+                    'extension' => $directory,
+                    'table' => function (string $table) use ($driver, $prefix): string {
+                        return $this->table($driver, $prefix, $table);
+                    },
+                ]);
+            } catch (\Throwable $exception) {
+                error_log('Raven extension schema provider failed for extension "' . $directory . '": ' . $exception->getMessage());
             }
-
-            $db->exec('UPDATE ' . $signupsTable . ' SET additional_fields_json = \'[]\' WHERE additional_fields_json IS NULL OR additional_fields_json = \'\'');
-            return;
         }
-
-        $signupsTable = $prefix . 'ext_signups_submissions';
-
-        if ($driver === 'mysql') {
-            if (!$this->appColumnExistsMySql($db, $signupsTable, 'additional_fields_json')) {
-                $db->exec('ALTER TABLE ' . $signupsTable . ' ADD COLUMN additional_fields_json TEXT NOT NULL');
-            }
-
-            $db->exec('UPDATE ' . $signupsTable . ' SET additional_fields_json = \'[]\' WHERE additional_fields_json IS NULL OR additional_fields_json = \'\'');
-            return;
-        }
-
-        if (!$this->appColumnExistsPgSql($db, $signupsTable, 'additional_fields_json')) {
-            $db->exec('ALTER TABLE ' . $signupsTable . ' ADD COLUMN additional_fields_json TEXT NOT NULL DEFAULT \'[]\'');
-        }
-
-        $db->exec('UPDATE ' . $signupsTable . ' SET additional_fields_json = \'[]\' WHERE additional_fields_json IS NULL OR additional_fields_json = \'\'');
-    }
-
-    /**
-     * Adds signup submission reverse-DNS hostname column when missing.
-     */
-    private function ensureSignupsSubmissionHostnameColumn(PDO $db, string $driver, string $prefix): void
-    {
-        if ($driver === 'sqlite') {
-            $signupsTable = $this->table($driver, $prefix, 'ext_signups_submissions');
-            if (!$this->appColumnExistsSqlite($db, $signupsTable, 'hostname')) {
-                $db->exec('ALTER TABLE ' . $signupsTable . ' ADD COLUMN hostname TEXT NULL');
-            }
-
-            // Normalize blank values into null for cleaner export/query handling.
-            $db->exec("UPDATE " . $signupsTable . " SET hostname = NULL WHERE hostname = ''");
-            return;
-        }
-
-        $signupsTable = $prefix . 'ext_signups_submissions';
-
-        if ($driver === 'mysql') {
-            if (!$this->appColumnExistsMySql($db, $signupsTable, 'hostname')) {
-                $db->exec('ALTER TABLE ' . $signupsTable . ' ADD COLUMN hostname VARCHAR(255) NULL');
-            }
-
-            $db->exec("UPDATE " . $signupsTable . " SET hostname = NULL WHERE hostname = ''");
-            return;
-        }
-
-        if (!$this->appColumnExistsPgSql($db, $signupsTable, 'hostname')) {
-            $db->exec('ALTER TABLE ' . $signupsTable . ' ADD COLUMN hostname VARCHAR(255) NULL');
-        }
-
-        $db->exec("UPDATE " . $signupsTable . " SET hostname = NULL WHERE hostname = ''");
-    }
-
-    /**
-     * Backfills centralized shortcode registry rows from stock form extensions.
-     */
-    private function ensureShortcodeRegistryBackfill(PDO $db, string $driver, string $prefix): void
-    {
-        $shortcodesTable = $this->table($driver, $prefix, 'shortcodes');
-        $contactTable = $this->table($driver, $prefix, 'ext_contact');
-        $signupsTable = $this->table($driver, $prefix, 'ext_signups');
-        $now = gmdate('Y-m-d H:i:s');
-        $safeNow = str_replace("'", "''", $now);
-
-        if ($driver === 'sqlite') {
-            $db->exec(
-                "INSERT OR IGNORE INTO {$shortcodesTable} (extension_name, label, shortcode, sort_order, created_at, updated_at)
-                 SELECT
-                     'contact' AS extension_name,
-                     'Contact Forms: ' || c.name AS label,
-                     '[contact slug=\"' || c.slug || '\"]' AS shortcode,
-                     c.id AS sort_order,
-                     COALESCE(c.created_at, '{$safeNow}') AS created_at,
-                     COALESCE(c.updated_at, '{$safeNow}') AS updated_at
-                 FROM {$contactTable} c
-                 WHERE c.enabled = 1"
-            );
-            $db->exec(
-                "INSERT OR IGNORE INTO {$shortcodesTable} (extension_name, label, shortcode, sort_order, created_at, updated_at)
-                 SELECT
-                     'signups' AS extension_name,
-                     'Signup Sheets: ' || s.name AS label,
-                     '[signups slug=\"' || s.slug || '\"]' AS shortcode,
-                     s.id AS sort_order,
-                     COALESCE(s.created_at, '{$safeNow}') AS created_at,
-                     COALESCE(s.updated_at, '{$safeNow}') AS updated_at
-                 FROM {$signupsTable} s
-                 WHERE s.enabled = 1"
-            );
-            return;
-        }
-
-        if ($driver === 'mysql') {
-            $db->exec(
-                "INSERT IGNORE INTO {$shortcodesTable} (extension_name, label, shortcode, sort_order, created_at, updated_at)
-                 SELECT
-                     'contact' AS extension_name,
-                     CONCAT('Contact Forms: ', c.name) AS label,
-                     CONCAT('[contact slug=\"', c.slug, '\"]') AS shortcode,
-                     c.id AS sort_order,
-                     COALESCE(c.created_at, '{$safeNow}') AS created_at,
-                     COALESCE(c.updated_at, '{$safeNow}') AS updated_at
-                 FROM {$contactTable} c
-                 WHERE c.enabled = 1"
-            );
-            $db->exec(
-                "INSERT IGNORE INTO {$shortcodesTable} (extension_name, label, shortcode, sort_order, created_at, updated_at)
-                 SELECT
-                     'signups' AS extension_name,
-                     CONCAT('Signup Sheets: ', s.name) AS label,
-                     CONCAT('[signups slug=\"', s.slug, '\"]') AS shortcode,
-                     s.id AS sort_order,
-                     COALESCE(s.created_at, '{$safeNow}') AS created_at,
-                     COALESCE(s.updated_at, '{$safeNow}') AS updated_at
-                 FROM {$signupsTable} s
-                 WHERE s.enabled = 1"
-            );
-            return;
-        }
-
-        $db->exec(
-            "INSERT INTO {$shortcodesTable} (extension_name, label, shortcode, sort_order, created_at, updated_at)
-             SELECT
-                 'contact' AS extension_name,
-                 'Contact Forms: ' || c.name AS label,
-                 '[contact slug=\"' || c.slug || '\"]' AS shortcode,
-                 c.id AS sort_order,
-                 COALESCE(c.created_at, '{$safeNow}') AS created_at,
-                 COALESCE(c.updated_at, '{$safeNow}') AS updated_at
-             FROM {$contactTable} c
-             WHERE c.enabled = 1
-             ON CONFLICT (extension_name, shortcode) DO NOTHING"
-        );
-        $db->exec(
-            "INSERT INTO {$shortcodesTable} (extension_name, label, shortcode, sort_order, created_at, updated_at)
-             SELECT
-                 'signups' AS extension_name,
-                 'Signup Sheets: ' || s.name AS label,
-                 '[signups slug=\"' || s.slug || '\"]' AS shortcode,
-                 s.id AS sort_order,
-                 COALESCE(s.created_at, '{$safeNow}') AS created_at,
-                 COALESCE(s.updated_at, '{$safeNow}') AS updated_at
-             FROM {$signupsTable} s
-             WHERE s.enabled = 1
-             ON CONFLICT (extension_name, shortcode) DO NOTHING"
-        );
     }
 
     /**
@@ -1676,6 +1343,10 @@ final class SchemaManager
     {
         if ($driver !== 'sqlite') {
             return $prefix . $table;
+        }
+
+        if (str_starts_with($table, 'ext_')) {
+            return 'extensions.' . $table;
         }
 
         return match ($table) {
@@ -1691,10 +1362,6 @@ final class SchemaManager
             'page_image_variants' => 'main.page_image_variants',
             'groups' => 'auth.groups',
             'user_groups' => 'auth.user_groups',
-            'ext_contact' => 'extensions.ext_contact',
-            'ext_contact_submissions' => 'extensions.ext_contact_submissions',
-            'ext_signups' => 'extensions.ext_signups',
-            'ext_signups_submissions' => 'extensions.ext_signups_submissions',
             'login_failures' => 'auth.login_failures',
             default => 'main.' . $table,
         };

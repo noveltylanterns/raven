@@ -1,6 +1,6 @@
 # Raven Extension Agent Guide
 
-Last updated: 2026-02-18
+Last updated: 2026-02-26
 
 ## Scope
 - This file defines the extension-authoring contract for `private/ext/`.
@@ -21,7 +21,9 @@ Last updated: 2026-02-18
 - Allowed extension directory name regex: `^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$`
 - Required manifest: `private/ext/{directory_name}/extension.json`
 - Optional extension service provider: `private/ext/{directory_name}/bootstrap.php`
+- Optional extension schema provider: `private/ext/{directory_name}/schema.php`
 - Optional panel routes registrar: `private/ext/{directory_name}/panel_routes.php`
+- Optional public routes registrar: `private/ext/{directory_name}/public_routes.php`
 - Optional page-editor shortcode provider: `private/ext/{directory_name}/shortcodes.php`
 - Optional extension-local state file(s) when needed by your extension
 - Optional extension-owned panel templates: `private/ext/{directory_name}/views/*.php`
@@ -78,6 +80,17 @@ Last updated: 2026-02-18
 - `setExtensionPermissionPath` => panel route for persisting extension permission bit
 - Registration happens after core panel routes are added.
 
+## Public Route Registration Contract
+- If enabled, Raven attempts to load `private/ext/{name}/public_routes.php`.
+- File must return a callable:
+- `function (Router $router, array $context): void`
+- Provided context keys:
+- `app` => bootstrap container array
+- `controller` => public controller instance
+- `input` => input sanitizer instance
+- `extensionDirectory` => enabled extension folder name
+- Registration happens during `public/index.php` route bootstrap before fallback page/channel routes.
+
 ## Extension Service Bootstrap Contract
 - If enabled, Raven attempts to load `private/ext/{name}/bootstrap.php` during `private/bootstrap.php`.
 - File must return a callable:
@@ -85,6 +98,19 @@ Last updated: 2026-02-18
 - Provider should register extension services into the shared app container (for example repositories/controllers/helpers required by extension routes/runtime).
 - Bootstrap providers are loaded only for enabled extensions listed in `private/ext/.state.php` with valid directory names.
 - Extension source autoloading (`private/ext/{name}/src/`) is also enabled only for extensions marked enabled in `.state.php`.
+
+## Extension Schema Contract
+- If enabled, Raven attempts to load `private/ext/{name}/schema.php` during core schema ensure.
+- File must return a callable:
+- `function (array $context): void`
+- Provided context keys:
+- `db` => PDO app connection
+- `driver` => active DB driver (`sqlite`/`mysql`/`pgsql`)
+- `prefix` => configured table prefix (empty in SQLite mode)
+- `extension` => extension directory name
+- `table` => callable `fn(string $logicalTable): string` to resolve physical table names for the active backend
+- Schema providers must be idempotent and safe to run repeatedly.
+- Keep extension table creation, extension-specific column migrations, and shortcode-registry backfills in this file rather than in core schema code.
 
 ## Services Available In `context['app']`
 - From `private/bootstrap.php`, extensions can consume:
@@ -108,12 +134,27 @@ Last updated: 2026-02-18
 - `tags`
 - `taxonomy`
 - `users`
+- `extension_services` (recommended extension-owned service map keyed by extension directory and service name)
+- `extension_services.{extension}.embedded_form_runtimes` (optional list of embedded shortcode runtimes implementing `Raven\Core\Extension\EmbeddedFormRuntimeInterface`)
 - `contact_forms`
 - `contact_submissions`
 - `signup_forms`
 - `signup_submissions`
 - Note: extension-owned service keys are optional and depend on whether the extension is enabled and whether its `bootstrap.php` registered them.
+- Legacy top-level keys (for example `contact_forms`) remain for compatibility during migration and should be considered transitional.
 - Use `isset(...)` and strict instance checks before assuming any service.
+
+### Embedded Form Runtime Contract
+- Extensions may register embedded shortcode runtimes through their bootstrap provider:
+- `extension_services.{extension}.embedded_form_runtimes[] = <EmbeddedFormRuntimeInterface>`
+- Core `PublicController` now discovers these runtimes generically for shortcode rendering and submit dispatch.
+- Runtime interface location: `private/src/Core/Extension/EmbeddedFormRuntimeInterface.php`.
+- Required runtime capabilities:
+- shortcode type token (`type()`)
+- owning extension key (`extensionKey()`)
+- enabled definition listing (`listEnabledForms()`)
+- render markup (`render(...)`)
+- submit handler (`submit(...)`)
 
 ## Panel UI Integration Pattern
 - Extensions generally render via shared panel layout: `private/views/layouts/panel.php`.
@@ -181,12 +222,10 @@ Last updated: 2026-02-18
 - DB-backed state for extensions is also supported and preferred for panel-managed structured data.
 
 ## Public Runtime Integration (Current Reality)
-- There is currently no generic extension public-route registrar equivalent to panel `panel_routes.php`.
-- Public extension behavior today is implemented by core-supported integration points.
+- Public routes can now be registered by enabled extensions via `public_routes.php`.
 - Existing example:
-- `contact` and `signups` expose configuration via DB-backed extension tables (`ext_contact`, `ext_signups`)
-- core public runtime reads those definitions and renders supported shortcodes
-- If your feature needs a new generic public runtime hook, treat it as a core platform feature request.
+- `contact` and `signups` register submit endpoints from their extension folders and expose configuration via DB-backed extension tables (`ext_contact`, `ext_signups`).
+- Core public runtime still owns shortcode rendering and site-wide access/routing fallback policy.
 - Do not hard-patch core for one-off extension behavior unless explicitly planned and accepted as a core change.
 
 ## Coexistence Goal
@@ -199,7 +238,7 @@ Last updated: 2026-02-18
 ## Update-Safe Workflow
 - Create `private/ext/{new_extension}/`.
 - Add `extension.json` first.
-- Add `panel_routes.php` and `views/` as needed.
+- Add `panel_routes.php`, `public_routes.php`, and `views/` as needed.
 - Persist extension-specific state in extension-owned files.
 - Enable through Extension Manager only after manifest/routes validate.
 - Repeated warning: do not modify core to ship extension features.

@@ -15,24 +15,18 @@ namespace Raven\Controller;
 
 use Raven\Core\Auth\AuthService;
 use Raven\Core\Config;
+use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Security\Csrf;
 use Raven\Core\Security\InputSanitizer;
-use Raven\Core\Support\CountryOptions;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Core\View;
-use Raven\Repository\ContactFormRepository;
-use Raven\Repository\ContactSubmissionRepository;
 use Raven\Repository\GroupRepository;
 use Raven\Repository\PageImageRepository;
 use Raven\Repository\PageRepository;
 use Raven\Repository\RedirectRepository;
-use Raven\Repository\SignupFormRepository;
 use Raven\Repository\TaxonomyRepository;
 use Raven\Repository\UserRepository;
-use Raven\Repository\SignupSubmissionRepository;
-
-use function Raven\Core\Support\redirect;
 
 /**
  * Handles public website routes.
@@ -48,12 +42,10 @@ final class PublicController
     private RedirectRepository $redirects;
     private TaxonomyRepository $taxonomy;
     private UserRepository $users;
-    private ?ContactFormRepository $contactForms;
-    private ?ContactSubmissionRepository $contactSubmissions;
-    private ?SignupFormRepository $signupForms;
     private InputSanitizer $input;
     private Csrf $csrf;
-    private ?SignupSubmissionRepository $signupSubmissions;
+    /** @var array<string, EmbeddedFormRuntimeInterface> */
+    private array $embeddedFormRuntimes = [];
     private bool $captchaScriptIncluded = false;
     /** @var array<string, bool>|null */
     private ?array $enabledExtensionMap = null;
@@ -74,12 +66,9 @@ final class PublicController
         RedirectRepository $redirects,
         TaxonomyRepository $taxonomy,
         UserRepository $users,
-        ?ContactFormRepository $contactForms,
-        ?ContactSubmissionRepository $contactSubmissions,
-        ?SignupFormRepository $signupForms,
         InputSanitizer $input,
         Csrf $csrf,
-        ?SignupSubmissionRepository $signupSubmissions
+        array $extensionServices = []
     )
     {
         $this->view = $view;
@@ -91,12 +80,54 @@ final class PublicController
         $this->redirects = $redirects;
         $this->taxonomy = $taxonomy;
         $this->users = $users;
-        $this->contactForms = $contactForms;
-        $this->contactSubmissions = $contactSubmissions;
-        $this->signupForms = $signupForms;
         $this->input = $input;
         $this->csrf = $csrf;
-        $this->signupSubmissions = $signupSubmissions;
+        $this->embeddedFormRuntimes = $this->discoverEmbeddedFormRuntimes($extensionServices);
+    }
+
+    /**
+     * Discovers extension-provided embedded-form runtimes.
+     *
+     * @param array<string, mixed> $extensionServices
+     * @return array<string, EmbeddedFormRuntimeInterface>
+     */
+    private function discoverEmbeddedFormRuntimes(array $extensionServices): array
+    {
+        $runtimes = [];
+
+        foreach ($extensionServices as $serviceBucket) {
+            if (!is_array($serviceBucket)) {
+                continue;
+            }
+
+            /** @var mixed $rawCandidates */
+            $rawCandidates = $serviceBucket['embedded_form_runtimes'] ?? [];
+            if (is_object($rawCandidates)) {
+                $rawCandidates = [$rawCandidates];
+            }
+            if (!is_array($rawCandidates)) {
+                continue;
+            }
+
+            foreach ($rawCandidates as $candidate) {
+                if (!$candidate instanceof EmbeddedFormRuntimeInterface) {
+                    continue;
+                }
+
+                $type = strtolower(trim($candidate->type()));
+                if ($type === '' || $this->input->slug($type) === null) {
+                    continue;
+                }
+
+                // First writer wins so one type cannot be overridden unexpectedly.
+                if (!isset($runtimes[$type])) {
+                    $runtimes[$type] = $candidate;
+                }
+            }
+        }
+
+        ksort($runtimes);
+        return $runtimes;
     }
 
     /**
@@ -465,15 +496,17 @@ final class PublicController
     }
 
     /**
-     * Handles one public signup-sheet submission request.
+     * Handles one public embedded-form submission request by type + slug.
      */
-    public function submitWaitlist(string $formSlug): void
+    public function submitEmbeddedForm(string $type, string $formSlug): void
     {
-        if (
-            !$this->isExtensionEnabled('signups')
-            || !$this->signupForms instanceof SignupFormRepository
-            || !$this->signupSubmissions instanceof SignupSubmissionRepository
-        ) {
+        $runtime = $this->embeddedFormRuntime($type);
+        if ($runtime === null) {
+            $this->notFound();
+            return;
+        }
+
+        if (!$this->isExtensionEnabled($runtime->extensionKey())) {
             $this->notFound();
             return;
         }
@@ -485,330 +518,29 @@ final class PublicController
         }
 
         $returnPath = $this->sanitizePublicReturnPath((string) ($_POST['return_path'] ?? '/'));
-        $redirectTo = $returnPath . '#signups-' . $slug;
-
-        if (!$this->csrf->validate($_POST['_csrf'] ?? null)) {
-            $this->pushWaitlistFormFlash($slug, 'error', 'Your session token is invalid. Please retry and submit again.');
-            redirect($redirectTo);
-        }
-
-        $definition = $this->findEmbeddedFormDefinition('signups', $slug);
-        if ($definition === null) {
-            $this->pushWaitlistFormFlash($slug, 'error', 'This signup sheet form is unavailable right now.');
-            redirect($redirectTo);
-        }
-
-        $displayName = $this->input->text((string) ($_POST['signups_display_name'] ?? ''), 160);
-        $emailRaw = strtolower($this->input->text((string) ($_POST['signups_email'] ?? ''), 254));
-        $email = $this->input->email($emailRaw);
-        $country = strtolower($this->input->text((string) ($_POST['signups_country'] ?? ''), 16));
-        $oldValues = [
-            'email' => $emailRaw,
-            'display_name' => $displayName,
-            'country' => $country,
-            'additional' => [],
-        ];
-
-        $errors = [];
-        if ($email === null) {
-            $errors[] = 'A valid email address is required.';
-        }
-        if ($displayName === '') {
-            $errors[] = 'Display name is required.';
-        }
-
-        $allowedCountries = array_keys($this->waitlistCountryOptions());
-        if ($country === '' || !in_array($country, $allowedCountries, true)) {
-            $errors[] = 'Please choose a valid country option.';
-        }
-
-        $additionalPayload = [];
-        foreach ($this->signupsAdditionalFieldDefinitions($slug, $definition) as $fieldDefinition) {
-            $inputName = (string) ($fieldDefinition['input_name'] ?? '');
-            $fieldName = (string) ($fieldDefinition['name'] ?? '');
-            $fieldLabel = (string) ($fieldDefinition['label'] ?? $fieldName);
-            $fieldType = (string) ($fieldDefinition['type'] ?? 'text');
-            $fieldRequired = (bool) ($fieldDefinition['required'] ?? false);
-
-            $rawValue = (string) ($_POST[$inputName] ?? '');
-            $rawValue = $this->input->text($rawValue, $fieldType === 'textarea' ? 4000 : 255);
-            $oldValues['additional'][$fieldName] = $rawValue;
-
-            if ($fieldType === 'email') {
-                $sanitizedEmail = $this->input->email($rawValue);
-                if ($rawValue !== '' && $sanitizedEmail === null) {
-                    $errors[] = $fieldLabel . ' must be a valid email address.';
-                }
-                if ($fieldRequired && $sanitizedEmail === null) {
-                    $errors[] = $fieldLabel . ' is required.';
-                }
-
-                if ($sanitizedEmail !== null) {
-                    $additionalPayload[] = [
-                        'label' => $fieldLabel,
-                        'name' => $fieldName,
-                        'type' => $fieldType,
-                        'value' => (string) $sanitizedEmail,
-                    ];
-                }
-                continue;
-            }
-
-            if ($fieldRequired && $rawValue === '') {
-                $errors[] = $fieldLabel . ' is required.';
-            }
-
-            if ($rawValue !== '') {
-                $additionalPayload[] = [
-                    'label' => $fieldLabel,
-                    'name' => $fieldName,
-                    'type' => $fieldType,
-                    'value' => $rawValue,
-                ];
-            }
-        }
-
-        if ($errors !== []) {
-            $this->pushWaitlistFormFlash($slug, 'error', implode(' ', $errors), $oldValues);
-            redirect($redirectTo);
-        }
-
-        $captchaError = $this->validatePublicCaptcha();
-        if ($captchaError !== null) {
-            $this->pushWaitlistFormFlash($slug, 'error', $captchaError, $oldValues);
-            redirect($redirectTo);
-        }
-
-        $ipAddress = $this->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
-        $hostname = $this->resolveClientHostname($ipAddress);
-        $userAgent = $this->input->text((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 500);
-        $additionalFieldsJson = '[]';
-        if ($additionalPayload !== []) {
-            $encodedAdditional = json_encode($additionalPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            if (is_string($encodedAdditional) && $encodedAdditional !== '') {
-                $additionalFieldsJson = $this->input->text($encodedAdditional, 20000);
-            }
-        }
 
         try {
-            $this->signupSubmissions->create([
-                'form_slug' => $slug,
-                'email' => (string) $email,
-                'display_name' => $displayName,
-                'country' => $country,
-                'additional_fields_json' => $additionalFieldsJson,
-                'source_url' => $returnPath,
-                'ip_address' => $ipAddress,
-                'hostname' => $hostname,
-                'user_agent' => $userAgent !== '' ? $userAgent : null,
-            ]);
+            $runtime->submit($slug, $returnPath, function (): ?string {
+                return $this->validatePublicCaptcha();
+            });
         } catch (\Throwable $exception) {
-            $message = $exception->getMessage();
-            if ($message === '') {
-                $message = 'Unable to save your signup right now.';
-            }
-
-            $this->pushWaitlistFormFlash($slug, 'error', $message, $oldValues);
-            redirect($redirectTo);
+            error_log(
+                'Raven embedded form submit failed for type "'
+                . $runtime->type()
+                . '": '
+                . $exception->getMessage()
+            );
+            $this->notFound();
         }
-
-        $this->pushWaitlistFormFlash($slug, 'success', 'Thanks, your signup has been received.');
-        redirect($redirectTo);
     }
 
     /**
-     * Handles one public contact-form submission request.
+     * Returns one embedded-form runtime by shortcode type when available.
      */
-    public function submitContactForm(string $formSlug): void
+    private function embeddedFormRuntime(string $type): ?EmbeddedFormRuntimeInterface
     {
-        if (
-            !$this->isExtensionEnabled('contact')
-            || !$this->contactForms instanceof ContactFormRepository
-            || !$this->contactSubmissions instanceof ContactSubmissionRepository
-        ) {
-            $this->notFound();
-            return;
-        }
-
-        $slug = $this->input->slug($formSlug);
-        if ($slug === null) {
-            $this->notFound();
-            return;
-        }
-
-        $returnPath = $this->sanitizePublicReturnPath((string) ($_POST['return_path'] ?? '/'));
-        $redirectTo = $returnPath . '#contact-form-' . $slug;
-
-        if (!$this->csrf->validate($_POST['_csrf'] ?? null)) {
-            $this->pushContactFormFlash($slug, 'error', 'Your session token is invalid. Please retry and submit again.');
-            redirect($redirectTo);
-        }
-
-        $definition = $this->findEmbeddedFormDefinition('contact', $slug);
-        if ($definition === null) {
-            $this->pushContactFormFlash($slug, 'error', 'This contact form is unavailable right now.');
-            redirect($redirectTo);
-        }
-
-        $destinations = $this->parseContactDestinations((string) ($definition['destination'] ?? ''));
-        if ($destinations === []) {
-            $this->pushContactFormFlash($slug, 'error', 'This contact form has no valid destination address configured.');
-            redirect($redirectTo);
-        }
-        $ccRecipients = $this->parseContactDestinations((string) ($definition['cc'] ?? ''));
-        $bccRecipients = $this->parseContactDestinations((string) ($definition['bcc'] ?? ''));
-
-        $senderName = $this->input->text((string) ($_POST['contact_name'] ?? ''), 160);
-        $senderEmailRaw = strtolower($this->input->text((string) ($_POST['contact_email'] ?? ''), 254));
-        $senderEmail = $this->input->email($senderEmailRaw);
-        $messageRaw = $this->input->html((string) ($_POST['contact_message'] ?? ''), 5000);
-        $message = trim((string) preg_replace('/\r\n?/', "\n", strip_tags($messageRaw)));
-
-        $oldValues = [
-            'name' => $senderName,
-            'email' => $senderEmailRaw,
-            'message' => $message,
-            'additional' => [],
-        ];
-
-        $errors = [];
-        if ($senderName === '') {
-            $errors[] = 'Name is required.';
-        }
-        if ($senderEmail === null) {
-            $errors[] = 'A valid email address is required.';
-        }
-        if ($message === '') {
-            $errors[] = 'Message is required.';
-        }
-
-        $additionalPayload = [];
-        foreach ($this->contactAdditionalFieldDefinitions($slug, $definition) as $fieldDefinition) {
-            $inputName = (string) ($fieldDefinition['input_name'] ?? '');
-            $fieldName = (string) ($fieldDefinition['name'] ?? '');
-            $fieldLabel = (string) ($fieldDefinition['label'] ?? $fieldName);
-            $fieldType = (string) ($fieldDefinition['type'] ?? 'text');
-            $fieldRequired = (bool) ($fieldDefinition['required'] ?? false);
-
-            $rawValue = (string) ($_POST[$inputName] ?? '');
-            $rawValue = $this->input->text($rawValue, $fieldType === 'textarea' ? 4000 : 255);
-            $oldValues['additional'][$fieldName] = $rawValue;
-
-            if ($fieldType === 'email') {
-                $sanitizedEmail = $this->input->email($rawValue);
-                if ($rawValue !== '' && $sanitizedEmail === null) {
-                    $errors[] = $fieldLabel . ' must be a valid email address.';
-                }
-                if ($fieldRequired && $sanitizedEmail === null) {
-                    $errors[] = $fieldLabel . ' is required.';
-                }
-
-                if ($sanitizedEmail !== null) {
-                    $additionalPayload[] = [
-                        'label' => $fieldLabel,
-                        'value' => (string) $sanitizedEmail,
-                    ];
-                }
-                continue;
-            }
-
-            if ($fieldRequired && $rawValue === '') {
-                $errors[] = $fieldLabel . ' is required.';
-            }
-
-            if ($rawValue !== '') {
-                $additionalPayload[] = [
-                    'label' => $fieldLabel,
-                    'value' => $rawValue,
-                ];
-            }
-        }
-
-        if ($errors !== []) {
-            $this->pushContactFormFlash($slug, 'error', implode(' ', $errors), $oldValues);
-            redirect($redirectTo);
-        }
-
-        $captchaError = $this->validatePublicCaptcha();
-        if ($captchaError !== null) {
-            $this->pushContactFormFlash($slug, 'error', $captchaError, $oldValues);
-            redirect($redirectTo);
-        }
-
-        $formName = $this->input->text((string) ($definition['name'] ?? 'Contact Form'), 160);
-        $subject = $this->buildContactSubject($formName);
-        $body = $this->buildContactBody(
-            $formName,
-            $slug,
-            $senderName,
-            (string) $senderEmail,
-            $message,
-            $additionalPayload,
-            $returnPath
-        );
-
-        $saveMailLocally = !array_key_exists('save_mail_locally', $definition)
-            || (bool) ($definition['save_mail_locally'] ?? true);
-        $savedLocally = false;
-        $localSaveError = null;
-        if ($saveMailLocally) {
-            $additionalFieldsJson = '[]';
-            if ($additionalPayload !== []) {
-                $encodedAdditional = json_encode($additionalPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                if (is_string($encodedAdditional) && $encodedAdditional !== '') {
-                    $additionalFieldsJson = $this->input->text($encodedAdditional, 20000);
-                }
-            }
-
-            $ipAddress = $this->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
-            $hostname = $this->resolveClientHostname($ipAddress);
-            $userAgent = $this->input->text((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 500);
-
-            try {
-                $this->contactSubmissions->create([
-                    'form_slug' => $slug,
-                    'sender_name' => $senderName,
-                    'sender_email' => (string) $senderEmail,
-                    'message_text' => $message,
-                    'additional_fields_json' => $additionalFieldsJson,
-                    'source_url' => $returnPath,
-                    'ip_address' => $ipAddress,
-                    'hostname' => $hostname,
-                    'user_agent' => $userAgent !== '' ? $userAgent : null,
-                ]);
-                $savedLocally = true;
-            } catch (\Throwable $exception) {
-                $localSaveError = $exception->getMessage() !== ''
-                    ? $exception->getMessage()
-                    : 'Failed to save your message locally.';
-            }
-        }
-
-        try {
-            $this->sendContactMail($destinations, $ccRecipients, $bccRecipients, $subject, $body, (string) $senderEmail, $slug);
-        } catch (\RuntimeException $exception) {
-            $errorMessage = $exception->getMessage();
-            if ($savedLocally) {
-                $errorMessage = 'Your message was saved locally, but email delivery failed. ' . $errorMessage;
-            } elseif ($localSaveError !== null) {
-                $errorMessage = $errorMessage . ' Local save also failed.';
-            }
-
-            $this->pushContactFormFlash($slug, 'error', trim($errorMessage), $oldValues);
-            redirect($redirectTo);
-        }
-
-        if ($saveMailLocally && !$savedLocally) {
-            $notice = 'Thanks, your message has been sent. Local save failed.';
-            if (is_string($localSaveError) && $localSaveError !== '') {
-                $notice .= ' ' . $localSaveError;
-            }
-            $this->pushContactFormFlash($slug, 'success', $notice);
-            redirect($redirectTo);
-        }
-
-        $this->pushContactFormFlash($slug, 'success', 'Thanks, your message has been sent.');
-        redirect($redirectTo);
+        $normalized = strtolower(trim($type));
+        return $this->embeddedFormRuntimes[$normalized] ?? null;
     }
 
     /**
@@ -1770,473 +1502,6 @@ final class PublicController
     }
 
     /**
-     * Returns available signup-country choices.
-     *
-     * @return array<string, string>
-     */
-    private function waitlistCountryOptions(): array
-    {
-        return CountryOptions::list(true);
-    }
-
-    /**
-     * Normalizes signup-sheet additional field definitions for rendering and submit validation.
-     *
-     * @param array<string, mixed> $definition
-     * @return array<int, array{
-     *   label: string,
-     *   name: string,
-     *   type: string,
-     *   required: bool,
-     *   input_name: string
-     * }>
-     */
-    private function signupsAdditionalFieldDefinitions(string $slug, array $definition): array
-    {
-        /** @var mixed $rawAdditionalFields */
-        $rawAdditionalFields = $definition['additional_fields'] ?? [];
-        if (!is_array($rawAdditionalFields)) {
-            return [];
-        }
-
-        $fields = [];
-        foreach ($rawAdditionalFields as $rawField) {
-            if (!is_array($rawField)) {
-                continue;
-            }
-
-            $fieldLabelRaw = $this->input->text((string) ($rawField['label'] ?? ''), 120);
-            $fieldNameRaw = strtolower($this->input->text((string) ($rawField['name'] ?? ''), 80));
-            $fieldNameRaw = preg_replace('/[^a-z0-9_]+/', '_', $fieldNameRaw) ?? '';
-            $fieldNameRaw = trim($fieldNameRaw, '_');
-            $fieldTypeRaw = strtolower($this->input->text((string) ($rawField['type'] ?? 'text'), 20));
-            if (!in_array($fieldTypeRaw, ['text', 'email', 'textarea'], true)) {
-                $fieldTypeRaw = 'text';
-            }
-
-            if ($fieldLabelRaw === '' || $fieldNameRaw === '') {
-                continue;
-            }
-
-            $fields[] = [
-                'label' => $fieldLabelRaw,
-                'name' => $fieldNameRaw,
-                'type' => $fieldTypeRaw,
-                'required' => (bool) ($rawField['required'] ?? false),
-                'input_name' => 'signups_' . $slug . '_' . $fieldNameRaw,
-            ];
-        }
-
-        return $fields;
-    }
-
-    /**
-     * Stores one flash payload for a signup-sheet form slug.
-     *
-     * @param array{email?: string, display_name?: string, country?: string, additional?: array<string, string>} $old
-     */
-    private function pushWaitlistFormFlash(string $slug, string $type, string $message, array $old = []): void
-    {
-        if (!isset($_SESSION['_raven_waitlist_form_flash']) || !is_array($_SESSION['_raven_waitlist_form_flash'])) {
-            $_SESSION['_raven_waitlist_form_flash'] = [];
-        }
-
-        $_SESSION['_raven_waitlist_form_flash'][$slug] = [
-            'type' => $type === 'success' ? 'success' : 'error',
-            'message' => $message,
-            'old' => $old,
-        ];
-    }
-
-    /**
-     * Returns and clears one signup-sheet form flash payload by slug.
-     *
-     * @return array{
-     *   type: string,
-     *   message: string,
-     *   old: array{email: string, display_name: string, country: string, additional: array<string, string>}
-     * }|null
-     */
-    private function pullWaitlistFormFlash(string $slug): ?array
-    {
-        $all = $_SESSION['_raven_waitlist_form_flash'] ?? null;
-        if (!is_array($all) || !isset($all[$slug]) || !is_array($all[$slug])) {
-            return null;
-        }
-
-        $raw = $all[$slug];
-        unset($_SESSION['_raven_waitlist_form_flash'][$slug]);
-        if ((array) ($_SESSION['_raven_waitlist_form_flash'] ?? []) === []) {
-            unset($_SESSION['_raven_waitlist_form_flash']);
-        }
-
-        $type = ((string) ($raw['type'] ?? 'error')) === 'success' ? 'success' : 'error';
-        $message = trim((string) ($raw['message'] ?? ''));
-        if ($message === '') {
-            return null;
-        }
-
-        /** @var mixed $rawOld */
-        $rawOld = $raw['old'] ?? [];
-        $old = is_array($rawOld) ? $rawOld : [];
-
-        /** @var mixed $rawAdditional */
-        $rawAdditional = $old['additional'] ?? [];
-        $additional = [];
-        if (is_array($rawAdditional)) {
-            foreach ($rawAdditional as $fieldName => $fieldValue) {
-                if (!is_string($fieldName)) {
-                    continue;
-                }
-
-                $additional[$fieldName] = $this->input->text((string) $fieldValue, 4000);
-            }
-        }
-
-        return [
-            'type' => $type,
-            'message' => $message,
-            'old' => [
-                'email' => $this->input->text((string) ($old['email'] ?? ''), 254),
-                'display_name' => $this->input->text((string) ($old['display_name'] ?? ''), 160),
-                'country' => strtolower($this->input->text((string) ($old['country'] ?? ''), 16)),
-                'additional' => $additional,
-            ],
-        ];
-    }
-
-    /**
-     * Stores one flash payload for a contact form slug.
-     *
-     * @param array{name?: string, email?: string, message?: string, additional?: array<string, string>} $old
-     */
-    private function pushContactFormFlash(string $slug, string $type, string $message, array $old = []): void
-    {
-        if (!isset($_SESSION['_raven_contact_form_flash']) || !is_array($_SESSION['_raven_contact_form_flash'])) {
-            $_SESSION['_raven_contact_form_flash'] = [];
-        }
-
-        $_SESSION['_raven_contact_form_flash'][$slug] = [
-            'type' => $type === 'success' ? 'success' : 'error',
-            'message' => $message,
-            'old' => $old,
-        ];
-    }
-
-    /**
-     * Returns and clears one contact form flash payload by slug.
-     *
-     * @return array{
-     *   type: string,
-     *   message: string,
-     *   old: array{name: string, email: string, message: string, additional: array<string, string>}
-     * }|null
-     */
-    private function pullContactFormFlash(string $slug): ?array
-    {
-        $all = $_SESSION['_raven_contact_form_flash'] ?? null;
-        if (!is_array($all) || !isset($all[$slug]) || !is_array($all[$slug])) {
-            return null;
-        }
-
-        $raw = $all[$slug];
-        unset($_SESSION['_raven_contact_form_flash'][$slug]);
-        if ((array) ($_SESSION['_raven_contact_form_flash'] ?? []) === []) {
-            unset($_SESSION['_raven_contact_form_flash']);
-        }
-
-        $type = ((string) ($raw['type'] ?? 'error')) === 'success' ? 'success' : 'error';
-        $message = trim((string) ($raw['message'] ?? ''));
-        if ($message === '') {
-            return null;
-        }
-
-        /** @var mixed $rawOld */
-        $rawOld = $raw['old'] ?? [];
-        $old = is_array($rawOld) ? $rawOld : [];
-
-        /** @var mixed $rawAdditional */
-        $rawAdditional = $old['additional'] ?? [];
-        $additional = [];
-        if (is_array($rawAdditional)) {
-            foreach ($rawAdditional as $fieldName => $fieldValue) {
-                if (!is_string($fieldName)) {
-                    continue;
-                }
-
-                $additional[$fieldName] = $this->input->text((string) $fieldValue, 4000);
-            }
-        }
-
-        return [
-            'type' => $type,
-            'message' => $message,
-            'old' => [
-                'name' => $this->input->text((string) ($old['name'] ?? ''), 160),
-                'email' => strtolower($this->input->text((string) ($old['email'] ?? ''), 254)),
-                'message' => $this->input->text((string) ($old['message'] ?? ''), 5000),
-                'additional' => $additional,
-            ],
-        ];
-    }
-
-    /**
-     * Normalizes contact additional field definitions for rendering and submit validation.
-     *
-     * @param array<string, mixed> $definition
-     * @return array<int, array{
-     *   label: string,
-     *   name: string,
-     *   type: string,
-     *   required: bool,
-     *   input_name: string
-     * }>
-     */
-    private function contactAdditionalFieldDefinitions(string $slug, array $definition): array
-    {
-        /** @var mixed $rawAdditionalFields */
-        $rawAdditionalFields = $definition['additional_fields'] ?? [];
-        if (!is_array($rawAdditionalFields)) {
-            return [];
-        }
-
-        $fields = [];
-        foreach ($rawAdditionalFields as $rawField) {
-            if (!is_array($rawField)) {
-                continue;
-            }
-
-            $fieldLabelRaw = $this->input->text((string) ($rawField['label'] ?? ''), 120);
-            $fieldNameRaw = strtolower($this->input->text((string) ($rawField['name'] ?? ''), 80));
-            $fieldNameRaw = preg_replace('/[^a-z0-9_]+/', '_', $fieldNameRaw) ?? '';
-            $fieldNameRaw = trim($fieldNameRaw, '_');
-            $fieldTypeRaw = strtolower($this->input->text((string) ($rawField['type'] ?? 'text'), 20));
-            if (!in_array($fieldTypeRaw, ['text', 'email', 'textarea'], true)) {
-                $fieldTypeRaw = 'text';
-            }
-
-            if ($fieldLabelRaw === '' || $fieldNameRaw === '') {
-                continue;
-            }
-
-            $fields[] = [
-                'label' => $fieldLabelRaw,
-                'name' => $fieldNameRaw,
-                'type' => $fieldTypeRaw,
-                'required' => (bool) ($rawField['required'] ?? false),
-                'input_name' => 'contact_' . $slug . '_' . $fieldNameRaw,
-            ];
-        }
-
-        return $fields;
-    }
-
-    /**
-     * Parses one contact-form recipient list into valid unique email addresses.
-     *
-     * @return array<int, string>
-     */
-    private function parseContactDestinations(string $rawDestinations): array
-    {
-        $normalized = $this->input->text($rawDestinations, 1000);
-        if ($normalized === '') {
-            return [];
-        }
-
-        $parts = preg_split('/[;,]+/', $normalized) ?: [];
-        $emails = [];
-        foreach ($parts as $part) {
-            if (!is_string($part) || trim($part) === '') {
-                continue;
-            }
-
-            $email = $this->input->email(trim($part));
-            if ($email === null) {
-                continue;
-            }
-
-            $emails[$email] = $email;
-        }
-
-        return array_values($emails);
-    }
-
-    /**
-     * Builds one sanitized email subject for contact submissions.
-     */
-    private function buildContactSubject(string $formName): string
-    {
-        $mailPrefix = $this->input->text((string) $this->config->get('mail.prefix', 'Mailer Daemon'), 120);
-        if ($mailPrefix === '') {
-            $mailPrefix = 'Mailer Daemon';
-        }
-
-        $formName = $this->input->text($formName, 120);
-        $subject = '[' . $mailPrefix . '] ' . ($formName !== '' ? $formName : 'Submission');
-        $subject = str_replace(["\r", "\n"], ' ', $subject);
-        return trim($subject);
-    }
-
-    /**
-     * Builds one plain-text contact mail body.
-     *
-     * @param array<int, array{label: string, value: string}> $additionalFields
-     */
-    private function buildContactBody(
-        string $formName,
-        string $formSlug,
-        string $senderName,
-        string $senderEmail,
-        string $message,
-        array $additionalFields,
-        string $sourceUrl
-    ): string {
-        $lines = [
-            'Contact form submission',
-            'Submitted (UTC): ' . gmdate('c'),
-            'Form: ' . $formName,
-            'Form slug: ' . $formSlug,
-            'Source path: ' . $sourceUrl,
-            '',
-            'Name: ' . $senderName,
-            'Email: ' . $senderEmail,
-            '',
-            'Message:',
-            $message,
-        ];
-
-        if ($additionalFields !== []) {
-            $lines[] = '';
-            $lines[] = 'Additional fields:';
-            foreach ($additionalFields as $field) {
-                $label = $this->input->text((string) ($field['label'] ?? ''), 120);
-                $value = $this->input->text((string) ($field['value'] ?? ''), 4000);
-                if ($label === '' || $value === '') {
-                    continue;
-                }
-
-                $lines[] = $label . ': ' . $value;
-            }
-        }
-
-        return implode("\n", $lines);
-    }
-
-    /**
-     * Sends contact form mail using configured global mail agent.
-     *
-     * @param array<int, string> $destinations
-     * @param array<int, string> $ccRecipients
-     * @param array<int, string> $bccRecipients
-     *
-     * @throws \RuntimeException
-     */
-    private function sendContactMail(
-        array $destinations,
-        array $ccRecipients,
-        array $bccRecipients,
-        string $subject,
-        string $body,
-        string $replyToEmail,
-        string $formSlug
-    ): void
-    {
-        $agent = strtolower($this->input->text((string) $this->config->get('mail.agent', 'php_mail'), 40));
-        if ($agent !== 'php_mail') {
-            throw new \RuntimeException('The configured mail agent is not supported yet.');
-        }
-
-        // Avoid duplicate recipients across To/CC/BCC.
-        $destinationMap = array_fill_keys($destinations, true);
-        $ccRecipients = array_values(array_filter($ccRecipients, static fn (string $email): bool => !isset($destinationMap[$email])));
-        $toAndCcMap = $destinationMap;
-        foreach ($ccRecipients as $ccEmail) {
-            $toAndCcMap[$ccEmail] = true;
-        }
-        $bccRecipients = array_values(array_filter($bccRecipients, static fn (string $email): bool => !isset($toAndCcMap[$email])));
-
-        $fromAddress = $this->configuredMailSenderAddress();
-        $fromName = $this->configuredMailSenderName();
-        $fromHeader = $fromName !== ''
-            ? ($fromName . ' <' . $fromAddress . '>')
-            : $fromAddress;
-        $subject = str_replace(["\r", "\n"], ' ', $subject);
-        $headers = [
-            'MIME-Version: 1.0',
-            'Content-Type: text/plain; charset=UTF-8',
-            'From: ' . $fromHeader,
-            'Reply-To: ' . $replyToEmail,
-            'X-Raven-Contact-Form: ' . $formSlug,
-        ];
-        if ($ccRecipients !== []) {
-            $headers[] = 'Cc: ' . implode(', ', $ccRecipients);
-        }
-        if ($bccRecipients !== []) {
-            $headers[] = 'Bcc: ' . implode(', ', $bccRecipients);
-        }
-        $headerString = implode("\r\n", $headers);
-
-        $toRecipients = implode(', ', $destinations);
-        $ok = @\mail($toRecipients, $subject, $body, $headerString);
-        if ($ok !== true) {
-            throw new \RuntimeException('Failed to send contact email via php_mail.');
-        }
-    }
-
-    /**
-     * Builds a safe no-reply address from configured site domain.
-     */
-    private function defaultNoReplyEmail(): string
-    {
-        $rawDomain = strtolower(trim((string) $this->config->get('site.domain', 'localhost')));
-        $host = '';
-
-        if ($rawDomain !== '') {
-            $host = (string) parse_url('//' . $rawDomain, PHP_URL_HOST);
-            if ($host === '') {
-                $host = $rawDomain;
-            }
-        }
-
-        $host = preg_replace('/[^a-z0-9.-]+/i', '', $host) ?? '';
-        $host = trim($host, '.-');
-        if ($host === '' || !str_contains($host, '.')) {
-            $host = 'localhost';
-        }
-
-        return 'no-reply@' . $host;
-    }
-
-    /**
-     * Returns configured sender address or fallback no-reply address.
-     */
-    private function configuredMailSenderAddress(): string
-    {
-        $configured = trim((string) $this->config->get('mail.sender_address', ''));
-        if ($configured !== '') {
-            $normalized = $this->input->email($configured);
-            if ($normalized !== null) {
-                return $normalized;
-            }
-        }
-
-        return $this->defaultNoReplyEmail();
-    }
-
-    /**
-     * Returns configured sender display name for outgoing contact mail.
-     */
-    private function configuredMailSenderName(): string
-    {
-        $name = $this->input->text((string) $this->config->get('mail.sender_name', 'Postmaster'), 120);
-        if ($name === '') {
-            $name = 'Postmaster';
-        }
-
-        return trim(str_replace(["\r", "\n"], ' ', $name));
-    }
-
-    /**
      * Resolves supported form shortcodes inside editor HTML content.
      */
     private function renderEmbeddedForms(string $html): string
@@ -2245,8 +1510,13 @@ final class PublicController
             return '';
         }
 
+        $shortcodePattern = $this->embeddedFormShortcodePattern();
+        if ($shortcodePattern === null) {
+            return $html;
+        }
+
         return (string) preg_replace_callback(
-            '/\[(contact|signups)\b([^\]]*)\]/i',
+            $shortcodePattern,
             function (array $matches): string {
                 $type = strtolower((string) ($matches[1] ?? ''));
                 $rawArgumentChunk = (string) ($matches[2] ?? '');
@@ -2298,7 +1568,7 @@ final class PublicController
             return $slug ?? '';
         }
 
-        // Also allow compact shorthand: `[contact my-form]` / `[signups my-form]`.
+        // Also allow compact shorthand: `[type my-form]`.
         if (preg_match('/^([a-z0-9_-]+)\s*$/i', $args, $matches) === 1) {
             $slug = $this->input->slug((string) ($matches[1] ?? ''));
             return $slug ?? '';
@@ -2320,8 +1590,8 @@ final class PublicController
             return null;
         }
 
-        if (($type === 'contact' && !$this->isExtensionEnabled('contact'))
-            || ($type === 'signups' && !$this->isExtensionEnabled('signups'))) {
+        $runtime = $this->embeddedFormRuntime($type);
+        if ($runtime === null || !$this->isExtensionEnabled($runtime->extensionKey())) {
             return null;
         }
 
@@ -2341,24 +1611,25 @@ final class PublicController
             return $this->embeddedFormLookupCache[$type];
         }
 
-        $forms = match ($type) {
-            'contact' => $this->contactForms?->listAll() ?? [],
-            'signups' => $this->signupForms?->listAll() ?? [],
-            default => [],
-        };
+        $runtime = $this->embeddedFormRuntime($type);
+        if ($runtime === null) {
+            $this->embeddedFormLookupCache[$type] = [];
+            return [];
+        }
 
+        $forms = $runtime->listEnabledForms();
         $lookup = [];
         foreach ($forms as $form) {
-            if (!is_array($form) || empty($form['enabled'])) {
+            if (!is_array($form)) {
                 continue;
             }
 
-            $slug = strtolower(trim((string) ($form['slug'] ?? '')));
+            $slug = $this->input->slug((string) ($form['slug'] ?? ''));
             if ($slug === '') {
                 continue;
             }
 
-            $lookup[$slug] = $form;
+            $lookup[strtolower($slug)] = $form;
         }
 
         $this->embeddedFormLookupCache[$type] = $lookup;
@@ -2385,162 +1656,36 @@ final class PublicController
      */
     private function embeddedFormMarkup(string $type, array $definition): string
     {
-        $name = htmlspecialchars(trim((string) ($definition['name'] ?? 'Form')), ENT_QUOTES, 'UTF-8');
-        $rawSlug = trim((string) ($definition['slug'] ?? ''));
-        $slug = htmlspecialchars($rawSlug, ENT_QUOTES, 'UTF-8');
-
-        if ($type === 'contact') {
-            $flash = $this->pullContactFormFlash($rawSlug);
-            $flashMarkup = '';
-            $oldValues = [
-                'name' => '',
-                'email' => '',
-                'message' => '',
-                'additional' => [],
-            ];
-            if ($flash !== null) {
-                $flashType = (string) ($flash['type'] ?? 'error');
-                $flashClass = $flashType === 'success' ? 'alert-success' : 'alert-danger';
-                $flashMessage = htmlspecialchars((string) ($flash['message'] ?? ''), ENT_QUOTES, 'UTF-8');
-                if ($flashMessage !== '') {
-                    $flashMarkup = '<div class="alert ' . $flashClass . '" role="alert">' . $flashMessage . '</div>';
-                }
-
-                /** @var mixed $rawOld */
-                $rawOld = $flash['old'] ?? [];
-                if (is_array($rawOld)) {
-                    $oldValues['name'] = htmlspecialchars((string) ($rawOld['name'] ?? ''), ENT_QUOTES, 'UTF-8');
-                    $oldValues['email'] = htmlspecialchars((string) ($rawOld['email'] ?? ''), ENT_QUOTES, 'UTF-8');
-                    $oldValues['message'] = htmlspecialchars((string) ($rawOld['message'] ?? ''), ENT_QUOTES, 'UTF-8');
-                    $oldValues['additional'] = is_array($rawOld['additional'] ?? null) ? (array) $rawOld['additional'] : [];
-                }
-            }
-
-            $additionalFieldMarkup = '';
-            foreach ($this->contactAdditionalFieldDefinitions($rawSlug, $definition) as $fieldDefinition) {
-                $fieldLabel = htmlspecialchars((string) ($fieldDefinition['label'] ?? ''), ENT_QUOTES, 'UTF-8');
-                $fieldName = (string) ($fieldDefinition['name'] ?? '');
-                $inputName = htmlspecialchars((string) ($fieldDefinition['input_name'] ?? ''), ENT_QUOTES, 'UTF-8');
-                $fieldType = (string) ($fieldDefinition['type'] ?? 'text');
-                $requiredAttr = (bool) ($fieldDefinition['required'] ?? false) ? ' required' : '';
-                $rawOldAdditional = (string) ($oldValues['additional'][$fieldName] ?? '');
-                $fieldValue = htmlspecialchars($rawOldAdditional, ENT_QUOTES, 'UTF-8');
-
-                if ($fieldType === 'textarea') {
-                    $additionalFieldMarkup .= '<div class="col-12"><label class="form-label">' . $fieldLabel . '</label>'
-                        . '<textarea class="form-control" name="' . $inputName . '" rows="3"' . $requiredAttr . '>' . $fieldValue . '</textarea></div>';
-                    continue;
-                }
-
-                $inputType = $fieldType === 'email' ? 'email' : 'text';
-                $additionalFieldMarkup .= '<div class="col-md-6"><label class="form-label">' . $fieldLabel . '</label>'
-                    . '<input type="' . $inputType . '" class="form-control" name="' . $inputName . '" value="' . $fieldValue . '"' . $requiredAttr . '></div>';
-            }
-
-            $submitAction = '/contact-form/submit/' . rawurlencode($rawSlug);
-            $submitAction = htmlspecialchars($submitAction, ENT_QUOTES, 'UTF-8');
-            $returnPath = htmlspecialchars($this->sanitizePublicReturnPath((string) ($_SERVER['REQUEST_URI'] ?? '/')), ENT_QUOTES, 'UTF-8');
-            $captchaMarkup = $this->publicCaptchaMarkup();
-
-            return '<section class="card my-3 raven-embedded-form raven-embedded-form-contact" id="contact-form-' . $slug . '" data-raven-form-type="contact" data-raven-form-slug="' . $slug . '">'
-                . '<div class="card-body">'
-                . '<h3 class="h5 mb-3">' . $name . '</h3>'
-                . $flashMarkup
-                . '<form method="post" action="' . $submitAction . '" novalidate>'
-                . $this->csrf->field()
-                . '<input type="hidden" name="return_path" value="' . $returnPath . '">'
-                . '<div class="row g-3">'
-                . '<div class="col-md-6"><label class="form-label">Name</label><input type="text" class="form-control" name="contact_name" placeholder="Your name" value="' . $oldValues['name'] . '" required></div>'
-                . '<div class="col-md-6"><label class="form-label">Email</label><input type="email" class="form-control" name="contact_email" placeholder="you@example.com" value="' . $oldValues['email'] . '" required></div>'
-                . '<div class="col-12"><label class="form-label">Message</label><textarea class="form-control" name="contact_message" rows="4" placeholder="How can we help?" required>' . $oldValues['message'] . '</textarea></div>'
-                . $additionalFieldMarkup
-                . $captchaMarkup
-                . '<div class="col-12"><button type="submit" class="btn btn-primary">Send Message</button></div>'
-                . '</div>'
-                . '</form>'
-                . '</div>'
-                . '</section>';
+        $runtime = $this->embeddedFormRuntime($type);
+        if ($runtime === null) {
+            return '';
         }
 
-        $flash = $this->pullWaitlistFormFlash($rawSlug);
-        $flashMarkup = '';
-        $oldValues = [
-            'email' => '',
-            'display_name' => '',
-            'country' => '',
-            'additional' => [],
-        ];
-        if ($flash !== null) {
-            $flashType = (string) ($flash['type'] ?? 'error');
-            $flashClass = $flashType === 'success' ? 'alert-success' : 'alert-danger';
-            $flashMessage = htmlspecialchars((string) ($flash['message'] ?? ''), ENT_QUOTES, 'UTF-8');
-            if ($flashMessage !== '') {
-                $flashMarkup = '<div class="alert ' . $flashClass . '" role="alert">' . $flashMessage . '</div>';
-            }
-
-            /** @var mixed $rawOld */
-            $rawOld = $flash['old'] ?? [];
-            if (is_array($rawOld)) {
-                $oldValues['email'] = htmlspecialchars((string) ($rawOld['email'] ?? ''), ENT_QUOTES, 'UTF-8');
-                $oldValues['display_name'] = htmlspecialchars((string) ($rawOld['display_name'] ?? ''), ENT_QUOTES, 'UTF-8');
-                $oldValues['country'] = strtolower((string) ($rawOld['country'] ?? ''));
-                $oldValues['additional'] = is_array($rawOld['additional'] ?? null) ? (array) $rawOld['additional'] : [];
-            }
-        }
-
-        $countryOptionsMarkup = '<option value="">Select country</option>';
-        foreach ($this->waitlistCountryOptions() as $countryCode => $countryLabel) {
-            $selectedAttr = $oldValues['country'] === $countryCode ? ' selected' : '';
-            $countryOptionsMarkup .= '<option value="' . htmlspecialchars($countryCode, ENT_QUOTES, 'UTF-8') . '"' . $selectedAttr . '>'
-                . htmlspecialchars($countryLabel, ENT_QUOTES, 'UTF-8')
-                . '</option>';
-        }
-
-        $additionalFieldMarkup = '';
-        foreach ($this->signupsAdditionalFieldDefinitions($rawSlug, $definition) as $fieldDefinition) {
-            $fieldLabel = htmlspecialchars((string) ($fieldDefinition['label'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $fieldName = (string) ($fieldDefinition['name'] ?? '');
-            $inputName = htmlspecialchars((string) ($fieldDefinition['input_name'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $fieldType = (string) ($fieldDefinition['type'] ?? 'text');
-            $requiredAttr = (bool) ($fieldDefinition['required'] ?? false) ? ' required' : '';
-            $rawOldAdditional = (string) ($oldValues['additional'][$fieldName] ?? '');
-            $fieldValue = htmlspecialchars($rawOldAdditional, ENT_QUOTES, 'UTF-8');
-
-            if ($fieldType === 'textarea') {
-                $additionalFieldMarkup .= '<div class="col-12"><label class="form-label">' . $fieldLabel . '</label>'
-                    . '<textarea class="form-control" name="' . $inputName . '" rows="3"' . $requiredAttr . '>' . $fieldValue . '</textarea></div>';
-                continue;
-            }
-
-            $inputType = $fieldType === 'email' ? 'email' : 'text';
-            $additionalFieldMarkup .= '<div class="col-md-6"><label class="form-label">' . $fieldLabel . '</label>'
-                . '<input type="' . $inputType . '" class="form-control" name="' . $inputName . '" value="' . $fieldValue . '"' . $requiredAttr . '></div>';
-        }
-
-        $submitAction = '/signups/submit/' . rawurlencode($rawSlug);
-        $submitAction = htmlspecialchars($submitAction, ENT_QUOTES, 'UTF-8');
-        $returnPath = htmlspecialchars($this->sanitizePublicReturnPath((string) ($_SERVER['REQUEST_URI'] ?? '/')), ENT_QUOTES, 'UTF-8');
-        $captchaMarkup = $this->publicCaptchaMarkup();
-
-        return '<section class="card my-3 raven-embedded-form raven-embedded-form-signups" id="signups-' . $slug . '" data-raven-form-type="signups" data-raven-form-slug="' . $slug . '">'
-            . '<div class="card-body">'
-            . '<h3 class="h5 mb-3">' . $name . '</h3>'
-            . $flashMarkup
-            . '<form method="post" action="' . $submitAction . '" novalidate>'
-            . $this->csrf->field()
-            . '<input type="hidden" name="return_path" value="' . $returnPath . '">'
-            . '<div class="row g-3">'
-            . '<div class="col-md-6"><label class="form-label">Email</label><input type="email" class="form-control" name="signups_email" placeholder="you@example.com" value="' . $oldValues['email'] . '" required></div>'
-            . '<div class="col-md-6"><label class="form-label">Display Name</label><input type="text" class="form-control" name="signups_display_name" placeholder="Your name" value="' . $oldValues['display_name'] . '" required></div>'
-            . '<div class="col-md-6"><label class="form-label">Country</label><select class="form-select" name="signups_country" required>'
-            . $countryOptionsMarkup
-            . '</select></div>'
-            . $additionalFieldMarkup
-            . $captchaMarkup
-            . '<div class="col-12"><button type="submit" class="btn btn-primary">Join Signup Sheet</button></div>'
-            . '</div>'
-            . '</form>'
-            . '</div>'
-            . '</section>';
+        $returnPath = $this->sanitizePublicReturnPath((string) ($_SERVER['REQUEST_URI'] ?? '/'));
+        return $runtime->render(
+            $definition,
+            $returnPath,
+            $this->csrf->field(),
+            $this->publicCaptchaMarkup()
+        );
     }
+
+    /**
+     * Returns regex used to resolve embedded-form shortcodes from HTML blocks.
+     */
+    private function embeddedFormShortcodePattern(): ?string
+    {
+        $types = array_keys($this->embeddedFormRuntimes);
+        if ($types === []) {
+            return null;
+        }
+
+        $escapedTypes = array_map(
+            static fn (string $token): string => preg_quote($token, '/'),
+            $types
+        );
+
+        return '/\[(' . implode('|', $escapedTypes) . ')\b([^\]]*)\]/i';
+    }
+
 }
