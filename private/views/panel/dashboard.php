@@ -36,7 +36,7 @@ $configSnapshot = $configSnapshot ?? null;
 $configFields = $configFields ?? [];
 $publicThemeOptions = is_array($publicThemeOptions ?? null) ? $publicThemeOptions : [];
 $activeConfigTab = strtolower(trim((string) ($activeConfigTab ?? 'basic')));
-if (!in_array($activeConfigTab, ['basic', 'content', 'database', 'debug', 'media', 'meta', 'session'], true)) {
+if (!in_array($activeConfigTab, ['basic', 'content', 'database', 'debug', 'media', 'meta', 'security', 'session'], true)) {
     $activeConfigTab = 'basic';
 }
 $siteDomainRaw = trim((string) (($configSnapshot['site']['domain'] ?? $site['domain'] ?? 'localhost')));
@@ -624,7 +624,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
     <div class="card mb-3">
         <div class="card-body">
             <h1 class="mb-0">System Configuration</h1>
-            <p class="text-muted mt-2 mb-0">Manage site, database, debug, media, meta, and user/session runtime settings.</p>
+            <p class="text-muted mt-2 mb-0">Manage site, database, debug, media, meta, security, and user/session runtime settings.</p>
         </div>
     </div>
 
@@ -730,6 +730,20 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                         </li>
                         <li class="nav-item" role="presentation">
                             <button
+                                class="nav-link<?= $isActiveConfigTab('security') ? ' active' : '' ?>"
+                                id="config-security-tab"
+                                data-bs-toggle="tab"
+                                data-bs-target="#config-security-pane"
+                                type="button"
+                                role="tab"
+                                aria-controls="config-security-pane"
+                                aria-selected="<?= $isActiveConfigTab('security') ? 'true' : 'false' ?>"
+                            >
+                                Security
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button
                                 class="nav-link<?= $isActiveConfigTab('session') ? ' active' : '' ?>"
                                 id="config-session-tab"
                                 data-bs-toggle="tab"
@@ -752,7 +766,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             aria-labelledby="config-basic-tab"
                             tabindex="0"
                         >
-                            <?php if ($basicSiteConfigFields === [] && $basicPanelConfigFields === [] && $basicOtherConfigFields === [] && $captchaConfigFields === []): ?>
+                            <?php if ($basicSiteConfigFields === [] && $basicPanelConfigFields === [] && $basicOtherConfigFields === []): ?>
                                 <p class="text-muted mb-0">No configuration fields available.</p>
                             <?php else: ?>
                                 <?php $hasBasicSections = false; ?>
@@ -784,15 +798,6 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                     <?php $hasBasicSections = true; ?>
                                 <?php endif; ?>
 
-                                <?php if ($captchaConfigFields !== []): ?>
-                                    <?php if ($hasBasicSections): ?>
-                                        <hr class="my-4">
-                                    <?php endif; ?>
-                                    <h2 class="h6 text-uppercase mb-3">Captcha</h2>
-                                    <?php foreach ($captchaConfigFields as $captchaField): ?>
-                                        <?php $renderConfigField($captchaField); ?>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
                             <?php endif; ?>
                         </div>
                         <div
@@ -944,13 +949,41 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             <?php endif; ?>
                         </div>
                         <div
+                            class="tab-pane fade<?= $isActiveConfigTab('security') ? ' show active' : '' ?>"
+                            id="config-security-pane"
+                            role="tabpanel"
+                            aria-labelledby="config-security-tab"
+                            tabindex="0"
+                        >
+                            <?php if ($captchaConfigFields === [] && $sessionBruteForceConfigFields === []): ?>
+                                <p class="text-muted mb-0">No configuration fields available.</p>
+                            <?php else: ?>
+                                <?php if ($captchaConfigFields !== []): ?>
+                                    <h2 class="h6 text-uppercase mb-3">Captcha</h2>
+                                    <?php foreach ($captchaConfigFields as $captchaField): ?>
+                                        <?php $renderConfigField($captchaField); ?>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+
+                                <?php if ($sessionBruteForceConfigFields !== []): ?>
+                                    <?php if ($captchaConfigFields !== []): ?>
+                                        <hr class="my-4">
+                                    <?php endif; ?>
+                                    <h2 class="h6 text-uppercase mb-3">Brute Force Protection</h2>
+                                    <?php foreach ($sessionBruteForceConfigFields as $sessionField): ?>
+                                        <?php $renderConfigField($sessionField); ?>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+                        <div
                             class="tab-pane fade<?= $isActiveConfigTab('session') ? ' show active' : '' ?>"
                             id="config-session-pane"
                             role="tabpanel"
                             aria-labelledby="config-session-tab"
                             tabindex="0"
                         >
-                            <?php if ($sessionGeneralConfigFields === [] && $sessionProfileConfigFields === [] && $sessionGroupConfigFields === [] && $sessionBruteForceConfigFields === []): ?>
+                            <?php if ($sessionGeneralConfigFields === [] && $sessionProfileConfigFields === [] && $sessionGroupConfigFields === []): ?>
                                 <p class="text-muted mb-0">No configuration fields available.</p>
                             <?php else: ?>
                                 <?php if ($sessionGeneralConfigFields !== []): ?>
@@ -976,16 +1009,6 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                     <?php endif; ?>
                                     <h2 class="h6 text-uppercase mb-3">Group Options</h2>
                                     <?php foreach ($sessionGroupConfigFields as $sessionField): ?>
-                                        <?php $renderConfigField($sessionField); ?>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-
-                                <?php if ($sessionBruteForceConfigFields !== []): ?>
-                                    <?php if ($sessionGeneralConfigFields !== [] || $sessionProfileConfigFields !== [] || $sessionGroupConfigFields !== []): ?>
-                                        <hr class="my-4">
-                                    <?php endif; ?>
-                                    <h2 class="h6 text-uppercase mb-3">Brute Force Protection</h2>
-                                    <?php foreach ($sessionBruteForceConfigFields as $sessionField): ?>
                                         <?php $renderConfigField($sessionField); ?>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
@@ -1052,7 +1075,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
               }
 
               var controls = String(button.getAttribute('aria-controls') || '');
-              var match = controls.match(/^config-(basic|content|database|debug|media|meta|session)-pane$/);
+              var match = controls.match(/^config-(basic|content|database|debug|media|meta|security|session)-pane$/);
               return match ? String(match[1]) : 'basic';
             }
 

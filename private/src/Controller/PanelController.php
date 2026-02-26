@@ -4245,7 +4245,7 @@ final class PanelController
         }
 
         if (!array_key_exists('cookie_prefix', $session)) {
-            $session['cookie_prefix'] = '';
+            $session['cookie_prefix'] = 'rvn_';
         } else {
             $cookiePrefix = trim((string) ($session['cookie_prefix'] ?? ''));
             if ($cookiePrefix !== '' && preg_match('/^[a-zA-Z0-9_-]{1,40}$/', $cookiePrefix) === 1) {
@@ -7947,7 +7947,7 @@ MARKDOWN;
     private function normalizeConfigEditorTab(mixed $value): string
     {
         $tab = strtolower($this->input->text(is_string($value) ? $value : null, 40));
-        $allowed = ['basic', 'content', 'database', 'debug', 'media', 'meta', 'session'];
+        $allowed = ['basic', 'content', 'database', 'debug', 'media', 'meta', 'security', 'session'];
         if (!in_array($tab, $allowed, true)) {
             return 'basic';
         }

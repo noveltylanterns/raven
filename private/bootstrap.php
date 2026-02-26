@@ -67,12 +67,12 @@ return (static function (): array {
     $config = new Config($root . '/private/config.php');
 
     // Initialize session early for auth, CSRF, and flash messaging.
-    $sessionName = trim((string) $config->get('session.name', 'raven_session'));
+    $sessionName = trim((string) $config->get('session.name', 'session'));
     if (!preg_match('/^[a-zA-Z0-9_-]{1,64}$/', $sessionName)) {
-        $sessionName = 'raven_session';
+        $sessionName = 'session';
     }
 
-    $cookiePrefix = trim((string) $config->get('session.cookie_prefix', ''));
+    $cookiePrefix = trim((string) $config->get('session.cookie_prefix', 'rvn_'));
     if ($cookiePrefix !== '' && preg_match('/^[a-zA-Z0-9_-]{1,40}$/', $cookiePrefix) === 1) {
         $prefixedSessionName = $cookiePrefix . $sessionName;
         if (preg_match('/^[a-zA-Z0-9_-]{1,64}$/', $prefixedSessionName) === 1) {

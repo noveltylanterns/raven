@@ -151,9 +151,9 @@ return array (
   ),
   'session' =>
   array (
-    'name' => 'raven_session',
+    'name' => 'session',
     'cookie_domain' => '',
-    'cookie_prefix' => '',
+    'cookie_prefix' => 'rvn_',
     'profile_mode' => 'disabled',
     'profile_prefix' => 'user',
     'login_attempt_max' => 5,

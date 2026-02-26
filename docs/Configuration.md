@@ -30,6 +30,7 @@ Tabs:
 - `Debug`
 - `Media`
 - `Meta`
+- `Security`
 - `Users`
 - Tab content uses card-like surface styling directly (without an extra card wrapper around the tab panes).
 
@@ -51,7 +52,6 @@ Tab behavior notes:
   - `panel.default_theme`
   - `panel.brand_name` (`Branded Panel Name`)
   - `panel.brand_logo` (`Branded Panel Logo`, URL-prefixed filename/path input)
-- `Captcha` section for `captcha.*` fields.
 
 #### Content Tab
 
@@ -121,6 +121,13 @@ Meta-path input behavior:
 
 - `meta.apple_touch_icon`, `meta.twitter.image`, and `meta.opengraph.image` are edited as local path input with a `https://{site.domain}/` prefix display.
 
+#### Security Tab
+
+Grouped sections:
+
+- `Captcha`
+- `Brute Force Protection`
+
 #### Users Tab
 
 Grouped sections:
@@ -128,7 +135,6 @@ Grouped sections:
 - `Cookie Settings`
 - `Profile Options`
 - `Group Options`
-- `Brute Force Protection`
 
 ### Field Input Types You’ll See
 
