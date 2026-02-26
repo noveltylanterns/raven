@@ -39,11 +39,22 @@ use function Raven\Core\Support\redirect;
  */
 final class PanelController
 {
-    /** Canonical upstream repo used by the Update System scaffold. */
-    private const UPDATE_SOURCE_REPO = 'https://github.com/HumphreyBoaGart/raven';
+    /** Default updater-source key used by the Update System scaffold. */
+    private const UPDATE_SOURCE_DEFAULT = 'github-noveltylanterns-raven';
 
-    /** GitHub API endpoint for reading the latest commit on default branch. */
-    private const UPDATE_SOURCE_LATEST_API = 'https://api.github.com/repos/HumphreyBoaGart/raven/commits?per_page=1';
+    /**
+     * Updater sources keyed for panel dropdown selection.
+     *
+     * @var array<string, array{label: string, repo: string, latest_api: string, version_api: string}>
+     */
+    private const UPDATE_SOURCES = [
+        'github-noveltylanterns-raven' => [
+            'label' => 'GitHub: noveltylanterns/raven',
+            'repo' => 'https://github.com/noveltylanterns/raven',
+            'latest_api' => 'https://api.github.com/repos/noveltylanterns/raven/commits?per_page=1',
+            'version_api' => 'https://api.github.com/repos/noveltylanterns/raven/contents/composer.json',
+        ],
+    ];
 
     /** Fixed side length for generated avatar thumbnail JPEG files. */
     private const AVATAR_THUMB_SIZE = 120;
@@ -2603,11 +2614,10 @@ final class PanelController
 
         $status = $this->loadUpdaterStatus();
 
-        // Keep displayed local revision synced to manifest version even when no remote check was run.
-        $localVersion = $this->detectLocalComposerVersion();
-        if ($localVersion !== null && $localVersion !== '') {
-            $status['current_revision'] = $localVersion;
-        }
+        // Keep local install identifiers synced even when no remote check was run.
+        $status['current_version'] = $this->detectLocalComposerVersion() ?? '';
+        $status['current_revision'] = $this->detectLocalRevision() ?? '';
+        $status['local_branch'] = $this->detectLocalBranch() ?? '';
 
         $this->view->render('panel/updates', [
             'site' => $this->siteData(),
@@ -2621,6 +2631,7 @@ final class PanelController
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
             'updateStatus' => $status,
+            'updateSources' => $this->updateSourcesForPanel(),
         ], 'layouts/panel');
     }
 
@@ -2643,7 +2654,8 @@ final class PanelController
             redirect($this->panelUrl('/updates'));
         }
 
-        $status = $this->checkForUpdates();
+        $sourceKey = $this->input->text((string) ($post['source_key'] ?? ''), 120);
+        $status = $this->checkForUpdates($sourceKey);
         $statusType = (string) ($status['status'] ?? 'unknown');
 
         if ($statusType === 'current') {
@@ -2680,7 +2692,12 @@ final class PanelController
         }
 
         // Re-check before run so "current" refusal is based on the latest known upstream state.
-        $status = $this->checkForUpdates();
+        $sourceKey = $this->input->text((string) ($post['source_key'] ?? ''), 120);
+        if ($sourceKey === '') {
+            $cachedStatus = $this->loadUpdaterStatus();
+            $sourceKey = (string) ($cachedStatus['source_key'] ?? '');
+        }
+        $status = $this->checkForUpdates($sourceKey);
 
         if ((string) ($status['status'] ?? '') === 'current') {
             $this->flash('error', 'Updater refused: this install is already current.');
@@ -5635,30 +5652,87 @@ final class PanelController
     }
 
     /**
+     * Returns updater sources formatted for panel dropdown rendering.
+     *
+     * @return array<int, array{key: string, label: string, repo: string}>
+     */
+    private function updateSourcesForPanel(): array
+    {
+        $options = [];
+        foreach (self::UPDATE_SOURCES as $key => $source) {
+            $options[] = [
+                'key' => (string) $key,
+                'label' => (string) ($source['label'] ?? $key),
+                'repo' => (string) ($source['repo'] ?? ''),
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
+     * Resolves a requested updater source key to a valid source definition.
+     *
+     * @param string|null $sourceKey
+     *
+     * @return array{key: string, label: string, repo: string, latest_api: string, version_api: string}
+     */
+    private function resolveUpdateSource(?string $sourceKey): array
+    {
+        $normalizedKey = $this->input->text($sourceKey, 120);
+        if (!array_key_exists($normalizedKey, self::UPDATE_SOURCES)) {
+            $normalizedKey = self::UPDATE_SOURCE_DEFAULT;
+        }
+
+        $source = self::UPDATE_SOURCES[$normalizedKey] ?? self::UPDATE_SOURCES[self::UPDATE_SOURCE_DEFAULT];
+
+        return [
+            'key' => $normalizedKey,
+            'label' => (string) ($source['label'] ?? ''),
+            'repo' => (string) ($source['repo'] ?? ''),
+            'latest_api' => (string) ($source['latest_api'] ?? ''),
+            'version_api' => (string) ($source['version_api'] ?? ''),
+        ];
+    }
+
+    /**
      * Performs a remote update check and persists status for the Updates page.
      *
+     * @param string|null $sourceKey
+     *
      * @return array{
+     *   source_key: string,
      *   source_repo: string,
+     *   current_version: string,
      *   current_revision: string,
+     *   latest_version: string,
      *   latest_revision: string,
      *   status: string,
      *   message: string,
-     *   checked_at: string
+     *   checked_at: string,
+     *   local_branch: string
      * }
      */
-    private function checkForUpdates(): array
+    private function checkForUpdates(?string $sourceKey = null): array
     {
+        $source = $this->resolveUpdateSource($sourceKey);
+        $currentVersion = $this->detectLocalComposerVersion() ?? '';
         $currentRevision = $this->detectLocalRevision() ?? '';
-        $latestRevision = $this->fetchLatestRemoteRevision();
+        $latestVersion = $this->fetchLatestRemoteComposerVersion((string) $source['version_api']) ?? '';
+        $latestRevision = $this->fetchLatestRemoteRevision((string) $source['latest_api']);
         $checkedAt = gmdate('Y-m-d H:i:s');
 
         $status = [
-            'source_repo' => self::UPDATE_SOURCE_REPO,
+            'source_key' => (string) $source['key'],
+            'source_repo' => (string) $source['repo'],
+            'current_version' => $currentVersion,
             'current_revision' => $currentRevision,
+            'latest_version' => $latestVersion,
             'latest_revision' => $latestRevision ?? '',
             'status' => 'unknown',
             'message' => '',
             'checked_at' => $checkedAt,
+            'local_branch' => $this->detectLocalBranch() ?? '',
         ];
 
         if ($latestRevision === null) {
@@ -5693,23 +5767,32 @@ final class PanelController
      * Loads updater status cache from disk.
      *
      * @return array{
+     *   source_key: string,
      *   source_repo: string,
+     *   current_version: string,
      *   current_revision: string,
+     *   latest_version: string,
      *   latest_revision: string,
      *   status: string,
      *   message: string,
-     *   checked_at: string
+     *   checked_at: string,
+     *   local_branch: string
      * }
      */
     private function loadUpdaterStatus(): array
     {
+        $source = $this->resolveUpdateSource(null);
         $default = [
-            'source_repo' => self::UPDATE_SOURCE_REPO,
+            'source_key' => (string) $source['key'],
+            'source_repo' => (string) $source['repo'],
+            'current_version' => $this->detectLocalComposerVersion() ?? '',
             'current_revision' => $this->detectLocalRevision() ?? '',
+            'latest_version' => '',
             'latest_revision' => '',
             'status' => 'unknown',
             'message' => 'Run "Check for Updates" to query upstream status.',
             'checked_at' => '',
+            'local_branch' => $this->detectLocalBranch() ?? '',
         ];
 
         $statePath = $this->updaterStateFilePath();
@@ -5723,13 +5806,20 @@ final class PanelController
             return $default;
         }
 
+        $sourceKey = $this->input->text((string) ($loaded['source_key'] ?? ''), 120);
+        $source = $this->resolveUpdateSource($sourceKey);
+
         $status = [
-            'source_repo' => $this->input->text((string) ($loaded['source_repo'] ?? self::UPDATE_SOURCE_REPO), 500),
+            'source_key' => (string) $source['key'],
+            'source_repo' => (string) $source['repo'],
+            'current_version' => $this->input->text((string) ($loaded['current_version'] ?? ''), 50),
             'current_revision' => $this->input->text((string) ($loaded['current_revision'] ?? ''), 80),
+            'latest_version' => $this->input->text((string) ($loaded['latest_version'] ?? ''), 50),
             'latest_revision' => $this->input->text((string) ($loaded['latest_revision'] ?? ''), 80),
             'status' => strtolower($this->input->text((string) ($loaded['status'] ?? 'unknown'), 20)),
             'message' => $this->input->text((string) ($loaded['message'] ?? ''), 500),
             'checked_at' => $this->input->text((string) ($loaded['checked_at'] ?? ''), 40),
+            'local_branch' => $this->input->text((string) ($loaded['local_branch'] ?? ''), 120),
         ];
 
         if (!in_array($status['status'], ['unknown', 'error', 'current', 'outdated'], true)) {
@@ -5776,8 +5866,12 @@ final class PanelController
     /**
      * Reads latest upstream revision hash from GitHub API.
      */
-    private function fetchLatestRemoteRevision(): ?string
+    private function fetchLatestRemoteRevision(string $apiUrl): ?string
     {
+        if (trim($apiUrl) === '') {
+            return null;
+        }
+
         $context = stream_context_create([
             'http' => [
                 'method' => 'GET',
@@ -5789,7 +5883,7 @@ final class PanelController
             ],
         ]);
 
-        $raw = @file_get_contents(self::UPDATE_SOURCE_LATEST_API, false, $context);
+        $raw = @file_get_contents($apiUrl, false, $context);
         if ($raw === false || trim($raw) === '') {
             return null;
         }
@@ -5811,6 +5905,62 @@ final class PanelController
         }
 
         return $sha;
+    }
+
+    /**
+     * Reads latest upstream package version from GitHub composer.json contents.
+     */
+    private function fetchLatestRemoteComposerVersion(string $apiUrl): ?string
+    {
+        if (trim($apiUrl) === '') {
+            return null;
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 8,
+                'header' => [
+                    'Accept: application/vnd.github+json',
+                    'User-Agent: Raven-Updater',
+                ],
+            ],
+        ]);
+
+        $raw = @file_get_contents($apiUrl, false, $context);
+        if ($raw === false || trim($raw) === '') {
+            return null;
+        }
+
+        /** @var mixed $decoded */
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        $encodedContent = (string) ($decoded['content'] ?? '');
+        if ($encodedContent === '') {
+            return null;
+        }
+
+        $cleanBase64 = preg_replace('/\s+/', '', $encodedContent) ?? '';
+        if ($cleanBase64 === '') {
+            return null;
+        }
+
+        $composerRaw = base64_decode($cleanBase64, true);
+        if (!is_string($composerRaw) || trim($composerRaw) === '') {
+            return null;
+        }
+
+        /** @var mixed $composerDecoded */
+        $composerDecoded = json_decode($composerRaw, true);
+        if (!is_array($composerDecoded)) {
+            return null;
+        }
+
+        $version = $this->input->text((string) ($composerDecoded['version'] ?? ''), 50);
+        return $version !== '' ? $version : null;
     }
 
     /**
@@ -5846,6 +5996,39 @@ final class PanelController
 
         $hash = strtolower($head);
         return $this->isValidRevisionHash($hash) ? $hash : null;
+    }
+
+    /**
+     * Detects local install branch from `.git/HEAD` where available.
+     */
+    private function detectLocalBranch(): ?string
+    {
+        $root = dirname(__DIR__, 3);
+        $headPath = $root . '/.git/HEAD';
+        if (!is_file($headPath)) {
+            return null;
+        }
+
+        $head = trim((string) @file_get_contents($headPath));
+        if ($head === '') {
+            return null;
+        }
+
+        if (str_starts_with($head, 'ref: ')) {
+            $ref = trim(substr($head, 5));
+            if ($ref === '' || str_contains($ref, '..') || str_starts_with($ref, '/')) {
+                return null;
+            }
+
+            if (str_starts_with($ref, 'refs/heads/')) {
+                $branch = substr($ref, strlen('refs/heads/'));
+                return $branch === '' ? null : $this->input->text($branch, 120);
+            }
+
+            return $this->input->text($ref, 120);
+        }
+
+        return $this->isValidRevisionHash(strtolower($head)) ? 'detached' : null;
     }
 
     /**
