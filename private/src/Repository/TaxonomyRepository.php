@@ -210,7 +210,8 @@ final class TaxonomyRepository
      *   categories: array<int, array{id: int, name: string, slug: string}>,
      *   tags: array<int, array{id: int, name: string, slug: string}>,
      *   assigned_categories: array<int, array{id: int, name: string, slug: string}>,
-     *   assigned_tags: array<int, array{id: int, name: string, slug: string}>
+     *   assigned_tags: array<int, array{id: int, name: string, slug: string}>,
+     *   shortcodes: array<int, array{extension: string, label: string, shortcode: string}>
      * }
      */
     public function listPageEditorTaxonomyData(int $pageId): array
@@ -218,31 +219,65 @@ final class TaxonomyRepository
         $channels = $this->table('channels');
         $categories = $this->table('categories');
         $tags = $this->table('tags');
+        $shortcodes = $this->table('shortcodes');
         $pageCategories = $this->table('page_categories');
         $pageTags = $this->table('page_tags');
         $normalizedPageId = max(0, $pageId);
 
         $stmt = $this->db->prepare(
-            'SELECT option_type, id, name, slug, is_assigned
+            'SELECT option_type, id, name, slug, is_assigned, extension_name, shortcode, sort_order
              FROM (
-                 SELECT \'channel\' AS option_type, c.id, c.name, c.slug, 0 AS is_assigned
+                 SELECT
+                    \'channel\' AS option_type,
+                    c.id,
+                    c.name,
+                    c.slug,
+                    0 AS is_assigned,
+                    \'\' AS extension_name,
+                    \'\' AS shortcode,
+                    0 AS sort_order
                  FROM ' . $channels . ' c
                  UNION ALL
-                 SELECT \'category\' AS option_type, c.id, c.name, c.slug,
-                        CASE WHEN pc.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned
+                 SELECT
+                    \'category\' AS option_type,
+                    c.id,
+                    c.name,
+                    c.slug,
+                    CASE WHEN pc.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned,
+                    \'\' AS extension_name,
+                    \'\' AS shortcode,
+                    0 AS sort_order
                  FROM ' . $categories . ' c
                  LEFT JOIN ' . $pageCategories . ' pc
                     ON pc.category_id = c.id
                    AND pc.page_id = ?
                  UNION ALL
-                 SELECT \'tag\' AS option_type, t.id, t.name, t.slug,
-                        CASE WHEN pt.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned
+                 SELECT
+                    \'tag\' AS option_type,
+                    t.id,
+                    t.name,
+                    t.slug,
+                    CASE WHEN pt.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned,
+                    \'\' AS extension_name,
+                    \'\' AS shortcode,
+                    0 AS sort_order
                  FROM ' . $tags . ' t
                  LEFT JOIN ' . $pageTags . ' pt
                     ON pt.tag_id = t.id
                    AND pt.page_id = ?
+                 UNION ALL
+                 SELECT
+                    \'shortcode\' AS option_type,
+                    s.id,
+                    s.label AS name,
+                    \'\' AS slug,
+                    0 AS is_assigned,
+                    s.extension_name,
+                    s.shortcode,
+                    s.sort_order
+                 FROM ' . $shortcodes . ' s
              ) options
-             ORDER BY option_type ASC, name ASC, id ASC'
+             ORDER BY option_type ASC, sort_order ASC, name ASC, id ASC'
         );
         $stmt->execute([$normalizedPageId, $normalizedPageId]);
 
@@ -253,6 +288,7 @@ final class TaxonomyRepository
             'tags' => [],
             'assigned_categories' => [],
             'assigned_tags' => [],
+            'shortcodes' => [],
         ];
 
         foreach ($rows as $row) {
@@ -287,6 +323,28 @@ final class TaxonomyRepository
                 if ($isAssigned) {
                     $result['assigned_tags'][] = $entry;
                 }
+                continue;
+            }
+            if ($optionType === 'shortcode') {
+                $extension = strtolower(trim((string) ($row['extension_name'] ?? '')));
+                $label = trim((string) ($row['name'] ?? ''));
+                $shortcode = trim((string) ($row['shortcode'] ?? ''));
+                $shortcode = str_replace(["\r", "\n", "\0"], '', $shortcode);
+                if (
+                    preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $extension) !== 1
+                    || $label === ''
+                    || $shortcode === ''
+                    || !str_starts_with($shortcode, '[')
+                    || !str_ends_with($shortcode, ']')
+                ) {
+                    continue;
+                }
+
+                $result['shortcodes'][] = [
+                    'extension' => $extension,
+                    'label' => $label,
+                    'shortcode' => $shortcode,
+                ];
             }
         }
 

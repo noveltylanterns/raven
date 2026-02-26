@@ -225,6 +225,7 @@ final class PanelController
         $tagOptions = is_array($taxonomyData['tags'] ?? null) ? $taxonomyData['tags'] : [];
         $assignedCategories = is_array($taxonomyData['assigned_categories'] ?? null) ? $taxonomyData['assigned_categories'] : [];
         $assignedTags = is_array($taxonomyData['assigned_tags'] ?? null) ? $taxonomyData['assigned_tags'] : [];
+        $preloadedShortcodes = is_array($taxonomyData['shortcodes'] ?? null) ? $taxonomyData['shortcodes'] : [];
         $galleryImages = $id !== null ? $this->pageImages->listForPage($id) : [];
 
         $this->view->render('panel/pages/edit', [
@@ -238,7 +239,7 @@ final class PanelController
             'galleryImages' => $galleryImages,
             'imageUploadTarget' => (string) $this->config->get('media.images.upload_target', 'local'),
             'imageMaxFilesPerUpload' => max(0, (int) $this->config->get('media.images.max_files_per_upload', 10)),
-            'shortcodeInsertItems' => $this->pageEditorInsertableShortcodes(),
+            'shortcodeInsertItems' => $this->pageEditorInsertableShortcodes($preloadedShortcodes),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'error' => $this->pullFlash('error'),
@@ -6744,11 +6745,11 @@ final class PanelController
      *   shortcode: string
      * }>
      */
-    private function pageEditorInsertableShortcodes(): array
+    private function pageEditorInsertableShortcodes(?array $preloadedRegistryItems = null): array
     {
         $enabledMap = $this->loadExtensionStateMap();
         $items = array_merge(
-            $this->centralizedExtensionShortcodesForEditor($enabledMap),
+            $this->centralizedExtensionShortcodesForEditor($enabledMap, $preloadedRegistryItems),
             $this->extensionProvidedShortcodesForEditor($enabledMap)
         );
 
@@ -6773,11 +6774,12 @@ final class PanelController
      * Loads centralized extension shortcode entries from taxonomy storage.
      *
      * @param array<string, bool> $enabledMap
+     * @param array<int, array{extension: string, label: string, shortcode: string}>|null $preloadedRegistryItems
      * @return array<int, array{extension: string, label: string, shortcode: string}>
      */
-    private function centralizedExtensionShortcodesForEditor(array $enabledMap): array
+    private function centralizedExtensionShortcodesForEditor(array $enabledMap, ?array $preloadedRegistryItems = null): array
     {
-        $registryRows = $this->taxonomy->listShortcodesForEditor();
+        $registryRows = is_array($preloadedRegistryItems) ? $preloadedRegistryItems : $this->taxonomy->listShortcodesForEditor();
         $items = [];
         foreach ($registryRows as $row) {
             $extensionName = strtolower(trim((string) ($row['extension'] ?? '')));
