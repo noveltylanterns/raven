@@ -2484,9 +2484,6 @@ final class PanelController
 
         $this->view->render('panel/dashboard', [
             'site' => $this->siteData(),
-            'user' => $this->auth->userSummary(),
-            'canManageUsers' => $this->auth->canManageUsers(),
-            'canManageGroups' => $this->auth->canManageGroups(),
             'canManageConfiguration' => $this->auth->canManageConfiguration(),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
@@ -2687,9 +2684,6 @@ final class PanelController
 
         $this->view->render('panel/updates', [
             'site' => $this->siteData(),
-            'user' => $this->auth->userSummary(),
-            'canManageUsers' => $this->auth->canManageUsers(),
-            'canManageConfiguration' => $this->auth->canManageConfiguration(),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
@@ -2888,9 +2882,6 @@ final class PanelController
 
         $this->view->render('panel/extensions', [
             'site' => $this->siteData(),
-            'user' => $this->auth->userSummary(),
-            'canManageUsers' => $this->auth->canManageUsers(),
-            'canManageConfiguration' => $this->auth->canManageConfiguration(),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),

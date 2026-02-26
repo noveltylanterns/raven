@@ -51,6 +51,20 @@ final class AuthService
     /** Request-local cache for guest permission mask lookup. */
     private ?int $permissionMaskForGuestCache = null;
 
+    /**
+     * Request-local cache for user preference rows by user id.
+     *
+     * @var array<int, array{
+     *   id: int,
+     *   username: string,
+     *   display_name: string,
+     *   email: string,
+     *   theme: string,
+     *   avatar_path: string|null
+     * }|null>
+     */
+    private array $userPreferencesCache = [];
+
     public function __construct(PDO $authDb, PDO $appDb, string $driver, string $prefix)
     {
         $this->authDb = $authDb;
@@ -480,6 +494,10 @@ final class AuthService
      */
     public function userPreferences(int $userId): ?array
     {
+        if ($userId > 0 && array_key_exists($userId, $this->userPreferencesCache)) {
+            return $this->userPreferencesCache[$userId];
+        }
+
         $stmt = $this->authDb->prepare(
             'SELECT id, username, display_name, email, theme, avatar_path
              FROM ' . $this->authTable('users') . '
@@ -490,10 +508,13 @@ final class AuthService
 
         $row = $stmt->fetch();
         if ($row === false) {
+            if ($userId > 0) {
+                $this->userPreferencesCache[$userId] = null;
+            }
             return null;
         }
 
-        return [
+        $result = [
             'id' => (int) $row['id'],
             'username' => (string) ($row['username'] ?? ''),
             'display_name' => (string) ($row['display_name'] ?? ''),
@@ -503,6 +524,12 @@ final class AuthService
                 ? (string) $row['avatar_path']
                 : null,
         ];
+
+        if ($userId > 0) {
+            $this->userPreferencesCache[$userId] = $result;
+        }
+
+        return $result;
     }
 
     /**
@@ -588,6 +615,7 @@ final class AuthService
              WHERE id = :id'
         );
         $stmt->execute($params);
+        unset($this->userPreferencesCache[$userId]);
 
         return ['ok' => true, 'errors' => []];
     }
@@ -883,6 +911,7 @@ final class AuthService
         $this->groupsForUserCache = [];
         $this->permissionMaskForUserCache = [];
         $this->permissionMaskForGuestCache = null;
+        $this->userPreferencesCache = [];
     }
 
     /**
