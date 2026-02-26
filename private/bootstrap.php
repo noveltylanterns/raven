@@ -13,23 +13,20 @@ use Raven\Core\Auth\AuthService;
 use Raven\Core\Config;
 use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\SchemaManager;
+use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Media\PageImageManager;
 use Raven\Core\Security\Csrf;
 use Raven\Core\Security\InputSanitizer;
 use Raven\Core\View;
 use Raven\Repository\CategoryRepository;
 use Raven\Repository\ChannelRepository;
-use Raven\Repository\ContactFormRepository;
-use Raven\Repository\ContactSubmissionRepository;
 use Raven\Repository\GroupRepository;
 use Raven\Repository\PageImageRepository;
 use Raven\Repository\PageRepository;
 use Raven\Repository\RedirectRepository;
-use Raven\Repository\SignupFormRepository;
 use Raven\Repository\TagRepository;
 use Raven\Repository\TaxonomyRepository;
 use Raven\Repository\UserRepository;
-use Raven\Repository\WaitlistSignupRepository;
 
 /**
  * Shared bootstrap for both web roots.
@@ -38,6 +35,8 @@ use Raven\Repository\WaitlistSignupRepository;
  */
 return (static function (): array {
     $root = dirname(__DIR__);
+    require_once $root . '/private/src/Core/Extension/ExtensionRegistry.php';
+    $enabledExtensionDirectories = ExtensionRegistry::enabledDirectories($root, true);
 
     // Load Composer autoloader when dependencies are installed.
     $composerAutoload = $root . '/composer/autoload.php';
@@ -45,8 +44,8 @@ return (static function (): array {
         require_once $composerAutoload;
     }
 
-    // Always provide local PSR-4 fallback so app classes work before install.
-    spl_autoload_register(static function (string $class) use ($root): void {
+    // Always provide local PSR-4 fallback so app/extension classes work before install.
+    spl_autoload_register(static function (string $class) use ($root, $enabledExtensionDirectories): void {
         $prefix = 'Raven\\';
 
         if (!str_starts_with($class, $prefix)) {
@@ -54,10 +53,33 @@ return (static function (): array {
         }
 
         $relative = str_replace('\\', '/', substr($class, strlen($prefix)));
-        $file = $root . '/private/src/' . $relative . '.php';
+        $baseSpecs = [
+            ['path' => $root . '/private/src/', 'flatten_repository' => false],
+        ];
+        foreach ($enabledExtensionDirectories as $directory) {
+            $extensionSourcePath = $root . '/private/ext/' . $directory . '/src/';
+            if (!is_dir($extensionSourcePath)) {
+                continue;
+            }
 
-        if (is_file($file)) {
-            require_once $file;
+            $baseSpecs[] = ['path' => $extensionSourcePath, 'flatten_repository' => true];
+        }
+
+        foreach ($baseSpecs as $baseSpec) {
+            $base = (string) ($baseSpec['path'] ?? '');
+            $flattenRepository = !empty($baseSpec['flatten_repository']);
+            $candidates = [$base . $relative . '.php'];
+
+            if ($flattenRepository && str_starts_with($relative, 'Repository/')) {
+                $candidates[] = $base . substr($relative, strlen('Repository/')) . '.php';
+            }
+
+            foreach ($candidates as $file) {
+                if (is_file($file)) {
+                    require_once $file;
+                    return;
+                }
+            }
         }
     });
 
@@ -175,12 +197,7 @@ return (static function (): array {
 
     $input = new InputSanitizer();
     $pageImages = new PageImageRepository($appDb, $driver, $prefix);
-    $contactForms = new ContactFormRepository($appDb, $driver, $prefix);
-    $contactSubmissions = new ContactSubmissionRepository($appDb, $driver, $prefix);
-    $signupForms = new SignupFormRepository($appDb, $driver, $prefix);
-    $waitlistSignups = new WaitlistSignupRepository($appDb, $driver, $prefix);
-
-    return [
+    $app = [
         'root' => $root,
         'config' => $config,
         'driver' => $driver,
@@ -191,8 +208,6 @@ return (static function (): array {
         'view' => new View($root . '/private/views'),
         'input' => $input,
         'csrf' => new Csrf(),
-        'contact_forms' => $contactForms,
-        'contact_submissions' => $contactSubmissions,
         'categories' => new CategoryRepository($appDb, $driver, $prefix),
         'channels' => new ChannelRepository($appDb, $driver, $prefix),
         'groups' => new GroupRepository($appDb, $driver, $prefix),
@@ -203,7 +218,28 @@ return (static function (): array {
         'tags' => new TagRepository($appDb, $driver, $prefix),
         'taxonomy' => new TaxonomyRepository($appDb, $driver, $prefix),
         'users' => new UserRepository($authDb, $appDb, $driver, $prefix),
-        'signup_forms' => $signupForms,
-        'signup_submissions' => $waitlistSignups,
     ];
+
+    // Load service providers from enabled extensions.
+    foreach ($enabledExtensionDirectories as $directory) {
+        $extensionBootstrapPath = $root . '/private/ext/' . $directory . '/bootstrap.php';
+        if (!is_file($extensionBootstrapPath)) {
+            continue;
+        }
+
+        /** @var mixed $provider */
+        $provider = require $extensionBootstrapPath;
+        if (!is_callable($provider)) {
+            error_log('Raven extension bootstrap is invalid for extension "' . $directory . '".');
+            continue;
+        }
+
+        try {
+            $provider($app);
+        } catch (\Throwable $exception) {
+            error_log('Raven extension bootstrap failed for extension "' . $directory . '": ' . $exception->getMessage());
+        }
+    }
+
+    return $app;
 })();

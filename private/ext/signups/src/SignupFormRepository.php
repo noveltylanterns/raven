@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/src/Repository/SignupFormRepository.php
+ * ~/private/ext/signups/src/SignupFormRepository.php
  * Repository for Signup Sheets extension form definition persistence.
  * Docs: https://raven.lanterns.io
  */

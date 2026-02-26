@@ -14,6 +14,7 @@ use Raven\Controller\PanelController;
 use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Debug\DebugToolbarRenderer;
 use Raven\Core\Debug\RequestProfiler;
+use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Routing\Router;
 
 use function Raven\Core\Support\request_path;
@@ -247,177 +248,26 @@ $extensionPanelPermissionOptions = static function (): array {
     ];
 };
 
-/**
- * Returns enabled extension directory map from `private/ext/.state.php`.
- *
- * @return array<string, bool>
- */
-$loadEnabledExtensionState = static function () use ($app): array {
-    $statePath = $app['root'] . '/private/ext/.state.php';
-    if (!is_file($statePath)) {
-        return [];
+$allowedExtensionPermissionBits = array_keys($extensionPanelPermissionOptions());
+$enabledState = ExtensionRegistry::enabledMap((string) $app['root']);
+$extensionPermissionState = ExtensionRegistry::permissionMap((string) $app['root'], $allowedExtensionPermissionBits);
+
+// Compute enabled, manifest-valid extensions once for panel nav and route registration.
+$enabledExtensions = [];
+$enabledExtensionManifests = [];
+foreach (array_keys($enabledState) as $directoryName) {
+    if (!is_dir($app['root'] . '/private/ext/' . $directoryName)) {
+        continue;
     }
 
-    // Read the latest state immediately after panel toggles.
-    clearstatcache(true, $statePath);
-    if (function_exists('opcache_invalidate')) {
-        @opcache_invalidate($statePath, true);
+    $manifest = ExtensionRegistry::readManifest((string) $app['root'], $directoryName);
+    if ($manifest === null) {
+        continue;
     }
 
-    /** @var mixed $rawState */
-    $rawState = require $statePath;
-    if (!is_array($rawState)) {
-        return [];
-    }
-
-    /** @var mixed $rawEnabled */
-    $rawEnabled = array_key_exists('enabled', $rawState) ? $rawState['enabled'] : $rawState;
-    if (!array_key_exists('enabled', $rawState) && array_key_exists('permissions', $rawState)) {
-        $rawEnabled = [];
-    }
-    if (!is_array($rawEnabled)) {
-        return [];
-    }
-
-    $enabled = [];
-    foreach ($rawEnabled as $directory => $flag) {
-        if (!is_string($directory) || !preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $directory)) {
-            continue;
-        }
-
-        if ((bool) $flag) {
-            $enabled[$directory] = true;
-        }
-    }
-
-    return $enabled;
-};
-
-/**
- * Returns required panel-side permission bit per extension from state.
- *
- * @return array<string, int>
- */
-$loadExtensionPermissionState = static function () use ($app, $extensionPanelPermissionOptions): array {
-    $statePath = $app['root'] . '/private/ext/.state.php';
-    if (!is_file($statePath)) {
-        return [];
-    }
-
-    clearstatcache(true, $statePath);
-    if (function_exists('opcache_invalidate')) {
-        @opcache_invalidate($statePath, true);
-    }
-
-    /** @var mixed $rawState */
-    $rawState = require $statePath;
-    if (!is_array($rawState)) {
-        return [];
-    }
-
-    /** @var mixed $rawPermissions */
-    $rawPermissions = $rawState['permissions'] ?? [];
-    if (!is_array($rawPermissions)) {
-        return [];
-    }
-
-    $allowedBits = array_keys($extensionPanelPermissionOptions());
-    $permissions = [];
-    foreach ($rawPermissions as $directory => $rawBit) {
-        if (!is_string($directory) || !preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $directory)) {
-            continue;
-        }
-
-        $bit = (int) $rawBit;
-        if (!in_array($bit, $allowedBits, true)) {
-            continue;
-        }
-
-        $permissions[$directory] = $bit;
-    }
-
-    return $permissions;
-};
-
-/**
- * Reads minimal extension manifest metadata from one extension directory.
- *
- * @return array{
- *   name: string,
- *   type: string,
- *   panel_path: string,
- *   panel_section: string,
- *   system_extension: bool
- * }|null
- */
-$readExtensionManifest = static function (string $directoryName) use ($app): ?array {
-    if (!preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $directoryName)) {
-        return null;
-    }
-
-    $manifestPath = $app['root'] . '/private/ext/' . $directoryName . '/extension.json';
-    if (!is_file($manifestPath)) {
-        return null;
-    }
-
-    $raw = file_get_contents($manifestPath);
-    if ($raw === false || trim($raw) === '') {
-        return null;
-    }
-
-    /** @var mixed $decoded */
-    $decoded = json_decode($raw, true);
-    if (!is_array($decoded)) {
-        return null;
-    }
-
-    $name = trim((string) ($decoded['name'] ?? ''));
-    if ($name === '') {
-        return null;
-    }
-
-    $type = strtolower(trim((string) ($decoded['type'] ?? 'basic')));
-    if (!in_array($type, ['basic', 'system'], true)) {
-        $type = 'basic';
-    }
-
-    $panelPath = trim((string) ($decoded['panel_path'] ?? ''), '/');
-    if ($panelPath !== '' && preg_match('/^[a-z0-9][a-z0-9_\/-]*$/i', $panelPath) !== 1) {
-        $panelPath = '';
-    }
-
-    $panelSection = strtolower(trim((string) ($decoded['panel_section'] ?? '')));
-    if ($panelSection !== '' && preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $panelSection) !== 1) {
-        $panelSection = '';
-    }
-
-    $systemExtension = (bool) ($decoded['system_extension'] ?? false);
-
-    return [
-        'name' => $name,
-        'type' => $type,
-        'panel_path' => $panelPath,
-        'panel_section' => $panelSection,
-        'system_extension' => $systemExtension,
-    ];
-};
-
-/**
- * Returns true when one extension is enabled and has a valid manifest.
- */
-$isExtensionEnabled = static function (string $directoryName) use ($loadEnabledExtensionState, $readExtensionManifest, $app): bool {
-    $enabledState = $loadEnabledExtensionState();
-    if (empty($enabledState[$directoryName])) {
-        return false;
-    }
-
-    // Invalid extensions must never execute.
-    if ($readExtensionManifest($directoryName) === null) {
-        return false;
-    }
-
-    return is_dir($app['root'] . '/private/ext/' . $directoryName);
-};
+    $enabledExtensions[$directoryName] = true;
+    $enabledExtensionManifests[$directoryName] = $manifest;
+}
 
 /**
  * Synchronizes lightweight identity data for the personalized welcome heading.
@@ -544,22 +394,7 @@ $hasPanelPermissionBit = static function (int $bit) use ($app): bool {
     };
 };
 
-// Compute the enabled extension list once and expose it for panel layout/nav logic.
-$enabledExtensions = [];
-$enabledExtensionManifests = [];
-$enabledState = $loadEnabledExtensionState();
-$extensionPermissionState = $loadExtensionPermissionState();
 $_SESSION['_raven_extension_permission_masks'] = $extensionPermissionState;
-foreach (array_keys($enabledState) as $directoryName) {
-    if ($isExtensionEnabled($directoryName)) {
-        $enabledExtensions[$directoryName] = true;
-
-        $manifest = $readExtensionManifest($directoryName);
-        if ($manifest !== null) {
-            $enabledExtensionManifests[$directoryName] = $manifest;
-        }
-    }
-}
 $_SESSION['_raven_enabled_extensions'] = array_keys($enabledExtensions);
 
 // Build dedicated nav links by extension type.
@@ -572,8 +407,7 @@ foreach ($enabledExtensionManifests as $directoryName => $manifest) {
         || !empty($manifest['system_extension'])
         || in_array($directoryName, $systemExtensionDirectories, true);
     $requiredPermissionBit = (int) ($extensionPermissionState[$directoryName] ?? PanelAccess::PANEL_LOGIN);
-    $allowedPermissionBits = array_keys($extensionPanelPermissionOptions());
-    if (!in_array($requiredPermissionBit, $allowedPermissionBits, true)) {
+    if (!in_array($requiredPermissionBit, $allowedExtensionPermissionBits, true)) {
         $requiredPermissionBit = PanelAccess::PANEL_LOGIN;
     }
 
@@ -949,7 +783,7 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
         continue;
     }
 
-    $manifest = $enabledExtensionManifests[$extensionName] ?? $readExtensionManifest($extensionName);
+    $manifest = $enabledExtensionManifests[$extensionName] ?? null;
     if (!is_array($manifest)) {
         $manifest = [
             'type' => 'basic',
@@ -961,8 +795,7 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
         || !empty($manifest['system_extension'])
         || in_array($extensionName, $systemExtensionDirectories, true);
     $requiredPermissionBit = (int) ($extensionPermissionState[$extensionName] ?? PanelAccess::PANEL_LOGIN);
-    $allowedPermissionBits = array_keys($extensionPanelPermissionOptions());
-    if (!in_array($requiredPermissionBit, $allowedPermissionBits, true)) {
+    if (!in_array($requiredPermissionBit, $allowedExtensionPermissionBits, true)) {
         $requiredPermissionBit = PanelAccess::PANEL_LOGIN;
     }
 

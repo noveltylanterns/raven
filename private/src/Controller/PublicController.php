@@ -15,9 +15,10 @@ namespace Raven\Controller;
 
 use Raven\Core\Auth\AuthService;
 use Raven\Core\Config;
-use Raven\Core\Support\CountryOptions;
+use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Security\Csrf;
 use Raven\Core\Security\InputSanitizer;
+use Raven\Core\Support\CountryOptions;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Core\View;
 use Raven\Repository\ContactFormRepository;
@@ -47,13 +48,15 @@ final class PublicController
     private RedirectRepository $redirects;
     private TaxonomyRepository $taxonomy;
     private UserRepository $users;
-    private ContactFormRepository $contactForms;
-    private ContactSubmissionRepository $contactSubmissions;
-    private SignupFormRepository $signupForms;
+    private ?ContactFormRepository $contactForms;
+    private ?ContactSubmissionRepository $contactSubmissions;
+    private ?SignupFormRepository $signupForms;
     private InputSanitizer $input;
     private Csrf $csrf;
-    private WaitlistSignupRepository $waitlistSignups;
+    private ?WaitlistSignupRepository $waitlistSignups;
     private bool $captchaScriptIncluded = false;
+    /** @var array<string, bool>|null */
+    private ?array $enabledExtensionMap = null;
     /**
      * Request-local cache of enabled embedded forms keyed by type then slug.
      *
@@ -71,12 +74,12 @@ final class PublicController
         RedirectRepository $redirects,
         TaxonomyRepository $taxonomy,
         UserRepository $users,
-        ContactFormRepository $contactForms,
-        ContactSubmissionRepository $contactSubmissions,
-        SignupFormRepository $signupForms,
+        ?ContactFormRepository $contactForms,
+        ?ContactSubmissionRepository $contactSubmissions,
+        ?SignupFormRepository $signupForms,
         InputSanitizer $input,
         Csrf $csrf,
-        WaitlistSignupRepository $waitlistSignups
+        ?WaitlistSignupRepository $waitlistSignups
     )
     {
         $this->view = $view;
@@ -466,6 +469,15 @@ final class PublicController
      */
     public function submitWaitlist(string $formSlug): void
     {
+        if (
+            !$this->isExtensionEnabled('signups')
+            || !$this->signupForms instanceof SignupFormRepository
+            || !$this->waitlistSignups instanceof WaitlistSignupRepository
+        ) {
+            $this->notFound();
+            return;
+        }
+
         $slug = $this->input->slug($formSlug);
         if ($slug === null) {
             $this->notFound();
@@ -609,6 +621,15 @@ final class PublicController
      */
     public function submitContactForm(string $formSlug): void
     {
+        if (
+            !$this->isExtensionEnabled('contact')
+            || !$this->contactForms instanceof ContactFormRepository
+            || !$this->contactSubmissions instanceof ContactSubmissionRepository
+        ) {
+            $this->notFound();
+            return;
+        }
+
         $slug = $this->input->slug($formSlug);
         if ($slug === null) {
             $this->notFound();
@@ -2321,8 +2342,8 @@ final class PublicController
         }
 
         $forms = match ($type) {
-            'contact' => $this->contactForms->listAll(),
-            'signups' => $this->signupForms->listAll(),
+            'contact' => $this->contactForms?->listAll() ?? [],
+            'signups' => $this->signupForms?->listAll() ?? [],
             default => [],
         };
 
@@ -2349,24 +2370,12 @@ final class PublicController
      */
     private function isExtensionEnabled(string $extensionName): bool
     {
-        $statePath = dirname(__DIR__, 2) . '/ext/.state.php';
-        if (!is_file($statePath)) {
-            return false;
+        if ($this->enabledExtensionMap === null) {
+            $root = dirname(__DIR__, 3);
+            $this->enabledExtensionMap = ExtensionRegistry::enabledMap($root);
         }
 
-        /** @var mixed $state */
-        $state = require $statePath;
-        if (!is_array($state)) {
-            return false;
-        }
-
-        /** @var mixed $rawEnabled */
-        $rawEnabled = $state['enabled'] ?? $state;
-        if (!is_array($rawEnabled)) {
-            return false;
-        }
-
-        return !empty($rawEnabled[$extensionName]);
+        return !empty($this->enabledExtensionMap[$extensionName]);
     }
 
     /**

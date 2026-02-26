@@ -2,12 +2,12 @@
 
 /**
  * RAVEN CMS
- * ~/private/src/Repository/ContactSubmissionRepository.php
- * Repository for contact submission persistence and panel management queries.
+ * ~/private/ext/signups/src/WaitlistSignupRepository.php
+ * Repository for signup submission persistence and panel management queries.
  * Docs: https://raven.lanterns.io
  */
 
-// Inline note: Keep contact-submission storage logic centralized so public/panel flows stay consistent.
+// Inline note: Keep signup submission storage logic centralized so panel/public flows stay consistent.
 
 declare(strict_types=1);
 
@@ -20,9 +20,9 @@ use PDOException;
 use RuntimeException;
 
 /**
- * Data access for Contact extension submissions.
+ * Data access for Signup Sheets extension submissions.
  */
-final class ContactSubmissionRepository
+final class WaitlistSignupRepository
 {
     private PDO $db;
     private string $driver;
@@ -37,13 +37,13 @@ final class ContactSubmissionRepository
     }
 
     /**
-     * Persists one contact submission and returns its id.
+     * Persists one signup submission and returns its id.
      *
      * @param array{
      *   form_slug: string,
-     *   sender_name: string,
-     *   sender_email: string,
-     *   message_text: string,
+     *   email: string,
+     *   display_name: string,
+     *   country: string,
      *   additional_fields_json?: string,
      *   source_url: string,
      *   ip_address: string|null,
@@ -54,12 +54,12 @@ final class ContactSubmissionRepository
      */
     public function create(array $data): int
     {
-        $table = $this->table('ext_contact_submissions');
+        $table = $this->table('ext_signups_submissions');
 
         $formSlug = trim((string) ($data['form_slug'] ?? ''));
-        $senderName = trim((string) ($data['sender_name'] ?? ''));
-        $senderEmail = strtolower(trim((string) ($data['sender_email'] ?? '')));
-        $messageText = trim((string) ($data['message_text'] ?? ''));
+        $email = strtolower(trim((string) ($data['email'] ?? '')));
+        $displayName = trim((string) ($data['display_name'] ?? ''));
+        $country = strtolower(trim((string) ($data['country'] ?? '')));
         $additionalFieldsJson = trim((string) ($data['additional_fields_json'] ?? ''));
         $sourceUrl = trim((string) ($data['source_url'] ?? ''));
         $ipAddress = isset($data['ip_address']) ? trim((string) $data['ip_address']) : '';
@@ -70,12 +70,15 @@ final class ContactSubmissionRepository
         $hostname = $hostname !== '' ? substr($hostname, 0, 255) : null;
         $userAgent = $userAgent !== '' ? substr($userAgent, 0, 500) : null;
 
-        if ($formSlug === '' || $senderName === '' || $senderEmail === '' || $messageText === '') {
-            throw new RuntimeException('Contact submission is missing required values.');
+        if ($formSlug === '' || $email === '' || $displayName === '' || $country === '') {
+            throw new RuntimeException('Signup submission is missing required values.');
         }
-
         if ($additionalFieldsJson === '') {
             $additionalFieldsJson = '[]';
+        }
+
+        if ($this->existsByFormAndEmail($formSlug, $email)) {
+            throw new RuntimeException('That email is already signed up for this signup sheet.');
         }
 
         $createdAt = $this->normalizeCreatedAt((string) ($data['created_at'] ?? ''));
@@ -83,15 +86,15 @@ final class ContactSubmissionRepository
         try {
             $stmt = $this->db->prepare(
                 'INSERT INTO ' . $table . '
-                 (form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at)
+                 (form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at)
                  VALUES
-                 (:form_slug, :sender_name, :sender_email, :message_text, :additional_fields_json, :source_url, :ip_address, :hostname, :user_agent, :created_at)'
+                 (:form_slug, :email, :display_name, :country, :additional_fields_json, :source_url, :ip_address, :hostname, :user_agent, :created_at)'
             );
             $stmt->execute([
                 ':form_slug' => $formSlug,
-                ':sender_name' => $senderName,
-                ':sender_email' => $senderEmail,
-                ':message_text' => $messageText,
+                ':email' => $email,
+                ':display_name' => $displayName,
+                ':country' => $country,
                 ':additional_fields_json' => $additionalFieldsJson,
                 ':source_url' => $sourceUrl,
                 ':ip_address' => $ipAddress,
@@ -99,19 +102,23 @@ final class ContactSubmissionRepository
                 ':user_agent' => $userAgent,
                 ':created_at' => $createdAt,
             ]);
-        } catch (PDOException) {
-            throw new RuntimeException('Failed to store contact submission.');
+        } catch (PDOException $exception) {
+            if ($this->isUniqueConstraintError($exception)) {
+                throw new RuntimeException('That email is already signed up for this signup sheet.');
+            }
+
+            throw new RuntimeException('Failed to store signup submission.');
         }
 
         return (int) $this->db->lastInsertId();
     }
 
     /**
-     * Returns total contact submission count for one form slug with optional search term.
+     * Returns total signup count for one signup-sheet form with optional search term.
      */
     public function countByFormSlug(string $formSlug, string $search = ''): int
     {
-        $table = $this->table('ext_contact_submissions');
+        $table = $this->table('ext_signups_submissions');
 
         $sql = 'SELECT COUNT(*)
                 FROM ' . $table . '
@@ -127,21 +134,21 @@ final class ContactSubmissionRepository
             $stmt->execute($params);
 
             return (int) ($stmt->fetchColumn() ?: 0);
-        } catch (PDOException) {
-            throw new RuntimeException('Failed to count contact submissions.');
+        } catch (PDOException $exception) {
+            throw new RuntimeException('Failed to count signup submissions.');
         }
     }
 
     /**
-     * Returns paginated contact submissions for one form slug.
+     * Returns paginated signup submissions for one form slug.
      *
      * @return array<int, array<string, mixed>>
      */
     public function listByFormSlug(string $formSlug, int $limit, int $offset, string $search = ''): array
     {
-        $table = $this->table('ext_contact_submissions');
+        $table = $this->table('ext_signups_submissions');
 
-        $sql = 'SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+        $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
                 FROM ' . $table . '
                 WHERE form_slug = :form_slug';
         $params = [
@@ -165,19 +172,19 @@ final class ContactSubmissionRepository
             $stmt->execute();
 
             return $stmt->fetchAll() ?: [];
-        } catch (PDOException) {
-            throw new RuntimeException('Failed to load contact submissions.');
+        } catch (PDOException $exception) {
+            throw new RuntimeException('Failed to load signup submissions.');
         }
     }
 
     /**
-     * Returns one paginated contact-submissions page plus total count in one query.
+     * Returns one paginated signup-submissions page plus total count in one query.
      *
      * @return array{rows: array<int, array<string, mixed>>, total: int}
      */
     public function listPageByFormSlug(string $formSlug, int $limit, int $offset, string $search = ''): array
     {
-        $table = $this->table('ext_contact_submissions');
+        $table = $this->table('ext_signups_submissions');
         $safeLimit = max(1, $limit);
         $safeOffset = max(0, $offset);
 
@@ -193,9 +200,9 @@ final class ContactSubmissionRepository
 
         $sql = 'SELECT page_rows.id,
                        page_rows.form_slug,
-                       page_rows.sender_name,
-                       page_rows.sender_email,
-                       page_rows.message_text,
+                       page_rows.email,
+                       page_rows.display_name,
+                       page_rows.country,
                        page_rows.additional_fields_json,
                        page_rows.source_url,
                        page_rows.ip_address,
@@ -204,7 +211,7 @@ final class ContactSubmissionRepository
                        page_rows.created_at,
                        totals.total_rows
                 FROM (
-                    SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+                    SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
                     FROM ' . $table . '
                     WHERE form_slug = :page_form_slug'
                     . $pageSearchClause
@@ -253,21 +260,21 @@ final class ContactSubmissionRepository
                 'rows' => $resultRows,
                 'total' => $total,
             ];
-        } catch (PDOException) {
-            throw new RuntimeException('Failed to load contact submissions.');
+        } catch (PDOException $exception) {
+            throw new RuntimeException('Failed to load signup submissions.');
         }
     }
 
     /**
-     * Returns all matching contact submissions for CSV export.
+     * Returns all matching signups for CSV export.
      *
      * @return array<int, array<string, mixed>>
      */
     public function listForExportByFormSlug(string $formSlug, string $search = ''): array
     {
-        $table = $this->table('ext_contact_submissions');
+        $table = $this->table('ext_signups_submissions');
 
-        $sql = 'SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+        $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
                 FROM ' . $table . '
                 WHERE form_slug = :form_slug';
         $params = [
@@ -282,17 +289,17 @@ final class ContactSubmissionRepository
             $stmt->execute($params);
 
             return $stmt->fetchAll() ?: [];
-        } catch (PDOException) {
-            throw new RuntimeException('Failed to load contact submissions export data.');
+        } catch (PDOException $exception) {
+            throw new RuntimeException('Failed to load signup submissions export data.');
         }
     }
 
     /**
-     * Deletes one contact submission row scoped to one form slug.
+     * Deletes one signup row scoped to a form slug.
      */
     public function deleteById(string $formSlug, int $id): bool
     {
-        $table = $this->table('ext_contact_submissions');
+        $table = $this->table('ext_signups_submissions');
 
         try {
             $stmt = $this->db->prepare(
@@ -305,17 +312,17 @@ final class ContactSubmissionRepository
             $stmt->execute();
 
             return $stmt->rowCount() > 0;
-        } catch (PDOException) {
-            throw new RuntimeException('Failed to delete contact submission.');
+        } catch (PDOException $exception) {
+            throw new RuntimeException('Failed to delete signup submission.');
         }
     }
 
     /**
-     * Deletes all contact submissions for one form slug and returns deleted row count.
+     * Deletes all signups for one signup-sheet form and returns deleted row count.
      */
     public function deleteAllByFormSlug(string $formSlug): int
     {
-        $table = $this->table('ext_contact_submissions');
+        $table = $this->table('ext_signups_submissions');
 
         try {
             $stmt = $this->db->prepare(
@@ -325,17 +332,17 @@ final class ContactSubmissionRepository
             $stmt->execute([':form_slug' => $formSlug]);
 
             return $stmt->rowCount();
-        } catch (PDOException) {
-            throw new RuntimeException('Failed to clear contact submissions.');
+        } catch (PDOException $exception) {
+            throw new RuntimeException('Failed to clear signup submissions.');
         }
     }
 
     /**
-     * Synchronizes stored submission metadata after a contact-form slug edit.
+     * Synchronizes stored submission metadata after a signup-sheet form slug edit.
      */
     public function syncFormIdentity(string $fromSlug, string $toSlug): void
     {
-        $table = $this->table('ext_contact_submissions');
+        $table = $this->table('ext_signups_submissions');
 
         try {
             $stmt = $this->db->prepare(
@@ -347,8 +354,38 @@ final class ContactSubmissionRepository
                 ':to_slug' => $toSlug,
                 ':from_slug' => $fromSlug,
             ]);
-        } catch (PDOException) {
-            throw new RuntimeException('Failed to synchronize contact submission metadata for the edited contact form.');
+        } catch (PDOException $exception) {
+            if ($this->isUniqueConstraintError($exception)) {
+                throw new RuntimeException('Cannot rename this signup sheet slug because matching email signups already exist on the destination slug.');
+            }
+
+            throw new RuntimeException('Failed to synchronize signup metadata for the edited signup sheet form.');
+        }
+    }
+
+    /**
+     * Returns true when one form already has a signup with this email.
+     */
+    private function existsByFormAndEmail(string $formSlug, string $email): bool
+    {
+        $table = $this->table('ext_signups_submissions');
+
+        try {
+            $stmt = $this->db->prepare(
+                'SELECT 1
+                 FROM ' . $table . '
+                 WHERE form_slug = :form_slug
+                   AND email = :email
+                 LIMIT 1'
+            );
+            $stmt->execute([
+                ':form_slug' => $formSlug,
+                ':email' => $email,
+            ]);
+
+            return $stmt->fetchColumn() !== false;
+        } catch (PDOException $exception) {
+            throw new RuntimeException('Failed to validate existing signup submissions.');
         }
     }
 
@@ -367,14 +404,11 @@ final class ContactSubmissionRepository
         $params[':' . $placeholderName] = '%' . $search . '%';
 
         return ' AND (
-                    LOWER(sender_name) LIKE :' . $placeholderName . '
-                    OR LOWER(sender_email) LIKE :' . $placeholderName . '
-                    OR LOWER(message_text) LIKE :' . $placeholderName . '
+                    LOWER(email) LIKE :' . $placeholderName . '
+                    OR LOWER(display_name) LIKE :' . $placeholderName . '
+                    OR LOWER(country) LIKE :' . $placeholderName . '
                     OR LOWER(COALESCE(additional_fields_json, \'\')) LIKE :' . $placeholderName . '
                     OR LOWER(COALESCE(source_url, \'\')) LIKE :' . $placeholderName . '
-                    OR LOWER(COALESCE(ip_address, \'\')) LIKE :' . $placeholderName . '
-                    OR LOWER(COALESCE(hostname, \'\')) LIKE :' . $placeholderName . '
-                    OR LOWER(COALESCE(user_agent, \'\')) LIKE :' . $placeholderName . '
                  )';
     }
 
@@ -388,13 +422,24 @@ final class ContactSubmissionRepository
         }
 
         return match ($table) {
-            'ext_contact_submissions' => 'extensions.ext_contact_submissions',
+            'ext_signups_submissions' => 'extensions.ext_signups_submissions',
             default => 'main.' . $table,
         };
     }
 
     /**
-     * Accepts common timestamp formats and normalizes to UTC SQL datetime.
+     * Detects duplicate-key SQL errors across supported PDO drivers.
+     */
+    private function isUniqueConstraintError(PDOException $exception): bool
+    {
+        $sqlState = (string) $exception->getCode();
+
+        // 23000 (MySQL/SQLite) and 23505 (PostgreSQL) represent unique-constraint failures.
+        return in_array($sqlState, ['23000', '23505'], true);
+    }
+
+    /**
+     * Accepts common CSV timestamp formats and normalizes to UTC SQL datetime.
      */
     private function normalizeCreatedAt(string $rawValue): string
     {
@@ -423,7 +468,7 @@ final class ContactSubmissionRepository
                 ->setTimezone(new DateTimeZone('UTC'))
                 ->format('Y-m-d H:i:s');
         } catch (\Throwable) {
-            // Fall through to `now` if value is not parseable.
+            // Fall through to `now` if import value is not parseable.
         }
 
         return gmdate('Y-m-d H:i:s');

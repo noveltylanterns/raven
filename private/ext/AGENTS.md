@@ -20,6 +20,7 @@ Last updated: 2026-02-18
 - Extension folder: `private/ext/{directory_name}/`
 - Allowed extension directory name regex: `^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$`
 - Required manifest: `private/ext/{directory_name}/extension.json`
+- Optional extension service provider: `private/ext/{directory_name}/bootstrap.php`
 - Optional panel routes registrar: `private/ext/{directory_name}/panel_routes.php`
 - Optional page-editor shortcode provider: `private/ext/{directory_name}/shortcodes.php`
 - Optional extension-local state file(s) when needed by your extension
@@ -28,6 +29,7 @@ Last updated: 2026-02-18
 ## Extension Enablement State
 - Runtime enablement state file: `private/ext/.state.php`
 - Commit-safe template: `private/ext/.state.php.dist`
+- Shared parser: `private/src/Core/Extension/ExtensionRegistry.php` (used by bootstrap/panel/public runtime checks)
 - State structure:
 - `enabled`: `{extension_directory => true}`
 - `permissions`: `{extension_directory => panel_permission_bit}` for basic extensions
@@ -76,6 +78,14 @@ Last updated: 2026-02-18
 - `setExtensionPermissionPath` => panel route for persisting extension permission bit
 - Registration happens after core panel routes are added.
 
+## Extension Service Bootstrap Contract
+- If enabled, Raven attempts to load `private/ext/{name}/bootstrap.php` during `private/bootstrap.php`.
+- File must return a callable:
+- `function (array &$app): void`
+- Provider should register extension services into the shared app container (for example repositories/controllers/helpers required by extension routes/runtime).
+- Bootstrap providers are loaded only for enabled extensions listed in `private/ext/.state.php` with valid directory names.
+- Extension source autoloading (`private/ext/{name}/src/`) is also enabled only for extensions marked enabled in `.state.php`.
+
 ## Services Available In `context['app']`
 - From `private/bootstrap.php`, extensions can consume:
 - `root`
@@ -99,8 +109,10 @@ Last updated: 2026-02-18
 - `taxonomy`
 - `users`
 - `contact_forms`
+- `contact_submissions`
 - `signup_forms`
 - `signup_submissions`
+- Note: extension-owned service keys are optional and depend on whether the extension is enabled and whether its `bootstrap.php` registered them.
 - Use `isset(...)` and strict instance checks before assuming any service.
 
 ## Panel UI Integration Pattern

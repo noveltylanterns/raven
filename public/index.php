@@ -154,12 +154,12 @@ $controller = new PublicController(
     $app['redirects'],
     $app['taxonomy'],
     $app['users'],
-    $app['contact_forms'],
-    $app['contact_submissions'],
-    $app['signup_forms'],
+    $app['contact_forms'] ?? null,
+    $app['contact_submissions'] ?? null,
+    $app['signup_forms'] ?? null,
     $app['input'],
     $app['csrf'],
-    $app['signup_submissions']
+    $app['signup_submissions'] ?? null
 );
 
 $input = $app['input'];

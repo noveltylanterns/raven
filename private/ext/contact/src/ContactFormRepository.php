@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/src/Repository/ContactFormRepository.php
+ * ~/private/ext/contact/src/ContactFormRepository.php
  * Repository for Contact extension form definition persistence.
  * Docs: https://raven.lanterns.io
  */

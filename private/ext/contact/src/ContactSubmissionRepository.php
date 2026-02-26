@@ -2,12 +2,12 @@
 
 /**
  * RAVEN CMS
- * ~/private/src/Repository/WaitlistSignupRepository.php
- * Repository for signup submission persistence and panel management queries.
+ * ~/private/ext/contact/src/ContactSubmissionRepository.php
+ * Repository for contact submission persistence and panel management queries.
  * Docs: https://raven.lanterns.io
  */
 
-// Inline note: Keep signup submission storage logic centralized so panel/public flows stay consistent.
+// Inline note: Keep contact-submission storage logic centralized so public/panel flows stay consistent.
 
 declare(strict_types=1);
 
@@ -20,9 +20,9 @@ use PDOException;
 use RuntimeException;
 
 /**
- * Data access for Signup Sheets extension submissions.
+ * Data access for Contact extension submissions.
  */
-final class WaitlistSignupRepository
+final class ContactSubmissionRepository
 {
     private PDO $db;
     private string $driver;
@@ -37,13 +37,13 @@ final class WaitlistSignupRepository
     }
 
     /**
-     * Persists one signup submission and returns its id.
+     * Persists one contact submission and returns its id.
      *
      * @param array{
      *   form_slug: string,
-     *   email: string,
-     *   display_name: string,
-     *   country: string,
+     *   sender_name: string,
+     *   sender_email: string,
+     *   message_text: string,
      *   additional_fields_json?: string,
      *   source_url: string,
      *   ip_address: string|null,
@@ -54,12 +54,12 @@ final class WaitlistSignupRepository
      */
     public function create(array $data): int
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('ext_contact_submissions');
 
         $formSlug = trim((string) ($data['form_slug'] ?? ''));
-        $email = strtolower(trim((string) ($data['email'] ?? '')));
-        $displayName = trim((string) ($data['display_name'] ?? ''));
-        $country = strtolower(trim((string) ($data['country'] ?? '')));
+        $senderName = trim((string) ($data['sender_name'] ?? ''));
+        $senderEmail = strtolower(trim((string) ($data['sender_email'] ?? '')));
+        $messageText = trim((string) ($data['message_text'] ?? ''));
         $additionalFieldsJson = trim((string) ($data['additional_fields_json'] ?? ''));
         $sourceUrl = trim((string) ($data['source_url'] ?? ''));
         $ipAddress = isset($data['ip_address']) ? trim((string) $data['ip_address']) : '';
@@ -70,15 +70,12 @@ final class WaitlistSignupRepository
         $hostname = $hostname !== '' ? substr($hostname, 0, 255) : null;
         $userAgent = $userAgent !== '' ? substr($userAgent, 0, 500) : null;
 
-        if ($formSlug === '' || $email === '' || $displayName === '' || $country === '') {
-            throw new RuntimeException('Signup submission is missing required values.');
-        }
-        if ($additionalFieldsJson === '') {
-            $additionalFieldsJson = '[]';
+        if ($formSlug === '' || $senderName === '' || $senderEmail === '' || $messageText === '') {
+            throw new RuntimeException('Contact submission is missing required values.');
         }
 
-        if ($this->existsByFormAndEmail($formSlug, $email)) {
-            throw new RuntimeException('That email is already signed up for this signup sheet.');
+        if ($additionalFieldsJson === '') {
+            $additionalFieldsJson = '[]';
         }
 
         $createdAt = $this->normalizeCreatedAt((string) ($data['created_at'] ?? ''));
@@ -86,15 +83,15 @@ final class WaitlistSignupRepository
         try {
             $stmt = $this->db->prepare(
                 'INSERT INTO ' . $table . '
-                 (form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at)
+                 (form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at)
                  VALUES
-                 (:form_slug, :email, :display_name, :country, :additional_fields_json, :source_url, :ip_address, :hostname, :user_agent, :created_at)'
+                 (:form_slug, :sender_name, :sender_email, :message_text, :additional_fields_json, :source_url, :ip_address, :hostname, :user_agent, :created_at)'
             );
             $stmt->execute([
                 ':form_slug' => $formSlug,
-                ':email' => $email,
-                ':display_name' => $displayName,
-                ':country' => $country,
+                ':sender_name' => $senderName,
+                ':sender_email' => $senderEmail,
+                ':message_text' => $messageText,
                 ':additional_fields_json' => $additionalFieldsJson,
                 ':source_url' => $sourceUrl,
                 ':ip_address' => $ipAddress,
@@ -102,23 +99,19 @@ final class WaitlistSignupRepository
                 ':user_agent' => $userAgent,
                 ':created_at' => $createdAt,
             ]);
-        } catch (PDOException $exception) {
-            if ($this->isUniqueConstraintError($exception)) {
-                throw new RuntimeException('That email is already signed up for this signup sheet.');
-            }
-
-            throw new RuntimeException('Failed to store signup submission.');
+        } catch (PDOException) {
+            throw new RuntimeException('Failed to store contact submission.');
         }
 
         return (int) $this->db->lastInsertId();
     }
 
     /**
-     * Returns total signup count for one signup-sheet form with optional search term.
+     * Returns total contact submission count for one form slug with optional search term.
      */
     public function countByFormSlug(string $formSlug, string $search = ''): int
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('ext_contact_submissions');
 
         $sql = 'SELECT COUNT(*)
                 FROM ' . $table . '
@@ -134,21 +127,21 @@ final class WaitlistSignupRepository
             $stmt->execute($params);
 
             return (int) ($stmt->fetchColumn() ?: 0);
-        } catch (PDOException $exception) {
-            throw new RuntimeException('Failed to count signup submissions.');
+        } catch (PDOException) {
+            throw new RuntimeException('Failed to count contact submissions.');
         }
     }
 
     /**
-     * Returns paginated signup submissions for one form slug.
+     * Returns paginated contact submissions for one form slug.
      *
      * @return array<int, array<string, mixed>>
      */
     public function listByFormSlug(string $formSlug, int $limit, int $offset, string $search = ''): array
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('ext_contact_submissions');
 
-        $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+        $sql = 'SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
                 FROM ' . $table . '
                 WHERE form_slug = :form_slug';
         $params = [
@@ -172,19 +165,19 @@ final class WaitlistSignupRepository
             $stmt->execute();
 
             return $stmt->fetchAll() ?: [];
-        } catch (PDOException $exception) {
-            throw new RuntimeException('Failed to load signup submissions.');
+        } catch (PDOException) {
+            throw new RuntimeException('Failed to load contact submissions.');
         }
     }
 
     /**
-     * Returns one paginated signup-submissions page plus total count in one query.
+     * Returns one paginated contact-submissions page plus total count in one query.
      *
      * @return array{rows: array<int, array<string, mixed>>, total: int}
      */
     public function listPageByFormSlug(string $formSlug, int $limit, int $offset, string $search = ''): array
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('ext_contact_submissions');
         $safeLimit = max(1, $limit);
         $safeOffset = max(0, $offset);
 
@@ -200,9 +193,9 @@ final class WaitlistSignupRepository
 
         $sql = 'SELECT page_rows.id,
                        page_rows.form_slug,
-                       page_rows.email,
-                       page_rows.display_name,
-                       page_rows.country,
+                       page_rows.sender_name,
+                       page_rows.sender_email,
+                       page_rows.message_text,
                        page_rows.additional_fields_json,
                        page_rows.source_url,
                        page_rows.ip_address,
@@ -211,7 +204,7 @@ final class WaitlistSignupRepository
                        page_rows.created_at,
                        totals.total_rows
                 FROM (
-                    SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+                    SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
                     FROM ' . $table . '
                     WHERE form_slug = :page_form_slug'
                     . $pageSearchClause
@@ -260,21 +253,21 @@ final class WaitlistSignupRepository
                 'rows' => $resultRows,
                 'total' => $total,
             ];
-        } catch (PDOException $exception) {
-            throw new RuntimeException('Failed to load signup submissions.');
+        } catch (PDOException) {
+            throw new RuntimeException('Failed to load contact submissions.');
         }
     }
 
     /**
-     * Returns all matching signups for CSV export.
+     * Returns all matching contact submissions for CSV export.
      *
      * @return array<int, array<string, mixed>>
      */
     public function listForExportByFormSlug(string $formSlug, string $search = ''): array
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('ext_contact_submissions');
 
-        $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+        $sql = 'SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
                 FROM ' . $table . '
                 WHERE form_slug = :form_slug';
         $params = [
@@ -289,17 +282,17 @@ final class WaitlistSignupRepository
             $stmt->execute($params);
 
             return $stmt->fetchAll() ?: [];
-        } catch (PDOException $exception) {
-            throw new RuntimeException('Failed to load signup submissions export data.');
+        } catch (PDOException) {
+            throw new RuntimeException('Failed to load contact submissions export data.');
         }
     }
 
     /**
-     * Deletes one signup row scoped to a form slug.
+     * Deletes one contact submission row scoped to one form slug.
      */
     public function deleteById(string $formSlug, int $id): bool
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('ext_contact_submissions');
 
         try {
             $stmt = $this->db->prepare(
@@ -312,17 +305,17 @@ final class WaitlistSignupRepository
             $stmt->execute();
 
             return $stmt->rowCount() > 0;
-        } catch (PDOException $exception) {
-            throw new RuntimeException('Failed to delete signup submission.');
+        } catch (PDOException) {
+            throw new RuntimeException('Failed to delete contact submission.');
         }
     }
 
     /**
-     * Deletes all signups for one signup-sheet form and returns deleted row count.
+     * Deletes all contact submissions for one form slug and returns deleted row count.
      */
     public function deleteAllByFormSlug(string $formSlug): int
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('ext_contact_submissions');
 
         try {
             $stmt = $this->db->prepare(
@@ -332,17 +325,17 @@ final class WaitlistSignupRepository
             $stmt->execute([':form_slug' => $formSlug]);
 
             return $stmt->rowCount();
-        } catch (PDOException $exception) {
-            throw new RuntimeException('Failed to clear signup submissions.');
+        } catch (PDOException) {
+            throw new RuntimeException('Failed to clear contact submissions.');
         }
     }
 
     /**
-     * Synchronizes stored submission metadata after a signup-sheet form slug edit.
+     * Synchronizes stored submission metadata after a contact-form slug edit.
      */
     public function syncFormIdentity(string $fromSlug, string $toSlug): void
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('ext_contact_submissions');
 
         try {
             $stmt = $this->db->prepare(
@@ -354,38 +347,8 @@ final class WaitlistSignupRepository
                 ':to_slug' => $toSlug,
                 ':from_slug' => $fromSlug,
             ]);
-        } catch (PDOException $exception) {
-            if ($this->isUniqueConstraintError($exception)) {
-                throw new RuntimeException('Cannot rename this signup sheet slug because matching email signups already exist on the destination slug.');
-            }
-
-            throw new RuntimeException('Failed to synchronize signup metadata for the edited signup sheet form.');
-        }
-    }
-
-    /**
-     * Returns true when one form already has a signup with this email.
-     */
-    private function existsByFormAndEmail(string $formSlug, string $email): bool
-    {
-        $table = $this->table('ext_signups_submissions');
-
-        try {
-            $stmt = $this->db->prepare(
-                'SELECT 1
-                 FROM ' . $table . '
-                 WHERE form_slug = :form_slug
-                   AND email = :email
-                 LIMIT 1'
-            );
-            $stmt->execute([
-                ':form_slug' => $formSlug,
-                ':email' => $email,
-            ]);
-
-            return $stmt->fetchColumn() !== false;
-        } catch (PDOException $exception) {
-            throw new RuntimeException('Failed to validate existing signup submissions.');
+        } catch (PDOException) {
+            throw new RuntimeException('Failed to synchronize contact submission metadata for the edited contact form.');
         }
     }
 
@@ -404,11 +367,14 @@ final class WaitlistSignupRepository
         $params[':' . $placeholderName] = '%' . $search . '%';
 
         return ' AND (
-                    LOWER(email) LIKE :' . $placeholderName . '
-                    OR LOWER(display_name) LIKE :' . $placeholderName . '
-                    OR LOWER(country) LIKE :' . $placeholderName . '
+                    LOWER(sender_name) LIKE :' . $placeholderName . '
+                    OR LOWER(sender_email) LIKE :' . $placeholderName . '
+                    OR LOWER(message_text) LIKE :' . $placeholderName . '
                     OR LOWER(COALESCE(additional_fields_json, \'\')) LIKE :' . $placeholderName . '
                     OR LOWER(COALESCE(source_url, \'\')) LIKE :' . $placeholderName . '
+                    OR LOWER(COALESCE(ip_address, \'\')) LIKE :' . $placeholderName . '
+                    OR LOWER(COALESCE(hostname, \'\')) LIKE :' . $placeholderName . '
+                    OR LOWER(COALESCE(user_agent, \'\')) LIKE :' . $placeholderName . '
                  )';
     }
 
@@ -422,24 +388,13 @@ final class WaitlistSignupRepository
         }
 
         return match ($table) {
-            'ext_signups_submissions' => 'extensions.ext_signups_submissions',
+            'ext_contact_submissions' => 'extensions.ext_contact_submissions',
             default => 'main.' . $table,
         };
     }
 
     /**
-     * Detects duplicate-key SQL errors across supported PDO drivers.
-     */
-    private function isUniqueConstraintError(PDOException $exception): bool
-    {
-        $sqlState = (string) $exception->getCode();
-
-        // 23000 (MySQL/SQLite) and 23505 (PostgreSQL) represent unique-constraint failures.
-        return in_array($sqlState, ['23000', '23505'], true);
-    }
-
-    /**
-     * Accepts common CSV timestamp formats and normalizes to UTC SQL datetime.
+     * Accepts common timestamp formats and normalizes to UTC SQL datetime.
      */
     private function normalizeCreatedAt(string $rawValue): string
     {
@@ -468,7 +423,7 @@ final class WaitlistSignupRepository
                 ->setTimezone(new DateTimeZone('UTC'))
                 ->format('Y-m-d H:i:s');
         } catch (\Throwable) {
-            // Fall through to `now` if import value is not parseable.
+            // Fall through to `now` if value is not parseable.
         }
 
         return gmdate('Y-m-d H:i:s');
