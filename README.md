@@ -46,5 +46,13 @@ Official Site: [raven.lanterns.io](https://raven.lanterns.io)
 
 ## Roadmap
 
-**0.8.0 (Current)**: Initial public release with basic panel & extension system.
-**0.9.0 (Next)**: Expanded theming system.
+- **0.8.0 (Current)**: Initial public release with basic panel & extension system.
+- **0.9.0 (Next)**: Expanded theming system.
+
+
+## Caveats
+
+- This application is very much still a proof-of-concept prototype.
+- I have not been able to personally verify the contents of every file.
+- Raven has not gone through a proper full security audit yet.
+- There are still some pretty nonsensical things I've caught the clanker doing, so some of the code might be horribly inefficient. *(But it is at least readable!)*
