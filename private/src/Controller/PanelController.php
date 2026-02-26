@@ -45,7 +45,7 @@ final class PanelController
     /**
      * Updater sources keyed for panel dropdown selection.
      *
-     * @var array<string, array{label: string, repo: string, latest_api: string, version_api: string}>
+     * @var array<string, array{label: string, repo: string, latest_api: string, version_api: string, compare_api: string}>
      */
     private const UPDATE_SOURCES = [
         'github-noveltylanterns-raven' => [
@@ -53,6 +53,7 @@ final class PanelController
             'repo' => 'https://github.com/noveltylanterns/raven',
             'latest_api' => 'https://api.github.com/repos/noveltylanterns/raven/commits?per_page=1',
             'version_api' => 'https://api.github.com/repos/noveltylanterns/raven/contents/composer.json',
+            'compare_api' => 'https://api.github.com/repos/noveltylanterns/raven/compare',
         ],
     ];
 
@@ -2660,6 +2661,10 @@ final class PanelController
 
         if ($statusType === 'current') {
             $this->flash('success', 'System is current.');
+        } elseif ($statusType === 'newer') {
+            $this->flash('success', 'This install is newer than the selected upstream mirror.');
+        } elseif ($statusType === 'diverged') {
+            $this->flash('error', 'This install and upstream mirror have diverged revisions.');
         } elseif ($statusType === 'outdated') {
             $this->flash('success', 'Update available.');
         } else {
@@ -5675,7 +5680,7 @@ final class PanelController
      *
      * @param string|null $sourceKey
      *
-     * @return array{key: string, label: string, repo: string, latest_api: string, version_api: string}
+     * @return array{key: string, label: string, repo: string, latest_api: string, version_api: string, compare_api: string}
      */
     private function resolveUpdateSource(?string $sourceKey): array
     {
@@ -5692,6 +5697,7 @@ final class PanelController
             'repo' => (string) ($source['repo'] ?? ''),
             'latest_api' => (string) ($source['latest_api'] ?? ''),
             'version_api' => (string) ($source['version_api'] ?? ''),
+            'compare_api' => (string) ($source['compare_api'] ?? ''),
         ];
     }
 
@@ -5749,7 +5755,13 @@ final class PanelController
             return $status;
         }
 
-        if (strcasecmp($currentRevision, $latestRevision) === 0) {
+        $remoteRelation = $this->fetchRemoteRevisionRelationship(
+            (string) $source['compare_api'],
+            $latestRevision,
+            $currentRevision
+        );
+
+        if ($remoteRelation === 'identical') {
             $status['status'] = 'current';
             $status['message'] = 'This install matches the latest upstream revision.'
                 . ' (Last Checked: ' . $checkedAt . ' UTC)';
@@ -5757,8 +5769,45 @@ final class PanelController
             return $status;
         }
 
-        $status['status'] = 'outdated';
-        $status['message'] = 'A newer upstream revision is available.';
+        if ($remoteRelation === 'ahead') {
+            $status['status'] = 'newer';
+            $status['message'] = 'This install is newer than the latest upstream revision.';
+            $this->saveUpdaterStatus($status);
+            return $status;
+        }
+
+        if ($remoteRelation === 'behind') {
+            $status['status'] = 'outdated';
+            $status['message'] = 'A newer upstream revision is available.';
+            $this->saveUpdaterStatus($status);
+            return $status;
+        }
+
+        if ($remoteRelation === 'diverged') {
+            $status['status'] = 'diverged';
+            $status['message'] = 'This install and upstream are on diverged revisions.';
+            $this->saveUpdaterStatus($status);
+            return $status;
+        }
+
+        // Fallback when compare API cannot resolve relationship.
+        $versionRelation = $this->compareVersionStrings($currentVersion, $latestVersion);
+        if ($versionRelation > 0) {
+            $status['status'] = 'newer';
+            $status['message'] = 'This install version is newer than upstream.';
+            $this->saveUpdaterStatus($status);
+            return $status;
+        }
+
+        if ($versionRelation < 0) {
+            $status['status'] = 'outdated';
+            $status['message'] = 'A newer upstream version is available.';
+            $this->saveUpdaterStatus($status);
+            return $status;
+        }
+
+        $status['status'] = 'diverged';
+        $status['message'] = 'Revision differs from upstream, but relationship could not be resolved.';
         $this->saveUpdaterStatus($status);
 
         return $status;
@@ -5823,7 +5872,7 @@ final class PanelController
             'local_branch' => $this->input->text((string) ($loaded['local_branch'] ?? ''), 120),
         ];
 
-        if (!in_array($status['status'], ['unknown', 'error', 'current', 'outdated'], true)) {
+        if (!in_array($status['status'], ['unknown', 'error', 'current', 'outdated', 'newer', 'diverged'], true)) {
             $status['status'] = 'unknown';
         }
 
@@ -5906,6 +5955,83 @@ final class PanelController
         }
 
         return $sha;
+    }
+
+    /**
+     * Reads commit relationship from GitHub compare API.
+     *
+     * Returns one of: `identical`, `ahead`, `behind`, `diverged`, or null.
+     */
+    private function fetchRemoteRevisionRelationship(string $compareApiUrl, string $baseRevision, string $headRevision): ?string
+    {
+        if (trim($compareApiUrl) === '') {
+            return null;
+        }
+
+        $baseRevision = strtolower($this->input->text($baseRevision, 64));
+        $headRevision = strtolower($this->input->text($headRevision, 64));
+        if (!$this->isValidRevisionHash($baseRevision) || !$this->isValidRevisionHash($headRevision)) {
+            return null;
+        }
+
+        $url = rtrim($compareApiUrl, '/') . '/' . rawurlencode($baseRevision) . '...' . rawurlencode($headRevision);
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 8,
+                'header' => [
+                    'Accept: application/vnd.github+json',
+                    'User-Agent: Raven-Updater',
+                ],
+            ],
+        ]);
+
+        $raw = @file_get_contents($url, false, $context);
+        if ($raw === false || trim($raw) === '') {
+            return null;
+        }
+
+        /** @var mixed $decoded */
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        $status = strtolower($this->input->text((string) ($decoded['status'] ?? ''), 20));
+        return in_array($status, ['identical', 'ahead', 'behind', 'diverged'], true) ? $status : null;
+    }
+
+    /**
+     * Compares semantic versions using major/minor/patch.
+     *
+     * Returns -1 when current<latest, 0 when equal/unknown, 1 when current>latest.
+     */
+    private function compareVersionStrings(string $currentVersion, string $latestVersion): int
+    {
+        $currentVersion = ltrim(strtolower(trim($currentVersion)), 'v');
+        $latestVersion = ltrim(strtolower(trim($latestVersion)), 'v');
+        if ($currentVersion === '' || $latestVersion === '') {
+            return 0;
+        }
+
+        if (!preg_match('/^\d+(?:\.\d+){0,2}(?:[-+].*)?$/', $currentVersion)) {
+            return 0;
+        }
+
+        if (!preg_match('/^\d+(?:\.\d+){0,2}(?:[-+].*)?$/', $latestVersion)) {
+            return 0;
+        }
+
+        $comparison = version_compare($currentVersion, $latestVersion);
+        if ($comparison > 0) {
+            return 1;
+        }
+
+        if ($comparison < 0) {
+            return -1;
+        }
+
+        return 0;
     }
 
     /**

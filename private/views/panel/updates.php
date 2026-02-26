@@ -44,7 +44,11 @@ $localBranch = (string) ($updateStatus['local_branch'] ?? '');
 $badgeClass = 'text-bg-secondary';
 if ($status === 'current') {
     $badgeClass = 'text-bg-success';
+} elseif ($status === 'newer') {
+    $badgeClass = 'text-bg-info';
 } elseif ($status === 'outdated') {
+    $badgeClass = 'text-bg-warning';
+} elseif ($status === 'diverged') {
     $badgeClass = 'text-bg-warning';
 } elseif ($status === 'error') {
     $badgeClass = 'text-bg-danger';
