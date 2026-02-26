@@ -1,0 +1,205 @@
+// RAVEN PUBLIC THEME ENTRYPOINT
+// Loads Bootstrap from Composer and applies public-site overrides.
+
+// Local font-face declarations shared with the panel typography stack.
+@mixin raven-local-font-face($family, $style, $weight, $basename) {
+  @font-face {
+    font-family: $family;
+    font-style: $style;
+    font-weight: $weight;
+    font-display: swap;
+    src: url("../fonts/#{$basename}.woff2") format("woff2"),
+      url("../fonts/#{$basename}.woff") format("woff"),
+      url("../fonts/#{$basename}.ttf") format("truetype");
+  }
+}
+
+// Red Hat Text for primary body typography.
+@include raven-local-font-face("Red Hat Text", normal, 300, "red-hat-text-v19-latin-ext-300");
+@include raven-local-font-face("Red Hat Text", italic, 300, "red-hat-text-v19-latin-ext-300italic");
+@include raven-local-font-face("Red Hat Text", normal, 400, "red-hat-text-v19-latin-ext-regular");
+@include raven-local-font-face("Red Hat Text", italic, 400, "red-hat-text-v19-latin-ext-italic");
+@include raven-local-font-face("Red Hat Text", normal, 500, "red-hat-text-v19-latin-ext-500");
+@include raven-local-font-face("Red Hat Text", italic, 500, "red-hat-text-v19-latin-ext-500italic");
+@include raven-local-font-face("Red Hat Text", normal, 600, "red-hat-text-v19-latin-ext-600");
+@include raven-local-font-face("Red Hat Text", italic, 600, "red-hat-text-v19-latin-ext-600italic");
+@include raven-local-font-face("Red Hat Text", normal, 700, "red-hat-text-v19-latin-ext-700");
+@include raven-local-font-face("Red Hat Text", italic, 700, "red-hat-text-v19-latin-ext-700italic");
+
+// Red Hat Display for headings.
+@include raven-local-font-face("Red Hat Display", normal, 300, "red-hat-display-v21-latin-ext-300");
+@include raven-local-font-face("Red Hat Display", italic, 300, "red-hat-display-v21-latin-ext-300italic");
+@include raven-local-font-face("Red Hat Display", normal, 400, "red-hat-display-v21-latin-ext-regular");
+@include raven-local-font-face("Red Hat Display", italic, 400, "red-hat-display-v21-latin-ext-italic");
+@include raven-local-font-face("Red Hat Display", normal, 500, "red-hat-display-v21-latin-ext-500");
+@include raven-local-font-face("Red Hat Display", italic, 500, "red-hat-display-v21-latin-ext-500italic");
+@include raven-local-font-face("Red Hat Display", normal, 600, "red-hat-display-v21-latin-ext-600");
+@include raven-local-font-face("Red Hat Display", italic, 600, "red-hat-display-v21-latin-ext-600italic");
+@include raven-local-font-face("Red Hat Display", normal, 700, "red-hat-display-v21-latin-ext-700");
+@include raven-local-font-face("Red Hat Display", italic, 700, "red-hat-display-v21-latin-ext-700italic");
+@include raven-local-font-face("Red Hat Display", normal, 800, "red-hat-display-v21-latin-ext-800");
+@include raven-local-font-face("Red Hat Display", italic, 800, "red-hat-display-v21-latin-ext-800italic");
+@include raven-local-font-face("Red Hat Display", normal, 900, "red-hat-display-v21-latin-ext-900");
+@include raven-local-font-face("Red Hat Display", italic, 900, "red-hat-display-v21-latin-ext-900italic");
+
+// Red Hat Mono for code/monospace contexts.
+@include raven-local-font-face("Red Hat Mono", normal, 300, "red-hat-mono-v16-latin-ext-300");
+@include raven-local-font-face("Red Hat Mono", italic, 300, "red-hat-mono-v16-latin-ext-300italic");
+@include raven-local-font-face("Red Hat Mono", normal, 400, "red-hat-mono-v16-latin-ext-regular");
+@include raven-local-font-face("Red Hat Mono", italic, 400, "red-hat-mono-v16-latin-ext-italic");
+@include raven-local-font-face("Red Hat Mono", normal, 500, "red-hat-mono-v16-latin-ext-500");
+@include raven-local-font-face("Red Hat Mono", italic, 500, "red-hat-mono-v16-latin-ext-500italic");
+@include raven-local-font-face("Red Hat Mono", normal, 600, "red-hat-mono-v16-latin-ext-600");
+@include raven-local-font-face("Red Hat Mono", italic, 600, "red-hat-mono-v16-latin-ext-600italic");
+@include raven-local-font-face("Red Hat Mono", normal, 700, "red-hat-mono-v16-latin-ext-700");
+@include raven-local-font-face("Red Hat Mono", italic, 700, "red-hat-mono-v16-latin-ext-700italic");
+
+// Bootstrap variables are overridden before import.
+$font-family-sans-serif: "Red Hat Text", "Segoe UI", "Inter", "Noto Sans", "Liberation Sans", Arial, sans-serif;
+$font-family-base: $font-family-sans-serif;
+$headings-font-family: "Red Hat Display", "Red Hat Text", "Segoe UI", "Inter", "Noto Sans", "Liberation Sans", Arial, sans-serif;
+$font-family-monospace: "Red Hat Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+$btn-font-family: $headings-font-family;
+$btn-font-size: 0.95rem;
+$btn-font-weight: 500;
+$btn-padding-y: 0.41rem;
+$btn-padding-x: 0.74rem;
+$enable-smooth-scroll: false;
+$body-bg: #f2ede2;
+$body-color: #1f2a34;
+$link-color: #1d5a86;
+$link-hover-color: #17496c;
+
+// Pull Bootstrap source directly from Composer.
+@import "../../../../composer/twbs/bootstrap/scss/bootstrap";
+
+:root {
+  --raven-bg-1: #f2ede2;
+  --raven-bg-2: #e4ebf6;
+  --raven-surface: #fffdf7;
+  --raven-surface-soft: #f4efe4;
+  --raven-border: #d4c7b4;
+  --raven-ink: #1f2a34;
+  --raven-muted: #5f6873;
+  --raven-accent: #1d5a86;
+  --raven-accent-hover: #17496c;
+  --raven-accent-active: #133e5d;
+  --raven-accent-soft: rgba(29, 90, 134, 0.14);
+  --raven-shadow: 0 0.45rem 1.2rem rgba(31, 42, 52, 0.12);
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  color: var(--raven-ink);
+  background: linear-gradient(155deg, var(--raven-bg-1), var(--raven-bg-2));
+  background-attachment: fixed;
+  font-family: $font-family-base;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.h1,
+.h2,
+.h3,
+.h4,
+.h5,
+.h6 {
+  font-family: $headings-font-family;
+}
+
+a {
+  color: var(--raven-accent);
+}
+
+a:hover,
+a:focus-visible {
+  color: var(--raven-accent-hover);
+}
+
+.site-shell {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+.site-header {
+  border-bottom: 1px solid var(--raven-border);
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.9rem;
+}
+
+.site-subtitle {
+  color: var(--raven-muted);
+  margin: 0;
+}
+
+main > article,
+main > section {
+  background: var(--raven-surface);
+  border: 1px solid var(--raven-border);
+  border-radius: 0.8rem;
+  box-shadow: var(--raven-shadow);
+  padding: 1.1rem 1.15rem;
+}
+
+.list-group {
+  --bs-list-group-bg: var(--raven-surface);
+  --bs-list-group-border-color: var(--raven-border);
+}
+
+.list-group-item {
+  color: var(--raven-ink);
+}
+
+.page-link {
+  color: var(--raven-accent);
+  border-color: var(--raven-border);
+  background-color: var(--raven-surface);
+}
+
+.page-link:hover,
+.page-link:focus {
+  color: var(--raven-accent-hover);
+  background-color: var(--raven-accent-soft);
+  border-color: var(--raven-border);
+}
+
+.page-item.active .page-link {
+  color: #fff;
+  background-color: var(--raven-accent);
+  border-color: var(--raven-accent);
+}
+
+.btn-primary {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--raven-accent);
+  --bs-btn-border-color: var(--raven-accent);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--raven-accent-hover);
+  --bs-btn-hover-border-color: var(--raven-accent-hover);
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: var(--raven-accent-active);
+  --bs-btn-active-border-color: var(--raven-accent-active);
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: $font-family-monospace;
+}
+
+pre,
+code {
+  background: var(--raven-surface-soft);
+  border: 1px solid var(--raven-border);
+  border-radius: 0.35rem;
+}

@@ -1,0 +1,13 @@
+/**
+ * RAVEN CMS
+ * ~/panel/ext/database/externals/jush/jush.css
+ * Lightweight fallback stylesheet for Jush assets in Database Manager.
+ * Docs: https://raven.lanterns.io
+ */
+
+/* Minimal syntax color fallback for Adminer code blocks when bundled Jush assets are unavailable. */
+pre.jush,
+code[class*="jush-"] {
+    background: #f8f9fa;
+    color: #212529;
+}

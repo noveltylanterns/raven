@@ -1,0 +1,8 @@
+{
+  "name": "Raven Basic",
+  "slug": "raven",
+  "is_child_theme": false,
+  "parent_theme": "",
+  "version": "0.8.0",
+  "description": "Default public theme bundled with Raven CMS."
+}

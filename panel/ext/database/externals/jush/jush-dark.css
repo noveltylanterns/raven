@@ -1,0 +1,13 @@
+/**
+ * RAVEN CMS
+ * ~/panel/ext/database/externals/jush/jush-dark.css
+ * Lightweight dark-mode fallback stylesheet for Jush assets.
+ * Docs: https://raven.lanterns.io
+ */
+
+/* Minimal dark-mode syntax color fallback used by Adminer in dark preference mode. */
+pre.jush,
+code[class*="jush-"] {
+    background: #1f2937;
+    color: #e5e7eb;
+}

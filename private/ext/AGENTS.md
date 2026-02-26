@@ -1,0 +1,192 @@
+# Raven Extension Agent Guide
+
+Last updated: 2026-02-18
+
+## Scope
+- This file defines the extension-authoring contract for `private/ext/`.
+- It is written for both human and AI authors building installable Raven extensions that can coexist in one ecosystem.
+- This document is intended to be standalone in production environments where repository-root `AGENTS.md` may be unavailable.
+- Keep this file thorough and self-sufficient for extension work; do not assume agents can fall back to root-level guidance.
+
+## Critical Rule: Do Not Modify Core
+- Do not modify `panel/index.php`, `public/index.php`, `private/src/*`, `private/views/*`, installer code, or updater code to ship an extension.
+- Do not patch core controllers to force extension behavior.
+- Keep extension code isolated under `private/ext/{extension_slug}/`.
+- Repeated warning: core edits for extension behavior can break updater compatibility and future upgrades.
+- Repeated warning: if behavior can be implemented inside extension routes/views/state, do not touch core.
+
+## Extension Directory Contract
+- Root: `private/ext/`
+- Extension folder: `private/ext/{directory_name}/`
+- Allowed extension directory name regex: `^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$`
+- Required manifest: `private/ext/{directory_name}/extension.json`
+- Optional panel routes registrar: `private/ext/{directory_name}/panel_routes.php`
+- Optional page-editor shortcode provider: `private/ext/{directory_name}/shortcodes.php`
+- Optional extension-local state file(s) when needed by your extension
+- Optional extension-owned panel templates: `private/ext/{directory_name}/views/*.php`
+
+## Extension Enablement State
+- Runtime enablement state file: `private/ext/.state.php`
+- Commit-safe template: `private/ext/.state.php.dist`
+- State structure:
+- `enabled`: `{extension_directory => true}`
+- `permissions`: `{extension_directory => panel_permission_bit}` for basic extensions
+- Extensions are enabled only when:
+- extension directory exists
+- directory is listed enabled in `.state.php` (or `.state.php.dist` fallback when `.state.php` is missing)
+- extension manifest is valid
+- Stock extensions are disabled by default in `.state.php.dist` unless explicitly changed.
+
+## Extension Discovery And Validation
+- Extension manager scans subdirectories in `private/ext/` and ignores hidden entries.
+- Manifest path: `private/ext/{name}/extension.json`
+- Minimum valid manifest requirement:
+- JSON object with non-empty `name`
+- Optional fields commonly used:
+- `version` (string)
+- `description` (string)
+- `type` (`basic` or `system`; `system` routes/nav are treated like System-category tools)
+- `author` (string; displayed in Extension Manager)
+- `homepage` (URL; used for Extension Manager author links)
+- `panel_path` (string path segment used for Extensions nav link target)
+- `panel_section` (string used for active nav matching)
+- `system_extension` (bool; hides extension from Extensions nav category)
+- `entrypoint` (extension-specific optional metadata; currently used by Database Manager)
+
+## Extension Type And Nav Placement
+- `type: "basic"` extensions are extension-category tools and can appear under the panel `Extensions` nav category.
+- `type: "system"` extensions are treated as System-category tools and are listed alphabetically in `System`.
+- System-category extension links require `Manage System Configuration`; unauthorized users must not see or access them.
+- Basic extension panel pages enforce the extension's configured permission mask from `private/ext/.state.php` (`permissions` map).
+
+## Panel Route Registration Contract
+- If enabled, Raven attempts to load `private/ext/{name}/panel_routes.php`.
+- File must return a callable:
+- `function (Router $router, array $context): void`
+- Provided context keys:
+- `app` => bootstrap container array
+- `panelUrl` => callable `fn(string $suffix): string`
+- `requirePanelLogin` => callable `fn(): void`
+- `currentUserTheme` => callable `fn(): string`
+- `renderPublicNotFound` => callable `fn(): void`
+- `extensionDirectory` => enabled extension folder name
+- `extensionRequiredPermissionBit` => required panel-side permission bit for this extension
+- `extensionPermissionOptions` => allowed panel-side permission bit map (`bit => label`)
+- `setExtensionPermissionPath` => panel route for persisting extension permission bit
+- Registration happens after core panel routes are added.
+
+## Services Available In `context['app']`
+- From `private/bootstrap.php`, extensions can consume:
+- `root`
+- `config`
+- `driver`
+- `prefix`
+- `db`
+- `auth_db`
+- `auth`
+- `view`
+- `input`
+- `csrf`
+- `categories`
+- `channels`
+- `groups`
+- `page_images`
+- `page_image_manager`
+- `pages`
+- `redirects`
+- `tags`
+- `taxonomy`
+- `users`
+- `contact_forms`
+- `signup_forms`
+- `signup_submissions`
+- Use `isset(...)` and strict instance checks before assuming any service.
+
+## Panel UI Integration Pattern
+- Extensions generally render via shared panel layout: `private/views/layouts/panel.php`.
+- Typical render flow:
+- render extension body template to buffer
+- pass buffered HTML as `content` into panel layout render
+- pass `site`, `csrfField`, `section`, `showSidebar`, `userTheme`
+- For extension sidebar/mobile nav category links:
+- extension must be enabled and manifest-valid
+- manifest should include `panel_path` and `panel_section`
+- extension must not be marked `system_extension`
+- stock/system extensions (for example `database`) stay under System category behavior.
+
+## Optional Page-Editor Shortcode Provider
+- Enabled extensions may expose insertable shortcodes to the Page Editor by adding:
+- `private/ext/{directory_name}/shortcodes.php`
+- Provider file may return either:
+- `array<int, array{label: string, shortcode: string}>`
+- `callable(): array<int, array{label: string, shortcode: string}>`
+- Each shortcode entry must provide:
+- `label`: shown in the Page Editor `Extensions` dropdown
+- `shortcode`: literal shortcode text to insert (for example `[my_extension slug="example"]`)
+- Invalid/empty entries are ignored.
+- If no shortcode items are available, the Page Editor `Extensions` button is hidden.
+
+## Extension List/Table UI Convention
+- For extension-owned panel list tables, follow panel conventions:
+- sortable headers on data columns where practical
+- `Actions` column present and non-sortable
+- `Actions` column center-aligned
+- Extension Manager columns are currently: `Name`, `Author` (links to `homepage` when provided), `Version`, `Actions`.
+
+## Permission And Security Requirements
+- All extension routes must enforce login/access by calling `requirePanelLogin`.
+- For basic extensions, `requirePanelLogin` is wrapped by core to enforce the extension's configured panel permission bit.
+- For system-level pages, enforce `canManageConfiguration()` explicitly.
+- For state-changing requests, validate CSRF with `$app['csrf']->validate(...)`.
+- Sanitize all user input through `$app['input']` (InputSanitizer).
+- Keep filesystem access constrained to extension-owned directories.
+- Use defensive checks on filenames/paths to prevent traversal.
+- Never trust manifest/state file contents without validation.
+- Extension UI/runtime assets must be local to the install; do not require CDN-hosted JS/CSS/fonts for core extension behavior.
+- Do not embed analytics/telemetry/phone-home scripts in extension panel/public output.
+- If extension dependencies support telemetry/update pings, keep them disabled by default.
+- Exception: captcha provider scripts (`hcaptcha`/`recaptcha`) are allowed only for public-facing forms that actually render captcha widgets.
+
+## Extension Upload/Packaging Rules
+- Extension Manager can generate a new extension scaffold directly in `private/ext/{name}/` (starter `extension.json`, `panel_routes.php`, and `views/panel_index.php`; generated header card pulls version/author/description/docs URL from `extension.json`).
+- The same modal can optionally generate `private/ext/{name}/AGENTS.md` with extension-local guidance and a backlink to this file for missing/global context.
+- Uploads are ZIP-only through Extension Manager.
+- ZIP upload size limit is 50MB.
+- Archive filename determines target directory name (sanitized).
+- Existing extension directory name collisions are rejected.
+- ZIP entry paths are validated to block zip-slip traversal.
+- Upload succeeds only when extracted package contains valid `extension.json`.
+- New uploads always start disabled.
+
+## Deletion/Protection Rules
+- Stock extension directories are protected from deletion.
+- Current stock list: `contact`, `database`, `phpinfo`, `signups`.
+- Enabled extensions must be disabled before deletion.
+
+## Extension-Local State Pattern
+- Extensions may persist their own state under their directory when appropriate.
+- DB-backed state for extensions is also supported and preferred for panel-managed structured data.
+
+## Public Runtime Integration (Current Reality)
+- There is currently no generic extension public-route registrar equivalent to panel `panel_routes.php`.
+- Public extension behavior today is implemented by core-supported integration points.
+- Existing example:
+- `contact` and `signups` expose configuration via DB-backed extension tables (`ext_contact`, `ext_signups`)
+- core public runtime reads those definitions and renders supported shortcodes
+- If your feature needs a new generic public runtime hook, treat it as a core platform feature request.
+- Do not hard-patch core for one-off extension behavior unless explicitly planned and accepted as a core change.
+
+## Coexistence Goal
+- This extension model is intended to let human-authored and AI-authored extensions run side-by-side.
+- Keep extension boundaries strict and updater-safe:
+- extension logic in extension folders
+- no core modifications for extension-only behavior
+- manifest + route contracts respected
+
+## Update-Safe Workflow
+- Create `private/ext/{new_extension}/`.
+- Add `extension.json` first.
+- Add `panel_routes.php` and `views/` as needed.
+- Persist extension-specific state in extension-owned files.
+- Enable through Extension Manager only after manifest/routes validate.
+- Repeated warning: do not modify core to ship extension features.

@@ -1,0 +1,10 @@
+{
+    "name": "PHP Info",
+    "version": "0.8.0",
+    "description": "Display phpinfo() data within the administration panel.",
+    "type": "system",
+    "author": "Novelty Lanterns",
+    "homepage": "https://raven.lanterns.io",
+    "panel_path": "phpinfo",
+    "panel_section": "phpinfo"
+}

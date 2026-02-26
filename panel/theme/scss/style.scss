@@ -1,0 +1,909 @@
+// RAVEN PANEL THEME ENTRYPOINT
+// Loads Bootstrap from Composer and applies panel-specific overrides.
+// This stylesheet is intentionally separate from the public-site theme.
+
+// Local font-face declarations for panel typography.
+@mixin raven-local-font-face($family, $style, $weight, $basename) {
+  @font-face {
+    font-family: $family;
+    font-style: $style;
+    font-weight: $weight;
+    font-display: swap;
+    src: url("../fonts/#{$basename}.woff2") format("woff2"),
+      url("../fonts/#{$basename}.woff") format("woff"),
+      url("../fonts/#{$basename}.ttf") format("truetype");
+  }
+}
+
+// Red Hat Text for primary interface/body typography.
+@include raven-local-font-face("Red Hat Text", normal, 300, "red-hat-text-v19-latin-ext-300");
+@include raven-local-font-face("Red Hat Text", italic, 300, "red-hat-text-v19-latin-ext-300italic");
+@include raven-local-font-face("Red Hat Text", normal, 400, "red-hat-text-v19-latin-ext-regular");
+@include raven-local-font-face("Red Hat Text", italic, 400, "red-hat-text-v19-latin-ext-italic");
+@include raven-local-font-face("Red Hat Text", normal, 500, "red-hat-text-v19-latin-ext-500");
+@include raven-local-font-face("Red Hat Text", italic, 500, "red-hat-text-v19-latin-ext-500italic");
+@include raven-local-font-face("Red Hat Text", normal, 600, "red-hat-text-v19-latin-ext-600");
+@include raven-local-font-face("Red Hat Text", italic, 600, "red-hat-text-v19-latin-ext-600italic");
+@include raven-local-font-face("Red Hat Text", normal, 700, "red-hat-text-v19-latin-ext-700");
+@include raven-local-font-face("Red Hat Text", italic, 700, "red-hat-text-v19-latin-ext-700italic");
+
+// Red Hat Display for headings and display-style labels.
+@include raven-local-font-face("Red Hat Display", normal, 300, "red-hat-display-v21-latin-ext-300");
+@include raven-local-font-face("Red Hat Display", italic, 300, "red-hat-display-v21-latin-ext-300italic");
+@include raven-local-font-face("Red Hat Display", normal, 400, "red-hat-display-v21-latin-ext-regular");
+@include raven-local-font-face("Red Hat Display", italic, 400, "red-hat-display-v21-latin-ext-italic");
+@include raven-local-font-face("Red Hat Display", normal, 500, "red-hat-display-v21-latin-ext-500");
+@include raven-local-font-face("Red Hat Display", italic, 500, "red-hat-display-v21-latin-ext-500italic");
+@include raven-local-font-face("Red Hat Display", normal, 600, "red-hat-display-v21-latin-ext-600");
+@include raven-local-font-face("Red Hat Display", italic, 600, "red-hat-display-v21-latin-ext-600italic");
+@include raven-local-font-face("Red Hat Display", normal, 700, "red-hat-display-v21-latin-ext-700");
+@include raven-local-font-face("Red Hat Display", italic, 700, "red-hat-display-v21-latin-ext-700italic");
+@include raven-local-font-face("Red Hat Display", normal, 800, "red-hat-display-v21-latin-ext-800");
+@include raven-local-font-face("Red Hat Display", italic, 800, "red-hat-display-v21-latin-ext-800italic");
+@include raven-local-font-face("Red Hat Display", normal, 900, "red-hat-display-v21-latin-ext-900");
+@include raven-local-font-face("Red Hat Display", italic, 900, "red-hat-display-v21-latin-ext-900italic");
+
+// Red Hat Mono for all monospace contexts.
+@include raven-local-font-face("Red Hat Mono", normal, 300, "red-hat-mono-v16-latin-ext-300");
+@include raven-local-font-face("Red Hat Mono", italic, 300, "red-hat-mono-v16-latin-ext-300italic");
+@include raven-local-font-face("Red Hat Mono", normal, 400, "red-hat-mono-v16-latin-ext-regular");
+@include raven-local-font-face("Red Hat Mono", italic, 400, "red-hat-mono-v16-latin-ext-italic");
+@include raven-local-font-face("Red Hat Mono", normal, 500, "red-hat-mono-v16-latin-ext-500");
+@include raven-local-font-face("Red Hat Mono", italic, 500, "red-hat-mono-v16-latin-ext-500italic");
+@include raven-local-font-face("Red Hat Mono", normal, 600, "red-hat-mono-v16-latin-ext-600");
+@include raven-local-font-face("Red Hat Mono", italic, 600, "red-hat-mono-v16-latin-ext-600italic");
+@include raven-local-font-face("Red Hat Mono", normal, 700, "red-hat-mono-v16-latin-ext-700");
+@include raven-local-font-face("Red Hat Mono", italic, 700, "red-hat-mono-v16-latin-ext-700italic");
+
+// Bootstrap variables are overridden before import.
+$font-family-sans-serif: "Red Hat Text", "Segoe UI", "Inter", "Noto Sans", "Liberation Sans", Arial, sans-serif;
+$font-family-base: $font-family-sans-serif;
+$headings-font-family: "Red Hat Display", "Red Hat Text", "Segoe UI", "Inter", "Noto Sans", "Liberation Sans", Arial, sans-serif;
+$font-family-monospace: "Red Hat Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+$btn-font-family: $headings-font-family;
+$h1-font-size: 1.88rem;
+$h4-font-size: 1.375rem;
+$h5-font-size: 1.2rem;
+$btn-font-size: 0.95rem;
+$btn-font-weight: 500;
+$btn-padding-y: 0.41rem;
+$btn-padding-x: 0.74rem;
+$enable-smooth-scroll: false;
+
+// Pull Bootstrap source directly from Composer.
+@import "../../../composer/twbs/bootstrap/scss/bootstrap";
+
+@function raven-button-hover($color) {
+  @return mix(#000, $color, 8%);
+}
+
+@function raven-button-active($color) {
+  @return mix(#000, $color, 15%);
+}
+
+@mixin raven-solid-button-tone($selector, $color, $text-color) {
+  body.raven-panel-theme #{$selector} {
+    --bs-btn-color: #{$text-color};
+    --bs-btn-bg: #{$color};
+    --bs-btn-border-color: #{$color};
+    --bs-btn-hover-color: #{$text-color};
+    --bs-btn-hover-bg: #{raven-button-hover($color)};
+    --bs-btn-hover-border-color: #{raven-button-hover($color)};
+    --bs-btn-active-color: #{$text-color};
+    --bs-btn-active-bg: #{raven-button-active($color)};
+    --bs-btn-active-border-color: #{raven-button-active($color)};
+    --bs-btn-disabled-color: #{$text-color};
+    --bs-btn-disabled-bg: #{$color};
+    --bs-btn-disabled-border-color: #{$color};
+  }
+}
+
+@mixin raven-outline-button-tone($selector, $color, $hover-text-color) {
+  body.raven-panel-theme #{$selector} {
+    --bs-btn-color: #{$color};
+    --bs-btn-border-color: #{$color};
+    --bs-btn-hover-color: #{$hover-text-color};
+    --bs-btn-hover-bg: #{raven-button-hover($color)};
+    --bs-btn-hover-border-color: #{raven-button-hover($color)};
+    --bs-btn-active-color: #{$hover-text-color};
+    --bs-btn-active-bg: #{raven-button-active($color)};
+    --bs-btn-active-border-color: #{raven-button-active($color)};
+    --bs-btn-disabled-color: #{$color};
+    --bs-btn-disabled-bg: transparent;
+    --bs-btn-disabled-border-color: #{$color};
+  }
+}
+
+body.raven-panel-theme {
+  --raven-bg-1: #f2ede2;
+  --raven-bg-2: #e4ebf6;
+  --raven-surface: #fffdf7;
+  --raven-surface-soft: #f4efe4;
+  --raven-border: #d4c7b4;
+  --raven-ink: #1f2a34;
+  --raven-muted: #5f6873;
+  --raven-accent: #1d5a86;
+  --raven-accent-hover: #17496c;
+  --raven-accent-active: #133e5d;
+  --raven-accent-soft: rgba(29, 90, 134, 0.14);
+  --raven-shadow: 0 0.45rem 1.2rem rgba(31, 42, 52, 0.12);
+
+  min-height: 100vh;
+  color: var(--raven-ink);
+  background: linear-gradient(155deg, var(--raven-bg-1), var(--raven-bg-2));
+  background-attachment: fixed;
+}
+
+// Theme variants controlled by User Preferences -> Theme.
+body.raven-panel-theme.theme-default {
+  --raven-bg-1: #f2ede2;
+  --raven-bg-2: #e4ebf6;
+  --raven-surface: #fffdf7;
+  --raven-surface-soft: #f4efe4;
+  --raven-border: #d4c7b4;
+  --raven-ink: #1f2a34;
+  --raven-muted: #5f6873;
+  --raven-accent: #1d5a86;
+  --raven-accent-hover: #17496c;
+  --raven-accent-active: #133e5d;
+  --raven-accent-soft: rgba(29, 90, 134, 0.14);
+  --raven-shadow: 0 0.45rem 1.2rem rgba(31, 42, 52, 0.12);
+}
+
+body.raven-panel-theme.theme-light {
+  // Light intentionally mirrors default to keep a two-appearance model (default/light + dark).
+  --raven-bg-1: #f2ede2;
+  --raven-bg-2: #e4ebf6;
+  --raven-surface: #fffdf7;
+  --raven-surface-soft: #f4efe4;
+  --raven-border: #d4c7b4;
+  --raven-ink: #1f2a34;
+  --raven-muted: #5f6873;
+  --raven-accent: #1d5a86;
+  --raven-accent-hover: #17496c;
+  --raven-accent-active: #133e5d;
+  --raven-accent-soft: rgba(29, 90, 134, 0.14);
+  --raven-shadow: 0 0.45rem 1.2rem rgba(31, 42, 52, 0.12);
+}
+
+body.raven-panel-theme.theme-dark {
+  --raven-bg-1: #0e1520;
+  --raven-bg-2: #162234;
+  --raven-surface: #1a2433;
+  --raven-surface-soft: #141d2b;
+  --raven-border: #334559;
+  --raven-ink: #f2f6fb;
+  --raven-muted: #c4cfdb;
+  --raven-accent: #50b8ff;
+  --raven-accent-hover: #68c3ff;
+  --raven-accent-active: #3eaaf2;
+  --raven-accent-soft: rgba(80, 184, 255, 0.2);
+  --raven-shadow: 0 0.55rem 1.35rem rgba(7, 10, 16, 0.45);
+  --bs-body-color: var(--raven-ink);
+  --bs-secondary-color: var(--raven-muted);
+  --bs-emphasis-color: #ffffff;
+  --bs-heading-color: #ffffff;
+  --bs-border-color: var(--raven-border);
+  color-scheme: dark;
+}
+
+body.raven-panel-theme nav.navbar {
+  background: linear-gradient(90deg, #121212 0%, #1a1e24 100%) !important;
+  border: 0;
+  border-bottom: 1px solid #000000;
+  box-shadow: none;
+}
+
+body.raven-panel-theme .raven-panel-sidebar-column {
+  background: linear-gradient(90deg, #121212 0%, #1a1e24 100%);
+}
+
+body.raven-panel-theme .card.raven-panel-sidebar-card {
+  position: sticky;
+  top: 1rem;
+  background-color: transparent;
+  background-image: url("../img/sidebar.png");
+  background-repeat: no-repeat;
+  background-position: left bottom;
+  background-size: contain;
+  border-color: #000000;
+  color: #e3e7eb;
+  scrollbar-width: thin;
+  scrollbar-color: #3a414b #111317;
+}
+
+body.raven-panel-theme .card.raven-panel-sidebar-card::-webkit-scrollbar {
+  width: 0.7rem;
+}
+
+body.raven-panel-theme .card.raven-panel-sidebar-card::-webkit-scrollbar-track {
+  background: #111317;
+}
+
+body.raven-panel-theme .card.raven-panel-sidebar-card::-webkit-scrollbar-thumb {
+  background-color: #3a414b;
+  border-radius: 999px;
+  border: 2px solid #111317;
+}
+
+body.raven-panel-theme .card.raven-panel-sidebar-card::-webkit-scrollbar-thumb:hover {
+  background-color: #4a525d;
+}
+
+body.raven-panel-theme .raven-panel-sidebar-card a {
+  color: #d6dde5;
+}
+
+body.raven-panel-theme .raven-panel-sidebar-card a:hover,
+body.raven-panel-theme .raven-panel-sidebar-card a:focus-visible {
+  color: #ffffff;
+}
+
+body.raven-panel-theme .raven-panel-sidebar-card .text-muted,
+body.raven-panel-theme .raven-panel-sidebar-card .form-text,
+body.raven-panel-theme .raven-panel-sidebar-card .h6.text-uppercase {
+  color: #a6b0bb !important;
+}
+
+body.raven-panel-theme .raven-panel-sidebar-card .nav-pills .nav-link {
+  color: #d6dde5;
+  background-color: transparent;
+  border-color: transparent;
+}
+
+body.raven-panel-theme .raven-panel-sidebar-card .nav-pills .nav-link:hover,
+body.raven-panel-theme .raven-panel-sidebar-card .nav-pills .nav-link:focus-visible {
+  color: #ffffff;
+  border-color: #2a2a2a;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+body.raven-panel-theme .raven-panel-sidebar-card .nav-pills .nav-link.active,
+body.raven-panel-theme .raven-panel-sidebar-card .nav-pills .show > .nav-link {
+  color: #ffffff;
+  border-color: var(--raven-accent);
+  background-color: var(--raven-accent);
+}
+
+body.raven-panel-theme .raven-panel-sidebar-card .raven-panel-sidebar-brand {
+  border-bottom-color: #35393f !important;
+}
+
+body.raven-panel-theme .raven-panel-sidebar-card .raven-panel-sidebar-brand-link,
+body.raven-panel-theme .raven-panel-sidebar-card .raven-panel-sidebar-brand-link:hover,
+body.raven-panel-theme .raven-panel-sidebar-card .raven-panel-sidebar-brand-link:focus-visible {
+  color: #ffffff;
+}
+
+@media (min-width: 768px) {
+  body.raven-panel-theme.has-sidebar .raven-panel-layout {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  body.raven-panel-theme.has-sidebar .raven-panel-layout-row {
+    --bs-gutter-x: 0;
+    --bs-gutter-y: 0;
+    min-height: 100vh;
+    align-items: stretch;
+  }
+
+  body.raven-panel-theme.has-sidebar .raven-panel-sidebar-column {
+    padding: 0;
+  }
+
+  body.raven-panel-theme.has-sidebar .raven-panel-sidebar-card {
+    top: 0;
+    min-height: 100vh;
+    height: 100vh;
+    margin: 0;
+    border-top: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-right: 1px solid #000000;
+    border-radius: 0;
+    box-shadow: none;
+    overflow-y: auto;
+  }
+
+  body.raven-panel-theme.has-sidebar .raven-panel-sidebar-card .card-body {
+    padding: 1rem 1rem 1.3rem;
+  }
+
+  body.raven-panel-theme.has-sidebar .raven-panel-main {
+    padding: 1.1rem 1.35rem;
+  }
+}
+
+// Login uses the shared panel stylesheet without sidebar chrome.
+body.raven-panel-theme .raven-panel-login-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 1.5rem);
+}
+
+body.raven-panel-theme .raven-panel-login-shell {
+  width: min(100%, 30rem);
+}
+
+body.raven-panel-theme .raven-panel-login-card {
+  border-color: var(--raven-border);
+  background: var(--raven-surface);
+}
+
+body.raven-panel-theme .raven-panel-login-card .card-body {
+  padding: 1.15rem 1.2rem;
+}
+
+body.raven-panel-theme .card {
+  border-color: var(--raven-border);
+  background: var(--raven-surface);
+  box-shadow: var(--raven-shadow);
+}
+
+body.raven-panel-theme .border,
+body.raven-panel-theme .border-top,
+body.raven-panel-theme .border-end,
+body.raven-panel-theme .border-bottom,
+body.raven-panel-theme .border-start {
+  border-color: var(--raven-border) !important;
+}
+
+// Sidebar/mobile-nav section headings use a stronger display face.
+body.raven-panel-theme nav.navbar .h6.text-uppercase,
+body.raven-panel-theme aside .h6.text-uppercase {
+  font-family: $headings-font-family;
+  letter-spacing: 0.07em;
+  margin-bottom: 0.45rem;
+}
+
+body.raven-panel-theme aside .text-muted,
+body.raven-panel-theme .text-muted,
+body.raven-panel-theme .form-text {
+  color: var(--raven-muted) !important;
+}
+
+body.raven-panel-theme main h6,
+body.raven-panel-theme main .h6 {
+  color: #744323;
+  font-size: 0.88rem;
+  line-height: 1;
+  font-family: $headings-font-family;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+body.raven-panel-theme .nav-pills .nav-link {
+  border: 1px solid transparent;
+  border-radius: 0.6rem;
+  color: var(--raven-ink);
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+body.raven-panel-theme .nav-pills .nav-link:hover,
+body.raven-panel-theme .nav-pills .nav-link:focus-visible {
+  color: var(--raven-ink);
+  background-color: var(--raven-accent-soft);
+  border-color: var(--raven-border);
+}
+
+body.raven-panel-theme .nav-pills .nav-link.active,
+body.raven-panel-theme .nav-pills .show > .nav-link {
+  background-color: var(--raven-accent);
+  border-color: var(--raven-accent);
+  color: #ffffff;
+}
+
+body.raven-panel-theme nav.navbar .nav-pills .nav-link {
+  color: #d6dde5;
+}
+
+body.raven-panel-theme nav.navbar .nav-pills .nav-link:hover,
+body.raven-panel-theme nav.navbar .nav-pills .nav-link:focus-visible {
+  color: #ffffff;
+  border-color: #2a2a2a;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+body.raven-panel-theme nav.navbar .nav-pills .nav-link.active,
+body.raven-panel-theme nav.navbar .nav-pills .show > .nav-link {
+  color: #ffffff;
+  border-color: var(--raven-accent);
+  background-color: var(--raven-accent);
+}
+
+body.raven-panel-theme nav.navbar .navbar-brand {
+  color: #ffffff;
+}
+
+body.raven-panel-theme nav.navbar .navbar-brand:hover,
+body.raven-panel-theme nav.navbar .navbar-brand:focus-visible {
+  color: #ffffff;
+}
+
+body.raven-panel-theme nav.navbar .h6.text-uppercase {
+  color: #a6b0bb !important;
+}
+
+body.raven-panel-theme .navbar-brand {
+  font-family: $font-family-sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+body.raven-panel-theme .raven-panel-brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42em;
+}
+
+body.raven-panel-theme .raven-panel-brand-link {
+  font-size: 1.4rem !important;
+}
+
+body.raven-panel-theme .raven-panel-brand-logo {
+  display: block;
+  width: auto;
+  height: 1.18em;
+  flex: 0 0 auto;
+}
+
+body.raven-panel-theme .raven-panel-brand-text {
+  line-height: 1;
+}
+
+body.raven-panel-theme .table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--raven-ink);
+  --bs-table-border-color: var(--raven-border);
+}
+
+body.raven-panel-theme .table > :not(caption) > * > * {
+  box-shadow: none;
+}
+
+body.raven-panel-theme .table > thead th {
+  color: var(--raven-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body.raven-panel-theme .table > tbody > tr:hover > td {
+  background-color: var(--raven-accent-soft);
+}
+
+body.raven-panel-theme tr.raven-row-selected > td {
+  background-color: var(--raven-accent-soft) !important;
+}
+
+body.raven-panel-theme .form-control,
+body.raven-panel-theme .form-select {
+  border-color: var(--raven-border);
+  background-color: var(--raven-surface);
+  color: var(--raven-ink);
+}
+
+body.raven-panel-theme .form-control:focus,
+body.raven-panel-theme .form-select:focus {
+  border-color: var(--raven-accent);
+  box-shadow: 0 0 0 0.2rem var(--raven-accent-soft);
+}
+
+body.raven-panel-theme .form-control::placeholder {
+  color: var(--raven-muted);
+  opacity: 0.82;
+}
+
+body.raven-panel-theme .form-control:disabled,
+body.raven-panel-theme .form-select:disabled {
+  background-color: var(--raven-surface-soft);
+}
+
+body.raven-panel-theme .input-group-text {
+  color: #ffffff;
+  background: #6a737b;
+  border-color: #6a737b;
+}
+
+// Force browser autofill colors to respect Raven panel theme tokens.
+body.raven-panel-theme .form-control:-webkit-autofill,
+body.raven-panel-theme .form-control:-webkit-autofill:hover,
+body.raven-panel-theme .form-control:-webkit-autofill:focus,
+body.raven-panel-theme .form-select:-webkit-autofill,
+body.raven-panel-theme .form-select:-webkit-autofill:hover,
+body.raven-panel-theme .form-select:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--raven-ink);
+  caret-color: var(--raven-ink);
+  -webkit-box-shadow: 0 0 0 1000px var(--raven-surface) inset;
+  box-shadow: 0 0 0 1000px var(--raven-surface) inset;
+  border-color: var(--raven-border);
+  transition: background-color 9999s ease-out 0s;
+}
+
+body.raven-panel-theme .form-check-input {
+  border-color: var(--raven-border);
+  background-color: var(--raven-surface);
+}
+
+body.raven-panel-theme .form-check-input:checked {
+  background-color: var(--raven-accent);
+  border-color: var(--raven-accent);
+}
+
+body.raven-panel-theme .nav-tabs {
+  border-bottom-color: var(--raven-border);
+}
+
+body.raven-panel-theme .nav-tabs .nav-link {
+  color: var(--raven-muted);
+}
+
+body.raven-panel-theme .nav-tabs .nav-link:hover {
+  border-color: var(--raven-border);
+  color: var(--raven-ink);
+}
+
+body.raven-panel-theme .nav-tabs .nav-link.active {
+  color: var(--raven-ink);
+  background-color: var(--raven-surface);
+  border-color: var(--raven-border) var(--raven-border) var(--raven-surface);
+}
+
+// Tabbed forms use this surface style when they intentionally omit a surrounding card.
+body.raven-panel-theme .tab-content.raven-tab-content-surface {
+  background: var(--raven-surface);
+  box-shadow: var(--raven-shadow);
+}
+
+body.raven-panel-theme #gallery_drop_zone {
+  border: 2px dashed var(--raven-border);
+  background: var(--raven-surface-soft);
+  border-radius: 0.75rem;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+body.raven-panel-theme #gallery_drop_zone:hover {
+  border-color: var(--raven-accent);
+  background: var(--raven-accent-soft);
+}
+
+body.raven-panel-theme .btn-link {
+  font-weight: $btn-font-weight;
+}
+
+body.raven-panel-theme #routing-table thead th[data-sort-key] {
+  color: var(--raven-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: color 140ms ease;
+}
+
+body.raven-panel-theme #routing-table thead th[data-sort-key].is-active-sort {
+  color: var(--bs-emphasis-color);
+  font-weight: 700;
+}
+
+body.raven-panel-theme .raven-routing-sort-caret {
+  font-size: 0.75em;
+  opacity: 0;
+  vertical-align: 0.02em;
+  transition: opacity 120ms ease;
+}
+
+body.raven-panel-theme #routing-table thead th[data-sort-key].is-active-sort .raven-routing-sort-caret {
+  opacity: 1;
+}
+
+body.raven-panel-theme .raven-routing-copy-icon {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--raven-muted);
+  padding: 0;
+  line-height: 1;
+}
+
+body.raven-panel-theme .raven-routing-copy-icon:hover,
+body.raven-panel-theme .raven-routing-copy-icon:focus-visible {
+  color: var(--raven-accent);
+}
+
+// Align primary button tint with sidebar active-item accent color.
+body.raven-panel-theme .btn-primary {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--raven-accent);
+  --bs-btn-border-color: var(--raven-accent);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--raven-accent-hover);
+  --bs-btn-hover-border-color: var(--raven-accent-hover);
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: var(--raven-accent-active);
+  --bs-btn-active-border-color: var(--raven-accent-active);
+  --bs-btn-disabled-color: #fff;
+  --bs-btn-disabled-bg: var(--raven-accent);
+  --bs-btn-disabled-border-color: var(--raven-accent);
+}
+
+body.raven-panel-theme .btn-outline-primary {
+  --bs-btn-color: var(--raven-accent);
+  --bs-btn-border-color: var(--raven-accent);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--raven-accent-hover);
+  --bs-btn-hover-border-color: var(--raven-accent-hover);
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: var(--raven-accent-active);
+  --bs-btn-active-border-color: var(--raven-accent-active);
+  --bs-btn-disabled-color: var(--raven-accent);
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: var(--raven-accent);
+}
+
+// Slightly desaturate other semantic button families so they sit with Raven blue.
+$raven-btn-secondary: mix($gray-700, $secondary, 6%);
+$raven-btn-success: mix($gray-700, $success, 6%);
+$raven-btn-info: mix($gray-700, $info, 9%);
+$raven-btn-warning: mix($gray-700, $warning, 10%);
+$raven-btn-danger: mix($gray-700, $danger, 7%);
+$raven-btn-dark: mix($gray-700, $dark, 3%);
+$raven-btn-secondary-hover: mix(#000, $raven-btn-secondary, 10%);
+
+@include raven-solid-button-tone(".btn-secondary", $raven-btn-secondary, #fff);
+@include raven-solid-button-tone(".btn-success", $raven-btn-success, #fff);
+@include raven-solid-button-tone(".btn-info", $raven-btn-info, #0f2534);
+@include raven-solid-button-tone(".btn-warning", $raven-btn-warning, #1f2a34);
+@include raven-solid-button-tone(".btn-danger", $raven-btn-danger, #fff);
+@include raven-solid-button-tone(".btn-dark", $raven-btn-dark, #fff);
+
+@include raven-outline-button-tone(".btn-outline-secondary", $raven-btn-secondary, #fff);
+@include raven-outline-button-tone(".btn-outline-success", $raven-btn-success, #fff);
+@include raven-outline-button-tone(".btn-outline-info", $raven-btn-info, #0f2534);
+@include raven-outline-button-tone(".btn-outline-warning", $raven-btn-warning, #1f2a34);
+@include raven-outline-button-tone(".btn-outline-danger", $raven-btn-danger, #fff);
+@include raven-outline-button-tone(".btn-outline-dark", $raven-btn-dark, #fff);
+
+// Nudge secondary hover one step darker than the shared tone helper.
+body.raven-panel-theme .btn-secondary,
+body.raven-panel-theme .btn-outline-secondary {
+  --bs-btn-hover-bg: #{$raven-btn-secondary-hover};
+  --bs-btn-hover-border-color: #{$raven-btn-secondary-hover};
+}
+
+body.raven-panel-theme a:not(.btn) {
+  color: var(--raven-accent);
+}
+
+body.raven-panel-theme a:not(.btn):hover {
+  color: var(--raven-accent);
+}
+
+body.raven-panel-theme code {
+  color: inherit;
+  font-size: 0.77em;
+  background: var(--raven-surface-soft);
+  border: 1px solid var(--raven-border);
+  border-radius: 0.35rem;
+  padding: 0.03rem 0.35rem 0.04rem;
+}
+
+body.raven-panel-theme .dropdown-menu {
+  border-color: var(--raven-border);
+  background: var(--raven-surface);
+  box-shadow: var(--raven-shadow);
+}
+
+body.raven-panel-theme .dropdown-item {
+  color: var(--raven-ink);
+}
+
+body.raven-panel-theme .dropdown-item:hover,
+body.raven-panel-theme .dropdown-item:focus {
+  color: var(--raven-ink);
+  background: var(--raven-accent-soft);
+}
+
+// Keep monospace contexts intentionally monospace, now backed by Red Hat Mono.
+body.raven-panel-theme code,
+body.raven-panel-theme kbd,
+body.raven-panel-theme pre,
+body.raven-panel-theme samp {
+  font-family: $font-family-monospace;
+}
+
+// Media tab density tuning keeps gallery cards compact without sacrificing readability.
+body.raven-panel-theme #page-media-pane .form-label {
+  margin-bottom: 0.2rem;
+  font-size: 0.84rem;
+  color: var(--raven-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+body.raven-panel-theme #page-media-pane [data-raven-gallery-row] {
+  border-color: var(--raven-border) !important;
+  background: var(--raven-surface-soft);
+  padding: 0.9rem !important;
+}
+
+body.raven-panel-theme #page-media-pane [data-raven-gallery-row] .form-control,
+body.raven-panel-theme #page-media-pane [data-raven-gallery-row] .form-select {
+  padding-top: 0.34rem;
+  padding-bottom: 0.34rem;
+}
+
+body.raven-panel-theme #page-media-pane [data-raven-gallery-row] img {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+}
+
+body.raven-panel-theme #page-media-pane .btn.btn-sm {
+  padding: 0.32rem 0.56rem;
+}
+
+body.raven-panel-theme.theme-dark nav.navbar {
+  background: linear-gradient(90deg, #080808 0%, #101317 100%) !important;
+  border-bottom-color: #000000;
+}
+
+body.raven-panel-theme.theme-dark .raven-panel-sidebar-column {
+  background: linear-gradient(90deg, #080808 0%, #101317 100%);
+}
+
+body.raven-panel-theme.theme-dark .raven-panel-sidebar-card .nav-pills .nav-link.active,
+body.raven-panel-theme.theme-dark .raven-panel-sidebar-card .nav-pills .show > .nav-link,
+body.raven-panel-theme.theme-dark nav.navbar .nav-pills .nav-link.active,
+body.raven-panel-theme.theme-dark nav.navbar .nav-pills .show > .nav-link {
+  border-color: #0f6cbf;
+  background-color: #0f6cbf;
+}
+
+body.raven-panel-theme.theme-dark main h1,
+body.raven-panel-theme.theme-dark main .h1,
+body.raven-panel-theme.theme-dark main .h2,
+body.raven-panel-theme.theme-dark main .h3,
+body.raven-panel-theme.theme-dark main .h4,
+body.raven-panel-theme.theme-dark main .h5 {
+  color: #ffffff;
+}
+
+body.raven-panel-theme.theme-dark main,
+body.raven-panel-theme.theme-dark main p,
+body.raven-panel-theme.theme-dark main li,
+body.raven-panel-theme.theme-dark main dt,
+body.raven-panel-theme.theme-dark main dd,
+body.raven-panel-theme.theme-dark main .card-text {
+  color: var(--raven-ink);
+}
+
+body.raven-panel-theme.theme-dark .form-label,
+body.raven-panel-theme.theme-dark .col-form-label,
+body.raven-panel-theme.theme-dark .form-check-label,
+body.raven-panel-theme.theme-dark legend {
+  color: var(--raven-ink);
+}
+
+body.raven-panel-theme.theme-dark .form-text,
+body.raven-panel-theme.theme-dark .text-muted {
+  color: var(--raven-muted) !important;
+}
+
+body.raven-panel-theme.theme-dark .input-group-text {
+  color: #ffffff;
+  background: #6a737b;
+  border-color: #6a737b;
+}
+
+body.raven-panel-theme.theme-dark .form-control::placeholder {
+  color: #b7c3d1;
+  opacity: 1;
+}
+
+body.raven-panel-theme.theme-dark .bg-light,
+body.raven-panel-theme.theme-dark .bg-white {
+  background-color: var(--raven-surface-soft) !important;
+  color: var(--raven-ink) !important;
+}
+
+body.raven-panel-theme.theme-dark .card,
+body.raven-panel-theme.theme-dark .dropdown-menu,
+body.raven-panel-theme.theme-dark .list-group-item {
+  background: var(--raven-surface);
+}
+
+body.raven-panel-theme.theme-dark .card.raven-panel-sidebar-card {
+  background-color: transparent;
+  border-color: #000000;
+}
+
+body.raven-panel-theme.theme-dark .table {
+  --bs-table-hover-color: var(--raven-ink);
+  --bs-table-striped-color: var(--raven-ink);
+}
+
+body.raven-panel-theme.theme-dark .table > tbody > tr:hover > td {
+  background-color: rgba(80, 184, 255, 0.12);
+}
+
+body.raven-panel-theme.theme-dark tr.raven-row-selected > td {
+  background-color: rgba(80, 184, 255, 0.2) !important;
+}
+
+body.raven-panel-theme.theme-dark tr.raven-row-selected:hover > td {
+  background-color: rgba(80, 184, 255, 0.26) !important;
+}
+
+body.raven-panel-theme.theme-dark .nav-tabs .nav-link.active {
+  background: var(--raven-surface-soft);
+  border-bottom-color: var(--raven-surface-soft);
+}
+
+body.raven-panel-theme.theme-dark .alert {
+  border-color: var(--raven-border);
+}
+
+body.raven-panel-theme.theme-dark .btn-outline-secondary {
+  color: #c7d5e6;
+  border-color: #4c6075;
+}
+
+body.raven-panel-theme.theme-dark .btn-outline-secondary:hover {
+  color: #ffffff;
+  border-color: #73c8ff;
+  background-color: rgba(115, 200, 255, 0.22);
+}
+
+body.raven-panel-theme.theme-dark #gallery_drop_zone {
+  background: rgba(16, 26, 38, 0.72);
+  border-color: #49627c;
+}
+
+@media (max-width: 767.98px) {
+  body.raven-panel-theme.has-sidebar .raven-panel-layout {
+    padding: 0 !important;
+  }
+
+  body.raven-panel-theme.has-sidebar .raven-panel-layout-row {
+    --bs-gutter-x: 0;
+    --bs-gutter-y: 0;
+  }
+
+  body.raven-panel-theme.has-sidebar .raven-panel-main {
+    padding: 0 !important;
+  }
+
+  body.raven-panel-theme.has-sidebar .raven-panel-main > .card {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  body.raven-panel-theme nav.navbar .container-fluid {
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+  }
+
+  body.raven-panel-theme #ravenMobilePanelNav {
+    max-height: calc(100vh - 4.75rem);
+    overflow-y: auto;
+    padding-bottom: 0.45rem;
+  }
+
+  body.raven-panel-theme nav.navbar .h6.text-uppercase {
+    margin-top: 0.55rem;
+  }
+
+  body.raven-panel-theme nav.navbar .nav-pills .nav-link {
+    padding: 0.44rem 0.6rem;
+    font-size: 0.94rem;
+  }
+}
+
+// Non-initialized TinyMCE source textareas should remain plain sans-serif as requested.
+textarea[data-raven-editor-input="1"] {
+  font-family: $font-family-sans-serif;
+}

@@ -1,0 +1,32 @@
+# Root agent guide is core-team only and should not ship in production packages.
+/AGENTS.md
+
+# Local runtime configuration
+/private/config.php
+!/private/config.php.dist
+/private/ext/.state.php
+!/private/ext/.state.php.dist
+
+# Local SQLite databases
+/private/db/
+
+# Uploaded media files (keep directory, ignore contents)
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# Composer artifacts
+/composer/
+/vendor/
+/composer.lock
+/composer.phar
+
+# Local temporary files
+/tmp/
+/private/tmp/
+/private/tmp/install.lock
+
+# Local release workflow checklist
+/release-checklist.md
+
+# Local debug/smoke tooling (development install only)
+/debug/

@@ -1,0 +1,9 @@
+{
+  "name": "Database Manager",
+  "version": "0.8.0",
+  "description": "Database management portal powered by Adminer.",
+  "type": "system",
+  "author": "Novelty Lanterns",
+  "homepage": "https://raven.lanterns.io",
+  "entrypoint": "adminer.php"
+}
