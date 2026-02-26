@@ -14,8 +14,9 @@ declare(strict_types=1);
 /** @var bool $canManageConfiguration */
 /** @var bool $adminerInstalled */
 /** @var bool $extensionEntrypointExists */
-/** @var string $adminerLaunchPath */
 /** @var string $extensionsPath */
+/** @var array<int, array{name: string, detail: string, launch_path: string}> $targets */
+/** @var string|null $selectorError */
 /** @var array{
  *   driver: string,
  *   table_prefix: string,
@@ -34,6 +35,8 @@ $extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
 $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.lanterns.io'));
+$modeLabel = $driver === 'sqlite' ? '.db Files' : 'SQL Tables';
+$canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
 ?>
 <div class="card mb-3">
     <div class="card-body">
@@ -62,114 +65,187 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
 </div>
 
 <?php if ($canManageConfiguration): ?>
+    <div class="d-flex justify-content-end mb-3">
+        <a class="btn btn-secondary" href="<?= e($extensionsPath) ?>"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Extensions</a>
+    </div>
+
     <div class="card mb-3">
         <div class="card-body">
-            <h2 class="h5 mb-3">Launch Adminer</h2>
+            <div class="row g-4">
+                <div class="col-12 col-lg-5">
+                    <h2 class="h5 mb-3">Launch Adminer</h2>
 
-            <?php if (!$extensionEntrypointExists): ?>
-                <div class="alert alert-danger" role="alert">
-                    Extension entrypoint is missing at <code>~/private/ext/database/adminer.php</code>.
+                    <?php if (!$extensionEntrypointExists): ?>
+                        <div class="alert alert-danger mb-0" role="alert">
+                            Extension entrypoint is missing at <code>~/private/ext/database/adminer.php</code>.
+                        </div>
+                    <?php elseif (!$adminerInstalled): ?>
+                        <div class="alert alert-warning mb-0" role="alert">
+                            Adminer dependency is not installed locally yet.
+                            Run <code>composer update</code> (or <code>composer require vrana/adminer:^5.3</code>) when network access is available.
+                        </div>
+                    <?php else: ?>
+                        <p class="mb-3">
+                            Open the Adminer launch targets:
+                        </p>
+                        <button
+                            type="button"
+                            class="btn btn-success"
+                            data-bs-toggle="modal"
+                            data-bs-target="#ravenAdminerLaunchModal"
+                        >
+                            Open Adminer<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i>
+                        </button>
+                    <?php endif; ?>
                 </div>
-            <?php elseif (!$adminerInstalled): ?>
-                <div class="alert alert-warning" role="alert">
-                    Adminer dependency is not installed locally yet.
-                    Run <code>composer update</code> (or <code>composer require vrana/adminer:^5.3</code>) when network access is available.
+
+                <div class="col-12 col-lg-7">
+                    <h2 class="h5 mb-3">Connection Summary</h2>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <tbody>
+                            <tr>
+                                <th scope="row" style="width: 220px;">Active Driver</th>
+                                <td><code><?= e($driver) ?></code></td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Table Prefix</th>
+                                <td><code><?= e((string) ($databaseSummary['table_prefix'] ?? '')) ?></code></td>
+                            </tr>
+
+                            <?php if ($driver === 'sqlite'): ?>
+                                <tr>
+                                    <th scope="row">SQLite Base Path</th>
+                                    <td><code><?= e((string) ($databaseSummary['sqlite_base_path'] ?? '')) ?></code></td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">SQLite Files</th>
+                                    <td>
+                                        <?php $sqliteFiles = (array) ($databaseSummary['sqlite_files'] ?? []); ?>
+                                        <?php if ($sqliteFiles === []): ?>
+                                            <span class="text-muted">&lt;none&gt;</span>
+                                        <?php else: ?>
+                                            <?php foreach ($sqliteFiles as $key => $filename): ?>
+                                                <div><code><?= e((string) $key) ?></code>: <code><?= e((string) $filename) ?></code></div>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php elseif ($driver === 'mysql'): ?>
+                                <?php $mysql = (array) ($databaseSummary['mysql'] ?? []); ?>
+                                <tr>
+                                    <th scope="row">MySQL Host</th>
+                                    <td><code><?= e((string) ($mysql['host'] ?? '')) ?></code></td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">MySQL Port</th>
+                                    <td><code><?= e((string) ($mysql['port'] ?? '')) ?></code></td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">MySQL Database</th>
+                                    <td><code><?= e((string) ($mysql['dbname'] ?? '')) ?></code></td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">MySQL User</th>
+                                    <td><code><?= e((string) ($mysql['user'] ?? '')) ?></code></td>
+                                </tr>
+                            <?php elseif ($driver === 'pgsql'): ?>
+                                <?php $pgsql = (array) ($databaseSummary['pgsql'] ?? []); ?>
+                                <tr>
+                                    <th scope="row">PostgreSQL Host</th>
+                                    <td><code><?= e((string) ($pgsql['host'] ?? '')) ?></code></td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">PostgreSQL Port</th>
+                                    <td><code><?= e((string) ($pgsql['port'] ?? '')) ?></code></td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">PostgreSQL Database</th>
+                                    <td><code><?= e((string) ($pgsql['dbname'] ?? '')) ?></code></td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">PostgreSQL User</th>
+                                    <td><code><?= e((string) ($pgsql['user'] ?? '')) ?></code></td>
+                                </tr>
+                            <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            <?php else: ?>
-                <p class="mb-3">
-                    Open the Adminer launch selector:
-                </p>
-                <a
-                    class="btn btn-success btn-sm"
-                    href="<?= e($adminerLaunchPath) ?>"
-                >
-                    Open Adminer<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i>
-                </a>
-            <?php endif; ?>
+            </div>
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-body">
-            <h2 class="h5 mb-3">Connection Summary</h2>
-
-            <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                    <tbody>
-                    <tr>
-                        <th scope="row" style="width: 220px;">Active Driver</th>
-                        <td><code><?= e($driver) ?></code></td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Table Prefix</th>
-                        <td><code><?= e((string) ($databaseSummary['table_prefix'] ?? '')) ?></code></td>
-                    </tr>
-
-                    <?php if ($driver === 'sqlite'): ?>
-                        <tr>
-                            <th scope="row">SQLite Base Path</th>
-                            <td><code><?= e((string) ($databaseSummary['sqlite_base_path'] ?? '')) ?></code></td>
-                        </tr>
-                        <tr>
-                            <th scope="row">SQLite Files</th>
-                            <td>
-                                <?php $sqliteFiles = (array) ($databaseSummary['sqlite_files'] ?? []); ?>
-                                <?php if ($sqliteFiles === []): ?>
-                                    <span class="text-muted">&lt;none&gt;</span>
-                                <?php else: ?>
-                                    <?php foreach ($sqliteFiles as $key => $filename): ?>
-                                        <div><code><?= e((string) $key) ?></code>: <code><?= e((string) $filename) ?></code></div>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php elseif ($driver === 'mysql'): ?>
-                        <?php $mysql = (array) ($databaseSummary['mysql'] ?? []); ?>
-                        <tr>
-                            <th scope="row">MySQL Host</th>
-                            <td><code><?= e((string) ($mysql['host'] ?? '')) ?></code></td>
-                        </tr>
-                        <tr>
-                            <th scope="row">MySQL Port</th>
-                            <td><code><?= e((string) ($mysql['port'] ?? '')) ?></code></td>
-                        </tr>
-                        <tr>
-                            <th scope="row">MySQL Database</th>
-                            <td><code><?= e((string) ($mysql['dbname'] ?? '')) ?></code></td>
-                        </tr>
-                        <tr>
-                            <th scope="row">MySQL User</th>
-                            <td><code><?= e((string) ($mysql['user'] ?? '')) ?></code></td>
-                        </tr>
-                    <?php elseif ($driver === 'pgsql'): ?>
-                        <?php $pgsql = (array) ($databaseSummary['pgsql'] ?? []); ?>
-                        <tr>
-                            <th scope="row">PostgreSQL Host</th>
-                            <td><code><?= e((string) ($pgsql['host'] ?? '')) ?></code></td>
-                        </tr>
-                        <tr>
-                            <th scope="row">PostgreSQL Port</th>
-                            <td><code><?= e((string) ($pgsql['port'] ?? '')) ?></code></td>
-                        </tr>
-                        <tr>
-                            <th scope="row">PostgreSQL Database</th>
-                            <td><code><?= e((string) ($pgsql['dbname'] ?? '')) ?></code></td>
-                        </tr>
-                        <tr>
-                            <th scope="row">PostgreSQL User</th>
-                            <td><code><?= e((string) ($pgsql['user'] ?? '')) ?></code></td>
-                        </tr>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="d-flex justify-content-end mt-3">
-                <a class="btn btn-secondary" href="<?= e($extensionsPath) ?>"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Extensions</a>
+    <?php if ($canLaunchAdminer): ?>
+        <div class="modal fade" id="ravenAdminerLaunchModal" tabindex="-1" aria-labelledby="ravenAdminerLaunchModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title fs-5" id="ravenAdminerLaunchModalLabel">Launch Targets (<?= e($modeLabel) ?>)</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <?php if (is_string($selectorError) && trim($selectorError) !== ''): ?>
+                            <div class="alert alert-warning mb-0" role="alert">
+                                <?= e($selectorError) ?>
+                            </div>
+                        <?php elseif ($targets === []): ?>
+                            <p class="text-muted mb-0">No launch targets were found for this driver.</p>
+                        <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Target</th>
+                                            <th scope="col">Details</th>
+                                            <th scope="col" class="text-end">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($targets as $target): ?>
+                                            <tr>
+                                                <td><code><?= e((string) ($target['name'] ?? '')) ?></code></td>
+                                                <td>
+                                                    <?php $detail = trim((string) ($target['detail'] ?? '')); ?>
+                                                    <?php if ($detail === ''): ?>
+                                                        <span class="text-muted">&ndash;</span>
+                                                    <?php else: ?>
+                                                        <?= e($detail) ?>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td class="text-end">
+                                                    <a
+                                                        class="btn btn-success btn-sm"
+                                                        href="<?= e((string) ($target['launch_path'] ?? '')) ?>"
+                                                        target="_blank"
+                                                        rel="noreferrer noopener"
+                                                    >
+                                                        Open in Adminer
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
             </div>
         </div>
+    <?php endif; ?>
+
+    <div class="d-flex justify-content-end">
+        <a class="btn btn-secondary" href="<?= e($extensionsPath) ?>"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Extensions</a>
     </div>
 <?php else: ?>
+    <div class="d-flex justify-content-end mb-3">
+        <a class="btn btn-secondary" href="<?= e($extensionsPath) ?>"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Extensions</a>
+    </div>
     <div class="d-flex justify-content-end">
         <a class="btn btn-secondary" href="<?= e($extensionsPath) ?>"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Extensions</a>
     </div>

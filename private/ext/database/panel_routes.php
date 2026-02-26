@@ -140,6 +140,130 @@ return static function (Router $router, array $context): void {
     };
 
     /**
+     * Builds Adminer launch targets for the currently configured driver.
+     *
+     * @param array<string, mixed> $databaseConfig
+     * @return array{
+     *   driver: string,
+     *   targets: array<int, array{name: string, detail: string, launch_path: string}>,
+     *   selector_error: string|null
+     * }
+     */
+    $buildAdminerLaunchTargets = static function (array $databaseConfig) use (
+        $app,
+        $panelUrl,
+        $resolveSqliteBasePath,
+        $sqliteCanonicalFiles
+    ): array {
+        $driver = strtolower((string) ($databaseConfig['driver'] ?? 'sqlite'));
+        $targets = [];
+        $selectorError = null;
+
+        if ($driver === 'sqlite') {
+            $basePath = $resolveSqliteBasePath($databaseConfig);
+            $canonicalByFile = [];
+            foreach ($sqliteCanonicalFiles() as $canonicalName => $canonicalFile) {
+                $canonicalByFile[strtolower((string) $canonicalFile)] = (string) $canonicalName;
+            }
+
+            if (!is_dir($basePath)) {
+                $selectorError = 'SQLite base path does not exist: ' . $basePath;
+            } else {
+                $entries = scandir($basePath);
+                if (is_array($entries)) {
+                    foreach ($entries as $entry) {
+                        $filename = trim((string) $entry);
+                        if ($filename === '' || $filename === '.' || $filename === '..') {
+                            continue;
+                        }
+
+                        if (!str_ends_with(strtolower($filename), '.db')) {
+                            continue;
+                        }
+
+                        $absolutePath = rtrim($basePath, '/') . '/' . $filename;
+                        if (!is_file($absolutePath)) {
+                            continue;
+                        }
+
+                        $canonicalKey = $canonicalByFile[strtolower($filename)] ?? '';
+                        if ($canonicalKey === '') {
+                            // Selector should only expose configured canonical SQLite files.
+                            continue;
+                        }
+
+                        $canonicalLabel = $canonicalKey !== ''
+                            ? ucwords(str_replace(['_', '-'], ' ', $canonicalKey))
+                            : '';
+
+                        $targets[] = [
+                            'name' => $filename,
+                            'detail' => $canonicalLabel,
+                            'launch_path' => $panelUrl('/database/adminer') . '?db=' . rawurlencode($absolutePath),
+                        ];
+                    }
+                }
+            }
+        } elseif (in_array($driver, ['mysql', 'pgsql'], true)) {
+            try {
+                $db = $app['db'] ?? null;
+                if (!($db instanceof \PDO)) {
+                    throw new RuntimeException('App DB connection is unavailable.');
+                }
+
+                if ($driver === 'mysql') {
+                    $statement = $db->query(
+                        "SELECT table_name
+                         FROM information_schema.tables
+                         WHERE table_schema = DATABASE()
+                           AND table_type = 'BASE TABLE'"
+                    );
+                } else {
+                    $statement = $db->query(
+                        "SELECT table_name
+                         FROM information_schema.tables
+                         WHERE table_schema = current_schema()
+                           AND table_type = 'BASE TABLE'"
+                    );
+                }
+
+                $tableNames = $statement !== false ? $statement->fetchAll(\PDO::FETCH_COLUMN) : [];
+                if (is_array($tableNames)) {
+                    foreach ($tableNames as $tableNameRaw) {
+                        $tableName = trim((string) $tableNameRaw);
+                        if ($tableName === '') {
+                            continue;
+                        }
+
+                        $targets[] = [
+                            'name' => $tableName,
+                            'detail' => '',
+                            'launch_path' => $panelUrl('/database/adminer') . '?table=' . rawurlencode($tableName),
+                        ];
+                    }
+                }
+            } catch (\Throwable $throwable) {
+                $selectorError = 'Failed to load SQL table list: ' . $throwable->getMessage();
+            }
+        } else {
+            $selectorError = 'Unsupported database driver configured: ' . $driver;
+        }
+
+        usort(
+            $targets,
+            static function (array $left, array $right): int {
+                return strtolower((string) ($left['name'] ?? '')) <=> strtolower((string) ($right['name'] ?? ''));
+            }
+        );
+
+        return [
+            'driver' => $driver,
+            'targets' => $targets,
+            'selector_error' => $selectorError,
+        ];
+    };
+
+    /**
      * Renders one extension-owned panel template inside the shared panel layout.
      *
      * @param array<string, mixed> $viewData
@@ -400,7 +524,8 @@ return static function (Router $router, array $context): void {
         $renderExtensionView,
         $renderPublicNotFound,
         $extensionMeta,
-        $sqliteCanonicalFiles
+        $sqliteCanonicalFiles,
+        $buildAdminerLaunchTargets
     ): void {
         $requirePanelLogin();
 
@@ -448,13 +573,16 @@ return static function (Router $router, array $context): void {
             ];
         }
 
+        $targetData = $buildAdminerLaunchTargets($databaseConfig);
+
         $renderExtensionView([
             'canManageConfiguration' => $canManageConfiguration,
             'adminerInstalled' => $resolveAdminerEntrypoint() !== null,
             'extensionEntrypointExists' => is_file($extensionEntrypoint),
-            'adminerLaunchPath' => $panelUrl('/database/adminer/select'),
             'extensionsPath' => $panelUrl('/extensions'),
             'databaseSummary' => $summary,
+            'targets' => is_array($targetData['targets'] ?? null) ? (array) $targetData['targets'] : [],
+            'selectorError' => is_string($targetData['selector_error'] ?? null) ? (string) $targetData['selector_error'] : null,
             'extensionMeta' => $extensionMeta,
         ]);
     });
@@ -469,8 +597,7 @@ return static function (Router $router, array $context): void {
         $renderPublicNotFound,
         $extensionMeta,
         $adminerSelectorViewFile,
-        $resolveSqliteBasePath,
-        $sqliteCanonicalFiles
+        $buildAdminerLaunchTargets
     ): void {
         $requirePanelLogin();
 
@@ -481,107 +608,10 @@ return static function (Router $router, array $context): void {
         }
 
         $databaseConfig = (array) $app['config']->get('database', []);
-        $driver = strtolower((string) ($databaseConfig['driver'] ?? 'sqlite'));
-
-        $targets = [];
-        $selectorError = null;
-
-        if ($driver === 'sqlite') {
-            $basePath = $resolveSqliteBasePath($databaseConfig);
-            $canonicalByFile = [];
-            foreach ($sqliteCanonicalFiles() as $canonicalName => $canonicalFile) {
-                $canonicalByFile[strtolower((string) $canonicalFile)] = (string) $canonicalName;
-            }
-
-            if (!is_dir($basePath)) {
-                $selectorError = 'SQLite base path does not exist: ' . $basePath;
-            } else {
-                $entries = scandir($basePath);
-                if (is_array($entries)) {
-                    foreach ($entries as $entry) {
-                        $filename = trim((string) $entry);
-                        if ($filename === '' || $filename === '.' || $filename === '..') {
-                            continue;
-                        }
-
-                        if (!str_ends_with(strtolower($filename), '.db')) {
-                            continue;
-                        }
-
-                        $absolutePath = rtrim($basePath, '/') . '/' . $filename;
-                        if (!is_file($absolutePath)) {
-                            continue;
-                        }
-
-                        $canonicalKey = $canonicalByFile[strtolower($filename)] ?? '';
-                        if ($canonicalKey === '') {
-                            // Selector should only expose configured canonical SQLite files.
-                            continue;
-                        }
-
-                        $canonicalLabel = $canonicalKey !== ''
-                            ? ucwords(str_replace(['_', '-'], ' ', $canonicalKey))
-                            : '';
-
-                        $targets[] = [
-                            'name' => $filename,
-                            'detail' => $canonicalLabel,
-                            'launch_path' => $panelUrl('/database/adminer') . '?db=' . rawurlencode($absolutePath),
-                        ];
-                    }
-                }
-            }
-        } elseif (in_array($driver, ['mysql', 'pgsql'], true)) {
-            try {
-                $db = $app['db'] ?? null;
-                if (!($db instanceof \PDO)) {
-                    throw new RuntimeException('App DB connection is unavailable.');
-                }
-
-                if ($driver === 'mysql') {
-                    $statement = $db->query(
-                        "SELECT table_name
-                         FROM information_schema.tables
-                         WHERE table_schema = DATABASE()
-                           AND table_type = 'BASE TABLE'"
-                    );
-                } else {
-                    $statement = $db->query(
-                        "SELECT table_name
-                         FROM information_schema.tables
-                         WHERE table_schema = current_schema()
-                           AND table_type = 'BASE TABLE'"
-                    );
-                }
-
-                $tableNames = $statement !== false ? $statement->fetchAll(\PDO::FETCH_COLUMN) : [];
-                if (is_array($tableNames)) {
-                    foreach ($tableNames as $tableNameRaw) {
-                        $tableName = trim((string) $tableNameRaw);
-                        if ($tableName === '') {
-                            continue;
-                        }
-
-                        $targets[] = [
-                            'name' => $tableName,
-                            'detail' => '',
-                            'launch_path' => $panelUrl('/database/adminer') . '?table=' . rawurlencode($tableName),
-                        ];
-                    }
-                }
-            } catch (\Throwable $throwable) {
-                $selectorError = 'Failed to load SQL table list: ' . $throwable->getMessage();
-            }
-        } else {
-            $selectorError = 'Unsupported database driver configured: ' . $driver;
-        }
-
-        usort(
-            $targets,
-            static function (array $left, array $right): int {
-                return strtolower((string) ($left['name'] ?? '')) <=> strtolower((string) ($right['name'] ?? ''));
-            }
-        );
+        $targetData = $buildAdminerLaunchTargets($databaseConfig);
+        $driver = strtolower((string) ($targetData['driver'] ?? 'sqlite'));
+        $targets = is_array($targetData['targets'] ?? null) ? (array) $targetData['targets'] : [];
+        $selectorError = is_string($targetData['selector_error'] ?? null) ? (string) $targetData['selector_error'] : null;
 
         $renderExtensionView(
             [
