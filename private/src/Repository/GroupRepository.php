@@ -82,6 +82,55 @@ final class GroupRepository
     }
 
     /**
+     * Returns one total-count for panel group index.
+     */
+    public function countForPanel(): int
+    {
+        $groups = $this->table('groups');
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM ' . $groups);
+        $stmt->execute();
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Returns paginated groups with member counts for panel listing.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listForPanel(int $limit = 50, int $offset = 0): array
+    {
+        $groups = $this->table('groups');
+        $userGroups = $this->table('user_groups');
+
+        $stmt = $this->db->prepare(
+            'SELECT g.id, g.name, g.slug, g.route_enabled, g.permission_mask, g.is_stock, g.created_at,
+                    COALESCE(ug.member_count, 0) AS member_count
+             FROM ' . $groups . ' g
+             LEFT JOIN (
+                 SELECT group_id, COUNT(*) AS member_count
+                 FROM ' . $userGroups . '
+                 GROUP BY group_id
+             ) ug ON ug.group_id = g.id
+             ORDER BY g.id ASC
+             LIMIT :limit OFFSET :offset'
+        );
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        foreach ($rows as &$row) {
+            if ($this->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
+                $row['route_enabled'] = 0;
+            }
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /**
      * Returns minimal group options for user assignment forms.
      *
      * @return array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>

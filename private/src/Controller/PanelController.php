@@ -150,10 +150,21 @@ final class PanelController
         $prefilterChannel = $this->input->slug($_GET['channel'] ?? null) ?? '';
         $prefilterCategoryId = $this->input->int($_GET['category'] ?? null, 1) ?? 0;
         $prefilterTagId = $this->input->int($_GET['tag'] ?? null, 1) ?? 0;
-        $hasPrefilter = $prefilterChannel !== '' || $prefilterCategoryId > 0 || $prefilterTagId > 0;
-
-        // Keep list size bounded while using a larger window for prefiltered views.
-        $pages = $this->pages->listForPanel($hasPrefilter ? 1000 : 100, 0);
+        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
+        $perPage = 50;
+        $totalItems = $this->pages->countForPanel(
+            $prefilterChannel !== '' ? $prefilterChannel : null,
+            $prefilterCategoryId > 0 ? $prefilterCategoryId : null,
+            $prefilterTagId > 0 ? $prefilterTagId : null
+        );
+        $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
+        $pages = $this->pages->listForPanel(
+            $pagination['per_page'],
+            $pagination['offset'],
+            $prefilterChannel !== '' ? $prefilterChannel : null,
+            $prefilterCategoryId > 0 ? $prefilterCategoryId : null,
+            $prefilterTagId > 0 ? $prefilterTagId : null
+        );
         $pageIds = array_values(array_map(
             static fn (array $pageRow): int => (int) ($pageRow['id'] ?? 0),
             $pages
@@ -178,6 +189,15 @@ final class PanelController
             'prefilterChannel' => strtolower($prefilterChannel),
             'prefilterCategoryId' => $prefilterCategoryId,
             'prefilterTagId' => $prefilterTagId,
+            'pagination' => $this->panelPaginationViewData(
+                '/pages',
+                $pagination,
+                [
+                    'channel' => $prefilterChannel,
+                    'category' => $prefilterCategoryId > 0 ? (string) $prefilterCategoryId : '',
+                    'tag' => $prefilterTagId > 0 ? (string) $prefilterTagId : '',
+                ]
+            ),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
@@ -581,9 +601,17 @@ final class PanelController
             return;
         }
 
+        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
+        $pagination = $this->panelPaginationState(
+            $this->channels->countForPanel(),
+            $requestedPage,
+            50
+        );
+
         $this->view->render('panel/channels/list', [
             'site' => $this->siteData(),
-            'channels' => $this->channels->listAll(),
+            'channels' => $this->channels->listForPanel($pagination['per_page'], $pagination['offset']),
+            'pagination' => $this->panelPaginationViewData('/channels', $pagination),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
@@ -829,9 +857,17 @@ final class PanelController
             return;
         }
 
+        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
+        $pagination = $this->panelPaginationState(
+            $this->categories->countForPanel(),
+            $requestedPage,
+            50
+        );
+
         $this->view->render('panel/categories/list', [
             'site' => $this->siteData(),
-            'categories' => $this->categories->listAll(),
+            'categories' => $this->categories->listForPanel($pagination['per_page'], $pagination['offset']),
+            'pagination' => $this->panelPaginationViewData('/categories', $pagination),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
@@ -1078,9 +1114,17 @@ final class PanelController
             return;
         }
 
+        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
+        $pagination = $this->panelPaginationState(
+            $this->tags->countForPanel(),
+            $requestedPage,
+            50
+        );
+
         $this->view->render('panel/tags/list', [
             'site' => $this->siteData(),
-            'tags' => $this->tags->listAll(),
+            'tags' => $this->tags->listForPanel($pagination['per_page'], $pagination['offset']),
+            'pagination' => $this->panelPaginationViewData('/tags', $pagination),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
@@ -1327,9 +1371,17 @@ final class PanelController
             return;
         }
 
+        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
+        $pagination = $this->panelPaginationState(
+            $this->redirects->countForPanel(),
+            $requestedPage,
+            50
+        );
+
         $this->view->render('panel/redirects/list', [
             'site' => $this->siteData(),
-            'redirects' => $this->redirects->listAll(),
+            'redirects' => $this->redirects->listForPanel($pagination['per_page'], $pagination['offset']),
+            'pagination' => $this->panelPaginationViewData('/redirects', $pagination),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
@@ -1516,9 +1568,28 @@ final class PanelController
             return;
         }
 
+        $prefilterGroup = strtolower(trim((string) ($this->input->text($_GET['group'] ?? null, 120) ?? '')));
+        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
+        $pagination = $this->panelPaginationState(
+            $this->users->countForPanel($prefilterGroup !== '' ? $prefilterGroup : null),
+            $requestedPage,
+            50
+        );
+
         $this->view->render('panel/users/list', [
             'site' => $this->siteData(),
-            'users' => $this->users->listAll(),
+            'users' => $this->users->listForPanel(
+                $pagination['per_page'],
+                $pagination['offset'],
+                $prefilterGroup !== '' ? $prefilterGroup : null
+            ),
+            'prefilterGroup' => $prefilterGroup,
+            'groupOptions' => $this->groups->listOptions(),
+            'pagination' => $this->panelPaginationViewData(
+                '/users',
+                $pagination,
+                ['group' => $prefilterGroup]
+            ),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
@@ -1937,9 +2008,17 @@ final class PanelController
             return;
         }
 
+        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
+        $pagination = $this->panelPaginationState(
+            $this->groups->countForPanel(),
+            $requestedPage,
+            50
+        );
+
         $this->view->render('panel/groups/list', [
             'site' => $this->siteData(),
-            'groups' => $this->groups->listAll(),
+            'groups' => $this->groups->listForPanel($pagination['per_page'], $pagination['offset']),
+            'pagination' => $this->panelPaginationViewData('/groups', $pagination),
             'groupRoutingEnabledSystemWide' => $this->groupRoutesEnabledForRoutingTable(),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
@@ -5492,6 +5571,56 @@ final class PanelController
         $suffix = '/' . ltrim($suffix, '/');
 
         return rtrim($prefix, '/') . ($suffix === '/' ? '' : $suffix);
+    }
+
+    /**
+     * Normalizes one list pagination state from total items and requested page.
+     *
+     * @return array{current: int, per_page: int, total_items: int, total_pages: int, offset: int}
+     */
+    private function panelPaginationState(int $totalItems, int $requestedPage, int $perPage): array
+    {
+        $totalItems = max(0, $totalItems);
+        $perPage = max(1, $perPage);
+        $totalPages = max(1, (int) ceil($totalItems / $perPage));
+        $currentPage = min(max(1, $requestedPage), $totalPages);
+
+        return [
+            'current' => $currentPage,
+            'per_page' => $perPage,
+            'total_items' => $totalItems,
+            'total_pages' => $totalPages,
+            'offset' => ($currentPage - 1) * $perPage,
+        ];
+    }
+
+    /**
+     * Builds panel-list pagination payload for view templates.
+     *
+     * @param array{current: int, per_page: int, total_items: int, total_pages: int, offset: int} $pagination
+     * @param array<string, scalar|null> $query
+     * @return array{current: int, per_page: int, total_items: int, total_pages: int, base_path: string, query: array<string, string>}
+     */
+    private function panelPaginationViewData(string $path, array $pagination, array $query = []): array
+    {
+        $normalizedQuery = [];
+        foreach ($query as $key => $value) {
+            $stringValue = trim((string) ($value ?? ''));
+            if ($stringValue === '') {
+                continue;
+            }
+
+            $normalizedQuery[$key] = $stringValue;
+        }
+
+        return [
+            'current' => (int) ($pagination['current'] ?? 1),
+            'per_page' => (int) ($pagination['per_page'] ?? 50),
+            'total_items' => (int) ($pagination['total_items'] ?? 0),
+            'total_pages' => (int) ($pagination['total_pages'] ?? 1),
+            'base_path' => $this->panelUrl($path),
+            'query' => $normalizedQuery,
+        ];
     }
 
     /**

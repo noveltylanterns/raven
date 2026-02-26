@@ -57,32 +57,111 @@ final class UserRepository
         // Build group rows separately to keep the main users query simple and portable.
         $groupMap = $this->groupEntriesByUserId();
 
-        $result = [];
-        foreach ($users as $row) {
-            $userId = (int) $row['id'];
-            /** @var array<int, array{name: string, permission_mask: int}> $groupEntries */
-            $groupEntries = $groupMap[$userId] ?? [];
-            $groupNames = array_map(
-                static fn (array $entry): string => (string) ($entry['name'] ?? ''),
-                $groupEntries
-            );
+        return $this->hydratePanelUsers($users, $groupMap);
+    }
 
-            $result[] = [
-                'id' => $userId,
-                'username' => (string) ($row['username'] ?? ''),
-                'display_name' => (string) ($row['display_name'] ?? ''),
-                'email' => (string) ($row['email'] ?? ''),
-                'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
-                'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                    ? (string) $row['avatar_path']
-                    : null,
-                'groups' => $groupNames,
-                'group_entries' => $groupEntries,
-                'groups_text' => implode(', ', $groupNames),
-            ];
+    /**
+     * Returns one total-count for panel user index with optional group-name filter.
+     */
+    public function countForPanel(?string $groupNameFilter = null): int
+    {
+        $normalizedGroupFilter = strtolower(trim((string) ($groupNameFilter ?? '')));
+        if ($normalizedGroupFilter === '') {
+            $usersTable = $this->authTable('users');
+            $stmt = $this->authDb->prepare('SELECT COUNT(*) FROM ' . $usersTable);
+            $stmt->execute();
+
+            return (int) $stmt->fetchColumn();
         }
 
-        return $result;
+        $groups = $this->groupTable('groups');
+        $userGroups = $this->groupTable('user_groups');
+        $stmt = $this->appDb->prepare(
+            'SELECT COUNT(DISTINCT ug.user_id)
+             FROM ' . $userGroups . ' ug
+             INNER JOIN ' . $groups . ' g ON g.id = ug.group_id
+             WHERE LOWER(g.name) = :group_name'
+        );
+        $stmt->execute([':group_name' => $normalizedGroupFilter]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Returns paginated users with group summaries for panel listing.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listForPanel(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
+    {
+        $normalizedGroupFilter = strtolower(trim((string) ($groupNameFilter ?? '')));
+        $userIds = [];
+
+        if ($normalizedGroupFilter === '') {
+            $usersTable = $this->authTable('users');
+            $stmt = $this->authDb->prepare(
+                'SELECT id
+                 FROM ' . $usersTable . '
+                 ORDER BY id ASC
+                 LIMIT :limit OFFSET :offset'
+            );
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+            foreach ($stmt->fetchAll() ?: [] as $row) {
+                $userId = (int) ($row['id'] ?? 0);
+                if ($userId > 0) {
+                    $userIds[] = $userId;
+                }
+            }
+        } else {
+            $groups = $this->groupTable('groups');
+            $userGroups = $this->groupTable('user_groups');
+            $stmt = $this->appDb->prepare(
+                'SELECT DISTINCT ug.user_id
+                 FROM ' . $userGroups . ' ug
+                 INNER JOIN ' . $groups . ' g ON g.id = ug.group_id
+                 WHERE LOWER(g.name) = :group_name
+                 ORDER BY ug.user_id ASC
+                 LIMIT :limit OFFSET :offset'
+            );
+            $stmt->bindValue(':group_name', $normalizedGroupFilter, PDO::PARAM_STR);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+            foreach ($stmt->fetchAll() ?: [] as $row) {
+                $userId = (int) ($row['user_id'] ?? 0);
+                if ($userId > 0) {
+                    $userIds[] = $userId;
+                }
+            }
+        }
+
+        $userIds = array_values(array_unique(array_filter($userIds, static fn (int $id): bool => $id > 0)));
+        if ($userIds === []) {
+            return [];
+        }
+
+        $usersTable = $this->authTable('users');
+        $placeholders = [];
+        $params = [];
+        foreach ($userIds as $index => $userId) {
+            $placeholder = ':user_id_' . $index;
+            $placeholders[] = $placeholder;
+            $params[$placeholder] = $userId;
+        }
+
+        $stmt = $this->authDb->prepare(
+            'SELECT id, username, display_name, email, theme, avatar_path
+             FROM ' . $usersTable . '
+             WHERE id IN (' . implode(', ', $placeholders) . ')
+             ORDER BY id ASC'
+        );
+        $stmt->execute($params);
+        $users = $stmt->fetchAll() ?: [];
+        $groupMap = $this->groupEntriesByUserId($userIds);
+
+        return $this->hydratePanelUsers($users, $groupMap);
     }
 
     /**
@@ -489,21 +568,36 @@ final class UserRepository
     /**
      * Builds map: user_id => list of group rows.
      *
+     * @param array<int> $userIds
      * @return array<int, array<int, array{name: string, permission_mask: int}>>
      */
-    private function groupEntriesByUserId(): array
+    private function groupEntriesByUserId(array $userIds = []): array
     {
         $groups = $this->groupTable('groups');
         $userGroups = $this->groupTable('user_groups');
+        $userIds = array_values(array_unique(array_filter($userIds, static fn (int $id): bool => $id > 0)));
+
+        $where = '';
+        $params = [];
+        if ($userIds !== []) {
+            $placeholders = [];
+            foreach ($userIds as $index => $userId) {
+                $placeholder = ':user_id_' . $index;
+                $placeholders[] = $placeholder;
+                $params[$placeholder] = $userId;
+            }
+            $where = ' WHERE ug.user_id IN (' . implode(', ', $placeholders) . ')';
+        }
 
         // Join once, then fan out rows into a user_id keyed map.
         $stmt = $this->appDb->prepare(
             'SELECT ug.user_id, g.name, g.permission_mask
              FROM ' . $userGroups . ' ug
              INNER JOIN ' . $groups . ' g ON g.id = ug.group_id
+             ' . $where . '
              ORDER BY ug.user_id ASC, g.id ASC'
         );
-        $stmt->execute();
+        $stmt->execute($params);
 
         $rows = $stmt->fetchAll() ?: [];
 
@@ -518,6 +612,43 @@ final class UserRepository
         }
 
         return $map;
+    }
+
+    /**
+     * Hydrates panel-facing user rows with group display metadata.
+     *
+     * @param array<int, array<string, mixed>> $users
+     * @param array<int, array<int, array{name: string, permission_mask: int}>> $groupMap
+     * @return array<int, array<string, mixed>>
+     */
+    private function hydratePanelUsers(array $users, array $groupMap): array
+    {
+        $result = [];
+        foreach ($users as $row) {
+            $userId = (int) ($row['id'] ?? 0);
+            /** @var array<int, array{name: string, permission_mask: int}> $groupEntries */
+            $groupEntries = $groupMap[$userId] ?? [];
+            $groupNames = array_map(
+                static fn (array $entry): string => (string) ($entry['name'] ?? ''),
+                $groupEntries
+            );
+
+            $result[] = [
+                'id' => $userId,
+                'username' => (string) ($row['username'] ?? ''),
+                'display_name' => (string) ($row['display_name'] ?? ''),
+                'email' => (string) ($row['email'] ?? ''),
+                'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
+                'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
+                    ? (string) $row['avatar_path']
+                    : null,
+                'groups' => $groupNames,
+                'group_entries' => $groupEntries,
+                'groups_text' => implode(', ', $groupNames),
+            ];
+        }
+
+        return $result;
     }
 
     /**

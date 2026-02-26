@@ -151,24 +151,81 @@ final class PageRepository
     }
 
     /**
-     * Returns paginated page list for panel page index.
-     *
-     * @return array<int, array<string, mixed>>
+     * Returns one total-count for panel page index with optional prefilters.
      */
-    public function listForPanel(int $limit = 50, int $offset = 0): array
+    public function countForPanel(?string $channelSlug = null, ?int $categoryId = null, ?int $tagId = null): int
     {
         $pages = $this->table('pages');
         $channels = $this->table('channels');
+        $pageCategories = $this->table('page_categories');
+        $pageTags = $this->table('page_tags');
 
-        $sql = 'SELECT p.id, p.title, p.slug, p.is_published, p.published_at,
-                       c.slug AS channel_slug
-                FROM ' . $pages . ' p
-                LEFT JOIN ' . $channels . ' c ON c.id = p.channel_id
-                ORDER BY COALESCE(p.published_at, p.created_at) DESC
-                LIMIT :limit OFFSET :offset';
+        $where = ['1 = 1'];
+        $params = [];
+        $this->appendPanelFilterClauses(
+            $where,
+            $params,
+            $channelSlug,
+            $categoryId,
+            $tagId,
+            $pageCategories,
+            $pageTags
+        );
+
+        $stmt = $this->db->prepare(
+            'SELECT COUNT(*)
+             FROM ' . $pages . ' p
+             LEFT JOIN ' . $channels . ' c ON c.id = p.channel_id
+             WHERE ' . implode(' AND ', $where)
+        );
+        $stmt->execute($params);
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Returns paginated page list for panel page index with optional prefilters.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listForPanel(
+        int $limit = 50,
+        int $offset = 0,
+        ?string $channelSlug = null,
+        ?int $categoryId = null,
+        ?int $tagId = null
+    ): array {
+        $pages = $this->table('pages');
+        $channels = $this->table('channels');
+        $pageCategories = $this->table('page_categories');
+        $pageTags = $this->table('page_tags');
+
+        $where = ['1 = 1'];
+        $params = [];
+        $this->appendPanelFilterClauses(
+            $where,
+            $params,
+            $channelSlug,
+            $categoryId,
+            $tagId,
+            $pageCategories,
+            $pageTags
+        );
+
+        $stmt = $this->db->prepare(
+            'SELECT p.id, p.title, p.slug, p.is_published, p.published_at,
+                    c.slug AS channel_slug
+             FROM ' . $pages . ' p
+             LEFT JOIN ' . $channels . ' c ON c.id = p.channel_id
+             WHERE ' . implode(' AND ', $where) . '
+             ORDER BY COALESCE(p.published_at, p.created_at) DESC
+             LIMIT :limit OFFSET :offset'
+        );
 
         // Bind as ints to avoid backend-specific LIMIT/OFFSET casting quirks.
-        $stmt = $this->db->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
@@ -989,5 +1046,49 @@ final class PageRepository
             'page_image_variants' => 'main.page_image_variants',
             default => 'main.' . $table,
         };
+    }
+
+    /**
+     * Appends shared panel-filter SQL clauses for page list/count queries.
+     *
+     * @param array<int, string> $where
+     * @param array<string, int|string> $params
+     */
+    private function appendPanelFilterClauses(
+        array &$where,
+        array &$params,
+        ?string $channelSlug,
+        ?int $categoryId,
+        ?int $tagId,
+        string $pageCategoriesTable,
+        string $pageTagsTable
+    ): void {
+        $channelSlug = trim((string) ($channelSlug ?? ''));
+        if ($channelSlug !== '') {
+            $where[] = 'LOWER(COALESCE(c.slug, \'\')) = :filter_channel_slug';
+            $params[':filter_channel_slug'] = strtolower($channelSlug);
+        }
+
+        $categoryId = $categoryId !== null && $categoryId > 0 ? $categoryId : null;
+        if ($categoryId !== null) {
+            $where[] = 'EXISTS (
+                SELECT 1
+                FROM ' . $pageCategoriesTable . ' pc
+                WHERE pc.page_id = p.id
+                  AND pc.category_id = :filter_category_id
+            )';
+            $params[':filter_category_id'] = $categoryId;
+        }
+
+        $tagId = $tagId !== null && $tagId > 0 ? $tagId : null;
+        if ($tagId !== null) {
+            $where[] = 'EXISTS (
+                SELECT 1
+                FROM ' . $pageTagsTable . ' pt
+                WHERE pt.page_id = p.id
+                  AND pt.tag_id = :filter_tag_id
+            )';
+            $params[':filter_tag_id'] = $tagId;
+        }
     }
 }

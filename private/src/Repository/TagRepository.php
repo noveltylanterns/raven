@@ -62,6 +62,49 @@ final class TagRepository
     }
 
     /**
+     * Returns one total-count for panel tag index.
+     */
+    public function countForPanel(): int
+    {
+        $tags = $this->table('tags');
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM ' . $tags);
+        $stmt->execute();
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Returns paginated tags with linked page counts for panel listing.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listForPanel(int $limit = 50, int $offset = 0): array
+    {
+        $tags = $this->table('tags');
+        $pageTags = $this->table('page_tags');
+
+        $stmt = $this->db->prepare(
+            'SELECT t.id, t.name, t.slug, t.description, t.created_at,
+                    t.cover_image_path, t.cover_image_sm_path, t.cover_image_md_path, t.cover_image_lg_path,
+                    t.preview_image_path, t.preview_image_sm_path, t.preview_image_md_path, t.preview_image_lg_path,
+                    COALESCE(pt.page_count, 0) AS page_count
+             FROM ' . $tags . ' t
+             LEFT JOIN (
+                 SELECT tag_id, COUNT(*) AS page_count
+                 FROM ' . $pageTags . '
+                 GROUP BY tag_id
+             ) pt ON pt.tag_id = t.id
+             ORDER BY t.name ASC, t.id ASC
+             LIMIT :limit OFFSET :offset'
+        );
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll() ?: [];
+    }
+
+    /**
      * Returns minimal tag options for panel select controls.
      *
      * @return array<int, array{id: int, name: string, slug: string}>

@@ -11,6 +11,9 @@
 
 /** @var array<string, string> $site */
 /** @var array<int, array<string, mixed>> $users */
+/** @var array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}> $groupOptions */
+/** @var string $prefilterGroup */
+/** @var array<string, mixed> $pagination */
 /** @var string $csrfField */
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
@@ -25,25 +28,35 @@ $usersSearchId = 'users-filter-search';
 $usersGroupFilterId = 'users-filter-group';
 $usersCountId = 'users-filter-count';
 $usersEmptyId = 'users-filter-empty';
-$prefilterGroup = strtolower(trim((string) ($_GET['group'] ?? '')));
+$prefilterGroup = strtolower(trim((string) ($prefilterGroup ?? '')));
 $groupFilterOptions = [];
-foreach ($users as $userRow) {
-    $groupsValue = trim((string) ($userRow['groups_text'] ?? ''));
-    if ($groupsValue === '') {
+foreach ($groupOptions as $groupOption) {
+    $groupName = trim((string) ($groupOption['name'] ?? ''));
+    if ($groupName === '') {
         continue;
     }
 
-    $groupParts = explode(',', $groupsValue);
-    foreach ($groupParts as $groupPart) {
-        $groupLabel = trim((string) $groupPart);
-        if ($groupLabel === '') {
-            continue;
-        }
-
-        $groupFilterOptions[strtolower($groupLabel)] = $groupLabel;
-    }
+    $groupFilterOptions[strtolower($groupName)] = $groupName;
 }
 asort($groupFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
+$pagination = is_array($pagination ?? null) ? $pagination : [];
+$paginationCurrent = max(1, (int) ($pagination['current'] ?? 1));
+$paginationTotalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
+$paginationTotalItems = max(0, (int) ($pagination['total_items'] ?? count($users)));
+$paginationBasePath = (string) ($pagination['base_path'] ?? ($panelBase . '/users'));
+$paginationQuery = is_array($pagination['query'] ?? null) ? $pagination['query'] : [];
+$buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath, $paginationQuery): string {
+    $pageNumber = max(1, $pageNumber);
+    $query = $paginationQuery;
+    if ($pageNumber > 1) {
+        $query['page'] = (string) $pageNumber;
+    } else {
+        unset($query['page']);
+    }
+
+    $queryString = http_build_query($query);
+    return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
+};
 ?>
 <div class="card mb-3">
     <div class="card-body">
@@ -255,6 +268,19 @@ asort($groupFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
                 </table>
             </div>
             <p id="<?= e($usersEmptyId) ?>" class="text-muted mb-0 mt-2 d-none">No users match the current filters.</p>
+            <?php if ($paginationTotalItems > 0): ?>
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+                    <div class="small text-muted">
+                        Page <?= $paginationCurrent ?> of <?= $paginationTotalPages ?> (<?= $paginationTotalItems ?> total)
+                    </div>
+                    <?php if ($paginationTotalPages > 1): ?>
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Users pagination">
+                            <a class="btn btn-outline-secondary<?= $paginationCurrent <= 1 ? ' disabled' : '' ?>" href="<?= e($buildPaginationUrl($paginationCurrent - 1)) ?>">Previous</a>
+                            <a class="btn btn-outline-secondary<?= $paginationCurrent >= $paginationTotalPages ? ' disabled' : '' ?>" href="<?= e($buildPaginationUrl($paginationCurrent + 1)) ?>">Next</a>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
 </div>

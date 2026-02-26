@@ -63,6 +63,50 @@ final class ChannelRepository
     }
 
     /**
+     * Returns one total-count for panel channel index.
+     */
+    public function countForPanel(): int
+    {
+        $channels = $this->table('channels');
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM ' . $channels);
+        $stmt->execute();
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Returns paginated channels with attached page counts for panel listing.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listForPanel(int $limit = 50, int $offset = 0): array
+    {
+        $channels = $this->table('channels');
+        $pages = $this->table('pages');
+
+        $stmt = $this->db->prepare(
+            'SELECT c.id, c.name, c.slug, c.description, c.created_at,
+                    c.cover_image_path, c.cover_image_sm_path, c.cover_image_md_path, c.cover_image_lg_path,
+                    c.preview_image_path, c.preview_image_sm_path, c.preview_image_md_path, c.preview_image_lg_path,
+                    COALESCE(pc.page_count, 0) AS page_count
+             FROM ' . $channels . ' c
+             LEFT JOIN (
+                 SELECT channel_id, COUNT(*) AS page_count
+                 FROM ' . $pages . '
+                 WHERE channel_id IS NOT NULL
+                 GROUP BY channel_id
+             ) pc ON pc.channel_id = c.id
+             ORDER BY c.name ASC, c.id ASC
+             LIMIT :limit OFFSET :offset'
+        );
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll() ?: [];
+    }
+
+    /**
      * Returns minimal channel options for panel select controls.
      *
      * @return array<int, array{id: int, name: string, slug: string}>

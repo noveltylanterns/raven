@@ -11,6 +11,7 @@
 
 /** @var array<string, string> $site */
 /** @var array<int, array<string, mixed>> $redirects */
+/** @var array<string, mixed> $pagination */
 /** @var string $csrfField */
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
@@ -25,6 +26,24 @@ $redirectsStatusSortId = 'redirects-sort-status';
 $redirectsChannelSortId = 'redirects-sort-channel';
 $redirectsCountId = 'redirects-filter-count';
 $redirectsEmptyId = 'redirects-filter-empty';
+$pagination = is_array($pagination ?? null) ? $pagination : [];
+$paginationCurrent = max(1, (int) ($pagination['current'] ?? 1));
+$paginationTotalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
+$paginationTotalItems = max(0, (int) ($pagination['total_items'] ?? count($redirects)));
+$paginationBasePath = (string) ($pagination['base_path'] ?? ($panelBase . '/redirects'));
+$paginationQuery = is_array($pagination['query'] ?? null) ? $pagination['query'] : [];
+$buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath, $paginationQuery): string {
+    $pageNumber = max(1, $pageNumber);
+    $query = $paginationQuery;
+    if ($pageNumber > 1) {
+        $query['page'] = (string) $pageNumber;
+    } else {
+        unset($query['page']);
+    }
+
+    $queryString = http_build_query($query);
+    return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
+};
 $redirectsStatusOptions = [];
 $redirectsChannelOptions = [];
 foreach ($redirects as $redirectRow) {
@@ -213,6 +232,19 @@ asort($redirectsChannelOptions, SORT_NATURAL | SORT_FLAG_CASE);
                 </table>
             </div>
             <p id="<?= e($redirectsEmptyId) ?>" class="text-muted mb-0 mt-2 d-none">No redirects match the current filters.</p>
+            <?php if ($paginationTotalItems > 0): ?>
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+                    <div class="small text-muted">
+                        Page <?= $paginationCurrent ?> of <?= $paginationTotalPages ?> (<?= $paginationTotalItems ?> total)
+                    </div>
+                    <?php if ($paginationTotalPages > 1): ?>
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Redirects pagination">
+                            <a class="btn btn-outline-secondary<?= $paginationCurrent <= 1 ? ' disabled' : '' ?>" href="<?= e($buildPaginationUrl($paginationCurrent - 1)) ?>">Previous</a>
+                            <a class="btn btn-outline-secondary<?= $paginationCurrent >= $paginationTotalPages ? ' disabled' : '' ?>" href="<?= e($buildPaginationUrl($paginationCurrent + 1)) ?>">Next</a>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
 </div>

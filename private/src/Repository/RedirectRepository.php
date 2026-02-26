@@ -56,6 +56,43 @@ final class RedirectRepository
     }
 
     /**
+     * Returns one total-count for panel redirect index.
+     */
+    public function countForPanel(): int
+    {
+        $redirects = $this->table('redirects');
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM ' . $redirects);
+        $stmt->execute();
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Returns paginated redirects with optional linked channel metadata.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listForPanel(int $limit = 50, int $offset = 0): array
+    {
+        $redirects = $this->table('redirects');
+        $channels = $this->table('channels');
+
+        $stmt = $this->db->prepare(
+            'SELECT r.id, r.title, r.description, r.slug, r.channel_id, r.is_active, r.target_url, r.created_at, r.updated_at,
+                    c.slug AS channel_slug, c.name AS channel_name
+             FROM ' . $redirects . ' r
+             LEFT JOIN ' . $channels . ' c ON c.id = r.channel_id
+             ORDER BY r.updated_at DESC, r.id DESC
+             LIMIT :limit OFFSET :offset'
+        );
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll() ?: [];
+    }
+
+    /**
      * Returns one redirect row by id for panel edit form.
      *
      * @return array<string, mixed>|null

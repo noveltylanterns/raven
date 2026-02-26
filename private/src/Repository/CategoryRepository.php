@@ -62,6 +62,49 @@ final class CategoryRepository
     }
 
     /**
+     * Returns one total-count for panel category index.
+     */
+    public function countForPanel(): int
+    {
+        $categories = $this->table('categories');
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM ' . $categories);
+        $stmt->execute();
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Returns paginated categories with linked page counts for panel listing.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listForPanel(int $limit = 50, int $offset = 0): array
+    {
+        $categories = $this->table('categories');
+        $pageCategories = $this->table('page_categories');
+
+        $stmt = $this->db->prepare(
+            'SELECT c.id, c.name, c.slug, c.description, c.created_at,
+                    c.cover_image_path, c.cover_image_sm_path, c.cover_image_md_path, c.cover_image_lg_path,
+                    c.preview_image_path, c.preview_image_sm_path, c.preview_image_md_path, c.preview_image_lg_path,
+                    COALESCE(pc.page_count, 0) AS page_count
+             FROM ' . $categories . ' c
+             LEFT JOIN (
+                 SELECT category_id, COUNT(*) AS page_count
+                 FROM ' . $pageCategories . '
+                 GROUP BY category_id
+             ) pc ON pc.category_id = c.id
+             ORDER BY c.name ASC, c.id ASC
+             LIMIT :limit OFFSET :offset'
+        );
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll() ?: [];
+    }
+
+    /**
      * Returns minimal category options for panel select controls.
      *
      * @return array<int, array{id: int, name: string, slug: string}>
