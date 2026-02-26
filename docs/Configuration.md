@@ -52,6 +52,11 @@ Tab behavior notes:
   - `panel.default_theme`
   - `panel.brand_name` (`Branded Panel Name`)
   - `panel.brand_logo` (`Branded Panel Logo`, URL-prefixed filename/path input)
+- `Mail` section:
+  - `mail.agent`
+  - `mail.prefix` (`Mail Prefix`, used for outgoing contact-mail subjects)
+  - `mail.sender_address` (`Mail Sender Address`, optional explicit sender email; blank uses auto no-reply fallback)
+  - `mail.sender_name` (`Mail Sender Name`, display name used in outgoing `From` header)
 
 #### Content Tab
 
@@ -231,6 +236,9 @@ The following config keys are expected to appear in this document and in runtime
 - `panel.brand_logo`
 - `site.default_theme`
 - `mail.agent`
+- `mail.prefix`
+- `mail.sender_address`
+- `mail.sender_name`
 - `categories.pagination`
 - `tags.pagination`
 - `categories.prefix`

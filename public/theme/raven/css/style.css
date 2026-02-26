@@ -12222,3 +12222,9 @@ code {
   border: 1px solid var(--raven-border);
   border-radius: 0.35rem;
 }
+
+.raven-embedded-form .form-control,
+.raven-embedded-form .form-select {
+  background-color: #fff;
+  border-color: var(--raven-border);
+}

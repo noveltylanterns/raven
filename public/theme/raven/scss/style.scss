@@ -203,3 +203,10 @@ code {
   border: 1px solid var(--raven-border);
   border-radius: 0.35rem;
 }
+
+// Public contact/signup embed fields should stay readable over page gradients.
+.raven-embedded-form .form-control,
+.raven-embedded-form .form-select {
+  background-color: #fff;
+  border-color: var(--raven-border);
+}

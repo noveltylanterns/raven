@@ -2398,6 +2398,7 @@ final class PanelController
         $configSnapshot = $this->ensureSiteEnabledConfig($configSnapshot);
         $configSnapshot = $this->ensurePanelBrandingConfig($configSnapshot);
         $configSnapshot = $this->ensureCaptchaConfig($configSnapshot);
+        $configSnapshot = $this->ensureMailConfig($configSnapshot);
         $configSnapshot = $this->ensureDebugToolbarConfig($configSnapshot);
         $activeConfigTab = $this->normalizeConfigEditorTab($_GET['tab'] ?? 'basic');
 
@@ -2452,6 +2453,7 @@ final class PanelController
         $currentConfig = $this->ensureSiteEnabledConfig($currentConfig);
         $currentConfig = $this->ensurePanelBrandingConfig($currentConfig);
         $currentConfig = $this->ensureCaptchaConfig($currentConfig);
+        $currentConfig = $this->ensureMailConfig($currentConfig);
         $currentConfig = $this->ensureDebugToolbarConfig($currentConfig);
         $fields = $this->flattenConfigFields($currentConfig);
         $nextConfig = $currentConfig;
@@ -2489,6 +2491,7 @@ final class PanelController
         $nextConfig = $this->ensureSiteEnabledConfig($nextConfig);
         $nextConfig = $this->ensurePanelBrandingConfig($nextConfig);
         $nextConfig = $this->ensureCaptchaConfig($nextConfig);
+        $nextConfig = $this->ensureMailConfig($nextConfig);
         $nextConfig = $this->ensureDebugToolbarConfig($nextConfig);
         $nextConfig = $this->removeSqliteDatabaseFilesConfig($nextConfig);
 
@@ -3375,6 +3378,18 @@ final class PanelController
             return 'Mail Agent';
         }
 
+        if ($path === 'mail.prefix') {
+            return 'Mail Prefix';
+        }
+
+        if ($path === 'mail.sender_address') {
+            return 'Mail Sender Address';
+        }
+
+        if ($path === 'mail.sender_name') {
+            return 'Mail Sender Name';
+        }
+
         if ($path === 'categories.prefix') {
             return 'Category URL Prefix';
         }
@@ -3782,6 +3797,28 @@ final class PanelController
             }
 
             return $agent;
+        }
+
+        if ($path === 'mail.prefix') {
+            return $this->input->text($value, 120);
+        }
+
+        if ($path === 'mail.sender_address') {
+            $address = trim($value);
+            if ($address === '') {
+                return '';
+            }
+
+            $normalized = $this->input->email($address);
+            if ($normalized === null) {
+                throw new \RuntimeException('mail.sender_address must be a valid email address or blank.');
+            }
+
+            return $normalized;
+        }
+
+        if ($path === 'mail.sender_name') {
+            return $this->input->text($value, 120);
         }
 
         if (in_array($path, ['meta.twitter.image', 'meta.apple_touch_icon', 'panel.brand_logo'], true)) {
@@ -4430,6 +4467,50 @@ final class PanelController
         $captcha['recaptcha2'] = $recaptcha2;
         $captcha['recaptcha3'] = $recaptcha3;
         $config['captcha'] = $captcha;
+
+        return $config;
+    }
+
+    /**
+     * Ensures mail config keys exist with safe defaults.
+     *
+     * @param array<string, mixed> $config
+     * @return array<string, mixed>
+     */
+    private function ensureMailConfig(array $config): array
+    {
+        $mail = $config['mail'] ?? null;
+        if (!is_array($mail)) {
+            $mail = [];
+        }
+
+        $agent = strtolower(trim((string) ($mail['agent'] ?? 'php_mail')));
+        if (!in_array($agent, ['php_mail'], true)) {
+            $agent = 'php_mail';
+        }
+        $mail['agent'] = $agent;
+
+        $prefix = $this->input->text((string) ($mail['prefix'] ?? 'Mailer Daemon'), 120);
+        if ($prefix === '') {
+            $prefix = 'Mailer Daemon';
+        }
+        $mail['prefix'] = $prefix;
+
+        $senderName = $this->input->text((string) ($mail['sender_name'] ?? 'Postmaster'), 120);
+        if ($senderName === '') {
+            $senderName = 'Postmaster';
+        }
+        $mail['sender_name'] = $senderName;
+
+        $senderAddressRaw = trim((string) ($mail['sender_address'] ?? ''));
+        if ($senderAddressRaw === '') {
+            $mail['sender_address'] = '';
+        } else {
+            $normalizedAddress = $this->input->email($senderAddressRaw);
+            $mail['sender_address'] = $normalizedAddress ?? '';
+        }
+
+        $config['mail'] = $mail;
 
         return $config;
     }

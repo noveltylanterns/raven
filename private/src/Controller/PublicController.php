@@ -2044,9 +2044,13 @@ final class PublicController
      */
     private function buildContactSubject(string $formName): string
     {
-        $siteName = $this->input->text((string) $this->config->get('site.name', 'Raven CMS'), 120);
+        $mailPrefix = $this->input->text((string) $this->config->get('mail.prefix', 'Mailer Daemon'), 120);
+        if ($mailPrefix === '') {
+            $mailPrefix = 'Mailer Daemon';
+        }
+
         $formName = $this->input->text($formName, 120);
-        $subject = '[' . ($siteName !== '' ? $siteName : 'Raven CMS') . '] Contact Form: ' . ($formName !== '' ? $formName : 'Submission');
+        $subject = '[' . $mailPrefix . '] ' . ($formName !== '' ? $formName : 'Submission');
         $subject = str_replace(["\r", "\n"], ' ', $subject);
         return trim($subject);
     }
@@ -2129,12 +2133,16 @@ final class PublicController
         }
         $bccRecipients = array_values(array_filter($bccRecipients, static fn (string $email): bool => !isset($toAndCcMap[$email])));
 
-        $fromAddress = $this->defaultNoReplyEmail();
+        $fromAddress = $this->configuredMailSenderAddress();
+        $fromName = $this->configuredMailSenderName();
+        $fromHeader = $fromName !== ''
+            ? ($fromName . ' <' . $fromAddress . '>')
+            : $fromAddress;
         $subject = str_replace(["\r", "\n"], ' ', $subject);
         $headers = [
             'MIME-Version: 1.0',
             'Content-Type: text/plain; charset=UTF-8',
-            'From: ' . $fromAddress,
+            'From: ' . $fromHeader,
             'Reply-To: ' . $replyToEmail,
             'X-Raven-Contact-Form: ' . $formSlug,
         ];
@@ -2175,6 +2183,35 @@ final class PublicController
         }
 
         return 'no-reply@' . $host;
+    }
+
+    /**
+     * Returns configured sender address or fallback no-reply address.
+     */
+    private function configuredMailSenderAddress(): string
+    {
+        $configured = trim((string) $this->config->get('mail.sender_address', ''));
+        if ($configured !== '') {
+            $normalized = $this->input->email($configured);
+            if ($normalized !== null) {
+                return $normalized;
+            }
+        }
+
+        return $this->defaultNoReplyEmail();
+    }
+
+    /**
+     * Returns configured sender display name for outgoing contact mail.
+     */
+    private function configuredMailSenderName(): string
+    {
+        $name = $this->input->text((string) $this->config->get('mail.sender_name', 'Postmaster'), 120);
+        if ($name === '') {
+            $name = 'Postmaster';
+        }
+
+        return trim(str_replace(["\r", "\n"], ' ', $name));
     }
 
     /**

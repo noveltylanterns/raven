@@ -115,6 +115,9 @@ return array (
   'mail' =>
   array (
     'agent' => 'php_mail',
+    'prefix' => 'Mailer Daemon',
+    'sender_address' => '',
+    'sender_name' => 'Postmaster',
   ),
   'media' =>
   array (
