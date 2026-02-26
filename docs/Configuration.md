@@ -37,7 +37,7 @@ Tab behavior notes:
 
 - Active tab is preserved while saving (`_config_tab` + `?tab=` behavior).
 - Database-specific fields auto-show based on selected `database.driver`.
-- Captcha-specific fields auto-show based on selected `captcha.provider`.
+- Captcha-specific fields auto-show based on selected `captcha.provider` (`none`, `hcaptcha`, `recaptcha2`, `recaptcha3`).
 
 ### Tab Rundown
 
@@ -287,8 +287,10 @@ The following config keys are expected to appear in this document and in runtime
 - `captcha.provider`
 - `captcha.hcaptcha.public_key`
 - `captcha.hcaptcha.secret_key`
-- `captcha.recaptcha.public_key`
-- `captcha.recaptcha.secret_key`
+- `captcha.recaptcha2.public_key`
+- `captcha.recaptcha2.secret_key`
+- `captcha.recaptcha3.public_key`
+- `captcha.recaptcha3.secret_key`
 
 ### Update Discipline
 

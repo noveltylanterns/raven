@@ -1548,7 +1548,7 @@ final class PublicController
     private function captchaProvider(): string
     {
         $provider = strtolower($this->input->text((string) $this->config->get('captcha.provider', 'none'), 20));
-        if (!in_array($provider, ['none', 'hcaptcha', 'recaptcha'], true)) {
+        if (!in_array($provider, ['none', 'hcaptcha', 'recaptcha2', 'recaptcha3'], true)) {
             return 'none';
         }
 
@@ -1560,15 +1560,12 @@ final class PublicController
      */
     private function captchaSiteKey(string $provider): string
     {
-        if ($provider === 'hcaptcha') {
-            return $this->input->text((string) $this->config->get('captcha.hcaptcha.public_key', ''), 500);
-        }
-
-        if ($provider === 'recaptcha') {
-            return $this->input->text((string) $this->config->get('captcha.recaptcha.public_key', ''), 500);
-        }
-
-        return '';
+        return match ($provider) {
+            'hcaptcha' => $this->input->text((string) $this->config->get('captcha.hcaptcha.public_key', ''), 500),
+            'recaptcha2' => $this->input->text((string) $this->config->get('captcha.recaptcha2.public_key', ''), 500),
+            'recaptcha3' => $this->input->text((string) $this->config->get('captcha.recaptcha3.public_key', ''), 500),
+            default => '',
+        };
     }
 
     /**
@@ -1576,15 +1573,12 @@ final class PublicController
      */
     private function captchaSecretKey(string $provider): string
     {
-        if ($provider === 'hcaptcha') {
-            return $this->input->text((string) $this->config->get('captcha.hcaptcha.secret_key', ''), 500);
-        }
-
-        if ($provider === 'recaptcha') {
-            return $this->input->text((string) $this->config->get('captcha.recaptcha.secret_key', ''), 500);
-        }
-
-        return '';
+        return match ($provider) {
+            'hcaptcha' => $this->input->text((string) $this->config->get('captcha.hcaptcha.secret_key', ''), 500),
+            'recaptcha2' => $this->input->text((string) $this->config->get('captcha.recaptcha2.secret_key', ''), 500),
+            'recaptcha3' => $this->input->text((string) $this->config->get('captcha.recaptcha3.secret_key', ''), 500),
+            default => '',
+        };
     }
 
     /**
@@ -1683,16 +1677,70 @@ final class PublicController
         }
 
         $widgetClass = $provider === 'hcaptcha' ? 'h-captcha' : 'g-recaptcha';
-        $scriptSrc = $provider === 'hcaptcha'
-            ? 'https://js.hcaptcha.com/1/api.js'
-            : 'https://www.google.com/recaptcha/api.js';
+        $scriptSrc = match ($provider) {
+            'hcaptcha' => 'https://js.hcaptcha.com/1/api.js',
+            'recaptcha3' => 'https://www.google.com/recaptcha/api.js?render=' . rawurlencode($siteKey),
+            default => 'https://www.google.com/recaptcha/api.js',
+        };
         $escapedSiteKey = htmlspecialchars($siteKey, ENT_QUOTES, 'UTF-8');
         $escapedScriptSrc = htmlspecialchars($scriptSrc, ENT_QUOTES, 'UTF-8');
 
         $scriptMarkup = '';
         if (!$this->captchaScriptIncluded) {
             $scriptMarkup = '<script src="' . $escapedScriptSrc . '" async defer></script>';
+            if ($provider === 'recaptcha3') {
+                $siteKeyJson = json_encode($siteKey, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+                if (!is_string($siteKeyJson) || $siteKeyJson === '') {
+                    $siteKeyJson = '""';
+                }
+
+                $scriptMarkup .= '<script>'
+                    . '(function(){'
+                    . 'if(window.__ravenRecaptcha3Bound){return;}'
+                    . 'window.__ravenRecaptcha3Bound=true;'
+                    . 'var siteKey=' . $siteKeyJson . ';'
+                    . 'document.addEventListener("submit",function(event){'
+                    . 'var form=event.target;'
+                    . 'if(!(form instanceof HTMLFormElement)){return;}'
+                    . 'if(!form.querySelector(\'[data-raven-captcha-provider="recaptcha3"]\')){return;}'
+                    . 'if(String(form.getAttribute("data-raven-recaptcha3-submitting")||"")==="1"){return;}'
+                    . 'event.preventDefault();'
+                    . 'form.setAttribute("data-raven-recaptcha3-submitting","1");'
+                    . 'var tokenField=form.querySelector(\'input[name="g-recaptcha-response"]\');'
+                    . 'if(!(tokenField instanceof HTMLInputElement)){'
+                    . 'tokenField=document.createElement("input");'
+                    . 'tokenField.type="hidden";'
+                    . 'tokenField.name="g-recaptcha-response";'
+                    . 'form.appendChild(tokenField);'
+                    . '}'
+                    . 'var submitWithoutToken=function(){'
+                    . 'form.removeAttribute("data-raven-recaptcha3-submitting");'
+                    . 'form.submit();'
+                    . '};'
+                    . 'if(!window.grecaptcha||typeof window.grecaptcha.ready!=="function"||typeof window.grecaptcha.execute!=="function"){'
+                    . 'submitWithoutToken();'
+                    . 'return;'
+                    . '}'
+                    . 'window.grecaptcha.ready(function(){'
+                    . 'window.grecaptcha.execute(siteKey,{action:"submit"}).then(function(token){'
+                    . 'tokenField.value=String(token||"");'
+                    . 'form.removeAttribute("data-raven-recaptcha3-submitting");'
+                    . 'form.submit();'
+                    . '}).catch(function(){submitWithoutToken();});'
+                    . '});'
+                    . '},true);'
+                    . '})();'
+                    . '</script>';
+            }
             $this->captchaScriptIncluded = true;
+        }
+
+        if ($provider === 'recaptcha3') {
+            return $scriptMarkup
+                . '<div class="col-12">'
+                . '<input type="hidden" name="g-recaptcha-response" value="">'
+                . '<div class="small text-muted" data-raven-captcha-provider="recaptcha3">Protected by reCAPTCHA.</div>'
+                . '</div>';
         }
 
         return $scriptMarkup

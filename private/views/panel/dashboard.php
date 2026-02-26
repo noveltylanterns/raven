@@ -348,7 +348,8 @@ $renderConfigField = static function (array $field) use ($publicThemeOptions, $m
         || str_starts_with($path, 'database.mysql.')
         || str_starts_with($path, 'database.pgsql.');
     $isCaptchaSpecificField = str_starts_with($path, 'captcha.hcaptcha.')
-        || str_starts_with($path, 'captcha.recaptcha.');
+        || str_starts_with($path, 'captcha.recaptcha2.')
+        || str_starts_with($path, 'captcha.recaptcha3.');
     $dbSection = '';
     $captchaSection = '';
     if ($path === 'database.table_prefix') {
@@ -362,8 +363,10 @@ $renderConfigField = static function (array $field) use ($publicThemeOptions, $m
     }
     if (str_starts_with($path, 'captcha.hcaptcha.')) {
         $captchaSection = 'hcaptcha';
-    } elseif (str_starts_with($path, 'captcha.recaptcha.')) {
-        $captchaSection = 'recaptcha';
+    } elseif (str_starts_with($path, 'captcha.recaptcha2.')) {
+        $captchaSection = 'recaptcha2';
+    } elseif (str_starts_with($path, 'captcha.recaptcha3.')) {
+        $captchaSection = 'recaptcha3';
     }
     $inputValue = (string) ($field['value'] ?? '');
     if ($isDomainPrefixedMetaPathField) {
@@ -438,7 +441,8 @@ $renderConfigField = static function (array $field) use ($publicThemeOptions, $m
             >
                 <option value="none"<?= (string) $field['value'] === 'none' ? ' selected' : '' ?>>none</option>
                 <option value="hcaptcha"<?= (string) $field['value'] === 'hcaptcha' ? ' selected' : '' ?>>hcaptcha</option>
-                <option value="recaptcha"<?= (string) $field['value'] === 'recaptcha' ? ' selected' : '' ?>>recaptcha</option>
+                <option value="recaptcha2"<?= (string) $field['value'] === 'recaptcha2' ? ' selected' : '' ?>>recaptcha2</option>
+                <option value="recaptcha3"<?= (string) $field['value'] === 'recaptcha3' ? ' selected' : '' ?>>recaptcha3</option>
             </select>
         <?php elseif ($isMailAgentField): ?>
             <!-- Mail agent is an explicit dropdown so supported drivers stay constrained. -->

@@ -2397,6 +2397,7 @@ final class PanelController
         $configSnapshot = $this->ensurePublicProfileConfig($configSnapshot);
         $configSnapshot = $this->ensureSiteEnabledConfig($configSnapshot);
         $configSnapshot = $this->ensurePanelBrandingConfig($configSnapshot);
+        $configSnapshot = $this->ensureCaptchaConfig($configSnapshot);
         $configSnapshot = $this->ensureDebugToolbarConfig($configSnapshot);
         $activeConfigTab = $this->normalizeConfigEditorTab($_GET['tab'] ?? 'basic');
 
@@ -2450,6 +2451,7 @@ final class PanelController
         $currentConfig = $this->ensurePublicProfileConfig($currentConfig);
         $currentConfig = $this->ensureSiteEnabledConfig($currentConfig);
         $currentConfig = $this->ensurePanelBrandingConfig($currentConfig);
+        $currentConfig = $this->ensureCaptchaConfig($currentConfig);
         $currentConfig = $this->ensureDebugToolbarConfig($currentConfig);
         $fields = $this->flattenConfigFields($currentConfig);
         $nextConfig = $currentConfig;
@@ -2486,6 +2488,7 @@ final class PanelController
         $nextConfig = $this->ensurePublicProfileConfig($nextConfig);
         $nextConfig = $this->ensureSiteEnabledConfig($nextConfig);
         $nextConfig = $this->ensurePanelBrandingConfig($nextConfig);
+        $nextConfig = $this->ensureCaptchaConfig($nextConfig);
         $nextConfig = $this->ensureDebugToolbarConfig($nextConfig);
         $nextConfig = $this->removeSqliteDatabaseFilesConfig($nextConfig);
 
@@ -3336,6 +3339,14 @@ final class PanelController
             return 'Site Key';
         }
 
+        if ($path === 'captcha.recaptcha2.public_key') {
+            return 'Site Key';
+        }
+
+        if ($path === 'captcha.recaptcha3.public_key') {
+            return 'Site Key';
+        }
+
         if ($path === 'panel.path') {
             return 'Panel Path';
         }
@@ -3757,8 +3768,8 @@ final class PanelController
 
         if ($path === 'captcha.provider') {
             $provider = strtolower($value);
-            if (!in_array($provider, ['none', 'hcaptcha', 'recaptcha'], true)) {
-                throw new \RuntimeException('captcha.provider must be none, hcaptcha, or recaptcha.');
+            if (!in_array($provider, ['none', 'hcaptcha', 'recaptcha2', 'recaptcha3'], true)) {
+                throw new \RuntimeException('captcha.provider must be none, hcaptcha, recaptcha2, or recaptcha3.');
             }
 
             return $provider;
@@ -4370,6 +4381,56 @@ final class PanelController
         // Enforce current key layout for panel path.
         unset($panel['panel_path']);
         $config['panel'] = $panel;
+        return $config;
+    }
+
+    /**
+     * Ensures captcha provider/keys are normalized with explicit reCAPTCHA v2/v3 drivers.
+     *
+     * @param array<string, mixed> $config
+     * @return array<string, mixed>
+     */
+    private function ensureCaptchaConfig(array $config): array
+    {
+        $captcha = $config['captcha'] ?? null;
+        if (!is_array($captcha)) {
+            $captcha = [];
+        }
+
+        $provider = strtolower(trim((string) ($captcha['provider'] ?? 'none')));
+        if (!in_array($provider, ['none', 'hcaptcha', 'recaptcha2', 'recaptcha3'], true)) {
+            $provider = 'none';
+        }
+        $captcha['provider'] = $provider;
+
+        $hcaptcha = $captcha['hcaptcha'] ?? null;
+        if (!is_array($hcaptcha)) {
+            $hcaptcha = [];
+        }
+        $hcaptcha['public_key'] = trim((string) ($hcaptcha['public_key'] ?? ''));
+        $hcaptcha['secret_key'] = trim((string) ($hcaptcha['secret_key'] ?? ''));
+
+        $recaptcha2 = $captcha['recaptcha2'] ?? null;
+        if (!is_array($recaptcha2)) {
+            $recaptcha2 = [];
+        }
+        $recaptcha2['public_key'] = trim((string) ($recaptcha2['public_key'] ?? ''));
+        $recaptcha2['secret_key'] = trim((string) ($recaptcha2['secret_key'] ?? ''));
+
+        $recaptcha3 = $captcha['recaptcha3'] ?? null;
+        if (!is_array($recaptcha3)) {
+            $recaptcha3 = [];
+        }
+        $recaptcha3['public_key'] = trim((string) ($recaptcha3['public_key'] ?? ''));
+        $recaptcha3['secret_key'] = trim((string) ($recaptcha3['secret_key'] ?? ''));
+
+        // Remove deprecated generic recaptcha node; explicit v2/v3 drivers are canonical.
+        unset($captcha['recaptcha']);
+        $captcha['hcaptcha'] = $hcaptcha;
+        $captcha['recaptcha2'] = $recaptcha2;
+        $captcha['recaptcha3'] = $recaptcha3;
+        $config['captcha'] = $captcha;
+
         return $config;
     }
 
