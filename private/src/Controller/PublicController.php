@@ -54,6 +54,12 @@ final class PublicController
     private Csrf $csrf;
     private WaitlistSignupRepository $waitlistSignups;
     private bool $captchaScriptIncluded = false;
+    /**
+     * Request-local cache of enabled embedded forms keyed by type then slug.
+     *
+     * @var array<string, array<string, array<string, mixed>>>
+     */
+    private array $embeddedFormLookupCache = [];
 
     public function __construct(
         View $view,
@@ -258,8 +264,8 @@ final class PublicController
         $perPage = max(1, (int) $this->config->get('categories.pagination', 10));
         $pageNumber = max(1, $pageNumber);
         $offset = ($pageNumber - 1) * $perPage;
-
-        $total = $this->pages->countByCategorySlug($categorySlug);
+        $pageResult = $this->pages->listPageByCategorySlug($categorySlug, $perPage, $offset);
+        $total = (int) ($pageResult['total'] ?? 0);
         $totalPages = max(1, (int) ceil($total / $perPage));
 
         if ($total > 0 && $pageNumber > $totalPages) {
@@ -267,7 +273,7 @@ final class PublicController
             return;
         }
 
-        $pages = $this->pages->listByCategorySlug($categorySlug, $perPage, $offset);
+        $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $categoryTemplate = $this->resolveCategoryTemplateName($categorySlug);
 
         $this->renderPublic($categoryTemplate, [
@@ -304,8 +310,8 @@ final class PublicController
         $perPage = max(1, (int) $this->config->get('tags.pagination', 10));
         $pageNumber = max(1, $pageNumber);
         $offset = ($pageNumber - 1) * $perPage;
-
-        $total = $this->pages->countByTagSlug($tagSlug);
+        $pageResult = $this->pages->listPageByTagSlug($tagSlug, $perPage, $offset);
+        $total = (int) ($pageResult['total'] ?? 0);
         $totalPages = max(1, (int) ceil($total / $perPage));
 
         if ($total > 0 && $pageNumber > $totalPages) {
@@ -313,7 +319,7 @@ final class PublicController
             return;
         }
 
-        $pages = $this->pages->listByTagSlug($tagSlug, $perPage, $offset);
+        $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $tagTemplate = $this->resolveTagTemplateName($tagSlug);
 
         $this->renderPublic($tagTemplate, [
@@ -404,13 +410,14 @@ final class PublicController
             return;
         }
 
-        $group = $this->groups->findPublicBySlug($normalizedSlug);
-        if ($group === null) {
+        $groupRouteData = $this->groups->findPublicRouteDataBySlug($normalizedSlug);
+        if ($groupRouteData === null) {
             $this->notFound();
             return;
         }
 
-        $members = $this->users->listPublicProfilesByGroupId((int) ($group['id'] ?? 0));
+        $group = is_array($groupRouteData['group'] ?? null) ? $groupRouteData['group'] : [];
+        $members = is_array($groupRouteData['members'] ?? null) ? $groupRouteData['members'] : [];
         $this->renderPublic('groups/list', [
             'site' => $this->siteData(),
             'group' => $group,
@@ -2292,35 +2299,55 @@ final class PublicController
      */
     private function findEmbeddedFormDefinition(string $type, string $slug): ?array
     {
+        $type = strtolower(trim($type));
+        $slug = strtolower(trim($slug));
+        if ($type === '' || $slug === '') {
+            return null;
+        }
+
         if (($type === 'contact' && !$this->isExtensionEnabled('contact'))
             || ($type === 'signups' && !$this->isExtensionEnabled('signups'))) {
             return null;
         }
 
-        foreach ($this->extensionFormsByType($type) as $form) {
-            $formSlug = strtolower(trim((string) ($form['slug'] ?? '')));
-            if ($formSlug !== $slug || empty($form['enabled'])) {
-                continue;
-            }
-
-            return $form;
-        }
-
-        return null;
+        $lookup = $this->extensionFormLookupByType($type);
+        $definition = $lookup[$slug] ?? null;
+        return is_array($definition) ? $definition : null;
     }
 
     /**
-     * Returns extension form definitions by shortcode type.
+     * Returns enabled extension form definitions keyed by slug for one type.
      *
-     * @return array<int, array<string, mixed>>
+     * @return array<string, array<string, mixed>>
      */
-    private function extensionFormsByType(string $type): array
+    private function extensionFormLookupByType(string $type): array
     {
-        return match ($type) {
+        if (isset($this->embeddedFormLookupCache[$type])) {
+            return $this->embeddedFormLookupCache[$type];
+        }
+
+        $forms = match ($type) {
             'contact' => $this->contactForms->listAll(),
             'signups' => $this->signupForms->listAll(),
             default => [],
         };
+
+        $lookup = [];
+        foreach ($forms as $form) {
+            if (!is_array($form) || empty($form['enabled'])) {
+                continue;
+            }
+
+            $slug = strtolower(trim((string) ($form['slug'] ?? '')));
+            if ($slug === '') {
+                continue;
+            }
+
+            $lookup[$slug] = $form;
+        }
+
+        $this->embeddedFormLookupCache[$type] = $lookup;
+        return $lookup;
     }
 
     /**

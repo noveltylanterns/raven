@@ -969,6 +969,112 @@ final class PageRepository
     }
 
     /**
+     * Returns one paginated category-page result with total count.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     */
+    public function listPageByCategorySlug(string $slug, int $limit, int $offset): array
+    {
+        $pages = $this->table('pages');
+        $channels = $this->table('channels');
+        $categories = $this->table('categories');
+        $pageCategories = $this->table('page_categories');
+        $safeLimit = max(1, $limit);
+        $safeOffset = max(0, $offset);
+
+        $stmt = $this->db->prepare(
+            'SELECT p.*, ch.slug AS channel_slug, COUNT(*) OVER() AS total_rows
+             FROM ' . $pages . ' p
+             LEFT JOIN ' . $channels . ' ch ON ch.id = p.channel_id
+             INNER JOIN ' . $pageCategories . ' pc ON pc.page_id = p.id
+             INNER JOIN ' . $categories . ' c ON c.id = pc.category_id
+             WHERE c.slug = :slug
+               AND p.is_published = :is_published
+             ORDER BY p.published_at DESC, p.id DESC
+             LIMIT :limit OFFSET :offset'
+        );
+        $stmt->bindValue(':slug', $slug);
+        $stmt->bindValue(':is_published', 1, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $total = 0;
+        $resultRows = [];
+        foreach ($rows as $row) {
+            if ($total === 0) {
+                $total = (int) ($row['total_rows'] ?? 0);
+            }
+
+            unset($row['total_rows']);
+            $resultRows[] = $this->hydratePageRow($row);
+        }
+
+        if ($resultRows === [] && $safeOffset > 0) {
+            $total = $this->countByCategorySlug($slug);
+        }
+
+        return [
+            'rows' => $resultRows,
+            'total' => $total,
+        ];
+    }
+
+    /**
+     * Returns one paginated tag-page result with total count.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     */
+    public function listPageByTagSlug(string $slug, int $limit, int $offset): array
+    {
+        $pages = $this->table('pages');
+        $channels = $this->table('channels');
+        $tags = $this->table('tags');
+        $pageTags = $this->table('page_tags');
+        $safeLimit = max(1, $limit);
+        $safeOffset = max(0, $offset);
+
+        $stmt = $this->db->prepare(
+            'SELECT p.*, ch.slug AS channel_slug, COUNT(*) OVER() AS total_rows
+             FROM ' . $pages . ' p
+             LEFT JOIN ' . $channels . ' ch ON ch.id = p.channel_id
+             INNER JOIN ' . $pageTags . ' pt ON pt.page_id = p.id
+             INNER JOIN ' . $tags . ' t ON t.id = pt.tag_id
+             WHERE t.slug = :slug
+               AND p.is_published = :is_published
+             ORDER BY p.published_at DESC, p.id DESC
+             LIMIT :limit OFFSET :offset'
+        );
+        $stmt->bindValue(':slug', $slug);
+        $stmt->bindValue(':is_published', 1, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $total = 0;
+        $resultRows = [];
+        foreach ($rows as $row) {
+            if ($total === 0) {
+                $total = (int) ($row['total_rows'] ?? 0);
+            }
+
+            unset($row['total_rows']);
+            $resultRows[] = $this->hydratePageRow($row);
+        }
+
+        if ($resultRows === [] && $safeOffset > 0) {
+            $total = $this->countByTagSlug($slug);
+        }
+
+        return [
+            'rows' => $resultRows,
+            'total' => $total,
+        ];
+    }
+
+    /**
      * Hydrates page row with repeatable Extended block metadata.
      *
      * @param array<string, mixed> $row
