@@ -683,7 +683,14 @@ return static function (Router $router, array $context): void {
                         'ip_address' => $findHeaderIndex($normalizedHeaders, ['ip_address', 'ip']),
                         'hostname' => $findHeaderIndex($normalizedHeaders, ['hostname', 'host']),
                         'user_agent' => $findHeaderIndex($normalizedHeaders, ['user_agent', 'useragent', 'ua']),
-                        'created_at' => $findHeaderIndex($normalizedHeaders, ['created_at', 'created', 'submitted_at']),
+                        'created_at' => $findHeaderIndex($normalizedHeaders, [
+                            'created_at',
+                            'created',
+                            'submitted_at',
+                            'submission_date',
+                            'submitted_on',
+                            'timestamp',
+                        ]),
                     ];
                     continue;
                 }
@@ -752,7 +759,7 @@ return static function (Router $router, array $context): void {
 
             $hostname = strtolower($app['input']->text($rawHostname, 255));
             $userAgent = $app['input']->text($rawUserAgent, 500);
-            $createdAt = $app['input']->text($rawCreatedAt, 32);
+            $createdAt = $app['input']->text($rawCreatedAt, 120);
 
             $additionalFieldsJson = '[]';
             $rawAdditionalFieldsJson = $app['input']->text($rawAdditionalFieldsJson, 20000);

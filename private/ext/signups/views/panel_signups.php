@@ -111,7 +111,6 @@ $signupsEmptyId = 'signups-filter-empty';
                         <th scope="col">Email</th>
                         <th scope="col">Display Name</th>
                         <th scope="col">Country</th>
-                        <th scope="col">Additional</th>
                         <th scope="col">IP Address</th>
                         <th scope="col">Submitted</th>
                         <th scope="col" class="text-center">Actions</th>
@@ -128,7 +127,6 @@ $signupsEmptyId = 'signups-filter-empty';
                         $hostname = trim((string) ($signup['hostname'] ?? ''));
                         $hostnameTooltip = $hostname !== '' ? $hostname : 'Hostname not available.';
 
-                        $additionalFieldsList = [];
                         $additionalSearchValues = [];
                         $rawAdditional = (string) ($signup['additional_fields_json'] ?? '');
                         if ($rawAdditional !== '') {
@@ -146,10 +144,6 @@ $signupsEmptyId = 'signups-filter-empty';
                                         continue;
                                     }
 
-                                    $additionalFieldsList[] = [
-                                        'label' => $fieldLabel,
-                                        'value' => $fieldValue,
-                                    ];
                                     $additionalSearchValues[] = $fieldLabel . ' ' . $fieldValue;
                                 }
                             }
@@ -168,18 +162,21 @@ $signupsEmptyId = 'signups-filter-empty';
                         ]);
                         ?>
                         <tr data-filter-search="<?= e($searchableText) ?>">
-                            <td><code><?= e((string) ($signup['email'] ?? '')) ?></code></td>
+                            <td>
+                                <code
+                                    role="button"
+                                    tabindex="0"
+                                    class="text-decoration-none"
+                                    data-raven-copy-email="1"
+                                    data-copy-value="<?= e((string) ($signup['email'] ?? '')) ?>"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="Click to copy email"
+                                    style="cursor: pointer;"
+                                ><?= e((string) ($signup['email'] ?? '')) ?></code>
+                            </td>
                             <td><?= e((string) ($signup['display_name'] ?? '')) ?></td>
                             <td><?= e($countryLabel) ?></td>
-                            <td>
-                                <?php if ($additionalFieldsList === []): ?>
-                                    <span class="text-muted">-</span>
-                                <?php else: ?>
-                                    <?php foreach ($additionalFieldsList as $field): ?>
-                                        <div class="small"><strong><?= e((string) $field['label']) ?>:</strong> <?= e((string) $field['value']) ?></div>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </td>
                             <td>
                                 <?php if ($ipAddress === ''): ?>
                                     <span class="text-muted">-</span>
@@ -317,13 +314,86 @@ $signupsEmptyId = 'signups-filter-empty';
       countLabel.textContent = 'Showing <?= (int) count($signups) ?> of <?= (int) count($signups) ?> submissions on this page.';
     }
 
-    if (!window.bootstrap || typeof window.bootstrap.Tooltip !== 'function') {
-      return;
+    function fallbackCopy(text) {
+      var temporaryInput = document.createElement('textarea');
+      temporaryInput.value = text;
+      temporaryInput.setAttribute('readonly', 'readonly');
+      temporaryInput.style.position = 'absolute';
+      temporaryInput.style.left = '-9999px';
+      document.body.appendChild(temporaryInput);
+      temporaryInput.select();
+      var copied = document.execCommand('copy');
+      document.body.removeChild(temporaryInput);
+      return copied;
     }
 
-    var elements = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-    elements.forEach(function (element) {
-      window.bootstrap.Tooltip.getOrCreateInstance(element);
+    function copyText(text) {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+        return Promise.resolve(fallbackCopy(text));
+      }
+
+      return navigator.clipboard.writeText(text).then(function () {
+        return true;
+      }).catch(function () {
+        return fallbackCopy(text);
+      });
+    }
+
+    function bootstrapTooltipAvailable() {
+      return !!(window.bootstrap && typeof window.bootstrap.Tooltip === 'function');
+    }
+
+    function showCopyFeedback(target, success) {
+      if (!(target instanceof HTMLElement) || !bootstrapTooltipAvailable()) {
+        return;
+      }
+
+      var tooltip = window.bootstrap.Tooltip.getOrCreateInstance(target, { trigger: 'manual' });
+      var message = success ? 'Copied!' : 'Copy failed';
+      target.setAttribute('data-bs-original-title', message);
+      tooltip.show();
+      window.setTimeout(function () {
+        target.setAttribute('data-bs-original-title', 'Click to copy email');
+        tooltip.hide();
+      }, success ? 900 : 1400);
+    }
+
+    document.querySelectorAll('[data-raven-copy-email="1"]').forEach(function (element) {
+      if (!(element instanceof HTMLElement)) {
+        return;
+      }
+
+      function triggerCopy() {
+        var value = String(element.getAttribute('data-copy-value') || '').trim();
+        if (value === '') {
+          return;
+        }
+
+        copyText(value).then(function (copied) {
+          showCopyFeedback(element, copied);
+        });
+      }
+
+      element.addEventListener('click', function (event) {
+        event.preventDefault();
+        triggerCopy();
+      });
+
+      element.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+          return;
+        }
+
+        event.preventDefault();
+        triggerCopy();
+      });
     });
+
+    if (bootstrapTooltipAvailable()) {
+      var elements = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+      elements.forEach(function (element) {
+        window.bootstrap.Tooltip.getOrCreateInstance(element);
+      });
+    }
   })();
 </script>

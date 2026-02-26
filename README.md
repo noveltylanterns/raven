@@ -48,6 +48,7 @@ Official Site: [raven.lanterns.io](https://raven.lanterns.io)
 
 - **0.8.0 (Current)**: Initial public release with basic panel & extension system.
 - **0.9.0 (Next)**: Expanded theming system.
+- **1.0.0 (Immediate Goal)**: First round UI polish, bug sweep, hardening & optimization.
 
 
 ## Caveats

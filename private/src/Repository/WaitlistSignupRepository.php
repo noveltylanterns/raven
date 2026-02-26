@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Raven\Repository;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use PDO;
 use PDOException;
 use RuntimeException;
@@ -81,13 +83,7 @@ final class WaitlistSignupRepository
             throw new RuntimeException('That email is already signed up for this signup sheet.');
         }
 
-        $createdAt = trim((string) ($data['created_at'] ?? ''));
-        if ($createdAt !== '' && preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $createdAt) !== 1) {
-            $createdAt = '';
-        }
-        if ($createdAt === '' || strtotime($createdAt . ' UTC') === false) {
-            $createdAt = gmdate('Y-m-d H:i:s');
-        }
+        $createdAt = $this->normalizeCreatedAt((string) ($data['created_at'] ?? ''));
 
         try {
             $stmt = $this->db->prepare(
@@ -356,5 +352,41 @@ final class WaitlistSignupRepository
 
         // 23000 (MySQL/SQLite) and 23505 (PostgreSQL) represent unique-constraint failures.
         return in_array($sqlState, ['23000', '23505'], true);
+    }
+
+    /**
+     * Accepts common CSV timestamp formats and normalizes to UTC SQL datetime.
+     */
+    private function normalizeCreatedAt(string $rawValue): string
+    {
+        $rawValue = trim($rawValue);
+        if ($rawValue === '') {
+            return gmdate('Y-m-d H:i:s');
+        }
+
+        // Keep canonical SQL DATETIME values as-is to avoid timezone shifting.
+        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $rawValue) === 1) {
+            return $rawValue;
+        }
+
+        // Accept unix epoch seconds or milliseconds.
+        if (preg_match('/^\d{10,13}$/', $rawValue) === 1) {
+            $timestamp = (int) $rawValue;
+            if (strlen($rawValue) === 13) {
+                $timestamp = (int) floor($timestamp / 1000);
+            }
+
+            return gmdate('Y-m-d H:i:s', $timestamp);
+        }
+
+        try {
+            return (new DateTimeImmutable($rawValue))
+                ->setTimezone(new DateTimeZone('UTC'))
+                ->format('Y-m-d H:i:s');
+        } catch (\Throwable) {
+            // Fall through to `now` if import value is not parseable.
+        }
+
+        return gmdate('Y-m-d H:i:s');
     }
 }
