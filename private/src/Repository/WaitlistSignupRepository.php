@@ -41,7 +41,6 @@ final class WaitlistSignupRepository
      *
      * @param array{
      *   form_slug: string,
-     *   form_target?: string,
      *   email: string,
      *   display_name: string,
      *   country: string,
@@ -58,7 +57,6 @@ final class WaitlistSignupRepository
         $table = $this->table('ext_signups_submissions');
 
         $formSlug = trim((string) ($data['form_slug'] ?? ''));
-        $formTarget = trim((string) ($data['form_target'] ?? $formSlug));
         $email = strtolower(trim((string) ($data['email'] ?? '')));
         $displayName = trim((string) ($data['display_name'] ?? ''));
         $country = strtolower(trim((string) ($data['country'] ?? '')));
@@ -88,13 +86,12 @@ final class WaitlistSignupRepository
         try {
             $stmt = $this->db->prepare(
                 'INSERT INTO ' . $table . '
-                 (form_slug, form_target, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at)
+                 (form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at)
                  VALUES
-                 (:form_slug, :form_target, :email, :display_name, :country, :additional_fields_json, :source_url, :ip_address, :hostname, :user_agent, :created_at)'
+                 (:form_slug, :email, :display_name, :country, :additional_fields_json, :source_url, :ip_address, :hostname, :user_agent, :created_at)'
             );
             $stmt->execute([
                 ':form_slug' => $formSlug,
-                ':form_target' => $formTarget,
                 ':email' => $email,
                 ':display_name' => $displayName,
                 ':country' => $country,
@@ -151,7 +148,7 @@ final class WaitlistSignupRepository
     {
         $table = $this->table('ext_signups_submissions');
 
-        $sql = 'SELECT id, form_slug, form_target, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+        $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
                 FROM ' . $table . '
                 WHERE form_slug = :form_slug';
         $params = [
@@ -203,7 +200,6 @@ final class WaitlistSignupRepository
 
         $sql = 'SELECT page_rows.id,
                        page_rows.form_slug,
-                       page_rows.form_target,
                        page_rows.email,
                        page_rows.display_name,
                        page_rows.country,
@@ -215,7 +211,7 @@ final class WaitlistSignupRepository
                        page_rows.created_at,
                        totals.total_rows
                 FROM (
-                    SELECT id, form_slug, form_target, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+                    SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
                     FROM ' . $table . '
                     WHERE form_slug = :page_form_slug'
                     . $pageSearchClause
@@ -278,7 +274,7 @@ final class WaitlistSignupRepository
     {
         $table = $this->table('ext_signups_submissions');
 
-        $sql = 'SELECT id, form_slug, form_target, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+        $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
                 FROM ' . $table . '
                 WHERE form_slug = :form_slug';
         $params = [
@@ -351,8 +347,7 @@ final class WaitlistSignupRepository
         try {
             $stmt = $this->db->prepare(
                 'UPDATE ' . $table . '
-                 SET form_slug = :to_slug,
-                     form_target = :to_slug
+                 SET form_slug = :to_slug
                  WHERE form_slug = :from_slug'
             );
             $stmt->execute([

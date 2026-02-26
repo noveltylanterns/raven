@@ -581,8 +581,6 @@ final class PublicController
         try {
             $this->waitlistSignups->create([
                 'form_slug' => $slug,
-                // Keep storage compatibility: form_target now mirrors form slug.
-                'form_target' => $slug,
                 'email' => (string) $email,
                 'display_name' => $displayName,
                 'country' => $country,
@@ -748,8 +746,6 @@ final class PublicController
             try {
                 $this->contactSubmissions->create([
                     'form_slug' => $slug,
-                    // Keep storage compatibility: form_target now mirrors form slug.
-                    'form_target' => $slug,
                     'sender_name' => $senderName,
                     'sender_email' => (string) $senderEmail,
                     'message_text' => $message,

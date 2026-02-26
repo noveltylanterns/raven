@@ -812,7 +812,6 @@ return static function (Router $router, array $context): void {
             try {
                 $signupsRepository->create([
                     'form_slug' => $slug,
-                    'form_target' => $slug,
                     'email' => (string) $email,
                     'display_name' => $displayName,
                     'country' => $country,

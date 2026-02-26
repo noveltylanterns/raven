@@ -41,7 +41,6 @@ final class ContactSubmissionRepository
      *
      * @param array{
      *   form_slug: string,
-     *   form_target?: string,
      *   sender_name: string,
      *   sender_email: string,
      *   message_text: string,
@@ -58,7 +57,6 @@ final class ContactSubmissionRepository
         $table = $this->table('ext_contact_submissions');
 
         $formSlug = trim((string) ($data['form_slug'] ?? ''));
-        $formTarget = trim((string) ($data['form_target'] ?? $formSlug));
         $senderName = trim((string) ($data['sender_name'] ?? ''));
         $senderEmail = strtolower(trim((string) ($data['sender_email'] ?? '')));
         $messageText = trim((string) ($data['message_text'] ?? ''));
@@ -85,13 +83,12 @@ final class ContactSubmissionRepository
         try {
             $stmt = $this->db->prepare(
                 'INSERT INTO ' . $table . '
-                 (form_slug, form_target, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at)
+                 (form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at)
                  VALUES
-                 (:form_slug, :form_target, :sender_name, :sender_email, :message_text, :additional_fields_json, :source_url, :ip_address, :hostname, :user_agent, :created_at)'
+                 (:form_slug, :sender_name, :sender_email, :message_text, :additional_fields_json, :source_url, :ip_address, :hostname, :user_agent, :created_at)'
             );
             $stmt->execute([
                 ':form_slug' => $formSlug,
-                ':form_target' => $formTarget,
                 ':sender_name' => $senderName,
                 ':sender_email' => $senderEmail,
                 ':message_text' => $messageText,
@@ -144,7 +141,7 @@ final class ContactSubmissionRepository
     {
         $table = $this->table('ext_contact_submissions');
 
-        $sql = 'SELECT id, form_slug, form_target, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+        $sql = 'SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
                 FROM ' . $table . '
                 WHERE form_slug = :form_slug';
         $params = [
@@ -196,7 +193,6 @@ final class ContactSubmissionRepository
 
         $sql = 'SELECT page_rows.id,
                        page_rows.form_slug,
-                       page_rows.form_target,
                        page_rows.sender_name,
                        page_rows.sender_email,
                        page_rows.message_text,
@@ -208,7 +204,7 @@ final class ContactSubmissionRepository
                        page_rows.created_at,
                        totals.total_rows
                 FROM (
-                    SELECT id, form_slug, form_target, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+                    SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
                     FROM ' . $table . '
                     WHERE form_slug = :page_form_slug'
                     . $pageSearchClause
@@ -271,7 +267,7 @@ final class ContactSubmissionRepository
     {
         $table = $this->table('ext_contact_submissions');
 
-        $sql = 'SELECT id, form_slug, form_target, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+        $sql = 'SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
                 FROM ' . $table . '
                 WHERE form_slug = :form_slug';
         $params = [
@@ -344,8 +340,7 @@ final class ContactSubmissionRepository
         try {
             $stmt = $this->db->prepare(
                 'UPDATE ' . $table . '
-                 SET form_slug = :to_slug,
-                     form_target = :to_slug
+                 SET form_slug = :to_slug
                  WHERE form_slug = :from_slug'
             );
             $stmt->execute([

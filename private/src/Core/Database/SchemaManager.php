@@ -37,6 +37,7 @@ final class SchemaManager
         $this->ensureContactFormSaveMailLocallyColumn($appDb, $driver, $prefix);
         $this->ensureSignupsSubmissionAdditionalFieldsColumn($appDb, $driver, $prefix);
         $this->ensureSignupsSubmissionHostnameColumn($appDb, $driver, $prefix);
+        $this->ensureSubmissionFormTargetColumnRemoved($appDb, $driver, $prefix);
         $this->ensureGroupRoutingColumns($appDb, $driver, $prefix);
         $this->ensureTaxonomyImageColumns($appDb, $driver, $prefix);
         $this->ensurePanelPerformanceIndexes($appDb, $driver, $prefix);
@@ -230,7 +231,6 @@ final class SchemaManager
             $db->exec('CREATE TABLE IF NOT EXISTS extensions.ext_contact_submissions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 form_slug TEXT NOT NULL,
-                form_target TEXT NOT NULL DEFAULT \'\',
                 sender_name TEXT NOT NULL,
                 sender_email TEXT NOT NULL,
                 message_text TEXT NOT NULL,
@@ -255,7 +255,6 @@ final class SchemaManager
             $db->exec('CREATE TABLE IF NOT EXISTS extensions.ext_signups_submissions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 form_slug TEXT NOT NULL,
-                form_target TEXT NOT NULL DEFAULT \'\',
                 email TEXT NOT NULL,
                 display_name TEXT NOT NULL,
                 country TEXT NOT NULL,
@@ -492,7 +491,6 @@ final class SchemaManager
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'ext_contact_submissions (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 form_slug VARCHAR(160) NOT NULL,
-                form_target VARCHAR(160) NOT NULL DEFAULT \'\',
                 sender_name VARCHAR(255) NOT NULL,
                 sender_email VARCHAR(254) NOT NULL,
                 message_text MEDIUMTEXT NOT NULL,
@@ -519,7 +517,6 @@ final class SchemaManager
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'ext_signups_submissions (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 form_slug VARCHAR(160) NOT NULL,
-                form_target VARCHAR(160) NOT NULL DEFAULT \'\',
                 email VARCHAR(254) NOT NULL,
                 display_name VARCHAR(255) NOT NULL,
                 country VARCHAR(16) NOT NULL,
@@ -742,7 +739,6 @@ final class SchemaManager
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'ext_contact_submissions (
             id BIGSERIAL PRIMARY KEY,
             form_slug VARCHAR(160) NOT NULL,
-            form_target VARCHAR(160) NOT NULL DEFAULT \'\',
             sender_name VARCHAR(255) NOT NULL,
             sender_email VARCHAR(254) NOT NULL,
             message_text TEXT NOT NULL,
@@ -769,7 +765,6 @@ final class SchemaManager
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'ext_signups_submissions (
             id BIGSERIAL PRIMARY KEY,
             form_slug VARCHAR(160) NOT NULL,
-            form_target VARCHAR(160) NOT NULL DEFAULT \'\',
             email VARCHAR(254) NOT NULL,
             display_name VARCHAR(255) NOT NULL,
             country VARCHAR(16) NOT NULL,
@@ -1578,6 +1573,133 @@ final class SchemaManager
         }
 
         $db->exec("UPDATE " . $signupsTable . " SET hostname = NULL WHERE hostname = ''");
+    }
+
+    /**
+     * Removes legacy submission `form_target` columns now that `form_slug` is canonical.
+     */
+    private function ensureSubmissionFormTargetColumnRemoved(PDO $db, string $driver, string $prefix): void
+    {
+        $contactTable = $this->table($driver, $prefix, 'ext_contact_submissions');
+        $signupsTable = $this->table($driver, $prefix, 'ext_signups_submissions');
+
+        if ($driver === 'sqlite') {
+            $this->dropSqliteLegacySubmissionTargetColumn($db, $contactTable, 'contact');
+            $this->dropSqliteLegacySubmissionTargetColumn($db, $signupsTable, 'signups');
+            return;
+        }
+
+        if ($driver === 'mysql') {
+            if ($this->appColumnExistsMySql($db, $contactTable, 'form_target')) {
+                $db->exec('ALTER TABLE ' . $contactTable . ' DROP COLUMN form_target');
+            }
+            if ($this->appColumnExistsMySql($db, $signupsTable, 'form_target')) {
+                $db->exec('ALTER TABLE ' . $signupsTable . ' DROP COLUMN form_target');
+            }
+            return;
+        }
+
+        if ($this->appColumnExistsPgSql($db, $contactTable, 'form_target')) {
+            $db->exec('ALTER TABLE ' . $this->quotePgIdentifier($contactTable) . ' DROP COLUMN form_target');
+        }
+        if ($this->appColumnExistsPgSql($db, $signupsTable, 'form_target')) {
+            $db->exec('ALTER TABLE ' . $this->quotePgIdentifier($signupsTable) . ' DROP COLUMN form_target');
+        }
+    }
+
+    /**
+     * Drops legacy SQLite `form_target` using native DROP COLUMN or table rebuild.
+     */
+    private function dropSqliteLegacySubmissionTargetColumn(PDO $db, string $table, string $type): void
+    {
+        if (!$this->appColumnExistsSqlite($db, $table, 'form_target')) {
+            return;
+        }
+
+        if ($this->sqliteSupportsDropColumn()) {
+            $db->exec('ALTER TABLE ' . $table . ' DROP COLUMN form_target');
+            return;
+        }
+
+        $temporaryTable = match ($type) {
+            'contact' => 'extensions._tmp_ext_contact_submissions',
+            default => 'extensions._tmp_ext_signups_submissions',
+        };
+
+        $db->beginTransaction();
+        try {
+            $db->exec('DROP TABLE IF EXISTS ' . $temporaryTable);
+
+            if ($type === 'contact') {
+                $db->exec('CREATE TABLE ' . $temporaryTable . ' (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    form_slug TEXT NOT NULL,
+                    sender_name TEXT NOT NULL,
+                    sender_email TEXT NOT NULL,
+                    message_text TEXT NOT NULL,
+                    additional_fields_json TEXT NOT NULL DEFAULT \'[]\',
+                    source_url TEXT NOT NULL DEFAULT \'\',
+                    ip_address TEXT NULL,
+                    hostname TEXT NULL,
+                    user_agent TEXT NULL,
+                    created_at TEXT NOT NULL
+                )');
+                $db->exec(
+                    'INSERT INTO ' . $temporaryTable . ' (id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at)
+                     SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+                     FROM ' . $table
+                );
+            } else {
+                $db->exec('CREATE TABLE ' . $temporaryTable . ' (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    form_slug TEXT NOT NULL,
+                    email TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    country TEXT NOT NULL,
+                    additional_fields_json TEXT NOT NULL DEFAULT \'[]\',
+                    source_url TEXT NOT NULL DEFAULT \'\',
+                    ip_address TEXT NULL,
+                    hostname TEXT NULL,
+                    user_agent TEXT NULL,
+                    created_at TEXT NOT NULL
+                )');
+                $db->exec(
+                    'INSERT INTO ' . $temporaryTable . ' (id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at)
+                     SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+                     FROM ' . $table
+                );
+            }
+
+            $db->exec('DROP TABLE ' . $table);
+            $db->exec(
+                'ALTER TABLE ' . $temporaryTable . ' RENAME TO '
+                . ($type === 'contact' ? 'ext_contact_submissions' : 'ext_signups_submissions')
+            );
+
+            if ($type === 'contact') {
+                $db->exec(
+                    'CREATE INDEX IF NOT EXISTS extensions.idx_ext_contact_submissions_form_slug_created_at
+                     ON ext_contact_submissions (form_slug, created_at DESC)'
+                );
+            } else {
+                $db->exec(
+                    'CREATE UNIQUE INDEX IF NOT EXISTS extensions.uniq_ext_signups_submissions_form_slug_email
+                     ON ext_signups_submissions (form_slug, email)'
+                );
+                $db->exec(
+                    'CREATE INDEX IF NOT EXISTS extensions.idx_ext_signups_submissions_form_slug_created_at
+                     ON ext_signups_submissions (form_slug, created_at DESC)'
+                );
+            }
+
+            $db->commit();
+        } catch (\Throwable $exception) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+
+            throw $exception;
+        }
     }
 
     /**
