@@ -167,7 +167,11 @@ final class UserRepository
     /**
      * Returns one paginated panel-user page plus total row count.
      *
-     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     * @return array{
+     *   rows: array<int, array<string, mixed>>,
+     *   total: int,
+     *   group_options: array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>
+     * }
      */
     public function listPageForPanel(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
     {
@@ -228,9 +232,11 @@ final class UserRepository
             }
 
             if ($userIds === []) {
+                $groupsAndOptions = $this->groupEntriesAndOptionsForUserIds([]);
                 return [
                     'rows' => [],
                     'total' => $total,
+                    'group_options' => $groupsAndOptions['group_options'],
                 ];
             }
 
@@ -271,17 +277,22 @@ final class UserRepository
         }
 
         if ($userIds === []) {
+            $groupsAndOptions = $this->groupEntriesAndOptionsForUserIds([]);
             return [
                 'rows' => [],
                 'total' => $total,
+                'group_options' => $groupsAndOptions['group_options'],
             ];
         }
 
-        $groupMap = $this->groupEntriesByUserId($userIds);
+        $groupsAndOptions = $this->groupEntriesAndOptionsForUserIds($userIds);
+        /** @var array<int, array<int, array{name: string, permission_mask: int}>> $groupMap */
+        $groupMap = $groupsAndOptions['group_map'];
 
         return [
             'rows' => $this->hydratePanelUsers($users, $groupMap),
             'total' => $total,
+            'group_options' => $groupsAndOptions['group_options'],
         ];
     }
 
@@ -733,6 +744,105 @@ final class UserRepository
         }
 
         return $map;
+    }
+
+    /**
+     * Returns one combined payload for user-group rows and group filter options.
+     *
+     * @param array<int> $userIds
+     * @return array{
+     *   group_map: array<int, array<int, array{name: string, permission_mask: int}>>,
+     *   group_options: array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>
+     * }
+     */
+    private function groupEntriesAndOptionsForUserIds(array $userIds): array
+    {
+        $groups = $this->groupTable('groups');
+        $userGroups = $this->groupTable('user_groups');
+        $normalizedUserIds = array_values(array_unique(array_filter($userIds, static fn (int $id): bool => $id > 0)));
+
+        $join = 'LEFT JOIN ' . $userGroups . ' ug ON ug.group_id = g.id';
+        $params = [];
+        if ($normalizedUserIds !== []) {
+            $placeholders = [];
+            foreach ($normalizedUserIds as $index => $userId) {
+                $placeholder = ':user_id_' . $index;
+                $placeholders[] = $placeholder;
+                $params[$placeholder] = $userId;
+            }
+
+            $join .= ' AND ug.user_id IN (' . implode(', ', $placeholders) . ')';
+        }
+
+        $stmt = $this->appDb->prepare(
+            'SELECT g.id AS group_id,
+                    g.name AS group_name,
+                    g.slug AS group_slug,
+                    g.permission_mask AS group_permission_mask,
+                    g.is_stock AS group_is_stock,
+                    ug.user_id
+             FROM ' . $groups . ' g
+             ' . $join . '
+             ORDER BY g.id ASC, ug.user_id ASC'
+        );
+        $stmt->execute($params);
+
+        $rows = $stmt->fetchAll() ?: [];
+        $groupMap = [];
+        $groupOptionsById = [];
+
+        foreach ($rows as $row) {
+            $groupId = (int) ($row['group_id'] ?? 0);
+            if ($groupId < 1) {
+                continue;
+            }
+
+            if (!isset($groupOptionsById[$groupId])) {
+                $groupOptionsById[$groupId] = [
+                    'id' => $groupId,
+                    'name' => (string) ($row['group_name'] ?? ''),
+                    'slug' => (string) ($row['group_slug'] ?? ''),
+                    'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
+                    'is_stock' => (int) ($row['group_is_stock'] ?? 0),
+                ];
+            }
+
+            $userId = (int) ($row['user_id'] ?? 0);
+            if ($userId < 1) {
+                continue;
+            }
+
+            $groupMap[$userId] ??= [];
+            $groupMap[$userId][] = [
+                'name' => (string) ($row['group_name'] ?? ''),
+                'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
+            ];
+        }
+
+        $groupOptions = array_values($groupOptionsById);
+        usort(
+            $groupOptions,
+            static function (array $a, array $b): int {
+                $aIsStock = (int) ($a['is_stock'] ?? 0);
+                $bIsStock = (int) ($b['is_stock'] ?? 0);
+                if ($aIsStock !== $bIsStock) {
+                    return $bIsStock <=> $aIsStock;
+                }
+
+                $aName = strtolower(trim((string) ($a['name'] ?? '')));
+                $bName = strtolower(trim((string) ($b['name'] ?? '')));
+                if ($aName !== $bName) {
+                    return $aName <=> $bName;
+                }
+
+                return ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0));
+            }
+        );
+
+        return [
+            'group_map' => $groupMap,
+            'group_options' => $groupOptions,
+        ];
     }
 
     /**

@@ -175,21 +175,13 @@ final class PanelController
             );
             $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
-        $pageIds = array_values(array_map(
-            static fn (array $pageRow): int => (int) ($pageRow['id'] ?? 0),
-            $pages
-        ));
-        $taxonomyAssignments = $this->pages->taxonomyAssignmentsForPages($pageIds);
-
+        $prefilterCategoryIds = $prefilterCategoryId > 0 ? [$prefilterCategoryId] : [];
+        $prefilterTagIds = $prefilterTagId > 0 ? [$prefilterTagId] : [];
         foreach ($pages as &$pageRow) {
-            $pageId = (int) ($pageRow['id'] ?? 0);
-            $pageAssignments = $taxonomyAssignments[$pageId] ?? ['categories' => [], 'tags' => []];
-            $pageRow['category_ids'] = is_array($pageAssignments['categories'] ?? null)
-                ? $pageAssignments['categories']
-                : [];
-            $pageRow['tag_ids'] = is_array($pageAssignments['tags'] ?? null)
-                ? $pageAssignments['tags']
-                : [];
+            // Server-side page prefilters already constrain result rows, so list rows only
+            // need the active prefilter ids for client-side in-page filter persistence.
+            $pageRow['category_ids'] = $prefilterCategoryIds;
+            $pageRow['tag_ids'] = $prefilterTagIds;
         }
         unset($pageRow);
 
@@ -1614,11 +1606,15 @@ final class PanelController
             $users = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
+        $groupOptions = is_array($pageResult['group_options'] ?? null)
+            ? $pageResult['group_options']
+            : $this->groups->listOptions();
+
         $this->view->render('panel/users/list', [
             'site' => $this->siteData(),
             'users' => $users,
             'prefilterGroup' => $prefilterGroup,
-            'groupOptions' => $this->groups->listOptions(),
+            'groupOptions' => $groupOptions,
             'pagination' => $this->panelPaginationViewData(
                 '/users',
                 $pagination,
