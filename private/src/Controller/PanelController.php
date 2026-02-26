@@ -4519,9 +4519,6 @@ final class PanelController
             }
         }
 
-        // Enforce current key layout for panel path and public theme ownership.
-        unset($site['panel_path']);
-        unset($config['public']);
         $config['site'] = $site;
         return $config;
     }
@@ -4566,8 +4563,6 @@ final class PanelController
             $panel['brand_logo'] = trim((string) ($panel['brand_logo'] ?? ''));
         }
 
-        // Enforce current key layout for panel path.
-        unset($panel['panel_path']);
         $config['panel'] = $panel;
         return $config;
     }
@@ -4612,8 +4607,6 @@ final class PanelController
         $recaptcha3['public_key'] = trim((string) ($recaptcha3['public_key'] ?? ''));
         $recaptcha3['secret_key'] = trim((string) ($recaptcha3['secret_key'] ?? ''));
 
-        // Remove deprecated generic recaptcha node; explicit v2/v3 drivers are canonical.
-        unset($captcha['recaptcha']);
         $captcha['hcaptcha'] = $hcaptcha;
         $captcha['recaptcha2'] = $recaptcha2;
         $captcha['recaptcha3'] = $recaptcha3;

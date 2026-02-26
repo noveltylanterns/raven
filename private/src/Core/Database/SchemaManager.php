@@ -37,7 +37,6 @@ final class SchemaManager
         $this->ensureContactFormSaveMailLocallyColumn($appDb, $driver, $prefix);
         $this->ensureSignupsSubmissionAdditionalFieldsColumn($appDb, $driver, $prefix);
         $this->ensureSignupsSubmissionHostnameColumn($appDb, $driver, $prefix);
-        $this->ensureSubmissionFormTargetColumnRemoved($appDb, $driver, $prefix);
         $this->ensureGroupRoutingColumns($appDb, $driver, $prefix);
         $this->ensureTaxonomyImageColumns($appDb, $driver, $prefix);
         $this->ensurePanelPerformanceIndexes($appDb, $driver, $prefix);
@@ -1576,54 +1575,6 @@ final class SchemaManager
     }
 
     /**
-     * Removes legacy submission `form_target` columns now that `form_slug` is canonical.
-     */
-    private function ensureSubmissionFormTargetColumnRemoved(PDO $db, string $driver, string $prefix): void
-    {
-        $contactTable = $this->table($driver, $prefix, 'ext_contact_submissions');
-        $signupsTable = $this->table($driver, $prefix, 'ext_signups_submissions');
-
-        if ($driver === 'sqlite') {
-            $this->dropSqliteLegacySubmissionTargetColumn($db, $contactTable);
-            $this->dropSqliteLegacySubmissionTargetColumn($db, $signupsTable);
-            return;
-        }
-
-        if ($driver === 'mysql') {
-            if ($this->appColumnExistsMySql($db, $contactTable, 'form_target')) {
-                $db->exec('ALTER TABLE ' . $contactTable . ' DROP COLUMN form_target');
-            }
-            if ($this->appColumnExistsMySql($db, $signupsTable, 'form_target')) {
-                $db->exec('ALTER TABLE ' . $signupsTable . ' DROP COLUMN form_target');
-            }
-            return;
-        }
-
-        if ($this->appColumnExistsPgSql($db, $contactTable, 'form_target')) {
-            $db->exec('ALTER TABLE ' . $this->quotePgIdentifier($contactTable) . ' DROP COLUMN form_target');
-        }
-        if ($this->appColumnExistsPgSql($db, $signupsTable, 'form_target')) {
-            $db->exec('ALTER TABLE ' . $this->quotePgIdentifier($signupsTable) . ' DROP COLUMN form_target');
-        }
-    }
-
-    /**
-     * Drops legacy SQLite `form_target` using native DROP COLUMN (SQLite 3.35+).
-     */
-    private function dropSqliteLegacySubmissionTargetColumn(PDO $db, string $table): void
-    {
-        if (!$this->appColumnExistsSqlite($db, $table, 'form_target')) {
-            return;
-        }
-
-        if (!$this->sqliteSupportsDropColumn()) {
-            throw new RuntimeException('SQLite 3.35+ is required to drop legacy submission form_target columns.');
-        }
-
-        $db->exec('ALTER TABLE ' . $table . ' DROP COLUMN form_target');
-    }
-
-    /**
      * Backfills centralized shortcode registry rows from stock form extensions.
      */
     private function ensureShortcodeRegistryBackfill(PDO $db, string $driver, string $prefix): void
@@ -2203,18 +2154,6 @@ final class SchemaManager
         }
 
         return substr($value, 0, 160);
-    }
-
-    /**
-     * Returns true when connected SQLite version supports DROP COLUMN.
-     */
-    private function sqliteSupportsDropColumn(): bool
-    {
-        if (!defined('SQLITE3_VERSION')) {
-            return false;
-        }
-
-        return version_compare((string) SQLITE3_VERSION, '3.35.0', '>=');
     }
 
     /**
