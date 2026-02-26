@@ -2605,9 +2605,6 @@ final class PanelController
 
         $this->view->render('panel/routing', [
             'site' => $this->siteData(),
-            'user' => $this->auth->userSummary(),
-            'canManageUsers' => $this->auth->canManageUsers(),
-            'canManageConfiguration' => $this->auth->canManageConfiguration(),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
@@ -8371,7 +8368,8 @@ MARKDOWN;
         $canManageTaxonomy = $this->auth->canManageTaxonomy();
         $canManageUsers = $this->auth->canManageUsers();
         $canManageGroups = $this->auth->canManageGroups();
-        $channelLandingMap = $this->pages->channelHomepagesForRouting();
+        $pagesForRouting = $this->pages->listAllForRouting();
+        $channelLandingMap = $this->channelLandingMapFromPagesForRouting($pagesForRouting);
 
         foreach ($this->channels->listOptions() as $channel) {
             $channelId = (int) ($channel['id'] ?? 0);
@@ -8412,7 +8410,7 @@ MARKDOWN;
             ];
         }
 
-        foreach ($this->pages->listAllForRouting() as $page) {
+        foreach ($pagesForRouting as $page) {
             $pageId = (int) ($page['id'] ?? 0);
             $pageSlug = trim((string) ($page['slug'] ?? ''));
             if ($pageId <= 0 || $pageSlug === '') {
@@ -8671,6 +8669,79 @@ MARKDOWN;
         });
 
         return $rows;
+    }
+
+    /**
+     * Derives one channel -> landing page slug map from routing page rows.
+     *
+     * Landing priority per channel:
+     * - published `home` first
+     * - published `index` fallback
+     * - for duplicate slug candidates, latest `published_at` wins
+     *
+     * @param array<int, array<string, mixed>> $pagesForRouting
+     * @return array<string, string>
+     */
+    private function channelLandingMapFromPagesForRouting(array $pagesForRouting): array
+    {
+        /** @var array<string, array{slug: string, priority: int, published_ts: int}> $best */
+        $best = [];
+
+        foreach ($pagesForRouting as $page) {
+            $channelSlug = trim((string) ($page['channel_slug'] ?? ''));
+            if ($channelSlug === '') {
+                continue;
+            }
+
+            if ((int) ($page['is_published'] ?? 0) !== 1) {
+                continue;
+            }
+
+            $pageSlug = trim((string) ($page['slug'] ?? ''));
+            $priority = match ($pageSlug) {
+                'home' => 0,
+                'index' => 1,
+                default => null,
+            };
+            if ($priority === null) {
+                continue;
+            }
+
+            $publishedAt = trim((string) ($page['published_at'] ?? ''));
+            $publishedTs = $publishedAt !== '' ? (int) strtotime($publishedAt) : 0;
+            if ($publishedTs < 0) {
+                $publishedTs = 0;
+            }
+
+            $candidate = [
+                'slug' => $pageSlug,
+                'priority' => $priority,
+                'published_ts' => $publishedTs,
+            ];
+
+            if (!isset($best[$channelSlug])) {
+                $best[$channelSlug] = $candidate;
+                continue;
+            }
+
+            $current = $best[$channelSlug];
+            if (
+                $candidate['priority'] < $current['priority']
+                || (
+                    $candidate['priority'] === $current['priority']
+                    && $candidate['published_ts'] > $current['published_ts']
+                )
+            ) {
+                $best[$channelSlug] = $candidate;
+            }
+        }
+
+        $result = [];
+        foreach ($best as $channelSlug => $candidate) {
+            $result[$channelSlug] = (string) ($candidate['slug'] ?? '');
+        }
+
+        return $result;
     }
 
     /**

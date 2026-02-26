@@ -244,7 +244,7 @@ final class PageRepository
         $channels = $this->table('channels');
 
         $stmt = $this->db->prepare(
-            'SELECT p.id, p.title, p.slug, p.is_published,
+            'SELECT p.id, p.title, p.slug, p.is_published, p.published_at,
                     c.id AS channel_id, c.slug AS channel_slug, c.name AS channel_name
              FROM ' . $pages . ' p
              LEFT JOIN ' . $channels . ' c ON c.id = p.channel_id
