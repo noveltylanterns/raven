@@ -1584,8 +1584,8 @@ final class SchemaManager
         $signupsTable = $this->table($driver, $prefix, 'ext_signups_submissions');
 
         if ($driver === 'sqlite') {
-            $this->dropSqliteLegacySubmissionTargetColumn($db, $contactTable, 'contact');
-            $this->dropSqliteLegacySubmissionTargetColumn($db, $signupsTable, 'signups');
+            $this->dropSqliteLegacySubmissionTargetColumn($db, $contactTable);
+            $this->dropSqliteLegacySubmissionTargetColumn($db, $signupsTable);
             return;
         }
 
@@ -1608,98 +1608,19 @@ final class SchemaManager
     }
 
     /**
-     * Drops legacy SQLite `form_target` using native DROP COLUMN or table rebuild.
+     * Drops legacy SQLite `form_target` using native DROP COLUMN (SQLite 3.35+).
      */
-    private function dropSqliteLegacySubmissionTargetColumn(PDO $db, string $table, string $type): void
+    private function dropSqliteLegacySubmissionTargetColumn(PDO $db, string $table): void
     {
         if (!$this->appColumnExistsSqlite($db, $table, 'form_target')) {
             return;
         }
 
-        if ($this->sqliteSupportsDropColumn()) {
-            $db->exec('ALTER TABLE ' . $table . ' DROP COLUMN form_target');
-            return;
+        if (!$this->sqliteSupportsDropColumn()) {
+            throw new RuntimeException('SQLite 3.35+ is required to drop legacy submission form_target columns.');
         }
 
-        $temporaryTable = match ($type) {
-            'contact' => 'extensions._tmp_ext_contact_submissions',
-            default => 'extensions._tmp_ext_signups_submissions',
-        };
-
-        $db->beginTransaction();
-        try {
-            $db->exec('DROP TABLE IF EXISTS ' . $temporaryTable);
-
-            if ($type === 'contact') {
-                $db->exec('CREATE TABLE ' . $temporaryTable . ' (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    form_slug TEXT NOT NULL,
-                    sender_name TEXT NOT NULL,
-                    sender_email TEXT NOT NULL,
-                    message_text TEXT NOT NULL,
-                    additional_fields_json TEXT NOT NULL DEFAULT \'[]\',
-                    source_url TEXT NOT NULL DEFAULT \'\',
-                    ip_address TEXT NULL,
-                    hostname TEXT NULL,
-                    user_agent TEXT NULL,
-                    created_at TEXT NOT NULL
-                )');
-                $db->exec(
-                    'INSERT INTO ' . $temporaryTable . ' (id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at)
-                     SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
-                     FROM ' . $table
-                );
-            } else {
-                $db->exec('CREATE TABLE ' . $temporaryTable . ' (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    form_slug TEXT NOT NULL,
-                    email TEXT NOT NULL,
-                    display_name TEXT NOT NULL,
-                    country TEXT NOT NULL,
-                    additional_fields_json TEXT NOT NULL DEFAULT \'[]\',
-                    source_url TEXT NOT NULL DEFAULT \'\',
-                    ip_address TEXT NULL,
-                    hostname TEXT NULL,
-                    user_agent TEXT NULL,
-                    created_at TEXT NOT NULL
-                )');
-                $db->exec(
-                    'INSERT INTO ' . $temporaryTable . ' (id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at)
-                     SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
-                     FROM ' . $table
-                );
-            }
-
-            $db->exec('DROP TABLE ' . $table);
-            $db->exec(
-                'ALTER TABLE ' . $temporaryTable . ' RENAME TO '
-                . ($type === 'contact' ? 'ext_contact_submissions' : 'ext_signups_submissions')
-            );
-
-            if ($type === 'contact') {
-                $db->exec(
-                    'CREATE INDEX IF NOT EXISTS extensions.idx_ext_contact_submissions_form_slug_created_at
-                     ON ext_contact_submissions (form_slug, created_at DESC)'
-                );
-            } else {
-                $db->exec(
-                    'CREATE UNIQUE INDEX IF NOT EXISTS extensions.uniq_ext_signups_submissions_form_slug_email
-                     ON ext_signups_submissions (form_slug, email)'
-                );
-                $db->exec(
-                    'CREATE INDEX IF NOT EXISTS extensions.idx_ext_signups_submissions_form_slug_created_at
-                     ON ext_signups_submissions (form_slug, created_at DESC)'
-                );
-            }
-
-            $db->commit();
-        } catch (\Throwable $exception) {
-            if ($db->inTransaction()) {
-                $db->rollBack();
-            }
-
-            throw $exception;
-        }
+        $db->exec('ALTER TABLE ' . $table . ' DROP COLUMN form_target');
     }
 
     /**
