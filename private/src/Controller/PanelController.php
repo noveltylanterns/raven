@@ -2661,8 +2661,6 @@ final class PanelController
 
         if ($statusType === 'current') {
             $this->flash('success', 'System is current.');
-        } elseif ($statusType === 'newer') {
-            $this->flash('success', 'This install is newer than the selected upstream mirror.');
         } elseif ($statusType === 'diverged') {
             $this->flash('error', 'This install and upstream mirror have diverged revisions.');
         } elseif ($statusType === 'outdated') {
@@ -5770,7 +5768,7 @@ final class PanelController
         }
 
         if ($remoteRelation === 'ahead') {
-            $status['status'] = 'newer';
+            $status['status'] = 'diverged';
             $status['message'] = 'This install is newer than the latest upstream revision.';
             $this->saveUpdaterStatus($status);
             return $status;
@@ -5793,7 +5791,7 @@ final class PanelController
         // Fallback when compare API cannot resolve relationship.
         $versionRelation = $this->compareVersionStrings($currentVersion, $latestVersion);
         if ($versionRelation > 0) {
-            $status['status'] = 'newer';
+            $status['status'] = 'diverged';
             $status['message'] = 'This install version is newer than upstream.';
             $this->saveUpdaterStatus($status);
             return $status;
@@ -5872,7 +5870,11 @@ final class PanelController
             'local_branch' => $this->input->text((string) ($loaded['local_branch'] ?? ''), 120),
         ];
 
-        if (!in_array($status['status'], ['unknown', 'error', 'current', 'outdated', 'newer', 'diverged'], true)) {
+        if ($status['status'] === 'newer') {
+            $status['status'] = 'diverged';
+        }
+
+        if (!in_array($status['status'], ['unknown', 'error', 'current', 'outdated', 'diverged'], true)) {
             $status['status'] = 'unknown';
         }
 
