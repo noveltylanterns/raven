@@ -57,7 +57,7 @@ DB-backed extension data examples:
 Shared/core-managed data examples:
 
 - Enablement and permission masks in `private/ext/.state.php`
-- Signup submissions in DB table `ext_signups_submissions` via `WaitlistSignupRepository`
+- Signup submissions in DB table `ext_signups_submissions` via `SignupSubmissionRepository`
 
 So the correct model is:
 

@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/ext/signups/src/WaitlistSignupRepository.php
+ * ~/private/ext/signups/src/SignupSubmissionRepository.php
  * Repository for signup submission persistence and panel management queries.
  * Docs: https://raven.lanterns.io
  */
@@ -22,7 +22,7 @@ use RuntimeException;
 /**
  * Data access for Signup Sheets extension submissions.
  */
-final class WaitlistSignupRepository
+final class SignupSubmissionRepository
 {
     private PDO $db;
     private string $driver;

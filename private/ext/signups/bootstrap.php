@@ -10,7 +10,7 @@
 declare(strict_types=1);
 
 use Raven\Repository\SignupFormRepository;
-use Raven\Repository\WaitlistSignupRepository;
+use Raven\Repository\SignupSubmissionRepository;
 
 /**
  * Registers Signup Sheets extension services into the shared app container.
@@ -29,5 +29,5 @@ return static function (array &$app): void {
     $prefix = (string) $app['prefix'];
 
     $app['signup_forms'] = new SignupFormRepository($app['db'], $driver, $prefix);
-    $app['signup_submissions'] = new WaitlistSignupRepository($app['db'], $driver, $prefix);
+    $app['signup_submissions'] = new SignupSubmissionRepository($app['db'], $driver, $prefix);
 };

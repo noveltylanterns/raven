@@ -30,7 +30,7 @@ use Raven\Repository\RedirectRepository;
 use Raven\Repository\SignupFormRepository;
 use Raven\Repository\TaxonomyRepository;
 use Raven\Repository\UserRepository;
-use Raven\Repository\WaitlistSignupRepository;
+use Raven\Repository\SignupSubmissionRepository;
 
 use function Raven\Core\Support\redirect;
 
@@ -53,7 +53,7 @@ final class PublicController
     private ?SignupFormRepository $signupForms;
     private InputSanitizer $input;
     private Csrf $csrf;
-    private ?WaitlistSignupRepository $waitlistSignups;
+    private ?SignupSubmissionRepository $signupSubmissions;
     private bool $captchaScriptIncluded = false;
     /** @var array<string, bool>|null */
     private ?array $enabledExtensionMap = null;
@@ -79,7 +79,7 @@ final class PublicController
         ?SignupFormRepository $signupForms,
         InputSanitizer $input,
         Csrf $csrf,
-        ?WaitlistSignupRepository $waitlistSignups
+        ?SignupSubmissionRepository $signupSubmissions
     )
     {
         $this->view = $view;
@@ -96,7 +96,7 @@ final class PublicController
         $this->signupForms = $signupForms;
         $this->input = $input;
         $this->csrf = $csrf;
-        $this->waitlistSignups = $waitlistSignups;
+        $this->signupSubmissions = $signupSubmissions;
     }
 
     /**
@@ -472,7 +472,7 @@ final class PublicController
         if (
             !$this->isExtensionEnabled('signups')
             || !$this->signupForms instanceof SignupFormRepository
-            || !$this->waitlistSignups instanceof WaitlistSignupRepository
+            || !$this->signupSubmissions instanceof SignupSubmissionRepository
         ) {
             $this->notFound();
             return;
@@ -591,7 +591,7 @@ final class PublicController
         }
 
         try {
-            $this->waitlistSignups->create([
+            $this->signupSubmissions->create([
                 'form_slug' => $slug,
                 'email' => (string) $email,
                 'display_name' => $displayName,

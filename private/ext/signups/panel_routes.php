@@ -13,7 +13,7 @@ use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Routing\Router;
 use Raven\Repository\SignupFormRepository;
 use Raven\Repository\TaxonomyRepository;
-use Raven\Repository\WaitlistSignupRepository;
+use Raven\Repository\SignupSubmissionRepository;
 
 use function Raven\Core\Support\redirect;
 
@@ -50,7 +50,7 @@ return static function (Router $router, array $context): void {
 
     if (
         !$app['signup_forms'] instanceof SignupFormRepository
-        || !$app['signup_submissions'] instanceof WaitlistSignupRepository
+        || !$app['signup_submissions'] instanceof SignupSubmissionRepository
         || !$app['taxonomy'] instanceof TaxonomyRepository
     ) {
         return;
