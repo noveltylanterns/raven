@@ -5742,6 +5742,7 @@ final class PanelController
         if ($latestRevision === null) {
             $status['status'] = 'error';
             $status['message'] = 'Unable to fetch latest revision from upstream repository.';
+            $status['message'] = $this->appendUpdaterLastCheckedSuffix($status['message'], $checkedAt);
             $this->saveUpdaterStatus($status);
             return $status;
         }
@@ -5749,6 +5750,7 @@ final class PanelController
         if ($currentRevision === '') {
             $status['status'] = 'unknown';
             $status['message'] = 'Latest revision is known, but current install revision could not be detected.';
+            $status['message'] = $this->appendUpdaterLastCheckedSuffix($status['message'], $checkedAt);
             $this->saveUpdaterStatus($status);
             return $status;
         }
@@ -5761,8 +5763,8 @@ final class PanelController
 
         if ($remoteRelation === 'identical') {
             $status['status'] = 'current';
-            $status['message'] = 'This install matches the latest upstream revision.'
-                . ' (Last Checked: ' . $checkedAt . ' UTC)';
+            $status['message'] = 'This install matches the latest upstream revision.';
+            $status['message'] = $this->appendUpdaterLastCheckedSuffix($status['message'], $checkedAt);
             $this->saveUpdaterStatus($status);
             return $status;
         }
@@ -5770,6 +5772,7 @@ final class PanelController
         if ($remoteRelation === 'ahead') {
             $status['status'] = 'diverged';
             $status['message'] = 'This install is newer than the latest upstream revision.';
+            $status['message'] = $this->appendUpdaterLastCheckedSuffix($status['message'], $checkedAt);
             $this->saveUpdaterStatus($status);
             return $status;
         }
@@ -5777,6 +5780,7 @@ final class PanelController
         if ($remoteRelation === 'behind') {
             $status['status'] = 'outdated';
             $status['message'] = 'A newer upstream revision is available.';
+            $status['message'] = $this->appendUpdaterLastCheckedSuffix($status['message'], $checkedAt);
             $this->saveUpdaterStatus($status);
             return $status;
         }
@@ -5784,6 +5788,7 @@ final class PanelController
         if ($remoteRelation === 'diverged') {
             $status['status'] = 'diverged';
             $status['message'] = 'This install and upstream are on diverged revisions.';
+            $status['message'] = $this->appendUpdaterLastCheckedSuffix($status['message'], $checkedAt);
             $this->saveUpdaterStatus($status);
             return $status;
         }
@@ -5793,6 +5798,7 @@ final class PanelController
         if ($versionRelation > 0) {
             $status['status'] = 'diverged';
             $status['message'] = 'This install version is newer than upstream.';
+            $status['message'] = $this->appendUpdaterLastCheckedSuffix($status['message'], $checkedAt);
             $this->saveUpdaterStatus($status);
             return $status;
         }
@@ -5800,12 +5806,14 @@ final class PanelController
         if ($versionRelation < 0) {
             $status['status'] = 'outdated';
             $status['message'] = 'A newer upstream version is available.';
+            $status['message'] = $this->appendUpdaterLastCheckedSuffix($status['message'], $checkedAt);
             $this->saveUpdaterStatus($status);
             return $status;
         }
 
         $status['status'] = 'diverged';
         $status['message'] = 'Revision differs from upstream, but relationship could not be resolved.';
+        $status['message'] = $this->appendUpdaterLastCheckedSuffix($status['message'], $checkedAt);
         $this->saveUpdaterStatus($status);
 
         return $status;
@@ -6034,6 +6042,22 @@ final class PanelController
         }
 
         return 0;
+    }
+
+    /**
+     * Appends/normalizes the updater "Last Checked" suffix for status messages.
+     */
+    private function appendUpdaterLastCheckedSuffix(string $message, string $checkedAt): string
+    {
+        $message = trim($message);
+        $checkedAt = trim($checkedAt);
+
+        if ($message === '' || $checkedAt === '') {
+            return $message;
+        }
+
+        $message = preg_replace('/\s*\(Last Checked:\s*[^)]+\)\s*$/i', '', $message) ?? $message;
+        return $message . ' (Last Checked: ' . $checkedAt . ' UTC)';
     }
 
     /**
