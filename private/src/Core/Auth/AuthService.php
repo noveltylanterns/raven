@@ -34,6 +34,23 @@ final class AuthService
     /** Delight Auth instance, when dependency is installed. */
     private mixed $auth = null;
 
+    /**
+     * Request-local cache for user group lookups.
+     *
+     * @var array<int, array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>>
+     */
+    private array $groupsForUserCache = [];
+
+    /**
+     * Request-local cache for merged permission masks by user id.
+     *
+     * @var array<int, int>
+     */
+    private array $permissionMaskForUserCache = [];
+
+    /** Request-local cache for guest permission mask lookup. */
+    private ?int $permissionMaskForGuestCache = null;
+
     public function __construct(PDO $authDb, PDO $appDb, string $driver, string $prefix)
     {
         $this->authDb = $authDb;
@@ -382,11 +399,13 @@ final class AuthService
             $this->auth->logOut();
             // Clear panel identity cache used by shared layout headings.
             unset($_SESSION['raven_panel_identity']);
+            $this->clearPermissionCaches();
             return;
         }
 
         unset($_SESSION['raven_user_id']);
         unset($_SESSION['raven_panel_identity']);
+        $this->clearPermissionCaches();
     }
 
     /**
@@ -719,6 +738,10 @@ final class AuthService
      */
     public function groupsForUser(int $userId): array
     {
+        if ($userId > 0 && array_key_exists($userId, $this->groupsForUserCache)) {
+            return $this->groupsForUserCache[$userId];
+        }
+
         $groupsTable = $this->groupTable('groups');
         $userGroupsTable = $this->groupTable('user_groups');
 
@@ -742,6 +765,10 @@ final class AuthService
                 'permission_mask' => (int) $row['permission_mask'],
                 'is_stock' => (int) $row['is_stock'],
             ];
+        }
+
+        if ($userId > 0) {
+            $this->groupsForUserCache[$userId] = $result;
         }
 
         return $result;
@@ -788,6 +815,8 @@ final class AuthService
             ':user_id' => $userId,
             ':group_id' => (int) $groupId,
         ]);
+
+        $this->invalidateUserPermissionCaches($userId);
     }
 
     /**
@@ -795,15 +824,26 @@ final class AuthService
      */
     private function permissionMaskForUser(int $userId): int
     {
+        if ($userId > 0 && array_key_exists($userId, $this->permissionMaskForUserCache)) {
+            return $this->permissionMaskForUserCache[$userId];
+        }
+
         $mask = 0;
 
         foreach ($this->groupsForUser($userId) as $group) {
             // Banned membership is a hard deny that overrides all other group grants.
             if (strtolower(trim((string) ($group['slug'] ?? ''))) === 'banned') {
+                if ($userId > 0) {
+                    $this->permissionMaskForUserCache[$userId] = 0;
+                }
                 return 0;
             }
 
             $mask |= (int) $group['permission_mask'];
+        }
+
+        if ($userId > 0) {
+            $this->permissionMaskForUserCache[$userId] = $mask;
         }
 
         return $mask;
@@ -814,6 +854,10 @@ final class AuthService
      */
     private function permissionMaskForGuest(): int
     {
+        if ($this->permissionMaskForGuestCache !== null) {
+            return $this->permissionMaskForGuestCache;
+        }
+
         $groupsTable = $this->groupTable('groups');
 
         $stmt = $this->appDb->prepare(
@@ -825,7 +869,32 @@ final class AuthService
         $stmt->execute([':slug' => 'guest']);
         $mask = $stmt->fetchColumn();
 
-        return $mask === false ? 0 : (int) $mask;
+        $resolvedMask = $mask === false ? 0 : (int) $mask;
+        $this->permissionMaskForGuestCache = $resolvedMask;
+
+        return $resolvedMask;
+    }
+
+    /**
+     * Clears all request-local permission/group caches.
+     */
+    private function clearPermissionCaches(): void
+    {
+        $this->groupsForUserCache = [];
+        $this->permissionMaskForUserCache = [];
+        $this->permissionMaskForGuestCache = null;
+    }
+
+    /**
+     * Clears request-local permission/group caches for one user id.
+     */
+    private function invalidateUserPermissionCaches(int $userId): void
+    {
+        if ($userId <= 0) {
+            return;
+        }
+
+        unset($this->groupsForUserCache[$userId], $this->permissionMaskForUserCache[$userId]);
     }
 
     /**
