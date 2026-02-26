@@ -65,114 +65,103 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
 </div>
 
 <?php if ($canManageConfiguration): ?>
-    <div class="d-flex justify-content-end mb-3">
-        <a class="btn btn-secondary" href="<?= e($extensionsPath) ?>"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Extensions</a>
-    </div>
+    <?php if ($canLaunchAdminer): ?>
+        <div class="d-flex justify-content-end mb-3">
+            <button
+                type="button"
+                class="btn btn-success"
+                data-bs-toggle="modal"
+                data-bs-target="#ravenAdminerLaunchModal"
+            >
+                Open Adminer<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i>
+            </button>
+        </div>
+    <?php endif; ?>
 
     <div class="card mb-3">
         <div class="card-body">
-            <div class="row g-4">
-                <div class="col-12 col-lg-5">
-                    <h2 class="h5 mb-3">Launch Adminer</h2>
+            <?php if (!$extensionEntrypointExists): ?>
+                <div class="alert alert-danger mb-3" role="alert">
+                    Extension entrypoint is missing at <code>~/private/ext/database/adminer.php</code>.
+                </div>
+            <?php elseif (!$adminerInstalled): ?>
+                <div class="alert alert-warning mb-3" role="alert">
+                    Adminer dependency is not installed locally yet.
+                    Run <code>composer update</code> (or <code>composer require vrana/adminer:^5.3</code>) when network access is available.
+                </div>
+            <?php endif; ?>
 
-                    <?php if (!$extensionEntrypointExists): ?>
-                        <div class="alert alert-danger mb-0" role="alert">
-                            Extension entrypoint is missing at <code>~/private/ext/database/adminer.php</code>.
-                        </div>
-                    <?php elseif (!$adminerInstalled): ?>
-                        <div class="alert alert-warning mb-0" role="alert">
-                            Adminer dependency is not installed locally yet.
-                            Run <code>composer update</code> (or <code>composer require vrana/adminer:^5.3</code>) when network access is available.
-                        </div>
-                    <?php else: ?>
-                        <p class="mb-3">
-                            Open the Adminer launch targets:
-                        </p>
-                        <button
-                            type="button"
-                            class="btn btn-success"
-                            data-bs-toggle="modal"
-                            data-bs-target="#ravenAdminerLaunchModal"
-                        >
-                            Open Adminer<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i>
-                        </button>
+            <h2 class="h5 mb-3">Connection Summary</h2>
+
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <tbody>
+                    <tr>
+                        <th scope="row" style="width: 220px;">Active Driver</th>
+                        <td><code><?= e($driver) ?></code></td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Table Prefix</th>
+                        <td><code><?= e((string) ($databaseSummary['table_prefix'] ?? '')) ?></code></td>
+                    </tr>
+
+                    <?php if ($driver === 'sqlite'): ?>
+                        <tr>
+                            <th scope="row">SQLite Base Path</th>
+                            <td><code><?= e((string) ($databaseSummary['sqlite_base_path'] ?? '')) ?></code></td>
+                        </tr>
+                        <tr>
+                            <th scope="row">SQLite Files</th>
+                            <td>
+                                <?php $sqliteFiles = (array) ($databaseSummary['sqlite_files'] ?? []); ?>
+                                <?php if ($sqliteFiles === []): ?>
+                                    <span class="text-muted">&lt;none&gt;</span>
+                                <?php else: ?>
+                                    <?php foreach ($sqliteFiles as $key => $filename): ?>
+                                        <div><code><?= e((string) $key) ?></code>: <code><?= e((string) $filename) ?></code></div>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php elseif ($driver === 'mysql'): ?>
+                        <?php $mysql = (array) ($databaseSummary['mysql'] ?? []); ?>
+                        <tr>
+                            <th scope="row">MySQL Host</th>
+                            <td><code><?= e((string) ($mysql['host'] ?? '')) ?></code></td>
+                        </tr>
+                        <tr>
+                            <th scope="row">MySQL Port</th>
+                            <td><code><?= e((string) ($mysql['port'] ?? '')) ?></code></td>
+                        </tr>
+                        <tr>
+                            <th scope="row">MySQL Database</th>
+                            <td><code><?= e((string) ($mysql['dbname'] ?? '')) ?></code></td>
+                        </tr>
+                        <tr>
+                            <th scope="row">MySQL User</th>
+                            <td><code><?= e((string) ($mysql['user'] ?? '')) ?></code></td>
+                        </tr>
+                    <?php elseif ($driver === 'pgsql'): ?>
+                        <?php $pgsql = (array) ($databaseSummary['pgsql'] ?? []); ?>
+                        <tr>
+                            <th scope="row">PostgreSQL Host</th>
+                            <td><code><?= e((string) ($pgsql['host'] ?? '')) ?></code></td>
+                        </tr>
+                        <tr>
+                            <th scope="row">PostgreSQL Port</th>
+                            <td><code><?= e((string) ($pgsql['port'] ?? '')) ?></code></td>
+                        </tr>
+                        <tr>
+                            <th scope="row">PostgreSQL Database</th>
+                            <td><code><?= e((string) ($pgsql['dbname'] ?? '')) ?></code></td>
+                        </tr>
+                        <tr>
+                            <th scope="row">PostgreSQL User</th>
+                            <td><code><?= e((string) ($pgsql['user'] ?? '')) ?></code></td>
+                        </tr>
                     <?php endif; ?>
-                </div>
-
-                <div class="col-12 col-lg-7">
-                    <h2 class="h5 mb-3">Connection Summary</h2>
-
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle mb-0">
-                            <tbody>
-                            <tr>
-                                <th scope="row" style="width: 220px;">Active Driver</th>
-                                <td><code><?= e($driver) ?></code></td>
-                            </tr>
-                            <tr>
-                                <th scope="row">Table Prefix</th>
-                                <td><code><?= e((string) ($databaseSummary['table_prefix'] ?? '')) ?></code></td>
-                            </tr>
-
-                            <?php if ($driver === 'sqlite'): ?>
-                                <tr>
-                                    <th scope="row">SQLite Base Path</th>
-                                    <td><code><?= e((string) ($databaseSummary['sqlite_base_path'] ?? '')) ?></code></td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">SQLite Files</th>
-                                    <td>
-                                        <?php $sqliteFiles = (array) ($databaseSummary['sqlite_files'] ?? []); ?>
-                                        <?php if ($sqliteFiles === []): ?>
-                                            <span class="text-muted">&lt;none&gt;</span>
-                                        <?php else: ?>
-                                            <?php foreach ($sqliteFiles as $key => $filename): ?>
-                                                <div><code><?= e((string) $key) ?></code>: <code><?= e((string) $filename) ?></code></div>
-                                            <?php endforeach; ?>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                            <?php elseif ($driver === 'mysql'): ?>
-                                <?php $mysql = (array) ($databaseSummary['mysql'] ?? []); ?>
-                                <tr>
-                                    <th scope="row">MySQL Host</th>
-                                    <td><code><?= e((string) ($mysql['host'] ?? '')) ?></code></td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">MySQL Port</th>
-                                    <td><code><?= e((string) ($mysql['port'] ?? '')) ?></code></td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">MySQL Database</th>
-                                    <td><code><?= e((string) ($mysql['dbname'] ?? '')) ?></code></td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">MySQL User</th>
-                                    <td><code><?= e((string) ($mysql['user'] ?? '')) ?></code></td>
-                                </tr>
-                            <?php elseif ($driver === 'pgsql'): ?>
-                                <?php $pgsql = (array) ($databaseSummary['pgsql'] ?? []); ?>
-                                <tr>
-                                    <th scope="row">PostgreSQL Host</th>
-                                    <td><code><?= e((string) ($pgsql['host'] ?? '')) ?></code></td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">PostgreSQL Port</th>
-                                    <td><code><?= e((string) ($pgsql['port'] ?? '')) ?></code></td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">PostgreSQL Database</th>
-                                    <td><code><?= e((string) ($pgsql['dbname'] ?? '')) ?></code></td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">PostgreSQL User</th>
-                                    <td><code><?= e((string) ($pgsql['user'] ?? '')) ?></code></td>
-                                </tr>
-                            <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -239,14 +228,16 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
         </div>
     <?php endif; ?>
 
-    <div class="d-flex justify-content-end">
-        <a class="btn btn-secondary" href="<?= e($extensionsPath) ?>"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Extensions</a>
-    </div>
-<?php else: ?>
-    <div class="d-flex justify-content-end mb-3">
-        <a class="btn btn-secondary" href="<?= e($extensionsPath) ?>"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Extensions</a>
-    </div>
-    <div class="d-flex justify-content-end">
-        <a class="btn btn-secondary" href="<?= e($extensionsPath) ?>"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Extensions</a>
-    </div>
+    <?php if ($canLaunchAdminer): ?>
+        <div class="d-flex justify-content-end">
+            <button
+                type="button"
+                class="btn btn-success"
+                data-bs-toggle="modal"
+                data-bs-target="#ravenAdminerLaunchModal"
+            >
+                Open Adminer<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i>
+            </button>
+        </div>
+    <?php endif; ?>
 <?php endif; ?>
