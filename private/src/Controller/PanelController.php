@@ -6020,17 +6020,7 @@ final class PanelController
             'local_branch' => $this->detectLocalBranch() ?? '',
         ];
 
-        $statePath = $this->updaterStateFilePath();
-        if (!is_file($statePath)) {
-            return $default;
-        }
-
-        if (function_exists('opcache_invalidate')) {
-            @opcache_invalidate($statePath, true);
-        }
-
-        /** @var mixed $loaded */
-        $loaded = require $statePath;
+        $loaded = $this->loadUpdaterStatePayload();
         if (!is_array($loaded)) {
             return $default;
         }
@@ -6065,7 +6055,7 @@ final class PanelController
     }
 
     /**
-     * Saves updater status cache to `private/tmp/updater_state.php`.
+     * Saves updater status cache to `private/tmp/updater_state.json`.
      *
      * @param array<string, string> $status
      */
@@ -6076,22 +6066,13 @@ final class PanelController
             return;
         }
 
-        $export = var_export($status, true);
-        $content = "<?php\n\n";
-        $content .= "/**\n";
-        $content .= " * RAVEN CMS\n";
-        $content .= " * ~/private/tmp/updater_state.php\n";
-        $content .= " * Cached update-check status for Update System page.\n";
-        $content .= " * Docs: https://raven.lanterns.io\n";
-        $content .= " */\n\n";
-        $content .= "declare(strict_types=1);\n\n";
-        $content .= "return " . $export . ";\n";
-
+        $content = json_encode($status, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if (!is_string($content) || $content === '') {
+            return;
+        }
+        $content .= "\n";
         $statePath = $this->updaterStateFilePath();
         @file_put_contents($statePath, $content, LOCK_EX);
-        if (function_exists('opcache_invalidate')) {
-            @opcache_invalidate($statePath, true);
-        }
     }
 
     /**
@@ -6099,7 +6080,52 @@ final class PanelController
      */
     private function updaterStateFilePath(): string
     {
+        return dirname(__DIR__, 2) . '/tmp/updater_state.json';
+    }
+
+    /**
+     * Returns legacy updater cache PHP path for one-time fallback reads.
+     */
+    private function legacyUpdaterStateFilePath(): string
+    {
         return dirname(__DIR__, 2) . '/tmp/updater_state.php';
+    }
+
+    /**
+     * Loads updater state payload from JSON with legacy PHP fallback.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function loadUpdaterStatePayload(): ?array
+    {
+        $jsonPath = $this->updaterStateFilePath();
+        if (is_file($jsonPath)) {
+            $raw = @file_get_contents($jsonPath);
+            if (is_string($raw) && trim($raw) !== '') {
+                /** @var mixed $decoded */
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) {
+                    return $decoded;
+                }
+            }
+        }
+
+        $legacyPath = $this->legacyUpdaterStateFilePath();
+        if (!is_file($legacyPath)) {
+            return null;
+        }
+
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($legacyPath, true);
+        }
+
+        /** @var mixed $legacy */
+        $legacy = require $legacyPath;
+        if (!is_array($legacy)) {
+            return null;
+        }
+
+        return $legacy;
     }
 
     /**
