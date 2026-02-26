@@ -105,6 +105,80 @@ final class TagRepository
     }
 
     /**
+     * Returns one paginated tag page plus total row count in one query.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     */
+    public function listPageForPanel(int $limit = 50, int $offset = 0): array
+    {
+        $tags = $this->table('tags');
+        $pageTags = $this->table('page_tags');
+        $safeLimit = max(1, $limit);
+        $safeOffset = max(0, $offset);
+
+        $stmt = $this->db->prepare(
+            'SELECT page_rows.id,
+                    page_rows.name,
+                    page_rows.slug,
+                    page_rows.description,
+                    page_rows.created_at,
+                    page_rows.cover_image_path,
+                    page_rows.cover_image_sm_path,
+                    page_rows.cover_image_md_path,
+                    page_rows.cover_image_lg_path,
+                    page_rows.preview_image_path,
+                    page_rows.preview_image_sm_path,
+                    page_rows.preview_image_md_path,
+                    page_rows.preview_image_lg_path,
+                    page_rows.page_count,
+                    totals.total_rows
+             FROM (
+                 SELECT t.id, t.name, t.slug, t.description, t.created_at,
+                        t.cover_image_path, t.cover_image_sm_path, t.cover_image_md_path, t.cover_image_lg_path,
+                        t.preview_image_path, t.preview_image_sm_path, t.preview_image_md_path, t.preview_image_lg_path,
+                        COALESCE(pt.page_count, 0) AS page_count
+                 FROM ' . $tags . ' t
+                 LEFT JOIN (
+                     SELECT tag_id, COUNT(*) AS page_count
+                     FROM ' . $pageTags . '
+                     GROUP BY tag_id
+                 ) pt ON pt.tag_id = t.id
+                 ORDER BY t.name ASC, t.id ASC
+                 LIMIT :limit OFFSET :offset
+             ) AS page_rows
+             CROSS JOIN (
+                 SELECT COUNT(*) AS total_rows
+                 FROM ' . $tags . '
+             ) AS totals'
+        );
+        $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $total = 0;
+        $resultRows = [];
+        foreach ($rows as $row) {
+            if ($total === 0) {
+                $total = (int) ($row['total_rows'] ?? 0);
+            }
+
+            unset($row['total_rows']);
+            $resultRows[] = $row;
+        }
+
+        // Offset can target an empty page while rows still exist; recover accurate total.
+        if ($resultRows === [] && $safeOffset > 0) {
+            $total = $this->countForPanel();
+        }
+
+        return [
+            'rows' => $resultRows,
+            'total' => $total,
+        ];
+    }
+
+    /**
      * Returns minimal tag options for panel select controls.
      *
      * @return array<int, array{id: int, name: string, slug: string}>

@@ -93,6 +93,71 @@ final class RedirectRepository
     }
 
     /**
+     * Returns one paginated redirect page plus total row count in one query.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     */
+    public function listPageForPanel(int $limit = 50, int $offset = 0): array
+    {
+        $redirects = $this->table('redirects');
+        $channels = $this->table('channels');
+        $safeLimit = max(1, $limit);
+        $safeOffset = max(0, $offset);
+
+        $stmt = $this->db->prepare(
+            'SELECT page_rows.id,
+                    page_rows.title,
+                    page_rows.description,
+                    page_rows.slug,
+                    page_rows.channel_id,
+                    page_rows.is_active,
+                    page_rows.target_url,
+                    page_rows.created_at,
+                    page_rows.updated_at,
+                    page_rows.channel_slug,
+                    page_rows.channel_name,
+                    totals.total_rows
+             FROM (
+                 SELECT r.id, r.title, r.description, r.slug, r.channel_id, r.is_active, r.target_url, r.created_at, r.updated_at,
+                        c.slug AS channel_slug, c.name AS channel_name
+                 FROM ' . $redirects . ' r
+                 LEFT JOIN ' . $channels . ' c ON c.id = r.channel_id
+                 ORDER BY r.updated_at DESC, r.id DESC
+                 LIMIT :limit OFFSET :offset
+             ) AS page_rows
+             CROSS JOIN (
+                 SELECT COUNT(*) AS total_rows
+                 FROM ' . $redirects . '
+             ) AS totals'
+        );
+        $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $total = 0;
+        $resultRows = [];
+        foreach ($rows as $row) {
+            if ($total === 0) {
+                $total = (int) ($row['total_rows'] ?? 0);
+            }
+
+            unset($row['total_rows']);
+            $resultRows[] = $row;
+        }
+
+        // Offset can target an empty page while rows still exist; recover accurate total.
+        if ($resultRows === [] && $safeOffset > 0) {
+            $total = $this->countForPanel();
+        }
+
+        return [
+            'rows' => $resultRows,
+            'total' => $total,
+        ];
+    }
+
+    /**
      * Returns one redirect row by id for panel edit form.
      *
      * @return array<string, mixed>|null

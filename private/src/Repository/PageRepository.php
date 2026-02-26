@@ -234,6 +234,109 @@ final class PageRepository
     }
 
     /**
+     * Returns one paginated panel page-list page plus total row count.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     */
+    public function listPageForPanel(
+        int $limit = 50,
+        int $offset = 0,
+        ?string $channelSlug = null,
+        ?int $categoryId = null,
+        ?int $tagId = null
+    ): array {
+        $pages = $this->table('pages');
+        $channels = $this->table('channels');
+        $pageCategories = $this->table('page_categories');
+        $pageTags = $this->table('page_tags');
+        $safeLimit = max(1, $limit);
+        $safeOffset = max(0, $offset);
+
+        $pageWhere = ['1 = 1'];
+        $pageParams = [];
+        $this->appendPanelFilterClauses(
+            $pageWhere,
+            $pageParams,
+            $channelSlug,
+            $categoryId,
+            $tagId,
+            $pageCategories,
+            $pageTags,
+            'page_filter'
+        );
+
+        $countWhere = ['1 = 1'];
+        $countParams = [];
+        $this->appendPanelFilterClauses(
+            $countWhere,
+            $countParams,
+            $channelSlug,
+            $categoryId,
+            $tagId,
+            $pageCategories,
+            $pageTags,
+            'count_filter'
+        );
+
+        $stmt = $this->db->prepare(
+            'SELECT page_rows.id,
+                    page_rows.title,
+                    page_rows.slug,
+                    page_rows.is_published,
+                    page_rows.published_at,
+                    page_rows.channel_slug,
+                    totals.total_rows
+             FROM (
+                 SELECT p.id, p.title, p.slug, p.is_published, p.published_at,
+                        c.slug AS channel_slug
+                 FROM ' . $pages . ' p
+                 LEFT JOIN ' . $channels . ' c ON c.id = p.channel_id
+                 WHERE ' . implode(' AND ', $pageWhere) . '
+                 ORDER BY COALESCE(p.published_at, p.created_at) DESC
+                 LIMIT :limit OFFSET :offset
+             ) AS page_rows
+             CROSS JOIN (
+                 SELECT COUNT(*) AS total_rows
+                 FROM ' . $pages . ' p
+                 LEFT JOIN ' . $channels . ' c ON c.id = p.channel_id
+                 WHERE ' . implode(' AND ', $countWhere) . '
+             ) AS totals'
+        );
+
+        foreach ($pageParams as $key => $value) {
+            $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        foreach ($countParams as $key => $value) {
+            $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $total = 0;
+        $resultRows = [];
+        foreach ($rows as $row) {
+            if ($total === 0) {
+                $total = (int) ($row['total_rows'] ?? 0);
+            }
+
+            unset($row['total_rows']);
+            $resultRows[] = $row;
+        }
+
+        // Offset can target an empty page while rows still exist; recover accurate total.
+        if ($resultRows === [] && $safeOffset > 0) {
+            $total = $this->countForPanel($channelSlug, $categoryId, $tagId);
+        }
+
+        return [
+            'rows' => $resultRows,
+            'total' => $total,
+        ];
+    }
+
+    /**
      * Returns all pages with channel context for routing inventory screens.
      *
      * @return array<int, array<string, mixed>>
@@ -567,40 +670,40 @@ final class PageRepository
             ];
         }
 
-        $placeholders = implode(', ', array_fill(0, count($normalizedPageIds), '?'));
+        $categoryPlaceholders = implode(', ', array_fill(0, count($normalizedPageIds), '?'));
+        $tagPlaceholders = implode(', ', array_fill(0, count($normalizedPageIds), '?'));
         $pageCategories = $this->table('page_categories');
         $pageTags = $this->table('page_tags');
 
-        $categoryStmt = $this->db->prepare(
-            'SELECT page_id, category_id
-             FROM ' . $pageCategories . '
-             WHERE page_id IN (' . $placeholders . ')'
+        $assignmentStmt = $this->db->prepare(
+            'SELECT page_id, taxonomy_id, taxonomy_type
+             FROM (
+                 SELECT page_id, category_id AS taxonomy_id, \'category\' AS taxonomy_type
+                 FROM ' . $pageCategories . '
+                 WHERE page_id IN (' . $categoryPlaceholders . ')
+                 UNION ALL
+                 SELECT page_id, tag_id AS taxonomy_id, \'tag\' AS taxonomy_type
+                 FROM ' . $pageTags . '
+                 WHERE page_id IN (' . $tagPlaceholders . ')
+             ) AS assignment_rows'
         );
-        $categoryStmt->execute($normalizedPageIds);
-        foreach ($categoryStmt->fetchAll() ?: [] as $row) {
+        $assignmentStmt->execute(array_merge($normalizedPageIds, $normalizedPageIds));
+        foreach ($assignmentStmt->fetchAll() ?: [] as $row) {
             $pageId = (int) ($row['page_id'] ?? 0);
-            $categoryId = (int) ($row['category_id'] ?? 0);
-            if ($pageId < 1 || $categoryId < 1 || !isset($result[$pageId])) {
+            $taxonomyId = (int) ($row['taxonomy_id'] ?? 0);
+            $taxonomyType = strtolower(trim((string) ($row['taxonomy_type'] ?? '')));
+            if ($pageId < 1 || $taxonomyId < 1 || !isset($result[$pageId])) {
                 continue;
             }
 
-            $result[$pageId]['categories'][$categoryId] = $categoryId;
-        }
-
-        $tagStmt = $this->db->prepare(
-            'SELECT page_id, tag_id
-             FROM ' . $pageTags . '
-             WHERE page_id IN (' . $placeholders . ')'
-        );
-        $tagStmt->execute($normalizedPageIds);
-        foreach ($tagStmt->fetchAll() ?: [] as $row) {
-            $pageId = (int) ($row['page_id'] ?? 0);
-            $tagId = (int) ($row['tag_id'] ?? 0);
-            if ($pageId < 1 || $tagId < 1 || !isset($result[$pageId])) {
+            if ($taxonomyType === 'category') {
+                $result[$pageId]['categories'][$taxonomyId] = $taxonomyId;
                 continue;
             }
 
-            $result[$pageId]['tags'][$tagId] = $tagId;
+            if ($taxonomyType === 'tag') {
+                $result[$pageId]['tags'][$taxonomyId] = $taxonomyId;
+            }
         }
 
         foreach ($result as $pageId => $assignments) {
@@ -1061,12 +1164,22 @@ final class PageRepository
         ?int $categoryId,
         ?int $tagId,
         string $pageCategoriesTable,
-        string $pageTagsTable
+        string $pageTagsTable,
+        string $placeholderPrefix = 'filter'
     ): void {
+        $placeholderPrefix = trim($placeholderPrefix);
+        if ($placeholderPrefix === '') {
+            $placeholderPrefix = 'filter';
+        }
+
+        $channelSlugPlaceholder = ':' . $placeholderPrefix . '_channel_slug';
+        $categoryIdPlaceholder = ':' . $placeholderPrefix . '_category_id';
+        $tagIdPlaceholder = ':' . $placeholderPrefix . '_tag_id';
+
         $channelSlug = trim((string) ($channelSlug ?? ''));
         if ($channelSlug !== '') {
-            $where[] = 'LOWER(COALESCE(c.slug, \'\')) = :filter_channel_slug';
-            $params[':filter_channel_slug'] = strtolower($channelSlug);
+            $where[] = 'LOWER(COALESCE(c.slug, \'\')) = ' . $channelSlugPlaceholder;
+            $params[$channelSlugPlaceholder] = strtolower($channelSlug);
         }
 
         $categoryId = $categoryId !== null && $categoryId > 0 ? $categoryId : null;
@@ -1075,9 +1188,9 @@ final class PageRepository
                 SELECT 1
                 FROM ' . $pageCategoriesTable . ' pc
                 WHERE pc.page_id = p.id
-                  AND pc.category_id = :filter_category_id
+                  AND pc.category_id = ' . $categoryIdPlaceholder . '
             )';
-            $params[':filter_category_id'] = $categoryId;
+            $params[$categoryIdPlaceholder] = $categoryId;
         }
 
         $tagId = $tagId !== null && $tagId > 0 ? $tagId : null;
@@ -1086,9 +1199,9 @@ final class PageRepository
                 SELECT 1
                 FROM ' . $pageTagsTable . ' pt
                 WHERE pt.page_id = p.id
-                  AND pt.tag_id = :filter_tag_id
+                  AND pt.tag_id = ' . $tagIdPlaceholder . '
             )';
-            $params[':filter_tag_id'] = $tagId;
+            $params[$tagIdPlaceholder] = $tagId;
         }
     }
 }

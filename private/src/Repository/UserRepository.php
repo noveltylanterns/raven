@@ -165,6 +165,127 @@ final class UserRepository
     }
 
     /**
+     * Returns one paginated panel-user page plus total row count.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     */
+    public function listPageForPanel(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
+    {
+        $normalizedGroupFilter = strtolower(trim((string) ($groupNameFilter ?? '')));
+        $safeLimit = max(1, $limit);
+        $safeOffset = max(0, $offset);
+        $usersTable = $this->authTable('users');
+        $users = [];
+        $total = 0;
+
+        if ($normalizedGroupFilter === '') {
+            $stmt = $this->authDb->prepare(
+                'SELECT id, username, display_name, email, theme, avatar_path, COUNT(*) OVER() AS total_rows
+                 FROM ' . $usersTable . '
+                 ORDER BY id ASC
+                 LIMIT :limit OFFSET :offset'
+            );
+            $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
+            $stmt->execute();
+            $users = $stmt->fetchAll() ?: [];
+        } else {
+            $groups = $this->groupTable('groups');
+            $userGroups = $this->groupTable('user_groups');
+            $stmt = $this->appDb->prepare(
+                'WITH filtered_user_ids AS (
+                     SELECT DISTINCT ug.user_id
+                     FROM ' . $userGroups . ' ug
+                     INNER JOIN ' . $groups . ' g ON g.id = ug.group_id
+                     WHERE LOWER(g.name) = :group_name
+                 )
+                 SELECT user_id, COUNT(*) OVER() AS total_rows
+                 FROM filtered_user_ids
+                 ORDER BY user_id ASC
+                 LIMIT :limit OFFSET :offset'
+            );
+            $stmt->bindValue(':group_name', $normalizedGroupFilter, PDO::PARAM_STR);
+            $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
+            $stmt->execute();
+            $idRows = $stmt->fetchAll() ?: [];
+            $userIds = [];
+            foreach ($idRows as $row) {
+                if ($total === 0) {
+                    $total = (int) ($row['total_rows'] ?? 0);
+                }
+
+                $userId = (int) ($row['user_id'] ?? 0);
+                if ($userId > 0) {
+                    $userIds[$userId] = $userId;
+                }
+            }
+            $userIds = array_values($userIds);
+
+            // Offset can target an empty page while rows still exist; recover accurate total.
+            if ($userIds === [] && $safeOffset > 0) {
+                $total = $this->countForPanel($normalizedGroupFilter);
+            }
+
+            if ($userIds === []) {
+                return [
+                    'rows' => [],
+                    'total' => $total,
+                ];
+            }
+
+            $placeholders = [];
+            $params = [];
+            foreach ($userIds as $index => $userId) {
+                $placeholder = ':user_id_' . $index;
+                $placeholders[] = $placeholder;
+                $params[$placeholder] = $userId;
+            }
+
+            $userStmt = $this->authDb->prepare(
+                'SELECT id, username, display_name, email, theme, avatar_path
+                 FROM ' . $usersTable . '
+                 WHERE id IN (' . implode(', ', $placeholders) . ')
+                 ORDER BY id ASC'
+            );
+            $userStmt->execute($params);
+            $users = $userStmt->fetchAll() ?: [];
+        }
+
+        $userIds = [];
+        foreach ($users as $row) {
+            if ($total === 0) {
+                $total = (int) ($row['total_rows'] ?? 0);
+            }
+
+            $userId = (int) ($row['id'] ?? 0);
+            if ($userId > 0) {
+                $userIds[$userId] = $userId;
+            }
+        }
+        $userIds = array_values($userIds);
+
+        // Offset can target an empty page while rows still exist; recover accurate total.
+        if ($userIds === [] && $safeOffset > 0) {
+            $total = $this->countForPanel($normalizedGroupFilter !== '' ? $normalizedGroupFilter : null);
+        }
+
+        if ($userIds === []) {
+            return [
+                'rows' => [],
+                'total' => $total,
+            ];
+        }
+
+        $groupMap = $this->groupEntriesByUserId($userIds);
+
+        return [
+            'rows' => $this->hydratePanelUsers($users, $groupMap),
+            'total' => $total,
+        ];
+    }
+
+    /**
      * Returns one user by id including assigned group ids.
      *
      * @return array<string, mixed>|null

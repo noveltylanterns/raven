@@ -131,6 +131,75 @@ final class GroupRepository
     }
 
     /**
+     * Returns one paginated group page plus total row count in one query.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     */
+    public function listPageForPanel(int $limit = 50, int $offset = 0): array
+    {
+        $groups = $this->table('groups');
+        $userGroups = $this->table('user_groups');
+        $safeLimit = max(1, $limit);
+        $safeOffset = max(0, $offset);
+
+        $stmt = $this->db->prepare(
+            'SELECT page_rows.id,
+                    page_rows.name,
+                    page_rows.slug,
+                    page_rows.route_enabled,
+                    page_rows.permission_mask,
+                    page_rows.is_stock,
+                    page_rows.created_at,
+                    page_rows.member_count,
+                    totals.total_rows
+             FROM (
+                 SELECT g.id, g.name, g.slug, g.route_enabled, g.permission_mask, g.is_stock, g.created_at,
+                        COALESCE(ug.member_count, 0) AS member_count
+                 FROM ' . $groups . ' g
+                 LEFT JOIN (
+                     SELECT group_id, COUNT(*) AS member_count
+                     FROM ' . $userGroups . '
+                     GROUP BY group_id
+                 ) ug ON ug.group_id = g.id
+                 ORDER BY g.id ASC
+                 LIMIT :limit OFFSET :offset
+             ) AS page_rows
+             CROSS JOIN (
+                 SELECT COUNT(*) AS total_rows
+                 FROM ' . $groups . '
+             ) AS totals'
+        );
+        $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $total = 0;
+        $resultRows = [];
+        foreach ($rows as $row) {
+            if ($total === 0) {
+                $total = (int) ($row['total_rows'] ?? 0);
+            }
+
+            unset($row['total_rows']);
+            if ($this->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
+                $row['route_enabled'] = 0;
+            }
+            $resultRows[] = $row;
+        }
+
+        // Offset can target an empty page while rows still exist; recover accurate total.
+        if ($resultRows === [] && $safeOffset > 0) {
+            $total = $this->countForPanel();
+        }
+
+        return [
+            'rows' => $resultRows,
+            'total' => $total,
+        ];
+    }
+
+    /**
      * Returns minimal group options for user assignment forms.
      *
      * @return array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>

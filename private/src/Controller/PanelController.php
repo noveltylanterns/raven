@@ -155,19 +155,26 @@ final class PanelController
         $prefilterTagId = $this->input->int($_GET['tag'] ?? null, 1) ?? 0;
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $totalItems = $this->pages->countForPanel(
+        $pageResult = $this->pages->listPageForPanel(
+            $perPage,
+            ($requestedPage - 1) * $perPage,
             $prefilterChannel !== '' ? $prefilterChannel : null,
             $prefilterCategoryId > 0 ? $prefilterCategoryId : null,
             $prefilterTagId > 0 ? $prefilterTagId : null
         );
+        $totalItems = (int) ($pageResult['total'] ?? 0);
+        $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
-        $pages = $this->pages->listForPanel(
-            $pagination['per_page'],
-            $pagination['offset'],
-            $prefilterChannel !== '' ? $prefilterChannel : null,
-            $prefilterCategoryId > 0 ? $prefilterCategoryId : null,
-            $prefilterTagId > 0 ? $prefilterTagId : null
-        );
+        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
+            $pageResult = $this->pages->listPageForPanel(
+                $perPage,
+                $pagination['offset'],
+                $prefilterChannel !== '' ? $prefilterChannel : null,
+                $prefilterCategoryId > 0 ? $prefilterCategoryId : null,
+                $prefilterTagId > 0 ? $prefilterTagId : null
+            );
+            $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        }
         $pageIds = array_values(array_map(
             static fn (array $pageRow): int => (int) ($pageRow['id'] ?? 0),
             $pages
@@ -605,15 +612,19 @@ final class PanelController
         }
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $pagination = $this->panelPaginationState(
-            $this->channels->countForPanel(),
-            $requestedPage,
-            50
-        );
+        $perPage = 50;
+        $pageResult = $this->channels->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $totalItems = (int) ($pageResult['total'] ?? 0);
+        $channels = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
+        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
+            $pageResult = $this->channels->listPageForPanel($perPage, $pagination['offset']);
+            $channels = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        }
 
         $this->view->render('panel/channels/list', [
             'site' => $this->siteData(),
-            'channels' => $this->channels->listForPanel($pagination['per_page'], $pagination['offset']),
+            'channels' => $channels,
             'pagination' => $this->panelPaginationViewData('/channels', $pagination),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
@@ -861,15 +872,19 @@ final class PanelController
         }
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $pagination = $this->panelPaginationState(
-            $this->categories->countForPanel(),
-            $requestedPage,
-            50
-        );
+        $perPage = 50;
+        $pageResult = $this->categories->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $totalItems = (int) ($pageResult['total'] ?? 0);
+        $categories = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
+        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
+            $pageResult = $this->categories->listPageForPanel($perPage, $pagination['offset']);
+            $categories = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        }
 
         $this->view->render('panel/categories/list', [
             'site' => $this->siteData(),
-            'categories' => $this->categories->listForPanel($pagination['per_page'], $pagination['offset']),
+            'categories' => $categories,
             'pagination' => $this->panelPaginationViewData('/categories', $pagination),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
@@ -1118,15 +1133,19 @@ final class PanelController
         }
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $pagination = $this->panelPaginationState(
-            $this->tags->countForPanel(),
-            $requestedPage,
-            50
-        );
+        $perPage = 50;
+        $pageResult = $this->tags->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $totalItems = (int) ($pageResult['total'] ?? 0);
+        $tags = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
+        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
+            $pageResult = $this->tags->listPageForPanel($perPage, $pagination['offset']);
+            $tags = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        }
 
         $this->view->render('panel/tags/list', [
             'site' => $this->siteData(),
-            'tags' => $this->tags->listForPanel($pagination['per_page'], $pagination['offset']),
+            'tags' => $tags,
             'pagination' => $this->panelPaginationViewData('/tags', $pagination),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
@@ -1375,15 +1394,19 @@ final class PanelController
         }
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $pagination = $this->panelPaginationState(
-            $this->redirects->countForPanel(),
-            $requestedPage,
-            50
-        );
+        $perPage = 50;
+        $pageResult = $this->redirects->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $totalItems = (int) ($pageResult['total'] ?? 0);
+        $redirects = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
+        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
+            $pageResult = $this->redirects->listPageForPanel($perPage, $pagination['offset']);
+            $redirects = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        }
 
         $this->view->render('panel/redirects/list', [
             'site' => $this->siteData(),
-            'redirects' => $this->redirects->listForPanel($pagination['per_page'], $pagination['offset']),
+            'redirects' => $redirects,
             'pagination' => $this->panelPaginationViewData('/redirects', $pagination),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
@@ -1573,19 +1596,27 @@ final class PanelController
 
         $prefilterGroup = strtolower(trim((string) ($this->input->text($_GET['group'] ?? null, 120) ?? '')));
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $pagination = $this->panelPaginationState(
-            $this->users->countForPanel($prefilterGroup !== '' ? $prefilterGroup : null),
-            $requestedPage,
-            50
+        $perPage = 50;
+        $pageResult = $this->users->listPageForPanel(
+            $perPage,
+            ($requestedPage - 1) * $perPage,
+            $prefilterGroup !== '' ? $prefilterGroup : null
         );
+        $totalItems = (int) ($pageResult['total'] ?? 0);
+        $users = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
+        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
+            $pageResult = $this->users->listPageForPanel(
+                $perPage,
+                $pagination['offset'],
+                $prefilterGroup !== '' ? $prefilterGroup : null
+            );
+            $users = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        }
 
         $this->view->render('panel/users/list', [
             'site' => $this->siteData(),
-            'users' => $this->users->listForPanel(
-                $pagination['per_page'],
-                $pagination['offset'],
-                $prefilterGroup !== '' ? $prefilterGroup : null
-            ),
+            'users' => $users,
             'prefilterGroup' => $prefilterGroup,
             'groupOptions' => $this->groups->listOptions(),
             'pagination' => $this->panelPaginationViewData(
@@ -2012,15 +2043,19 @@ final class PanelController
         }
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $pagination = $this->panelPaginationState(
-            $this->groups->countForPanel(),
-            $requestedPage,
-            50
-        );
+        $perPage = 50;
+        $pageResult = $this->groups->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $totalItems = (int) ($pageResult['total'] ?? 0);
+        $groups = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
+        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
+            $pageResult = $this->groups->listPageForPanel($perPage, $pagination['offset']);
+            $groups = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        }
 
         $this->view->render('panel/groups/list', [
             'site' => $this->siteData(),
-            'groups' => $this->groups->listForPanel($pagination['per_page'], $pagination['offset']),
+            'groups' => $groups,
             'pagination' => $this->panelPaginationViewData('/groups', $pagination),
             'groupRoutingEnabledSystemWide' => $this->groupRoutesEnabledForRoutingTable(),
             'csrfField' => $this->csrf->field(),

@@ -105,6 +105,80 @@ final class CategoryRepository
     }
 
     /**
+     * Returns one paginated category page plus total row count in one query.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     */
+    public function listPageForPanel(int $limit = 50, int $offset = 0): array
+    {
+        $categories = $this->table('categories');
+        $pageCategories = $this->table('page_categories');
+        $safeLimit = max(1, $limit);
+        $safeOffset = max(0, $offset);
+
+        $stmt = $this->db->prepare(
+            'SELECT page_rows.id,
+                    page_rows.name,
+                    page_rows.slug,
+                    page_rows.description,
+                    page_rows.created_at,
+                    page_rows.cover_image_path,
+                    page_rows.cover_image_sm_path,
+                    page_rows.cover_image_md_path,
+                    page_rows.cover_image_lg_path,
+                    page_rows.preview_image_path,
+                    page_rows.preview_image_sm_path,
+                    page_rows.preview_image_md_path,
+                    page_rows.preview_image_lg_path,
+                    page_rows.page_count,
+                    totals.total_rows
+             FROM (
+                 SELECT c.id, c.name, c.slug, c.description, c.created_at,
+                        c.cover_image_path, c.cover_image_sm_path, c.cover_image_md_path, c.cover_image_lg_path,
+                        c.preview_image_path, c.preview_image_sm_path, c.preview_image_md_path, c.preview_image_lg_path,
+                        COALESCE(pc.page_count, 0) AS page_count
+                 FROM ' . $categories . ' c
+                 LEFT JOIN (
+                     SELECT category_id, COUNT(*) AS page_count
+                     FROM ' . $pageCategories . '
+                     GROUP BY category_id
+                 ) pc ON pc.category_id = c.id
+                 ORDER BY c.name ASC, c.id ASC
+                 LIMIT :limit OFFSET :offset
+             ) AS page_rows
+             CROSS JOIN (
+                 SELECT COUNT(*) AS total_rows
+                 FROM ' . $categories . '
+             ) AS totals'
+        );
+        $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $total = 0;
+        $resultRows = [];
+        foreach ($rows as $row) {
+            if ($total === 0) {
+                $total = (int) ($row['total_rows'] ?? 0);
+            }
+
+            unset($row['total_rows']);
+            $resultRows[] = $row;
+        }
+
+        // Offset can target an empty page while rows still exist; recover accurate total.
+        if ($resultRows === [] && $safeOffset > 0) {
+            $total = $this->countForPanel();
+        }
+
+        return [
+            'rows' => $resultRows,
+            'total' => $total,
+        ];
+    }
+
+    /**
      * Returns minimal category options for panel select controls.
      *
      * @return array<int, array{id: int, name: string, slug: string}>
