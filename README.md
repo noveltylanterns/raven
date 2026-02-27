@@ -6,7 +6,7 @@ It is both a classic self-hosted CMS & an AI-powered website generation platform
 
 I told Codex to go liberal on the inline comments and produce human-readable code. Rather than starting with a vague overall blueprint, I had Codex build this piece-by-piece as if I were doing it manually. Because of this I was able to somewhat-force the machine to adhere to my [minimalist workflow](https://bestpoint.institute/tactics/unix-philosophy) as best as I could. *(This whole project is just an excuse to explore the possibilities of AI-assisted tooling.)*
 
-Loose guardrails are in place so your Agent can modify the system while remaining compatible with the rudimentary Git-powered update mechanism. *(Tho I say those guardrails are "loose" because I can't stop you from telling the machine to edit core system files or ignore AGENTS.md directives.)* The end result is a platform for a Wordpress-like software ecosystem where humans & clankers can code side-by-side in harmony, with the machines sensibly leashed up so they don't run amok.
+Loose guardrails are in place so your Agent can modify the system while remaining compatible with the rudimentary Git-powered update mechanism. *(Tho I say those guardrails are "loose" because I can't stop you from telling the machine to edit core system files or ignore AGENTS.md directives.)* The end result is a self-hosted website management platform, **where you own your own data**, where humans & clankers can code side-by-side in harmony, with the machines sensibly leashed up so they don't run amok.
 
 
 ## How to Install
