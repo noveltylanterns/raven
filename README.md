@@ -38,7 +38,7 @@ It sounds dystopian, but the AI is much like a German Shephard dog. It was bred 
 
 This is designed to be updated with Git. The browser-based updater in the panel isn't fully tested yet, but it just pulls the repo. Everything sensitive to your local install is covered in your `.gitignore` file.
 
-If you need architectural info, I had Codex [document](docs/README.md) its work.
+There are several places in your local install that are ignored by the update process: Your **Theme** and **Extension** folders. They are designed to safely accomodate your modifications and preserve them through system updates. If you need further architectural info, I had Codex [document](docs/README.md) its work.
 
 ### Themes
 
@@ -75,7 +75,7 @@ The option is available in your [System Configuration](docs/Configuration.md). I
 
 - **0.8 (Current)**: Initial public release with basic panel & extension system.
 - **0.9 (Next)**: Expanded theming system.
-- **1.0 (Immediate Goal)**: First round UI polish, bug sweep, hardening & optimization.
+- **1.0 (Immediate Goal)**: First round UI polish, finish formalizing update process, bug sweep, hardening & optimization.
 
 
 ## Caveats
@@ -84,6 +84,7 @@ The option is available in your [System Configuration](docs/Configuration.md). I
 - I have not been able to personally verify the contents of every file.
 - Raven has not gone through a proper full security audit yet.
 - There are still some pretty nonsensical things I've caught the clanker doing, so some of the code might be horribly inefficient. *(But it is at least readable! So we can hammer that one out in time.)*
+- Do not trust the updater yet. I'm not generating upgrade/migration scripts. You may suddenly find yourself permanently disconnected from the main branch. **Prepare to rebuild a few times until this is out of the prototype stage!**
 
 
 ## But Why?
