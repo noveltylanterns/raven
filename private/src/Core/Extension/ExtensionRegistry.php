@@ -149,21 +149,10 @@ final class ExtensionRegistry
             $type = 'basic';
         }
 
-        $panelPath = trim((string) ($decoded['panel_path'] ?? ''), '/');
-        if ($panelPath !== '' && preg_match('/^[a-z0-9][a-z0-9_\/-]*$/i', $panelPath) !== 1) {
-            $panelPath = '';
-        }
-
-        $panelSection = strtolower(trim((string) ($decoded['panel_section'] ?? '')));
-        if ($panelSection !== '' && preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $panelSection) !== 1) {
-            $panelSection = '';
-        }
-
-        if ($type === 'helper') {
-            // Helper extensions are intentionally non-routable/invisible in panel nav.
-            $panelPath = '';
-            $panelSection = '';
-        }
+        // Extension routing identity is standardized on directory slug.
+        // Keep helper extensions non-routable/invisible by clearing both keys.
+        $panelPath = $type === 'helper' ? '' : $directoryName;
+        $panelSection = $type === 'helper' ? '' : $directoryName;
 
         return [
             'name' => $name,

@@ -53,8 +53,8 @@ Last updated: 2026-02-26
 - `type` (`basic`, `system`, or `helper`; `system` routes/nav are treated like System-category tools, `helper` is non-routable/invisible)
 - `author` (string; displayed in Extension Manager)
 - `homepage` (URL; used for Extension Manager author links)
-- `panel_path` (string path segment used for Extensions nav link target)
-- `panel_section` (string used for active nav matching)
+- `panel_path` and `panel_section` are legacy keys and are ignored in current routing/nav behavior.
+- Extension panel route/nav identity is derived from extension directory slug.
 - `system_extension` (bool; hides extension from Extensions nav category)
 - `entrypoint` (extension-specific optional metadata; currently used by Database Manager)
 
@@ -165,7 +165,7 @@ Last updated: 2026-02-26
 - pass `site`, `csrfField`, `section`, `showSidebar`, `userTheme`
 - For extension sidebar/mobile nav category links:
 - extension must be enabled and manifest-valid
-- manifest should include `panel_path` and `panel_section`
+- route path and nav section are derived from extension directory slug
 - extension must not be marked `system_extension`
 - stock/system extensions (for example `database`) stay under System category behavior.
 

@@ -3364,8 +3364,6 @@ final class PanelController
             $homepage = $homepageRaw;
         }
 
-        $panelPath = $extensionName;
-        $panelSection = $extensionName;
         $generateAgentsFile = isset($post['generate_agents']) && (string) $post['generate_agents'] === '1';
 
         try {
@@ -3390,8 +3388,6 @@ final class PanelController
                 'type' => $type,
                 'author' => $author,
                 'homepage' => $homepage,
-                'panel_path' => $panelPath,
-                'panel_section' => $panelSection,
             ], $generateAgentsFile);
         } catch (\Throwable $exception) {
             // Roll back partial writes so failed scaffold attempts do not leave broken extensions.
@@ -6859,11 +6855,7 @@ final class PanelController
             $extensions[] = [
                 'directory' => $entry,
                 'type' => (string) ($manifest['type'] ?? 'basic'),
-                'panel_path' => (
-                    ((string) ($manifest['type'] ?? 'basic')) === 'helper'
-                        ? ''
-                        : ($manifest['panel_path'] !== '' ? $manifest['panel_path'] : $entry)
-                ),
+                'panel_path' => ((string) ($manifest['type'] ?? 'basic')) === 'helper' ? '' : $entry,
                 'name' => $manifest['name'] !== '' ? $manifest['name'] : $entry,
                 'version' => $manifest['version'],
                 'description' => $manifest['description'],
@@ -6917,6 +6909,11 @@ final class PanelController
      */
     private function readExtensionManifest(string $extensionPath): array
     {
+        $directorySlug = trim((string) basename($extensionPath));
+        if (!$this->isSafeExtensionDirectoryName($directorySlug)) {
+            $directorySlug = '';
+        }
+
         $manifestPath = rtrim($extensionPath, '/') . '/extension.json';
         if (!is_file($manifestPath)) {
             return [
@@ -6978,18 +6975,11 @@ final class PanelController
             ];
         }
 
-        $panelPath = trim((string) ($decoded['panel_path'] ?? ''), '/');
-        if ($panelPath !== '' && preg_match('/^[a-z0-9][a-z0-9_\/-]*$/i', $panelPath) !== 1) {
-            $panelPath = '';
-        }
-
         $type = strtolower(trim((string) ($decoded['type'] ?? 'basic')));
         if (!in_array($type, ['basic', 'system', 'helper'], true)) {
             $type = 'basic';
         }
-        if ($type === 'helper') {
-            $panelPath = '';
-        }
+        $panelPath = $type === 'helper' ? '' : $directorySlug;
 
         $author = $this->input->text((string) ($decoded['author'] ?? ''), 120);
         $homepageRaw = trim((string) ($decoded['homepage'] ?? ''));
@@ -7404,9 +7394,7 @@ final class PanelController
      *   description: string,
      *   type: string,
      *   author: string,
-     *   homepage: string,
-     *   panel_path: string,
-     *   panel_section: string
+     *   homepage: string
      * } $meta
      */
     private function createExtensionSkeleton(string $extensionPath, array $meta, bool $generateAgentsFile = false): void
@@ -7500,9 +7488,7 @@ final class PanelController
      *   description: string,
      *   type: string,
      *   author: string,
-     *   homepage: string,
-     *   panel_path: string,
-     *   panel_section: string
+     *   homepage: string
      * } $meta
      */
     private function renderExtensionManifestJson(array $meta): string
@@ -7520,12 +7506,6 @@ final class PanelController
 
         if ($meta['homepage'] !== '') {
             $manifest['homepage'] = $meta['homepage'];
-        }
-
-        $type = strtolower(trim((string) ($meta['type'] ?? 'basic')));
-        if ($type !== 'helper') {
-            $manifest['panel_path'] = $meta['panel_path'];
-            $manifest['panel_section'] = $meta['panel_section'];
         }
 
         $encoded = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
@@ -7601,21 +7581,19 @@ PHP;
      * @param array{
      *   directory: string,
      *   name: string,
-     *   type: string,
-     *   panel_path: string,
-     *   panel_section: string
+     *   type: string
      * } $meta
      */
     private function renderExtensionRoutesSkeleton(array $meta): string
     {
-        $routePath = '/' . ltrim($meta['panel_path'], '/');
+        $routePath = '/' . ltrim((string) ($meta['directory'] ?? ''), '/');
         $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
         $routePathLiteral = var_export($routePath, true);
-        $sectionLiteral = var_export($meta['panel_section'], true);
+        $sectionLiteral = var_export((string) ($meta['directory'] ?? ''), true);
         $directoryLiteral = var_export($meta['directory'], true);
         $nameLiteral = var_export($meta['name'], true);
         $typeLiteral = var_export($meta['type'], true);
-        $panelPathLiteral = var_export($meta['panel_path'], true);
+        $panelPathLiteral = var_export((string) ($meta['directory'] ?? ''), true);
         $content = <<<'PHP'
 <?php
 

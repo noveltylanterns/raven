@@ -29,7 +29,7 @@ Core panel bootstrap (`panel/index.php`) does this:
 
 1. Reads extension enablement state from `private/ext/.state.php` (or `.state.php.dist` fallback).
 2. Validates extension directory names and manifests.
-3. Builds nav items from manifest fields (`name`, `type`, `panel_path`, `panel_section`).
+3. Builds nav items from extension directory slug and manifest type/name.
 4. Loads optional extension providers (`bootstrap.php`, `schema.php`, route registrars) for enabled, valid extensions.
 5. Injects a context object (`app`, `panelUrl`, `requirePanelLogin`, etc.) for route registration.
 
@@ -132,7 +132,7 @@ Create modal (`Create New Extension`):
 
 - `Extension Name`
 - `Directory Slug`
-- `Directory Slug` auto-fills panel path and panel section for non-helper extensions
+- `Directory Slug` is the single route/nav slug source for non-helper extensions
 - `Type`
 - `Version`
 - `Author`
@@ -155,9 +155,12 @@ Common manifest fields:
 - `type` (`basic`, `system`, or `helper`)
 - `author`
 - `homepage`
-- `panel_path`
-- `panel_section`
 - `system_extension` (optional behavior flag)
+
+Notes:
+
+- `panel_path` and `panel_section` are legacy manifest keys and are ignored.
+- Panel route/nav identity comes from the extension directory slug.
 
 ## 9) Agent Guidance
 

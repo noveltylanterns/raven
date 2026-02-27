@@ -413,20 +413,10 @@ foreach ($enabledExtensionManifests as $directoryName => $manifest) {
         $requiredPermissionBit = PanelAccess::PANEL_LOGIN;
     }
 
-    $panelPath = trim((string) ($manifest['panel_path'] ?? ''));
-    if ($panelPath === '') {
-        $panelPath = $directoryName;
-    }
-
-    $panelSection = trim((string) ($manifest['panel_section'] ?? ''));
-    if ($panelSection === '') {
-        $panelSection = $directoryName;
-    }
-
     $item = [
         'label' => (string) $manifest['name'],
-        'path' => $panelUrl('/' . ltrim($panelPath, '/')),
-        'section' => $panelSection,
+        'path' => $panelUrl('/' . ltrim($directoryName, '/')),
+        'section' => $directoryName,
     ];
 
     if ($isSystemType) {
