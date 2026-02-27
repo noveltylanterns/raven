@@ -53,7 +53,7 @@ There are several extension types:
 
 - **Helper:** A half-extension. No views, just provides additional functionality to other scripts.
 - **Basic:** You can build permissions-gated admin panel pages for these.
-- **Content:** Adds content types. Coming before v1.
+- **Content:** Adds content types. *(Not fully implemented. Coming before v1.)*
 - **System:** Provides deep-level administrative utilties only visible to top-level admins.
 - **Stock:** Raven comes with several bundled extensions to serve as examples. They cannot be deleted, but they are disabled by-default *(opt-in)* on all new installs.
 
