@@ -2,7 +2,7 @@
 
 An experiment in vibe-coding a better content management system, and a better foundation for your web sites. It is a classic self-hosted CMS built on common open-source technologies where you own your own data.
 
-It is also an AI-powered website generation platform all-in-one. It is designed to be flexible for hobbyists & professionals. You can build on it the old-fashioned way with a text-editor, or point your clanker to the documentation & various bundled `AGENTS.md` files to extend your system. And if you're a traditionalist, all the AI bullshit is completely optional - nothing is dependent on the machine. Even the build tools, if I lost access to Codex, all of this could still be maintained like a traditional piece of software.
+It is also an AI-powered website generation platform all-in-one. It is designed to be flexible for hobbyists & professionals. You can customize & extend it the old-fashioned way with a text editor, or by pointing your clanker to the [documentation](docs/) & various bundled `AGENTS.md` files. And if you're a traditionalist, all the AI bullshit is completely optional - nothing is dependent on the machine. Even the build tools, if I lost access to Codex, all of this could still be maintained like a traditional piece of software.
 
 I told Codex to go liberal on the inline comments and produce human-readable code. Rather than starting with a vague overall blueprint, I had Codex build this piece-by-piece as if I were doing it manually. Because of this I was able to somewhat-force the machine to adhere to my [workflow](https://bestpoint.institute/tactics/unix-philosophy) as best as I could. *(This whole project is just an excuse to explore the possibilities of AI-assisted tooling in minimalist server frameworks.)*
 
