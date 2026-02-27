@@ -1,13 +1,10 @@
 # Raven CMS
 
-An experiment in vibe-coding a better CMS, and a better foundation for your web sites.
+An experiment in vibe-coding a better content management system, and a better foundation for your web sites. It is a classic self-hosted CMS built on common open-source technologies where you own your own data.
 
-It is both a classic self-hosted CMS & an AI-powered website generation platform all-in-one. It is designed to be flexible for hobbyists & professionals. You can build on it the old-fashioned way with a text-editor, or point your AI to the documentation & various bundled `AGENTS.md` files to extend your system with Codex, Claude, etc. And if you're a traditionalist, all the AI bullshit is completely optional - nothing is dependent on the clanker.
+It is also an AI-powered website generation platform all-in-one. It is designed to be flexible for hobbyists & professionals. You can build on it the old-fashioned way with a text-editor, or point your AI to the documentation & various bundled `AGENTS.md` files to extend your system with Codex, Claude, etc. And if you're a traditionalist, all the AI bullshit is completely optional - nothing is dependent on the clanker.
 
 I told Codex to go liberal on the inline comments and produce human-readable code. Rather than starting with a vague overall blueprint, I had Codex build this piece-by-piece as if I were doing it manually. Because of this I was able to somewhat-force the machine to adhere to my [minimalist workflow](https://bestpoint.institute/tactics/unix-philosophy) as best as I could. *(This whole project is just an excuse to explore the possibilities of AI-assisted tooling.)*
-
-Loose guardrails are in place so your Agent can modify the system while remaining compatible with the rudimentary Git-powered update mechanism. *(Tho I say those guardrails are "loose" because I can't stop you from telling the machine to edit core system files or ignore AGENTS.md directives.)* The end result is a self-hosted website management platform, **where you own your own data**, where humans & clankers can code side-by-side in harmony, with the machines sensibly leashed up so they don't run amok.
-
 
 ## How to Install
 
