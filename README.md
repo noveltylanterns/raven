@@ -38,6 +38,8 @@ It sounds dystopian, but the AI is much like a German Shephard dog. It was bred 
 
 This is designed to be updated with Git. The browser-based updater in the panel isn't fully tested yet, but it just pulls the repo. Everything sensitive to your local install is covered in your `.gitignore` file.
 
+If you need architectural info, I had Codex [document](docs/README.md) its work.
+
 ### Themes
 
 Currently working on a sensible theming system, with the ability for custom themes to "fall back" on parent themes to enable rapid deployment.
@@ -49,7 +51,6 @@ The frontend works and is themeable, but there is no real template tagging syste
 When loading the frontend, Raven first checks `public/theme/{slug}` for whatever theme you have set in your config. Whatever views are missing from your theme, it should pull default basic styles from `private/views`. If your theme is set as a "child theme," it will pull the missing views from the parent first before checking `private/views/` for the rest.
 
 In theory.
-
 
 ### Extensions
 
@@ -64,6 +65,21 @@ There are several extension types:
 - **Stock:** Raven comes with several bundled extensions to serve as examples. They cannot be deleted, but they are disabled by-default *(opt-in)* on all new installs.
 
 Point your Agent at `private/ext/AGENTS.md` to get started with building Raven extensions, or generate a skeleton in your panel's [Extension Manager](docs/Extensions.md).
+
+
+## Roadmap
+
+- **0.8 (Current)**: Initial public release with basic panel & extension system.
+- **0.9 (Next)**: Expanded theming system.
+- **1.0 (Immediate Goal)**: First round UI polish, bug sweep, hardening & optimization.
+
+
+## Caveats
+
+- This application is very much still a proof-of-concept prototype.
+- I have not been able to personally verify the contents of every file.
+- Raven has not gone through a proper full security audit yet.
+- There are still some pretty nonsensical things I've caught the clanker doing, so some of the code might be horribly inefficient. *(But it is at least readable! So we can hammer that one out in time.)*
 
 
 ## But Why?
@@ -84,18 +100,3 @@ Documentation Index: [docs/README.md](docs/README.md)
 Official Site: [raven.lanterns.io](https://raven.lanterns.io)
 
 Packagist: [noveltylanterns/raven](https://packagist.org/packages/noveltylanterns/raven)
-
-
-## Roadmap
-
-- **0.8 (Current)**: Initial public release with basic panel & extension system.
-- **0.9 (Next)**: Expanded theming system.
-- **1.0 (Immediate Goal)**: First round UI polish, bug sweep, hardening & optimization.
-
-
-## Caveats
-
-- This application is very much still a proof-of-concept prototype.
-- I have not been able to personally verify the contents of every file.
-- Raven has not gone through a proper full security audit yet.
-- There are still some pretty nonsensical things I've caught the clanker doing, so some of the code might be horribly inefficient. *(But it is at least readable! So we can hammer that one out in time.)*
