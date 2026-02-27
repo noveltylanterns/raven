@@ -68,7 +68,7 @@ Point your Agent at `private/ext/AGENTS.md` to get started with building Raven e
 
 #### Enable the Output Profiler
 
-The option is availble in your [System Configuration](docs/Configuration.md). It puts a little debug toolbar at the bottom of every page, so you can easily chase down hiccups & bloat - exactly what you need for auditing AI-generated code.
+The option is available in your [System Configuration](docs/Configuration.md). It puts a little debug toolbar at the bottom of every page, so you can easily chase down hiccups & bloat - exactly what you need for auditing AI-generated code.
 
 
 ## Roadmap
