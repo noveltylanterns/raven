@@ -104,8 +104,8 @@ server {
   listen [::]:443 ssl;
   http2 on;
   server_name WWW.YOURDOMAIN.COM;
-  ssl_certificate /etc/letsencrypt/live/WWW.YOURDOMAIN.COM/fullchain.pem; # managed by Certbot
-  ssl_certificate_key /etc/letsencrypt/live/WWW.YOURDOMAIN.COM/privkey.pem; # managed by Certbot
+  ssl_certificate /etc/letsencrypt/live/WWW.YOURDOMAIN.COM/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/WWW.YOURDOMAIN.COM/privkey.pem;
   include /etc/nginx/includes/ssl.conf;
   include /etc/nginx/includes/headers.conf;
   include /etc/nginx/includes/util.conf;
