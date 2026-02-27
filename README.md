@@ -34,6 +34,32 @@ It sounds dystopian, but the AI is much like a German Shephard dog. It was bred 
 7) PROFIT!!!
 
 
+## Building on Raven
+
+This is designed to be updated with Git. The browser-based updater in the panel isn't fully tested yet, but it just pulls the repo. Everything sensitive to your local install is covered in your `.gitignore` file.
+
+### Themes
+
+Currently working on a sensible theming system, with the ability for custom themes to "fall back" on parent themes to enable rapid deployment.
+
+The frontend works and is themeable, but there is no real template tagging system in place. If you don't mind this, point your agent at `public/theme/AGENTS.md` to get started building a custom frontend for your Raven install. Then set the them in your [System Configuration](docs/Configuration.md).
+
+
+### Extensions
+
+If you need to add content types, helper functions, or even whole new parts of the panel, use the Extensions system. This will help your complex modifications remain compatible with future upgrades.
+
+There are several extension types:
+
+- **Helper:** A half-extension. No views, just provides additional functionality to other scripts.
+- **Basic:** You can build permissions-gated admin panel pages for these.
+- **Content:** Adds content types. Coming before v1.
+- **System:** Provides deep-level administrative utilties only visible to top-level admins.
+- **Stock:** Raven comes with several bundled extensions to serve as examples. They cannot be deleted, but they are disabled by-default *(opt-in)* on all new installs.
+
+Point your Agent at `private/ext/AGENTS.md` to get started with building Raven extensions, or generate a skeleton in your panel's [Extension Manager}(docs/Extensions.md).
+
+
 ## But Why?
 
 After spending the past twenty years freelancing in web development & building blogs for people,  I have come to harbor an intense hatred for Wordpress. Wordpress is a mess and it sucks. The community sucks even more. God help you if you need to extend your system, as third-party plugins & themes trap you in bloated Javascript frameworks & dependency hell. Developing for Wordpress makes me want to die.
