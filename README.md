@@ -57,7 +57,7 @@ There are several extension types:
 - **System:** Provides deep-level administrative utilties only visible to top-level admins.
 - **Stock:** Raven comes with several bundled extensions to serve as examples. They cannot be deleted, but they are disabled by-default *(opt-in)* on all new installs.
 
-Point your Agent at `private/ext/AGENTS.md` to get started with building Raven extensions, or generate a skeleton in your panel's [Extension Manager}(docs/Extensions.md).
+Point your Agent at `private/ext/AGENTS.md` to get started with building Raven extensions, or generate a skeleton in your panel's [Extension Manager](docs/Extensions.md).
 
 
 ## But Why?
