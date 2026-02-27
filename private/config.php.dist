@@ -44,7 +44,7 @@ return array (
   array (
     'path' => 'panel',
     'default_theme' => 'light',
-    'brand_name' => 'Raven CMS',
+    'brand_name' => '',
     'brand_logo' => '',
   ),
   'database' =>
