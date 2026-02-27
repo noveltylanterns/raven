@@ -17,6 +17,10 @@ Loose guardrails are in place so your Agent can modify the system while remainin
 - PHP 8.5 *(May work on earlier PHP 8.x releases, but I have not tested yet)*
 - SQLite3 or a clean MySQL/PgSQL database
 
+### Agent Notes
+
+If you're using this on a production web server, for the love of God do not run your Agent as the same user that has write permissions over the Agent's binary. You really do need to keep these things on a short leash, or they will just run rampant like demons at the least-convenient opportunity. Ideally just put your whole Agent-powered dev environment on a cheap private VPS somewhere, and push Raven-sans-AI via Git to your server.
+
 ### Steps
 
 1) Upload the package to your webhost, with the contents of `public/` going into your web root. *(May be called `public_html/` on some systems.)*
