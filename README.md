@@ -27,7 +27,7 @@ If you're using this on a production web server, for the love of God do not run 
 2) Run `composer install` in the application root to pull in Composer dependencies.
 3) Go to your-domain.com/install.php
 4) Fill out the form, configure your database driver, and create your first admin user.
-5) Verify your site works, and delete `install.php`, and start creating content.
+5) Verify your site works, delete `install.php`, and start creating content.
 6) ???????
 7) PROFIT!!!
 
