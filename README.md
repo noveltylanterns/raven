@@ -21,7 +21,7 @@ Loose guardrails are in place so your Agent can modify the system while remainin
 
 If you're using this on a production web server, for the love of God do not run your Agent as the same user that has write permissions over the Agent's binary. And the user for the server process shouldn't even be able to read it at all. You really do need to keep these things on a short leash, or they will just run rampant like demons at the least-convenient opportunity. Ideally just put your whole Agent-powered dev environment on a cheap private VPS somewhere, and use your production server to `git fetch` Raven-sans-AI so that it can't escape.
 
-It sounds dystopian, but the AI is much like a German Shephard dog. It needs focused tasks to do or it will hallucinate. Boundaries, in my experience so far, seems to help focus the machine.
+It sounds dystopian, but the AI is much like a German Shephard dog. It was bred to be a working animal. It needs focused tasks to do or it will hallucinate and possibly bite someone. But boundaries, in my experience so far, seems to help focus the machine.
 
 ### Steps
 
