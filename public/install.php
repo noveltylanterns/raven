@@ -25,36 +25,6 @@ function installer_e(string $value): string
 }
 
 /**
- * Returns true when a path is absolute on Unix or Windows.
- */
-function installer_is_absolute_path(string $path): bool
-{
-    if ($path === '') {
-        return false;
-    }
-
-    return str_starts_with($path, '/')
-        || preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) === 1;
-}
-
-/**
- * Normalizes a configured path and resolves relative paths under project root.
- */
-function installer_normalize_path(string $path, string $root): string
-{
-    $path = trim(str_replace('\\', '/', $path));
-    if ($path === '') {
-        return '';
-    }
-
-    if (installer_is_absolute_path($path)) {
-        return rtrim($path, '/');
-    }
-
-    return rtrim($root, '/') . '/' . ltrim($path, '/');
-}
-
-/**
  * Persists runtime config to private/config.php with the standard header block.
  *
  * @param array<string, mixed> $config
@@ -89,6 +59,7 @@ $configTemplatePath = $root . '/private/config.php.dist';
 $extensionStatePath = $root . '/private/ext/.state.php';
 $extensionStateTemplatePath = $root . '/private/ext/.state.php.dist';
 $lockPath = $root . '/private/tmp/install.lock';
+$sqliteDefaultBasePath = rtrim($root, '/') . '/private/db';
 
 // Installer lock is checked first to keep re-entry behavior deterministic.
 if (is_file($lockPath)) {
@@ -151,7 +122,6 @@ $form = [
     'panel_path' => trim((string) ($defaultConfig['panel']['path'] ?? 'panel')),
     'db_driver' => strtolower(trim((string) ($defaultConfig['database']['driver'] ?? 'sqlite'))),
     'db_table_prefix' => trim((string) ($defaultConfig['database']['table_prefix'] ?? 'raven_')),
-    'sqlite_base_path' => trim((string) ($defaultConfig['database']['sqlite']['base_path'] ?? ($root . '/private/db'))),
     'mysql_host' => trim((string) ($defaultConfig['database']['mysql']['host'] ?? '127.0.0.1')),
     'mysql_port' => trim((string) ($defaultConfig['database']['mysql']['port'] ?? '3306')),
     'mysql_dbname' => trim((string) ($defaultConfig['database']['mysql']['dbname'] ?? 'raven')),
@@ -202,12 +172,9 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
 
     $tablePrefix = preg_replace('/[^a-zA-Z0-9_]/', '', $form['db_table_prefix']) ?? '';
     if ($driver === 'sqlite') {
-        $sqliteBasePath = installer_normalize_path($form['sqlite_base_path'], $root);
-        if ($sqliteBasePath === '') {
-            $errors[] = 'SQLite base path is required.';
-        }
+        $sqliteBasePath = $sqliteDefaultBasePath;
     } else {
-        $sqliteBasePath = trim((string) ($template['database']['sqlite']['base_path'] ?? ($root . '/private/db')));
+        $sqliteBasePath = $sqliteDefaultBasePath;
     }
 
     $mysqlPort = (int) $form['mysql_port'];
@@ -477,9 +444,8 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
 
             <div class="grid" data-driver-section="sqlite">
                 <div class="field full">
-                    <label for="sqlite_base_path">SQLite Base Path</label>
-                    <input id="sqlite_base_path" name="sqlite_base_path" value="<?= installer_e($form['sqlite_base_path']) ?>">
-                    <div class="note">SQLite database filenames are managed automatically by Raven for consistency.</div>
+                    <label>SQLite Storage</label>
+                    <div class="note">SQLite files are stored automatically in <code>private/db/</code>.</div>
                 </div>
             </div>
 
