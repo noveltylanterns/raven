@@ -84,7 +84,7 @@ The option is available in your [System Configuration](docs/Configuration.md). I
 - I have not been able to personally verify the contents of every file.
 - Raven has not gone through a proper full security audit yet.
 - There are still some pretty nonsensical things I've caught the clanker doing, so some of the code might be horribly inefficient. *(But it is at least readable! So we can hammer that one out in time.)*
-- Do not trust the updater yet. I'm not generating upgrade/migration scripts. You may suddenly find yourself permanently disconnected from the main branch. **Prepare to rebuild a few times until this is out of the prototype stage!**
+- Do not trust the updater. All it does it grab a fresh copy of the Git repo. **Otherwise, I am not generating upgrade/migration scripts yet.** You may suddenly find yourself permanently disconnected from the main branch. ***Prepare to rebuild a few times until this is out of the prototype stage!***
 
 
 ## But Why?
