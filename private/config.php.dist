@@ -71,7 +71,7 @@ return array (
       'user' => 'PGSQL_USER',
       'password' => 'PGSQL_PASSWORD',
     ),
-    'table_prefix' => 'raven_',
+    'table_prefix' => 'rvn_',
   ),
   'debug' =>
   array (

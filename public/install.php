@@ -61,6 +61,30 @@ $extensionStateTemplatePath = $root . '/private/ext/.state.php.dist';
 $lockPath = $root . '/private/tmp/install.lock';
 $sqliteDefaultBasePath = rtrim($root, '/') . '/private/db';
 
+$detectedDomain = strtolower(trim((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '')));
+if ($detectedDomain !== '') {
+    if (str_contains($detectedDomain, ',')) {
+        $detectedDomain = trim((string) explode(',', $detectedDomain, 2)[0]);
+    }
+
+    if (str_starts_with($detectedDomain, '[')) {
+        $closingBracketPos = strpos($detectedDomain, ']');
+        if ($closingBracketPos !== false) {
+            $detectedDomain = substr($detectedDomain, 1, $closingBracketPos - 1);
+        }
+    } else {
+        $lastColonPos = strrpos($detectedDomain, ':');
+        if ($lastColonPos !== false && substr_count($detectedDomain, ':') === 1) {
+            $maybePort = substr($detectedDomain, $lastColonPos + 1);
+            if ($maybePort !== '' && ctype_digit($maybePort)) {
+                $detectedDomain = substr($detectedDomain, 0, $lastColonPos);
+            }
+        }
+    }
+
+    $detectedDomain = rtrim($detectedDomain, '.');
+}
+
 // Installer lock is checked first to keep re-entry behavior deterministic.
 if (is_file($lockPath)) {
     header('Location: /', true, 302);
@@ -114,14 +138,25 @@ $rawExisting = is_file($configPath) ? require $configPath : [];
 $existing = is_array($rawExisting) ? $rawExisting : [];
 
 $defaultConfig = $existing !== [] ? $existing : $template;
+$defaultSiteDomain = trim((string) ($defaultConfig['site']['domain'] ?? ''));
+if ($defaultSiteDomain === '') {
+    $defaultSiteDomain = $detectedDomain;
+}
+$defaultTablePrefix = trim((string) ($defaultConfig['database']['table_prefix'] ?? ''));
+if ($defaultTablePrefix === '') {
+    $defaultTablePrefix = 'rvn_';
+}
+if ($existing === [] && strtolower($defaultTablePrefix) === 'raven_') {
+    $defaultTablePrefix = 'rvn_';
+}
 
 // Baseline defaults keep first render usable even when template file is missing.
 $form = [
-    'site_domain' => trim((string) ($defaultConfig['site']['domain'] ?? '')),
+    'site_domain' => $defaultSiteDomain,
     'site_name' => trim((string) ($defaultConfig['site']['name'] ?? 'Raven CMS')),
     'panel_path' => trim((string) ($defaultConfig['panel']['path'] ?? 'panel')),
     'db_driver' => strtolower(trim((string) ($defaultConfig['database']['driver'] ?? 'sqlite'))),
-    'db_table_prefix' => trim((string) ($defaultConfig['database']['table_prefix'] ?? 'raven_')),
+    'db_table_prefix' => $defaultTablePrefix,
     'mysql_host' => trim((string) ($defaultConfig['database']['mysql']['host'] ?? '127.0.0.1')),
     'mysql_port' => trim((string) ($defaultConfig['database']['mysql']['port'] ?? '3306')),
     'mysql_dbname' => trim((string) ($defaultConfig['database']['mysql']['dbname'] ?? 'raven')),
@@ -436,7 +471,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
                         <option value="pgsql"<?= $form['db_driver'] === 'pgsql' ? ' selected' : '' ?>>PostgreSQL</option>
                     </select>
                 </div>
-                <div class="field">
+                <div class="field" id="db_table_prefix_field">
                     <label for="db_table_prefix">Table Prefix (MySQL/PostgreSQL)</label>
                     <input id="db_table_prefix" name="db_table_prefix" value="<?= installer_e($form['db_table_prefix']) ?>">
                 </div>
@@ -489,6 +524,8 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
     if (!(driverSelect instanceof HTMLSelectElement)) {
       return;
     }
+    var tablePrefixField = document.getElementById('db_table_prefix_field');
+    var tablePrefixInput = document.getElementById('db_table_prefix');
 
     function syncDriverSections() {
       var selected = driverSelect.value;
@@ -500,6 +537,13 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
 
         section.style.display = section.getAttribute('data-driver-section') === selected ? 'grid' : 'none';
       });
+
+      if (tablePrefixField instanceof HTMLElement) {
+        tablePrefixField.style.display = selected === 'sqlite' ? 'none' : '';
+      }
+      if (tablePrefixInput instanceof HTMLInputElement) {
+        tablePrefixInput.disabled = selected === 'sqlite';
+      }
     }
 
     driverSelect.addEventListener('change', syncDriverSections);
