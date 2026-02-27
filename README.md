@@ -44,6 +44,12 @@ Currently working on a sensible theming system, with the ability for custom them
 
 The frontend works and is themeable, but there is no real template tagging system in place. If you don't mind this, point your agent at `public/theme/AGENTS.md` to get started building a custom frontend for your Raven install. Then set the theme in your [System Configuration](docs/Configuration.md).
 
+#### Theme Fallback Chain
+
+When loading the frontend, Raven first checks `public/theme/{slug}` for whatever theme you have set in your config. Whatever views are missing from your theme, it should pull default basic styles from `private/views`. If your theme is set as a "child theme," it will pull the missing views from the parent first before checking `private/views/` for the rest.
+
+In theory.
+
 
 ### Extensions
 
