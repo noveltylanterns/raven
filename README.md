@@ -42,7 +42,7 @@ This is designed to be updated with Git. The browser-based updater in the panel 
 
 Currently working on a sensible theming system, with the ability for custom themes to "fall back" on parent themes to enable rapid deployment.
 
-The frontend works and is themeable, but there is no real template tagging system in place. If you don't mind this, point your agent at `public/theme/AGENTS.md` to get started building a custom frontend for your Raven install. Then set the them in your [System Configuration](docs/Configuration.md).
+The frontend works and is themeable, but there is no real template tagging system in place. If you don't mind this, point your agent at `public/theme/AGENTS.md` to get started building a custom frontend for your Raven install. Then set the theme in your [System Configuration](docs/Configuration.md).
 
 
 ### Extensions
