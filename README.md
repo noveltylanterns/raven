@@ -1,6 +1,6 @@
 # Raven CMS
 
-An experiment in vibe-coding a better CMS. The idea is to package it with everything most people would need to build a website or blog, without having to install a million plugins.
+An experiment in vibe-coding a better CMS, and a better foundation for your web sites.
 
 It is both a classic self-hosted CMS & an AI-powered website generation platform all-in-one. It is designed to be flexible for hobbyists & professionals. You can build on it the old-fashioned way with a text-editor, or point your AI to the documentation & various bundled `AGENTS.md` files to extend your system with Codex, Claude, etc. And if you're a traditionalist, all the AI bullshit is completely optional - nothing is dependent on the clanker.
 
