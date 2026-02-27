@@ -13,7 +13,7 @@ Loose guardrails are in place so your Agent can modify the system while remainin
 
 ### Requirements
 
-- A web server *(Nginx or [Grackle](https://github.com/humphreyboagart/grackle) ideal)*
+- A web server *([Nginx](docs/examples/nginx.md) or [Grackle](docs/examples/grackle.md) ideal)*
 - PHP 8.5 *(May work on earlier PHP 8.x releases, but I have not tested yet)*
 - SQLite3 or a clean MySQL/PgSQL database
 
