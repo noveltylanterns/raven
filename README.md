@@ -49,6 +49,11 @@ When loading the frontend, Raven first checks `public/theme/{slug}` for whatever
 
 In theory.
 
+#### Custom Admin Panel Themes
+
+The admin panel is a bit more rigid, since it's focus is to be a robust scaffold. However, it is themable to some extent. Refer to [panel/theme/AGENTS.md](panel/theme/AGENTS.md) for architectural info.
+
+
 ### Extensions
 
 If you need to add content types, helper functions, or even whole new parts of the panel, use the Extensions system. This will help your complex modifications remain compatible with future upgrades.
