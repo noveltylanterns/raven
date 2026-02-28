@@ -33,7 +33,7 @@ It sounds dystopian, but the AI is much like a German Shephard dog. It was bred 
 
 ## Building on Raven
 
-This is designed to be updated with Git. The browser-based updater in the panel isn't fully tested yet, but it just pulls the repo. Everything sensitive to your local install is covered in your `.gitignore` file.
+This is designed to be updated with Git. The browser-based updater in the panel isn't fully tested yet, but it just pulls the repo. Everything sensitive to your local install is covered in your [.gitignore](.gitignore) file.
 
 There are several places in your local install that are ignored by the update process: Your **Theme** and **Extension** folders. They are designed to safely accomodate your modifications and preserve them through system updates. If you need further architectural info, I had Codex [document](docs/README.md) its work.
 
