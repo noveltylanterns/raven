@@ -51,7 +51,7 @@ In theory.
 
 #### Custom Admin Panel Themes
 
-The admin panel is a bit more rigid, since it's focus is to be a robust scaffold. However, it is themable to some extent. Refer to [panel/theme/AGENTS.md](panel/theme/AGENTS.md) for architectural info.
+The admin panel is a bit more rigid, since its focus is to be a robust out-of-box scaffold to enable rapid frontend prototyping. However, it is themable to some extent. Refer to [panel/theme/AGENTS.md](panel/theme/AGENTS.md) for architectural info.
 
 
 ### Extensions
