@@ -2712,7 +2712,11 @@ final class PanelController
             return;
         }
 
-        $status = $this->loadUpdaterStatus();
+        $cachedStatus = $this->loadUpdaterStatus();
+        $status = $this->checkForUpdates(
+            (string) ($cachedStatus['source_key'] ?? ''),
+            (string) ($cachedStatus['custom_repo'] ?? '')
+        );
 
         // Keep local install identifiers synced even when no remote check was run.
         $status['current_version'] = $this->detectLocalComposerVersion() ?? '';
