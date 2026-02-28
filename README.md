@@ -45,7 +45,7 @@ The frontend works and is themeable, but there is no real template tagging syste
 
 #### Theme Fallback Chain
 
-When loading the frontend, Raven first checks `public/theme/{slug}` for whatever theme you have set in your config. Whatever views are missing from your theme, it should pull default basic styles from `private/views`. If your theme is set as a "child theme," it will pull the missing views from the parent first before checking `private/views/` for the rest.
+When loading the frontend, Raven first checks `public/theme/{slug}` for whatever theme you have set in your config. Whatever views are missing from your theme, it should pull default basic styles from `private/views/`. If your theme is set as a "child theme," it will pull the missing views from the parent first before checking `private/views/` for the rest.
 
 In theory.
 
