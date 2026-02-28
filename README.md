@@ -41,7 +41,7 @@ There are several places in your local install that are ignored by the update pr
 
 Currently working on a sensible theming system, with the ability for custom themes to "fall back" on parent themes to enable rapid deployment.
 
-The frontend works and is themeable, but there is no real template tagging system in place. If you don't mind this, point your agent at `public/theme/AGENTS.md` to get started building a custom frontend for your Raven install. Then set the theme in your [System Configuration](docs/Configuration.md).
+The frontend works and is themeable, but there is no real template tagging system in place. If you don't mind this, point your agent at [public/theme/AGENTS.md](public/theme/AGENTS.md) to get started building a custom frontend for your Raven install. Then set the theme in your [System Configuration](docs/Configuration.md).
 
 #### Theme Fallback Chain
 
@@ -61,7 +61,7 @@ There are several extension types:
 - **System:** Provides deep-level administrative utilties only visible to top-level admins.
 - **Stock:** Raven comes with several bundled extensions to serve as examples. They cannot be deleted, but they are disabled by-default *(opt-in)* on all new installs.
 
-Point your Agent at `private/ext/AGENTS.md` to get started with building Raven extensions, or generate a skeleton in your panel's [Extension Manager](docs/Extensions.md).
+Point your Agent at [private/ext/AGENTS.md](private/ext/AGENTS.md) to get started with building Raven extensions, or generate a skeleton in your panel's [Extension Manager](docs/Extensions.md).
 
 #### Enable the Output Profiler
 
