@@ -2878,11 +2878,9 @@ final class PanelController
             redirect($this->panelUrl('/updates'));
         }
 
-        $reinstallSummary = [];
         $reinstallError = $this->performUpdaterReinstall(
             (string) ($source['git_url'] ?? ''),
-            self::UPDATE_SOURCE_DEFAULT_BRANCH,
-            $reinstallSummary
+            self::UPDATE_SOURCE_DEFAULT_BRANCH
         );
         if ($reinstallError !== null) {
             $this->flash('error', 'Updater failed: ' . $reinstallError);
@@ -2892,24 +2890,14 @@ final class PanelController
         // Refresh updater status after reinstall so panel reflects post-run state.
         $refreshedStatus = $this->checkForUpdates($sourceKey, $customRepo);
         $refreshedState = strtolower((string) ($refreshedStatus['status'] ?? 'unknown'));
-        $preservedCount = (int) ($reinstallSummary['preserved_count'] ?? 0);
-        /** @var array<int, string> $preservedPreview */
-        $preservedPreview = is_array($reinstallSummary['preserved_preview'] ?? null)
-            ? $reinstallSummary['preserved_preview']
-            : [];
-        $preservedSuffix = ' Preserved custom directories: ' . $preservedCount . '.';
-        if ($preservedPreview !== []) {
-            $preservedSuffix .= ' Preserved preview: ' . implode(', ', $preservedPreview) . '.';
-        }
         if ($refreshedState === 'current') {
-            $this->flash('success', 'Updater completed successfully. System now matches upstream.' . $preservedSuffix);
+            $this->flash('success', 'Updater completed successfully. System now matches upstream.');
         } else {
             $this->flash(
                 'success',
                 'Updater completed. Current status: '
                 . ucfirst($refreshedState !== '' ? $refreshedState : 'unknown')
                 . '.'
-                . $preservedSuffix
             );
         }
 
@@ -6412,14 +6400,8 @@ final class PanelController
      * 2) `git reset --hard FETCH_HEAD`
      * 3) `git clean -fd` with update-safe exclusions for custom extension/theme directories
      */
-    private function performUpdaterReinstall(string $gitUrl, string $branch, ?array &$summary = null): ?string
+    private function performUpdaterReinstall(string $gitUrl, string $branch): ?string
     {
-        $preservedDirectories = $this->updaterPreservedUntrackedDirectories();
-        $summary = [
-            'preserved_count' => count($preservedDirectories),
-            'preserved_preview' => array_slice($preservedDirectories, 0, 3),
-        ];
-
         $root = dirname(__DIR__, 3);
         if (!is_dir($root . '/.git')) {
             return 'Updater reinstall requires a local Git repository.';
