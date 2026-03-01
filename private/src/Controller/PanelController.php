@@ -2727,6 +2727,7 @@ final class PanelController
             'site' => $this->siteData(),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
+            'flashSuccessList' => $this->pullFlashList('success'),
             'flashError' => $this->pullFlash('error'),
             'section' => 'updates',
             'showSidebar' => true,
@@ -2826,7 +2827,26 @@ final class PanelController
             redirect($this->panelUrl('/updates'));
         }
 
-        $this->flash('success', (string) ($dryRun['summary'] ?? 'Updater dry run completed.'));
+        /** @var mixed $rawSummaryItems */
+        $rawSummaryItems = $dryRun['summary_items'] ?? null;
+        $summaryItems = [];
+        if (is_array($rawSummaryItems)) {
+            foreach ($rawSummaryItems as $item) {
+                $normalizedItem = $this->input->text(is_string($item) ? $item : null, 400);
+                if ($normalizedItem === '') {
+                    continue;
+                }
+
+                $summaryItems[] = $normalizedItem;
+            }
+        }
+
+        if ($summaryItems !== []) {
+            $this->flash('success', 'Updater dry run completed.');
+            $this->flashList('success', $summaryItems);
+        } else {
+            $this->flash('success', (string) ($dryRun['summary'] ?? 'Updater dry run completed.'));
+        }
         redirect($this->panelUrl('/updates'));
     }
 
@@ -5635,6 +5655,56 @@ final class PanelController
     }
 
     /**
+     * Stores one flash list payload in session.
+     *
+     * @param array<int, string> $values
+     */
+    private function flashList(string $key, array $values): void
+    {
+        $normalized = [];
+        foreach ($values as $value) {
+            $item = trim($value);
+            if ($item === '') {
+                continue;
+            }
+
+            $normalized[] = $this->input->text($item, 400);
+        }
+
+        if ($normalized === []) {
+            return;
+        }
+
+        $_SESSION['_raven_flash_list'][$key] = $normalized;
+    }
+
+    /**
+     * Pulls and removes one flash list payload.
+     *
+     * @return array<int, string>|null
+     */
+    private function pullFlashList(string $key): ?array
+    {
+        $value = $_SESSION['_raven_flash_list'][$key] ?? null;
+        unset($_SESSION['_raven_flash_list'][$key]);
+        if (!is_array($value)) {
+            return null;
+        }
+
+        $normalized = [];
+        foreach ($value as $item) {
+            $stringItem = is_string($item) ? trim($item) : '';
+            if ($stringItem === '') {
+                continue;
+            }
+
+            $normalized[] = $this->input->text($stringItem, 400);
+        }
+
+        return $normalized === [] ? null : $normalized;
+    }
+
+    /**
      * Normalizes bulk-selection id arrays from list forms.
      *
      * @param array<string, mixed> $post
@@ -6437,7 +6507,7 @@ final class PanelController
     /**
      * Runs updater dry-run preview and returns one-line summary.
      *
-     * @return array{summary?: string, error?: string}
+     * @return array{summary?: string, summary_items?: array<int, string>, error?: string}
      */
     private function performUpdaterDryRun(string $gitUrl, string $branch): array
     {
@@ -6521,7 +6591,10 @@ final class PanelController
                 . '.';
         }
 
-        return ['summary' => implode(' ', $summaryParts)];
+        return [
+            'summary' => implode(' ', $summaryParts),
+            'summary_items' => $summaryParts,
+        ];
     }
 
     /**

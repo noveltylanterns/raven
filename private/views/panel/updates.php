@@ -14,6 +14,7 @@ declare(strict_types=1);
 /** @var array<string, string> $site */
 /** @var string $csrfField */
 /** @var string|null $flashSuccess */
+/** @var array<int, string>|null $flashSuccessList */
 /** @var string|null $flashError */
 /** @var array{
  *   source_key: string,
@@ -70,8 +71,19 @@ $requiresForceRun = $status !== 'outdated';
     <div class="card-body">
         <h1 class="mb-3">Update System</h1>
 
-        <?php if ($flashSuccess !== null): ?>
-            <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
+        <?php if ($flashSuccess !== null || $flashSuccessList !== null): ?>
+            <div class="alert alert-success" role="alert">
+                <?php if ($flashSuccess !== null): ?>
+                    <div><?= e($flashSuccess) ?></div>
+                <?php endif; ?>
+                <?php if ($flashSuccessList !== null): ?>
+                    <ul class="mb-0 mt-2">
+                        <?php foreach ($flashSuccessList as $successItem): ?>
+                            <li><?= e($successItem) ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
 
         <?php if ($flashError !== null): ?>
