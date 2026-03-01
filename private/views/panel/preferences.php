@@ -46,19 +46,18 @@ $avatarThumbUrl = '/uploads/avatars/' . rawurlencode($avatarThumbFilename);
 
 <form method="post" action="<?= e($panelBase) ?>/preferences/save" enctype="multipart/form-data">
     <?= $csrfField ?>
-
     <nav>
         <button type="submit" class="btn btn-primary"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Preferences</button>
     </nav>
 
     <section class="card">
         <div class="card-body">
+
             <div class="mb-3">
                 <label class="form-label h5" for="username">Username</label>
-                <input
+                <input class="form-control"
                     id="username"
                     name="username"
-                    class="form-control"
                     required
                     value="<?= e((string) ($preferences['username'] ?? '')) ?>"
                 >
@@ -66,21 +65,19 @@ $avatarThumbUrl = '/uploads/avatars/' . rawurlencode($avatarThumbFilename);
 
             <div class="mb-3">
                 <label class="form-label h5" for="display_name">Display Name</label>
-                <input
+                <input class="form-control"
                     id="display_name"
                     name="display_name"
-                    class="form-control"
                     value="<?= e((string) ($preferences['display_name'] ?? '')) ?>"
                 >
             </div>
 
             <div class="mb-3">
                 <label class="form-label h5" for="email">Email</label>
-                <input
+                <input class="form-control"
                     id="email"
                     name="email"
                     type="email"
-                    class="form-control"
                     required
                     value="<?= e((string) ($preferences['email'] ?? '')) ?>"
                 >
@@ -88,13 +85,17 @@ $avatarThumbUrl = '/uploads/avatars/' . rawurlencode($avatarThumbFilename);
 
             <div class="mb-3">
                 <label class="form-label h5" for="new_password">New Password</label>
-                <input id="new_password" name="new_password" type="password" class="form-control">
+                <input class="form-control"
+                    id="new_password"
+                    name="new_password"
+                    type="password"
+                >
                 <div class="form-text">Leave blank to keep current password (minimum 8 chars if changing).</div>
             </div>
 
             <div class="mb-3">
                 <label class="form-label h5" for="theme">Panel Theme</label>
-                <select id="theme" name="theme" class="form-select" required>
+                <select class="form-select" id="theme" name="theme" required>
                     <?php foreach ($themeOptions as $option): ?>
                         <?php $optionLabel = $option === 'default' ? '<Default>' : ucfirst($option); ?>
                         <option value="<?= e($option) ?>"<?= (string) ($preferences['theme'] ?? 'default') === $option ? ' selected' : '' ?>>
@@ -108,19 +109,18 @@ $avatarThumbUrl = '/uploads/avatars/' . rawurlencode($avatarThumbFilename);
             <div class="mb-3">
                 <label class="form-label h5" for="avatar">Avatar</label>
                 <?php if ($avatarFilename !== ''): ?>
-                    <div class="mb-2">
-                        <!-- Avatar image is served from required public content path. -->
-                        <img
-                            src="<?= e($avatarThumbUrl) ?>"
-                            onerror="this.onerror=null;this.src='<?= e($avatarUrl) ?>';"
-                            alt="Current avatar"
-                            style="max-width: 96px; max-height: 96px; border-radius: 8px;"
-                        >
-                    </div>
+                <div class="mb-2">
+                    <!-- Avatar image is served from required public content path. -->
+                    <img
+                        src="<?= e($avatarThumbUrl) ?>"
+                        onerror="this.onerror=null;this.src='<?= e($avatarUrl) ?>';"
+                        alt="Current avatar"
+                        style="max-width: 96px; max-height: 96px; border-radius: 8px;"
+                    >
+                </div>
                 <?php endif; ?>
                 <input id="avatar" name="avatar" type="file" class="form-control" accept=".gif,.jpg,.jpeg,.png,image/gif,image/jpeg,image/png">
                 <div class="form-text"><?= e($avatarUploadLimitsNote) ?></div>
-
                 <?php if ($avatarFilename !== ''): ?>
                     <div class="form-check mt-2">
                         <input class="form-check-input" type="checkbox" value="1" id="remove_avatar" name="remove_avatar">
@@ -128,6 +128,7 @@ $avatarThumbUrl = '/uploads/avatars/' . rawurlencode($avatarThumbFilename);
                     </div>
                 <?php endif; ?>
             </div>
+
         </div>
     </section>
 

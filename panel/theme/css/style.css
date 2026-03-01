@@ -13028,6 +13028,10 @@ body.raven-panel-theme .raven-panel-main section {
   margin-bottom: 1rem;
 }
 
+body.raven-panel-theme .raven-panel-main footer {
+  margin-bottom: 1rem;
+}
+
 body.raven-panel-theme .btn-lg, body.raven-panel-theme .btn-group-lg > .btn {
   padding: 0.4rem 0.8rem;
   font-size: 1.1rem;

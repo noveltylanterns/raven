@@ -120,14 +120,12 @@ $requiresForceRun = $status !== 'outdated';
         <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
         <button type="submit" class="btn btn-primary">Check for Updates</button>
     </form>
-
     <form method="post" action="<?= e($panelBase) ?>/updates/dry-run" class="m-0">
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
         <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
         <button type="submit" class="btn btn-secondary">Dry Run</button>
     </form>
-
     <form method="post" action="<?= e($panelBase) ?>/updates/run" class="m-0">
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
@@ -143,7 +141,7 @@ $requiresForceRun = $status !== 'outdated';
 
 <section class="card">
     <div class="card-body">
-        <h2 class="h5 mb-3">Current Status</h2>
+        <h2 class="h4 mb-3">Current Status</h2>
 
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
             <span class="badge <?= e($badgeClass) ?>"><?= e(ucfirst($status)) ?></span>
@@ -188,14 +186,12 @@ $requiresForceRun = $status !== 'outdated';
         <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
         <button type="submit" class="btn btn-primary">Check for Updates</button>
     </form>
-
     <form method="post" action="<?= e($panelBase) ?>/updates/dry-run" class="m-0">
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
         <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
         <button type="submit" class="btn btn-secondary">Dry Run</button>
     </form>
-
     <form method="post" action="<?= e($panelBase) ?>/updates/run" class="m-0">
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
@@ -210,25 +206,25 @@ $requiresForceRun = $status !== 'outdated';
 </nav>
 
 <?php if ($requiresForceRun): ?>
-    <div class="modal fade" id="updaterForceRunModal" tabindex="-1" aria-labelledby="updaterForceRunModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2 class="modal-title h5 mb-0" id="updaterForceRunModalLabel">Force Run Updater?</h2>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="mb-2">Current status is <strong><?= e(ucfirst($status)) ?></strong>.</p>
-                    <p class="mb-2"><?= e($statusMessage !== '' ? $statusMessage : 'Updater status is not marked as Outdated.') ?></p>
-                    <p class="mb-0 text-danger">Running anyway will fetch upstream, hard-reset tracked files, and clean untracked non-ignored files.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-warning" id="updaterForceRunConfirm">Run Updater Anyway</button>
-                </div>
+<div class="modal fade" id="updaterForceRunModal" tabindex="-1" aria-labelledby="updaterForceRunModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5 mb-0" id="updaterForceRunModalLabel">Force Run Updater?</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Current status is <strong><?= e(ucfirst($status)) ?></strong>.</p>
+                <p class="mb-2"><?= e($statusMessage !== '' ? $statusMessage : 'Updater status is not marked as Outdated.') ?></p>
+                <p class="mb-0 text-danger">Running anyway will fetch upstream, hard-reset tracked files, and clean untracked non-ignored files.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="updaterForceRunConfirm">Run Updater Anyway</button>
             </div>
         </div>
     </div>
+</div>
 <?php endif; ?>
 
 <script>
