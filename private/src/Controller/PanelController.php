@@ -6591,9 +6591,14 @@ final class PanelController
                 . '.';
         }
 
+        $summaryItems = $summaryParts;
+        if (($summaryItems[0] ?? '') === 'Dry run complete.') {
+            array_shift($summaryItems);
+        }
+
         return [
             'summary' => implode(' ', $summaryParts),
-            'summary_items' => $summaryParts,
+            'summary_items' => $summaryItems,
         ];
     }
 
