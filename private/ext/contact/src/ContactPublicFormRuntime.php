@@ -148,16 +148,16 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
         $safeReturnPath = htmlspecialchars($returnPath, ENT_QUOTES, 'UTF-8');
         $sectionId = htmlspecialchars($this->anchorId($rawSlug), ENT_QUOTES, 'UTF-8');
 
-        return '<section class="card my-3 raven-embedded-form raven-embedded-form-contact" id="' . $sectionId . '" data-raven-form-type="contact" data-raven-form-slug="' . $slug . '">'
+        return '<section class="card raven-embedded-form raven-embedded-form-contact" id="' . $sectionId . '" data-raven-form-type="contact" data-raven-form-slug="' . $slug . '">'
             . '<div class="card-body">'
-            . '<h3 class="h5 mb-3">' . $name . '</h3>'
+            . '<h3>' . $name . '</h3>'
             . $flashMarkup
             . '<form method="post" action="' . $submitAction . '" novalidate>'
             . $csrfField
             . '<input type="hidden" name="return_path" value="' . $safeReturnPath . '">'
             . '<div class="row g-3">'
-            . '<div class="col-md-6"><label class="form-label">Name</label><input type="text" class="form-control" name="contact_name" placeholder="Your name" value="' . $oldValues['name'] . '" required></div>'
-            . '<div class="col-md-6"><label class="form-label">Email</label><input type="email" class="form-control" name="contact_email" placeholder="you@example.com" value="' . $oldValues['email'] . '" required></div>'
+            . '<div class="col-12"><label class="form-label">Name</label><input type="text" class="form-control" name="contact_name" placeholder="Your name" value="' . $oldValues['name'] . '" required></div>'
+            . '<div class="col-12"><label class="form-label">Email</label><input type="email" class="form-control" name="contact_email" placeholder="you@example.com" value="' . $oldValues['email'] . '" required></div>'
             . '<div class="col-12"><label class="form-label">Message</label><textarea class="form-control" name="contact_message" rows="4" placeholder="How can we help?" required>' . $oldValues['message'] . '</textarea></div>'
             . $additionalFieldMarkup
             . $captchaMarkup
@@ -628,24 +628,7 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
             ? ($fromName . ' <' . $fromAddress . '>')
             : $fromAddress;
         $subject = str_replace(["\r", "\n"], ' ', $subject);
-        $bodyDigest = hash('sha256', $body);
-        $mailFingerprint = hash(
-            'sha256',
-            implode('|', [
-                strtolower($formSlug),
-                strtolower($replyToEmail),
-                strtolower($subject),
-                strtolower(implode(',', $destinations)),
-                strtolower(implode(',', $ccRecipients)),
-                strtolower(implode(',', $bccRecipients)),
-                $bodyDigest,
-            ])
-        );
-        if ($this->wasContactMailRecentlySent($formSlug, $mailFingerprint, 20)) {
-            return;
-        }
-
-        $messageId = '<raven-contact-' . substr($mailFingerprint, 0, 24) . '@' . $this->mailHeaderDomain() . '>';
+        $messageId = '<raven-contact-' . bin2hex(random_bytes(12)) . '@' . $this->mailHeaderDomain() . '>';
         $headers = [
             'MIME-Version: 1.0',
             'Content-Type: text/plain; charset=UTF-8',
@@ -654,6 +637,29 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
             'Message-ID: ' . $messageId,
             'X-Raven-Contact-Form: ' . $formSlug,
         ];
+        $envelopeRecipients = array_values(array_unique(array_merge($destinations, $ccRecipients, $bccRecipients)));
+
+        $transportError = '';
+        $sendmailBinary = $this->sendmailBinaryPath();
+        if ($sendmailBinary !== null) {
+            if (
+                $this->sendContactMailViaSendmail(
+                    $sendmailBinary,
+                    $envelopeRecipients,
+                    $destinations,
+                    $ccRecipients,
+                    $subject,
+                    $body,
+                    $headers,
+                    $fromAddress,
+                    $transportError
+                )
+            ) {
+                return;
+            }
+        }
+
+        // Fallback for environments where direct sendmail execution is unavailable.
         if ($ccRecipients !== []) {
             $headers[] = 'Cc: ' . implode(', ', $ccRecipients);
         }
@@ -661,119 +667,117 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
             $headers[] = 'Bcc: ' . implode(', ', $bccRecipients);
         }
         $headerString = implode("\r\n", $headers);
-
         $toRecipients = implode(', ', $destinations);
         $ok = @\mail($toRecipients, $subject, $body, $headerString);
         if ($ok !== true) {
-            throw new \RuntimeException('Failed to send contact email via php_mail.');
+            $suffix = $transportError !== '' ? (' ' . $transportError) : '';
+            throw new \RuntimeException('Failed to send contact email via php_mail.' . $suffix);
         }
-
-        $this->rememberSentContactMailFingerprint($formSlug, $mailFingerprint, 20);
     }
 
     /**
-     * Returns true when an identical contact mail was sent recently for this slug.
+     * Returns sendmail binary path from `sendmail_path` ini setting when executable.
      */
-    private function wasContactMailRecentlySent(string $slug, string $fingerprint, int $windowSeconds): bool
+    private function sendmailBinaryPath(): ?string
     {
-        $normalizedSlug = $this->input->slug($slug);
-        if (
-            $normalizedSlug === null
-            || $normalizedSlug === ''
-            || preg_match('/^[a-f0-9]{64}$/', $fingerprint) !== 1
-        ) {
-            return false;
+        $rawPath = trim((string) ini_get('sendmail_path'));
+        if ($rawPath === '') {
+            return null;
         }
 
-        /** @var mixed $rawAll */
-        $rawAll = $_SESSION['_raven_contact_sent_mail_fingerprints'] ?? null;
-        if (!is_array($rawAll)) {
-            return false;
+        $binary = '';
+        if (preg_match('/^(?:"([^"]+)"|\'([^\']+)\'|(\S+))/', $rawPath, $matches) !== 1) {
+            return null;
         }
 
-        /** @var mixed $rawBucket */
-        $rawBucket = $rawAll[$normalizedSlug] ?? null;
-        if (!is_array($rawBucket)) {
-            return false;
+        $binary = (string) ($matches[1] ?? $matches[2] ?? $matches[3] ?? '');
+        if ($binary === '' || !is_file($binary) || !is_executable($binary)) {
+            return null;
         }
 
-        $now = time();
-        $oldestAllowed = $now - max(1, $windowSeconds);
-        foreach ($rawBucket as $hash => $timestamp) {
-            if (!is_string($hash) || preg_match('/^[a-f0-9]{64}$/', $hash) !== 1) {
-                unset($rawBucket[$hash]);
-                continue;
-            }
-
-            $ts = is_int($timestamp) ? $timestamp : (int) $timestamp;
-            if ($ts < $oldestAllowed) {
-                unset($rawBucket[$hash]);
-            } else {
-                $rawBucket[$hash] = $ts;
-            }
-        }
-
-        if ($rawBucket === []) {
-            unset($rawAll[$normalizedSlug]);
-        } else {
-            $rawAll[$normalizedSlug] = $rawBucket;
-        }
-
-        if ($rawAll === []) {
-            unset($_SESSION['_raven_contact_sent_mail_fingerprints']);
-        } else {
-            $_SESSION['_raven_contact_sent_mail_fingerprints'] = $rawAll;
-        }
-
-        return isset($rawBucket[$fingerprint]);
+        return $binary;
     }
 
     /**
-     * Stores one sent-mail fingerprint for duplicate suppression.
+     * Sends one contact mail by invoking sendmail directly without `-t`.
+     *
+     * @param array<int, string> $envelopeRecipients
+     * @param array<int, string> $toRecipients
+     * @param array<int, string> $ccRecipients
+     * @param array<int, string> $baseHeaders
      */
-    private function rememberSentContactMailFingerprint(string $slug, string $fingerprint, int $windowSeconds): void
-    {
-        $normalizedSlug = $this->input->slug($slug);
-        if (
-            $normalizedSlug === null
-            || $normalizedSlug === ''
-            || preg_match('/^[a-f0-9]{64}$/', $fingerprint) !== 1
-        ) {
-            return;
+    private function sendContactMailViaSendmail(
+        string $sendmailBinary,
+        array $envelopeRecipients,
+        array $toRecipients,
+        array $ccRecipients,
+        string $subject,
+        string $body,
+        array $baseHeaders,
+        string $fromAddress,
+        string &$error
+    ): bool {
+        $error = '';
+        if ($envelopeRecipients === [] || $toRecipients === []) {
+            $error = 'No valid recipients available for sendmail delivery.';
+            return false;
         }
 
-        /** @var mixed $rawAll */
-        $rawAll = $_SESSION['_raven_contact_sent_mail_fingerprints'] ?? [];
-        $all = is_array($rawAll) ? $rawAll : [];
+        $command = array_merge([$sendmailBinary, '-i', '-f', $fromAddress], $envelopeRecipients);
+        $descriptorSpec = [
+            0 => ['pipe', 'w'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $process = @proc_open($command, $descriptorSpec, $pipes);
+        if (!is_resource($process)) {
+            $error = 'Could not start sendmail process.';
+            return false;
+        }
 
-        /** @var mixed $rawBucket */
-        $rawBucket = $all[$normalizedSlug] ?? [];
-        $bucket = is_array($rawBucket) ? $rawBucket : [];
-
-        $now = time();
-        $oldestAllowed = $now - max(1, $windowSeconds);
-        foreach ($bucket as $hash => $timestamp) {
-            if (!is_string($hash) || preg_match('/^[a-f0-9]{64}$/', $hash) !== 1) {
-                unset($bucket[$hash]);
+        $headers = [];
+        foreach ($baseHeaders as $headerLine) {
+            $line = trim((string) $headerLine);
+            if ($line === '') {
                 continue;
             }
 
-            $ts = is_int($timestamp) ? $timestamp : (int) $timestamp;
-            if ($ts < $oldestAllowed) {
-                unset($bucket[$hash]);
-            } else {
-                $bucket[$hash] = $ts;
-            }
+            $headers[] = str_replace(["\r", "\n"], '', $line);
+        }
+        $headers[] = 'To: ' . implode(', ', $toRecipients);
+        if ($ccRecipients !== []) {
+            $headers[] = 'Cc: ' . implode(', ', $ccRecipients);
+        }
+        $headers[] = 'Subject: ' . str_replace(["\r", "\n"], ' ', $subject);
+
+        $normalizedBody = str_replace(["\r\n", "\r"], "\n", $body);
+        $message = implode("\r\n", $headers) . "\r\n\r\n" . str_replace("\n", "\r\n", $normalizedBody);
+
+        if (isset($pipes[0]) && is_resource($pipes[0])) {
+            fwrite($pipes[0], $message);
+            fclose($pipes[0]);
         }
 
-        $bucket[$fingerprint] = $now;
-        if (count($bucket) > 20) {
-            asort($bucket);
-            $bucket = array_slice($bucket, -20, null, true);
+        $stdout = '';
+        if (isset($pipes[1]) && is_resource($pipes[1])) {
+            $stdout = (string) stream_get_contents($pipes[1]);
+            fclose($pipes[1]);
         }
 
-        $all[$normalizedSlug] = $bucket;
-        $_SESSION['_raven_contact_sent_mail_fingerprints'] = $all;
+        $stderr = '';
+        if (isset($pipes[2]) && is_resource($pipes[2])) {
+            $stderr = (string) stream_get_contents($pipes[2]);
+            fclose($pipes[2]);
+        }
+
+        $exitCode = proc_close($process);
+        if ($exitCode !== 0) {
+            $combined = trim(trim($stdout) . PHP_EOL . trim($stderr));
+            $error = $combined !== '' ? ('sendmail exited with status ' . $exitCode . ': ' . $combined) : ('sendmail exited with status ' . $exitCode . '.');
+            return false;
+        }
+
+        return true;
     }
 
     /**

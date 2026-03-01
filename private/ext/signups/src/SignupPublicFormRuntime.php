@@ -153,17 +153,17 @@ final class SignupPublicFormRuntime implements EmbeddedFormRuntimeInterface
         $safeReturnPath = htmlspecialchars($returnPath, ENT_QUOTES, 'UTF-8');
         $sectionId = htmlspecialchars($this->anchorId($rawSlug), ENT_QUOTES, 'UTF-8');
 
-        return '<section class="card my-3 raven-embedded-form raven-embedded-form-signups" id="' . $sectionId . '" data-raven-form-type="signups" data-raven-form-slug="' . $slug . '">'
+        return '<section class="card raven-embedded-form raven-embedded-form-signups" id="' . $sectionId . '" data-raven-form-type="signups" data-raven-form-slug="' . $slug . '">'
             . '<div class="card-body">'
-            . '<h3 class="h5 mb-3">' . $name . '</h3>'
+            . '<h3>' . $name . '</h3>'
             . $flashMarkup
             . '<form method="post" action="' . $submitAction . '" novalidate>'
             . $csrfField
             . '<input type="hidden" name="return_path" value="' . $safeReturnPath . '">'
             . '<div class="row g-3">'
-            . '<div class="col-md-6"><label class="form-label">Email</label><input type="email" class="form-control" name="signups_email" placeholder="you@example.com" value="' . $oldValues['email'] . '" required></div>'
-            . '<div class="col-md-6"><label class="form-label">Display Name</label><input type="text" class="form-control" name="signups_display_name" placeholder="Your name" value="' . $oldValues['display_name'] . '" required></div>'
-            . '<div class="col-md-6"><label class="form-label">Country</label><select class="form-select" name="signups_country" required>'
+            . '<div class="col-12"><label class="form-label">Email</label><input type="email" class="form-control" name="signups_email" placeholder="you@example.com" value="' . $oldValues['email'] . '" required></div>'
+            . '<div class="col-12"><label class="form-label">Display Name</label><input type="text" class="form-control" name="signups_display_name" placeholder="Your name" value="' . $oldValues['display_name'] . '" required></div>'
+            . '<div class="col-12"><label class="form-label">Country</label><select class="form-select" name="signups_country" required>'
             . $countryOptionsMarkup
             . '</select></div>'
             . $additionalFieldMarkup
