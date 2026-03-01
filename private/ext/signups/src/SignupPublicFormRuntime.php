@@ -153,8 +153,7 @@ final class SignupPublicFormRuntime implements EmbeddedFormRuntimeInterface
         $safeReturnPath = htmlspecialchars($returnPath, ENT_QUOTES, 'UTF-8');
         $sectionId = htmlspecialchars($this->anchorId($rawSlug), ENT_QUOTES, 'UTF-8');
 
-        return '<section class="card raven-embedded-form raven-embedded-form-signups" id="' . $sectionId . '" data-raven-form-type="signups" data-raven-form-slug="' . $slug . '">'
-            . '<div class="card-body">'
+        return '<section class="raven-embedded-form raven-embedded-form-signups" id="' . $sectionId . '" data-raven-form-type="signups" data-raven-form-slug="' . $slug . '">'
             . $flashMarkup
             . '<form method="post" action="' . $submitAction . '" novalidate>'
             . $csrfField
@@ -170,7 +169,6 @@ final class SignupPublicFormRuntime implements EmbeddedFormRuntimeInterface
             . '<div class="col-12"><button type="submit" class="btn btn-primary">Join Signup Sheet</button></div>'
             . '</div>'
             . '</form>'
-            . '</div>'
             . '</section>';
     }
 

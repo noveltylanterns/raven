@@ -148,8 +148,7 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
         $safeReturnPath = htmlspecialchars($returnPath, ENT_QUOTES, 'UTF-8');
         $sectionId = htmlspecialchars($this->anchorId($rawSlug), ENT_QUOTES, 'UTF-8');
 
-        return '<section class="card raven-embedded-form raven-embedded-form-contact" id="' . $sectionId . '" data-raven-form-type="contact" data-raven-form-slug="' . $slug . '">'
-            . '<div class="card-body">'
+        return '<section class="raven-embedded-form raven-embedded-form-contact" id="' . $sectionId . '" data-raven-form-type="contact" data-raven-form-slug="' . $slug . '">'
             . $flashMarkup
             . '<form method="post" action="' . $submitAction . '" novalidate>'
             . $csrfField
@@ -163,7 +162,6 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
             . '<div class="col-12"><button type="submit" class="btn btn-primary">Send Message</button></div>'
             . '</div>'
             . '</form>'
-            . '</div>'
             . '</section>';
     }
 
