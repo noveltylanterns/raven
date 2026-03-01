@@ -34,7 +34,10 @@ if ($siteName === '') {
     $siteName = 'Raven CMS';
 }
 $twitterCard = trim((string) ($site['twitter_card'] ?? ''));
-$twitterSite = $siteName;
+$twitterSite = trim((string) ($site['twitter_site'] ?? ''));
+if ($twitterSite === '') {
+    $twitterSite = $siteName;
+}
 $twitterCreator = trim((string) ($site['twitter_creator'] ?? ''));
 $twitterImage = trim((string) ($site['twitter_image'] ?? ''));
 $openGraphImage = trim((string) ($site['og_image'] ?? ''));
