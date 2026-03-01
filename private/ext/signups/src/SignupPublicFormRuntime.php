@@ -155,7 +155,6 @@ final class SignupPublicFormRuntime implements EmbeddedFormRuntimeInterface
 
         return '<section class="card raven-embedded-form raven-embedded-form-signups" id="' . $sectionId . '" data-raven-form-type="signups" data-raven-form-slug="' . $slug . '">'
             . '<div class="card-body">'
-            . '<h3>' . $name . '</h3>'
             . $flashMarkup
             . '<form method="post" action="' . $submitAction . '" novalidate>'
             . $csrfField

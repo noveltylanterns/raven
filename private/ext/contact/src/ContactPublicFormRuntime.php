@@ -150,7 +150,6 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
 
         return '<section class="card raven-embedded-form raven-embedded-form-contact" id="' . $sectionId . '" data-raven-form-type="contact" data-raven-form-slug="' . $slug . '">'
             . '<div class="card-body">'
-            . '<h3>' . $name . '</h3>'
             . $flashMarkup
             . '<form method="post" action="' . $submitAction . '" novalidate>'
             . $csrfField
