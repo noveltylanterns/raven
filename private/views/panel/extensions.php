@@ -52,38 +52,34 @@ $panelBase = '/' . trim($site['panel_path'], '/');
         opacity: 1;
     }
 </style>
-<div class="card mb-3">
+<header class="card">
     <div class="card-body">
         <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
             <h1 class="mb-0">Extension Manager</h1>
             <button
-                type="button"
-                class="btn btn-primary btn-sm"
-                data-bs-toggle="modal"
-                data-bs-target="#create-extension-modal"
-            >
-                Create New Extension<i class="bi bi-plus-square ms-2" aria-hidden="true"></i>
+              type="button"
+              class="btn btn-primary btn-sm"
+              data-bs-toggle="modal"
+              data-bs-target="#create-extension-modal"
+              >Create New Extension<i class="bi bi-plus-square ms-2" aria-hidden="true"></i>
             </button>
         </div>
-
-        <?php if ($flashSuccess !== null): ?>
-            <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
-        <?php endif; ?>
-
-        <?php if ($flashError !== null): ?>
-            <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
-        <?php endif; ?>
-
-        <p class="mb-21">
-            Use this page to create, upload, enable, and disable Raven extensions.<br>
-        </p>
+        <p">Use this page to create, upload, enable, and disable Raven extensions.<br></p>
         <h6>Notes:</h6>
         <p class="text-muted mb-0">
-            - Enabled extensions must be disabled before deletion.<br>
-            - Stock extensions cannot be deleted, only disabled.
+          - Enabled extensions must be disabled before deletion.<br>
+          - Stock extensions cannot be deleted, only disabled.
         </p>
     </div>
-</div>
+</header>
+
+<?php if ($flashSuccess !== null): ?>
+<div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
+<?php endif; ?>
+
+<?php if ($flashError !== null): ?>
+<div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
+<?php endif; ?>
 
 <div class="card mb-3">
     <div class="card-body">

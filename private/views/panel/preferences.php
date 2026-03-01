@@ -29,19 +29,19 @@ $avatarThumbFilename = $avatarBase !== '' ? $avatarBase . '_thumb.jpg' : $avatar
 $avatarUrl = '/uploads/avatars/' . rawurlencode($avatarFilename);
 $avatarThumbUrl = '/uploads/avatars/' . rawurlencode($avatarThumbFilename);
 ?>
-<div class="card mb-3">
+<header class="card">
     <div class="card-body">
-        <h1 class="mb-0">Preferences</h1>
-        <p class="text-muted mt-2 mb-0">Manage your account details, panel theme, and avatar.</p>
+        <h1>Preferences</h1>
+        <p class="text-muted mb-0">Manage your account details, panel theme, and avatar.</p>
     </div>
-</div>
+</header>
 
 <?php if ($flashSuccess !== null): ?>
-    <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
+<div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
 <?php endif; ?>
 
 <?php if ($flashError !== null): ?>
-    <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
+<div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
 <form method="post" action="<?= e($panelBase) ?>/preferences/save" enctype="multipart/form-data">

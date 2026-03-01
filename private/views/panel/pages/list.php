@@ -75,25 +75,25 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
 };
 ?>
-<div class="card mb-3">
+<header class="card">
     <div class="card-body">
-        <h1 class="mb-0">Pages</h1>
-        <p class="text-muted mt-2 mb-0">Create, organize, and manage your site pages with publication and channel controls.</p>
+        <h1>Pages</h1>
+        <p class="text-muted mb-0">Create, organize, and manage your site pages with publication and channel controls.</p>
     </div>
-</div>
+</header>
+
+<?php if ($flashSuccess !== null): ?>
+<div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
+<?php endif; ?>
+
+<?php if ($flashError !== null): ?>
+<div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
+<?php endif; ?>
 
 <!-- Standalone bulk-delete form receives selected row ids via `form` attribute. -->
 <form id="<?= e($bulkDeleteFormId) ?>" method="post" action="<?= e($panelBase) ?>/pages/delete">
     <?= $csrfField ?>
 </form>
-
-<?php if ($flashSuccess !== null): ?>
-    <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
-<?php endif; ?>
-
-<?php if ($flashError !== null): ?>
-    <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
-<?php endif; ?>
 
 <div class="d-flex justify-content-end gap-2 mb-3">
     <a class="btn btn-primary" href="<?= e($panelBase) ?>/pages/edit"><i class="bi bi-file-earmark-plus me-2" aria-hidden="true"></i>Create Page</a>

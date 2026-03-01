@@ -13011,4 +13011,8 @@ textarea[data-raven-editor-input="1"] {
   font-family: "Red Hat Text", "Segoe UI", "Inter", "Noto Sans", "Liberation Sans", Arial, sans-serif;
 }
 
+body.raven-panel-theme header {
+  margin-bottom: 1rem;
+}
+
 /*# sourceMappingURL=style.css.map */

@@ -59,19 +59,19 @@ foreach ($routeRows as $row) {
 asort($typeFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
 asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
 ?>
-<div class="card mb-3">
+<header class="card">
     <div class="card-body">
-        <h1 class="mb-0">Routing Table</h1>
-        <p class="text-muted mt-2 mb-0">A sortable inventory of all public URI routes and their destinations.</p>
+        <h1>Routing Table</h1>
+        <p class="text-muted mb-0">A sortable inventory of all public URI routes and their destinations.</p>
     </div>
-</div>
+</header>
 
 <?php if ($flashSuccess !== null): ?>
-    <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
+<div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
 <?php endif; ?>
 
 <?php if ($flashError !== null): ?>
-    <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
+<div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
 <div class="row g-3 mb-3">

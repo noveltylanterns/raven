@@ -907,3 +907,7 @@ body.raven-panel-theme.theme-dark #gallery_drop_zone {
 textarea[data-raven-editor-input="1"] {
   font-family: $font-family-sans-serif;
 }
+
+body.raven-panel-theme header {
+  margin-bottom: 1rem;
+}

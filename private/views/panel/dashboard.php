@@ -605,28 +605,28 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
 };
 ?>
 <?php if ($flashSuccess !== null): ?>
-    <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
+<div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
 <?php endif; ?>
 
 <?php if ($flashError !== null): ?>
-    <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
+<div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
 <?php if ($section === 'dashboard'): ?>
-    <div class="card">
-        <div class="card-body">
-            <h1>Dashboard</h1>
-            <p class="mb-1">Logged in as: <strong><?= e((string) ($user['email'] ?? 'unknown')) ?></strong></p>
-            <p class="text-muted">Welcome to <b>Raven CMS</b>. Use the navigation to browse your system. Full dashboard coming soon.</p>
-        </div>
+<header class="card">
+    <div class="card-body">
+        <h1>Dashboard</h1>
+        <p class="mb-1">Logged in as: <strong><?= e((string) ($user['email'] ?? 'unknown')) ?></strong></p>
+        <p class="text-muted">Welcome to <b>Raven CMS</b>. Use the navigation to browse your system. Full dashboard coming soon.</p>
     </div>
+</header>
 <?php elseif ($section === 'configuration'): ?>
-    <div class="card mb-3">
-        <div class="card-body">
-            <h1 class="mb-0">System Configuration</h1>
-            <p class="text-muted mt-2 mb-0">Manage site, database, debug, media, meta, security, and user/session runtime settings.</p>
-        </div>
+<header class="card">
+    <div class="card-body">
+        <h1 class="mb-0">System Configuration</h1>
+        <p class="text-muted mt-2 mb-0">Manage site, database, debug, media, meta, security, and user/session runtime settings.</p>
     </div>
+</header>
 
     <?php if (!$canManageConfiguration): ?>
         <div class="card">
@@ -1128,13 +1128,13 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
         </script>
     <?php endif; ?>
 <?php else: ?>
-    <div class="card">
-        <div class="card-body">
-            <h1 class="text-capitalize"><?= e($section) ?></h1>
-            <p class="text-muted mb-0">This section is scaffolded and will be implemented in the next pass.</p>
-            <?php if (($section === 'users' && !$canManageUsers) || ($section === 'groups' && !$canManageGroups)): ?>
-                <p class="text-danger mt-2 mb-0">Manage Users or Manage Groups permission is required for this section.</p>
-            <?php endif; ?>
-        </div>
+<header class="card">
+    <div class="card-body">
+        <h1><?= e($section) ?></h1>
+        <p class="text-muted mb-0">This section is scaffolded and will be implemented in the next pass.</p>
+        <?php if (($section === 'users' && !$canManageUsers) || ($section === 'groups' && !$canManageGroups)): ?>
+        <p class="text-danger mt-2 mb-0">Manage Users or Manage Groups permission is required for this section.</p>
+        <?php endif; ?>
     </div>
+</header>
 <?php endif; ?>

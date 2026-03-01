@@ -67,57 +67,50 @@ if (preg_match('/^\s*v?(\d+)\.(\d+)/i', $latestVersion, $latestSeriesMatch) === 
 
 $requiresForceRun = $status !== 'outdated';
 ?>
-<div class="card mb-3">
+
+<header class="card">
     <div class="card-body">
-        <h1 class="mb-3">Update System</h1>
-
-        <?php if ($flashSuccess !== null || $flashSuccessList !== null): ?>
-            <div class="alert alert-success" role="alert">
-                <?php if ($flashSuccess !== null): ?>
-                    <div><?= e($flashSuccess) ?></div>
-                <?php endif; ?>
-                <?php if ($flashSuccessList !== null): ?>
-                    <ul class="mb-0 mt-2">
-                        <?php foreach ($flashSuccessList as $successItem): ?>
-                            <li><?= e($successItem) ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-            </div>
-        <?php endif; ?>
-
-        <?php if ($flashError !== null): ?>
-            <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
-        <?php endif; ?>
-
+        <h1>Update System</h1>
         <div class="d-flex flex-wrap align-items-center gap-2">
             <label for="update-source-key" class="form-label mb-0">Upstream Source</label>
             <select class="form-select form-select-sm w-auto" id="update-source-key" name="source_key" aria-label="Upstream Source">
-                <?php foreach ($updateSources as $source): ?>
-                    <?php
+                <?php foreach ($updateSources as $source):
                     $optionKey = (string) ($source['key'] ?? '');
                     $optionLabel = (string) ($source['label'] ?? $optionKey);
                     $optionRepo = (string) ($source['repo'] ?? '');
                     $optionText = $optionRepo === '' ? $optionLabel : ($optionLabel . ' (' . $optionRepo . ')');
-                    ?>
-                    <option value="<?= e($optionKey) ?>"<?= $optionKey === $sourceKey ? ' selected' : '' ?>>
-                        <?= e($optionText) ?>
-                    </option>
+                ?>
+                <option value="<?= e($optionKey) ?>"<?= $optionKey === $sourceKey ? ' selected' : '' ?>><?= e($optionText) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
         <div class="mt-2 d-none" id="updater-custom-repo-wrap">
             <label for="updater-custom-repo" class="form-label mb-1">Custom Git Repo</label>
             <input
-                id="updater-custom-repo"
-                type="text"
-                class="form-control form-control-sm"
-                value="<?= e($customRepo) ?>"
-                placeholder="https://git.example.com/owner/repo.git or git@example.com:owner/repo.git"
-            >
+              id="updater-custom-repo"
+              type="text"
+              class="form-control form-control-sm"
+              value="<?= e($customRepo) ?>"
+              placeholder="https://git.example.com/owner/repo.git or git@example.com:owner/repo.git"
+              >
         </div>
     </div>
+</header>
+
+<?php if ($flashSuccess !== null || $flashSuccessList !== null): ?>
+<div class="alert alert-success" role="alert">
+    <?php if ($flashSuccess !== null): ?><div><?= e($flashSuccess) ?></div><?php endif; ?>
+    <?php if ($flashSuccessList !== null): ?>
+    <ul class="mb-0 mt-2">
+        <?php foreach ($flashSuccessList as $successItem): ?><li><?= e($successItem) ?></li><?php endforeach; ?>
+    </ul>
+    <?php endif; ?>
 </div>
+<?php endif; ?>
+
+<?php if ($flashError !== null): ?>
+<div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
+<?php endif; ?>
 
 <div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
     <form method="post" action="<?= e($panelBase) ?>/updates/check" class="m-0">

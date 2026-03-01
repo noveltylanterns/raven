@@ -58,15 +58,15 @@ if ($tag !== null && $publicBase !== '' && $tagSlug !== '' && $tagRoutePrefix !=
     $tagPublicUrl = $publicBase . '/' . rawurlencode($tagRoutePrefix) . '/' . rawurlencode($tagSlug);
 }
 ?>
-<div class="card mb-3">
+<header class="card">
     <div class="card-body">
-        <h1 class="mb-0">
+        <h1>
             <?= $tag === null ? 'New Tag' : 'Edit Tag: \'' . e($tagName !== '' ? $tagName : 'Untitled') . '\'' ?>
         </h1>
         <?php if ($tag === null): ?>
-            <p class="text-muted mt-2 mb-0">Create or update a tag and manage its preview/cover media.</p>
+            <p class="text-muted mb-0">Create or update a tag and manage its preview/cover media.</p>
         <?php elseif ($tagPublicUrl !== null): ?>
-            <p class="mt-2 mb-0 small">
+            <p class="mb-0 small">
                 <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
                 <a
                     href="<?= e($tagPublicUrl) ?>"
@@ -81,22 +81,22 @@ if ($tag !== null && $publicBase !== '' && $tagSlug !== '' && $tagRoutePrefix !=
             </p>
         <?php endif; ?>
     </div>
-</div>
+</header>
 
 <?php if ($flashSuccess !== null): ?>
-    <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
+<div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
 <?php endif; ?>
 
 <?php if ($error !== null): ?>
-    <div class="alert alert-danger" role="alert"><?= e($error) ?></div>
+<div class="alert alert-danger" role="alert"><?= e($error) ?></div>
 <?php endif; ?>
 
 <?php if ($hasPersistedTag): ?>
-    <!-- Standalone delete form avoids nested forms and keeps CSRF enforcement intact. -->
-    <form id="<?= e($deleteFormId) ?>" method="post" action="<?= e($panelBase) ?>/tags/delete">
-        <?= $csrfField ?>
-        <input type="hidden" name="id" value="<?= $tagId ?>">
-    </form>
+<!-- Standalone delete form avoids nested forms and keeps CSRF enforcement intact. -->
+<form id="<?= e($deleteFormId) ?>" method="post" action="<?= e($panelBase) ?>/tags/delete">
+    <?= $csrfField ?>
+    <input type="hidden" name="id" value="<?= $tagId ?>">
+</form>
 <?php endif; ?>
 
 <form method="post" action="<?= e($panelBase) ?>/tags/save" enctype="multipart/form-data">

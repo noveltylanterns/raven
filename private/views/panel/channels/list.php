@@ -43,25 +43,25 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
 };
 ?>
-<div class="card mb-3">
+<header class="card">
     <div class="card-body">
-        <h1 class="mb-0">Channels</h1>
-        <p class="text-muted mt-2 mb-0">Manage channel sections used for URL structure and channel landing pages.</p>
+        <h1>Channels</h1>
+        <p class="text-muted mb-0">Manage channel sections used for URL structure and channel landing pages.</p>
     </div>
-</div>
+</header>
+
+<?php if ($flashSuccess !== null): ?>
+<div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
+<?php endif; ?>
+
+<?php if ($flashError !== null): ?>
+<div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
+<?php endif; ?>
 
 <!-- Standalone bulk-delete form receives selected row ids via `form` attribute. -->
 <form id="<?= e($bulkDeleteFormId) ?>" method="post" action="<?= e($panelBase) ?>/channels/delete">
     <?= $csrfField ?>
 </form>
-
-<?php if ($flashSuccess !== null): ?>
-    <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
-<?php endif; ?>
-
-<?php if ($flashError !== null): ?>
-    <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
-<?php endif; ?>
 
 <div class="d-flex justify-content-end gap-2 mb-3">
     <a class="btn btn-primary" href="<?= e($panelBase) ?>/channels/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Channel</a>
