@@ -115,7 +115,7 @@ if ($tag !== null && $publicBase !== '' && $tagSlug !== '' && $tagRoutePrefix !=
         <?php endif; ?>
     </nav>
 
-    <div class="card mb-3">
+    <section class="card">
         <div class="card-body">
             <div class="mb-3">
                 <label for="name" class="form-label h5">Name</label>
@@ -201,7 +201,7 @@ if ($tag !== null && $publicBase !== '' && $tagSlug !== '' && $tagRoutePrefix !=
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 
     <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Tag</button>

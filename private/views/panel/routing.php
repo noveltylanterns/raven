@@ -74,7 +74,7 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
 <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
-<div class="row g-3 mb-3">
+<section class="row g-3">
     <div class="col-6 col-md-3">
         <div class="card h-100">
             <div class="card-body">
@@ -117,7 +117,7 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
             </div>
         </div>
     </div>
-</div>
+</section>
 
 <?php if ($routeRows !== []): ?>
 <nav>
@@ -127,7 +127,7 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
 </nav>
 <?php endif; ?>
 
-<div class="card mb-3">
+<section class="card">
     <div class="card-body">
         <?php if ($routeRows === []): ?>
             <p class="text-muted mb-0">No routing records found.</p>
@@ -241,7 +241,7 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
             <p id="routing-filter-empty" class="text-muted mb-0 mt-2 d-none">No routing records match the current filters.</p>
         <?php endif; ?>
     </div>
-</div>
+</section>
 
 <?php if ($routeRows !== []): ?>
 <nav>

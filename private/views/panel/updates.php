@@ -141,7 +141,7 @@ $requiresForceRun = $status !== 'outdated';
     </form>
 </nav>
 
-<div class="card mb-3">
+<section class="card">
     <div class="card-body">
         <h2 class="h5 mb-3">Current Status</h2>
 
@@ -179,7 +179,7 @@ $requiresForceRun = $status !== 'outdated';
             </div>
         </div>
     </div>
-</div>
+</section>
 
 <nav>
     <form method="post" action="<?= e($panelBase) ?>/updates/check" class="m-0">

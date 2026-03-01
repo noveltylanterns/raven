@@ -80,7 +80,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
 <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
-<div class="card mb-3">
+<section class="card">
     <div class="card-body">
         <h2 class="h5 mb-3">Upload Extension</h2>
         <form method="post" action="<?= e($panelBase) ?>/extensions/upload" enctype="multipart/form-data">
@@ -102,7 +102,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
             <button type="submit" class="btn btn-primary btn-sm">Upload Extension<i class="bi bi-upload ms-2" aria-hidden="true"></i></button>
         </form>
     </div>
-</div>
+</section>
 
 <div class="modal fade" id="create-extension-modal" tabindex="-1" aria-labelledby="create-extension-modal-label" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -226,7 +226,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
     </div>
 </div>
 
-<div class="card">
+<section class="card">
     <div class="card-body">
         <h2 class="h5 mb-3">Installed Extensions</h2>
         <?php if ($extensions === []): ?>
@@ -341,7 +341,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
             </div>
         <?php endif; ?>
     </div>
-</div>
+</section>
 <script>
     (function () {
         var table = document.getElementById('extensions-table');

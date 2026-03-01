@@ -200,7 +200,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
         </li>
     </ul>
 
-    <div class="tab-content raven-tab-content-surface border border-top-0 rounded-bottom p-3 mb-3" id="pageEditorTabsContent">
+    <section class="tab-content raven-tab-content-surface border border-top-0 rounded-bottom p-3 mb-3" id="pageEditorTabsContent">
                 <div
                     class="tab-pane fade<?= $activeTab === 'content' ? ' show active' : '' ?>"
                     id="page-content-pane"
@@ -648,7 +648,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>
-    </div>
+    </section>
 
     <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Page</button>

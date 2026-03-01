@@ -179,7 +179,7 @@ foreach ($permissionDefinitions as $permission) {
         <?php endif; ?>
     </nav>
 
-    <div class="card mb-3">
+    <section class="card">
         <div class="card-body">
             <div class="mb-3">
                 <label for="name" class="form-label h5">Name</label>
@@ -338,7 +338,7 @@ foreach ($permissionDefinitions as $permission) {
                 </div>
             </fieldset>
         </div>
-    </div>
+    </section>
 
     <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Group</button>

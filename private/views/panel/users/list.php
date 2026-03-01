@@ -88,7 +88,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
 </nav>
 
-<div class="card mb-3">
+<section class="card">
     <div class="card-body">
         <?php if ($users === []): ?>
             <p class="text-muted mb-0">No users found.</p>
@@ -281,7 +281,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
             <?php endif; ?>
         <?php endif; ?>
     </div>
-</div>
+</section>
 
 <nav>
     <a class="btn btn-primary" href="<?= e($panelBase) ?>/users/edit"><i class="bi bi-person-plus me-2" aria-hidden="true"></i>New User</a>

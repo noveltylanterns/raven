@@ -105,7 +105,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
 </nav>
 
-<div class="card mb-3">
+<section class="card">
     <div class="card-body">
         <?php // Table contains edit/delete row actions for each page. ?>
         <?php if ($pages === []): ?>
@@ -265,7 +265,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
             <?php endif; ?>
         <?php endif; ?>
     </div>
-</div>
+</section>
 
 <nav>
     <a class="btn btn-primary" href="<?= e($panelBase) ?>/pages/edit"><i class="bi bi-file-earmark-plus me-2" aria-hidden="true"></i>Create Page</a>

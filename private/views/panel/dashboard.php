@@ -614,6 +614,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
 <?php endif; ?>
 
 <?php if ($section === 'dashboard'): ?>
+
 <header class="card">
     <div class="card-body">
         <h1>Dashboard</h1>
@@ -621,7 +622,9 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
         <p class="text-muted">Welcome to <b>Raven CMS</b>. Use the navigation to browse your system. Full dashboard coming soon.</p>
     </div>
 </header>
+
 <?php elseif ($section === 'configuration'): ?>
+
 <header class="card">
     <div class="card-body">
         <h1>System Configuration</h1>
@@ -629,14 +632,14 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
     </div>
 </header>
 
-    <?php if (!$canManageConfiguration): ?>
-    <div class="card">
-        <div class="card-body">
-            <p class="text-danger mb-0">Manage System Configuration permission is required for this section.</p>
-        </div>
+<?php if (!$canManageConfiguration): ?>
+<section class="card">
+    <div class="card-body">
+        <p class="text-danger mb-0">Manage System Configuration permission is required for this section.</p>
     </div>
-    <?php else: ?>
-    <form method="post" action="<?= e($panelBase) ?>/configuration/save">
+</section>
+<?php else: ?>
+<form method="post" action="<?= e($panelBase) ?>/configuration/save">
         <?= $csrfField ?>
         <input type="hidden" name="_config_tab" id="config-active-tab" value="<?= e($activeConfigTab) ?>">
         <nav>
@@ -734,7 +737,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
             </li>
         </ul>
 
-        <div class="tab-content raven-tab-content-surface border border-top-0 rounded-bottom p-3 mb-3" id="configEditorTabsContent">
+        <section class="tab-content raven-tab-content-surface border border-top-0 rounded-bottom p-3 mb-3" id="configEditorTabsContent">
                         <div
                             class="tab-pane fade<?= $isActiveConfigTab('basic') ? ' show active' : '' ?>"
                             id="config-basic-pane"
@@ -990,121 +993,102 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                 <?php endif; ?>
                             <?php endif; ?>
                         </div>
-        </div>
+    </section>
 
-        <nav>
-            <button class="btn btn-primary" type="submit"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Configuration</button>
-        </nav>
-    </form>
-        <script>
-          // Shows only config fields for the selected DB driver.
-          (function () {
-            var driverSelect = document.querySelector('[data-raven-db-driver-select="1"]');
-            var captchaProviderSelect = document.querySelector('[data-raven-captcha-provider-select="1"]');
-            var activeTabInput = document.getElementById('config-active-tab');
-            var configForm = activeTabInput instanceof HTMLInputElement ? activeTabInput.form : null;
-
-            function syncDatabaseRows() {
-              if (!(driverSelect instanceof HTMLSelectElement)) {
-                return;
-              }
-
-              var selected = String(driverSelect.value || '').toLowerCase();
-
-              document.querySelectorAll('[data-raven-db-section]').forEach(function (row) {
-                if (!(row instanceof HTMLElement)) {
-                  return;
-                }
-
-                var section = String(row.getAttribute('data-raven-db-section') || '').toLowerCase();
-                var allowed = section.split(',').map(function (part) {
-                  return String(part || '').trim();
-                }).filter(function (part) {
-                  return part !== '';
-                });
-                var show = allowed.indexOf(selected) !== -1;
-                row.classList.toggle('d-none', !show);
-              });
-            }
-
-            function syncCaptchaRows() {
-              if (!(captchaProviderSelect instanceof HTMLSelectElement)) {
-                return;
-              }
-
-              var selected = String(captchaProviderSelect.value || '').toLowerCase();
-
-              document.querySelectorAll('[data-raven-captcha-section]').forEach(function (row) {
-                if (!(row instanceof HTMLElement)) {
-                  return;
-                }
-
-                var section = String(row.getAttribute('data-raven-captcha-section') || '');
-                var show = section === selected;
-                row.classList.toggle('d-none', !show);
-              });
-            }
-
-            function tabKeyFromButton(button) {
-              if (!(button instanceof HTMLElement)) {
-                return 'basic';
-              }
-
-              var controls = String(button.getAttribute('aria-controls') || '');
-              var match = controls.match(/^config-(basic|content|database|debug|media|meta|security|session)-pane$/);
-              return match ? String(match[1]) : 'basic';
-            }
-
-            function syncActiveTabHiddenFieldFromDom() {
-              if (!(activeTabInput instanceof HTMLInputElement)) {
-                return;
-              }
-
-              var activeButton = document.querySelector('#configEditorTabs button.nav-link.active[data-bs-toggle="tab"]');
-              if (!(activeButton instanceof HTMLElement)) {
-                return;
-              }
-
-              activeTabInput.value = tabKeyFromButton(activeButton);
-            }
-
-            if (driverSelect instanceof HTMLSelectElement) {
-              driverSelect.addEventListener('change', syncDatabaseRows);
-            }
-            syncDatabaseRows();
-
-            if (captchaProviderSelect instanceof HTMLSelectElement) {
-              captchaProviderSelect.addEventListener('change', syncCaptchaRows);
-            }
-            syncCaptchaRows();
-
-            document.querySelectorAll('#configEditorTabs button[data-bs-toggle="tab"]').forEach(function (button) {
-              button.addEventListener('shown.bs.tab', function (event) {
-                if (!(activeTabInput instanceof HTMLInputElement)) {
-                  return;
-                }
-
-                var target = event.target;
-                if (!(target instanceof HTMLElement)) {
-                  return;
-                }
-
-                activeTabInput.value = tabKeyFromButton(target);
-              });
-            });
-
-            if (configForm instanceof HTMLFormElement) {
-              configForm.addEventListener('submit', function () {
-                syncActiveTabHiddenFieldFromDom();
-              });
-            }
-
-            syncActiveTabHiddenFieldFromDom();
-          })();
-        </script>
-    <?php endif; ?>
+    <nav>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Configuration</button>
+    </nav>
+</form>
+<script>
+  // Shows only config fields for the selected DB driver.
+  (function () {
+    var driverSelect = document.querySelector('[data-raven-db-driver-select="1"]');
+    var captchaProviderSelect = document.querySelector('[data-raven-captcha-provider-select="1"]');
+    var activeTabInput = document.getElementById('config-active-tab');
+    var configForm = activeTabInput instanceof HTMLInputElement ? activeTabInput.form : null;
+    function syncDatabaseRows() {
+      if (!(driverSelect instanceof HTMLSelectElement)) {
+        return;
+      }
+      var selected = String(driverSelect.value || '').toLowerCase();
+      document.querySelectorAll('[data-raven-db-section]').forEach(function (row) {
+        if (!(row instanceof HTMLElement)) {
+          return;
+        }
+        var section = String(row.getAttribute('data-raven-db-section') || '').toLowerCase();
+        var allowed = section.split(',').map(function (part) {
+          return String(part || '').trim();
+        }).filter(function (part) {
+          return part !== '';
+        });
+        var show = allowed.indexOf(selected) !== -1;
+        row.classList.toggle('d-none', !show);
+      });
+    }
+    function syncCaptchaRows() {
+      if (!(captchaProviderSelect instanceof HTMLSelectElement)) {
+        return;
+      }
+      var selected = String(captchaProviderSelect.value || '').toLowerCase();
+      document.querySelectorAll('[data-raven-captcha-section]').forEach(function (row) {
+        if (!(row instanceof HTMLElement)) {
+          return;
+        }
+        var section = String(row.getAttribute('data-raven-captcha-section') || '');
+        var show = section === selected;
+        row.classList.toggle('d-none', !show);
+      });
+    }
+    function tabKeyFromButton(button) {
+      if (!(button instanceof HTMLElement)) {
+        return 'basic';
+      }
+      var controls = String(button.getAttribute('aria-controls') || '');
+      var match = controls.match(/^config-(basic|content|database|debug|media|meta|security|session)-pane$/);
+      return match ? String(match[1]) : 'basic';
+    }
+    function syncActiveTabHiddenFieldFromDom() {
+      if (!(activeTabInput instanceof HTMLInputElement)) {
+        return;
+      }
+      var activeButton = document.querySelector('#configEditorTabs button.nav-link.active[data-bs-toggle="tab"]');
+      if (!(activeButton instanceof HTMLElement)) {
+        return;
+      }
+      activeTabInput.value = tabKeyFromButton(activeButton);
+    }
+    if (driverSelect instanceof HTMLSelectElement) {
+      driverSelect.addEventListener('change', syncDatabaseRows);
+    }
+    syncDatabaseRows();
+    if (captchaProviderSelect instanceof HTMLSelectElement) {
+      captchaProviderSelect.addEventListener('change', syncCaptchaRows);
+    }
+    syncCaptchaRows();
+    document.querySelectorAll('#configEditorTabs button[data-bs-toggle="tab"]').forEach(function (button) {
+      button.addEventListener('shown.bs.tab', function (event) {
+        if (!(activeTabInput instanceof HTMLInputElement)) {
+          return;
+        }
+        var target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        activeTabInput.value = tabKeyFromButton(target);
+      });
+    });
+    if (configForm instanceof HTMLFormElement) {
+      configForm.addEventListener('submit', function () {
+        syncActiveTabHiddenFieldFromDom();
+      });
+    }
+    syncActiveTabHiddenFieldFromDom();
+  })();
+</script>
+<?php endif; ?>
 
 <?php else: ?>
+
 <header class="card">
     <div class="card-body">
         <h1><?= e($section) ?></h1>
@@ -1114,4 +1098,5 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
         <?php endif; ?>
     </div>
 </header>
+
 <?php endif; ?>
