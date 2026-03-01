@@ -120,7 +120,7 @@ final class SignupPublicFormRuntime implements EmbeddedFormRuntimeInterface
             }
         }
 
-        $countryOptionsMarkup = '<option value="">Select country</option>';
+        $countryOptionsMarkup = '<option value="">Select Country</option>';
         foreach ($this->countryOptions() as $countryCode => $countryLabel) {
             $selectedAttr = $oldValues['country'] === $countryCode ? ' selected' : '';
             $countryOptionsMarkup .= '<option value="' . htmlspecialchars($countryCode, ENT_QUOTES, 'UTF-8') . '"' . $selectedAttr . '>'
@@ -159,8 +159,8 @@ final class SignupPublicFormRuntime implements EmbeddedFormRuntimeInterface
             . $csrfField
             . '<input type="hidden" name="return_path" value="' . $safeReturnPath . '">'
             . '<div class="row g-3">'
-            . '<div class="col-12"><label class="form-label">Email</label><input type="email" class="form-control" name="signups_email" placeholder="you@example.com" value="' . $oldValues['email'] . '" required></div>'
-            . '<div class="col-12"><label class="form-label">Display Name</label><input type="text" class="form-control" name="signups_display_name" placeholder="Your name" value="' . $oldValues['display_name'] . '" required></div>'
+            . '<div class="col-12"><label class="form-label">Email</label><input type="email" class="form-control" name="signups_email" placeholder="Your Email" value="' . $oldValues['email'] . '" required></div>'
+            . '<div class="col-12"><label class="form-label">Display Name</label><input type="text" class="form-control" name="signups_display_name" placeholder="Your Name" value="' . $oldValues['display_name'] . '" required></div>'
             . '<div class="col-12"><label class="form-label">Country</label><select class="form-select" name="signups_country" required>'
             . $countryOptionsMarkup
             . '</select></div>'

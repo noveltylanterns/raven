@@ -154,8 +154,8 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
             . $csrfField
             . '<input type="hidden" name="return_path" value="' . $safeReturnPath . '">'
             . '<div class="row g-3">'
-            . '<div class="col-12"><label class="form-label">Name</label><input type="text" class="form-control" name="contact_name" placeholder="Your name" value="' . $oldValues['name'] . '" required></div>'
-            . '<div class="col-12"><label class="form-label">Email</label><input type="email" class="form-control" name="contact_email" placeholder="you@example.com" value="' . $oldValues['email'] . '" required></div>'
+            . '<div class="col-12"><label class="form-label">Name</label><input type="text" class="form-control" name="contact_name" placeholder="Your Name" value="' . $oldValues['name'] . '" required></div>'
+            . '<div class="col-12"><label class="form-label">Email</label><input type="email" class="form-control" name="contact_email" placeholder="Your Email" value="' . $oldValues['email'] . '" required></div>'
             . '<div class="col-12"><label class="form-label">Message</label><textarea class="form-control" name="contact_message" rows="4" placeholder="How can we help?" required>' . $oldValues['message'] . '</textarea></div>'
             . $additionalFieldMarkup
             . $captchaMarkup
