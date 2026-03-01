@@ -113,7 +113,7 @@ $requiresForceRun = $status !== 'outdated';
 <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
-<div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
+<nav>
     <form method="post" action="<?= e($panelBase) ?>/updates/check" class="m-0">
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
@@ -137,11 +137,9 @@ $requiresForceRun = $status !== 'outdated';
             type="submit"
             class="btn btn-warning js-updater-run-button"
             title="Run updater"
-        >
-            Run Updater
-        </button>
+        >Run Updater</button>
     </form>
-</div>
+</nav>
 
 <div class="card mb-3">
     <div class="card-body">
@@ -183,7 +181,7 @@ $requiresForceRun = $status !== 'outdated';
     </div>
 </div>
 
-<div class="d-flex flex-wrap justify-content-end gap-2">
+<nav class="d-flex flex-wrap justify-content-end gap-2">
     <form method="post" action="<?= e($panelBase) ?>/updates/check" class="m-0">
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
@@ -211,7 +209,7 @@ $requiresForceRun = $status !== 'outdated';
             Run Updater
         </button>
     </form>
-</div>
+</nav>
 
 <?php if ($requiresForceRun): ?>
     <div class="modal fade" id="updaterForceRunModal" tabindex="-1" aria-labelledby="updaterForceRunModalLabel" aria-hidden="true">

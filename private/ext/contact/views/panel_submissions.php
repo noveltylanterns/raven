@@ -64,7 +64,7 @@ $submissionsEmptyId = 'contact-submissions-filter-empty';
 <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
-<div class="d-flex justify-content-end flex-wrap gap-2 mb-3">
+<nav>
     <a href="<?= e($editPath) ?>" class="btn btn-primary"><i class="bi bi-pencil me-2" aria-hidden="true"></i>Edit Form</a>
     <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Contact Forms</a>
     <form method="post" action="<?= e($clearSubmissionsPath) ?>" class="m-0" onsubmit="return confirm('Clear all submissions for this contact form?');">
@@ -73,7 +73,7 @@ $submissionsEmptyId = 'contact-submissions-filter-empty';
         <input type="hidden" name="return_q" value="<?= e($searchQuery) ?>">
         <button type="submit" class="btn btn-danger"<?= $totalItems === 0 ? ' disabled' : '' ?>><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Clear All</button>
     </form>
-</div>
+</nav>
 
 <div class="card">
     <div class="card-body">

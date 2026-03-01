@@ -61,8 +61,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
               class="btn btn-primary btn-sm"
               data-bs-toggle="modal"
               data-bs-target="#create-extension-modal"
-              >Create New Extension<i class="bi bi-plus-square ms-2" aria-hidden="true"></i>
-            </button>
+              ><i class="bi bi-plus-square me-2" aria-hidden="true"></i>Create New Extension</button>
         </div>
         <p class="mb-2">Use this page to create, upload, enable, and disable Raven extensions.</p>
         <h6>Notes:</h6>
@@ -100,9 +99,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                     Archive must include a valid <code>extension.json</code> file!
                 </div>
             </div>
-            <div class="d-flex justify-content-end">
-                <button type="submit" class="btn btn-primary btn-sm">Upload Extension<i class="bi bi-upload ms-2" aria-hidden="true"></i></button>
-            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Upload Extension<i class="bi bi-upload ms-2" aria-hidden="true"></i></button>
         </form>
     </div>
 </div>

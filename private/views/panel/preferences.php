@@ -47,9 +47,9 @@ $avatarThumbUrl = '/uploads/avatars/' . rawurlencode($avatarThumbFilename);
 <form method="post" action="<?= e($panelBase) ?>/preferences/save" enctype="multipart/form-data">
     <?= $csrfField ?>
 
-    <div class="d-flex justify-content-end mb-3">
+    <nav>
         <button type="submit" class="btn btn-primary"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Preferences</button>
-    </div>
+    </nav>
 
     <div class="card">
         <div class="card-body">

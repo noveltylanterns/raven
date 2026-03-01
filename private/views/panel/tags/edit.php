@@ -103,8 +103,7 @@ if ($tag !== null && $publicBase !== '' && $tagSlug !== '' && $tagRoutePrefix !=
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $tagId ?>">
 
-    <!-- Match page-editor ergonomics with right-aligned top actions. -->
-    <div class="d-flex justify-content-end gap-2 mb-3">
+    <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Tag</button>
         <a href="<?= e($panelBase) ?>/tags" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Tags</a>
         <?php if ($hasPersistedTag): ?>
@@ -113,11 +112,9 @@ if ($tag !== null && $publicBase !== '' && $tagSlug !== '' && $tagRoutePrefix !=
                 class="btn btn-danger"
                 form="<?= e($deleteFormId) ?>"
                 onclick="return confirm('Delete this tag? Existing page-tag links will be removed.');"
-            >
-                <i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Tag
-            </button>
+            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Tag</button>
         <?php endif; ?>
-    </div>
+    </nav>
 
     <div class="card">
         <div class="card-body">

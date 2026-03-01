@@ -167,8 +167,7 @@ foreach ($permissionDefinitions as $permission) {
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $groupId ?>">
 
-    <!-- Match page-editor ergonomics with right-aligned top actions. -->
-    <div class="d-flex justify-content-end gap-2 mb-3">
+    <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Group</button>
         <a href="<?= e($panelBase) ?>/groups" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Groups</a>
         <?php if ($canDeleteGroup): ?>
@@ -177,11 +176,9 @@ foreach ($permissionDefinitions as $permission) {
                 class="btn btn-danger"
                 form="<?= e($deleteFormId) ?>"
                 onclick="return confirm('Delete this group? Users left without groups will be reassigned to User.');"
-            >
-                <i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Group
-            </button>
+            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Group</button>
         <?php endif; ?>
-    </div>
+    </nav>
 
     <div class="card">
         <div class="card-body">

@@ -100,8 +100,7 @@ if ($category !== null && $publicBase !== '' && $categorySlug !== '' && $categor
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $categoryId ?>">
 
-    <!-- Match page-editor ergonomics with right-aligned top actions. -->
-    <div class="d-flex justify-content-end gap-2 mb-3">
+    <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Category</button>
         <a href="<?= e($panelBase) ?>/categories" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Categories</a>
         <?php if ($hasPersistedCategory): ?>
@@ -110,11 +109,9 @@ if ($category !== null && $publicBase !== '' && $categorySlug !== '' && $categor
                 class="btn btn-danger"
                 form="<?= e($deleteFormId) ?>"
                 onclick="return confirm('Delete this category? Existing page-category links will be removed.');"
-            >
-                <i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Category
-            </button>
+            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Category</button>
         <?php endif; ?>
-    </div>
+    </nav>
 
     <div class="card">
         <div class="card-body">

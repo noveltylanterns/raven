@@ -77,16 +77,14 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
     <?php endif; ?>
 
     <?php if ($canLaunchAdminer): ?>
-        <div class="d-flex justify-content-end mb-3">
-            <button
-                type="button"
-                class="btn btn-success"
-                data-bs-toggle="modal"
-                data-bs-target="#ravenAdminerLaunchModal"
-            >
-                Open Adminer<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i>
-            </button>
-        </div>
+    <nav>
+        <button
+            type="button"
+            class="btn btn-success"
+            data-bs-toggle="modal"
+            data-bs-target="#ravenAdminerLaunchModal"
+        >Open Adminer<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i></button>
+    </nav>
     <?php endif; ?>
 
     <div class="card mb-3">

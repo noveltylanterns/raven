@@ -904,13 +904,20 @@ textarea[data-raven-editor-input="1"] {
   font-family: $font-family-sans-serif;
 }
 
-body.raven-panel-theme header {
+body.raven-panel-theme header,
+body.raven-panel-theme.has-sidebar .raven-panel-main > header.card {
   margin-bottom: 1rem;
 }
 body.raven-panel-theme header h1 {
   margin-bottom: 0;
 }
-
+body.raven-panel-theme nav {
+  margin-bottom: 1rem;
+  justify-content: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
 body.raven-panel-theme .btn-lg {
   padding: 0.4rem 0.8rem;
   font-size: 1.1rem;

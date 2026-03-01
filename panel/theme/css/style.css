@@ -13007,12 +13007,21 @@ textarea[data-raven-editor-input="1"] {
   font-family: "Red Hat Text", "Segoe UI", "Inter", "Noto Sans", "Liberation Sans", Arial, sans-serif;
 }
 
-body.raven-panel-theme header {
+body.raven-panel-theme header,
+body.raven-panel-theme.has-sidebar .raven-panel-main > header.card {
   margin-bottom: 1rem;
 }
 
 body.raven-panel-theme header h1, body.raven-panel-theme header .h1 {
   margin-bottom: 0;
+}
+
+body.raven-panel-theme nav {
+  margin-bottom: 1rem;
+  justify-content: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 body.raven-panel-theme .btn-lg, body.raven-panel-theme .btn-group-lg > .btn {

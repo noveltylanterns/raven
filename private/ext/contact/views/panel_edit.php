@@ -99,7 +99,7 @@ $deleteFormId = 'delete-contact-form';
     <?= $csrfField ?>
     <input type="hidden" name="original_slug" value="<?= e($formSlug) ?>">
 
-    <div class="d-flex justify-content-end gap-2 mb-3">
+    <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Form</button>
         <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Contact Forms</a>
         <?php if ($isEditMode): ?>
@@ -108,11 +108,9 @@ $deleteFormId = 'delete-contact-form';
                 class="btn btn-danger"
                 form="<?= e($deleteFormId) ?>"
                 onclick="return confirm('Delete this contact form?');"
-            >
-                <i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Form
-            </button>
+            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Form</button>
         <?php endif; ?>
-    </div>
+    </nav>
 
     <div class="card">
         <div class="card-body">

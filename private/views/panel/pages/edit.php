@@ -152,8 +152,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $pageId ?>">
 
-    <!-- Mirror list-page action layout with right-aligned top controls. -->
-    <div class="d-flex justify-content-end gap-2 mb-3">
+    <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Page</button>
         <a href="<?= e($panelBase) ?>/pages" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Pages</a>
         <?php if ($hasPersistedPage): ?>
@@ -162,11 +161,9 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                 class="btn btn-danger"
                 form="<?= e($deleteFormId) ?>"
                 onclick="return confirm('Delete this page?');"
-            >
-                <i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Page
-            </button>
+            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Page</button>
         <?php endif; ?>
-    </div>
+    </nav>
 
     <!-- Bootstrap tabs split primary writing fields from metadata and media controls. -->
     <ul class="nav nav-tabs" id="pageEditorTabs" role="tablist">

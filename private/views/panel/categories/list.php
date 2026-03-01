@@ -63,17 +63,15 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     <?= $csrfField ?>
 </form>
 
-<div class="d-flex justify-content-end gap-2 mb-3">
+<nav>
     <a class="btn btn-primary" href="<?= e($panelBase) ?>/categories/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Category</a>
     <button
         type="submit"
         class="btn btn-danger"
         form="<?= e($bulkDeleteFormId) ?>"
         onclick="return confirm('Delete selected categories? Existing page-category links will be removed.');"
-    >
-        <i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected
-    </button>
-</div>
+    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
+</nav>
 
 <div class="card">
     <div class="card-body">
@@ -206,9 +204,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
         class="btn btn-danger"
         form="<?= e($bulkDeleteFormId) ?>"
         onclick="return confirm('Delete selected categories? Existing page-category links will be removed.');"
-    >
-        <i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected
-    </button>
+    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
 </div>
 
 <script>

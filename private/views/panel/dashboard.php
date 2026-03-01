@@ -639,9 +639,9 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
             <?= $csrfField ?>
             <input type="hidden" name="_config_tab" id="config-active-tab" value="<?= e($activeConfigTab) ?>">
 
-            <div class="d-flex justify-content-end mb-3">
+            <nav>
                 <button class="btn btn-primary" type="submit"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Configuration</button>
-            </div>
+            </nav>
 
             <ul class="nav nav-tabs" id="configEditorTabs" role="tablist">
                         <li class="nav-item" role="presentation">
@@ -1016,9 +1016,9 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                         </div>
             </div>
 
-            <div class="d-flex justify-content-end mt-3">
+            <nav class="d-flex justify-content-end mt-3">
                 <button class="btn btn-primary" type="submit"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Configuration</button>
-            </div>
+            </nav>
         </form>
         <script>
           // Shows only config fields for the selected DB driver.

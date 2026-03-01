@@ -101,8 +101,7 @@ if ($channel !== null && $publicBase !== '' && $channelSlug !== '') {
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $channelId ?>">
 
-    <!-- Match page-editor ergonomics with right-aligned top actions. -->
-    <div class="d-flex justify-content-end gap-2 mb-3">
+    <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Channel</button>
         <a href="<?= e($panelBase) ?>/channels" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Channels</a>
         <?php if ($hasPersistedChannel): ?>
@@ -111,11 +110,9 @@ if ($channel !== null && $publicBase !== '' && $channelSlug !== '') {
                 class="btn btn-danger"
                 form="<?= e($deleteFormId) ?>"
                 onclick="return confirm('Delete this channel? Linked pages will be detached.');"
-            >
-                <i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Channel
-            </button>
+            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Channel</button>
         <?php endif; ?>
-    </div>
+    </nav>
 
     <div class="card">
         <div class="card-body">

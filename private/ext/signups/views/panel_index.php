@@ -94,9 +94,9 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
 <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
-<div class="d-flex justify-content-end mb-3">
+<nav>
     <a href="<?= e($editBasePath) ?>" class="btn btn-primary"><i class="bi bi-clipboard-plus me-2" aria-hidden="true"></i>New Signup Sheet Form</a>
-</div>
+</nav>
 
 <div class="card">
     <div class="card-body">
