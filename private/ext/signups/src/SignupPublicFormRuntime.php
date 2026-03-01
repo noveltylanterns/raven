@@ -166,7 +166,7 @@ final class SignupPublicFormRuntime implements EmbeddedFormRuntimeInterface
             . '</select></div>'
             . $additionalFieldMarkup
             . $captchaMarkup
-            . '<div class="col-12"><button type="submit" class="btn btn-primary">Join Signup Sheet</button></div>'
+            . '<div class="col-12"><button type="submit" class="btn btn-primary">Submit</button></div>'
             . '</div>'
             . '</form>'
             . '</section>';
