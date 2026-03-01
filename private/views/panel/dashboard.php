@@ -604,6 +604,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
     }
 };
 ?>
+
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
 <?php endif; ?>
@@ -629,136 +630,111 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
 </header>
 
     <?php if (!$canManageConfiguration): ?>
-        <div class="card">
-            <div class="card-body">
-                <p class="text-danger mb-0">Manage System Configuration permission is required for this section.</p>
-            </div>
+    <div class="card">
+        <div class="card-body">
+            <p class="text-danger mb-0">Manage System Configuration permission is required for this section.</p>
         </div>
+    </div>
     <?php else: ?>
-        <form method="post" action="<?= e($panelBase) ?>/configuration/save">
-            <?= $csrfField ?>
-            <input type="hidden" name="_config_tab" id="config-active-tab" value="<?= e($activeConfigTab) ?>">
+    <form method="post" action="<?= e($panelBase) ?>/configuration/save">
+        <?= $csrfField ?>
+        <input type="hidden" name="_config_tab" id="config-active-tab" value="<?= e($activeConfigTab) ?>">
+        <nav>
+            <button class="btn btn-primary" type="submit"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Configuration</button>
+        </nav>
 
-            <nav>
-                <button class="btn btn-primary" type="submit"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Configuration</button>
-            </nav>
+        <ul class="nav nav-tabs" id="configEditorTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link<?= $isActiveConfigTab('basic') ? ' active' : '' ?>"
+                    id="config-basic-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#config-basic-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="config-basic-pane"
+                    aria-selected="<?= $isActiveConfigTab('basic') ? 'true' : 'false' ?>"
+                >Basic</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link<?= $isActiveConfigTab('content') ? ' active' : '' ?>"
+                    id="config-content-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#config-content-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="config-content-pane"
+                    aria-selected="<?= $isActiveConfigTab('content') ? 'true' : 'false' ?>"
+                >Content</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link<?= $isActiveConfigTab('database') ? ' active' : '' ?>"
+                    id="config-database-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#config-database-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="config-database-pane"
+                    aria-selected="<?= $isActiveConfigTab('database') ? 'true' : 'false' ?>"
+                >Database</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link<?= $isActiveConfigTab('debug') ? ' active' : '' ?>"
+                    id="config-debug-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#config-debug-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="config-debug-pane"
+                    aria-selected="<?= $isActiveConfigTab('debug') ? 'true' : 'false' ?>"
+                >Debug</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link<?= $isActiveConfigTab('media') ? ' active' : '' ?>"
+                    id="config-media-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#config-media-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="config-media-pane"
+                    aria-selected="<?= $isActiveConfigTab('media') ? 'true' : 'false' ?>"
+                >Media</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link<?= $isActiveConfigTab('meta') ? ' active' : '' ?>"
+                    id="config-meta-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#config-meta-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="config-meta-pane"
+                    aria-selected="<?= $isActiveConfigTab('meta') ? 'true' : 'false' ?>"
+                >Meta</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link<?= $isActiveConfigTab('security') ? ' active' : '' ?>"
+                    id="config-security-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#config-security-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="config-security-pane"
+                    aria-selected="<?= $isActiveConfigTab('security') ? 'true' : 'false' ?>"
+                >Security</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link<?= $isActiveConfigTab('session') ? ' active' : '' ?>"
+                    id="config-session-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#config-session-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="config-session-pane"
+                    aria-selected="<?= $isActiveConfigTab('session') ? 'true' : 'false' ?>"
+                >Users</button>
+            </li>
+        </ul>
 
-            <ul class="nav nav-tabs" id="configEditorTabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button
-                                class="nav-link<?= $isActiveConfigTab('basic') ? ' active' : '' ?>"
-                                id="config-basic-tab"
-                                data-bs-toggle="tab"
-                                data-bs-target="#config-basic-pane"
-                                type="button"
-                                role="tab"
-                                aria-controls="config-basic-pane"
-                                aria-selected="<?= $isActiveConfigTab('basic') ? 'true' : 'false' ?>"
-                            >
-                                Basic
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button
-                                class="nav-link<?= $isActiveConfigTab('content') ? ' active' : '' ?>"
-                                id="config-content-tab"
-                                data-bs-toggle="tab"
-                                data-bs-target="#config-content-pane"
-                                type="button"
-                                role="tab"
-                                aria-controls="config-content-pane"
-                                aria-selected="<?= $isActiveConfigTab('content') ? 'true' : 'false' ?>"
-                            >
-                                Content
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button
-                                class="nav-link<?= $isActiveConfigTab('database') ? ' active' : '' ?>"
-                                id="config-database-tab"
-                                data-bs-toggle="tab"
-                                data-bs-target="#config-database-pane"
-                                type="button"
-                                role="tab"
-                                aria-controls="config-database-pane"
-                                aria-selected="<?= $isActiveConfigTab('database') ? 'true' : 'false' ?>"
-                            >
-                                Database
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button
-                                class="nav-link<?= $isActiveConfigTab('debug') ? ' active' : '' ?>"
-                                id="config-debug-tab"
-                                data-bs-toggle="tab"
-                                data-bs-target="#config-debug-pane"
-                                type="button"
-                                role="tab"
-                                aria-controls="config-debug-pane"
-                                aria-selected="<?= $isActiveConfigTab('debug') ? 'true' : 'false' ?>"
-                            >
-                                Debug
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button
-                                class="nav-link<?= $isActiveConfigTab('media') ? ' active' : '' ?>"
-                                id="config-media-tab"
-                                data-bs-toggle="tab"
-                                data-bs-target="#config-media-pane"
-                                type="button"
-                                role="tab"
-                                aria-controls="config-media-pane"
-                                aria-selected="<?= $isActiveConfigTab('media') ? 'true' : 'false' ?>"
-                            >
-                                Media
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button
-                                class="nav-link<?= $isActiveConfigTab('meta') ? ' active' : '' ?>"
-                                id="config-meta-tab"
-                                data-bs-toggle="tab"
-                                data-bs-target="#config-meta-pane"
-                                type="button"
-                                role="tab"
-                                aria-controls="config-meta-pane"
-                                aria-selected="<?= $isActiveConfigTab('meta') ? 'true' : 'false' ?>"
-                            >
-                                Meta
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button
-                                class="nav-link<?= $isActiveConfigTab('security') ? ' active' : '' ?>"
-                                id="config-security-tab"
-                                data-bs-toggle="tab"
-                                data-bs-target="#config-security-pane"
-                                type="button"
-                                role="tab"
-                                aria-controls="config-security-pane"
-                                aria-selected="<?= $isActiveConfigTab('security') ? 'true' : 'false' ?>"
-                            >
-                                Security
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button
-                                class="nav-link<?= $isActiveConfigTab('session') ? ' active' : '' ?>"
-                                id="config-session-tab"
-                                data-bs-toggle="tab"
-                                data-bs-target="#config-session-pane"
-                                type="button"
-                                role="tab"
-                                aria-controls="config-session-pane"
-                                aria-selected="<?= $isActiveConfigTab('session') ? 'true' : 'false' ?>"
-                            >
-                                Users
-                            </button>
-                        </li>
-                    </ul>
-
-            <div class="tab-content raven-tab-content-surface border border-top-0 rounded-bottom p-3" id="configEditorTabsContent">
+        <div class="tab-content raven-tab-content-surface border border-top-0 rounded-bottom p-3 mb-3" id="configEditorTabsContent">
                         <div
                             class="tab-pane fade<?= $isActiveConfigTab('basic') ? ' show active' : '' ?>"
                             id="config-basic-pane"
@@ -1014,12 +990,12 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                 <?php endif; ?>
                             <?php endif; ?>
                         </div>
-            </div>
+        </div>
 
-            <nav class="d-flex justify-content-end mt-3">
-                <button class="btn btn-primary" type="submit"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Configuration</button>
-            </nav>
-        </form>
+        <nav>
+            <button class="btn btn-primary" type="submit"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Configuration</button>
+        </nav>
+    </form>
         <script>
           // Shows only config fields for the selected DB driver.
           (function () {
@@ -1127,6 +1103,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
           })();
         </script>
     <?php endif; ?>
+
 <?php else: ?>
 <header class="card">
     <div class="card-body">

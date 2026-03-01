@@ -166,8 +166,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
 
     <ul class="nav nav-tabs" id="pageEditorTabs" role="tablist">
         <li class="nav-item" role="presentation">
-            <button
-                class="nav-link<?= $activeTab === 'content' ? ' active' : '' ?>"
+            <button class="nav-link<?= $activeTab === 'content' ? ' active' : '' ?>"
                 id="page-content-tab"
                 data-bs-toggle="tab"
                 data-bs-target="#page-content-pane"
@@ -178,8 +177,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
             >Content</button>
         </li>
         <li class="nav-item" role="presentation">
-            <button
-                class="nav-link<?= $activeTab === 'meta' ? ' active' : '' ?>"
+            <button class="nav-link<?= $activeTab === 'meta' ? ' active' : '' ?>"
                 id="page-meta-tab"
                 data-bs-toggle="tab"
                 data-bs-target="#page-meta-pane"
@@ -190,8 +188,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
             >Meta</button>
         </li>
         <li class="nav-item" role="presentation">
-            <button
-                class="nav-link<?= $activeTab === 'media' ? ' active' : '' ?>"
+            <button class="nav-link<?= $activeTab === 'media' ? ' active' : '' ?>"
                 id="page-media-tab"
                 data-bs-toggle="tab"
                 data-bs-target="#page-media-pane"
