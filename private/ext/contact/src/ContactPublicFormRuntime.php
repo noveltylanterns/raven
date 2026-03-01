@@ -628,11 +628,30 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
             ? ($fromName . ' <' . $fromAddress . '>')
             : $fromAddress;
         $subject = str_replace(["\r", "\n"], ' ', $subject);
+        $bodyDigest = hash('sha256', $body);
+        $mailFingerprint = hash(
+            'sha256',
+            implode('|', [
+                strtolower($formSlug),
+                strtolower($replyToEmail),
+                strtolower($subject),
+                strtolower(implode(',', $destinations)),
+                strtolower(implode(',', $ccRecipients)),
+                strtolower(implode(',', $bccRecipients)),
+                $bodyDigest,
+            ])
+        );
+        if ($this->wasContactMailRecentlySent($formSlug, $mailFingerprint, 20)) {
+            return;
+        }
+
+        $messageId = '<raven-contact-' . substr($mailFingerprint, 0, 24) . '@' . $this->mailHeaderDomain() . '>';
         $headers = [
             'MIME-Version: 1.0',
             'Content-Type: text/plain; charset=UTF-8',
             'From: ' . $fromHeader,
             'Reply-To: ' . $replyToEmail,
+            'Message-ID: ' . $messageId,
             'X-Raven-Contact-Form: ' . $formSlug,
         ];
         if ($ccRecipients !== []) {
@@ -648,6 +667,136 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
         if ($ok !== true) {
             throw new \RuntimeException('Failed to send contact email via php_mail.');
         }
+
+        $this->rememberSentContactMailFingerprint($formSlug, $mailFingerprint, 20);
+    }
+
+    /**
+     * Returns true when an identical contact mail was sent recently for this slug.
+     */
+    private function wasContactMailRecentlySent(string $slug, string $fingerprint, int $windowSeconds): bool
+    {
+        $normalizedSlug = $this->input->slug($slug);
+        if (
+            $normalizedSlug === null
+            || $normalizedSlug === ''
+            || preg_match('/^[a-f0-9]{64}$/', $fingerprint) !== 1
+        ) {
+            return false;
+        }
+
+        /** @var mixed $rawAll */
+        $rawAll = $_SESSION['_raven_contact_sent_mail_fingerprints'] ?? null;
+        if (!is_array($rawAll)) {
+            return false;
+        }
+
+        /** @var mixed $rawBucket */
+        $rawBucket = $rawAll[$normalizedSlug] ?? null;
+        if (!is_array($rawBucket)) {
+            return false;
+        }
+
+        $now = time();
+        $oldestAllowed = $now - max(1, $windowSeconds);
+        foreach ($rawBucket as $hash => $timestamp) {
+            if (!is_string($hash) || preg_match('/^[a-f0-9]{64}$/', $hash) !== 1) {
+                unset($rawBucket[$hash]);
+                continue;
+            }
+
+            $ts = is_int($timestamp) ? $timestamp : (int) $timestamp;
+            if ($ts < $oldestAllowed) {
+                unset($rawBucket[$hash]);
+            } else {
+                $rawBucket[$hash] = $ts;
+            }
+        }
+
+        if ($rawBucket === []) {
+            unset($rawAll[$normalizedSlug]);
+        } else {
+            $rawAll[$normalizedSlug] = $rawBucket;
+        }
+
+        if ($rawAll === []) {
+            unset($_SESSION['_raven_contact_sent_mail_fingerprints']);
+        } else {
+            $_SESSION['_raven_contact_sent_mail_fingerprints'] = $rawAll;
+        }
+
+        return isset($rawBucket[$fingerprint]);
+    }
+
+    /**
+     * Stores one sent-mail fingerprint for duplicate suppression.
+     */
+    private function rememberSentContactMailFingerprint(string $slug, string $fingerprint, int $windowSeconds): void
+    {
+        $normalizedSlug = $this->input->slug($slug);
+        if (
+            $normalizedSlug === null
+            || $normalizedSlug === ''
+            || preg_match('/^[a-f0-9]{64}$/', $fingerprint) !== 1
+        ) {
+            return;
+        }
+
+        /** @var mixed $rawAll */
+        $rawAll = $_SESSION['_raven_contact_sent_mail_fingerprints'] ?? [];
+        $all = is_array($rawAll) ? $rawAll : [];
+
+        /** @var mixed $rawBucket */
+        $rawBucket = $all[$normalizedSlug] ?? [];
+        $bucket = is_array($rawBucket) ? $rawBucket : [];
+
+        $now = time();
+        $oldestAllowed = $now - max(1, $windowSeconds);
+        foreach ($bucket as $hash => $timestamp) {
+            if (!is_string($hash) || preg_match('/^[a-f0-9]{64}$/', $hash) !== 1) {
+                unset($bucket[$hash]);
+                continue;
+            }
+
+            $ts = is_int($timestamp) ? $timestamp : (int) $timestamp;
+            if ($ts < $oldestAllowed) {
+                unset($bucket[$hash]);
+            } else {
+                $bucket[$hash] = $ts;
+            }
+        }
+
+        $bucket[$fingerprint] = $now;
+        if (count($bucket) > 20) {
+            asort($bucket);
+            $bucket = array_slice($bucket, -20, null, true);
+        }
+
+        $all[$normalizedSlug] = $bucket;
+        $_SESSION['_raven_contact_sent_mail_fingerprints'] = $all;
+    }
+
+    /**
+     * Returns a safe domain token for RFC Message-ID header generation.
+     */
+    private function mailHeaderDomain(): string
+    {
+        $rawDomain = strtolower(trim((string) $this->config->get('site.domain', 'localhost')));
+        $host = '';
+        if ($rawDomain !== '') {
+            $host = (string) parse_url('//' . $rawDomain, PHP_URL_HOST);
+            if ($host === '') {
+                $host = $rawDomain;
+            }
+        }
+
+        $host = preg_replace('/[^a-z0-9.-]+/i', '', $host) ?? '';
+        $host = trim($host, '.-');
+        if ($host === '' || !str_contains($host, '.')) {
+            $host = 'localhost.localdomain';
+        }
+
+        return $host;
     }
 
     /**
@@ -752,4 +901,3 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
         return $this->input->text($hostname, 255);
     }
 }
-
