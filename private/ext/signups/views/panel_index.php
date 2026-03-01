@@ -40,7 +40,7 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-start gap-3">
             <div>
-                <h1 class="mb-0">
+                <h1>
                     <?= e($extensionName !== '' ? $extensionName : 'Signup Sheets') ?>
                     <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
                 </h1>

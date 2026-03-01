@@ -28,20 +28,20 @@ $extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));
 $modeLabel = strtolower($driver) === 'sqlite' ? '.db Files' : 'SQL Tables';
 $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
 ?>
-<div class="card mb-3">
+<header class="card">
     <div class="card-body">
-        <h1 class="mb-1">
+        <h1>
             <?= e($extensionName !== '' ? $extensionName : 'Database Manager') ?>
             <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
         </h1>
         <p class="mb-0">Select one <?= e($modeLabel) ?> target to open in Adminer. The list is sorted alphabetically.</p>
     </div>
-</div>
+</header>
 
 <?php if (!$canManageConfiguration): ?>
-    <div class="alert alert-danger" role="alert">
-        Manage System Configuration permission is required for this section.
-    </div>
+<div class="alert alert-danger" role="alert">
+    Manage System Configuration permission is required for this section.
+</div>
 <?php endif; ?>
 
 <?php if ($canManageConfiguration): ?>

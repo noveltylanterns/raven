@@ -55,7 +55,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
 <header class="card">
     <div class="card-body">
         <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
-            <h1 class="mb-0">Extension Manager</h1>
+            <h1>Extension Manager</h1>
             <button
               type="button"
               class="btn btn-primary btn-sm"

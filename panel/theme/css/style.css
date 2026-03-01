@@ -13015,4 +13015,8 @@ body.raven-panel-theme header {
   margin-bottom: 1rem;
 }
 
+body.raven-panel-theme header h1, body.raven-panel-theme header .h1 {
+  margin-bottom: 0;
+}
+
 /*# sourceMappingURL=style.css.map */

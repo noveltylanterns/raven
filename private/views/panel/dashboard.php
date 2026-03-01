@@ -623,7 +623,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
 <?php elseif ($section === 'configuration'): ?>
 <header class="card">
     <div class="card-body">
-        <h1 class="mb-0">System Configuration</h1>
+        <h1>System Configuration</h1>
         <p class="text-muted mt-2 mb-0">Manage site, database, debug, media, meta, security, and user/session runtime settings.</p>
     </div>
 </header>
