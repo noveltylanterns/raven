@@ -150,19 +150,19 @@ $requiresForceRun = $status !== 'outdated';
 
         <div class="row g-3">
             <div class="col-12 col-md-6">
-                <label class="form-label h6">Local Series</label>
+                <label class="form-label h6">Local Version</label>
                 <div><code><?= e($currentSeries) ?></code></div>
             </div>
             <div class="col-12 col-md-6">
-                <label class="form-label h6">Latest Upstream Series</label>
+                <label class="form-label h6">Latest Upstream Version</label>
                 <div><code><?= e($latestSeries) ?></code></div>
             </div>
             <div class="col-12 col-md-6">
-                <label class="form-label h6">Local Git Revision</label>
+                <label class="form-label h6">Local Patch Release</label>
                 <div><code><?= e($currentRevision !== '' ? $currentRevision : '<unknown>') ?></code></div>
             </div>
             <div class="col-12 col-md-6">
-                <label class="form-label h6">Latest Upstream Git Revision</label>
+                <label class="form-label h6">Latest Upstream Patch Release</label>
                 <div><code><?= e($latestRevision !== '' ? $latestRevision : '<unknown>') ?></code></div>
             </div>
             <div class="col-12 col-md-6">
