@@ -2878,9 +2878,11 @@ final class PanelController
             redirect($this->panelUrl('/updates'));
         }
 
+        $reinstallSummary = [];
         $reinstallError = $this->performUpdaterReinstall(
             (string) ($source['git_url'] ?? ''),
-            self::UPDATE_SOURCE_DEFAULT_BRANCH
+            self::UPDATE_SOURCE_DEFAULT_BRANCH,
+            $reinstallSummary
         );
         if ($reinstallError !== null) {
             $this->flash('error', 'Updater failed: ' . $reinstallError);
@@ -2890,12 +2892,24 @@ final class PanelController
         // Refresh updater status after reinstall so panel reflects post-run state.
         $refreshedStatus = $this->checkForUpdates($sourceKey, $customRepo);
         $refreshedState = strtolower((string) ($refreshedStatus['status'] ?? 'unknown'));
+        $preservedCount = (int) ($reinstallSummary['preserved_count'] ?? 0);
+        /** @var array<int, string> $preservedPreview */
+        $preservedPreview = is_array($reinstallSummary['preserved_preview'] ?? null)
+            ? $reinstallSummary['preserved_preview']
+            : [];
+        $preservedSuffix = ' Preserved custom directories: ' . $preservedCount . '.';
+        if ($preservedPreview !== []) {
+            $preservedSuffix .= ' Preserved preview: ' . implode(', ', $preservedPreview) . '.';
+        }
         if ($refreshedState === 'current') {
-            $this->flash('success', 'Updater completed successfully. System now matches upstream.');
+            $this->flash('success', 'Updater completed successfully. System now matches upstream.' . $preservedSuffix);
         } else {
             $this->flash(
                 'success',
-                'Updater completed. Current status: ' . ucfirst($refreshedState !== '' ? $refreshedState : 'unknown') . '.'
+                'Updater completed. Current status: '
+                . ucfirst($refreshedState !== '' ? $refreshedState : 'unknown')
+                . '.'
+                . $preservedSuffix
             );
         }
 
@@ -6396,10 +6410,16 @@ final class PanelController
      * This performs:
      * 1) `git fetch <source> <branch>`
      * 2) `git reset --hard FETCH_HEAD`
-     * 3) `git clean -fd` (removes untracked non-ignored paths only)
+     * 3) `git clean -fd` with update-safe exclusions for custom extension/theme directories
      */
-    private function performUpdaterReinstall(string $gitUrl, string $branch): ?string
+    private function performUpdaterReinstall(string $gitUrl, string $branch, ?array &$summary = null): ?string
     {
+        $preservedDirectories = $this->updaterPreservedUntrackedDirectories();
+        $summary = [
+            'preserved_count' => count($preservedDirectories),
+            'preserved_preview' => array_slice($preservedDirectories, 0, 3),
+        ];
+
         $root = dirname(__DIR__, 3);
         if (!is_dir($root . '/.git')) {
             return 'Updater reinstall requires a local Git repository.';
@@ -6424,7 +6444,8 @@ final class PanelController
             return 'Failed to reset working tree to fetched upstream revision. ' . $output;
         }
 
-        if (!$this->runGitCommand(['clean', '-fd'], $output)) {
+        $cleanArguments = $this->updaterCleanArguments(false);
+        if (!$this->runGitCommand($cleanArguments, $output)) {
             return 'Failed to clean untracked non-ignored files. ' . $output;
         }
 
@@ -6482,7 +6503,10 @@ final class PanelController
 
         $cleanCount = 0;
         $cleanPreview = [];
-        if ($this->runGitCommand(['clean', '-fdn'], $output)) {
+        $preservedDirectories = $this->updaterPreservedUntrackedDirectories();
+        $preservedCount = count($preservedDirectories);
+        $cleanArguments = $this->updaterCleanArguments(true);
+        if ($this->runGitCommand($cleanArguments, $output)) {
             $lines = array_map('trim', explode("\n", $output));
             foreach ($lines as $line) {
                 if (!str_starts_with($line, 'Would remove ')) {
@@ -6503,12 +6527,117 @@ final class PanelController
         $summaryParts[] = 'Tracked changes: ' . $shortStat;
         $summaryParts[] = 'Changed files: ' . $changedFileCount . '.';
         $summaryParts[] = 'Untracked non-ignored removals: ' . $cleanCount . '.';
+        $summaryParts[] = 'Preserved custom directories: ' . $preservedCount . '.';
 
         if ($cleanPreview !== []) {
             $summaryParts[] = 'Preview: ' . implode(', ', $cleanPreview) . ($cleanCount > 3 ? ', ...' : '') . '.';
         }
+        if ($preservedDirectories !== []) {
+            $summaryParts[] = 'Preserved preview: '
+                . implode(', ', array_slice($preservedDirectories, 0, 3))
+                . ($preservedCount > 3 ? ', ...' : '')
+                . '.';
+        }
 
         return ['summary' => implode(' ', $summaryParts)];
+    }
+
+    /**
+     * Builds `git clean` arguments with update-safe exclusions.
+     *
+     * @return array<int, string>
+     */
+    private function updaterCleanArguments(bool $dryRun): array
+    {
+        $arguments = ['clean', $dryRun ? '-fdn' : '-fd'];
+        foreach ($this->updaterPreservedUntrackedDirectories() as $relativePath) {
+            $arguments[] = '-e';
+            $arguments[] = $relativePath;
+        }
+
+        return $arguments;
+    }
+
+    /**
+     * Returns untracked custom directories that updater must preserve.
+     *
+     * @return array<int, string>
+     */
+    private function updaterPreservedUntrackedDirectories(): array
+    {
+        $preserved = array_merge(
+            $this->updaterUntrackedTopLevelDirectories('private/ext'),
+            $this->updaterUntrackedTopLevelDirectories('public/theme')
+        );
+        $preserved = array_values(array_unique($preserved));
+        sort($preserved);
+
+        return $preserved;
+    }
+
+    /**
+     * Finds untracked first-level directories under one repo-relative path.
+     *
+     * @return array<int, string>
+     */
+    private function updaterUntrackedTopLevelDirectories(string $relativeBasePath): array
+    {
+        $relativeBasePath = trim(str_replace('\\', '/', $relativeBasePath), '/');
+        if ($relativeBasePath === '') {
+            return [];
+        }
+
+        $root = dirname(__DIR__, 3);
+        $basePath = $root . '/' . $relativeBasePath;
+        if (!is_dir($basePath)) {
+            return [];
+        }
+
+        $entries = scandir($basePath);
+        if (!is_array($entries)) {
+            return [];
+        }
+
+        $directories = [];
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
+                continue;
+            }
+
+            $absolutePath = $basePath . '/' . $entry;
+            if (!is_dir($absolutePath)) {
+                continue;
+            }
+
+            $relativePath = $relativeBasePath . '/' . $entry;
+            if ($this->updaterPathContainsTrackedFiles($relativePath)) {
+                continue;
+            }
+
+            // Trailing slash ensures the exclusion is treated as a directory prefix.
+            $directories[] = $relativePath . '/';
+        }
+
+        return $directories;
+    }
+
+    /**
+     * Returns true when Git tracks at least one file under the given path.
+     */
+    private function updaterPathContainsTrackedFiles(string $relativePath): bool
+    {
+        $relativePath = trim(str_replace('\\', '/', $relativePath), '/');
+        if ($relativePath === '') {
+            return false;
+        }
+
+        $output = '';
+        if (!$this->runGitCommand(['ls-files', '--', $relativePath], $output)) {
+            // Preserve on lookup failures to avoid deleting local custom assets.
+            return false;
+        }
+
+        return trim($output) !== '';
     }
 
     /**
