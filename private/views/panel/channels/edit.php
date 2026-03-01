@@ -100,7 +100,6 @@ if ($channel !== null && $publicBase !== '' && $channelSlug !== '') {
 <form method="post" action="<?= e($panelBase) ?>/channels/save" enctype="multipart/form-data">
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $channelId ?>">
-
     <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Channel</button>
         <a href="<?= e($panelBase) ?>/channels" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Channels</a>
@@ -114,7 +113,7 @@ if ($channel !== null && $publicBase !== '' && $channelSlug !== '') {
         <?php endif; ?>
     </nav>
 
-    <div class="card">
+    <div class="card mb-3">
         <div class="card-body">
             <div class="mb-3">
                 <label for="name" class="form-label h5">Name</label>
@@ -202,8 +201,7 @@ if ($channel !== null && $publicBase !== '' && $channelSlug !== '') {
         </div>
     </div>
 
-    <!-- Duplicate actions at bottom so long forms do not require scrolling upward. -->
-    <div class="d-flex justify-content-end gap-2 mt-3">
+    <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Channel</button>
         <a href="<?= e($panelBase) ?>/channels" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Channels</a>
         <?php if ($hasPersistedChannel): ?>
@@ -212,11 +210,9 @@ if ($channel !== null && $publicBase !== '' && $channelSlug !== '') {
                 class="btn btn-danger"
                 form="<?= e($deleteFormId) ?>"
                 onclick="return confirm('Delete this channel? Linked pages will be detached.');"
-            >
-                <i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Channel
-            </button>
+            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Channel</button>
         <?php endif; ?>
-    </div>
+    </nav>
 </form>
 
 <script>

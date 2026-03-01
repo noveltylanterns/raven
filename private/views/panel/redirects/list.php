@@ -93,7 +93,7 @@ asort($redirectsChannelOptions, SORT_NATURAL | SORT_FLAG_CASE);
     ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
 </nav>
 
-<div class="card">
+<div class="card mb-3">
     <div class="card-body">
         <?php if ($redirects === []): ?>
             <p class="text-muted mb-0">No redirects yet.</p>
@@ -247,17 +247,15 @@ asort($redirectsChannelOptions, SORT_NATURAL | SORT_FLAG_CASE);
     </div>
 </div>
 
-<div class="d-flex justify-content-end gap-2 mt-3">
+<nav>
     <a class="btn btn-primary" href="<?= e($panelBase) ?>/redirects/edit"><i class="bi bi-bookmark-plus me-2" aria-hidden="true"></i>New Redirect</a>
     <button
         type="submit"
         class="btn btn-danger"
         form="<?= e($bulkDeleteFormId) ?>"
         onclick="return confirm('Delete selected redirects?');"
-    >
-        <i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected
-    </button>
-</div>
+    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
+</nav>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {

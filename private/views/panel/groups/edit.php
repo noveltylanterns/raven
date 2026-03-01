@@ -166,7 +166,6 @@ foreach ($permissionDefinitions as $permission) {
 <form method="post" action="<?= e($panelBase) ?>/groups/save">
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $groupId ?>">
-
     <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Group</button>
         <a href="<?= e($panelBase) ?>/groups" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Groups</a>
@@ -180,7 +179,7 @@ foreach ($permissionDefinitions as $permission) {
         <?php endif; ?>
     </nav>
 
-    <div class="card">
+    <div class="card mb-3">
         <div class="card-body">
             <div class="mb-3">
                 <label for="name" class="form-label h5">Name</label>
@@ -341,8 +340,7 @@ foreach ($permissionDefinitions as $permission) {
         </div>
     </div>
 
-    <!-- Duplicate actions at bottom so long forms do not require scrolling upward. -->
-    <div class="d-flex justify-content-end gap-2 mt-3">
+    <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Group</button>
         <a href="<?= e($panelBase) ?>/groups" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Groups</a>
         <?php if ($canDeleteGroup): ?>
@@ -351,11 +349,9 @@ foreach ($permissionDefinitions as $permission) {
                 class="btn btn-danger"
                 form="<?= e($deleteFormId) ?>"
                 onclick="return confirm('Delete this group? Users left without groups will be reassigned to User.');"
-            >
-                <i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Group
-            </button>
+            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Group</button>
         <?php endif; ?>
-    </div>
+    </nav>
 </form>
 <script>
   (function () {

@@ -87,7 +87,6 @@ if ($redirectRow !== null && $publicBase !== '' && $redirectSlug !== '') {
 <form method="post" action="<?= e($panelBase) ?>/redirects/save">
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $redirectId ?>">
-
     <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Redirect</button>
         <a href="<?= e($panelBase) ?>/redirects" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Redirects</a>
@@ -101,7 +100,7 @@ if ($redirectRow !== null && $publicBase !== '' && $redirectSlug !== '') {
         <?php endif; ?>
     </nav>
 
-    <div class="card">
+    <div class="card mb-3">
         <div class="card-body">
             <div class="mb-3">
                 <label for="title" class="form-label h5">Title</label>
@@ -168,8 +167,7 @@ if ($redirectRow !== null && $publicBase !== '' && $redirectSlug !== '') {
         </div>
     </div>
 
-    <!-- Duplicate actions at bottom so long forms do not require scrolling upward. -->
-    <div class="d-flex justify-content-end gap-2 mt-3">
+    <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Redirect</button>
         <a href="<?= e($panelBase) ?>/redirects" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Redirects</a>
         <?php if ($hasPersistedRedirect): ?>
@@ -178,9 +176,7 @@ if ($redirectRow !== null && $publicBase !== '' && $redirectSlug !== '') {
                 class="btn btn-danger"
                 form="<?= e($deleteFormId) ?>"
                 onclick="return confirm('Delete this redirect?');"
-            >
-                <i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Redirect
-            </button>
+            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Redirect</button>
         <?php endif; ?>
-    </div>
+    </nav>
 </form>

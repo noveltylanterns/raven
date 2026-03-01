@@ -88,7 +88,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
 </nav>
 
-<div class="card">
+<div class="card mb-3">
     <div class="card-body">
         <?php if ($users === []): ?>
             <p class="text-muted mb-0">No users found.</p>
@@ -283,17 +283,15 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     </div>
 </div>
 
-<div class="d-flex justify-content-end gap-2 mt-3">
+<nav>
     <a class="btn btn-primary" href="<?= e($panelBase) ?>/users/edit"><i class="bi bi-person-plus me-2" aria-hidden="true"></i>New User</a>
     <button
         type="submit"
         class="btn btn-danger"
         form="<?= e($bulkDeleteFormId) ?>"
         onclick="return confirm('Delete selected users? You cannot delete your currently logged-in account.');"
-    >
-        <i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected
-    </button>
-</div>
+    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
+</nav>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {

@@ -151,7 +151,6 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
 <form id="page-edit-form" method="post" action="<?= e($panelBase) ?>/pages/save">
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $pageId ?>">
-
     <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Page</button>
         <a href="<?= e($panelBase) ?>/pages" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Pages</a>
@@ -165,53 +164,46 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
         <?php endif; ?>
     </nav>
 
-    <!-- Bootstrap tabs split primary writing fields from metadata and media controls. -->
     <ul class="nav nav-tabs" id="pageEditorTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button
-                        class="nav-link<?= $activeTab === 'content' ? ' active' : '' ?>"
-                        id="page-content-tab"
-                        data-bs-toggle="tab"
-                        data-bs-target="#page-content-pane"
-                        type="button"
-                        role="tab"
-                        aria-controls="page-content-pane"
-                        aria-selected="<?= $activeTab === 'content' ? 'true' : 'false' ?>"
-                    >
-                        Content
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button
-                        class="nav-link<?= $activeTab === 'meta' ? ' active' : '' ?>"
-                        id="page-meta-tab"
-                        data-bs-toggle="tab"
-                        data-bs-target="#page-meta-pane"
-                        type="button"
-                        role="tab"
-                        aria-controls="page-meta-pane"
-                        aria-selected="<?= $activeTab === 'meta' ? 'true' : 'false' ?>"
-                    >
-                        Meta
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button
-                        class="nav-link<?= $activeTab === 'media' ? ' active' : '' ?>"
-                        id="page-media-tab"
-                        data-bs-toggle="tab"
-                        data-bs-target="#page-media-pane"
-                        type="button"
-                        role="tab"
-                        aria-controls="page-media-pane"
-                        aria-selected="<?= $activeTab === 'media' ? 'true' : 'false' ?>"
-                    >
-                        Media
-                    </button>
-                </li>
-            </ul>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link<?= $activeTab === 'content' ? ' active' : '' ?>"
+                id="page-content-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#page-content-pane"
+                type="button"
+                role="tab"
+                aria-controls="page-content-pane"
+                aria-selected="<?= $activeTab === 'content' ? 'true' : 'false' ?>"
+            >Content</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link<?= $activeTab === 'meta' ? ' active' : '' ?>"
+                id="page-meta-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#page-meta-pane"
+                type="button"
+                role="tab"
+                aria-controls="page-meta-pane"
+                aria-selected="<?= $activeTab === 'meta' ? 'true' : 'false' ?>"
+            >Meta</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link<?= $activeTab === 'media' ? ' active' : '' ?>"
+                id="page-media-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#page-media-pane"
+                type="button"
+                role="tab"
+                aria-controls="page-media-pane"
+                aria-selected="<?= $activeTab === 'media' ? 'true' : 'false' ?>"
+            >Media</button>
+        </li>
+    </ul>
 
-    <div class="tab-content raven-tab-content-surface border border-top-0 rounded-bottom p-3" id="pageEditorTabsContent">
+    <div class="tab-content raven-tab-content-surface border border-top-0 rounded-bottom p-3 mb-3" id="pageEditorTabsContent">
                 <div
                     class="tab-pane fade<?= $activeTab === 'content' ? ' show active' : '' ?>"
                     id="page-content-pane"
@@ -661,8 +653,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                 </div>
     </div>
 
-    <!-- Duplicate controls at bottom so long forms do not require scrolling back up. -->
-    <div class="d-flex justify-content-end gap-2 mt-3">
+    <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Page</button>
         <a href="<?= e($panelBase) ?>/pages" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Pages</a>
         <?php if ($hasPersistedPage): ?>
@@ -671,11 +662,9 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                 class="btn btn-danger"
                 form="<?= e($deleteFormId) ?>"
                 onclick="return confirm('Delete this page?');"
-            >
-                <i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Page
-            </button>
+            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Page</button>
         <?php endif; ?>
-    </div>
+    </nav>
 </form>
 
 <template id="page-extended-block-template">

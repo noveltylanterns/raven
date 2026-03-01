@@ -99,7 +99,6 @@ if ($userRow !== null && $publicBase !== '' && $profileRoutesEnabled && $profile
 <form method="post" action="<?= e($panelBase) ?>/users/save" enctype="multipart/form-data">
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $userId ?>">
-
     <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save User</button>
         <a href="<?= e($panelBase) ?>/users" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Users</a>
@@ -113,7 +112,7 @@ if ($userRow !== null && $publicBase !== '' && $profileRoutesEnabled && $profile
         <?php endif; ?>
     </nav>
 
-    <div class="card">
+    <div class="card mb-3">
         <div class="card-body">
             <div class="mb-3">
                 <label for="username" class="form-label h5">Username</label>
@@ -219,8 +218,7 @@ if ($userRow !== null && $publicBase !== '' && $profileRoutesEnabled && $profile
         </div>
     </div>
 
-    <!-- Duplicate actions at bottom so long forms do not require scrolling upward. -->
-    <div class="d-flex justify-content-end gap-2 mt-3">
+    <nav>
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save User</button>
         <a href="<?= e($panelBase) ?>/users" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Users</a>
         <?php if ($hasPersistedUser): ?>
@@ -229,9 +227,7 @@ if ($userRow !== null && $publicBase !== '' && $profileRoutesEnabled && $profile
                 class="btn btn-danger"
                 form="<?= e($deleteFormId) ?>"
                 onclick="return confirm('Delete this user?');"
-            >
-                <i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete User
-            </button>
+            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete User</button>
         <?php endif; ?>
-    </div>
+    </nav>
 </form>

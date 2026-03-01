@@ -73,7 +73,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
 </nav>
 
-<div class="card">
+<div class="card mb-3">
     <div class="card-body">
         <?php if ($categories === []): ?>
             <p class="text-muted mb-0">No categories yet.</p>
@@ -197,7 +197,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     </div>
 </div>
 
-<div class="d-flex justify-content-end gap-2 mt-3">
+<nav>
     <a class="btn btn-primary" href="<?= e($panelBase) ?>/categories/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Category</a>
     <button
         type="submit"
@@ -205,7 +205,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
         form="<?= e($bulkDeleteFormId) ?>"
         onclick="return confirm('Delete selected categories? Existing page-category links will be removed.');"
     ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
-</div>
+</nav>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
