@@ -1498,7 +1498,7 @@ final class PublicController
         }
 
         return $scriptMarkup
-            . '<div class="col-12"><div class="' . $widgetClass . '" data-sitekey="' . $escapedSiteKey . '"></div></div>';
+            . '<div class="col-12"><div class="' . $widgetClass . '" data-theme="dark" data-sitekey="' . $escapedSiteKey . '"></div></div>';
     }
 
     /**
