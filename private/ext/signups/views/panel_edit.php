@@ -40,34 +40,33 @@ $deleteFormId = 'delete-signups-form';
 ?>
 <header class="card">
     <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
-            <div>
-                <h1><?= $isEditMode ? 'Edit Signup Sheet Form: \'' . e($formName !== '' ? $formName : $formSlug) . '\'' : 'Create New Signup Sheet Form' ?></h1>
+        <div class="d-flex align-items-start justify-content-between gap-2">
+            <h1><?= $isEditMode ? 'Edit Signup Sheet Form: \'' . e($formName !== '' ? $formName : $formSlug) . '\'' : 'Create New Signup Sheet Form' ?></h1>
 
-                <?php if (!$isEditMode): ?>
-                <p class="text-muted mb-0">Create or update signup sheet fields and availability.</p>
-                <?php endif; ?>
-
-                <?php if ($isEditMode): ?>
-                    <p class="mb-0 small">
-                        <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
-                        <code
-                            id="signups_form_shortcode"
-                            role="button"
-                            tabindex="0"
-                            title="Click to copy shortcode"
-                            data-bs-toggle="tooltip"
-                            data-bs-placement="top"
-                        ><?= e($shortcodeValue) ?></code>
-                    </p>
-                <?php endif; ?>
-            </div>
             <?php if ($isEditMode): ?>
-                <div class="d-flex gap-2">
-                    <a href="<?= e($signupsBasePath) ?>/<?= rawurlencode($formSlug) ?>" class="btn btn-primary btn-sm">View Submissions</a>
-                </div>
+            <div class="d-flex gap-2">
+                <a href="<?= e($signupsBasePath) ?>/<?= rawurlencode($formSlug) ?>" class="btn btn-primary btn-sm">View Submissions</a>
+            </div>
             <?php endif; ?>
         </div>
+
+        <?php if (!$isEditMode): ?>
+        <p class="text-muted mb-0">Create or update signup sheet fields and availability.</p>
+        <?php endif; ?>
+
+        <?php if ($isEditMode): ?>
+        <p class="mb-0 small">
+            <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
+            <code
+                id="signups_form_shortcode"
+                role="button"
+                tabindex="0"
+                title="Click to copy shortcode"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+            ><?= e($shortcodeValue) ?></code>
+        </p>
+        <?php endif; ?>
     </div>
 </header>
 

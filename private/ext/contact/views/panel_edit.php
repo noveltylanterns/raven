@@ -50,34 +50,33 @@ $deleteFormId = 'delete-contact-form';
 ?>
 <header class="card">
     <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
-            <div>
-                <h1><?= $isEditMode ? 'Edit Contact Form: \'' . e($formName !== '' ? $formName : $formSlug) . '\'' : 'Create New Contact Form' ?></h1>
+        <div class="d-flex align-items-start justify-content-between gap-2">
+            <h1><?= $isEditMode ? 'Edit Contact Form: \'' . e($formName !== '' ? $formName : $formSlug) . '\'' : 'Create New Contact Form' ?></h1>
 
-                <?php if (!$isEditMode): ?>
-                <p class="text-mutedmb-0">Create or update contact form fields and delivery settings.</p>
-                <?php endif; ?>
-
-                <?php if ($isEditMode): ?>
-                <p class="mb-0 small">
-                    <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
-                    <code
-                        id="contact_form_shortcode"
-                        role="button"
-                        tabindex="0"
-                        title="Click to copy shortcode"
-                        data-bs-toggle="tooltip"
-                        data-bs-placement="top"
-                    ><?= e($shortcodeValue) ?></code>
-                </p>
-                <?php endif; ?>
-            </div>
             <?php if ($isEditMode): ?>
             <div class="d-flex gap-2">
                 <a href="<?= e($contactSubmissionsBasePath) ?>/<?= rawurlencode($formSlug) ?>" class="btn btn-primary btn-sm">View Submissions</a>
             </div>
             <?php endif; ?>
         </div>
+
+        <?php if (!$isEditMode): ?>
+        <p class="text-mutedmb-0">Create or update contact form fields and delivery settings.</p>
+        <?php endif; ?>
+
+        <?php if ($isEditMode): ?>
+        <p class="mb-0 small">
+            <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
+            <code
+                id="contact_form_shortcode"
+                role="button"
+                tabindex="0"
+                title="Click to copy shortcode"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+            ><?= e($shortcodeValue) ?></code>
+        </p>
+        <?php endif; ?>
     </div>
 </header>
 

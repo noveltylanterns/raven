@@ -38,20 +38,16 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
 ?>
 <header class="card">
     <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start gap-3">
-            <div>
-                <h1>
-                    <?= e($extensionName !== '' ? $extensionName : 'Signup Sheets') ?>
-                    <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
-                </h1>
-                <h6 class="mb-2">by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h6>
-                <p class="mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'Configured signup sheet form definitions available to page content integrations.') ?></p>
-            </div>
+        <div class="d-flex align-items-start justify-content-between gap-2">
+            <h1>
+                <?= e($extensionName !== '' ? $extensionName : 'Signup Sheets') ?>
+                <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
+            </h1>
             <div class="d-flex flex-wrap gap-2">
                 <?php if ($extensionDocsUrl !== ''): ?>
-                    <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                        <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
-                    </a>
+                <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
+                    <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
+                </a>
                 <?php endif; ?>
                 <div class="dropdown">
                     <button
@@ -85,8 +81,18 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
                 </div>
             </div>
         </div>
+        <h6 class="mb-2">by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h6>
+        <p class="mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'Configured signup sheet form definitions available to page content integrations.') ?></p>
     </div>
 </header>
+
+<?php if ($flashSuccess !== null): ?>
+<div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
+<?php endif; ?>
+
+<?php if ($flashError !== null): ?>
+<div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
+<?php endif; ?>
 
 <div class="d-flex justify-content-end mb-3">
     <a href="<?= e($editBasePath) ?>" class="btn btn-primary"><i class="bi bi-clipboard-plus me-2" aria-hidden="true"></i>New Signup Sheet Form</a>
@@ -94,14 +100,6 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
 
 <div class="card">
     <div class="card-body">
-        <?php if ($flashSuccess !== null): ?>
-            <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
-        <?php endif; ?>
-
-        <?php if ($flashError !== null): ?>
-            <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
-        <?php endif; ?>
-
         <h2 class="h6 mb-3">Configured Forms</h2>
 
         <?php if ($forms === []): ?>

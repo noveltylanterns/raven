@@ -40,31 +40,42 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
 ?>
 <header class="card">
     <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
-            <div>
-                <h1>
-                    <?= e($extensionName !== '' ? $extensionName : 'Database Manager') ?>
-                    <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
-                </h1>
-                <h6 class="mb-2">by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h6>
-                <p class="mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'This page is provided by the Database Manager extension and uses Adminer as a single-page database editor.') ?></p>
-            </div>
+        <div class="d-flex align-items-start justify-content-between gap-2">
+            <h1>
+                <?= e($extensionName !== '' ? $extensionName : 'Database Manager') ?>
+                <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
+            </h1>
             <?php if ($extensionDocsUrl !== ''): ?>
-                <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                    <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
-                </a>
+            <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
+                <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
+            </a>
             <?php endif; ?>
         </div>
 
-        <?php if (!$canManageConfiguration): ?>
-            <div class="alert alert-danger" role="alert">
-                Manage System Configuration permission is required for this section.
-            </div>
-        <?php endif; ?>
+        <h6 class="mb-2">by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h6>
+        <p class="mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'This page is provided by the Database Manager extension and uses Adminer as a single-page database editor.') ?></p>
     </div>
 </header>
 
+<?php if (!$canManageConfiguration): ?>
+<div class="alert alert-danger" role="alert">
+    Manage System Configuration permission is required for this section.
+</div>
+<?php endif; ?>
+
 <?php if ($canManageConfiguration): ?>
+
+    <?php if (!$extensionEntrypointExists): ?>
+    <div class="alert alert-danger mb-3" role="alert">
+        Extension entrypoint is missing at <code>~/private/ext/database/adminer.php</code>.
+    </div>
+    <?php elseif (!$adminerInstalled): ?>
+    <div class="alert alert-warning mb-3" role="alert">
+        Adminer dependency is not installed locally yet.
+        Run <code>composer update</code> (or <code>composer require vrana/adminer:^5.3</code>) when network access is available.
+    </div>
+    <?php endif; ?>
+
     <?php if ($canLaunchAdminer): ?>
         <div class="d-flex justify-content-end mb-3">
             <button
@@ -80,17 +91,6 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
 
     <div class="card mb-3">
         <div class="card-body">
-            <?php if (!$extensionEntrypointExists): ?>
-                <div class="alert alert-danger mb-3" role="alert">
-                    Extension entrypoint is missing at <code>~/private/ext/database/adminer.php</code>.
-                </div>
-            <?php elseif (!$adminerInstalled): ?>
-                <div class="alert alert-warning mb-3" role="alert">
-                    Adminer dependency is not installed locally yet.
-                    Run <code>composer update</code> (or <code>composer require vrana/adminer:^5.3</code>) when network access is available.
-                </div>
-            <?php endif; ?>
-
             <h2 class="h5 mb-3">Connection Summary</h2>
 
             <div class="table-responsive">

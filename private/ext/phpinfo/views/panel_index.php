@@ -27,21 +27,19 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
 ?>
 <header class="card">
     <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start gap-3">
-            <div>
-                <h1>
-                    <?= e($extensionName !== '' ? $extensionName : 'PHP Info') ?>
-                    <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
-                </h1>
-                <h6 class="mb-2">by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h6>
-                <p class="mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'Runtime diagnostics from phpinfo().') ?></p>
-            </div>
+        <div class="d-flex align-items-start justify-content-between gap-2">
+            <h1>
+                <?= e($extensionName !== '' ? $extensionName : 'PHP Info') ?>
+                <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
+            </h1>
             <?php if ($extensionDocsUrl !== ''): ?>
-                <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                    <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
-                </a>
+            <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
+                <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
+            </a>
             <?php endif; ?>
         </div>
+        <h6 class="mb-2">by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h6>
+        <p class="mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'Runtime diagnostics from phpinfo().') ?></p>
     </div>
 </header>
 

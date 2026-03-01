@@ -45,24 +45,24 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
 <?php endif; ?>
 
 <?php if ($canManageConfiguration): ?>
+    <?php if (!$extensionEntrypointExists): ?>
+    <div class="alert alert-danger mb-3" role="alert">
+        Extension entrypoint is missing at <code>~/private/ext/database/adminer.php</code>.
+    </div>
+    <?php elseif (!$adminerInstalled): ?>
+    <div class="alert alert-warning mb-3" role="alert">
+        Adminer dependency is not installed locally yet.
+        Run <code>composer update</code> (or <code>composer require vrana/adminer:^5.3</code>) when network access is available.
+    </div>
+    <?php elseif (is_string($selectorError) && trim($selectorError) !== ''): ?>
+    <div class="alert alert-warning mb-3" role="alert">
+        <?= e($selectorError) ?>
+    </div>
+    <?php endif; ?>
+
     <div class="card">
         <div class="card-body">
             <h2 class="h5 mb-3">Launch Targets (<?= e($modeLabel) ?>)</h2>
-
-            <?php if (!$extensionEntrypointExists): ?>
-                <div class="alert alert-danger mb-3" role="alert">
-                    Extension entrypoint is missing at <code>~/private/ext/database/adminer.php</code>.
-                </div>
-            <?php elseif (!$adminerInstalled): ?>
-                <div class="alert alert-warning mb-3" role="alert">
-                    Adminer dependency is not installed locally yet.
-                    Run <code>composer update</code> (or <code>composer require vrana/adminer:^5.3</code>) when network access is available.
-                </div>
-            <?php elseif (is_string($selectorError) && trim($selectorError) !== ''): ?>
-                <div class="alert alert-warning mb-3" role="alert">
-                    <?= e($selectorError) ?>
-                </div>
-            <?php endif; ?>
 
             <?php if ($targets === []): ?>
                 <p class="text-muted mb-0">No launch targets were found for this driver.</p>

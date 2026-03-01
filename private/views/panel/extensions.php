@@ -54,7 +54,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
 </style>
 <header class="card">
     <div class="card-body">
-        <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+        <div class="d-flex align-items-center justify-content-between gap-2">
             <h1>Extension Manager</h1>
             <button
               type="button"
@@ -64,7 +64,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
               >Create New Extension<i class="bi bi-plus-square ms-2" aria-hidden="true"></i>
             </button>
         </div>
-        <p">Use this page to create, upload, enable, and disable Raven extensions.<br></p>
+        <p class="mb-2">Use this page to create, upload, enable, and disable Raven extensions.</p>
         <h6>Notes:</h6>
         <p class="text-muted mb-0">
           - Enabled extensions must be disabled before deletion.<br>

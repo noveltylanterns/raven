@@ -71,6 +71,7 @@ $requiresForceRun = $status !== 'outdated';
 <header class="card">
     <div class="card-body">
         <h1>Update System</h1>
+        <p class="text-muted">Update your Raven installation from one of our stock mirrors, or enter a custom repo.</p>
         <div class="d-flex flex-wrap align-items-center gap-2">
             <label for="update-source-key" class="form-label mb-0">Upstream Source</label>
             <select class="form-select form-select-sm w-auto" id="update-source-key" name="source_key" aria-label="Upstream Source">

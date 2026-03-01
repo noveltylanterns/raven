@@ -50,19 +50,14 @@ $signupsEmptyId = 'signups-filter-empty';
 ?>
 <header class="card">
     <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-            <div>
-                <h1>Submissions for: "<?= e($formName !== '' ? $formName : $formSlug) ?>"</h1>
-                <p class="text-muted mb-0">
-                    Slug <code><?= e($formSlug) ?></code>
-                    | Total <strong><?= (int) $totalItems ?></strong>
-                </p>
-            </div>
+        <div class="d-flex align-items-start justify-content-between gap-2">
+            <h1>Submissions for: "<?= e($formName !== '' ? $formName : $formSlug) ?>"</h1>
             <div class="d-flex flex-wrap gap-2">
                 <a href="<?= e($exportPath) ?>" class="btn btn-primary btn-sm"><i class="bi bi-download me-2" aria-hidden="true"></i>Export CSV</a>
                 <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#<?= e($importModalId) ?>"><i class="bi bi-upload me-2" aria-hidden="true"></i>Import CSV</button>
             </div>
         </div>
+        <p class="text-muted mb-0">Slug <code><?= e($formSlug) ?></code> | Total <strong><?= (int) $totalItems ?></strong></p>
     </div>
 </header>
 
