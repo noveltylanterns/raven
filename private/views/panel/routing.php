@@ -127,7 +127,7 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
 </nav>
 <?php endif; ?>
 
-<div class="card">
+<div class="card mb-3">
     <div class="card-body">
         <?php if ($routeRows === []): ?>
             <p class="text-muted mb-0">No routing records found.</p>
@@ -242,13 +242,15 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
         <?php endif; ?>
     </div>
 </div>
+
 <?php if ($routeRows !== []): ?>
-    <div class="d-flex justify-content-end gap-2 mt-3">
-        <a class="btn btn-primary" href="<?= e($panelBase) ?>/routing/export">
-            <i class="bi bi-download me-2" aria-hidden="true"></i>Export CSV
-        </a>
-    </div>
+<nav>
+    <a class="btn btn-primary" href="<?= e($panelBase) ?>/routing/export">
+        <i class="bi bi-download me-2" aria-hidden="true"></i>Export CSV
+    </a>
+</nav>
 <?php endif; ?>
+
 <script>
     (function () {
         var table = document.getElementById('routing-table');

@@ -51,7 +51,7 @@ $avatarThumbUrl = '/uploads/avatars/' . rawurlencode($avatarThumbFilename);
         <button type="submit" class="btn btn-primary"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Preferences</button>
     </nav>
 
-    <div class="card">
+    <div class="card mb-3">
         <div class="card-body">
             <div class="mb-3">
                 <label class="form-label h5" for="username">Username</label>
@@ -131,7 +131,7 @@ $avatarThumbUrl = '/uploads/avatars/' . rawurlencode($avatarThumbFilename);
         </div>
     </div>
 
-    <div class="d-flex justify-content-end mt-3">
+    <nav>
         <button type="submit" class="btn btn-primary"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Preferences</button>
-    </div>
+    </nav>
 </form>

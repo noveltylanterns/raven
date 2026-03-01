@@ -181,7 +181,7 @@ $requiresForceRun = $status !== 'outdated';
     </div>
 </div>
 
-<nav class="d-flex flex-wrap justify-content-end gap-2">
+<nav>
     <form method="post" action="<?= e($panelBase) ?>/updates/check" class="m-0">
         <?= $csrfField ?>
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
@@ -205,9 +205,7 @@ $requiresForceRun = $status !== 'outdated';
             type="submit"
             class="btn btn-warning js-updater-run-button"
             title="Run updater"
-        >
-            Run Updater
-        </button>
+        >Run Updater</button>
     </form>
 </nav>
 

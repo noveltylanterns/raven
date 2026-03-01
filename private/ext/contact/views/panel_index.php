@@ -98,7 +98,7 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
     <a href="<?= e($editBasePath) ?>" class="btn btn-primary"><i class="bi bi-envelope-plus me-2" aria-hidden="true"></i>New Contact Form</a>
 </nav>
 
-<div class="card">
+<div class="card mb-3">
     <div class="card-body">
         <h2 class="h6 mb-3">Configured Forms</h2>
 
@@ -172,6 +172,6 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
     </div>
 </div>
 
-<div class="d-flex justify-content-end mt-3">
+<nav>
     <a href="<?= e($editBasePath) ?>" class="btn btn-primary"><i class="bi bi-envelope-plus me-2" aria-hidden="true"></i>New Contact Form</a>
-</div>
+</nav>
