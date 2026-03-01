@@ -52,6 +52,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
         opacity: 1;
     }
 </style>
+
 <header class="card">
     <div class="card-body">
         <div class="d-flex align-items-start justify-content-between gap-2">
@@ -63,7 +64,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
               data-bs-target="#create-extension-modal"
               ><i class="bi bi-plus-square me-2" aria-hidden="true"></i>Create New Extension</button>
         </div>
-        <p class="mb-2">Use this page to create, upload, enable, and disable Raven extensions.</p>
+        <p class="text-muted mb-2">Use this page to create, upload, enable, and disable Raven extensions.</p>
         <h6>Notes:</h6>
         <p class="text-muted mb-0">
           - Enabled extensions must be disabled before deletion.<br>
@@ -82,11 +83,12 @@ $panelBase = '/' . trim($site['panel_path'], '/');
 
 <section class="card">
     <div class="card-body">
-        <h2 class="h5 mb-3">Upload Extension</h2>
+        <h2 class="h4">Upload Extension</h2>
         <form method="post" action="<?= e($panelBase) ?>/extensions/upload" enctype="multipart/form-data">
             <?= $csrfField ?>
+
             <div class="mb-3">
-                <label for="extension_archive" class="form-label">ZIP Archive</label>
+                <label for="extension_archive" class="form-label"><small>Formats Accepted: <i>Zip</i></small></label>
                 <input
                     id="extension_archive"
                     type="file"
@@ -95,12 +97,128 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                     accept=".zip,application/zip"
                     required
                 >
-                <div class="form-text">
-                    Archive must include a valid <code>extension.json</code> file!
-                </div>
+                <div class="form-text">Archive must include a valid <code>extension.json</code> file!</div>
             </div>
-            <button type="submit" class="btn btn-primary btn-sm">Upload Extension<i class="bi bi-upload ms-2" aria-hidden="true"></i></button>
+
+            <button type="submit" class="btn btn-primary btn-lg">Click to Upload<i class="bi bi-upload ms-2" aria-hidden="true"></i></button>
         </form>
+    </div>
+</section>
+
+<section class="card">
+    <div class="card-body">
+        <h2 class="h4">Installed Extensions</h2>
+        <?php if ($extensions === []): ?>
+            <p class="text-muted mb-0">No extensions found in <code>private/ext/</code>.</p>
+        <?php else: ?>
+            <div class="table-responsive">
+                <table id="extensions-table" class="table table-sm align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th scope="col" data-sort-key="name" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Name</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+                        <th scope="col" data-sort-key="author" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Author</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+                        <th scope="col" data-sort-key="version" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Version</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+                        <th scope="col" data-sort-key="description" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Description</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+                        <th scope="col" class="text-center">Action</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($extensions as $extension): ?>
+                        <?php
+                        $directory = (string) ($extension['directory'] ?? '');
+                        $extensionPanelPath = trim((string) ($extension['panel_path'] ?? ''), '/');
+                        $name = (string) ($extension['name'] ?? $directory);
+                        $version = (string) ($extension['version'] ?? '');
+                        $description = (string) ($extension['description'] ?? '');
+                        $author = (string) ($extension['author'] ?? '');
+                        $homepage = (string) ($extension['homepage'] ?? '');
+                        $valid = (bool) ($extension['valid'] ?? false);
+                        $invalidReason = (string) ($extension['invalid_reason'] ?? '');
+                        $enabled = (bool) ($extension['enabled'] ?? false);
+                        $isStock = (bool) ($extension['is_stock'] ?? false);
+                        $canDelete = (bool) ($extension['can_delete'] ?? false);
+                        $deleteBlockReason = (string) ($extension['delete_block_reason'] ?? '');
+                        $nameLabel = $name !== '' ? $name : $directory;
+                        $panelTarget = $extensionPanelPath !== '' ? ($panelBase . '/' . ltrim($extensionPanelPath, '/')) : '';
+                        $canOpenSettings = $enabled && $panelTarget !== '';
+                        $authorLabel = $author !== '' ? $author : '<none>';
+                        $versionLabel = $version !== '' ? $version : '<none>';
+                        $descriptionLabel = $description !== '' ? $description : '<none>';
+                        ?>
+                        <tr
+                            data-extensions-row="1"
+                            data-sort-name="<?= e($nameLabel) ?>"
+                            data-sort-author="<?= e($authorLabel) ?>"
+                            data-sort-version="<?= e($versionLabel) ?>"
+                            data-sort-description="<?= e($descriptionLabel) ?>"
+                        >
+                            <td><?= e($nameLabel) ?></td>
+                            <td>
+                                <?php if ($author !== '' && $homepage !== ''): ?>
+                                    <a href="<?= e($homepage) ?>" target="_blank" rel="noopener noreferrer"><?= e($author) ?></a>
+                                <?php elseif ($author !== ''): ?>
+                                    <?= e($author) ?>
+                                <?php else: ?>
+                                    <?= e('<none>') ?>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= e($versionLabel) ?></td>
+                            <td>
+                                <?= e($descriptionLabel) ?>
+                                <?php if (!$valid && $invalidReason !== ''): ?>
+                                    <div class="small text-danger mt-1"><?= e($invalidReason) ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-center">
+                                <div class="d-inline-flex align-items-center gap-1">
+                                    <?php if ($canOpenSettings): ?>
+                                        <a
+                                            href="<?= e($panelTarget) ?>"
+                                            class="btn btn-primary btn-sm"
+                                            aria-label="Settings"
+                                            title="Settings"
+                                        >
+                                            <i class="bi bi-gear-fill" aria-hidden="true"></i>
+                                            <span class="visually-hidden">Settings</span>
+                                        </a>
+                                    <?php endif; ?>
+                                    <form method="post" action="<?= e($panelBase) ?>/extensions/toggle" class="d-inline m-0">
+                                        <?= $csrfField ?>
+                                        <input type="hidden" name="extension" value="<?= e($directory) ?>">
+                                        <input type="hidden" name="enabled" value="<?= $enabled ? '0' : '1' ?>">
+                                        <button
+                                            type="submit"
+                                            class="btn <?= $enabled ? 'btn-warning' : 'btn-success' ?> btn-sm"
+                                            <?= !$valid ? 'disabled' : '' ?>
+                                            <?= !$valid && $invalidReason !== '' ? 'title="' . e($invalidReason) . '"' : '' ?>
+                                            <?= $valid ? 'title="' . e($enabled ? 'Disable' : 'Enable') . '"' : '' ?>
+                                            aria-label="<?= e($enabled ? 'Disable' : 'Enable') ?>"
+                                        >
+                                            <i class="bi <?= $enabled ? 'bi-stop-circle' : 'bi-play-circle' ?>" aria-hidden="true"></i>
+                                        </button>
+                                    </form>
+                                    <?php if ($canDelete): ?>
+                                        <form method="post" action="<?= e($panelBase) ?>/extensions/delete" class="d-inline m-0">
+                                            <?= $csrfField ?>
+                                            <input type="hidden" name="extension" value="<?= e($directory) ?>">
+                                            <button
+                                                type="submit"
+                                                class="btn btn-danger btn-sm"
+                                                aria-label="Delete"
+                                                onclick="return confirm('Delete this extension from disk? This cannot be undone.');"
+                                            >
+                                                <i class="bi bi-trash3" aria-hidden="true"></i>
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
     </div>
 </section>
 
@@ -226,129 +344,12 @@ $panelBase = '/' . trim($site['panel_path'], '/');
     </div>
 </div>
 
-<section class="card">
-    <div class="card-body">
-        <h2 class="h5 mb-3">Installed Extensions</h2>
-        <?php if ($extensions === []): ?>
-            <p class="text-muted mb-0">No extensions found in <code>private/ext/</code>.</p>
-        <?php else: ?>
-            <div class="table-responsive">
-                <table id="extensions-table" class="table table-sm align-middle mb-0">
-                    <thead>
-                    <tr>
-                        <th scope="col" data-sort-key="name" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Name</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="author" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Author</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="version" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Version</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="description" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Description</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" class="text-center">Action</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($extensions as $extension): ?>
-                        <?php
-                        $directory = (string) ($extension['directory'] ?? '');
-                        $extensionPanelPath = trim((string) ($extension['panel_path'] ?? ''), '/');
-                        $name = (string) ($extension['name'] ?? $directory);
-                        $version = (string) ($extension['version'] ?? '');
-                        $description = (string) ($extension['description'] ?? '');
-                        $author = (string) ($extension['author'] ?? '');
-                        $homepage = (string) ($extension['homepage'] ?? '');
-                        $valid = (bool) ($extension['valid'] ?? false);
-                        $invalidReason = (string) ($extension['invalid_reason'] ?? '');
-                        $enabled = (bool) ($extension['enabled'] ?? false);
-                        $isStock = (bool) ($extension['is_stock'] ?? false);
-                        $canDelete = (bool) ($extension['can_delete'] ?? false);
-                        $deleteBlockReason = (string) ($extension['delete_block_reason'] ?? '');
-                        $nameLabel = $name !== '' ? $name : $directory;
-                        $panelTarget = $extensionPanelPath !== '' ? ($panelBase . '/' . ltrim($extensionPanelPath, '/')) : '';
-                        $canOpenSettings = $enabled && $panelTarget !== '';
-                        $authorLabel = $author !== '' ? $author : '<none>';
-                        $versionLabel = $version !== '' ? $version : '<none>';
-                        $descriptionLabel = $description !== '' ? $description : '<none>';
-                        ?>
-                        <tr
-                            data-extensions-row="1"
-                            data-sort-name="<?= e($nameLabel) ?>"
-                            data-sort-author="<?= e($authorLabel) ?>"
-                            data-sort-version="<?= e($versionLabel) ?>"
-                            data-sort-description="<?= e($descriptionLabel) ?>"
-                        >
-                            <td><?= e($nameLabel) ?></td>
-                            <td>
-                                <?php if ($author !== '' && $homepage !== ''): ?>
-                                    <a href="<?= e($homepage) ?>" target="_blank" rel="noopener noreferrer"><?= e($author) ?></a>
-                                <?php elseif ($author !== ''): ?>
-                                    <?= e($author) ?>
-                                <?php else: ?>
-                                    <?= e('<none>') ?>
-                                <?php endif; ?>
-                            </td>
-                            <td><?= e($versionLabel) ?></td>
-                            <td>
-                                <?= e($descriptionLabel) ?>
-                                <?php if (!$valid && $invalidReason !== ''): ?>
-                                    <div class="small text-danger mt-1"><?= e($invalidReason) ?></div>
-                                <?php endif; ?>
-                            </td>
-                            <td class="text-center">
-                                <div class="d-inline-flex align-items-center gap-1">
-                                    <?php if ($canOpenSettings): ?>
-                                        <a
-                                            href="<?= e($panelTarget) ?>"
-                                            class="btn btn-primary btn-sm"
-                                            aria-label="Settings"
-                                            title="Settings"
-                                        >
-                                            <i class="bi bi-gear-fill" aria-hidden="true"></i>
-                                            <span class="visually-hidden">Settings</span>
-                                        </a>
-                                    <?php endif; ?>
-                                    <form method="post" action="<?= e($panelBase) ?>/extensions/toggle" class="d-inline m-0">
-                                        <?= $csrfField ?>
-                                        <input type="hidden" name="extension" value="<?= e($directory) ?>">
-                                        <input type="hidden" name="enabled" value="<?= $enabled ? '0' : '1' ?>">
-                                        <button
-                                            type="submit"
-                                            class="btn <?= $enabled ? 'btn-warning' : 'btn-success' ?> btn-sm"
-                                            <?= !$valid ? 'disabled' : '' ?>
-                                            <?= !$valid && $invalidReason !== '' ? 'title="' . e($invalidReason) . '"' : '' ?>
-                                            <?= $valid ? 'title="' . e($enabled ? 'Disable' : 'Enable') . '"' : '' ?>
-                                            aria-label="<?= e($enabled ? 'Disable' : 'Enable') ?>"
-                                        >
-                                            <i class="bi <?= $enabled ? 'bi-stop-circle' : 'bi-play-circle' ?>" aria-hidden="true"></i>
-                                        </button>
-                                    </form>
-                                    <?php if ($canDelete): ?>
-                                        <form method="post" action="<?= e($panelBase) ?>/extensions/delete" class="d-inline m-0">
-                                            <?= $csrfField ?>
-                                            <input type="hidden" name="extension" value="<?= e($directory) ?>">
-                                            <button
-                                                type="submit"
-                                                class="btn btn-danger btn-sm"
-                                                aria-label="Delete"
-                                                onclick="return confirm('Delete this extension from disk? This cannot be undone.');"
-                                            >
-                                                <i class="bi bi-trash3" aria-hidden="true"></i>
-                                            </button>
-                                        </form>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
-    </div>
-</section>
 <script>
     (function () {
         var table = document.getElementById('extensions-table');
         if (!(table instanceof HTMLTableElement)) {
             return;
         }
-
         var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-extensions-row="1"]'));
         var tableBody = table.tBodies.length > 0 ? table.tBodies[0] : null;
         var sortHeaders = Array.prototype.slice.call(table.querySelectorAll('thead th[data-sort-key]'));
@@ -362,7 +363,6 @@ $panelBase = '/' . trim($site['panel_path'], '/');
             version: 'data-sort-version',
             description: 'data-sort-description'
         };
-
         function sortValue(row, key) {
             var attrName = sortAttrByKey[key];
             if (typeof attrName !== 'string' || attrName === '') {
@@ -371,20 +371,17 @@ $panelBase = '/' . trim($site['panel_path'], '/');
 
             return String(row.getAttribute(attrName) || '');
         }
-
         function compareNatural(left, right) {
             return String(left).localeCompare(String(right), undefined, {
                 numeric: true,
                 sensitivity: 'base'
             });
         }
-
         function updateSortHeaderState() {
             sortHeaders.forEach(function (header) {
                 if (!(header instanceof HTMLTableCellElement)) {
                     return;
                 }
-
                 var key = String(header.getAttribute('data-sort-key') || '').trim();
                 var caretIcon = header.querySelector('.raven-routing-sort-caret');
                 if (key === '' || key !== sortState.key) {
@@ -395,7 +392,6 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                     }
                     return;
                 }
-
                 header.setAttribute('aria-sort', sortState.direction === 'desc' ? 'descending' : 'ascending');
                 header.classList.add('is-active-sort');
                 if (caretIcon instanceof HTMLElement) {
@@ -404,74 +400,59 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                 }
             });
         }
-
         function sortRowsBy(key, forcedDirection) {
             if (!(tableBody instanceof HTMLTableSectionElement) || key === '') {
                 return;
             }
-
             var direction = 'asc';
             if (forcedDirection === 'asc' || forcedDirection === 'desc') {
                 direction = forcedDirection;
             } else if (sortState.key === key) {
                 direction = sortState.direction === 'asc' ? 'desc' : 'asc';
             }
-
             sortState = {
                 key: key,
                 direction: direction
             };
-
             rows.sort(function (leftRow, rightRow) {
                 var leftValue = sortValue(leftRow, key);
                 var rightValue = sortValue(rightRow, key);
                 var result = compareNatural(leftValue, rightValue);
-
                 if (result === 0) {
                     result = compareNatural(
                         sortValue(leftRow, 'name'),
                         sortValue(rightRow, 'name')
                     );
                 }
-
                 return direction === 'desc' ? -result : result;
             });
-
             rows.forEach(function (row) {
                 tableBody.appendChild(row);
             });
-
             updateSortHeaderState();
         }
-
         sortHeaders.forEach(function (header) {
             if (!(header instanceof HTMLTableCellElement)) {
                 return;
             }
-
             var key = String(header.getAttribute('data-sort-key') || '').trim();
             if (key === '') {
                 return;
             }
-
             header.addEventListener('click', function () {
                 sortRowsBy(key);
             });
-
             header.addEventListener('keydown', function (event) {
                 if (!(event instanceof KeyboardEvent)) {
                     return;
                 }
-
                 if (event.key !== 'Enter' && event.key !== ' ') {
                     return;
                 }
-
                 event.preventDefault();
                 sortRowsBy(key);
             });
         });
-
         sortRowsBy('name', 'asc');
     })();
 </script>

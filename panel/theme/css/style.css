@@ -13024,7 +13024,8 @@ body.raven-panel-theme .raven-panel-main nav {
   gap: 0.5rem;
 }
 
-body.raven-panel-theme .raven-panel-main section {
+body.raven-panel-theme .raven-panel-main section,
+body.raven-panel-theme.has-sidebar .raven-panel-main > section.card {
   margin-bottom: 1rem;
 }
 

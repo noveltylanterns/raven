@@ -29,6 +29,7 @@ $avatarThumbFilename = $avatarBase !== '' ? $avatarBase . '_thumb.jpg' : $avatar
 $avatarUrl = '/uploads/avatars/' . rawurlencode($avatarFilename);
 $avatarThumbUrl = '/uploads/avatars/' . rawurlencode($avatarThumbFilename);
 ?>
+
 <header class="card">
     <div class="card-body">
         <h1>Preferences</h1>

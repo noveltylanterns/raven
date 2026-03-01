@@ -59,6 +59,7 @@ foreach ($routeRows as $row) {
 asort($typeFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
 asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
 ?>
+
 <header class="card">
     <div class="card-body">
         <h1>Routing Table</h1>

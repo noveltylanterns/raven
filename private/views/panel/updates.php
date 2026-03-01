@@ -131,25 +131,19 @@ $requiresForceRun = $status !== 'outdated';
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
         <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
         <input type="hidden" name="force_run" value="0" data-updater-force-run="1">
-        <button
-            type="submit"
-            class="btn btn-warning js-updater-run-button"
-            title="Run updater"
-        >Run Updater</button>
+        <button class="btn btn-warning js-updater-run-button" type="submit" title="Run updater">Run Updater</button>
     </form>
 </nav>
 
 <section class="card">
     <div class="card-body">
         <h2 class="h4 mb-3">Current Status</h2>
-
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
             <span class="badge <?= e($badgeClass) ?>"><?= e(ucfirst($status)) ?></span>
             <span class="text-muted small">
                 <?= e($statusMessage !== '' ? $statusMessage : 'No status message available.') ?>
             </span>
         </div>
-
         <div class="row g-3">
             <div class="col-12 col-md-6">
                 <label class="form-label h6">Local Version</label>
@@ -197,11 +191,7 @@ $requiresForceRun = $status !== 'outdated';
         <input type="hidden" name="source_key" value="<?= e($sourceKey) ?>" data-updater-source-key="1">
         <input type="hidden" name="custom_repo" value="<?= e($customRepo) ?>" data-updater-custom-repo="1">
         <input type="hidden" name="force_run" value="0" data-updater-force-run="1">
-        <button
-            type="submit"
-            class="btn btn-warning js-updater-run-button"
-            title="Run updater"
-        >Run Updater</button>
+        <button class="btn btn-warning js-updater-run-button" type="submit" title="Run updater">Run Updater</button>
     </form>
 </nav>
 
@@ -236,7 +226,6 @@ $requiresForceRun = $status !== 'outdated';
     var customRepoWrap = document.getElementById('updater-custom-repo-wrap');
     var customRepoInput = document.getElementById('updater-custom-repo');
     var customRepoKey = '<?= e('custom-git-repo') ?>';
-
     var hiddenInputs = document.querySelectorAll('input[type="hidden"][data-updater-source-key="1"]');
     var hiddenCustomRepoInputs = document.querySelectorAll('input[type="hidden"][data-updater-custom-repo="1"]');
     var syncCustomRepoValue = function () {
@@ -247,7 +236,6 @@ $requiresForceRun = $status !== 'outdated';
         }
       });
     };
-
     var syncCustomRepoVisibility = function () {
       var isCustom = sourceSelect.value === customRepoKey;
       if (customRepoWrap instanceof HTMLElement) {
@@ -257,7 +245,6 @@ $requiresForceRun = $status !== 'outdated';
         customRepoInput.disabled = !isCustom;
       }
     };
-
     var syncSourceValue = function () {
       hiddenInputs.forEach(function (node) {
         if (node instanceof HTMLInputElement) {
@@ -266,19 +253,16 @@ $requiresForceRun = $status !== 'outdated';
       });
       syncCustomRepoVisibility();
     };
-
     var syncAllUpdaterFields = function () {
       syncSourceValue();
       syncCustomRepoValue();
     };
-
     sourceSelect.addEventListener('change', syncSourceValue);
     if (customRepoInput instanceof HTMLInputElement) {
       customRepoInput.addEventListener('input', syncCustomRepoValue);
       customRepoInput.addEventListener('change', syncCustomRepoValue);
     }
     syncAllUpdaterFields();
-
     var allUpdaterForms = document.querySelectorAll(
       'form[action$="/updates/check"], form[action$="/updates/dry-run"], form[action$="/updates/run"]'
     );
@@ -286,24 +270,20 @@ $requiresForceRun = $status !== 'outdated';
       if (!(formNode instanceof HTMLFormElement)) {
         return;
       }
-
       formNode.addEventListener('submit', function () {
         syncAllUpdaterFields();
       });
     });
-
     var runForms = document.querySelectorAll('form[action$="/updates/run"]');
     runForms.forEach(function (formNode) {
       if (!(formNode instanceof HTMLFormElement)) {
         return;
       }
-
       var forceField = formNode.querySelector('input[type="hidden"][data-updater-force-run="1"]');
       if (forceField instanceof HTMLInputElement) {
         forceField.value = '0';
       }
     });
-
     <?php if ($requiresForceRun): ?>
       var modalNode = document.getElementById('updaterForceRunModal');
       var confirmButton = document.getElementById('updaterForceRunConfirm');
@@ -330,29 +310,24 @@ $requiresForceRun = $status !== 'outdated';
         if (!(formNode instanceof HTMLFormElement)) {
           return;
         }
-
         formNode.addEventListener('submit', function (event) {
           var forceField = formNode.querySelector('input[type="hidden"][data-updater-force-run="1"]');
           if (forceField instanceof HTMLInputElement && forceField.value === '1') {
             return;
           }
-
           event.preventDefault();
           pendingRunForm = formNode;
           if (canUseModal && modal !== null) {
             modal.show();
             return;
           }
-
           if (window.confirm(forceRunWarning) !== true) {
             pendingRunForm = null;
             return;
           }
-
           if (!(pendingRunForm instanceof HTMLFormElement)) {
             return;
           }
-
           var fallbackForceField = pendingRunForm.querySelector('input[type="hidden"][data-updater-force-run="1"]');
           if (fallbackForceField instanceof HTMLInputElement) {
             fallbackForceField.value = '1';
@@ -360,16 +335,13 @@ $requiresForceRun = $status !== 'outdated';
           pendingRunForm.submit();
         });
       });
-
       if (!(confirmButton instanceof HTMLButtonElement) || modal === null) {
         return;
       }
-
       confirmButton.addEventListener('click', function () {
         if (!(pendingRunForm instanceof HTMLFormElement)) {
           return;
         }
-
         var forceField = pendingRunForm.querySelector('input[type="hidden"][data-updater-force-run="1"]');
         if (forceField instanceof HTMLInputElement) {
           forceField.value = '1';
