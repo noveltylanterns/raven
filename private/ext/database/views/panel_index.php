@@ -38,11 +38,11 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
 $modeLabel = $driver === 'sqlite' ? '.db Files' : 'SQL Tables';
 $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
 ?>
-<div class="card mb-3">
+<header class="card">
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
             <div>
-                <h1 class="mb-1">
+                <h1 class="mb-0">
                     <?= e($extensionName !== '' ? $extensionName : 'Database Manager') ?>
                     <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
                 </h1>
@@ -62,7 +62,7 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
             </div>
         <?php endif; ?>
     </div>
-</div>
+</header>
 
 <?php if ($canManageConfiguration): ?>
     <?php if ($canLaunchAdminer): ?>

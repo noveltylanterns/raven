@@ -44,11 +44,11 @@ $submissionsBodyId = $submissionsTableId . '-body';
 $submissionsCountId = 'contact-submissions-filter-count';
 $submissionsEmptyId = 'contact-submissions-filter-empty';
 ?>
-<div class="card mb-3">
+<header class="card">
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
             <div>
-                <h1 class="mb-1">Submissions for: "<?= e($formName !== '' ? $formName : $formSlug) ?>"</h1>
+                <h1>Submissions for: "<?= e($formName !== '' ? $formName : $formSlug) ?>"</h1>
                 <p class="text-muted mb-0">
                     Slug <code><?= e($formSlug) ?></code>
                     | Total <strong><?= (int) $totalItems ?></strong>
@@ -59,7 +59,7 @@ $submissionsEmptyId = 'contact-submissions-filter-empty';
             </div>
         </div>
     </div>
-</div>
+</header>
 
 <?php if ($flashSuccess !== null): ?>
     <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>

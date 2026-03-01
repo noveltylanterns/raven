@@ -48,52 +48,52 @@ $shortcodeValue = $formSlug !== '' ? '[contact slug="' . $formSlug . '"]' : '';
 $additionalFields = is_array($formData['additional_fields'] ?? null) ? (array) $formData['additional_fields'] : [];
 $deleteFormId = 'delete-contact-form';
 ?>
-<div class="card mb-3">
+<header class="card">
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
             <div>
-                <h1 class="mb-0">
-                    <?= $isEditMode ? 'Edit Contact Form: \'' . e($formName !== '' ? $formName : $formSlug) . '\'' : 'Create New Contact Form' ?>
-                </h1>
+                <h1><?= $isEditMode ? 'Edit Contact Form: \'' . e($formName !== '' ? $formName : $formSlug) . '\'' : 'Create New Contact Form' ?></h1>
+
                 <?php if (!$isEditMode): ?>
-                    <p class="text-muted mt-2 mb-0">Create or update contact form fields and delivery settings.</p>
+                <p class="text-mutedmb-0">Create or update contact form fields and delivery settings.</p>
                 <?php endif; ?>
+
                 <?php if ($isEditMode): ?>
-                    <p class="mt-2 mb-0 small">
-                        <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
-                        <code
-                            id="contact_form_shortcode"
-                            role="button"
-                            tabindex="0"
-                            title="Click to copy shortcode"
-                            data-bs-toggle="tooltip"
-                            data-bs-placement="top"
-                        ><?= e($shortcodeValue) ?></code>
-                    </p>
+                <p class="mb-0 small">
+                    <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
+                    <code
+                        id="contact_form_shortcode"
+                        role="button"
+                        tabindex="0"
+                        title="Click to copy shortcode"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                    ><?= e($shortcodeValue) ?></code>
+                </p>
                 <?php endif; ?>
             </div>
             <?php if ($isEditMode): ?>
-                <div class="d-flex gap-2">
-                    <a href="<?= e($contactSubmissionsBasePath) ?>/<?= rawurlencode($formSlug) ?>" class="btn btn-primary btn-sm">View Submissions</a>
-                </div>
+            <div class="d-flex gap-2">
+                <a href="<?= e($contactSubmissionsBasePath) ?>/<?= rawurlencode($formSlug) ?>" class="btn btn-primary btn-sm">View Submissions</a>
+            </div>
             <?php endif; ?>
         </div>
     </div>
-</div>
+</header>
 
 <?php if ($flashSuccess !== null): ?>
-    <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
+<div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
 <?php endif; ?>
 
 <?php if ($flashError !== null): ?>
-    <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
+<div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
 <?php if ($isEditMode): ?>
-    <form id="<?= e($deleteFormId) ?>" method="post" action="<?= e($deleteAction) ?>">
-        <?= $csrfField ?>
-        <input type="hidden" name="slug" value="<?= e($formSlug) ?>">
-    </form>
+<form id="<?= e($deleteFormId) ?>" method="post" action="<?= e($deleteAction) ?>">
+    <?= $csrfField ?>
+    <input type="hidden" name="slug" value="<?= e($formSlug) ?>">
+</form>
 <?php endif; ?>
 
 <form method="post" action="<?= e($formAction) ?>">

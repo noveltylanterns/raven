@@ -36,11 +36,11 @@ $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
 $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.lanterns.io'));
 ?>
-<div class="card mb-3">
+<header class="card">
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-start gap-3">
             <div>
-                <h1 class="mb-1">
+                <h1 class="mb-0">
                     <?= e($extensionName !== '' ? $extensionName : 'Signup Sheets') ?>
                     <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
                 </h1>
@@ -86,7 +86,7 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
             </div>
         </div>
     </div>
-</div>
+</header>
 
 <div class="d-flex justify-content-end mb-3">
     <a href="<?= e($editBasePath) ?>" class="btn btn-primary"><i class="bi bi-clipboard-plus me-2" aria-hidden="true"></i>New Signup Sheet Form</a>
