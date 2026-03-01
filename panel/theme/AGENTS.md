@@ -1,10 +1,17 @@
 # Raven Panel Theme Agent Guide
 
-Last updated: 2026-02-18
+Last updated: 2026-03-01
 
 ## Scope
 - This file documents admin-panel theming under `panel/theme/`.
 - This guide is for maintainers and automation agents working on panel CSS/SCSS behavior.
+
+## Agent Safe Mode (Mandatory)
+- Default path for most tasks: edit `panel/theme/css/custom.css` only.
+- Do not modify panel PHP/controller code for visual-only requests.
+- Do not add remote assets (CDNs, external fonts, telemetry/tracking scripts).
+- Prefer small, isolated CSS changes and verify in both light/default and dark modes.
+- If requested change appears to require core markup edits, stop and flag it as a core change.
 
 ## Critical Rule: Keep Panel Theming Update-Safe
 - Do not modify core PHP/controller/routing code for style-only panel changes.
@@ -31,6 +38,28 @@ Last updated: 2026-02-18
 - For routine customization, create/edit `panel/theme/css/custom.css`.
 - Keep all site-specific panel tweaks in that one file.
 - This avoids editing `style.scss` and survives upstream changes to the base panel theme more cleanly.
+
+## Deterministic Panel Theme Build Recipe
+1. Start with `panel/theme/css/custom.css`.
+2. Add minimal scoped selectors and avoid editing `style.css`.
+3. Verify state variants: default/light/dark body classes.
+4. Verify common UI surfaces: cards, forms, table headers, action buttons, sidebar/mobile nav.
+5. Only if Sass-level bootstrap variable changes are required, use `custom.scss -> custom.css`.
+
+## Canonical Minimal `custom.css`
+```css
+/* RAVEN CMS panel overrides */
+body.raven-panel-theme .card {
+  border-radius: 0.5rem;
+}
+```
+
+## Hard-Fail Validation Checklist (Before Hand-Off)
+- No visual-only task required edits outside `panel/theme/` unless explicitly approved as core work.
+- `custom.css` is loaded after `style.css` and `bootstrap-icons.min.css` (confirm runtime order unchanged).
+- Changes are readable/usable on `theme-default`, `theme-light`, and `theme-dark`.
+- Sortable table headers remain clear (`.raven-routing-sort-label`, `.raven-routing-sort-caret`, `.is-active-sort`).
+- No external network dependency added for panel rendering.
 
 ## Full Sass Rebuild Path (When You Need Bootstrap-Level Changes)
 - If you need deeper Bootstrap-stack changes, create a custom Sass entrypoint and compile it to `custom.css`.

@@ -1,12 +1,175 @@
 # Raven Extension Agent Guide
 
-Last updated: 2026-02-26
+Last updated: 2026-03-01
 
 ## Scope
 - This file defines the extension-authoring contract for `private/ext/`.
 - It is written for both human and AI authors building installable Raven extensions that can coexist in one ecosystem.
 - This document is intended to be standalone in production environments where repository-root `AGENTS.md` may be unavailable.
 - Keep this file thorough and self-sufficient for extension work; do not assume agents can fall back to root-level guidance.
+
+## Agent Safe Mode (Mandatory)
+- If your model is unsure, do not improvise. Follow only the explicit contracts in this file.
+- Do not invent extra files, extra manifest keys, or custom bootstrap flows outside this contract.
+- Do not rename required files (`extension.json`, `bootstrap.php`, `schema.php`, route providers) unless requested by the operator.
+- Build the smallest valid extension first, then add features in small steps.
+- After each step, run validation checks (JSON parse and `php -l`) before continuing.
+- If a requested behavior requires core edits, stop and report that it is a core change (not an extension-local change).
+
+## Deterministic Build Recipe (Use This Order)
+1. Create folder: `private/ext/{slug}/` using a safe slug.
+2. Create `extension.json` first and validate JSON syntax.
+3. Add `bootstrap.php` and `schema.php` as no-op valid callables.
+4. If `type` is `basic` or `system`, add `panel_routes.php`, `public_routes.php`, and `views/panel_index.php`.
+5. If shortcode insertion is needed, add `shortcodes.php`.
+6. Only after files are valid, enable the extension from Extension Manager.
+
+## Canonical Minimal `extension.json` Templates
+- `basic`:
+```json
+{
+  "name": "Example Extension",
+  "version": "0.8.0",
+  "description": "Example basic extension.",
+  "type": "basic",
+  "author": "Your Name",
+  "homepage": ""
+}
+```
+- `system`:
+```json
+{
+  "name": "Example System Tool",
+  "version": "0.8.0",
+  "description": "Example system extension.",
+  "type": "system",
+  "author": "Your Name",
+  "homepage": ""
+}
+```
+- `helper`:
+```json
+{
+  "name": "Example Helper",
+  "version": "0.8.0",
+  "description": "Non-routable helper extension.",
+  "type": "helper",
+  "author": "Your Name",
+  "homepage": ""
+}
+```
+
+## Canonical Minimal PHP Scaffolds
+- `bootstrap.php`:
+```php
+<?php
+/**
+ * RAVEN CMS
+ * ~/private/ext/{slug}/bootstrap.php
+ * Extension service bootstrap provider.
+ * docs: /private/ext/AGENTS.md
+ */
+declare(strict_types=1);
+
+return static function (array &$app): void {
+    // Register extension services into $app['extension_services'] when needed.
+};
+```
+- `schema.php`:
+```php
+<?php
+/**
+ * RAVEN CMS
+ * ~/private/ext/{slug}/schema.php
+ * Extension schema ensure provider.
+ * docs: /private/ext/AGENTS.md
+ */
+declare(strict_types=1);
+
+return static function (array $context): void {
+    // Keep schema work idempotent; use $context['table'](...) for table naming.
+};
+```
+- `panel_routes.php` (basic/system only):
+```php
+<?php
+/**
+ * RAVEN CMS
+ * ~/private/ext/{slug}/panel_routes.php
+ * Extension panel route registrar.
+ * docs: /private/ext/AGENTS.md
+ */
+declare(strict_types=1);
+
+use Raven\Core\Http\Router;
+
+return static function (Router $router, array $context): void {
+    // Register panel routes here.
+};
+```
+- `public_routes.php` (basic/system only):
+```php
+<?php
+/**
+ * RAVEN CMS
+ * ~/private/ext/{slug}/public_routes.php
+ * Extension public route registrar.
+ * docs: /private/ext/AGENTS.md
+ */
+declare(strict_types=1);
+
+use Raven\Core\Http\Router;
+
+return static function (Router $router, array $context): void {
+    // Register public routes here.
+};
+```
+- `shortcodes.php` (optional for all types):
+```php
+<?php
+/**
+ * RAVEN CMS
+ * ~/private/ext/{slug}/shortcodes.php
+ * Page Editor shortcode provider.
+ * docs: /private/ext/AGENTS.md
+ */
+declare(strict_types=1);
+
+return static function (): array {
+    return [];
+};
+```
+- `views/panel_index.php` (basic/system only):
+```php
+<?php
+/**
+ * RAVEN CMS
+ * ~/private/ext/{slug}/views/panel_index.php
+ * Extension panel landing view.
+ * docs: /private/ext/AGENTS.md
+ */
+declare(strict_types=1);
+
+if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
+    http_response_code(404);
+    exit;
+}
+?>
+<div class="card shadow-sm border-0">
+  <div class="card-body">
+    <h1 class="h4 mb-0">Extension</h1>
+  </div>
+</div>
+```
+
+## Hard-Fail Validation Checklist (Before Hand-Off)
+- `extension.json` parses as JSON object and has non-empty `name`.
+- `type` is exactly one of: `basic`, `system`, `helper`.
+- `helper` does not define panel/public routes in behavior.
+- Every PHP file in the extension directory passes `php -l`.
+- No extension change depends on edits in `private/src/*`, `panel/index.php`, or `public/index.php`.
+- Any state-changing route uses CSRF validation.
+- Any input handling uses centralized sanitizer (`$app['input']`).
 
 ## Critical Rule: Do Not Modify Core
 - Do not modify `panel/index.php`, `public/index.php`, `private/src/*`, `private/views/*`, installer code, or updater code to ship an extension.

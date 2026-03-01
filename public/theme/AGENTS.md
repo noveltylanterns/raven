@@ -1,12 +1,89 @@
 # Raven Theme System Agent Guide
 
-Last updated: 2026-02-25
+Last updated: 2026-03-01
 
 ## Scope
 - This file documents how Raven public theming works for all theme folders under `public/theme/`.
 - This guide is for theme builders and automation agents that need to create or modify themes without touching core application code.
 - This document is intended to be standalone in production environments where repository-root `AGENTS.md` may be unavailable.
 - Keep this file thorough and self-sufficient for theme work; do not assume agents can fall back to root-level guidance.
+
+## Agent Safe Mode (Mandatory)
+- If your model is uncertain, do not invent behavior. Use only this contract.
+- Never edit core files for theme work (`public/index.php`, `private/src/*`, `private/views/*`).
+- Never introduce CDN assets, remote fonts, telemetry scripts, or tracking beacons.
+- Build minimal valid theme structure first, then layer optional templates.
+- Validate each file as you create it; do not batch large uncertain changes.
+
+## Deterministic Theme Build Recipe (Use This Order)
+1. Create `public/theme/{slug}/` with a safe slug.
+2. Create valid `theme.json` first.
+3. Add `css/style.css` (even if minimal).
+4. Add `views/wrapper.php` with render guard and `$content` output.
+5. Add only the view overrides you need (`views/pages/index.php`, `views/home.php`, etc.).
+6. Switch `site.default_theme` to test, then verify route/template rendering.
+
+## Canonical Minimal Theme Scaffold
+- Required minimum for a standalone functional theme:
+- `public/theme/{slug}/theme.json`
+- `public/theme/{slug}/css/style.css`
+- `public/theme/{slug}/views/wrapper.php`
+- Minimal `theme.json`:
+```json
+{
+  "name": "Example Theme",
+  "is_child_theme": false,
+  "parent_theme": ""
+}
+```
+- Minimal `views/wrapper.php`:
+```php
+<?php
+/**
+ * RAVEN CMS
+ * ~/public/theme/{slug}/views/wrapper.php
+ * Public theme wrapper template.
+ * docs: /public/theme/AGENTS.md
+ */
+declare(strict_types=1);
+
+if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
+    http_response_code(404);
+    exit;
+}
+?>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><?= \Raven\Core\Support\e((string) ($site['name'] ?? 'Raven CMS')); ?></title>
+  <link rel="stylesheet" href="/theme/<?= \Raven\Core\Support\e((string) ($site['public_theme_css'] ?? $site['public_theme'] ?? 'raven')); ?>/css/style.css">
+</head>
+<body>
+<?= $content ?? ''; ?>
+</body>
+</html>
+```
+- Minimal `css/style.css`:
+```css
+/* RAVEN CMS public theme baseline */
+body { background: #fff; color: #212529; }
+```
+
+## Hard-Fail Validation Checklist (Before Hand-Off)
+- `theme.json` is valid JSON with non-empty `name`.
+- Every theme PHP template has `RAVEN_VIEW_RENDER_CONTEXT` guard.
+- No theme output assumes unescaped user input; escape with `Raven\Core\Support\e()` unless trusted HTML is intentional.
+- Theme works without any external network assets except configured captcha provider scripts on pages that render captcha.
+- Wrapper prints `$content` exactly once.
+- Theme renders 404/denied/disabled states cleanly (either overridden or inherited fallback).
+
+## Common Failure Patterns To Avoid
+- Putting templates in `private/views/` instead of `public/theme/{slug}/views/`.
+- Forgetting wrapper guard, which allows direct template execution.
+- Hardcoding a theme slug in asset paths instead of using `$site['public_theme_css']` resolution.
+- Overriding too many templates unnecessarily instead of inheriting fallback behavior.
 
 ## Critical Rule: Do Not Modify Core
 - Do not modify `public/index.php`, `private/src/*`, `private/views/*`, or installer/updater code to build a theme.
