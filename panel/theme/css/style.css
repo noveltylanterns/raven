@@ -3123,8 +3123,8 @@ textarea.form-control-lg {
 }
 
 .btn {
-  --bs-btn-padding-x: 0.74rem;
-  --bs-btn-padding-y: 0.41rem;
+  --bs-btn-padding-x: 0.6rem;
+  --bs-btn-padding-y: 0.3rem;
   --bs-btn-font-family: Red Hat Display, Red Hat Text, Segoe UI, Inter, Noto Sans, Liberation Sans, Arial, sans-serif;
   --bs-btn-font-size: 0.95rem;
   --bs-btn-font-weight: 500;
@@ -3919,8 +3919,8 @@ textarea.form-control-lg {
 }
 
 .dropdown-toggle-split {
-  padding-right: 0.555rem;
-  padding-left: 0.555rem;
+  padding-right: 0.45rem;
+  padding-left: 0.45rem;
 }
 .dropdown-toggle-split::after, .dropup .dropdown-toggle-split::after, .dropend .dropdown-toggle-split::after {
   margin-left: 0;
@@ -12852,10 +12852,6 @@ body.raven-panel-theme #page-media-pane [data-raven-gallery-row] img {
   object-fit: cover;
 }
 
-body.raven-panel-theme #page-media-pane .btn.btn-sm, body.raven-panel-theme #page-media-pane .btn-group-sm > .btn {
-  padding: 0.32rem 0.56rem;
-}
-
 body.raven-panel-theme.theme-dark nav.navbar {
   background: linear-gradient(90deg, #080808 0%, #101317 100%) !important;
   border-bottom-color: #000000;
@@ -13017,6 +13013,16 @@ body.raven-panel-theme header {
 
 body.raven-panel-theme header h1, body.raven-panel-theme header .h1 {
   margin-bottom: 0;
+}
+
+body.raven-panel-theme .btn-lg, body.raven-panel-theme .btn-group-lg > .btn {
+  padding: 0.4rem 0.8rem;
+  font-size: 1.1rem;
+}
+
+body.raven-panel-theme .btn-sm, body.raven-panel-theme .btn-group-sm > .btn {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.75rem;
 }
 
 /*# sourceMappingURL=style.css.map */

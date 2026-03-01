@@ -66,8 +66,8 @@ $h4-font-size: 1.375rem;
 $h5-font-size: 1.2rem;
 $btn-font-size: 0.95rem;
 $btn-font-weight: 500;
-$btn-padding-y: 0.41rem;
-$btn-padding-x: 0.74rem;
+$btn-padding-y: 0.3rem;
+$btn-padding-x: 0.6rem;
 $enable-smooth-scroll: false;
 
 // Pull Bootstrap source directly from Composer.
@@ -740,10 +740,6 @@ body.raven-panel-theme #page-media-pane [data-raven-gallery-row] img {
   object-fit: cover;
 }
 
-body.raven-panel-theme #page-media-pane .btn.btn-sm {
-  padding: 0.32rem 0.56rem;
-}
-
 body.raven-panel-theme.theme-dark nav.navbar {
   background: linear-gradient(90deg, #080808 0%, #101317 100%) !important;
   border-bottom-color: #000000;
@@ -914,3 +910,13 @@ body.raven-panel-theme header {
 body.raven-panel-theme header h1 {
   margin-bottom: 0;
 }
+
+body.raven-panel-theme .btn-lg {
+  padding: 0.4rem 0.8rem;
+  font-size: 1.1rem;
+}
+body.raven-panel-theme .btn-sm {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.75rem;
+}
+
