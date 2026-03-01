@@ -231,7 +231,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                             <td><span class="badge <?= e($statusBadgeClass) ?>"><?= e($statusLabel) ?></span></td>
                             <td class="text-center">
                                 <div class="d-flex justify-content-center gap-2">
-                                    <a class="btn btn-secondary btn-sm" href="<?= e($panelBase) ?>/pages/edit/<?= $rowId ?>" title="Edit" aria-label="Edit">
+                                    <a class="btn btn-primary btn-sm" href="<?= e($panelBase) ?>/pages/edit/<?= $rowId ?>" title="Edit" aria-label="Edit">
                                         <i class="bi bi-pencil" aria-hidden="true"></i>
                                         <span class="visually-hidden">Edit</span>
                                     </a>

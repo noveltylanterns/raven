@@ -157,7 +157,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                             <td class="text-center">
                                 <div class="d-flex justify-content-center gap-2">
                                     <a
-                                        class="btn btn-secondary btn-sm"
+                                        class="btn btn-primary btn-sm"
                                         href="<?= e($panelBase) ?>/categories/edit/<?= $categoryId ?>"
                                         title="Edit"
                                         aria-label="Edit"

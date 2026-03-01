@@ -140,7 +140,7 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
                                     <a href="<?= e($contactSubmissionsBasePath) ?>/<?= rawurlencode($slug) ?>" class="btn btn-success btn-sm">View Submissions</a>
                                     <a
                                         href="<?= e($editBasePath) ?>/<?= rawurlencode($slug) ?>"
-                                        class="btn btn-secondary btn-sm"
+                                        class="btn btn-primary btn-sm"
                                         title="Edit"
                                         aria-label="Edit"
                                     >

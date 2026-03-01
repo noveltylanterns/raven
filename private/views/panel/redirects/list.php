@@ -207,7 +207,7 @@ asort($redirectsChannelOptions, SORT_NATURAL | SORT_FLAG_CASE);
                             <td class="text-center">
                                 <div class="d-flex justify-content-center gap-2">
                                     <a
-                                        class="btn btn-secondary btn-sm"
+                                        class="btn btn-primary btn-sm"
                                         href="<?= e($panelBase) ?>/redirects/edit/<?= $redirectId ?>"
                                         title="Edit"
                                         aria-label="Edit"

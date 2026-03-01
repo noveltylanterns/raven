@@ -121,7 +121,7 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
 
 <?php if ($routeRows !== []): ?>
     <div class="d-flex justify-content-end gap-2 mb-3">
-        <a class="btn btn-secondary" href="<?= e($panelBase) ?>/routing/export">
+        <a class="btn btn-primary" href="<?= e($panelBase) ?>/routing/export">
             <i class="bi bi-download me-2" aria-hidden="true"></i>Export CSV
         </a>
     </div>
@@ -244,7 +244,7 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
 </div>
 <?php if ($routeRows !== []): ?>
     <div class="d-flex justify-content-end gap-2 mt-3">
-        <a class="btn btn-secondary" href="<?= e($panelBase) ?>/routing/export">
+        <a class="btn btn-primary" href="<?= e($panelBase) ?>/routing/export">
             <i class="bi bi-download me-2" aria-hidden="true"></i>Export CSV
         </a>
     </div>
