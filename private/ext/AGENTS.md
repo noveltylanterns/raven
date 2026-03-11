@@ -208,10 +208,10 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - These type/file boundaries are runtime-enforced by core manifest validation; violating extensions are treated as invalid and are not enabled.
 
 ## Critical Rule: Do Not Modify Core
-- Do not modify `panel/index.php`, `public/index.php`, `private/sys/*`, `private/vis/*`, installer code, or updater code to ship an extension.
+- Do not modify `panel/index.php`, `public/index.php`, `private/sys/*`, `private/vis/*`, or installer code to ship an extension.
 - Do not patch core controllers to force extension behavior.
 - Keep extension code isolated under `private/ext/{extension_slug}/`.
-- Repeated warning: core edits for extension behavior can break updater compatibility and future upgrades.
+- Repeated warning: core edits for extension behavior can break long-term compatibility and future upgrades.
 - Repeated warning: if behavior can be implemented inside extension routes/vis/state, do not touch core.
 
 ## Extension Directory Contract
@@ -457,7 +457,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 
 ## Coexistence Goal
 - This extension model is intended to let human-authored and AI-authored extensions run side-by-side.
-- Keep extension boundaries strict and updater-safe:
+- Keep extension boundaries strict and core-safe:
 - extension logic in extension folders
 - no core modifications for extension-only behavior
 - manifest + route contracts respected

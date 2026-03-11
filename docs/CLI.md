@@ -20,7 +20,6 @@ Shipped CLI entrypoints:
 - `private/bin/rvn-theme`
 - `private/bin/rvn-ext`
 - `private/bin/rvn-sys`
-- `private/bin/rvn-update`
 - `private/bin/rvn.sh` (shell completion helper)
 
 ## 2) Global Flags
@@ -58,7 +57,6 @@ Dispatcher commands:
 - `theme`
 - `ext`
 - `system`
-- `update`
 
 ## 4) Focused Commands
 
@@ -184,22 +182,6 @@ System/environment/version inspection:
 - `env`
 - `extensions`
 
-### `rvn-update`
-
-Git-driven updater utility:
-
-- `check [--source <git_url_or_path>] [--branch <branch>]`
-- `run [--source <git_url_or_path>] [--branch <branch>] [--rollback-ref <name>] [--yes] [--clean]`
-- `rollback --rollback-ref <name> [--yes]`
-
-Updater behavior:
-
-- `run` creates a rollback branch/ref before reset.
-- `run` fetches upstream and advances local tracked files to `FETCH_HEAD`.
-- when `private/tmp/install.lock` exists and `public/install.php` is already absent, `run` preserves that local deletion instead of restoring the installer entrypoint
-- `run` optionally runs `git clean -fd` when `--clean` is set.
-- `run` also performs missing-config-key sync from `config.php.dist`.
-
 ## 5) Shell Completion Helper
 
 `private/bin/rvn.sh` provides basic command/flag completion for bash/zsh-style `complete` usage.
@@ -241,4 +223,3 @@ Use your local validation workflow to verify CLI basics:
 - destructive-guard behavior (stock group/extension/theme delete blocked, active-theme delete blocked)
 - unsafe-input behavior (path-traversal slugs rejected, unsafe ZIP entry paths rejected on import)
 - dedicated web-security smoke runner for CSRF/auth/XSS-escape/SQLi-baseline checks
-- updater check behavior

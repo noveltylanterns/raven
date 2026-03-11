@@ -94,11 +94,11 @@ body { background: #fff; color: #212529; }
 - Overriding too many templates unnecessarily instead of inheriting fallback behavior.
 
 ## Critical Rule: Do Not Modify Core
-- Do not modify `public/index.php`, `private/sys/*`, `private/vis/*`, or installer/updater code to build a theme.
+- Do not modify `public/index.php`, `private/sys/*`, `private/vis/*`, or installer code to build a theme.
 - Do not patch core routing or controllers for theme-only visual/layout changes.
 - Do not place custom theme templates in `private/vis/`; keep them inside your theme folder.
 - Theme customizations must live in `public/theme/{your_theme_slug}/` so updates can replace core safely without destroying custom work.
-- Repeated warning: changing core for theming will create updater conflicts and can break future updates.
+- Repeated warning: changing core for theming will create maintenance conflicts and can break future upgrades.
 - Repeated warning: if a requirement can be solved in a theme override, do not edit core.
 
 ## Theme Folder Contract
@@ -384,7 +384,7 @@ body { background: #fff; color: #212529; }
 - Keep all custom assets in your theme folder.
 - Select the theme in Theme Manager or with `private/bin/rvn-theme enable --slug <theme_slug>`.
 - Never change core files for theme presentation.
-- Repeated warning: core edits for theming can break updater merges and jeopardize data safety during upgrades.
+- Repeated warning: core edits for theming can break future merges and jeopardize data safety during upgrades.
 
 ## Parent Theme Strategy For Long-Term Maintainability
 - Prefer child themes for custom projects that start from stock themes.

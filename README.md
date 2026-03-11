@@ -31,9 +31,18 @@ It sounds dystopian, but the AI is much like a German Shephard dog. It was bred 
 7) PROFIT!!!
 
 
+## Updating Raven
+
+That's the neat thing: You don't!
+
+No but seriously, the Agent DOES NOT want this having an update mechanism. It takes every possible opportunity to mangle both the update script & the git publishing pipeline. I have to do everything on 'main' because the minute there's a second branch, it goes haywire and mangles the repo to make it permanently diverge from Github, and then it runs in circles pretending to fix it while breaking other things.
+
+So yeah, OpenAI said we aren't allowed to have an update mechanism. You have to download the repo and image it over yourself.
+
+
 ## Building on Raven
 
-This is designed to be updated with Git. The browser-based updater in the panel isn't fully tested yet, but it just pulls the repo. Everything sensitive to your local install is covered in your [.gitignore](.gitignore) file.
+This is designed to be managed with Git. Everything sensitive to your local install is covered in your [.gitignore](.gitignore) file.
 
 There are several places in your local install that are ignored by the update process: Your **Theme** and **Extension** folders. They are designed to safely accomodate your modifications and preserve them through system updates. If you need further architectural info, I had Codex [document](docs/README.md) its work.
 
@@ -58,7 +67,7 @@ The admin panel is a bit more rigid, since its focus is to be a robust out-of-bo
 
 ### Extensions
 
-If you need to add content types, helper functions, or even whole new parts of the panel, use the Extensions system. This will help your complex modifications remain compatible with future upgrades.
+If you need to add content types, helper functions, or even whole new parts of the panel, use the Extensions system. This will help your complex modifications remain compatible with future core changes.
 
 There are several extension types:
 
@@ -81,7 +90,7 @@ The option is available in your [System Configuration](docs/Configuration.md). I
 - I have not been able to personally verify the contents of every file.
 - Raven has not gone through a proper full security audit yet.
 - There are still some pretty nonsensical things I've caught the clanker doing, so some of the code might be horribly inefficient. *(But it is at least readable! So we can hammer that one out in time.)*
-- Do not trust the updater. All it does it grab a fresh copy of the Git repo. **Otherwise, I am not generating upgrade/migration scripts yet.** You may suddenly find yourself permanently disconnected from the main branch. ***Prepare to rebuild a few times until this is out of the prototype stage!***
+- I am not generating upgrade or migration scripts yet. ***Prepare to rebuild a few times until this is out of the prototype stage.***
 
 
 ## But Why?

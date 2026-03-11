@@ -53,4 +53,3 @@ complete -F _rvn_complete rvn-conf
 complete -F _rvn_complete rvn-theme
 complete -F _rvn_complete rvn-ext
 complete -F _rvn_complete rvn-sys
-complete -F _rvn_complete rvn-update

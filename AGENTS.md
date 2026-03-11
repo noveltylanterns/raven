@@ -80,7 +80,6 @@ Last updated: 2026-03-05
 - `private/bin/rvn-theme`
 - `private/bin/rvn-ext`
 - `private/bin/rvn-sys`
-- `private/bin/rvn-update`
 - `private/bin/rvn.sh` (shell completion helper)
 - `private/bin/lib/raven_cli.php` - Shared CLI command framework and command implementations for 'rvn*' tools.
 - CLI command requirements when commands are added:
@@ -128,7 +127,7 @@ Shared CLI tooling. (See CLI Appendix above)
 Environment-local runtime configuration (generated during install from config.php.dist)
 
 #### /private/config.php.dist
-Factory config.php defaults, for installation runtime. kept for updater failsafe checks & future reference.
+Factory config.php defaults, for installation runtime and future reference.
 
 #### /private/dat/
 Where private site content (sqlite databases, other data stores that don't need to be accessible by the web process) is stashed. Much of it is sorted by type.
@@ -136,7 +135,7 @@ Where private site content (sqlite databases, other data stores that don't need 
 #### /private/ext/
 Where extensions are stored. Not all extensions will have all these files, but they will follow this rough format:
 - `/private/ext/.state.php` - Environment-local extension enablement and permission state map. (generated during install from .state.php.dist)
-- `/private/ext/.state.php.dist` - Factory .state.php defaults, for installation runtime. kept for updater failsafe checks & future reference.
+- `/private/ext/.state.php.dist` - Factory .state.php defaults, for installation runtime and future reference.
 - `/private/ext/AGENTS.md` - Agent guidance for custom extension creation.
 - `/private/ext/*/` - Each extension gets its own self-contained folder right here. (http-accessible assets go in parallel `/public/uploads/ext/{slug}/` or `/panel/ext/{slug}/` folders, but only when absolutely necessary.)
 - `/private/ext/*/ext.json` - Extension manifest metadata & internal API bind location.
@@ -232,7 +231,6 @@ Core fallback templates:
 - `/private/vis/panel/routing.php` - Panel routing inventory/list template.
 - `/private/vis/panel/tags/edit.php` - Panel tag create/edit template.
 - `/private/vis/panel/tags/list.php` - Panel tag list template.
-- `/private/vis/panel/updates.php` - Panel updater UI template.
 - `/private/vis/panel/users/edit.php` - Panel user create/edit template.
 - `/private/vis/panel/users/list.php` - Panel user list template.
 - `/private/vis/panel/wrapper.php` - Panel layout wrapper template used by panel pages.
