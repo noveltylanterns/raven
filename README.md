@@ -39,6 +39,7 @@ No but seriously, the Agent DOES NOT want this having an update mechanism. It ta
 
 So yeah, OpenAI said we aren't allowed to have an update mechanism. You have to download the repo and image it over yourself.
 
+*(Once the core architecture is nailed down, I'm just gonna manually build an updater later.)*
 
 ## Building on Raven
 
