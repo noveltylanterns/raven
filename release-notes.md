@@ -7,5 +7,6 @@
 - CLI updater runs still preserve an already-removed `public/install.php` on installed instances.
 - Fixed panel-side public 404 fallback rendering so denied/misrouted panel requests no longer dump raw `{site:*}` brace tags from the public wrapper.
 - Added server-log breadcrumbs for panel login exceptions that were previously collapsed into a generic "Invalid credentials" response.
+- Fixed panel updater config-sync so it no longer copies installer placeholder values like `SQLITE_BASE_PATH` or `SITE_DOMAIN` from `private/config.php.dist` into live installs during updates.
 - Hardened `public/install.php` to use the same Composer autoload guard as runtime bootstrap, preventing first-run installer fatals caused by `tualo/easymde` autoload side effects.
 - Fixed extension schema bootstrapping so enabled extensions load `lib/schema.php` correctly, allowing fresh installs to create the required `contact` and `signups` tables when those extensions are enabled later.

@@ -8088,6 +8088,10 @@ final class PanelController
             }
 
             $path = $prefix === '' ? $key : ($prefix . '.' . $key);
+            if ($this->updaterShouldSkipConfigDefault($path, $defaultValue)) {
+                continue;
+            }
+
             if (!array_key_exists($key, $target)) {
                 $missingPaths[] = $path;
                 if (!$previewOnly) {
@@ -8119,6 +8123,36 @@ final class PanelController
         }
 
         return $changed;
+    }
+
+    /**
+     * Skips installer-placeholder defaults when syncing config during updates.
+     *
+     * Older installs may legitimately miss newer config keys. Importing install
+     * placeholders like `SQLITE_BASE_PATH` into runtime config would repoint the
+     * app at an empty database on the next request.
+     */
+    private function updaterShouldSkipConfigDefault(string $path, mixed $defaultValue): bool
+    {
+        if (!is_string($defaultValue)) {
+            return false;
+        }
+
+        $installerPlaceholderDefaults = [
+            'site.domain' => 'SITE_DOMAIN',
+            'database.sqlite.base_path' => 'SQLITE_BASE_PATH',
+            'database.mysql.host' => 'MYSQL_HOST',
+            'database.mysql.dbname' => 'MYSQL_DATABASE',
+            'database.mysql.user' => 'MYSQL_USER',
+            'database.mysql.password' => 'MYSQL_PASSWORD',
+            'database.pgsql.host' => 'PGSQL_HOST',
+            'database.pgsql.dbname' => 'PGSQL_DATABASE',
+            'database.pgsql.user' => 'PGSQL_USER',
+            'database.pgsql.password' => 'PGSQL_PASSWORD',
+        ];
+
+        return isset($installerPlaceholderDefaults[$path])
+            && $defaultValue === $installerPlaceholderDefaults[$path];
     }
 
     /**
