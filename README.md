@@ -35,7 +35,7 @@ It sounds dystopian, but the AI is much like a German Shephard dog. It was bred 
 
 That's the neat thing: You don't!
 
-No but seriously, the Agent DOES NOT want this having an update mechanism. It takes every possible opportunity to mangle both the update script & the git publishing pipeline. I have to do everything on 'main' because the minute there's a second branch, it goes haywire and mangles the repo to make it permanently diverge from Github, and then it runs in circles pretending to fix it while breaking other things.
+No but seriously, the Agent DOES NOT want this having an update mechanism. It takes every possible opportunity to mangle both the update script & the git publishing pipeline. I have to do everything on 'main' because the minute there's a second branch, it goes haywire and mangles the repo to make it permanently diverge from Github to the point where we can't push or reconcile it, and then it runs in circles pretending to fix it while breaking other things.
 
 So yeah, OpenAI said we aren't allowed to have an update mechanism. You have to download the repo and image it over yourself.
 
