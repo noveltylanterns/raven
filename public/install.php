@@ -59,7 +59,7 @@ $configTemplatePath = $root . '/private/config.php.dist';
 $extensionStatePath = $root . '/private/ext/.state.php';
 $extensionStateTemplatePath = $root . '/private/ext/.state.php.dist';
 $lockPath = $root . '/private/tmp/install.lock';
-$sqliteDefaultBasePath = rtrim($root, '/') . '/private/db';
+$sqliteDefaultBasePath = rtrim($root, '/') . '/private/dat/db';
 
 $detectedDomain = strtolower(trim((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '')));
 if ($detectedDomain !== '') {
@@ -499,7 +499,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
             <div class="grid" data-driver-section="sqlite">
                 <div class="field full">
                     <label>SQLite Storage</label>
-                    <div class="note">SQLite files are stored automatically in <code>private/db/</code>.</div>
+                    <div class="note">SQLite files are stored automatically in <code>private/dat/db/</code>.</div>
                 </div>
             </div>
 

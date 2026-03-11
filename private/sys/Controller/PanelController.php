@@ -7895,7 +7895,8 @@ final class PanelController
     {
         $preserved = array_merge(
             $this->updaterUntrackedTopLevelDirectories('private/ext'),
-            $this->updaterUntrackedTopLevelDirectories('public/theme')
+            $this->updaterUntrackedTopLevelDirectories('public/theme'),
+            $this->updaterConfiguredRuntimeDirectories()
         );
         $preserved = array_values(array_unique($preserved));
         sort($preserved);
@@ -7946,6 +7947,49 @@ final class PanelController
             $directories[] = $relativePath . '/';
         }
 
+        return $directories;
+    }
+
+    /**
+     * Returns configured runtime directories that updater must preserve.
+     *
+     * @return array<int, string>
+     */
+    private function updaterConfiguredRuntimeDirectories(): array
+    {
+        $directories = [];
+        $databaseDriver = strtolower(trim((string) $this->config->get('database.driver', 'sqlite')));
+        if ($databaseDriver !== 'sqlite') {
+            return $directories;
+        }
+
+        $root = dirname(__DIR__, 3);
+        $basePath = trim((string) $this->config->get('database.sqlite.base_path', ''));
+        if ($basePath === '') {
+            return $directories;
+        }
+
+        $normalizedRoot = rtrim(str_replace('\\', '/', $root), '/');
+        $normalizedBasePath = str_replace('\\', '/', $basePath);
+        if (!str_starts_with($normalizedBasePath, '/')) {
+            $normalizedBasePath = $normalizedRoot . '/' . ltrim($normalizedBasePath, '/');
+        }
+        $normalizedBasePath = rtrim($normalizedBasePath, '/');
+
+        if ($normalizedBasePath === '' || !is_dir($normalizedBasePath)) {
+            return $directories;
+        }
+
+        if (!str_starts_with($normalizedBasePath, $normalizedRoot . '/')) {
+            return $directories;
+        }
+
+        $relativePath = ltrim(substr($normalizedBasePath, strlen($normalizedRoot)), '/');
+        if ($relativePath === '' || $this->updaterPathContainsTrackedFiles($relativePath)) {
+            return $directories;
+        }
+
+        $directories[] = $relativePath . '/';
         return $directories;
     }
 
