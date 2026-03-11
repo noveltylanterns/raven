@@ -7707,8 +7707,7 @@ final class PanelController
      * This performs:
      * 1) `git fetch <source> <branch>`
      * 2) advances local Git state to `FETCH_HEAD`
-     * 3) preserves a locally removed installer entrypoint on installed instances
-     * 4) `git clean -fd` with update-safe exclusions for custom extension/theme directories
+     * 3) `git clean -fd` with update-safe exclusions for custom extension/theme directories
      */
     private function performUpdaterReinstall(string $gitUrl, string $branch): ?string
     {
@@ -7732,25 +7731,7 @@ final class PanelController
             return 'Failed to fetch upstream branch. ' . $output;
         }
 
-        $preserveMissingInstaller = $this->updaterShouldPreserveMissingInstaller();
-        if ($preserveMissingInstaller) {
-            if (!$this->runGitCommand(['reset', '--soft', 'FETCH_HEAD'], $output)) {
-                return 'Failed to advance local revision to fetched upstream revision. ' . $output;
-            }
-
-            $restoreArguments = [
-                'restore',
-                '--source',
-                'FETCH_HEAD',
-                '--worktree',
-                '--',
-                '.',
-                ':(exclude)public/install.php',
-            ];
-            if (!$this->runGitCommand($restoreArguments, $output)) {
-                return 'Failed to restore tracked files from fetched upstream revision. ' . $output;
-            }
-        } elseif (!$this->runGitCommand(['reset', '--hard', 'FETCH_HEAD'], $output)) {
+        if (!$this->runGitCommand(['reset', '--hard', 'FETCH_HEAD'], $output)) {
             return 'Failed to reset working tree to fetched upstream revision. ' . $output;
         }
 
@@ -7762,13 +7743,6 @@ final class PanelController
         $configSyncError = $this->updaterApplyMissingConfigDefaults();
         if ($configSyncError !== null) {
             return $configSyncError;
-        }
-
-        if (!$preserveMissingInstaller) {
-            $installerRemovalError = $this->updaterRemoveInstallerEntrypointIfInstalled();
-            if ($installerRemovalError !== null) {
-                return $installerRemovalError;
-            }
         }
 
         return null;
@@ -7894,46 +7868,6 @@ final class PanelController
             'summary' => implode(' ', $summaryParts),
             'summary_items' => $summaryItems,
         ];
-    }
-
-    /**
-     * Removes installer entrypoint after updater runs on installed instances.
-     */
-    private function updaterRemoveInstallerEntrypointIfInstalled(): ?string
-    {
-        $installLockPath = dirname(__DIR__, 2) . '/tmp/install.lock';
-        if (!is_file($installLockPath)) {
-            return null;
-        }
-
-        $installerPath = dirname(__DIR__, 3) . '/public/install.php';
-        if (!file_exists($installerPath)) {
-            return null;
-        }
-
-        if (!is_file($installerPath)) {
-            return 'Updater post-run check failed: public/install.php exists but is not a regular file.';
-        }
-
-        if (!@unlink($installerPath)) {
-            return 'Updater post-run check failed: unable to remove public/install.php for this installed instance.';
-        }
-
-        return null;
-    }
-
-    /**
-     * Returns true when updater should preserve an already-removed installer entrypoint.
-     */
-    private function updaterShouldPreserveMissingInstaller(): bool
-    {
-        $installLockPath = dirname(__DIR__, 2) . '/tmp/install.lock';
-        if (!is_file($installLockPath)) {
-            return false;
-        }
-
-        $installerPath = dirname(__DIR__, 3) . '/public/install.php';
-        return !file_exists($installerPath);
     }
 
     /**
