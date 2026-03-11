@@ -1,0 +1,209 @@
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/config.php.dist
+ * Distribution template for runtime configuration values.
+ * Docs: https://raven.lanterns.io
+ */
+
+// Inline note: Copy this file to `private/config.php` and replace placeholder values.
+
+declare(strict_types=1);
+
+/**
+ * Raven runtime configuration template (commit this file, not config.php).
+ */
+return array (
+  'site' =>
+  array (
+    'domain' => 'SITE_DOMAIN',
+    'name' => 'Raven CMS',
+    'enabled' => 'public',
+    'default_theme' => 'raven',
+  ),
+  'meta' =>
+  array (
+    'apple_touch_icon' => '',
+    'robots' => 'index,follow',
+    'twitter' =>
+    array (
+      'card' => '',
+      'site' => '',
+      'creator' => '',
+      'image' => '',
+    ),
+    'opengraph' =>
+    array (
+      'image' => '',
+      'type' => 'website',
+      'locale' => 'en_US',
+    ),
+  ),
+  'panel' =>
+  array (
+    'path' => 'panel',
+    'default_theme' => 'light',
+    'brand_name' => '',
+    'brand_logo' => '',
+  ),
+  'database' =>
+  array (
+    'driver' => 'sqlite',
+    'sqlite' =>
+    array (
+      'base_path' => 'SQLITE_BASE_PATH',
+    ),
+    'mysql' =>
+    array (
+      'host' => 'MYSQL_HOST',
+      'port' => 3306,
+      'dbname' => 'MYSQL_DATABASE',
+      'user' => 'MYSQL_USER',
+      'password' => 'MYSQL_PASSWORD',
+      'charset' => 'utf8mb4',
+    ),
+    'pgsql' =>
+    array (
+      'host' => 'PGSQL_HOST',
+      'port' => 5432,
+      'dbname' => 'PGSQL_DATABASE',
+      'user' => 'PGSQL_USER',
+      'password' => 'PGSQL_PASSWORD',
+    ),
+    'table_prefix' => 'rvn_',
+  ),
+  'debug' =>
+  array (
+    'show_public' => false,
+    'show_private' => false,
+    'show_benchmarks' => true,
+    'show_queries' => true,
+    'show_trace' => true,
+    'show_request' => true,
+    'show_environment' => true,
+  ),
+  'category' =>
+  array (
+    'enabled' => true,
+    'prefix' => 'cat',
+    'pagination' => 10,
+  ),
+  'tag' =>
+  array (
+    'enabled' => true,
+    'prefix' => 'tag',
+    'pagination' => 10,
+  ),
+  'content' =>
+  array (
+    'default_editor' => 'tinymce',
+    'separator' => '-',
+  ),
+  'captcha' =>
+  array (
+    'provider' => 'none',
+    'hcaptcha' =>
+    array (
+      'public_key' => '',
+      'secret_key' => '',
+    ),
+    'recaptcha2' =>
+    array (
+      'public_key' => '',
+      'secret_key' => '',
+    ),
+    'recaptcha3' =>
+    array (
+      'public_key' => '',
+      'secret_key' => '',
+    ),
+  ),
+  'mail' =>
+  array (
+    'agent' => 'php_mail',
+    'sender_address' => '',
+    'sender_name' => 'Postmaster',
+  ),
+  'media' =>
+  array (
+    'images' =>
+    array (
+      'upload_target' => 'local',
+      'max_filesize_kb' => 10240,
+      'max_files_per_upload' => 10,
+      'allowed_extensions' => 'gif,jpg,jpeg,png',
+      'strip_exif' => true,
+      'small' =>
+      array (
+        'width' => 200,
+        'height' => 200,
+      ),
+      'med' =>
+      array (
+        'width' => 600,
+        'height' => 600,
+      ),
+      'large' =>
+      array (
+        'width' => 1000,
+        'height' => 1000,
+      ),
+    ),
+    'avatars' =>
+    array (
+      'max_filesize_kb' => 1024,
+      'max_width' => 500,
+      'max_height' => 500,
+      'allowed_extensions' => 'gif,jpg,jpeg,png',
+    ),
+  ),
+  'session' =>
+  array (
+    'cookie' =>
+    array (
+      'name' => 'session',
+      'domain' => '',
+      'prefix' => 'rvn_',
+    ),
+    'brute' =>
+    array (
+      'max' => 5,
+      'window' => 600,
+      'lock' => 900,
+    ),
+  ),
+  'user' =>
+  array (
+    'privacy' => 'disabled',
+    'prefix' => 'user',
+    'contact' =>
+    array (
+      'email' =>
+      array (
+        'label' => 'Email',
+        'url_prefix' => 'mailto:',
+      ),
+      'phone' =>
+      array (
+        'label' => 'Phone',
+        'url_prefix' => 'tel:',
+      ),
+      'website' =>
+      array (
+        'label' => 'Website',
+        'url_prefix' => 'https://',
+      ),
+      'x' =>
+      array (
+        'label' => 'X',
+        'url_prefix' => 'https://x.com/',
+      ),
+    ),
+  ),
+  'group' =>
+  array (
+    'privacy' => 'disabled',
+    'prefix' => 'group',
+  ),
+);

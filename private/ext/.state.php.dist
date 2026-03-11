@@ -1,0 +1,21 @@
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/ext/.state.php.dist
+ * Distribution template for extension enablement state.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+// Inline note: Installer copies this file to `private/ext/.state.php` during first-run setup.
+
+return array (
+  'enabled' => 
+  array (
+  ),
+  'permissions' => 
+  array (
+  ),
+);

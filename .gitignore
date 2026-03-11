@@ -1,0 +1,33 @@
+# Local runtime configuration
+/private/config.php
+!/private/config.php.dist
+/private/dat/*
+!/private/dat/
+!/private/dat/channel/
+!/private/dat/channel/.channel.php.dist
+/private/ext/.state.php
+!/private/ext/.state.php.dist
+/private/ext/debug-*/
+
+# Uploaded media files (keep directory, ignore contents)
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# Composer artifacts
+/composer/
+/vendor/
+/composer.lock
+/composer.phar
+
+# Local temporary files
+/tmp/
+/private/tmp/
+/private/tmp/install.lock
+
+# Local dev tools
+/debug/
+
+# Editor swap/backup artifacts
+*.swp
+*.swo
+*~

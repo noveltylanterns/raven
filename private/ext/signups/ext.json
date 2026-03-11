@@ -1,0 +1,11 @@
+{
+    "name": "Signup Sheets",
+    "version": "0.9",
+    "description": "Deploy custom signup sheets for waitlists and various other marketing campaigns.",
+    "type": "plugin",
+    "author": "Novelty Lanterns",
+    "author_url": "https://raven.lanterns.io",
+    "docs_url": "https://raven.lanterns.io",
+    "panel_path": "signups",
+    "panel_section": "signups"
+}

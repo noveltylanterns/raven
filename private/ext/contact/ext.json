@@ -1,0 +1,11 @@
+{
+    "name": "Contact Forms",
+    "version": "0.9",
+    "description": "Quickly build contact forms to embed in your pages.",
+    "type": "plugin",
+    "author": "Novelty Lanterns",
+    "author_url": "https://raven.lanterns.io",
+    "docs_url": "https://raven.lanterns.io",
+    "panel_path": "contact",
+    "panel_section": "contact"
+}

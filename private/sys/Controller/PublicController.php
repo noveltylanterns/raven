@@ -1,0 +1,3251 @@
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/sys/Controller/PublicController.php
+ * Controller for handling Raven HTTP request flow.
+ * Docs: https://raven.lanterns.io
+ */
+
+// Inline note: Enforce access and input validation before delegating to lower layers.
+
+declare(strict_types=1);
+
+namespace Raven\Controller;
+
+use Raven\Core\Auth\AuthService;
+use Raven\Core\Config;
+use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
+use Raven\Core\Extension\ExtensionRegistry;
+use Raven\Core\Security\Csrf;
+use Raven\Core\Security\InputSanitizer;
+use Raven\Core\Theme\PublicThemeRegistry;
+use Raven\Core\View;
+use Raven\Core\View\TemplateTagEngine;
+use Raven\Repository\GroupRepository;
+use Raven\Repository\PageImageRepository;
+use Raven\Repository\PageRepository;
+use Raven\Repository\RedirectRepository;
+use Raven\Repository\TaxonomyRepository;
+use Raven\Repository\UserRepository;
+
+/**
+ * Handles public website routes.
+ */
+final class PublicController
+{
+    private View $view;
+    private Config $config;
+    private AuthService $auth;
+    private GroupRepository $groups;
+    private PageImageRepository $pageImages;
+    private PageRepository $pages;
+    private RedirectRepository $redirects;
+    private TaxonomyRepository $taxonomy;
+    private UserRepository $users;
+    private InputSanitizer $input;
+    private Csrf $csrf;
+    /** @var array<string, EmbeddedFormRuntimeInterface> */
+    private array $embeddedFormRuntimes = [];
+    private TemplateTagEngine $templateTags;
+    private bool $captchaScriptIncluded = false;
+    /** @var array<string, bool>|null */
+    private ?array $enabledExtensionMap = null;
+    /** @var array<string, array{label: string, editor: string}>|null */
+    private ?array $pageBodyBlockTypeDefinitionsCache = null;
+    /**
+     * Request-local cache of enabled embedded forms keyed by type then slug.
+     *
+     * @var array<string, array<string, array<string, mixed>>>
+     */
+    private array $embeddedFormLookupCache = [];
+
+    public function __construct(
+        View $view,
+        Config $config,
+        AuthService $auth,
+        GroupRepository $groups,
+        PageImageRepository $pageImages,
+        PageRepository $pages,
+        RedirectRepository $redirects,
+        TaxonomyRepository $taxonomy,
+        UserRepository $users,
+        InputSanitizer $input,
+        Csrf $csrf,
+        array $extensionServices = []
+    )
+    {
+        $this->view = $view;
+        $this->config = $config;
+        $this->auth = $auth;
+        $this->groups = $groups;
+        $this->pageImages = $pageImages;
+        $this->pages = $pages;
+        $this->redirects = $redirects;
+        $this->taxonomy = $taxonomy;
+        $this->users = $users;
+        $this->input = $input;
+        $this->csrf = $csrf;
+        $this->embeddedFormRuntimes = $this->discoverEmbeddedFormRuntimes($extensionServices);
+        $this->templateTags = new TemplateTagEngine(dirname(__DIR__, 3) . '/private/tmp/template_tag_cache');
+    }
+
+    /**
+     * Discovers extension-provided embedded-form runtimes.
+     *
+     * @param array<string, mixed> $extensionServices
+     * @return array<string, EmbeddedFormRuntimeInterface>
+     */
+    private function discoverEmbeddedFormRuntimes(array $extensionServices): array
+    {
+        $runtimes = [];
+
+        foreach ($extensionServices as $serviceBucket) {
+            if (!is_array($serviceBucket)) {
+                continue;
+            }
+
+            /** @var mixed $rawCandidates */
+            $rawCandidates = $serviceBucket['embedded_form_runtimes'] ?? [];
+            if (is_object($rawCandidates)) {
+                $rawCandidates = [$rawCandidates];
+            }
+            if (!is_array($rawCandidates)) {
+                continue;
+            }
+
+            foreach ($rawCandidates as $candidate) {
+                if (!$candidate instanceof EmbeddedFormRuntimeInterface) {
+                    continue;
+                }
+
+                $type = strtolower(trim($candidate->type()));
+                if ($type === '' || $this->input->slug($type) === null) {
+                    continue;
+                }
+
+                // First writer wins so one type cannot be overridden unexpectedly.
+                if (!isset($runtimes[$type])) {
+                    $runtimes[$type] = $candidate;
+                }
+            }
+        }
+
+        ksort($runtimes);
+        return $runtimes;
+    }
+
+    /**
+     * Renders homepage using `home` slug or `index` fallback, outside channels.
+     */
+    public function home(): void
+    {
+        $page = $this->pages->findHomepage();
+
+        if ($page === null) {
+            $this->notFound();
+            return;
+        }
+
+        $galleryEnabled = (int) ($page['gallery_enabled'] ?? 0) === 1 || $this->pageBodyIncludesGalleryBlock($page);
+        $galleryImages = $galleryEnabled
+            ? $this->pageImages->listReadyForPublicPage((int) $page['id'])
+            : [];
+
+        $page['content'] = $this->renderEmbeddedForms((string) ($page['content'] ?? ''));
+        $page = $this->renderPageExtendedBlocks($page);
+        $page = $this->decoratePageForTemplate($page);
+        $galleryImages = $this->decorateGalleryImagesForTemplate($galleryImages);
+
+        $this->renderPublic('home', [
+            'site' => $this->siteDataWithPageMeta($page),
+            'page' => $page,
+            'galleryEnabled' => $galleryEnabled,
+            'galleryImages' => $galleryImages,
+        ], 'wrapper');
+    }
+
+    /**
+     * Resolves one channel landing route by channel slug.
+     *
+     * Landing selection mirrors homepage priority inside the channel:
+     * `home` first, then `index`.
+     *
+     * If no channel landing page is available, fallback preserves existing
+     * single-segment behavior (root page + redirect lookup).
+     */
+    public function channel(string $channelSlug): void
+    {
+        $page = $this->pages->findChannelHomepage($channelSlug);
+
+        if ($page === null) {
+            $this->page($channelSlug, null);
+            return;
+        }
+
+        $channel = $this->taxonomy->findChannelBySlug($channelSlug);
+
+        $galleryEnabled = (int) ($page['gallery_enabled'] ?? 0) === 1 || $this->pageBodyIncludesGalleryBlock($page);
+        $galleryImages = $galleryEnabled
+            ? $this->pageImages->listReadyForPublicPage((int) $page['id'])
+            : [];
+
+        $page['content'] = $this->renderEmbeddedForms((string) ($page['content'] ?? ''));
+        $page = $this->renderPageExtendedBlocks($page);
+        $page = $this->decoratePageForTemplate($page);
+        $galleryImages = $this->decorateGalleryImagesForTemplate($galleryImages);
+
+        $channelTemplate = $this->resolveChannelTemplateName($channelSlug);
+        $site = $this->siteDataWithPageMeta($page);
+        if (is_array($channel)) {
+            // Channel-level cover/preview uploads override default/page fallback for channel landing routes.
+            $site = $this->siteDataWithTaxonomyMetaImage($channel, $site);
+        }
+
+        $this->renderPublic($channelTemplate, [
+            'site' => $site,
+            'page' => $page,
+            'galleryEnabled' => $galleryEnabled,
+            'galleryImages' => $galleryImages,
+        ], 'wrapper');
+    }
+
+    /**
+     * Renders one public page, optionally nested by channel slug.
+     */
+    public function page(string $pageSlug, ?string $channelSlug = null): void
+    {
+        $requestedSlug = strtolower(trim($pageSlug));
+        $lookupSlug = $requestedSlug;
+        $channelRouteMode = 'slug';
+        $channelWordSeparator = '-';
+
+        if ($channelSlug !== null) {
+            $channel = $this->taxonomy->findChannelBySlug($channelSlug);
+            if ($channel === null) {
+                if ($this->tryRedirect($requestedSlug, $channelSlug)) {
+                    return;
+                }
+
+                $this->notFound();
+                return;
+            }
+
+            $channelRouteMode = $this->normalizeChannelPageRouteMode(
+                (string) ($channel['page_route_mode'] ?? 'slug')
+            );
+            $channelWordSeparator = $this->resolveChannelPageUrlSeparator(
+                (string) ($channel['page_url_separator'] ?? 'inherit')
+            );
+
+            if ($channelRouteMode === 'date_slug') {
+                $parsed = $this->parseChannelDateSlugSegment($requestedSlug, $channelWordSeparator);
+                if ($parsed === null) {
+                    if ($this->tryRedirect($requestedSlug, $channelSlug)) {
+                        return;
+                    }
+
+                    $this->notFound();
+                    return;
+                }
+
+                $lookupSlug = (string) ($parsed['slug'] ?? $requestedSlug);
+            } else {
+                $normalizedLookupSlug = $this->normalizeChannelPageSlugForLookup($requestedSlug, $channelWordSeparator);
+                if ($normalizedLookupSlug === null) {
+                    if ($this->tryRedirect($requestedSlug, $channelSlug)) {
+                        return;
+                    }
+
+                    $this->notFound();
+                    return;
+                }
+
+                $lookupSlug = $normalizedLookupSlug;
+            }
+        }
+
+        $page = $this->pages->findPublicPage($lookupSlug, $channelSlug);
+
+        if ($page === null) {
+            // If no page exists at this path, attempt redirect fallback before 404.
+            if ($this->tryRedirect($requestedSlug, $channelSlug)) {
+                return;
+            }
+
+            $this->notFound();
+            return;
+        }
+
+        if ($channelSlug !== null) {
+            $canonicalSegment = $this->channelPageRouteSegment(
+                (string) ($page['slug'] ?? ''),
+                (string) ($page['published_at'] ?? ''),
+                $channelRouteMode,
+                $channelWordSeparator
+            );
+            if ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedSlug) !== 0) {
+                \Raven\Core\Support\redirect(
+                    '/' . rawurlencode($channelSlug) . '/' . rawurlencode($canonicalSegment),
+                    301
+                );
+            }
+        }
+
+        $galleryEnabled = (int) ($page['gallery_enabled'] ?? 0) === 1 || $this->pageBodyIncludesGalleryBlock($page);
+        $galleryImages = $galleryEnabled
+            ? $this->pageImages->listReadyForPublicPage((int) $page['id'])
+            : [];
+
+        $page['content'] = $this->renderEmbeddedForms((string) ($page['content'] ?? ''));
+        $page = $this->renderPageExtendedBlocks($page);
+        $page = $this->decoratePageForTemplate($page);
+        $galleryImages = $this->decorateGalleryImagesForTemplate($galleryImages);
+
+        $pageTemplate = $this->resolvePageTemplateName($channelSlug);
+
+        $this->renderPublic($pageTemplate, [
+            'site' => $this->siteDataWithPageMeta($page),
+            'page' => $page,
+            'galleryEnabled' => $galleryEnabled,
+            'galleryImages' => $galleryImages,
+        ], 'wrapper');
+    }
+
+    /**
+     * Builds public URL paths for category/tag page-list rows.
+     *
+     * @param array<int, array<string, mixed>> $pages
+     * @return array<int, array<string, mixed>>
+     */
+    private function decoratePageListPublicPaths(array $pages): array
+    {
+        foreach ($pages as $index => $page) {
+            if (!is_array($page)) {
+                continue;
+            }
+
+            $slug = $this->input->slug((string) ($page['slug'] ?? ''));
+            if ($slug === null || $slug === '') {
+                $pages[$index]['public_path'] = '/';
+                continue;
+            }
+
+            $channelSlug = $this->input->slug((string) ($page['channel_slug'] ?? ''));
+            if ($channelSlug === null || $channelSlug === '') {
+                $pages[$index]['public_path'] = '/' . rawurlencode($slug);
+                continue;
+            }
+
+            $pages[$index]['public_path'] = '/'
+                . rawurlencode($channelSlug)
+                . '/'
+                . rawurlencode(
+                    $this->channelPageRouteSegment(
+                        $slug,
+                        (string) ($page['published_at'] ?? ''),
+                        (string) ($page['channel_page_route_mode'] ?? 'slug'),
+                        (string) ($page['channel_page_url_separator'] ?? 'inherit')
+                    )
+                );
+        }
+
+        return $pages;
+    }
+
+    /**
+     * Prepares page-list rows for template tags.
+     *
+     * @param array<int, array<string, mixed>> $pages
+     * @return array<int, array<string, mixed>>
+     */
+    private function decoratePageListForTemplate(array $pages): array
+    {
+        foreach ($pages as $index => $page) {
+            if (!is_array($page)) {
+                continue;
+            }
+
+            $path = trim((string) ($page['public_path'] ?? ''));
+            if ($path === '') {
+                $slug = $this->input->slug((string) ($page['slug'] ?? ''));
+                $channelSlug = $this->input->slug((string) ($page['channel_slug'] ?? ''));
+                if ($slug === null || $slug === '') {
+                    $path = '/';
+                } elseif ($channelSlug === null || $channelSlug === '') {
+                    $path = '/' . rawurlencode($slug);
+                } else {
+                    $path = '/' . rawurlencode($channelSlug) . '/' . rawurlencode($slug);
+                }
+            }
+
+            $pages[$index]['public_path'] = $path;
+        }
+
+        return $pages;
+    }
+
+    /**
+     * Normalizes one stored channel page-route mode value.
+     */
+    private function normalizeChannelPageRouteMode(string $value): string
+    {
+        $mode = strtolower(trim($value));
+        return in_array($mode, ['slug', 'date_slug'], true)
+            ? $mode
+            : 'slug';
+    }
+
+    /**
+     * Normalizes channel-level page-url separator override values.
+     */
+    private function normalizeChannelPageUrlSeparator(string $value): string
+    {
+        $separator = trim($value);
+        return in_array($separator, ['inherit', '-', '_'], true)
+            ? $separator
+            : 'inherit';
+    }
+
+    /**
+     * Normalizes global default page-url separator values.
+     */
+    private function normalizeGlobalPageUrlSeparator(string $value): string
+    {
+        $separator = trim($value);
+        return in_array($separator, ['-', '_'], true)
+            ? $separator
+            : '-';
+    }
+
+    /**
+     * Resolves effective channel page-url separator from channel + global config.
+     */
+    private function resolveChannelPageUrlSeparator(string $channelValue): string
+    {
+        $normalizedChannel = $this->normalizeChannelPageUrlSeparator($channelValue);
+        if ($normalizedChannel !== 'inherit') {
+            return $normalizedChannel;
+        }
+
+        return $this->normalizeGlobalPageUrlSeparator(
+            (string) $this->config->get('content.separator', '-')
+        );
+    }
+
+    /**
+     * Normalizes one channel route segment into canonical stored slug format.
+     */
+    private function normalizeChannelPageSlugForLookup(string $segment, string $wordSeparator): ?string
+    {
+        $segment = strtolower(trim($segment));
+        if ($segment === '') {
+            return null;
+        }
+
+        if (preg_match('/^[a-z0-9][a-z0-9_-]*$/', $segment) !== 1) {
+            return null;
+        }
+
+        $resolvedSeparator = $this->resolveChannelPageUrlSeparator($wordSeparator);
+        if ($resolvedSeparator === '_') {
+            $segment = str_replace('_', '-', $segment);
+        }
+
+        return $this->input->slug($segment);
+    }
+
+    /**
+     * Parses one `YYYY-MM-DD-{slug}` channel route segment.
+     *
+     * @return array{date: string, slug: string}|null
+     */
+    private function parseChannelDateSlugSegment(string $segment, string $wordSeparator): ?array
+    {
+        $segment = strtolower(trim($segment));
+        if ($segment === '') {
+            return null;
+        }
+
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})-(.+)$/', $segment, $matches) !== 1) {
+            return null;
+        }
+
+        $slug = $this->normalizeChannelPageSlugForLookup(
+            (string) ($matches[2] ?? ''),
+            $wordSeparator
+        );
+        if ($slug === null || $slug === '') {
+            return null;
+        }
+
+        return [
+            'date' => (string) ($matches[1] ?? ''),
+            'slug' => $slug,
+        ];
+    }
+
+    /**
+     * Returns one channel page route segment from slug + mode.
+     */
+    private function channelPageRouteSegment(
+        string $slug,
+        string $publishedAt,
+        string $routeMode,
+        string $wordSeparator
+    ): string
+    {
+        $normalizedSlug = $this->input->slug($slug);
+        if ($normalizedSlug === null || $normalizedSlug === '') {
+            return '';
+        }
+
+        $resolvedSeparator = $this->resolveChannelPageUrlSeparator($wordSeparator);
+        $routeSlug = $resolvedSeparator === '_'
+            ? str_replace('-', '_', $normalizedSlug)
+            : $normalizedSlug;
+        $mode = $this->normalizeChannelPageRouteMode($routeMode);
+        if ($mode !== 'date_slug') {
+            return $routeSlug;
+        }
+
+        $datePrefix = $this->channelPageDatePrefix($publishedAt);
+        return $datePrefix . '-' . $routeSlug;
+    }
+
+    /**
+     * Extracts one `YYYY-MM-DD` prefix from a publish timestamp.
+     */
+    private function channelPageDatePrefix(string $publishedAt): string
+    {
+        $publishedAt = trim($publishedAt);
+        if ($publishedAt !== '' && preg_match('/^\d{4}-\d{2}-\d{2}/', $publishedAt, $matches) === 1) {
+            return (string) ($matches[0] ?? gmdate('Y-m-d'));
+        }
+
+        $timestamp = $publishedAt !== '' ? strtotime($publishedAt) : false;
+        if ($timestamp === false || $timestamp <= 0) {
+            $timestamp = time();
+        }
+
+        return gmdate('Y-m-d', $timestamp);
+    }
+
+    /**
+     * Attempts active redirect lookup for a URL path and emits HTTP redirect when found.
+     */
+    private function tryRedirect(string $pageSlug, ?string $channelSlug = null): bool
+    {
+        $redirect = $this->redirects->findActiveByPath($pageSlug, $channelSlug);
+        if ($redirect === null) {
+            return false;
+        }
+
+        $targetUrl = trim((string) ($redirect['target_url'] ?? ''));
+        if (!$this->isAllowedRedirectTargetUrl($targetUrl)) {
+            return false;
+        }
+
+        // Default behavior is temporary redirect; status configuration can be added later.
+        \Raven\Core\Support\redirect($targetUrl, 302);
+    }
+
+    /**
+     * Safety check for redirect targets loaded from persistence.
+     */
+    private function isAllowedRedirectTargetUrl(string $targetUrl): bool
+    {
+        if ($targetUrl === '' || str_contains($targetUrl, ' ')) {
+            return false;
+        }
+
+        if (str_starts_with($targetUrl, '/')) {
+            // Block protocol-relative URLs (`//host`) to avoid bypassing scheme validation.
+            return !str_starts_with($targetUrl, '//');
+        }
+
+        if (filter_var($targetUrl, FILTER_VALIDATE_URL) === false) {
+            return false;
+        }
+
+        $scheme = strtolower((string) parse_url($targetUrl, PHP_URL_SCHEME));
+        return in_array($scheme, ['http', 'https'], true);
+    }
+
+    /**
+     * Renders category listing route `/{category_prefix}/{category_slug}/{page?}`.
+     */
+    public function category(string $categorySlug, int $pageNumber = 1): void
+    {
+        $categoryPrefix = $this->categoryRoutePrefix();
+        if ($categoryPrefix === '') {
+            $this->notFound();
+            return;
+        }
+
+        $category = $this->taxonomy->findCategoryBySlug($categorySlug);
+
+        if ($category === null) {
+            $this->notFound();
+            return;
+        }
+
+        $perPage = max(1, (int) $this->config->get('category.pagination', 10));
+        $pageNumber = max(1, $pageNumber);
+        $offset = ($pageNumber - 1) * $perPage;
+        $pageResult = $this->pages->listPageByCategorySlug($categorySlug, $perPage, $offset);
+        $total = (int) ($pageResult['total'] ?? 0);
+        $totalPages = max(1, (int) ceil($total / $perPage));
+
+        if ($total > 0 && $pageNumber > $totalPages) {
+            $this->notFound();
+            return;
+        }
+
+        $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $pages = $this->decoratePageListPublicPaths($pages);
+        $pages = $this->decoratePageListForTemplate($pages);
+        $pagination = [
+            'current' => $pageNumber,
+            'total_pages' => $totalPages,
+            'total_items' => $total,
+            'base_path' => '/' . $categoryPrefix . '/' . rawurlencode($categorySlug),
+        ];
+        $pagination = $this->decoratePaginationForTemplate($pagination);
+        $categoryTemplate = $this->resolveCategoryTemplateName($categorySlug);
+
+        $this->renderPublic($categoryTemplate, [
+            'site' => $this->siteDataWithTaxonomyMetaImage($category),
+            'category' => $category,
+            'pages' => $pages,
+            'pagination' => $pagination,
+        ], 'wrapper');
+    }
+
+    /**
+     * Renders tag listing route `/{tag_prefix}/{tag_slug}/{page?}`.
+     */
+    public function tag(string $tagSlug, int $pageNumber = 1): void
+    {
+        $tagPrefix = $this->tagRoutePrefix();
+        if ($tagPrefix === '') {
+            $this->notFound();
+            return;
+        }
+
+        $tag = $this->taxonomy->findTagBySlug($tagSlug);
+
+        if ($tag === null) {
+            $this->notFound();
+            return;
+        }
+
+        $perPage = max(1, (int) $this->config->get('tag.pagination', 10));
+        $pageNumber = max(1, $pageNumber);
+        $offset = ($pageNumber - 1) * $perPage;
+        $pageResult = $this->pages->listPageByTagSlug($tagSlug, $perPage, $offset);
+        $total = (int) ($pageResult['total'] ?? 0);
+        $totalPages = max(1, (int) ceil($total / $perPage));
+
+        if ($total > 0 && $pageNumber > $totalPages) {
+            $this->notFound();
+            return;
+        }
+
+        $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $pages = $this->decoratePageListPublicPaths($pages);
+        $pages = $this->decoratePageListForTemplate($pages);
+        $pagination = [
+            'current' => $pageNumber,
+            'total_pages' => $totalPages,
+            'total_items' => $total,
+            'base_path' => '/' . $tagPrefix . '/' . rawurlencode($tagSlug),
+        ];
+        $pagination = $this->decoratePaginationForTemplate($pagination);
+        $tagTemplate = $this->resolveTagTemplateName($tagSlug);
+
+        $this->renderPublic($tagTemplate, [
+            'site' => $this->siteDataWithTaxonomyMetaImage($tag),
+            'tag' => $tag,
+            'pages' => $pages,
+            'pagination' => $pagination,
+        ], 'wrapper');
+    }
+
+    /**
+     * Renders one public profile route `/{profile_prefix}/{username}`.
+     */
+    public function profile(string $username): void
+    {
+        $profileMode = $this->profileMode();
+        $isLoggedIn = $this->auth->isLoggedIn();
+        if ($this->profileRoutePrefix() === '') {
+            $this->notFound();
+            return;
+        }
+
+        if ($profileMode === 'disabled') {
+            $this->renderProfileUnavailable('not_found', 'disabled');
+            return;
+        }
+
+        if ($profileMode === 'private' && !$isLoggedIn) {
+            $this->renderProfileUnavailable('permission_denied', 'private');
+            return;
+        }
+
+        $normalizedUsername = $this->input->username($username);
+        if ($normalizedUsername === null) {
+            $this->notFound();
+            return;
+        }
+
+        $profile = $this->users->findPublicProfileByUsername($normalizedUsername);
+        if ($profile === null) {
+            $this->notFound();
+            return;
+        }
+        $profile = $this->decoratePublicProfileContacts($profile);
+        $profile = $this->decorateProfileForTemplate($profile);
+
+        $template = match ($profileMode) {
+            'public_full' => 'profiles/full',
+            'public_limited' => $isLoggedIn ? 'profiles/full' : 'profiles/limited',
+            'private' => 'profiles/full',
+            default => 'profiles/index',
+        };
+
+        $this->renderPublic($template, [
+            'site' => $this->siteData(),
+            'profile' => $profile,
+        ], 'wrapper');
+    }
+
+    /**
+     * Renders one public group route `/{group_prefix}/{group_slug}`.
+     */
+    public function group(string $groupSlug): void
+    {
+        $groupMode = $this->groupMode();
+        $isLoggedIn = $this->auth->isLoggedIn();
+        if ($this->groupRoutePrefix() === '') {
+            $this->notFound();
+            return;
+        }
+
+        if ($groupMode === 'disabled') {
+            $this->renderGroupUnavailable('not_found', 'disabled');
+            return;
+        }
+
+        if ($groupMode === 'private' && !$isLoggedIn) {
+            $this->renderGroupUnavailable('permission_denied', 'private');
+            return;
+        }
+
+        $normalizedSlug = $this->input->slug($groupSlug);
+        if ($normalizedSlug === null) {
+            $this->notFound();
+            return;
+        }
+
+        $groupRouteData = $this->groups->findPublicRouteDataBySlug($normalizedSlug);
+        if ($groupRouteData === null) {
+            $this->notFound();
+            return;
+        }
+
+        $group = is_array($groupRouteData['group'] ?? null) ? $groupRouteData['group'] : [];
+        $members = is_array($groupRouteData['members'] ?? null) ? $groupRouteData['members'] : [];
+        $members = $this->decorateGroupMembersForTemplate($members);
+        $group = $this->decorateGroupForTemplate($group, $members);
+        $template = match ($groupMode) {
+            'public_full' => 'groups/list',
+            'public_limited' => $isLoggedIn ? 'groups/list' : 'groups/limited',
+            'private' => 'groups/list',
+            default => 'groups/index',
+        };
+
+        $this->renderPublic($template, [
+            'site' => $this->siteData(),
+            'group' => $group,
+            'members' => $members,
+        ], 'wrapper');
+    }
+
+    /**
+     * Renders profile-disabled/private-denied placeholder with explicit status.
+     */
+    private function renderProfileUnavailable(string $error, string $mode): void
+    {
+        if ($error === 'permission_denied') {
+            http_response_code(403);
+        } else {
+            http_response_code(404);
+        }
+
+        $this->renderPublic('profiles/index', [
+            'site' => $this->siteData(),
+            'profile_show_denied' => $error === 'permission_denied' && $mode === 'private',
+        ], 'wrapper');
+    }
+
+    /**
+     * Renders group-route disabled/private-denied placeholder with explicit status.
+     */
+    private function renderGroupUnavailable(string $error, string $mode): void
+    {
+        if ($error === 'permission_denied') {
+            http_response_code(403);
+        } else {
+            http_response_code(404);
+        }
+
+        $this->renderPublic('groups/index', [
+            'site' => $this->siteData(),
+            'group_show_denied' => $error === 'permission_denied' && $mode === 'private',
+        ], 'wrapper');
+    }
+
+    /**
+     * Returns default profile-contact option map (slug => metadata).
+     *
+     * @return array<string, array{label: string, url_prefix: string}>
+     */
+    private function defaultProfileContactOptions(): array
+    {
+        return [
+            'email' => ['label' => 'Email', 'url_prefix' => 'mailto:'],
+            'phone' => ['label' => 'Phone', 'url_prefix' => 'tel:'],
+            'website' => ['label' => 'Website', 'url_prefix' => 'https://'],
+            'x' => ['label' => 'X', 'url_prefix' => 'https://x.com/'],
+        ];
+    }
+
+    /**
+     * Returns contact-option defaults that are mandatory and cannot be removed.
+     *
+     * @return array<string, array{label: string, url_prefix: string}>
+     */
+    private function requiredProfileContactOptions(): array
+    {
+        $defaults = $this->defaultProfileContactOptions();
+        $required = [];
+        foreach (['email', 'phone', 'website', 'x'] as $slug) {
+            if (!isset($defaults[$slug])) {
+                continue;
+            }
+
+            $required[$slug] = $defaults[$slug];
+        }
+
+        return $required;
+    }
+
+    /**
+     * Normalizes one profile-contact option map from config.
+     *
+     * @return array<string, array{label: string, url_prefix: string}>
+     */
+    private function profileContactOptions(): array
+    {
+        /** @var mixed $raw */
+        $raw = $this->config->get('user.contact', $this->defaultProfileContactOptions());
+        $source = is_array($raw) ? $raw : $this->defaultProfileContactOptions();
+        $defaults = $this->defaultProfileContactOptions();
+        $requiredDefaults = $this->requiredProfileContactOptions();
+        $normalized = [];
+
+        foreach ($source as $key => $definition) {
+            if (!is_string($key) && !is_int($key)) {
+                continue;
+            }
+
+            $slug = $this->input->slug((string) $key);
+            if ($slug === null || $slug === '') {
+                continue;
+            }
+
+            $defaultLabel = (string) ($defaults[$slug]['label'] ?? ucwords(str_replace('-', ' ', $slug)));
+            $defaultPrefix = (string) ($defaults[$slug]['url_prefix'] ?? '');
+            $label = $defaultLabel;
+            $prefix = $defaultPrefix;
+
+            if (is_array($definition)) {
+                $label = $this->input->text((string) ($definition['label'] ?? $defaultLabel), 80);
+                $prefix = $this->input->text((string) ($definition['url_prefix'] ?? $defaultPrefix), 255);
+            } else {
+                $label = $this->input->text((string) $definition, 80);
+            }
+
+            if ($label === '') {
+                continue;
+            }
+
+            if (!isset($normalized[$slug])) {
+                $normalized[$slug] = [
+                    'label' => $label,
+                    'url_prefix' => trim($prefix),
+                ];
+            }
+        }
+
+        foreach ($requiredDefaults as $requiredSlug => $requiredConfig) {
+            if (isset($normalized[$requiredSlug])) {
+                continue;
+            }
+
+            $normalized[$requiredSlug] = [
+                'label' => (string) ($requiredConfig['label'] ?? ucwords(str_replace('-', ' ', $requiredSlug))),
+                'url_prefix' => trim((string) ($requiredConfig['url_prefix'] ?? '')),
+            ];
+        }
+
+        if ($normalized === []) {
+            return $requiredDefaults;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Attaches label/href metadata to public profile contact rows.
+     *
+     * @param array<string, mixed> $profile
+     * @return array<string, mixed>
+     */
+    private function decoratePublicProfileContacts(array $profile): array
+    {
+        $options = $this->profileContactOptions();
+        $rawEntries = is_array($profile['contact_profiles'] ?? null) ? $profile['contact_profiles'] : [];
+        $entries = [];
+
+        foreach ($rawEntries as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $type = $this->input->slug((string) ($entry['type'] ?? ''));
+            if ($type === null || $type === '') {
+                continue;
+            }
+
+            $value = $this->input->text((string) ($entry['value'] ?? ''), 255);
+            if ($value === '') {
+                continue;
+            }
+
+            $option = $options[$type] ?? [
+                'label' => ucwords(str_replace('-', ' ', $type)),
+                'url_prefix' => '',
+            ];
+            $label = (string) ($option['label'] ?? $type);
+            $urlPrefix = trim((string) ($option['url_prefix'] ?? ''));
+            $href = $this->resolveProfileContactHref($value, $urlPrefix);
+
+            $entries[] = [
+                'type' => $type,
+                'label' => $label,
+                'value' => $value,
+                'href' => $href,
+            ];
+
+            if (count($entries) >= 20) {
+                break;
+            }
+        }
+
+        $profile['contact_profiles'] = $entries;
+        return $profile;
+    }
+
+    /**
+     * Resolves one optional URL/href for contact value + configured prefix.
+     */
+    private function resolveProfileContactHref(string $value, string $urlPrefix): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('/^[a-z][a-z0-9+.-]*:/i', $value) === 1) {
+            return $value;
+        }
+
+        if ($urlPrefix === '') {
+            if (preg_match('#^https?://#i', $value) === 1) {
+                return $value;
+            }
+
+            return null;
+        }
+
+        if (str_ends_with($urlPrefix, '/')) {
+            return $urlPrefix . ltrim($value, '@/');
+        }
+
+        return $urlPrefix . $value;
+    }
+
+    /**
+     * Handles one public embedded-form submission request by type + slug.
+     */
+    public function submitEmbeddedForm(string $type, string $formSlug): void
+    {
+        $runtime = $this->embeddedFormRuntime($type);
+        if ($runtime === null) {
+            $this->notFound();
+            return;
+        }
+
+        if (!$this->isExtensionEnabled($runtime->extensionKey())) {
+            $this->notFound();
+            return;
+        }
+
+        $slug = $this->input->slug($formSlug);
+        if ($slug === null) {
+            $this->notFound();
+            return;
+        }
+
+        $returnPath = $this->sanitizePublicReturnPath((string) ($_POST['return_path'] ?? '/'));
+
+        try {
+            $runtime->submit($slug, $returnPath, function (): ?string {
+                return $this->validatePublicCaptcha();
+            });
+        } catch (\Throwable $exception) {
+            error_log(
+                'Raven embedded form submit failed for type "'
+                . $runtime->type()
+                . '": '
+                . $exception->getMessage()
+            );
+            $this->notFound();
+        }
+    }
+
+    /**
+     * Returns one embedded-form runtime by shortcode type when available.
+     */
+    private function embeddedFormRuntime(string $type): ?EmbeddedFormRuntimeInterface
+    {
+        $normalized = strtolower(trim($type));
+        return $this->embeddedFormRuntimes[$normalized] ?? null;
+    }
+
+    /**
+     * Enforces global frontend availability mode before route handling.
+     */
+    public function enforceSiteAvailability(): bool
+    {
+        $mode = $this->siteEnabledMode();
+
+        if ($mode === 'disabled') {
+            if ($this->auth->isLoggedIn() && $this->auth->canViewDisabledSite()) {
+                return true;
+            }
+
+            http_response_code(503);
+            $this->renderPublic('messages/disabled', [
+                'site' => $this->siteData(),
+            ], 'wrapper');
+            return false;
+        }
+
+        if ($mode === 'private') {
+            if (!$this->auth->isLoggedIn() || !$this->auth->canViewPrivateSite()) {
+                http_response_code(403);
+                $this->renderPublic('messages/denied', [
+                    'site' => $this->siteData(),
+                ], 'wrapper');
+                return false;
+            }
+
+            return true;
+        }
+
+        if (!$this->auth->canViewPublicSite()) {
+            http_response_code(403);
+            $this->renderPublic('messages/denied', [
+                'site' => $this->siteData(),
+            ], 'wrapper');
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Renders public not-found page.
+     */
+    public function notFound(): void
+    {
+        http_response_code(404);
+
+        $this->renderPublic('messages/404', [
+            'site' => $this->siteData(),
+        ], 'wrapper');
+    }
+
+    /**
+     * Returns configured global frontend availability mode.
+     */
+    private function siteEnabledMode(): string
+    {
+        $mode = strtolower(trim((string) $this->config->get('site.enabled', 'public')));
+        if (!in_array($mode, ['public', 'private', 'disabled'], true)) {
+            return 'public';
+        }
+
+        return $mode;
+    }
+
+    /**
+     * Collects site config values required by public templates.
+     *
+     * @return array<string, string>
+     */
+    private function siteData(): array
+    {
+        $publicTheme = $this->currentPublicThemeSlug();
+        $configuredDomain = (string) $this->config->get('site.domain', 'localhost');
+
+        return [
+            'name' => (string) $this->config->get('site.name', 'Raven CMS'),
+            'domain' => $configuredDomain,
+            'panel_path' => (string) $this->config->get('panel.path', 'panel'),
+            'current_url' => $this->currentRequestUrl($configuredDomain),
+            'apple_touch_icon' => trim((string) $this->config->get('meta.apple_touch_icon', '')),
+            'robots' => trim((string) $this->config->get('meta.robots', 'index,follow')),
+            'twitter_card' => trim((string) $this->config->get('meta.twitter.card', '')),
+            'twitter_site' => trim((string) $this->config->get('meta.twitter.site', '')),
+            'twitter_creator' => trim((string) $this->config->get('meta.twitter.creator', '')),
+            'twitter_image' => $this->absoluteMetaImageUrl(
+                trim((string) $this->config->get('meta.twitter.image', '')),
+                $configuredDomain
+            ),
+            'og_image' => $this->absoluteMetaImageUrl(
+                trim((string) $this->config->get('meta.opengraph.image', '')),
+                $configuredDomain
+            ),
+            'og_type' => trim((string) $this->config->get('meta.opengraph.type', 'website')),
+            'og_locale' => trim((string) $this->config->get('meta.opengraph.locale', 'en_US')),
+            'public_theme' => $publicTheme,
+            // CSS may live only in a parent theme for child-theme setups.
+            'public_theme_css' => $this->currentPublicThemeCssSlug($publicTheme),
+        ];
+    }
+
+    /**
+     * Returns site data with page-level social metadata overrides when available.
+     *
+     * @param array<string, mixed> $page
+     * @return array<string, string>
+     */
+    private function siteDataWithPageMeta(array $page): array
+    {
+        $site = $this->siteData();
+        $site['twitter_creator'] = $this->resolvedTwitterCreatorForPage(
+            $page,
+            (string) ($site['twitter_creator'] ?? '')
+        );
+
+        $pageId = (int) ($page['id'] ?? 0);
+        if ($pageId < 1) {
+            return $site;
+        }
+
+        $previewImageUrl = $this->absoluteMetaImageUrl(
+            trim((string) ($this->pageImages->previewImageUrlForPage($pageId) ?? '')),
+            (string) ($site['domain'] ?? 'localhost')
+        );
+        if ($previewImageUrl === '') {
+            return $site;
+        }
+
+        $site['og_image'] = $previewImageUrl;
+        $site['twitter_image'] = $previewImageUrl;
+
+        return $site;
+    }
+
+    /**
+     * Resolves effective `twitter:creator` for a page author with config fallback.
+     *
+     * @param array<string, mixed> $page
+     */
+    private function resolvedTwitterCreatorForPage(array $page, string $fallback): string
+    {
+        $fallback = trim($fallback);
+        $authorUserId = (int) ($page['author_user_id'] ?? 0);
+        if ($authorUserId < 1) {
+            return $fallback;
+        }
+
+        $author = $this->users->findById($authorUserId);
+        if (!is_array($author)) {
+            return $fallback;
+        }
+
+        $profiles = is_array($author['contact_profiles'] ?? null) ? $author['contact_profiles'] : [];
+        $creator = $this->twitterCreatorFromContactProfiles($profiles);
+        return $creator !== '' ? $creator : $fallback;
+    }
+
+    /**
+     * Extracts first valid Twitter/X creator handle from normalized contact-profile rows.
+     *
+     * @param array<int, array<string, mixed>> $profiles
+     */
+    private function twitterCreatorFromContactProfiles(array $profiles): string
+    {
+        if ($profiles === []) {
+            return '';
+        }
+
+        $contactOptions = $this->profileContactOptions();
+        foreach ($profiles as $profile) {
+            if (!is_array($profile)) {
+                continue;
+            }
+
+            $type = $this->input->slug((string) ($profile['type'] ?? ''));
+            $value = trim((string) ($profile['value'] ?? ''));
+            if ($type === null || $type === '' || $value === '') {
+                continue;
+            }
+
+            $urlPrefix = trim((string) ($contactOptions[$type]['url_prefix'] ?? ''));
+            if (!$this->isTwitterProfileContactType($type, $urlPrefix)) {
+                continue;
+            }
+
+            $creator = $this->normalizeTwitterCreatorHandle($value);
+            if ($creator !== '') {
+                return $creator;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Returns true when a profile-contact type/prefix maps to Twitter/X.
+     */
+    private function isTwitterProfileContactType(string $type, string $urlPrefix): bool
+    {
+        if (in_array($type, ['x', 'twitter'], true)) {
+            return true;
+        }
+
+        $prefix = strtolower($urlPrefix);
+        return str_contains($prefix, 'x.com') || str_contains($prefix, 'twitter.com');
+    }
+
+    /**
+     * Converts one contact value into a `twitter:creator` handle (`@username`).
+     */
+    private function normalizeTwitterCreatorHandle(string $value): string
+    {
+        $raw = trim(str_replace(["\r", "\n", "\0"], '', $value));
+        if ($raw === '') {
+            return '';
+        }
+
+        if (preg_match('#^https?://#i', $raw) === 1) {
+            $host = strtolower((string) parse_url($raw, PHP_URL_HOST));
+            if (str_starts_with($host, 'www.')) {
+                $host = substr($host, 4);
+            }
+            if (!in_array($host, ['x.com', 'twitter.com'], true)) {
+                return '';
+            }
+
+            $raw = (string) parse_url($raw, PHP_URL_PATH);
+        }
+
+        $raw = trim(preg_replace('/[?#].*$/', '', $raw) ?? '');
+        $raw = ltrim($raw, '@/');
+        if (str_contains($raw, '/')) {
+            $raw = (string) explode('/', $raw, 2)[0];
+        }
+
+        if ($raw === '' || preg_match('/^[A-Za-z0-9_]{1,30}$/', $raw) !== 1) {
+            return '';
+        }
+
+        return '@' . $raw;
+    }
+
+    /**
+     * Returns site data with taxonomy-level OG/Twitter image override when available.
+     *
+     * @param array<string, mixed> $taxonomy
+     * @param array<string, string>|null $baseSiteData
+     * @return array<string, string>
+     */
+    private function siteDataWithTaxonomyMetaImage(array $taxonomy, ?array $baseSiteData = null): array
+    {
+        $site = $baseSiteData ?? $this->siteData();
+        $configuredDomain = (string) ($site['domain'] ?? 'localhost');
+
+        $candidates = [
+            trim((string) ($taxonomy['preview_image_lg_path'] ?? '')),
+            trim((string) ($taxonomy['preview_image_path'] ?? '')),
+            trim((string) ($taxonomy['preview_image_md_path'] ?? '')),
+            trim((string) ($taxonomy['preview_image_sm_path'] ?? '')),
+            trim((string) ($taxonomy['cover_image_lg_path'] ?? '')),
+            trim((string) ($taxonomy['cover_image_path'] ?? '')),
+            trim((string) ($taxonomy['cover_image_md_path'] ?? '')),
+            trim((string) ($taxonomy['cover_image_sm_path'] ?? '')),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if ($candidate === '') {
+                continue;
+            }
+
+            $resolved = $this->absoluteMetaImageUrl($candidate, $configuredDomain);
+            if ($resolved === '') {
+                continue;
+            }
+
+            $site['og_image'] = $resolved;
+            $site['twitter_image'] = $resolved;
+            return $site;
+        }
+
+        return $site;
+    }
+
+    /**
+     * Resolves one safe absolute URL for OpenGraph/Twitter image tag.
+     *
+     * Accepts absolute HTTP(S) URLs or local URL paths.
+     */
+    private function absoluteMetaImageUrl(string $value, string $configuredDomain): string
+    {
+        $value = trim(str_replace(["\r", "\n", "\0"], '', $value));
+        if ($value === '') {
+            return '';
+        }
+
+        if (str_starts_with($value, '//')) {
+            return '';
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL) !== false) {
+            $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
+            return in_array($scheme, ['http', 'https'], true) ? $value : '';
+        }
+
+        $path = str_starts_with($value, '/') ? $value : ('/' . ltrim($value, '/'));
+        $scheme = $this->resolveRequestScheme();
+        $host = $this->resolveRequestHost($configuredDomain);
+
+        return $scheme . '://' . $host . $path;
+    }
+
+    /**
+     * Resolves active public theme slug from configuration + discovered manifests.
+     */
+    private function currentPublicThemeSlug(): string
+    {
+        $configured = strtolower($this->input->text((string) $this->config->get('site.default_theme', 'raven'), 80));
+        $options = $this->publicThemeOptions();
+
+        if (isset($options[$configured])) {
+            return $configured;
+        }
+
+        if (isset($options['raven'])) {
+            return 'raven';
+        }
+
+        $slugs = array_keys($options);
+        return (string) ($slugs[0] ?? 'raven');
+    }
+
+    /**
+     * Returns one canonical absolute URL for the current public request.
+     */
+    private function currentRequestUrl(string $configuredDomain): string
+    {
+        $scheme = $this->resolveRequestScheme();
+        $host = $this->resolveRequestHost($configuredDomain);
+
+        $requestUri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+        $path = (string) parse_url($requestUri, PHP_URL_PATH);
+        if ($path === '' || !str_starts_with($path, '/')) {
+            $path = '/';
+        }
+
+        $query = (string) parse_url($requestUri, PHP_URL_QUERY);
+        $query = str_replace(["\r", "\n", "\0"], '', $query);
+
+        $url = $scheme . '://' . $host . $path;
+        if ($query !== '') {
+            $url .= '?' . $query;
+        }
+
+        return $url;
+    }
+
+    /**
+     * Resolves request scheme from forwarded/proxy/server context.
+     */
+    private function resolveRequestScheme(): string
+    {
+        $forwarded = strtolower(trim((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')));
+        if (in_array($forwarded, ['http', 'https'], true)) {
+            return $forwarded;
+        }
+
+        $requestScheme = strtolower(trim((string) ($_SERVER['REQUEST_SCHEME'] ?? '')));
+        if (in_array($requestScheme, ['http', 'https'], true)) {
+            return $requestScheme;
+        }
+
+        $https = (string) ($_SERVER['HTTPS'] ?? '');
+        if ($https !== '' && strtolower($https) !== 'off' && $https !== '0') {
+            return 'https';
+        }
+
+        return 'http';
+    }
+
+    /**
+     * Resolves one safe host[:port] for absolute URL generation.
+     */
+    private function resolveRequestHost(string $configuredDomain): string
+    {
+        $configured = trim($configuredDomain);
+
+        if ($configured !== '') {
+            if (str_contains($configured, '://')) {
+                $parsedHost = trim((string) parse_url($configured, PHP_URL_HOST));
+                $parsedPort = parse_url($configured, PHP_URL_PORT);
+                if ($parsedHost !== '') {
+                    $candidate = $parsedHost;
+                    if (is_int($parsedPort) && $parsedPort > 0) {
+                        $candidate .= ':' . $parsedPort;
+                    }
+
+                    if ($this->isValidHostWithOptionalPort($candidate)) {
+                        return $candidate;
+                    }
+                }
+            }
+
+            // Strip any accidental path/query suffix from domain config.
+            $configured = preg_replace('/[\/?#].*$/', '', $configured) ?? $configured;
+            if ($this->isValidHostWithOptionalPort($configured)) {
+                return $configured;
+            }
+        }
+
+        $serverHost = trim((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost'));
+        if ($this->isValidHostWithOptionalPort($serverHost)) {
+            return $serverHost;
+        }
+
+        return 'localhost';
+    }
+
+    /**
+     * Returns true when a host[:port] value is safe for URL composition.
+     */
+    private function isValidHostWithOptionalPort(string $value): bool
+    {
+        if ($value === '' || str_contains($value, '/') || str_contains($value, '\\')) {
+            return false;
+        }
+
+        if (preg_match('/[\r\n\0]/', $value) === 1) {
+            return false;
+        }
+
+        if (preg_match('/^[a-z0-9.-]+(?::\d{1,5})?$/i', $value) === 1) {
+            return true;
+        }
+
+        // Accept bracketed IPv6 hosts with optional port.
+        return preg_match('/^\[[a-f0-9:]+\](?::\d{1,5})?$/i', $value) === 1;
+    }
+
+    /**
+     * Returns discoverable public themes from `public/theme/{slug}/theme.json`.
+     *
+     * @return array<string, string>
+     */
+    private function publicThemeOptions(): array
+    {
+        $themesRoot = $this->publicThemesRoot();
+        $options = PublicThemeRegistry::options($themesRoot);
+        if ($options === []) {
+            return ['raven' => 'Raven Basic'];
+        }
+
+        return $options;
+    }
+
+    /**
+     * Returns filesystem root containing public themes.
+     */
+    private function publicThemesRoot(): string
+    {
+        return dirname(__DIR__, 3) . '/public/theme';
+    }
+
+    /**
+     * Resolves active theme inheritance chain, child first.
+     *
+     * @return array<int, string>
+     */
+    private function currentPublicThemeInheritanceChain(string $themeSlug): array
+    {
+        $chain = PublicThemeRegistry::inheritanceChain($this->publicThemesRoot(), $themeSlug);
+        if ($chain === []) {
+            return [$themeSlug];
+        }
+
+        return $chain;
+    }
+
+    /**
+     * Resolves one theme slug that provides the active public stylesheet.
+     */
+    private function currentPublicThemeCssSlug(string $themeSlug): string
+    {
+        foreach ($this->currentPublicThemeInheritanceChain($themeSlug) as $candidateThemeSlug) {
+            $cssPath = $this->publicThemesRoot() . '/' . $candidateThemeSlug . '/css/style.css';
+            if (is_file($cssPath)) {
+                return $candidateThemeSlug;
+            }
+        }
+
+        return $themeSlug;
+    }
+
+    /**
+     * Normalizes and shortcode-renders repeatable Extended page blocks.
+     *
+     * @param array<string, mixed> $page
+     * @return array<string, mixed>
+     */
+    private function renderPageExtendedBlocks(array $page): array
+    {
+        $page['content'] = $this->renderEmbeddedForms((string) ($page['content'] ?? ''));
+        $rawBlocks = $page['extended_blocks'] ?? null;
+        if (!is_array($rawBlocks)) {
+            $rawBlocks = [];
+        }
+
+        $renderedBlocks = [];
+        $hasGalleryBlock = false;
+        foreach ($rawBlocks as $block) {
+            $type = 'tinymce';
+            $content = '';
+            $cssId = '';
+            $cssClass = '';
+
+            if (is_array($block)) {
+                $type = $this->normalizePageBodyBlockType((string) ($block['type'] ?? 'tinymce'));
+                $value = $block['content'] ?? '';
+                $cssId = $this->normalizeBodyBlockCssId($block['css_id'] ?? null);
+                $cssClass = $this->normalizeBodyBlockCssClassList($block['css_class'] ?? null);
+                if (!is_scalar($value) && $value !== null) {
+                    continue;
+                }
+                $content = (string) ($value ?? '');
+            } else {
+                if (!is_scalar($block) && $block !== null) {
+                    continue;
+                }
+                $content = (string) ($block ?? '');
+            }
+
+            if ($this->pageBodyBlockEditorMode($type) === 'gallery') {
+                $hasGalleryBlock = true;
+                continue;
+            }
+
+            $html = $this->renderPageBodyBlockByType($type, $content);
+            if (trim($html) === '') {
+                continue;
+            }
+
+            $renderedBlocks[] = [
+                'html' => $html,
+                'css_id' => $cssId,
+                'css_class' => $cssClass,
+            ];
+        }
+
+        $page['extended_blocks'] = $renderedBlocks;
+        if ($hasGalleryBlock) {
+            $page['gallery_enabled'] = 1;
+        }
+
+        return $page;
+    }
+
+    /**
+     * Returns true when at least one typed body block requests gallery output.
+     *
+     * @param array<string, mixed> $page
+     */
+    private function pageBodyIncludesGalleryBlock(array $page): bool
+    {
+        $rawBlocks = $page['extended_blocks'] ?? null;
+        if (!is_array($rawBlocks)) {
+            return false;
+        }
+
+        foreach ($rawBlocks as $block) {
+            if (!is_array($block)) {
+                continue;
+            }
+
+            if ($this->pageBodyBlockEditorMode((string) ($block['type'] ?? '')) === 'gallery') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Renders one body block into public HTML.
+     */
+    private function renderPageBodyBlockByType(string $type, string $content): string
+    {
+        $type = $this->normalizePageBodyBlockType($type);
+        $content = str_replace("\0", '', $content);
+
+        return match ($this->pageBodyBlockEditorMode($type)) {
+            'plaintext' => '<div class="raven-page-body-plaintext" style="white-space: pre-wrap;">'
+                . $this->escapeHtml($content)
+                . '</div>',
+            'autobr' => '<div class="raven-page-body-autobr">'
+                . $this->escapeNewlinesAsBreaks($content)
+                . '</div>',
+            'markdown' => $this->renderMarkdownBlockContent($content),
+            'markdown_file' => $this->renderMarkdownFileBlock($content),
+            'gallery' => '',
+            default => $this->renderEmbeddedForms($content),
+        };
+    }
+
+    /**
+     * Normalizes one optional body-block CSS id token.
+     */
+    private function normalizeBodyBlockCssId(mixed $value): string
+    {
+        if (!is_scalar($value) && $value !== null) {
+            return '';
+        }
+
+        $id = str_replace("\0", '', trim((string) ($value ?? '')));
+        $id = ltrim($id, '#');
+        if ($id === '') {
+            return '';
+        }
+
+        if (mb_strlen($id) > 120) {
+            $id = mb_substr($id, 0, 120);
+        }
+
+        return preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/', $id) === 1
+            ? $id
+            : '';
+    }
+
+    /**
+     * Normalizes optional body-block CSS class list into one space-delimited value.
+     */
+    private function normalizeBodyBlockCssClassList(mixed $value): string
+    {
+        if (!is_scalar($value) && $value !== null) {
+            return '';
+        }
+
+        $raw = str_replace("\0", '', trim((string) ($value ?? '')));
+        if ($raw === '') {
+            return '';
+        }
+
+        $classMap = [];
+        $classes = [];
+        foreach (preg_split('/[\s,]+/', $raw) ?: [] as $token) {
+            $token = ltrim(trim((string) $token), '.');
+            if ($token === '' || preg_match('/^[a-zA-Z0-9_-]{1,80}$/', $token) !== 1) {
+                continue;
+            }
+
+            $key = strtolower($token);
+            if (isset($classMap[$key])) {
+                continue;
+            }
+
+            $classMap[$key] = true;
+            $classes[] = $token;
+            if (count($classes) >= 12) {
+                break;
+            }
+        }
+
+        return implode(' ', $classes);
+    }
+
+    /**
+     * Normalizes one page body-block type value.
+     */
+    private function normalizePageBodyBlockType(string $value): string
+    {
+        $type = strtolower(trim($value));
+        if ($type === '') {
+            return 'tinymce';
+        }
+
+        $definitions = $this->pageBodyBlockTypeDefinitions();
+        return array_key_exists($type, $definitions) ? $type : 'tinymce';
+    }
+
+    /**
+     * Resolves editor mode for one public page body-block type key.
+     */
+    private function pageBodyBlockEditorMode(string $type): string
+    {
+        $normalized = strtolower(trim($type));
+        if ($normalized === '') {
+            return 'tinymce';
+        }
+
+        $definitions = $this->pageBodyBlockTypeDefinitions();
+        $editor = strtolower(trim((string) ($definitions[$normalized]['editor'] ?? 'tinymce')));
+        return in_array($editor, ['tinymce', 'plaintext', 'autobr', 'markdown', 'markdown_file', 'gallery'], true)
+            ? $editor
+            : 'tinymce';
+    }
+
+    /**
+     * Returns public page body-block type definitions.
+     *
+     * @return array<string, array{label: string, editor: string}>
+     */
+    private function pageBodyBlockTypeDefinitions(): array
+    {
+        if (is_array($this->pageBodyBlockTypeDefinitionsCache)) {
+            return $this->pageBodyBlockTypeDefinitionsCache;
+        }
+
+        $definitions = [
+            'tinymce' => ['label' => 'Rich Text', 'editor' => 'tinymce'],
+            'plaintext' => ['label' => 'Plaintext', 'editor' => 'plaintext'],
+            'autobr' => ['label' => 'Auto <br>', 'editor' => 'autobr'],
+            'markdown' => ['label' => 'Markdown', 'editor' => 'markdown'],
+            'markdown_file' => ['label' => 'Markdown File', 'editor' => 'markdown_file'],
+            'image_gallery' => ['label' => 'Image Gallery', 'editor' => 'gallery'],
+        ];
+
+        $root = dirname(__DIR__, 3);
+        foreach (ExtensionRegistry::enabledDirectories($root, true) as $extensionName) {
+            $manifest = ExtensionRegistry::readManifest($root, $extensionName);
+            if (
+                !is_array($manifest)
+                || !in_array((string) ($manifest['type'] ?? ''), ['content', 'plugin', 'module'], true)
+            ) {
+                continue;
+            }
+
+            $fields = ExtensionRegistry::fields(
+                $root,
+                (string) $extensionName,
+                [
+                    'extension' => (string) $extensionName,
+                ]
+            );
+            if ($fields === null) {
+                continue;
+            }
+
+            foreach ($fields as $entry) {
+                $slug = $this->input->slug((string) ($entry['slug'] ?? ''));
+                if ($slug === null || $slug === '') {
+                    continue;
+                }
+
+                $normalizedSlug = str_replace('-', '_', strtolower($slug));
+                $normalizedExtension = str_replace('-', '_', strtolower($extensionName));
+                $type = 'content_' . $normalizedExtension . '_' . $normalizedSlug;
+                if (isset($definitions[$type]) || preg_match('/^[a-z0-9_]{1,120}$/', $type) !== 1) {
+                    continue;
+                }
+
+                $label = $this->input->text((string) ($entry['label'] ?? ''), 120);
+                $editor = strtolower(trim((string) ($entry['editor'] ?? 'tinymce')));
+                if ($label === '' || !in_array($editor, ['tinymce', 'plaintext', 'autobr', 'markdown', 'markdown_file'], true)) {
+                    continue;
+                }
+
+                $definitions[$type] = [
+                    'label' => $label,
+                    'editor' => $editor,
+                ];
+            }
+        }
+
+        $this->pageBodyBlockTypeDefinitionsCache = $definitions;
+        return $definitions;
+    }
+
+    /**
+     * Renders markdown text block content into HTML.
+     */
+    private function renderMarkdownBlockContent(string $markdown): string
+    {
+        $html = $this->simpleMarkdownToHtml($markdown);
+        if (trim($html) === '') {
+            return '';
+        }
+
+        return $this->renderEmbeddedForms($html);
+    }
+
+    /**
+     * Renders markdown from one local project path.
+     */
+    private function renderMarkdownFileBlock(string $pathInput): string
+    {
+        $markdown = $this->loadLocalMarkdownFileForBlock($pathInput);
+        if ($markdown === null) {
+            return '';
+        }
+
+        return $this->renderMarkdownBlockContent($markdown);
+    }
+
+    /**
+     * Loads markdown content from one local path under project root.
+     */
+    private function loadLocalMarkdownFileForBlock(string $pathInput): ?string
+    {
+        $path = trim($pathInput);
+        if ($path === '') {
+            return null;
+        }
+
+        $path = (string) preg_replace('/[?#].*$/', '', $path);
+        if ($path === '') {
+            return null;
+        }
+
+        $path = str_replace('\\', '/', $path);
+        if (preg_match('/\.(?:md|markdown)$/i', $path) !== 1) {
+            return null;
+        }
+
+        $projectRoot = realpath(dirname(__DIR__, 3));
+        if (!is_string($projectRoot) || $projectRoot === '') {
+            return null;
+        }
+
+        $projectRootPrefix = rtrim($projectRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        $trimmedPath = trim($path);
+        if ($trimmedPath === '') {
+            return null;
+        }
+
+        $candidatePath = $projectRoot . '/' . ltrim($trimmedPath, '/');
+        if ($candidatePath === '') {
+            return null;
+        }
+
+        $resolved = realpath($candidatePath);
+        if (!is_string($resolved) || $resolved === '') {
+            return null;
+        }
+
+        if (!str_starts_with($resolved, $projectRootPrefix) || !is_file($resolved) || !is_readable($resolved)) {
+            return null;
+        }
+
+        $content = @file_get_contents($resolved, false, null, 0, 1048576);
+        if (!is_string($content) || $content === '') {
+            return null;
+        }
+
+        return str_replace("\0", '', $content);
+    }
+
+    /**
+     * Converts markdown into basic safe HTML.
+     */
+    private function simpleMarkdownToHtml(string $markdown): string
+    {
+        $markdown = str_replace(["\r\n", "\r"], "\n", $markdown);
+        $markdown = trim($markdown);
+        if ($markdown === '') {
+            return '';
+        }
+
+        // Extract fenced code blocks before paragraph chunking so blank lines inside
+        // code fences are preserved.
+        $codeBlockPlaceholders = [];
+        $processedLines = [];
+        $isInFence = false;
+        $fenceChar = '';
+        $fenceLength = 0;
+        $fenceLines = [];
+        $lines = preg_split('/\n/', $markdown) ?: [];
+        foreach ($lines as $line) {
+            if (!$isInFence) {
+                if (preg_match('/^([`~]{3,})(?:\s*[a-z0-9_-]+)?\s*$/i', $line, $matches) === 1) {
+                    $fence = (string) ($matches[1] ?? '');
+                    if ($fence !== '') {
+                        $isInFence = true;
+                        $fenceChar = substr($fence, 0, 1);
+                        $fenceLength = strlen($fence);
+                        $fenceLines = [];
+                        continue;
+                    }
+                }
+
+                $processedLines[] = $line;
+                continue;
+            }
+
+            $closingFencePattern = '/^' . preg_quote($fenceChar, '/') . '{' . $fenceLength . ',}\s*$/';
+            if (preg_match($closingFencePattern, $line) === 1) {
+                $token = '__RAVEN_FENCED_CODE_' . count($codeBlockPlaceholders) . '__';
+                $codeBlockPlaceholders[$token] = '<pre><code>' . $this->escapeHtml(implode("\n", $fenceLines)) . '</code></pre>';
+                $processedLines[] = '';
+                $processedLines[] = $token;
+                $processedLines[] = '';
+                $isInFence = false;
+                $fenceChar = '';
+                $fenceLength = 0;
+                $fenceLines = [];
+                continue;
+            }
+
+            $fenceLines[] = $line;
+        }
+
+        if ($isInFence) {
+            $token = '__RAVEN_FENCED_CODE_' . count($codeBlockPlaceholders) . '__';
+            $codeBlockPlaceholders[$token] = '<pre><code>' . $this->escapeHtml(implode("\n", $fenceLines)) . '</code></pre>';
+            $processedLines[] = '';
+            $processedLines[] = $token;
+            $processedLines[] = '';
+        }
+
+        $markdown = trim(implode("\n", $processedLines));
+        if ($markdown === '') {
+            return '';
+        }
+
+        $parts = [];
+        $paragraphLines = [];
+        $lines = preg_split('/\n/', $markdown) ?: [];
+        $lineCount = count($lines);
+        $lineIndex = 0;
+
+        $flushParagraph = function () use (&$paragraphLines, &$parts): void {
+            if ($paragraphLines === []) {
+                return;
+            }
+
+            $paragraphText = trim(implode("\n", $paragraphLines));
+            $paragraphLines = [];
+            if ($paragraphText === '') {
+                return;
+            }
+
+            $parts[] = '<p>' . nl2br($this->renderMarkdownInline($paragraphText), false) . '</p>';
+        };
+
+        while ($lineIndex < $lineCount) {
+            $line = (string) ($lines[$lineIndex] ?? '');
+            $trimmedLine = trim($line);
+
+            if ($trimmedLine === '') {
+                $flushParagraph();
+                $lineIndex++;
+                continue;
+            }
+
+            if (isset($codeBlockPlaceholders[$trimmedLine])) {
+                $flushParagraph();
+                $parts[] = (string) $codeBlockPlaceholders[$trimmedLine];
+                $lineIndex++;
+                continue;
+            }
+
+            if (preg_match('/^(#{1,6})\s+(.+)$/', $trimmedLine, $headingMatches) === 1) {
+                $flushParagraph();
+                $level = strlen((string) ($headingMatches[1] ?? '#'));
+                $text = (string) ($headingMatches[2] ?? '');
+                $parts[] = '<h' . $level . '>' . $this->renderMarkdownInline($text) . '</h' . $level . '>';
+                $lineIndex++;
+                continue;
+            }
+
+            if (preg_match('/^[-*+]\s+(.+)$/', $trimmedLine, $listMatches) === 1) {
+                $flushParagraph();
+                $items = [];
+                while ($lineIndex < $lineCount) {
+                    $listLine = trim((string) ($lines[$lineIndex] ?? ''));
+                    if (preg_match('/^[-*+]\s+(.+)$/', $listLine, $itemMatches) !== 1) {
+                        break;
+                    }
+
+                    $items[] = '<li>' . $this->renderMarkdownInline((string) ($itemMatches[1] ?? '')) . '</li>';
+                    $lineIndex++;
+                }
+
+                if ($items !== []) {
+                    $parts[] = '<ul>' . implode('', $items) . '</ul>';
+                }
+                continue;
+            }
+
+            if (preg_match('/^\d+\.\s+(.+)$/', $trimmedLine, $orderedListMatches) === 1) {
+                $flushParagraph();
+                $items = [];
+                while ($lineIndex < $lineCount) {
+                    $listLine = trim((string) ($lines[$lineIndex] ?? ''));
+                    if (preg_match('/^\d+\.\s+(.+)$/', $listLine, $itemMatches) !== 1) {
+                        break;
+                    }
+
+                    $items[] = '<li>' . $this->renderMarkdownInline((string) ($itemMatches[1] ?? '')) . '</li>';
+                    $lineIndex++;
+                }
+
+                if ($items !== []) {
+                    $parts[] = '<ol>' . implode('', $items) . '</ol>';
+                }
+                continue;
+            }
+
+            if (preg_match('/^>\s?.+$/', $trimmedLine) === 1) {
+                $flushParagraph();
+                $quoteLines = [];
+                while ($lineIndex < $lineCount) {
+                    $quoteLine = trim((string) ($lines[$lineIndex] ?? ''));
+                    if (preg_match('/^>\s?.+$/', $quoteLine) !== 1) {
+                        break;
+                    }
+
+                    $quoteLines[] = (string) preg_replace('/^>\s?/', '', $quoteLine);
+                    $lineIndex++;
+                }
+
+                if ($quoteLines !== []) {
+                    $quoteText = implode("\n", $quoteLines);
+                    $parts[] = '<blockquote><p>' . nl2br($this->renderMarkdownInline($quoteText), false) . '</p></blockquote>';
+                }
+                continue;
+            }
+
+            $paragraphLines[] = $line;
+            $lineIndex++;
+        }
+
+        $flushParagraph();
+        return implode("\n", $parts);
+    }
+
+    /**
+     * Renders markdown inline tokens within one text fragment.
+     */
+    private function renderMarkdownInline(string $text): string
+    {
+        $escaped = $this->escapeHtml($text);
+        $codePlaceholders = [];
+        $escaped = preg_replace_callback('/`([^`]+)`/', function (array $matches) use (&$codePlaceholders): string {
+            $token = '%%RAVENCODE' . count($codePlaceholders) . '%%';
+            $codePlaceholders[$token] = '<code>' . $this->escapeHtml((string) ($matches[1] ?? '')) . '</code>';
+            return $token;
+        }, $escaped) ?? $escaped;
+
+        $escaped = preg_replace_callback('/\[(.+?)\]\((.+?)\)/', function (array $matches): string {
+            $label = (string) ($matches[1] ?? '');
+            $url = $this->normalizeMarkdownLinkUrl((string) ($matches[2] ?? ''));
+            if ($url === null) {
+                return $this->escapeHtml($label);
+            }
+
+            return '<a href="' . $this->escapeHtml($url) . '">' . $this->escapeHtml($label) . '</a>';
+        }, $escaped) ?? $escaped;
+
+        $escaped = preg_replace('/\*\*([^*]+)\*\*/', '<strong>$1</strong>', $escaped) ?? $escaped;
+        $escaped = preg_replace('/__([^_]+)__/', '<strong>$1</strong>', $escaped) ?? $escaped;
+        $escaped = preg_replace('/\*([^*\n]+)\*/', '<em>$1</em>', $escaped) ?? $escaped;
+        $escaped = preg_replace('/_([^_\n]+)_/', '<em>$1</em>', $escaped) ?? $escaped;
+
+        foreach ($codePlaceholders as $token => $html) {
+            $escaped = str_replace($token, $html, $escaped);
+        }
+
+        return $escaped;
+    }
+
+    /**
+     * Normalizes one markdown link URL.
+     */
+    private function normalizeMarkdownLinkUrl(string $url): ?string
+    {
+        $url = html_entity_decode(trim($url), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($url === '') {
+            return null;
+        }
+
+        // Support standard markdown link syntax variants:
+        // - [label](https://example.com "Title")
+        // - [label](<https://example.com>)
+        if (preg_match('/^(<[^>]+>|\\S+)(?:\\s+["\'][^"\']*["\'])?$/u', $url, $matches) === 1) {
+            $url = (string) ($matches[1] ?? $url);
+        }
+        $url = trim($url, "<> \t\n\r\0\x0B");
+        if ($url === '') {
+            return null;
+        }
+
+        // Reject control characters and dangerous protocol-relative URLs.
+        if (preg_match('/[\x00-\x1F\x7F]/', $url) === 1 || str_starts_with($url, '//')) {
+            return null;
+        }
+
+        // Keep same-page fragment links.
+        if (str_starts_with($url, '#')) {
+            return $url;
+        }
+
+        if (str_starts_with($url, '/')) {
+            return $url;
+        }
+
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        if ($scheme !== '') {
+            if (!in_array($scheme, ['http', 'https'], true)) {
+                return null;
+            }
+
+            return filter_var($url, FILTER_VALIDATE_URL) === false ? null : $url;
+        }
+
+        // Keep relative links (`./file.md`, `../dir/file.md`, `docs/file.md`, etc).
+        if (str_contains($url, '\\')) {
+            return null;
+        }
+
+        return $url;
+    }
+
+    /**
+     * Escapes HTML while preserving UTF-8 text.
+     */
+    private function escapeHtml(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    /**
+     * Escapes text and converts newlines into `<br>` tag.
+     */
+    private function escapeNewlinesAsBreaks(string $value): string
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", $value);
+        return nl2br($this->escapeHtml($normalized), false);
+    }
+
+    /**
+     * Returns configured category-list route prefix.
+     */
+    private function categoryRoutePrefix(): string
+    {
+        if (!$this->categoryEnabled()) {
+            return '';
+        }
+
+        return $this->normalizeTaxonomyRoutePrefix((string) $this->config->get('category.prefix', 'cat'), 'cat', true);
+    }
+
+    /**
+     * Returns configured tag-list route prefix.
+     */
+    private function tagRoutePrefix(): string
+    {
+        if (!$this->tagEnabled()) {
+            return '';
+        }
+
+        return $this->normalizeTaxonomyRoutePrefix((string) $this->config->get('tag.prefix', 'tag'), 'tag', true);
+    }
+
+    /**
+     * Returns true when category taxonomy is enabled.
+     */
+    private function categoryEnabled(): bool
+    {
+        return $this->configBool($this->config->get('category.enabled', true), true);
+    }
+
+    /**
+     * Returns true when tag taxonomy is enabled.
+     */
+    private function tagEnabled(): bool
+    {
+        return $this->configBool($this->config->get('tag.enabled', true), true);
+    }
+
+    /**
+     * Normalizes one config scalar to a boolean value.
+     */
+    private function configBool(mixed $value, bool $default = false): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return ((int) $value) !== 0;
+        }
+
+        if (is_string($value)) {
+            $normalized = strtolower(trim($value));
+            if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
+                return true;
+            }
+
+            if (in_array($normalized, ['0', 'false', 'no', 'off'], true)) {
+                return false;
+            }
+        }
+
+        return $default;
+    }
+
+    /**
+     * Returns configured public profile route prefix.
+     */
+    private function profileRoutePrefix(): string
+    {
+        return $this->normalizeTaxonomyRoutePrefix((string) $this->config->get('user.prefix', 'user'), 'user', true);
+    }
+
+    /**
+     * Returns configured public profile mode.
+     */
+    private function profileMode(): string
+    {
+        $mode = strtolower(trim((string) $this->config->get('user.privacy', 'disabled')));
+        if (!in_array($mode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
+            return 'disabled';
+        }
+
+        return $mode;
+    }
+
+    /**
+     * Returns configured public group route prefix.
+     */
+    private function groupRoutePrefix(): string
+    {
+        return $this->normalizeTaxonomyRoutePrefix((string) $this->config->get('group.prefix', 'group'), 'group', true);
+    }
+
+    /**
+     * Returns configured public group mode.
+     */
+    private function groupMode(): string
+    {
+        $mode = strtolower(trim((string) $this->config->get('group.privacy', 'disabled')));
+        if ($mode === 'public') {
+            $mode = 'public_full';
+        }
+        if (!in_array($mode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
+            return 'disabled';
+        }
+
+        return $mode;
+    }
+
+    /**
+     * Normalizes one taxonomy route-prefix value and falls back safely.
+     */
+    private function normalizeTaxonomyRoutePrefix(string $configured, string $fallback, bool $allowBlank = false): string
+    {
+        $configured = trim($configured);
+        if ($allowBlank && $configured === '') {
+            return '';
+        }
+
+        $slug = $this->input->slug($configured);
+        if ($slug === null || $slug === '') {
+            return $fallback;
+        }
+
+        return $slug;
+    }
+
+    /**
+     * Expands pagination payload into template-ready link rows.
+     *
+     * @param array<string, mixed> $pagination
+     * @return array<string, mixed>
+     */
+    private function decoratePaginationForTemplate(array $pagination): array
+    {
+        $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
+        $current = max(1, (int) ($pagination['current'] ?? 1));
+        $basePath = trim((string) ($pagination['base_path'] ?? ''));
+        if ($basePath === '') {
+            $basePath = '/';
+        }
+
+        $links = [];
+        for ($i = 1; $i <= $totalPages; $i++) {
+            $links[] = [
+                'label' => (string) $i,
+                // Page 1 omits the extra segment by specification.
+                'href' => $basePath . ($i === 1 ? '' : '/' . $i),
+                'is_current' => $i === $current,
+            ];
+        }
+
+        $pagination['links'] = $links;
+        return $pagination;
+    }
+
+    /**
+     * Adds template-friendly derived keys for page render views.
+     *
+     * @param array<string, mixed> $page
+     * @return array<string, mixed>
+     */
+    private function decoratePageForTemplate(array $page): array
+    {
+        $page['display_title_resolved'] = !array_key_exists('display_title', $page)
+            || (int) ($page['display_title'] ?? 1) === 1;
+
+        $rawBlocks = is_array($page['extended_blocks'] ?? null) ? $page['extended_blocks'] : [];
+        $hasBodyContent = trim((string) ($page['content'] ?? '')) !== '';
+        $renderedBlocks = [];
+        $displayIndex = 0;
+
+        foreach ($rawBlocks as $block) {
+            if (!is_array($block)) {
+                continue;
+            }
+
+            $html = trim((string) ($block['html'] ?? ''));
+            if ($html === '') {
+                continue;
+            }
+
+            $displayIndex++;
+            $classNames = [
+                'raven-page-extended-block',
+                'raven-page-extended-block-' . $displayIndex,
+            ];
+
+            if ($hasBodyContent || $displayIndex > 1) {
+                array_unshift($classNames, 'mt-3');
+            }
+
+            $customClass = trim((string) ($block['css_class'] ?? ''));
+            if ($customClass !== '') {
+                $classNames[] = $customClass;
+            }
+
+            $renderedBlocks[] = [
+                'html' => $html,
+                'css_id' => trim((string) ($block['css_id'] ?? '')),
+                'class' => trim(implode(' ', $classNames)),
+            ];
+        }
+
+        $page['extended_blocks'] = $renderedBlocks;
+        return $page;
+    }
+
+    /**
+     * Adds template-ready URL fields for gallery image rows.
+     *
+     * @param array<int, array<string, mixed>> $galleryImages
+     * @return array<int, array<string, mixed>>
+     */
+    private function decorateGalleryImagesForTemplate(array $galleryImages): array
+    {
+        foreach ($galleryImages as $index => $image) {
+            if (!is_array($image)) {
+                continue;
+            }
+
+            $variants = is_array($image['variants'] ?? null) ? $image['variants'] : [];
+            $imageUrl = trim((string) (($variants['md']['url'] ?? '') ?: ($image['url'] ?? '')));
+            $fullUrl = trim((string) (($variants['lg']['url'] ?? '') ?: $imageUrl));
+
+            $galleryImages[$index]['image_url'] = $imageUrl;
+            $galleryImages[$index]['full_url'] = $fullUrl;
+            $galleryImages[$index]['alt_text'] = (string) ($image['alt_text'] ?? '');
+            $galleryImages[$index]['caption'] = (string) ($image['caption'] ?? '');
+        }
+
+        return $galleryImages;
+    }
+
+    /**
+     * Adds template-friendly derived keys to one public profile payload.
+     *
+     * @param array<string, mixed> $profile
+     * @return array<string, mixed>
+     */
+    private function decorateProfileForTemplate(array $profile): array
+    {
+        $displayName = trim((string) ($profile['display_name'] ?? ''));
+        $username = trim((string) ($profile['username'] ?? ''));
+        $profile['display_name_resolved'] = $displayName !== '' ? $displayName : $username;
+
+        $avatar = $this->avatarTemplateDataFromPath((string) ($profile['avatar_path'] ?? ''));
+        $profile['avatar_filename'] = $avatar['filename'];
+        $profile['avatar_url'] = $avatar['url'];
+        $profile['avatar_thumb_url'] = $avatar['thumb_url'];
+        $profile['has_avatar'] = $avatar['filename'] !== '';
+
+        $contacts = is_array($profile['contact_profiles'] ?? null) ? $profile['contact_profiles'] : [];
+        foreach ($contacts as $index => $contact) {
+            if (!is_array($contact)) {
+                continue;
+            }
+
+            $href = trim((string) ($contact['href'] ?? ''));
+            $contacts[$index]['is_external'] = preg_match('#^https?://#i', $href) === 1;
+        }
+        $profile['contact_profiles'] = $contacts;
+
+        return $profile;
+    }
+
+    /**
+     * Adds template-friendly member rows for group list templates.
+     *
+     * @param array<int, array<string, mixed>> $members
+     * @return array<int, array<string, mixed>>
+     */
+    private function decorateGroupMembersForTemplate(array $members): array
+    {
+        foreach ($members as $index => $member) {
+            if (!is_array($member)) {
+                continue;
+            }
+
+            $displayName = trim((string) ($member['display_name'] ?? ''));
+            $username = trim((string) ($member['username'] ?? ''));
+            $members[$index]['display_name_resolved'] = $displayName !== '' ? $displayName : $username;
+
+            $avatar = $this->avatarTemplateDataFromPath((string) ($member['avatar_path'] ?? ''));
+            $members[$index]['avatar_filename'] = $avatar['filename'];
+            $members[$index]['avatar_url'] = $avatar['url'];
+            $members[$index]['avatar_thumb_url'] = $avatar['thumb_url'];
+            $members[$index]['has_avatar'] = $avatar['filename'] !== '';
+        }
+
+        return $members;
+    }
+
+    /**
+     * Adds derived fields for group templates.
+     *
+     * @param array<string, mixed> $group
+     * @param array<int, array<string, mixed>> $members
+     * @return array<string, mixed>
+     */
+    private function decorateGroupForTemplate(array $group, array $members): array
+    {
+        $group['member_count_resolved'] = max(count($members), (int) ($group['member_count'] ?? 0));
+        return $group;
+    }
+
+    /**
+     * Builds template-facing avatar URL values from stored avatar path.
+     *
+     * @return array{filename: string, url: string, thumb_url: string}
+     */
+    private function avatarTemplateDataFromPath(string $avatarPath): array
+    {
+        $avatarFilename = basename(trim($avatarPath));
+        if ($avatarFilename === '') {
+            return ['filename' => '', 'url' => '', 'thumb_url' => ''];
+        }
+
+        $avatarBase = (string) pathinfo($avatarFilename, PATHINFO_FILENAME);
+        $avatarThumbFilename = $avatarBase !== '' ? $avatarBase . '_thumb.jpg' : $avatarFilename;
+
+        return [
+            'filename' => $avatarFilename,
+            'url' => '/uploads/avatars/' . rawurlencode($avatarFilename),
+            'thumb_url' => '/uploads/avatars/' . rawurlencode($avatarThumbFilename),
+        ];
+    }
+
+    /**
+     * Injects shared wrapper metadata derived from route payloads.
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function decorateTemplateData(array $data): array
+    {
+        $site = is_array($data['site'] ?? null) ? $data['site'] : [];
+
+        $siteName = trim((string) ($site['name'] ?? 'Raven CMS'));
+        if ($siteName === '') {
+            $siteName = 'Raven CMS';
+        }
+        $site['name'] = $siteName;
+
+        $publicThemeCss = trim((string) ($site['public_theme_css'] ?? $site['public_theme'] ?? 'raven'));
+        if ($publicThemeCss === '') {
+            $publicThemeCss = 'raven';
+        }
+        $site['public_theme_css'] = $publicThemeCss;
+
+        if (trim((string) ($site['twitter_site'] ?? '')) === '') {
+            $site['twitter_site'] = $siteName;
+        }
+        if (trim((string) ($site['og_type'] ?? '')) === '') {
+            $site['og_type'] = 'website';
+        }
+        if (trim((string) ($site['og_locale'] ?? '')) === '') {
+            $site['og_locale'] = 'en_US';
+        }
+
+        $viewTitle = '';
+        $metaDescription = '';
+        $pagination = is_array($data['pagination'] ?? null) ? $data['pagination'] : [];
+        $pageNumber = max(1, (int) ($pagination['current'] ?? 1));
+
+        if (is_array($data['page'] ?? null)) {
+            $viewTitle = trim((string) ($data['page']['title'] ?? ''));
+            $metaDescription = trim((string) ($data['page']['description'] ?? ''));
+        } elseif (is_array($data['category'] ?? null)) {
+            $categoryName = trim((string) ($data['category']['name'] ?? ''));
+            if ($categoryName !== '') {
+                $viewTitle = 'Category: ' . $categoryName;
+                if ($pageNumber > 1) {
+                    $viewTitle .= ' (Page ' . $pageNumber . ')';
+                }
+
+                $metaDescription = trim((string) ($data['category']['description'] ?? ''));
+                if ($metaDescription === '') {
+                    $metaDescription = 'Browse pages in category ' . $categoryName . '.';
+                }
+            }
+        } elseif (is_array($data['tag'] ?? null)) {
+            $tagName = trim((string) ($data['tag']['name'] ?? ''));
+            if ($tagName !== '') {
+                $viewTitle = 'Tag: ' . $tagName;
+                if ($pageNumber > 1) {
+                    $viewTitle .= ' (Page ' . $pageNumber . ')';
+                }
+
+                $metaDescription = 'Browse pages tagged ' . $tagName . '.';
+            }
+        } elseif (is_array($data['profile'] ?? null)) {
+            $profileName = trim((string) ($data['profile']['display_name_resolved'] ?? $data['profile']['display_name'] ?? ''));
+            if ($profileName === '') {
+                $profileName = trim((string) ($data['profile']['username'] ?? ''));
+            }
+            if ($profileName !== '') {
+                $viewTitle = 'Profile: ' . $profileName;
+                $metaDescription = 'Public profile for ' . $profileName . '.';
+            }
+        } elseif (is_array($data['group'] ?? null)) {
+            $groupName = trim((string) ($data['group']['name'] ?? ''));
+            if ($groupName !== '') {
+                $viewTitle = 'Group: ' . $groupName;
+                $metaDescription = 'Members in group ' . $groupName . '.';
+            }
+        }
+
+        if ($viewTitle === '' && http_response_code() === 404) {
+            $viewTitle = 'Not Found';
+            if ($metaDescription === '') {
+                $metaDescription = 'The requested page could not be found.';
+            }
+        }
+
+        $documentTitle = $viewTitle === '' ? $siteName : ($viewTitle . ' [' . $siteName . ']');
+
+        $data['site'] = $site;
+        $data['view_meta'] = [
+            'title' => $viewTitle,
+            'description' => $metaDescription,
+            'document_title' => $documentTitle,
+        ];
+
+        return $data;
+    }
+
+    /**
+     * Renders one public template with theme-aware lookup and private fallback.
+     *
+     * Theme lookup order:
+     * 1) `public/theme/{active_theme}/vis/{template}.php`
+     * 2) `private/vis/{template}.php`
+     *
+     * @param array<string, mixed> $data
+     */
+    private function renderPublic(string $template, array $data = [], ?string $layout = null): void
+    {
+        $data = $this->decorateTemplateData($data);
+
+        $themeViewsRoots = $this->currentPublicThemeViewsRoots();
+        $coreViewsRoot = dirname(__DIR__, 3) . '/private/vis';
+        $lookupRoots = [...$themeViewsRoots, $coreViewsRoot];
+
+        $templateFile = $this->resolvePublicTemplateFile($template, ...$lookupRoots);
+        if ($templateFile === null) {
+            throw new \RuntimeException('Public template not found: ' . $template);
+        }
+
+        $content = $this->renderPublicTemplateFile($templateFile, $data);
+        if ($layout === null) {
+            echo $content;
+            return;
+        }
+
+        $layoutFile = $this->resolvePublicTemplateFile($layout, ...$lookupRoots);
+        if ($layoutFile === null) {
+            throw new \RuntimeException('Public layout not found: ' . $layout);
+        }
+
+        $layoutData = $data;
+        $layoutData['content'] = $content;
+        echo $this->renderPublicTemplateFile($layoutFile, $layoutData);
+    }
+
+    /**
+     * Returns active public theme views roots, child first.
+     *
+     * @return array<int, string>
+     */
+    private function currentPublicThemeViewsRoots(): array
+    {
+        $roots = [];
+        $themeSlug = $this->currentPublicThemeSlug();
+        foreach ($this->currentPublicThemeInheritanceChain($themeSlug) as $candidateThemeSlug) {
+            $themeViewsRoot = $this->publicThemesRoot() . '/' . $candidateThemeSlug . '/vis';
+            if (is_dir($themeViewsRoot)) {
+                $roots[] = $themeViewsRoot;
+            }
+        }
+
+        return $roots;
+    }
+
+    /**
+     * Resolves one public template path from ordered roots.
+     */
+    private function resolvePublicTemplateFile(string $template, string ...$roots): ?string
+    {
+        $relative = trim($template, '/') . '.php';
+
+        foreach ($roots as $root) {
+            if ($root === '') {
+                continue;
+            }
+
+            $candidate = rtrim($root, '/\\') . '/' . $relative;
+            if (is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolves channel landing template name with slug-specific override support.
+     *
+     * Priority:
+     * 1) `vis/channels/{channel_slug}.php`
+     * 2) `vis/channels/index.php`
+     */
+    private function resolveChannelTemplateName(string $channelSlug): string
+    {
+        $normalizedSlug = $this->input->slug($channelSlug);
+        if ($normalizedSlug === null) {
+            return 'channels/index';
+        }
+
+        $themeViewsRoots = $this->currentPublicThemeViewsRoots();
+        $coreViewsRoot = dirname(__DIR__, 3) . '/private/vis';
+        $lookupRoots = [...$themeViewsRoots, $coreViewsRoot];
+
+        $slugTemplate = 'channels/' . $normalizedSlug;
+        if ($this->resolvePublicTemplateFile($slugTemplate, ...$lookupRoots) !== null) {
+            return $slugTemplate;
+        }
+
+        return 'channels/index';
+    }
+
+    /**
+     * Resolves public page template with optional channel-specific override.
+     *
+     * Priority:
+     * 1) `vis/pages/{channel_slug}.php` when route has a channel
+     * 2) `vis/pages/index.php`
+     */
+    private function resolvePageTemplateName(?string $channelSlug): string
+    {
+        $themeViewsRoots = $this->currentPublicThemeViewsRoots();
+        $coreViewsRoot = dirname(__DIR__, 3) . '/private/vis';
+        $lookupRoots = [...$themeViewsRoots, $coreViewsRoot];
+
+        if ($channelSlug !== null) {
+            $normalizedSlug = $this->input->slug($channelSlug);
+            if ($normalizedSlug !== null) {
+                $channelTemplate = 'pages/' . $normalizedSlug;
+                if ($this->resolvePublicTemplateFile($channelTemplate, ...$lookupRoots) !== null) {
+                    return $channelTemplate;
+                }
+            }
+        }
+
+        return 'pages/index';
+    }
+
+    /**
+     * Resolves category-list template name with category-slug override support.
+     *
+     * Priority:
+     * 1) `vis/categories/{category_slug}.php`
+     * 2) `vis/categories/index.php`
+     */
+    private function resolveCategoryTemplateName(string $categorySlug): string
+    {
+        $normalizedSlug = $this->input->slug($categorySlug);
+        if ($normalizedSlug === null) {
+            return 'categories/index';
+        }
+
+        $themeViewsRoots = $this->currentPublicThemeViewsRoots();
+        $coreViewsRoot = dirname(__DIR__, 3) . '/private/vis';
+        $lookupRoots = [...$themeViewsRoots, $coreViewsRoot];
+
+        $slugTemplate = 'categories/' . $normalizedSlug;
+        if ($this->resolvePublicTemplateFile($slugTemplate, ...$lookupRoots) !== null) {
+            return $slugTemplate;
+        }
+
+        return 'categories/index';
+    }
+
+    /**
+     * Resolves tag-list template name with tag-slug override support.
+     *
+     * Priority:
+     * 1) `vis/tags/{tag_slug}.php`
+     * 2) `vis/tags/index.php`
+     */
+    private function resolveTagTemplateName(string $tagSlug): string
+    {
+        $normalizedSlug = $this->input->slug($tagSlug);
+        if ($normalizedSlug === null) {
+            return 'tags/index';
+        }
+
+        $themeViewsRoots = $this->currentPublicThemeViewsRoots();
+        $coreViewsRoot = dirname(__DIR__, 3) . '/private/vis';
+        $lookupRoots = [...$themeViewsRoots, $coreViewsRoot];
+
+        $slugTemplate = 'tags/' . $normalizedSlug;
+        if ($this->resolvePublicTemplateFile($slugTemplate, ...$lookupRoots) !== null) {
+            return $slugTemplate;
+        }
+
+        return 'tags/index';
+    }
+
+    /**
+     * Executes one resolved public template file in isolated scope.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function renderPublicTemplateFile(string $file, array $data): string
+    {
+        return $this->templateTags->renderFile($file, $data);
+    }
+
+    /**
+     * Normalizes a post-submit return path to one safe local absolute path.
+     */
+    private function sanitizePublicReturnPath(string $rawPath): string
+    {
+        $rawPath = trim($rawPath);
+        if ($rawPath === '' || str_contains($rawPath, "\0") || str_contains($rawPath, '\\')) {
+            return '/';
+        }
+
+        $path = (string) parse_url($rawPath, PHP_URL_PATH);
+        if ($path === '' || !str_starts_with($path, '/') || str_starts_with($path, '//')) {
+            return '/';
+        }
+
+        return $path;
+    }
+
+    /**
+     * Returns normalized client IP when present and valid.
+     */
+    private function normalizeClientIp(string $rawIp): ?string
+    {
+        $rawIp = trim($rawIp);
+        if ($rawIp === '') {
+            return null;
+        }
+
+        // Keep only the first address in chained forwarding values.
+        if (str_contains($rawIp, ',')) {
+            $parts = explode(',', $rawIp);
+            $rawIp = trim((string) ($parts[0] ?? ''));
+        }
+
+        if ($rawIp === '' || filter_var($rawIp, FILTER_VALIDATE_IP) === false) {
+            return null;
+        }
+
+        return $this->input->text($rawIp, 45);
+    }
+
+    /**
+     * Resolves reverse-DNS hostname for one normalized client IP.
+     */
+    private function resolveClientHostname(?string $ipAddress): ?string
+    {
+        if ($ipAddress === null || $ipAddress === '') {
+            return null;
+        }
+
+        $rawHostname = @gethostbyaddr($ipAddress);
+        if (!is_string($rawHostname)) {
+            return null;
+        }
+
+        $hostname = strtolower(trim($rawHostname));
+        if ($hostname === '' || $hostname === $ipAddress || filter_var($hostname, FILTER_VALIDATE_IP) !== false) {
+            return null;
+        }
+
+        // Remove optional trailing dot from fully-qualified DNS names.
+        $hostname = rtrim($hostname, '.');
+        if ($hostname === '' || str_contains($hostname, '..') || preg_match('/[^a-z0-9.-]/', $hostname) === 1) {
+            return null;
+        }
+
+        return $this->input->text($hostname, 255);
+    }
+
+    /**
+     * Returns configured captcha provider for public form handling.
+     */
+    private function captchaProvider(): string
+    {
+        $provider = strtolower($this->input->text((string) $this->config->get('captcha.provider', 'none'), 20));
+        if (!in_array($provider, ['none', 'hcaptcha', 'recaptcha2', 'recaptcha3'], true)) {
+            return 'none';
+        }
+
+        return $provider;
+    }
+
+    /**
+     * Returns normalized public captcha site key for one provider.
+     */
+    private function captchaSiteKey(string $provider): string
+    {
+        return match ($provider) {
+            'hcaptcha' => $this->input->text((string) $this->config->get('captcha.hcaptcha.public_key', ''), 500),
+            'recaptcha2' => $this->input->text((string) $this->config->get('captcha.recaptcha2.public_key', ''), 500),
+            'recaptcha3' => $this->input->text((string) $this->config->get('captcha.recaptcha3.public_key', ''), 500),
+            default => '',
+        };
+    }
+
+    /**
+     * Returns normalized captcha secret key for one provider.
+     */
+    private function captchaSecretKey(string $provider): string
+    {
+        return match ($provider) {
+            'hcaptcha' => $this->input->text((string) $this->config->get('captcha.hcaptcha.secret_key', ''), 500),
+            'recaptcha2' => $this->input->text((string) $this->config->get('captcha.recaptcha2.secret_key', ''), 500),
+            'recaptcha3' => $this->input->text((string) $this->config->get('captcha.recaptcha3.secret_key', ''), 500),
+            default => '',
+        };
+    }
+
+    /**
+     * Returns submit payload field name for one captcha provider.
+     */
+    private function captchaResponseField(string $provider): string
+    {
+        return $provider === 'hcaptcha' ? 'h-captcha-response' : 'g-recaptcha-response';
+    }
+
+    /**
+     * Verifies configured public captcha response in current request.
+     *
+     * @return string|null One user-facing validation error, or null when captcha passes.
+     */
+    private function validatePublicCaptcha(): ?string
+    {
+        $provider = $this->captchaProvider();
+        if ($provider === 'none') {
+            return null;
+        }
+
+        $siteKey = $this->captchaSiteKey($provider);
+        $secretKey = $this->captchaSecretKey($provider);
+        if ($siteKey === '' || $secretKey === '') {
+            return 'Captcha is not configured right now. Please try again later.';
+        }
+
+        $responseField = $this->captchaResponseField($provider);
+        $captchaToken = $this->input->text((string) ($_POST[$responseField] ?? ''), 6000);
+        if ($captchaToken === '') {
+            return 'Please complete the captcha challenge.';
+        }
+
+        $remoteIp = $this->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+        if (!$this->verifyCaptchaToken($provider, $secretKey, $captchaToken, $remoteIp)) {
+            return 'Captcha verification failed. Please try again.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Performs server-side token verification against configured captcha provider.
+     */
+    private function verifyCaptchaToken(string $provider, string $secretKey, string $captchaToken, ?string $remoteIp): bool
+    {
+        $endpoint = $provider === 'hcaptcha'
+            ? 'https://api.hcaptcha.com/siteverify'
+            : 'https://www.google.com/recaptcha/api/siteverify';
+
+        $payload = [
+            'secret' => $secretKey,
+            'response' => $captchaToken,
+        ];
+        if ($remoteIp !== null && $remoteIp !== '') {
+            $payload['remoteip'] = $remoteIp;
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
+                'content' => http_build_query($payload, '', '&', PHP_QUERY_RFC3986),
+                'timeout' => 8,
+                'ignore_errors' => true,
+            ],
+        ]);
+
+        $rawResponse = @file_get_contents($endpoint, false, $context);
+        if (!is_string($rawResponse) || trim($rawResponse) === '') {
+            return false;
+        }
+
+        $decoded = json_decode($rawResponse, true);
+        if (!is_array($decoded)) {
+            return false;
+        }
+
+        return !empty($decoded['success']);
+    }
+
+    /**
+     * Returns captcha widget + script markup for public embedded forms.
+     */
+    private function publicCaptchaMarkup(): string
+    {
+        $provider = $this->captchaProvider();
+        if ($provider === 'none') {
+            return '';
+        }
+
+        $siteKey = $this->captchaSiteKey($provider);
+        if ($siteKey === '') {
+            return '<div class="col-12"><div class="alert alert-warning mb-0" role="alert">Captcha is currently unavailable.</div></div>';
+        }
+
+        $widgetClass = $provider === 'hcaptcha' ? 'h-captcha' : 'g-recaptcha';
+        $scriptSrc = match ($provider) {
+            'hcaptcha' => 'https://js.hcaptcha.com/1/api.js',
+            'recaptcha3' => 'https://www.google.com/recaptcha/api.js?render=' . rawurlencode($siteKey),
+            default => 'https://www.google.com/recaptcha/api.js',
+        };
+        $escapedSiteKey = htmlspecialchars($siteKey, ENT_QUOTES, 'UTF-8');
+        $escapedScriptSrc = htmlspecialchars($scriptSrc, ENT_QUOTES, 'UTF-8');
+
+        $scriptMarkup = '';
+        if (!$this->captchaScriptIncluded) {
+            $scriptMarkup = '<script src="' . $escapedScriptSrc . '" async defer></script>';
+            if ($provider === 'recaptcha3') {
+                $siteKeyJson = json_encode($siteKey, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+                if (!is_string($siteKeyJson) || $siteKeyJson === '') {
+                    $siteKeyJson = '""';
+                }
+
+                $scriptMarkup .= '<script>'
+                    . '(function(){'
+                    . 'if(window.__ravenRecaptcha3Bound){return;}'
+                    . 'window.__ravenRecaptcha3Bound=true;'
+                    . 'var siteKey=' . $siteKeyJson . ';'
+                    . 'document.addEventListener("submit",function(event){'
+                    . 'var form=event.target;'
+                    . 'if(!(form instanceof HTMLFormElement)){return;}'
+                    . 'if(!form.querySelector(\'[data-rvn-captcha-provider="recaptcha3"]\')){return;}'
+                    . 'if(String(form.getAttribute("data-rvn-recaptcha3-submitting")||"")==="1"){return;}'
+                    . 'event.preventDefault();'
+                    . 'form.setAttribute("data-rvn-recaptcha3-submitting","1");'
+                    . 'var tokenField=form.querySelector(\'input[name="g-recaptcha-response"]\');'
+                    . 'if(!(tokenField instanceof HTMLInputElement)){'
+                    . 'tokenField=document.createElement("input");'
+                    . 'tokenField.type="hidden";'
+                    . 'tokenField.name="g-recaptcha-response";'
+                    . 'form.appendChild(tokenField);'
+                    . '}'
+                    . 'var submitWithoutToken=function(){'
+                    . 'form.removeAttribute("data-rvn-recaptcha3-submitting");'
+                    . 'form.submit();'
+                    . '};'
+                    . 'if(!window.grecaptcha||typeof window.grecaptcha.ready!=="function"||typeof window.grecaptcha.execute!=="function"){'
+                    . 'submitWithoutToken();'
+                    . 'return;'
+                    . '}'
+                    . 'window.grecaptcha.ready(function(){'
+                    . 'window.grecaptcha.execute(siteKey,{action:"submit"}).then(function(token){'
+                    . 'tokenField.value=String(token||"");'
+                    . 'form.removeAttribute("data-rvn-recaptcha3-submitting");'
+                    . 'form.submit();'
+                    . '}).catch(function(){submitWithoutToken();});'
+                    . '});'
+                    . '},true);'
+                    . '})();'
+                    . '</script>';
+            }
+            $this->captchaScriptIncluded = true;
+        }
+
+        if ($provider === 'recaptcha3') {
+            return $scriptMarkup
+                . '<div class="col-12">'
+                . '<input type="hidden" name="g-recaptcha-response" value="">'
+                . '<div class="small text-muted" data-rvn-captcha-provider="recaptcha3">Protected by reCAPTCHA.</div>'
+                . '</div>';
+        }
+
+        return $scriptMarkup
+            . '<div class="col-12"><div class="' . $widgetClass . '" data-theme="dark" data-sitekey="' . $escapedSiteKey . '"></div></div>';
+    }
+
+    /**
+     * Resolves supported form shortcodes inside editor HTML content.
+     */
+    private function renderEmbeddedForms(string $html): string
+    {
+        if ($html === '') {
+            return '';
+        }
+
+        $shortcodePattern = $this->embeddedFormShortcodePattern();
+        if ($shortcodePattern === null) {
+            return $html;
+        }
+
+        return (string) preg_replace_callback(
+            $shortcodePattern,
+            function (array $matches): string {
+                $type = strtolower((string) ($matches[1] ?? ''));
+                $rawArgumentChunk = (string) ($matches[2] ?? '');
+                $slug = $this->extractEmbeddedFormSlug($rawArgumentChunk);
+                if ($type === '' || $slug === '') {
+                    return '';
+                }
+
+                $definition = $this->findEmbeddedFormDefinition($type, $slug);
+                if ($definition === null) {
+                    return '';
+                }
+
+                return $this->embeddedFormMarkup($type, $definition);
+            },
+            $html
+        );
+    }
+
+    /**
+     * Extracts one shortcode form slug from raw shortcode arguments.
+     *
+     * Supported formats:
+     * - `slug="my-form"`
+     * - `slug='my-form'`
+     * - `slug=my-form`
+     * - `my-form`
+     */
+    private function extractEmbeddedFormSlug(string $rawArgs): string
+    {
+        $args = html_entity_decode($rawArgs, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $args = trim($args);
+        if ($args === '') {
+            return '';
+        }
+
+        // Handle explicit `slug=...` first (quoted or unquoted).
+        if (preg_match('/(?:^|\s)slug\s*=\s*(?:"([^"]+)"|\'([^\']+)\'|([a-z0-9_-]+))/i', $args, $matches) === 1) {
+            $candidate = '';
+            for ($index = 1; $index <= 3; $index++) {
+                $value = trim((string) ($matches[$index] ?? ''));
+                if ($value !== '') {
+                    $candidate = $value;
+                    break;
+                }
+            }
+
+            $slug = $this->input->slug($candidate);
+            return $slug ?? '';
+        }
+
+        // Also allow compact shorthand: `[type my-form]`.
+        if (preg_match('/^([a-z0-9_-]+)\s*$/i', $args, $matches) === 1) {
+            $slug = $this->input->slug((string) ($matches[1] ?? ''));
+            return $slug ?? '';
+        }
+
+        return '';
+    }
+
+    /**
+     * Finds one enabled embedded form definition by shortcode type + slug.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function findEmbeddedFormDefinition(string $type, string $slug): ?array
+    {
+        $type = strtolower(trim($type));
+        $slug = strtolower(trim($slug));
+        if ($type === '' || $slug === '') {
+            return null;
+        }
+
+        $runtime = $this->embeddedFormRuntime($type);
+        if ($runtime === null || !$this->isExtensionEnabled($runtime->extensionKey())) {
+            return null;
+        }
+
+        $lookup = $this->extensionFormLookupByType($type);
+        $definition = $lookup[$slug] ?? null;
+        return is_array($definition) ? $definition : null;
+    }
+
+    /**
+     * Returns enabled extension form definitions keyed by slug for one type.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function extensionFormLookupByType(string $type): array
+    {
+        if (isset($this->embeddedFormLookupCache[$type])) {
+            return $this->embeddedFormLookupCache[$type];
+        }
+
+        $runtime = $this->embeddedFormRuntime($type);
+        if ($runtime === null) {
+            $this->embeddedFormLookupCache[$type] = [];
+            return [];
+        }
+
+        $forms = $runtime->listEnabledForms();
+        $lookup = [];
+        foreach ($forms as $form) {
+            if (!is_array($form)) {
+                continue;
+            }
+
+            $slug = $this->input->slug((string) ($form['slug'] ?? ''));
+            if ($slug === '') {
+                continue;
+            }
+
+            $lookup[strtolower($slug)] = $form;
+        }
+
+        $this->embeddedFormLookupCache[$type] = $lookup;
+        return $lookup;
+    }
+
+    /**
+     * Returns true when one extension is enabled in `private/ext/.state.php`.
+     */
+    private function isExtensionEnabled(string $extensionName): bool
+    {
+        if ($this->enabledExtensionMap === null) {
+            $root = dirname(__DIR__, 3);
+            $this->enabledExtensionMap = ExtensionRegistry::enabledMap($root);
+        }
+
+        return !empty($this->enabledExtensionMap[$extensionName]);
+    }
+
+    /**
+     * Builds public HTML markup for one embedded form definition.
+     *
+     * @param array<string, mixed> $definition
+     */
+    private function embeddedFormMarkup(string $type, array $definition): string
+    {
+        $runtime = $this->embeddedFormRuntime($type);
+        if ($runtime === null) {
+            return '';
+        }
+
+        $returnPath = $this->sanitizePublicReturnPath((string) ($_SERVER['REQUEST_URI'] ?? '/'));
+        return $runtime->render(
+            $definition,
+            $returnPath,
+            $this->csrf->field(),
+            $this->publicCaptchaMarkup()
+        );
+    }
+
+    /**
+     * Returns regex used to resolve embedded-form shortcodes from HTML blocks.
+     */
+    private function embeddedFormShortcodePattern(): ?string
+    {
+        $types = array_keys($this->embeddedFormRuntimes);
+        if ($types === []) {
+            return null;
+        }
+
+        $escapedTypes = array_map(
+            static fn (string $token): string => preg_quote($token, '/'),
+            $types
+        );
+
+        return '/\[(' . implode('|', $escapedTypes) . ')\b([^\]]*)\]/i';
+    }
+
+}

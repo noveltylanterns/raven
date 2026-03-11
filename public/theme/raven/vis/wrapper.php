@@ -1,0 +1,81 @@
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/public/theme/raven/vis/wrapper.php
+ * Shared layout template for rendered views.
+ * Docs: https://raven.lanterns.io
+ */
+
+if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
+    http_response_code(404);
+    exit('Not Found');
+}
+?>
+<!doctype html>
+<html lang="en">
+<head>
+    <title>{view_meta:document_title}</title>
+{if site:apple_touch_icon}
+    <link rel="apple-touch-icon" href="{site:apple_touch_icon}">
+{/if}
+{if site:current_url}
+    <link rel="canonical" href="{site:current_url}">
+{/if}
+    <link rel="icon" type="image/png" href="/theme/{site:public_theme_css}/img/favicon.png">
+    <link rel="stylesheet" href="/theme/{site:public_theme_css}/css/style.css">
+    <meta charset="utf-8">
+{if view_meta:description}
+    <meta name="description" content="{view_meta:description}">
+{/if}
+{if site:robots}
+    <meta name="robots" content="{site:robots}">
+{/if}
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+{if view_meta:description}
+    <meta property="og:description" content="{view_meta:description}">
+{/if}
+{if site:og_image}
+    <meta property="og:image" content="{site:og_image}">
+{/if}
+    <meta property="og:locale" content="{site:og_locale}">
+    <meta property="og:site_name" content="{site:name}">
+    <meta property="og:title" content="{view_meta:document_title}">
+    <meta property="og:type" content="{site:og_type}">
+{if site:current_url}
+    <meta property="og:url" content="{site:current_url}">
+{/if}
+{if site:twitter_card}
+    <meta property="twitter:card" content="{site:twitter_card}">
+{/if}
+{if site:twitter_creator}
+    <meta property="twitter:creator" content="{site:twitter_creator}">
+{/if}
+{if view_meta:description}
+    <meta property="twitter:description" content="{view_meta:description}">
+{/if}
+{if site:twitter_image}
+    <meta property="twitter:image" content="{site:twitter_image}">
+{/if}
+{if site:twitter_site}
+    <meta property="twitter:site" content="{site:twitter_site}">
+{/if}
+    <meta property="twitter:title" content="{view_meta:document_title}">
+{if site:current_url}
+    <meta property="twitter:url" content="{site:current_url}">
+{/if}
+</head>
+<body>
+<div class="site-shell">
+    <header class="site-header">
+        <h1 class="h3 mb-1">{site:name}</h1>
+        <p class="site-subtitle">Domain: {site:domain}</p>
+    </header>
+
+    <main>
+        {raw:content}
+    </main>
+</div>
+<script src="/bootstrap.bundle.min.js"></script>
+</body>
+</html>

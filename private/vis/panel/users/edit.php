@@ -1,0 +1,498 @@
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/vis/panel/users/edit.php
+ * Admin panel view template for this screen.
+ * Docs: https://raven.lanterns.io
+ */
+
+// Inline note: Template expects controller-provided data and keeps business logic out of views.
+
+/** @var array<string, string> $site */
+/** @var array<string, mixed>|null $userRow */
+/** @var string $profileRoutePrefix */
+/** @var bool $profileRoutesEnabled */
+/** @var array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}> $groupOptions */
+/** @var bool $canAssignSuperAdmin */
+/** @var bool $canAssignConfigurationGroups */
+/** @var array<string, array{label: string, url_prefix: string}> $profileContactOptions */
+/** @var array<int, string> $themeOptions */
+/** @var string $avatarUploadLimitsNote */
+/** @var string $csrfField */
+/** @var string|null $flashSuccess */
+/** @var string|null $error */
+
+use Raven\Core\Auth\PanelAccess;
+use function Raven\Core\Support\e;
+
+$panelBase = '/' . trim($site['panel_path'], '/');
+// Shared create/edit derivations keep template branching shallow.
+$userName = trim((string) ($userRow['username'] ?? ''));
+$userId = (int) ($userRow['id'] ?? 0);
+$hasPersistedUser = $userId > 0;
+$deleteFormId = 'delete-user-form';
+$profileRoutePrefix = trim((string) ($profileRoutePrefix ?? ''), '/');
+$profileRoutesEnabled = (bool) ($profileRoutesEnabled ?? false);
+$usernameRouteSegment = trim((string) ($userRow['username'] ?? ''));
+// Multi-select group inputs are compared against normalized integer ids.
+$selectedGroupIds = array_map('intval', (array) ($userRow['group_ids'] ?? []));
+$avatarPath = isset($userRow['avatar_path']) && is_string($userRow['avatar_path'])
+    ? $userRow['avatar_path']
+    : null;
+$avatarFilename = is_string($avatarPath) ? basename($avatarPath) : '';
+$avatarBase = (string) pathinfo($avatarFilename, PATHINFO_FILENAME);
+$avatarThumbFilename = $avatarBase !== '' ? $avatarBase . '_thumb.jpg' : $avatarFilename;
+$avatarUrl = '/uploads/avatars/' . rawurlencode($avatarFilename);
+$avatarThumbUrl = '/uploads/avatars/' . rawurlencode($avatarThumbFilename);
+$profileContactOptions = is_array($profileContactOptions ?? null) ? $profileContactOptions : [];
+$contactProfilesRaw = is_array($userRow['contact_profiles'] ?? null) ? $userRow['contact_profiles'] : [];
+$contactProfiles = [];
+foreach ($contactProfilesRaw as $entry) {
+    if (!is_array($entry)) {
+        continue;
+    }
+
+    $type = strtolower(trim((string) ($entry['type'] ?? '')));
+    $value = trim((string) ($entry['value'] ?? ''));
+    if ($type === '' || $value === '') {
+        continue;
+    }
+
+    if (!array_key_exists($type, $profileContactOptions)) {
+        continue;
+    }
+
+    $contactProfiles[] = [
+        'type' => $type,
+        'value' => $value,
+    ];
+}
+$normalizedDomain = trim((string) ($site['domain'] ?? ''));
+$publicBase = $normalizedDomain;
+if ($publicBase !== '' && !preg_match('#^https?://#i', $publicBase)) {
+    $publicBase = 'https://' . $publicBase;
+}
+$publicBase = rtrim($publicBase, '/');
+$userPublicUrl = null;
+if ($userRow !== null && $publicBase !== '' && $profileRoutesEnabled && $profileRoutePrefix !== '' && $usernameRouteSegment !== '') {
+    $userPublicUrl = $publicBase . '/' . rawurlencode($profileRoutePrefix) . '/' . rawurlencode($usernameRouteSegment);
+}
+$requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
+$activeTab = in_array($requestedTab, ['account', 'permissions', 'profile'], true) ? $requestedTab : 'account';
+?>
+<header class="card">
+    <div class="card-body">
+        <h1>
+            <?= $userRow === null ? 'New User' : 'Edit User: <span class="text-primary">\'' . e($userName !== '' ? $userName : 'Untitled') . '\'</span>' ?>
+        </h1>
+        <?php if ($userRow === null): ?>
+            <p class="text-muted mb-0">Create or update user accounts, group membership, theme, and avatar settings.</p>
+        <?php elseif ($userPublicUrl !== null): ?>
+            <p class="mb-0 small">
+                <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
+                <a
+                    href="<?= e($userPublicUrl) ?>"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="<?= e($userPublicUrl) ?>"
+                    aria-label="Open user profile URL"
+                    style="font-size: 0.88em;"
+                >
+                    <?= e($userPublicUrl) ?>
+                </a>
+            </p>
+        <?php endif; ?>
+    </div>
+</header>
+
+<?php if ($flashSuccess !== null): ?>
+<div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
+<?php endif; ?>
+
+<?php if ($error !== null): ?>
+<div class="alert alert-danger" role="alert"><?= e($error) ?></div>
+<?php endif; ?>
+
+<?php if ($hasPersistedUser): ?>
+<!-- Standalone delete form avoids nested forms and keeps CSRF enforcement intact. -->
+<form id="<?= e($deleteFormId) ?>" method="post" action="<?= e($panelBase) ?>/users/delete">
+    <?= $csrfField ?>
+    <input type="hidden" name="id" value="<?= $userId ?>">
+</form>
+<?php endif; ?>
+
+<form method="post" action="<?= e($panelBase) ?>/users/save" enctype="multipart/form-data">
+    <?= $csrfField ?>
+    <input type="hidden" name="id" value="<?= $userId ?>">
+    <nav class="rvnp-editor-actions">
+        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save User</button>
+        <a href="<?= e($panelBase) ?>/users" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Users</a>
+        <?php if ($hasPersistedUser): ?>
+            <button
+                type="submit"
+                class="btn btn-danger"
+                form="<?= e($deleteFormId) ?>"
+                onclick="return confirm('Delete this user?');"
+            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete User</button>
+        <?php endif; ?>
+    </nav>
+
+    <section class="rvnp-editor-layout" data-rvn-tab-layout="editor">
+    <ul class="nav nav-tabs" id="rvnp-editor-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link<?= $activeTab === 'account' ? ' active' : '' ?>"
+                id="user-account-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#rvnp-editor-pane-account"
+                type="button"
+                role="tab"
+                aria-controls="rvnp-editor-pane-account"
+                aria-selected="<?= $activeTab === 'account' ? 'true' : 'false' ?>"
+            >Account</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link<?= $activeTab === 'permissions' ? ' active' : '' ?>"
+                id="user-permissions-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#rvnp-editor-pane-permissions"
+                type="button"
+                role="tab"
+                aria-controls="rvnp-editor-pane-permissions"
+                aria-selected="<?= $activeTab === 'permissions' ? 'true' : 'false' ?>"
+            >Permissions</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link<?= $activeTab === 'profile' ? ' active' : '' ?>"
+                id="user-profile-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#rvnp-editor-pane-profile"
+                type="button"
+                role="tab"
+                aria-controls="rvnp-editor-pane-profile"
+                aria-selected="<?= $activeTab === 'profile' ? 'true' : 'false' ?>"
+            >Profile</button>
+        </li>
+    </ul>
+
+    <div class="tab-content raven-tab-content-surface border border-top-0 p-3" id="rvnp-editor-content">
+        <div
+            class="tab-pane fade<?= $activeTab === 'account' ? ' show active' : '' ?>"
+            id="rvnp-editor-pane-account"
+            role="tabpanel"
+            aria-labelledby="user-account-tab"
+            tabindex="0"
+        >
+            <div class="form-group">
+                <label for="username" class="form-label">Username</label>
+                <input id="username" name="username" class="form-control" required value="<?= e((string) ($userRow['username'] ?? '')) ?>">
+            </div>
+
+            <div class="form-group">
+                <label for="display_name" class="form-label">Display Name</label>
+                <input id="display_name" name="display_name" class="form-control" value="<?= e((string) ($userRow['display_name'] ?? '')) ?>">
+            </div>
+
+            <div class="form-group">
+                <label for="email" class="form-label">Email</label>
+                <input id="email" name="email" type="email" class="form-control" required value="<?= e((string) ($userRow['email'] ?? '')) ?>">
+            </div>
+
+            <div class="form-group">
+                <label for="password" class="form-label">
+                    <?= $userRow === null ? 'Password' : 'New Password (leave blank to keep current)' ?>
+                </label>
+                <input id="password" name="password" type="password" class="form-control"<?= $userRow === null ? ' required' : '' ?>>
+                <div class="form-text">Minimum 8 characters.</div>
+            </div>
+
+            <div class="form-group mb-0">
+                <label for="theme" class="form-label">Panel Theme</label>
+                <!-- Theme value is persisted per user and drives panel layout theme classes. -->
+                <select id="theme" name="theme" class="form-select" required>
+                    <?php foreach ($themeOptions as $option): ?>
+                        <?php $optionLabel = $option === 'default' ? '<Default>' : ucfirst($option); ?>
+                        <option value="<?= e($option) ?>"<?= (string) ($userRow['theme'] ?? 'default') === $option ? ' selected' : '' ?>>
+                            <?= e($optionLabel) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="form-text"><code>&lt;Default&gt;</code> follows the system's configured default admin theme.</div>
+            </div>
+        </div>
+
+        <div
+            class="tab-pane fade<?= $activeTab === 'permissions' ? ' show active' : '' ?>"
+            id="rvnp-editor-pane-permissions"
+            role="tabpanel"
+            aria-labelledby="user-permissions-tab"
+            tabindex="0"
+        >
+            <fieldset class="mb-0">
+                <legend class="h5">Group Memberships</legend>
+                <?php foreach ($groupOptions as $group): ?>
+                    <?php
+                    $groupId = (int) $group['id'];
+                    $isSuperAdminGroup = strtolower(trim((string) ($group['slug'] ?? ''))) === 'super';
+                    $isConfigurationGroup = (((int) ($group['permission_mask'] ?? 0)) & PanelAccess::MANAGE_CONFIGURATION) === PanelAccess::MANAGE_CONFIGURATION;
+                    $isSelected = in_array($groupId, $selectedGroupIds, true);
+                    $lockSuperAdminAssignment = $isSuperAdminGroup && !$canAssignSuperAdmin;
+                    $lockConfigurationPromotion = !$canAssignConfigurationGroups && $isConfigurationGroup && !$isSelected && !$isSuperAdminGroup;
+                    $groupCheckboxDisabled = $lockSuperAdminAssignment || $lockConfigurationPromotion;
+                    ?>
+                    <div class="form-check">
+                        <input
+                            class="form-check-input"
+                            type="checkbox"
+                            name="group_ids[]"
+                            id="group_<?= $groupId ?>"
+                            value="<?= $groupId ?>"
+                            <?= $isSelected ? 'checked' : '' ?>
+                            <?= $groupCheckboxDisabled ? 'disabled' : '' ?>
+                        >
+                        <?php if ($lockSuperAdminAssignment && $isSelected): ?>
+                            <!-- Disabled checkboxes are not submitted, so preserve existing assignment with hidden input. -->
+                            <input type="hidden" name="group_ids[]" value="<?= $groupId ?>">
+                        <?php endif; ?>
+                        <label class="form-check-label" for="group_<?= $groupId ?>">
+                            <?= e($group['name']) ?>
+                        </label>
+                    </div>
+                <?php endforeach; ?>
+                <div class="form-text">If none selected, user is assigned to <code>Guest</code> automatically.</div>
+                <?php if (!$canAssignSuperAdmin): ?>
+                    <div class="form-text text-muted">Only Super Admin users can assign the <code>Super Admin</code> group.</div>
+                <?php endif; ?>
+                <?php if (!$canAssignConfigurationGroups): ?>
+                    <div class="form-text text-muted">Only Super Admin users can assign groups with <code>Manage System Configuration</code>.</div>
+                <?php endif; ?>
+            </fieldset>
+        </div>
+
+        <div
+            class="tab-pane fade<?= $activeTab === 'profile' ? ' show active' : '' ?>"
+            id="rvnp-editor-pane-profile"
+            role="tabpanel"
+            aria-labelledby="user-profile-tab"
+            tabindex="0"
+        >
+            <div class="form-group">
+                <label class="form-label h3" for="avatar">Avatar</label>
+                <?php if ($avatarFilename !== ''): ?>
+                    <div class="mb-2">
+                        <!-- Avatar image is served from required public content path. -->
+                        <img
+                            src="<?= e($avatarThumbUrl) ?>"
+                            onerror="this.onerror=null;this.src='<?= e($avatarUrl) ?>';"
+                            alt="Current avatar"
+                            style="max-width: 96px; max-height: 96px; border-radius: 8px;"
+                        >
+                    </div>
+                <?php endif; ?>
+                <input id="avatar" name="avatar" type="file" class="form-control" accept=".gif,.jpg,.jpeg,.png,image/gif,image/jpeg,image/png">
+                <div class="form-text"><?= e($avatarUploadLimitsNote) ?></div>
+
+                <?php if ($avatarFilename !== ''): ?>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" value="1" id="remove_avatar" name="remove_avatar">
+                        <label class="form-check-label" for="remove_avatar">Remove current avatar</label>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <div class="form-group mb-0">
+                <label class="form-label d-block h3">Contact Information</label>
+                <div id="user-contact-profiles-list">
+                    <?php foreach ($contactProfiles as $index => $contactProfile): ?>
+                        <?php
+                        $contactType = (string) ($contactProfile['type'] ?? '');
+                        $contactValue = (string) ($contactProfile['value'] ?? '');
+                        ?>
+                        <div class="border rounded p-2 mb-2" data-user-contact-row="1">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-4">
+                                    <label class="form-label">Type</label>
+                                    <select
+                                        class="form-select"
+                                        data-user-contact-key="type"
+                                        name="contact_profiles[<?= (int) $index ?>][type]"
+                                    >
+                                        <?php foreach ($profileContactOptions as $optionSlug => $optionData): ?>
+                                            <?php $optionLabel = (string) ($optionData['label'] ?? $optionSlug); ?>
+                                            <?php $optionPrefix = (string) ($optionData['url_prefix'] ?? ''); ?>
+                                            <option
+                                                value="<?= e((string) $optionSlug) ?>"
+                                                data-url-prefix="<?= e($optionPrefix) ?>"
+                                                <?= $contactType === (string) $optionSlug ? ' selected' : '' ?>
+                                            ><?= e($optionLabel) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md pe-md-0">
+                                    <label class="form-label">Value</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text d-none" data-user-contact-prefix-addon="1"></span>
+                                        <input
+                                            type="text"
+                                            class="form-control"
+                                            data-user-contact-key="value"
+                                            name="contact_profiles[<?= (int) $index ?>][value]"
+                                            value="<?= e($contactValue) ?>"
+                                            placeholder="username/path or value"
+                                        >
+                                    </div>
+                                </div>
+                                <div class="col-auto ps-md-0 d-flex align-items-end">
+                                    <button type="button" class="btn btn-danger ms-2" data-user-contact-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php if ($profileContactOptions !== []): ?>
+                    <button type="button" class="btn btn-primary" id="user-contact-profiles-add">Add More Contact Information</button>
+                <?php else: ?>
+                    <div class="form-text text-muted">No contact types are configured in <code>user.contact</code>.</div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    </section>
+
+    <nav class="rvnp-editor-actions">
+        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save User</button>
+        <a href="<?= e($panelBase) ?>/users" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Users</a>
+        <?php if ($hasPersistedUser): ?>
+            <button
+                type="submit"
+                class="btn btn-danger"
+                form="<?= e($deleteFormId) ?>"
+                onclick="return confirm('Delete this user?');"
+            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete User</button>
+        <?php endif; ?>
+    </nav>
+</form>
+
+<?php if ($profileContactOptions !== []): ?>
+<template id="user-contact-profile-template">
+    <div class="border rounded p-2 mb-2" data-user-contact-row="1">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Type</label>
+                <select class="form-select" data-user-contact-key="type">
+                    <?php foreach ($profileContactOptions as $optionSlug => $optionData): ?>
+                        <?php $optionLabel = (string) ($optionData['label'] ?? $optionSlug); ?>
+                        <?php $optionPrefix = (string) ($optionData['url_prefix'] ?? ''); ?>
+                        <option value="<?= e((string) $optionSlug) ?>" data-url-prefix="<?= e($optionPrefix) ?>"><?= e($optionLabel) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md pe-md-0">
+                <label class="form-label">Value</label>
+                <div class="input-group">
+                    <span class="input-group-text d-none" data-user-contact-prefix-addon="1"></span>
+                    <input
+                        type="text"
+                        class="form-control"
+                        data-user-contact-key="value"
+                        placeholder="username/path or value"
+                    >
+                </div>
+            </div>
+            <div class="col-auto ps-md-0 d-flex align-items-end">
+                <button type="button" class="btn btn-danger ms-2" data-user-contact-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+            </div>
+        </div>
+    </div>
+</template>
+<script>
+  (function () {
+    var list = document.getElementById('user-contact-profiles-list');
+    var addButton = document.getElementById('user-contact-profiles-add');
+    var template = document.getElementById('user-contact-profile-template');
+
+    if (!(list instanceof HTMLElement) || !(addButton instanceof HTMLButtonElement) || !(template instanceof HTMLTemplateElement)) {
+      return;
+    }
+
+    function reindexRows() {
+      var rows = list.querySelectorAll('[data-user-contact-row="1"]');
+      rows.forEach(function (row, index) {
+        if (!(row instanceof HTMLElement)) {
+          return;
+        }
+        var typeField = row.querySelector('[data-user-contact-key="type"]');
+        var valueField = row.querySelector('[data-user-contact-key="value"]');
+        if (typeField instanceof HTMLSelectElement) {
+          typeField.name = 'contact_profiles[' + index + '][type]';
+        }
+        if (valueField instanceof HTMLInputElement) {
+          valueField.name = 'contact_profiles[' + index + '][value]';
+        }
+        syncPrefixAddon(row);
+      });
+    }
+
+    function syncPrefixAddon(row) {
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+      var typeField = row.querySelector('[data-user-contact-key="type"]');
+      var prefixAddon = row.querySelector('[data-user-contact-prefix-addon="1"]');
+      if (!(typeField instanceof HTMLSelectElement) || !(prefixAddon instanceof HTMLElement)) {
+        return;
+      }
+      var option = typeField.options[typeField.selectedIndex];
+      var prefix = option instanceof HTMLOptionElement ? String(option.getAttribute('data-url-prefix') || '').trim() : '';
+      if (prefix === '') {
+        prefixAddon.textContent = '';
+        prefixAddon.classList.add('d-none');
+        return;
+      }
+      prefixAddon.textContent = prefix;
+      prefixAddon.classList.remove('d-none');
+    }
+
+    function appendRow() {
+      var fragment = template.content.cloneNode(true);
+      list.appendChild(fragment);
+      reindexRows();
+    }
+
+    addButton.addEventListener('click', function () {
+      appendRow();
+    });
+
+    list.addEventListener('change', function (event) {
+      var target = event.target;
+      if (!(target instanceof HTMLSelectElement) || target.getAttribute('data-user-contact-key') !== 'type') {
+        return;
+      }
+      var row = target.closest('[data-user-contact-row="1"]');
+      syncPrefixAddon(row);
+    });
+
+    list.addEventListener('click', function (event) {
+      var target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      var removeButton = target.closest('[data-user-contact-remove="1"]');
+      if (!(removeButton instanceof HTMLElement)) {
+        return;
+      }
+      var row = removeButton.closest('[data-user-contact-row="1"]');
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+      row.remove();
+      reindexRows();
+    });
+
+    reindexRows();
+  })();
+</script>
+<?php endif; ?>
