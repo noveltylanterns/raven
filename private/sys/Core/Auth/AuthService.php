@@ -97,7 +97,15 @@ final class AuthService
             // Delight Auth requires email for login; we resolved it by username.
             $this->auth->login($email, $password);
             return ['ok' => true, 'message' => 'Login successful.'];
-        } catch (\Throwable) {
+        } catch (\Throwable $exception) {
+            error_log(
+                'Raven panel login failed for username "'
+                . $username
+                . '": '
+                . $exception::class
+                . ' - '
+                . $exception->getMessage()
+            );
             // Keep login errors generic so auth backend details are not disclosed to users.
             return ['ok' => false, 'message' => 'Invalid credentials.'];
         }

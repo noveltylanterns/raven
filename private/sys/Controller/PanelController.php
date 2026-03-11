@@ -11930,16 +11930,8 @@ MARKDOWN;
      */
     private function renderPublicFallbackTemplateFile(string $file, array $data): string
     {
-        extract($data, EXTR_SKIP);
-
-        if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
-            define('RAVEN_VIEW_RENDER_CONTEXT', true);
-        }
-
-        ob_start();
-        include $file;
-
-        return (string) ob_get_clean();
+        $templateTags = new \Raven\Core\View\TemplateTagEngine(dirname(__DIR__, 3) . '/private/tmp/template_tag_cache');
+        return $templateTags->renderFile($file, $data);
     }
 
     /**
