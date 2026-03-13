@@ -11,9 +11,10 @@ declare(strict_types=1);
 
 use Raven\Controller\PublicController;
 use Raven\Core\Debug\DebugToolbarRenderer;
-use Raven\Core\Debug\RequestProfiler;
+use Raven\Lib\Profiling\RequestProfiler;
 use Raven\Core\Extension\ExtensionRegistry;
-use Raven\Core\Routing\Router;
+use Raven\Lib\Routing\RouteRequest;
+use Raven\Lib\Routing\Router;
 
 use function Raven\Core\Support\request_path;
 
@@ -454,6 +455,7 @@ if (!$bypassAvailability && !$controller->enforceSiteAvailability()) {
     exit;
 }
 
-if (!$router->dispatch($method, $path)) {
+$dispatchResult = $router->dispatch(new RouteRequest($method, $path));
+if (!$dispatchResult->isHandled()) {
     $controller->notFound();
 }

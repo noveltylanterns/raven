@@ -13,8 +13,8 @@ namespace Raven;
 
 use Raven\Core\Config;
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
-use Raven\Core\Security\Csrf;
-use Raven\Core\Security\InputSanitizer;
+use Raven\Lib\Security\Csrf;
+use Raven\Lib\Security\InputSanitizer;
 use Raven\Repository\ContactFormRepository;
 use Raven\Repository\ContactSubmissionRepository;
 

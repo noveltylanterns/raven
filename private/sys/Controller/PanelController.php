@@ -20,8 +20,8 @@ use Raven\Core\Media\PageImageManager;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Repository\CategoryRepository;
 use Raven\Core\Security\AvatarValidator;
-use Raven\Core\Security\Csrf;
-use Raven\Core\Security\InputSanitizer;
+use Raven\Lib\Security\Csrf;
+use Raven\Lib\Security\InputSanitizer;
 use Raven\Core\View;
 use Raven\Repository\ChannelRepository;
 use Raven\Repository\GroupRepository;
@@ -8920,7 +8920,7 @@ PHP;
 
 declare(strict_types=1);
 
-use Raven\Core\Routing\Router;
+use Raven\Lib\Routing\Router;
 
 /**
  * Registers __NAME_DOC__ routes into the panel router.
@@ -9080,7 +9080,7 @@ PHP;
 
 declare(strict_types=1);
 
-use Raven\Core\Routing\Router;
+use Raven\Lib\Routing\Router;
 
 /**
  * Registers extension routes into the public router.

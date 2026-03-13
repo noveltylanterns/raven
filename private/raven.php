@@ -15,8 +15,8 @@ use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\SchemaManager;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Media\PageImageManager;
-use Raven\Core\Security\Csrf;
-use Raven\Core\Security\InputSanitizer;
+use Raven\Lib\Security\Csrf;
+use Raven\Lib\Security\InputSanitizer;
 use Raven\Core\View;
 use Raven\Repository\CategoryRepository;
 use Raven\Repository\ChannelRepository;
@@ -64,10 +64,19 @@ return (static function (): array {
         require_once $composerAutoload;
     }
 
-    // Always provide local PSR-4 fallback so app/extension classes work before install.
+    // Always provide local PSR-4 fallback so app/lib/extension classes work before install.
     spl_autoload_register(static function (string $class) use ($root, $enabledExtensionDirectories): void {
-        $prefix = 'Raven\\';
+        $libPrefix = 'Raven\\Lib\\';
+        if (str_starts_with($class, $libPrefix)) {
+            $relativeLib = str_replace('\\', '/', substr($class, strlen($libPrefix)));
+            $libFile = $root . '/private/lib/' . $relativeLib . '.php';
+            if (is_file($libFile)) {
+                require_once $libFile;
+            }
+            return;
+        }
 
+        $prefix = 'Raven\\';
         if (!str_starts_with($class, $prefix)) {
             return;
         }

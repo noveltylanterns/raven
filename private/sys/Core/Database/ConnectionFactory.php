@@ -14,6 +14,9 @@ declare(strict_types=1);
 namespace Raven\Core\Database;
 
 use PDO;
+use Raven\Lib\Database\Profiling\ProfiledPDO;
+use Raven\Lib\Database\Profiling\QueryProfilerInterface;
+use Raven\Lib\Profiling\RequestQueryProfilerAdapter;
 use RuntimeException;
 
 /**
@@ -23,13 +26,15 @@ final class ConnectionFactory
 {
     /** @var array<string, mixed> */
     private array $config;
+    private QueryProfilerInterface $queryProfiler;
 
     /**
      * @param array<string, mixed> $databaseConfig
      */
-    public function __construct(array $databaseConfig)
+    public function __construct(array $databaseConfig, ?QueryProfilerInterface $queryProfiler = null)
     {
         $this->config = $databaseConfig;
+        $this->queryProfiler = $queryProfiler ?? new RequestQueryProfilerAdapter();
     }
 
     /**
@@ -106,7 +111,7 @@ final class ConnectionFactory
         $pdo = new ProfiledPDO('sqlite:' . $path, null, null, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ], $connectionLabel);
+        ], $connectionLabel, $this->queryProfiler);
 
         $pdo->exec('PRAGMA foreign_keys = ON');
 
@@ -138,7 +143,8 @@ final class ConnectionFactory
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 ],
-                $connectionLabel
+                $connectionLabel,
+                $this->queryProfiler
             );
         }
 
@@ -160,7 +166,8 @@ final class ConnectionFactory
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ],
-            $connectionLabel
+            $connectionLabel,
+            $this->queryProfiler
         );
     }
 

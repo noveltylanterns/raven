@@ -13,7 +13,7 @@ namespace Raven\Core\Media;
 
 use Imagick;
 use Raven\Core\Config;
-use Raven\Core\Security\InputSanitizer;
+use Raven\Lib\Security\InputSanitizer;
 use Raven\Repository\PageImageRepository;
 
 /**

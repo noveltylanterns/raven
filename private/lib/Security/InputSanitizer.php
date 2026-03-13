@@ -1,34 +1,19 @@
 <?php
 
-/**
- * RAVEN CMS
- * ~/private/sys/Core/Security/InputSanitizer.php
- * Security utility for validation and protections.
- * Docs: https://raven.lanterns.io
- */
-
 declare(strict_types=1);
 
-namespace Raven\Core\Security;
+namespace Raven\Lib\Security;
 
 /**
- * Centralized input sanitization and validation utilities.
- *
- * Public and panel controllers should exclusively use this class for
- * request-derived scalar values to keep behavior consistent.
+ * Standalone input sanitization and validation utilities.
  */
 final class InputSanitizer
 {
-    /**
-     * Normalizes generic text input by trimming, stripping control chars,
-     * and enforcing length limits.
-     */
     public function text(?string $value, int $maxLength = 255): string
     {
         $value ??= '';
         $value = trim($value);
 
-        // Remove non-printable control characters to avoid log/view issues.
         $value = preg_replace('/[\x00-\x1F\x7F]/u', '', $value) ?? '';
 
         if (mb_strlen($value) > $maxLength) {
@@ -38,14 +23,9 @@ final class InputSanitizer
         return $value;
     }
 
-    /**
-     * Keeps rich HTML content for editors while removing NULL bytes.
-     */
     public function html(?string $value, int $maxLength = 200000): string
     {
         $value ??= '';
-
-        // Keep HTML intact for TinyMCE content; only remove dangerous nulls.
         $value = str_replace("\0", '', $value);
 
         if (mb_strlen($value) > $maxLength) {
@@ -55,9 +35,6 @@ final class InputSanitizer
         return $value;
     }
 
-    /**
-     * Validates and normalizes a slug value.
-     */
     public function slug(?string $value): ?string
     {
         $value = strtolower($this->text($value, 160));
@@ -73,9 +50,6 @@ final class InputSanitizer
         return $value;
     }
 
-    /**
-     * Validates email format and returns normalized lowercase value.
-     */
     public function email(?string $value): ?string
     {
         $value = strtolower($this->text($value, 254));
@@ -91,14 +65,6 @@ final class InputSanitizer
         return $value;
     }
 
-    /**
-     * Validates and normalizes a username value.
-     *
-     * Rules:
-     * - 3..50 chars
-     * - lowercase a-z, 0-9, underscore, hyphen, dot
-     * - must start with alphanumeric
-     */
     public function username(?string $value): ?string
     {
         $value = strtolower($this->text($value, 50));
@@ -114,9 +80,6 @@ final class InputSanitizer
         return $value;
     }
 
-    /**
-     * Converts input to bounded integer; returns null if invalid.
-     */
     public function int(mixed $value, int $min = 1, int $max = PHP_INT_MAX): ?int
     {
         if (is_string($value) && trim($value) === '') {
@@ -124,7 +87,6 @@ final class InputSanitizer
         }
 
         $intValue = filter_var($value, FILTER_VALIDATE_INT);
-
         if ($intValue === false) {
             return null;
         }
@@ -136,3 +98,4 @@ final class InputSanitizer
         return $intValue;
     }
 }
+

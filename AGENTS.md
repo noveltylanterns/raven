@@ -1,6 +1,6 @@
 # Raven CMS Agent Guide
 
-Last updated: 2026-03-05
+Last updated: 2026-03-13
 
 ## Upon Opening
 - Hello, this your Captain speaking. I am the original developer of this software I have placed you guardian over.
@@ -150,13 +150,27 @@ Where extensions are stored. Not all extensions will have all these files, but t
 - `/private/ext/*/vis/public_*.php` - Extension-specific public/ view templates.
 
 #### /private/lib/
-Future home of shared libraries & internal apis.
+Reusable library modules decoupled from Raven core runtime assumptions:
+- `/private/lib/Database/Profiling/ProfiledPDO.php` - PDO subclass that records query timings through an injected profiler contract.
+- `/private/lib/Database/Profiling/ProfiledPDOStatement.php` - PDOStatement subclass that records execute payloads/timings through a profiler contract.
+- `/private/lib/Database/Profiling/QueryProfilerInterface.php` - Interface contract for query profiling collectors used by profiled PDO classes.
+- `/private/lib/Profiling/ProfilerOutputInterface.php` - Interface contract for pluggable request-profiler output renderers.
+- `/private/lib/Profiling/RequestProfiler.php` - Reusable in-memory request profiler collector and output registry.
+- `/private/lib/Profiling/RequestQueryProfilerAdapter.php` - Adapter that connects DB query-profiler interface calls to RequestProfiler.
+- `/private/lib/Routing/RouteDispatchResult.php` - Immutable route dispatch result contract (handled state + params/response).
+- `/private/lib/Routing/RouteRequest.php` - Immutable route request contract (normalized method/path).
+- `/private/lib/Routing/Router.php` - Reusable HTTP path router with `{param}` placeholder matching.
+- `/private/lib/Security/Csrf.php` - CSRF token helper decoupled behind a token-store contract.
+- `/private/lib/Security/CsrfTokenStoreInterface.php` - Contract for CSRF token persistence backends.
+- `/private/lib/Security/InputSanitizer.php` - Reusable scalar input sanitization and validation utility.
+- `/private/lib/Security/PhpSessionTokenStore.php` - Default CSRF token-store implementation backed by PHP sessions.
+- `/private/lib/Security/tests/InputSanitizerSmoke.php` - Standalone smoke test for library-level InputSanitizer behavior.
 
 #### /private/raven.php
 Bootstrap/service container wiring and startup helpers.
 
 #### /private/sys/
-Core system files::
+Core system files:
 - `/private/sys/Controller/AuthController.php` - Authentication controller for login/logout and auth flow handling.
 - `/private/sys/Controller/PanelController.php` - Primary panel controller for admin routes, forms, and page rendering.
 - `/private/sys/Controller/PublicController.php` - Primary public controller for frontend rendering and form endpoints.
@@ -164,25 +178,21 @@ Core system files::
 - `/private/sys/Core/Auth/PanelAccess.php` - Panel permission bit constants and access helper utilities.
 - `/private/sys/Core/Config.php` - Config loader/getter/setter persistence service for Raven config keys.
 - `/private/sys/Core/Database/ConnectionFactory.php` - Database connection factory for SQLite/MySQL/PostgreSQL backends.
-- `/private/sys/Core/Database/ProfiledPDO.php` - PDO wrapper that records query timing/profiling metadata.
-- `/private/sys/Core/Database/ProfiledPDOStatement.php` - PDOStatement wrapper that emits profiler query events.
 - `/private/sys/Core/Database/SchemaManager.php` - Idempotent schema ensure/migration coordinator for core and extensions.
 - `/private/sys/Core/Debug/DebugToolbarRenderer.php` - Renderer for the Output Profiler toolbar UI and sections.
-- `/private/sys/Core/Debug/RequestProfiler.php` - Request profiler collector for timings, SQL, env, and request diagnostics.
 - `/private/sys/Core/Extension/EmbeddedFormRuntimeInterface.php` - Contract interface for extension-provided embedded form runtimes.
 - `/private/sys/Core/Extension/ExtensionRegistry.php` - Extension discovery, validation, manifest, and provider registry logic.
 - `/private/sys/Core/Media/PageImageManager.php` - Page image upload/variant processing and storage lifecycle manager.
-- `/private/sys/Core/Routing/Router.php` - HTTP router used by panel and public front controllers.
 - `/private/sys/Core/Security/AvatarValidator.php` - Avatar image validation and normalization rules helper.
-- `/private/sys/Core/Security/Csrf.php` - CSRF token generation and validation service.
-- `/private/sys/Core/Security/InputSanitizer.php` - Centralized input sanitization helpers for request data.
 - `/private/sys/Core/Support/CountryOptions.php` - Country option dataset/provider used by UI and form builders.
 - `/private/sys/Core/Support/Helpers.php` - Shared support helper functions for common runtime tasks.
 - `/private/sys/Core/Theme/PublicThemeRegistry.php` - Public theme discovery, validation, and inheritance resolution registry.
 - `/private/sys/Core/View.php` - Template rendering service for panel/public/extension views.
+- `/private/sys/Core/View/TemplateTagEngine.php` - Tag expansion engine for template-side dynamic placeholders.
 - `/private/sys/Repository/CategoryRepository.php` - Category repository CRUD/query layer.
 - `/private/sys/Repository/ChannelRepository.php` - Channel repository (flat-file metadata + linked ids) access layer.
 - `/private/sys/Repository/GroupRepository.php` - Group repository CRUD/query layer and permission mask persistence.
+- `/private/sys/Repository/InviteTokenRepository.php` - Invite token repository CRUD/query layer for registration workflows.
 - `/private/sys/Repository/PageImageRepository.php` - Page gallery image metadata repository.
 - `/private/sys/Repository/PageRepository.php` - Page repository CRUD, routing, taxonomy, and body-block persistence.
 - `/private/sys/Repository/RedirectRepository.php` - Redirect repository CRUD/query layer.

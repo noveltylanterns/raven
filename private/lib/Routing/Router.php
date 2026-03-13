@@ -1,17 +1,8 @@
 <?php
 
-/**
- * RAVEN CMS
- * ~/private/sys/Core/Routing/Router.php
- * Core router for path-to-handler dispatch.
- * Docs: https://raven.lanterns.io
- */
-
-// Inline note: Keep routing deterministic by matching normalized paths and methods only.
-
 declare(strict_types=1);
 
-namespace Raven\Core\Routing;
+namespace Raven\Lib\Routing;
 
 /**
  * Minimal path router supporting `{param}` placeholders.
@@ -21,27 +12,19 @@ final class Router
     /** @var array<int, array{method: string, regex: string, handler: callable}> */
     private array $routes = [];
 
-    /**
-     * Registers one route for one HTTP method.
-     */
     public function add(string $method, string $pattern, callable $handler): void
     {
         $this->routes[] = [
-            'method' => strtoupper($method),
+            'method' => strtoupper(trim($method)),
             'regex' => $this->compilePattern($pattern),
             'handler' => $handler,
         ];
     }
 
-    /**
-     * Dispatches route and invokes its handler when matched.
-     *
-     * Returns true when a route handled the request, otherwise false.
-     */
-    public function dispatch(string $method, string $path): bool
+    public function dispatch(RouteRequest $request): RouteDispatchResult
     {
-        $normalizedMethod = strtoupper($method);
-        $normalizedPath = $this->normalizePath($path);
+        $normalizedMethod = $request->method();
+        $normalizedPath = $request->path();
 
         foreach ($this->routes as $route) {
             if ($route['method'] !== $normalizedMethod) {
@@ -52,7 +35,6 @@ final class Router
                 continue;
             }
 
-            // Keep only named placeholders from regex captures.
             $params = [];
             foreach ($matches as $key => $value) {
                 if (is_string($key)) {
@@ -60,19 +42,16 @@ final class Router
                 }
             }
 
-            ($route['handler'])($params);
-            return true;
+            $response = ($route['handler'])($params);
+            return RouteDispatchResult::handled($params, $response);
         }
 
-        return false;
+        return RouteDispatchResult::notHandled();
     }
 
-    /**
-     * Converts a pattern like `/pages/edit/{id}` into a strict regex.
-     */
     private function compilePattern(string $pattern): string
     {
-        $normalized = $this->normalizePath($pattern);
+        $normalized = RouteRequest::normalizePath($pattern);
 
         $regex = preg_replace_callback(
             '/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/',
@@ -82,13 +61,5 @@ final class Router
 
         return '#^' . $regex . '$#';
     }
-
-    /**
-     * Normalizes incoming paths to one canonical form (`/foo/bar`).
-     */
-    private function normalizePath(string $path): string
-    {
-        $trimmed = '/' . trim($path, '/');
-        return $trimmed === '//' ? '/' : $trimmed;
-    }
 }
+

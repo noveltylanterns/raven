@@ -37,7 +37,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
             <div class="d-flex align-items-center gap-2">
                 <button
                     type="button"
-                    class="btn btn-outline-primary btn-sm"
+                    class="btn btn-primary btn-sm"
                     data-bs-toggle="modal"
                     data-bs-target="#upload-theme-modal"
                 >
@@ -120,28 +120,28 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                             </td>
                             <td class="text-center">
                                 <div class="d-inline-flex align-items-center gap-1">
-                                    <form method="get" action="<?= e($panelBase) ?>/themes/export" class="d-inline m-0">
-                                        <input type="hidden" name="theme" value="<?= e($slug) ?>">
-                                        <button
-                                            type="submit"
-                                            class="btn btn-sm btn-outline-primary"
-                                            title="Export"
-                                            aria-label="Export"
-                                        >
-                                            <i class="bi bi-download" aria-hidden="true"></i>
-                                        </button>
-                                    </form>
                                     <form method="post" action="<?= e($panelBase) ?>/themes/enable" class="d-inline m-0">
                                         <?= $csrfField ?>
                                         <input type="hidden" name="theme" value="<?= e($slug) ?>">
                                         <button
                                             type="submit"
-                                            class="btn btn-sm <?= $isActive ? 'btn-secondary' : 'btn-success' ?>"
+                                            class="btn btn-sm <?= $isActive ? 'btn-info' : 'btn-success' ?>"
                                             title="<?= e($isActive ? 'Active' : 'Enable') ?>"
                                             aria-label="<?= e($isActive ? 'Active' : 'Enable') ?>"
                                             <?= $isActive ? 'disabled' : '' ?>
                                         >
                                             <i class="bi <?= $isActive ? 'bi-check-circle-fill' : 'bi-play-circle-fill' ?>" aria-hidden="true"></i>
+                                        </button>
+                                    </form>
+                                    <form method="get" action="<?= e($panelBase) ?>/themes/export" class="d-inline m-0">
+                                        <input type="hidden" name="theme" value="<?= e($slug) ?>">
+                                        <button
+                                            type="submit"
+                                            class="btn btn-sm btn-secondary"
+                                            title="Export"
+                                            aria-label="Export"
+                                        >
+                                            <i class="bi bi-download" aria-hidden="true"></i>
                                         </button>
                                     </form>
                                     <?php if (!$isActive && !$isStock): ?>
@@ -150,7 +150,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                             <input type="hidden" name="theme" value="<?= e($slug) ?>">
                                             <button
                                                 type="submit"
-                                                class="btn btn-sm btn-outline-danger"
+                                                class="btn btn-sm btn-danger"
                                                 title="Delete"
                                                 aria-label="Delete"
                                                 onclick="return confirm('Delete theme <?= e($slug) ?> from disk?');"

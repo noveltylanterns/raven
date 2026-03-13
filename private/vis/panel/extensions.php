@@ -62,7 +62,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
             <div class="d-flex align-items-center gap-2">
                 <button
                     type="button"
-                    class="btn btn-outline-primary btn-sm"
+                    class="btn btn-primary btn-sm"
                     data-bs-toggle="modal"
                     data-bs-target="#upload-extension-modal"
                 >
@@ -161,17 +161,17 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                             </td>
                             <td class="text-center">
                                 <div class="d-inline-flex align-items-center gap-1">
-                                    <form method="get" action="<?= e($panelBase) ?>/extensions/export" class="d-inline m-0">
-                                        <input type="hidden" name="extension" value="<?= e($directory) ?>">
-                                        <button
-                                            type="submit"
-                                            class="btn btn-outline-primary btn-sm"
-                                            title="Export"
-                                            aria-label="Export"
+                                    <?php if ($canOpenSettings): ?>
+                                        <a
+                                            href="<?= e($panelTarget) ?>"
+                                            class="btn btn-primary btn-sm"
+                                            aria-label="Settings"
+                                            title="Settings"
                                         >
-                                            <i class="bi bi-download" aria-hidden="true"></i>
-                                        </button>
-                                    </form>
+                                            <i class="bi bi-gear-fill" aria-hidden="true"></i>
+                                            <span class="visually-hidden">Settings</span>
+                                        </a>
+                                    <?php endif; ?>
                                     <form method="post" action="<?= e($panelBase) ?>/extensions/toggle" class="d-inline m-0">
                                         <?= $csrfField ?>
                                         <input type="hidden" name="extension" value="<?= e($directory) ?>">
@@ -187,24 +187,24 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                             <i class="bi <?= $enabled ? 'bi-stop-circle-fill' : 'bi-play-circle-fill' ?>" aria-hidden="true"></i>
                                         </button>
                                     </form>
-                                    <?php if ($canOpenSettings): ?>
-                                        <a
-                                            href="<?= e($panelTarget) ?>"
-                                            class="btn btn-primary btn-sm"
-                                            aria-label="Settings"
-                                            title="Settings"
+                                    <form method="get" action="<?= e($panelBase) ?>/extensions/export" class="d-inline m-0">
+                                        <input type="hidden" name="extension" value="<?= e($directory) ?>">
+                                        <button
+                                            type="submit"
+                                            class="btn btn-secondary btn-sm"
+                                            title="Export"
+                                            aria-label="Export"
                                         >
-                                            <i class="bi bi-gear-fill" aria-hidden="true"></i>
-                                            <span class="visually-hidden">Settings</span>
-                                        </a>
-                                    <?php endif; ?>
+                                            <i class="bi bi-download" aria-hidden="true"></i>
+                                        </button>
+                                    </form>
                                     <?php if ($canDelete): ?>
                                         <form method="post" action="<?= e($panelBase) ?>/extensions/delete" class="d-inline m-0">
                                             <?= $csrfField ?>
                                             <input type="hidden" name="extension" value="<?= e($directory) ?>">
                                             <button
                                                 type="submit"
-                                                class="btn btn-outline-danger btn-sm"
+                                                class="btn btn-danger btn-sm"
                                                 aria-label="Delete"
                                                 title="Delete"
                                                 onclick="return confirm('Delete this extension from disk? This cannot be undone.');"
@@ -415,7 +415,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary btn-sm">Create Extension<i class="bi bi-plus-square ms-2" aria-hidden="true"></i></button>
                 </div>
             </form>

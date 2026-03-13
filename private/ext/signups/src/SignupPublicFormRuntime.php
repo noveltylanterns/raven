@@ -12,8 +12,8 @@ declare(strict_types=1);
 namespace Raven;
 
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
-use Raven\Core\Security\Csrf;
-use Raven\Core\Security\InputSanitizer;
+use Raven\Lib\Security\Csrf;
+use Raven\Lib\Security\InputSanitizer;
 use Raven\Core\Support\CountryOptions;
 use Raven\Repository\SignupFormRepository;
 use Raven\Repository\SignupSubmissionRepository;

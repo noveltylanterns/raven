@@ -1,32 +1,23 @@
 <?php
 
-/**
- * RAVEN CMS
- * ~/private/sys/Core/Database/ProfiledPDOStatement.php
- * PDOStatement subclass that reports execute timings to request profiler.
- * Docs: https://raven.lanterns.io
- */
-
 declare(strict_types=1);
 
-namespace Raven\Core\Database;
+namespace Raven\Lib\Database\Profiling;
 
 use PDO;
-use Raven\Core\Debug\RequestProfiler;
 use Throwable;
 
-/**
- * Tracks statement execute timing and parameter payloads for debug output.
- */
 final class ProfiledPDOStatement extends \PDOStatement
 {
     private string $connectionLabel = 'app';
     /** @var array<int|string, mixed> */
     private array $boundValues = [];
+    private ?QueryProfilerInterface $queryProfiler = null;
 
-    protected function __construct(string $connectionLabel = 'app')
+    protected function __construct(string $connectionLabel = 'app', ?QueryProfilerInterface $queryProfiler = null)
     {
         $this->connectionLabel = strtolower(trim($connectionLabel)) !== '' ? strtolower(trim($connectionLabel)) : 'app';
+        $this->queryProfiler = $queryProfiler;
     }
 
     public function bindValue(string|int $param, mixed $value, int $type = PDO::PARAM_STR): bool
@@ -67,11 +58,11 @@ final class ProfiledPDOStatement extends \PDOStatement
      */
     private function record(string $sql, array $params, float $durationMs, bool $success, ?string $error): void
     {
-        if (!RequestProfiler::isEnabled() || $sql === '') {
+        if ($sql === '' || $this->queryProfiler === null || !$this->queryProfiler->isEnabled()) {
             return;
         }
 
-        RequestProfiler::recordQuery(
+        $this->queryProfiler->recordQuery(
             $this->connectionLabel,
             'execute',
             $sql,

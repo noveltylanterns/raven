@@ -12,8 +12,8 @@ declare(strict_types=1);
 namespace Raven\Controller;
 
 use Raven\Core\Config;
-use Raven\Core\Security\Csrf;
-use Raven\Core\Security\InputSanitizer;
+use Raven\Lib\Security\Csrf;
+use Raven\Lib\Security\InputSanitizer;
 use Raven\Core\View;
 use Raven\Core\Auth\AuthService;
 

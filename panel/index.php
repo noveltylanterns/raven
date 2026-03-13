@@ -13,9 +13,10 @@ use Raven\Controller\AuthController;
 use Raven\Controller\PanelController;
 use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Debug\DebugToolbarRenderer;
-use Raven\Core\Debug\RequestProfiler;
 use Raven\Core\Extension\ExtensionRegistry;
-use Raven\Core\Routing\Router;
+use Raven\Lib\Profiling\RequestProfiler;
+use Raven\Lib\Routing\RouteRequest;
+use Raven\Lib\Routing\Router;
 
 use function Raven\Core\Support\request_path;
 use function Raven\Core\Support\redirect;
@@ -1098,6 +1099,7 @@ if ($debugToolbarEnabled) {
 
 // Final route dispatch for panel-internal path.
 // Unknown panel routes intentionally render the public themed 404 response.
-if (!$router->dispatch($method, $internalPath)) {
+$dispatchResult = $router->dispatch(new RouteRequest($method, $internalPath));
+if (!$dispatchResult->isHandled()) {
     $panelController->renderPublicNotFound();
 }

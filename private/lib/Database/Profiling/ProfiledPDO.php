@@ -1,45 +1,43 @@
 <?php
 
-/**
- * RAVEN CMS
- * ~/private/sys/Core/Database/ProfiledPDO.php
- * PDO subclass with lightweight query-timing hooks for debug profiler output.
- * Docs: https://raven.lanterns.io
- */
-
 declare(strict_types=1);
 
-namespace Raven\Core\Database;
+namespace Raven\Lib\Database\Profiling;
 
 use PDO;
 use PDOStatement;
-use Raven\Core\Debug\RequestProfiler;
 use Throwable;
 
-/**
- * Wraps PDO operations and reports query activity into RequestProfiler.
- */
 final class ProfiledPDO extends PDO
 {
     private string $connectionLabel;
+    private ?QueryProfilerInterface $queryProfiler;
 
     public function __construct(
         string $dsn,
         ?string $username = null,
         ?string $password = null,
         array $options = [],
-        string $connectionLabel = 'app'
+        string $connectionLabel = 'app',
+        ?QueryProfilerInterface $queryProfiler = null
     ) {
         $this->connectionLabel = strtolower(trim($connectionLabel)) !== '' ? strtolower(trim($connectionLabel)) : 'app';
+        $this->queryProfiler = $queryProfiler;
         parent::__construct($dsn, $username, $password, $options);
 
-        $this->setAttribute(PDO::ATTR_STATEMENT_CLASS, [ProfiledPDOStatement::class, [$this->connectionLabel]]);
+        $this->setAttribute(PDO::ATTR_STATEMENT_CLASS, [
+            ProfiledPDOStatement::class,
+            [$this->connectionLabel, $this->queryProfiler],
+        ]);
     }
 
     public function prepare(string $query, array $options = []): PDOStatement|false
     {
         if (!isset($options[PDO::ATTR_STATEMENT_CLASS])) {
-            $options[PDO::ATTR_STATEMENT_CLASS] = [ProfiledPDOStatement::class, [$this->connectionLabel]];
+            $options[PDO::ATTR_STATEMENT_CLASS] = [
+                ProfiledPDOStatement::class,
+                [$this->connectionLabel, $this->queryProfiler],
+            ];
         }
 
         return parent::prepare($query, $options);
@@ -89,11 +87,11 @@ final class ProfiledPDO extends PDO
         bool $success,
         ?string $error
     ): void {
-        if (!RequestProfiler::isEnabled()) {
+        if ($this->queryProfiler === null || !$this->queryProfiler->isEnabled()) {
             return;
         }
 
-        RequestProfiler::recordQuery(
+        $this->queryProfiler->recordQuery(
             $this->connectionLabel,
             $mode,
             $sql,

@@ -1,18 +1,11 @@
 <?php
 
-/**
- * RAVEN CMS
- * ~/private/sys/Core/Debug/RequestProfiler.php
- * In-memory request profiler state for debug toolbar output.
- * Docs: https://raven.lanterns.io
- */
-
 declare(strict_types=1);
 
-namespace Raven\Core\Debug;
+namespace Raven\Lib\Profiling;
 
 /**
- * Collects lightweight request diagnostics for optional debug toolbar rendering.
+ * In-memory request profiler collector with pluggable render outputs.
  */
 final class RequestProfiler
 {
@@ -25,6 +18,8 @@ final class RequestProfiler
     private static int $droppedQueries = 0;
     /** @var array<int, string>|null */
     private static ?array $renderTrace = null;
+    /** @var array<string, ProfilerOutputInterface> */
+    private static array $outputs = [];
 
     public static function start(float $requestStart, string $scope): void
     {
@@ -86,18 +81,11 @@ final class RequestProfiler
     }
 
     /**
-     * Captures one stack snapshot during template rendering.
-     *
      * @param array<int, array<string, mixed>> $trace
      */
     public static function captureRenderTrace(array $trace): void
     {
-        if (!self::$enabled) {
-            return;
-        }
-
-        // Keep first render snapshot because it usually includes the full controller path.
-        if (self::$renderTrace !== null) {
+        if (!self::$enabled || self::$renderTrace !== null) {
             return;
         }
 
@@ -126,8 +114,6 @@ final class RequestProfiler
     }
 
     /**
-     * Returns one immutable snapshot suitable for debug-toolbar rendering.
-     *
      * @return array{
      *   enabled: bool,
      *   scope: string,
@@ -165,6 +151,60 @@ final class RequestProfiler
             'queries' => self::$queries,
             'render_trace' => self::$renderTrace ?? [],
         ];
+    }
+
+    public static function registerOutput(ProfilerOutputInterface $output): void
+    {
+        $id = strtolower(trim($output->id()));
+        if ($id === '') {
+            return;
+        }
+
+        self::$outputs[$id] = $output;
+    }
+
+    public static function hasOutput(string $id): bool
+    {
+        $normalized = strtolower(trim($id));
+        return isset(self::$outputs[$normalized]);
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    public static function renderOutput(string $id, array $context = []): string
+    {
+        $normalized = strtolower(trim($id));
+        if ($normalized === '' || !isset(self::$outputs[$normalized])) {
+            return '';
+        }
+
+        return self::$outputs[$normalized]->render(self::snapshot(), $context);
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     * @return array<string, string>
+     */
+    public static function renderAllOutputs(array $context = []): array
+    {
+        $snapshot = self::snapshot();
+        $rendered = [];
+        foreach (self::$outputs as $id => $output) {
+            $html = $output->render($snapshot, $context);
+            if ($html === '') {
+                continue;
+            }
+
+            $rendered[$id] = $html;
+        }
+
+        return $rendered;
+    }
+
+    public static function clearOutputs(): void
+    {
+        self::$outputs = [];
     }
 
     /**

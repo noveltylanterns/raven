@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Routing\Router;
+use Raven\Lib\Routing\Router;
 
 /**
  * Registers Database Manager routes into the panel router.

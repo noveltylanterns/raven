@@ -41,6 +41,7 @@
     },
     "autoload": {
         "psr-4": {
+            "Raven\\Lib\\": "private/lib/",
             "Raven\\": "private/sys/"
         }
     },
