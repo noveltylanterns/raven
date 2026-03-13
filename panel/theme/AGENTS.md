@@ -1,6 +1,6 @@
 # Raven Panel Theme Agent Guide
 
-Last updated: 2026-03-05
+Last updated: 2026-03-13
 
 ## Scope
 - This file documents admin-panel theming under `panel/theme/`.
@@ -15,7 +15,7 @@ Last updated: 2026-03-05
 - Default path for most tasks: edit `panel/theme/css/custom.css` only.
 - Do not modify panel PHP/controller code for visual-only requests.
 - Do not add remote assets (CDNs, external fonts, telemetry/tracking scripts).
-- Prefer small, isolated CSS changes and verify in both light/default and dark modes.
+- Prefer small, isolated CSS changes and verify in Corporate/Ice/Midnight modes.
 - If requested change appears to require core markup edits, stop and flag it as a core change.
 
 ## Critical Rule: Keep Panel Theming Update-Safe
@@ -47,7 +47,7 @@ Last updated: 2026-03-05
 ## Deterministic Panel Theme Build Recipe
 1. Start with `panel/theme/css/custom.css`.
 2. Add minimal scoped selectors and avoid editing `style.css`.
-3. Verify state variants: default/light/dark body classes.
+3. Verify state variants: Corporate/Ice/Midnight body classes.
 4. Verify common UI surfaces: cards, forms, table headers, action buttons, sidebar/mobile nav.
 5. Only if Sass-level bootstrap variable changes are required, use `custom.scss -> custom.css`.
 
@@ -63,6 +63,7 @@ body#rvnp .card {
 - No visual-only task required edits outside `panel/theme/` unless explicitly approved as core work.
 - `custom.css` is loaded after `style.css` and `bootstrap-icons.min.css` (confirm runtime order unchanged).
 - Changes are readable/usable on `theme-default`, `theme-light`, and `theme-dark`.
+  - Runtime mapping: `corp -> theme-default`, `ice -> theme-light`, `midnight -> theme-dark`.
 - Sortable table headers remain clear (`.raven-routing-sort-label`, `.raven-routing-sort-caret`, `.is-active-sort`).
 - No external network dependency added for panel rendering.
 
@@ -81,23 +82,26 @@ body#rvnp .card {
 - Base panel pipeline is: `bootstrap scss` -> `panel/theme/scss/style.scss` -> `panel/theme/css/style.css`
 - Custom pipeline variant is: `bootstrap scss` -> `panel/theme/scss/custom.scss` -> `panel/theme/css/custom.css`
 
-## Theme Switcher Behavior (Default/Light/Dark)
+## Theme Switcher Behavior (Corporate/Ice/Midnight)
 - Panel `<body>` includes classes like:
 - `rvn-panel`
 - `theme-default` or `theme-light` or `theme-dark`
 - These are generated in `private/vis/panel/wrapper.php` from controller-provided `userTheme`.
 - User preference theme values:
 - `default`
-- `light`
-- `dark`
-- `default` resolves to global config `panel.default_theme` (`light` or `dark`).
+- `corp`
+- `ice`
+- `midnight`
+- `default` resolves to global config `panel.default_theme` (`corp`, `ice`, or `midnight`).
 - Login page also uses this default theme resolution (not a separate theme path).
 - Sass mode source selectors are in `panel/theme/scss/style.scss`:
 - `body#rvnp.theme-default`
 - `body#rvnp.theme-light`
 - `body#rvnp.theme-dark`
-- Current contract intentionally keeps `theme-light` visually aligned with `theme-default`.
-- Operational intent: treat "light" as an alias of "default" for panel-theme changes; do not maintain a separate light-only design track.
+- CSS class mapping keeps existing selectors stable:
+  - `corp` uses `theme-default`
+  - `ice` uses `theme-light`
+  - `midnight` uses `theme-dark`
 
 ## Panel View/Theming Boundary
 - Unlike public themes, panel theming does not provide customizable PHP view directories under `panel/theme/`.

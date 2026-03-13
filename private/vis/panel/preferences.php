@@ -60,6 +60,21 @@ foreach ($contactProfilesRaw as $entry) {
 }
 $requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
 $activeTab = in_array($requestedTab, ['account', 'profile'], true) ? $requestedTab : 'account';
+$selectedTheme = strtolower(trim((string) ($preferences['theme'] ?? 'default')));
+if (in_array($selectedTheme, ['light', 'raven'], true)) {
+    $selectedTheme = 'corp';
+} elseif ($selectedTheme === 'dark') {
+    $selectedTheme = 'midnight';
+}
+if (!in_array($selectedTheme, ['default', 'corp', 'ice', 'midnight'], true)) {
+    $selectedTheme = 'default';
+}
+$themeLabels = [
+    'default' => '<Default>',
+    'corp' => 'Corporate',
+    'ice' => 'Ice',
+    'midnight' => 'Midnight',
+];
 ?>
 
 <header class="card">
@@ -168,8 +183,8 @@ $activeTab = in_array($requestedTab, ['account', 'profile'], true) ? $requestedT
                 <label class="form-label" for="theme">Panel Theme</label>
                 <select class="form-select" id="theme" name="theme" required>
                     <?php foreach ($themeOptions as $option): ?>
-                        <?php $optionLabel = $option === 'default' ? '<Default>' : ucfirst($option); ?>
-                        <option value="<?= e($option) ?>"<?= (string) ($preferences['theme'] ?? 'default') === $option ? ' selected' : '' ?>>
+                        <?php $optionLabel = (string) ($themeLabels[$option] ?? $option); ?>
+                        <option value="<?= e($option) ?>"<?= $selectedTheme === $option ? ' selected' : '' ?>>
                             <?= e($optionLabel) ?>
                         </option>
                     <?php endforeach; ?>

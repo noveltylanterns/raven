@@ -86,6 +86,21 @@ if ($userRow !== null && $publicBase !== '' && $profileRoutesEnabled && $profile
 }
 $requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
 $activeTab = in_array($requestedTab, ['account', 'permissions', 'profile'], true) ? $requestedTab : 'account';
+$selectedTheme = strtolower(trim((string) ($userRow['theme'] ?? 'default')));
+if (in_array($selectedTheme, ['light', 'raven'], true)) {
+    $selectedTheme = 'corp';
+} elseif ($selectedTheme === 'dark') {
+    $selectedTheme = 'midnight';
+}
+if (!in_array($selectedTheme, ['default', 'corp', 'ice', 'midnight'], true)) {
+    $selectedTheme = 'default';
+}
+$themeLabels = [
+    'default' => '<Default>',
+    'corp' => 'Corporate',
+    'ice' => 'Ice',
+    'midnight' => 'Midnight',
+];
 ?>
 <header class="card">
     <div class="card-body">
@@ -225,8 +240,8 @@ $activeTab = in_array($requestedTab, ['account', 'permissions', 'profile'], true
                 <!-- Theme value is persisted per user and drives panel layout theme classes. -->
                 <select id="theme" name="theme" class="form-select" required>
                     <?php foreach ($themeOptions as $option): ?>
-                        <?php $optionLabel = $option === 'default' ? '<Default>' : ucfirst($option); ?>
-                        <option value="<?= e($option) ?>"<?= (string) ($userRow['theme'] ?? 'default') === $option ? ' selected' : '' ?>>
+                        <?php $optionLabel = (string) ($themeLabels[$option] ?? $option); ?>
+                        <option value="<?= e($option) ?>"<?= $selectedTheme === $option ? ' selected' : '' ?>>
                             <?= e($optionLabel) ?>
                         </option>
                     <?php endforeach; ?>

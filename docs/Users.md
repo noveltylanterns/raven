@@ -70,7 +70,7 @@ Fields/options:
 - `Password`
   - Required on create
   - Optional on edit (leave blank to keep existing password)
-- `Panel Theme` (`<Default>`, `Light`, `Dark`)
+- `Panel Theme` (`<Default>`, `Corporate`, `Ice`, `Midnight`)
 - `Avatar`
   - file upload (`gif/jpg/jpeg/png`)
   - optional `Remove current avatar` checkbox when avatar exists

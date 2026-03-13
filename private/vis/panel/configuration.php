@@ -582,15 +582,27 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
                 <option value="disabled"<?= (string) $field['value'] === 'disabled' ? ' selected' : '' ?>>Disabled</option>
             </select>
         <?php elseif ($isPanelDefaultThemeField): ?>
-            <!-- Default panel theme is constrained to the supported light/dark modes. -->
+            <!-- Default panel theme is constrained to supported panel variants. -->
+            <?php
+            $panelDefaultTheme = strtolower(trim((string) $field['value']));
+            if (in_array($panelDefaultTheme, ['light', 'raven', 'default'], true)) {
+                $panelDefaultTheme = 'corp';
+            } elseif ($panelDefaultTheme === 'dark') {
+                $panelDefaultTheme = 'midnight';
+            }
+            if (!in_array($panelDefaultTheme, ['corp', 'ice', 'midnight'], true)) {
+                $panelDefaultTheme = 'corp';
+            }
+            ?>
             <select
                 class="form-select font-monospace"
                 id="<?= e($inputId) ?>"
                 name="<?= e($fieldName) ?>"
                 required
             >
-                <option value="light"<?= (string) $field['value'] === 'light' ? ' selected' : '' ?>>light</option>
-                <option value="dark"<?= (string) $field['value'] === 'dark' ? ' selected' : '' ?>>dark</option>
+                <option value="corp"<?= $panelDefaultTheme === 'corp' ? ' selected' : '' ?>>Corporate</option>
+                <option value="ice"<?= $panelDefaultTheme === 'ice' ? ' selected' : '' ?>>Ice</option>
+                <option value="midnight"<?= $panelDefaultTheme === 'midnight' ? ' selected' : '' ?>>Midnight</option>
             </select>
         <?php elseif ($isImageUploadTargetField): ?>
             <!-- Keep upload-target as explicit dropdown for forward-compatible storage backends. -->

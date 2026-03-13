@@ -210,6 +210,14 @@ final class PanelController
             return;
         }
 
+        $pagesNavChannel = '';
+        if ($id === null) {
+            $requestedChannel = $this->input->slug($_GET['channel'] ?? null);
+            if (is_string($requestedChannel) && $requestedChannel !== '') {
+                $pagesNavChannel = $requestedChannel;
+            }
+        }
+
         // Null id means create mode; numeric id means edit mode.
         $page = null;
         $galleryImages = [];
@@ -241,6 +249,28 @@ final class PanelController
             );
         }
         unset($channelOption);
+        if ($id === null && $pagesNavChannel !== '') {
+            $channelExists = false;
+            foreach ($channelOptions as $channelOption) {
+                if (!is_array($channelOption)) {
+                    continue;
+                }
+
+                if (strtolower(trim((string) ($channelOption['slug'] ?? ''))) === strtolower($pagesNavChannel)) {
+                    $channelExists = true;
+                    break;
+                }
+            }
+
+            if ($channelExists) {
+                if (!is_array($page)) {
+                    $page = [];
+                }
+                $page['channel_slug'] = $pagesNavChannel;
+            } else {
+                $pagesNavChannel = '';
+            }
+        }
         $categoryOptions = is_array($taxonomyData['categories'] ?? null) ? $taxonomyData['categories'] : [];
         $tagOptions = is_array($taxonomyData['tags'] ?? null) ? $taxonomyData['tags'] : [];
         $assignedCategories = is_array($taxonomyData['assigned_categories'] ?? null) ? $taxonomyData['assigned_categories'] : [];
@@ -276,6 +306,7 @@ final class PanelController
             'section' => 'pages',
             // Highlight "Create Page" only when opening the new-page form.
             'pagesNav' => $id === null ? 'create' : null,
+            'pagesNavChannel' => $id === null ? $pagesNavChannel : null,
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -2127,6 +2158,10 @@ final class PanelController
 
         $editData = $this->users->editFormData($id);
         $user = is_array($editData['user'] ?? null) ? $editData['user'] : null;
+        if (is_array($user)) {
+            $normalizedTheme = $this->normalizePanelThemeChoice((string) ($user['theme'] ?? 'default'), true);
+            $user['theme'] = $normalizedTheme ?? 'default';
+        }
         if ($id !== null && $user === null) {
             $this->flash('error', 'User not found.');
             redirect($this->panelUrl('/users'));
@@ -2147,7 +2182,7 @@ final class PanelController
             'canAssignSuperAdmin' => $actorIsSuperAdmin,
             // Groups that include Manage System Configuration are assignable by Super Admin only.
             'canAssignConfigurationGroups' => $actorIsSuperAdmin,
-            'themeOptions' => ['default', 'light', 'dark'],
+            'themeOptions' => ['default', 'corp', 'ice', 'midnight'],
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'error' => $this->pullFlash('error'),
@@ -2185,7 +2220,8 @@ final class PanelController
         $username = $this->normalizeUserIdentifierValue($rawUsername);
         $displayName = $this->input->text($post['display_name'] ?? null, 160);
         $email = $this->input->email($post['email'] ?? null);
-        $theme = $this->input->text($post['theme'] ?? null, 50);
+        $themeRaw = $this->input->text($post['theme'] ?? null, 50);
+        $theme = $this->normalizePanelThemeChoice((string) $themeRaw, true);
         $password = $this->input->text($post['password'] ?? null, 255);
         $profileContactOptions = $this->profileContactOptions();
         $contactProfiles = $this->normalizeSubmittedContactProfiles($post['contact_profiles'] ?? null, $profileContactOptions);
@@ -2279,12 +2315,11 @@ final class PanelController
             }
         }
 
-        $allowedThemes = ['default', 'light', 'dark'];
         $usernameRequired = $loginIdentifierMode === 'username';
         $usernameInvalid = $usernameRequired
             ? !is_string($username)
             : ($rawUsername !== '' && !is_string($username));
-        if ($usernameInvalid || $email === null || !in_array($theme, $allowedThemes, true)) {
+        if ($usernameInvalid || $email === null || !is_string($theme)) {
             $this->flash(
                 'error',
                 $usernameRequired
@@ -2957,6 +2992,8 @@ final class PanelController
             $this->flash('error', 'Unable to load your preferences.');
             redirect($this->panelUrl('/'));
         }
+        $normalizedTheme = $this->normalizePanelThemeChoice((string) ($preferences['theme'] ?? 'default'), true);
+        $preferences['theme'] = $normalizedTheme ?? 'default';
 
         $this->view->render('panel/preferences', [
             'site' => $this->siteData(),
@@ -2968,7 +3005,7 @@ final class PanelController
             'preferences' => $preferences,
             'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
             'profileContactOptions' => $this->profileContactOptions(),
-            'themeOptions' => ['default', 'light', 'dark'],
+            'themeOptions' => ['default', 'corp', 'ice', 'midnight'],
             'avatarUploadLimitsNote' => $this->avatarUploadLimitsNote(),
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -3007,13 +3044,13 @@ final class PanelController
         $username = $this->normalizeUserIdentifierValue($rawUsername);
         $displayName = $this->input->text($post['display_name'] ?? null, 160);
         $email = $this->input->email($post['email'] ?? null);
-        $theme = $this->input->text($post['theme'] ?? null, 50);
+        $themeRaw = $this->input->text($post['theme'] ?? null, 50);
+        $theme = $this->normalizePanelThemeChoice((string) $themeRaw, true);
         $newPassword = $this->input->text($post['new_password'] ?? null, 255);
         $profileContactOptions = $this->profileContactOptions();
         $contactProfiles = $this->normalizeSubmittedContactProfiles($post['contact_profiles'] ?? null, $profileContactOptions);
         $removeAvatar = isset($post['remove_avatar']) && (string) $post['remove_avatar'] === '1';
 
-        $allowedThemes = ['default', 'light', 'dark'];
         $errors = [];
         $usernameRequired = $loginIdentifierMode === 'username';
 
@@ -3030,7 +3067,7 @@ final class PanelController
             $errors[] = 'A valid email address is required.';
         }
 
-        if (!in_array($theme, $allowedThemes, true)) {
+        if (!is_string($theme)) {
             $errors[] = 'Theme selection is invalid.';
         }
 
@@ -5024,9 +5061,9 @@ final class PanelController
         }
 
         if ($path === 'panel.default_theme') {
-            $theme = strtolower($value);
-            if (!in_array($theme, ['light', 'dark'], true)) {
-                throw new \RuntimeException('panel.default_theme must be light or dark.');
+            $theme = $this->normalizePanelThemeChoice($value, false);
+            if (!is_string($theme)) {
+                throw new \RuntimeException('panel.default_theme must be corp, ice, or midnight.');
             }
 
             return $theme;
@@ -5747,10 +5784,10 @@ final class PanelController
         }
 
         if (!array_key_exists('default_theme', $panel)) {
-            $panel['default_theme'] = 'light';
+            $panel['default_theme'] = 'corp';
         } else {
-            $configuredTheme = strtolower(trim((string) ($panel['default_theme'] ?? '')));
-            $panel['default_theme'] = in_array($configuredTheme, ['light', 'dark'], true) ? $configuredTheme : 'light';
+            $configuredTheme = $this->normalizePanelThemeChoice((string) ($panel['default_theme'] ?? ''), false);
+            $panel['default_theme'] = is_string($configuredTheme) ? $configuredTheme : 'corp';
         }
 
         if (!array_key_exists('brand_name', $panel)) {
@@ -9712,8 +9749,10 @@ MARKDOWN;
         }
 
         $preferences = $this->auth->userPreferences($userId);
-        $theme = is_array($preferences) ? strtolower(trim((string) ($preferences['theme'] ?? 'default'))) : 'default';
-        if (!in_array($theme, ['default', 'light', 'dark'], true)) {
+        $theme = is_array($preferences)
+            ? $this->normalizePanelThemeChoice((string) ($preferences['theme'] ?? 'default'), true)
+            : 'default';
+        if (!is_string($theme)) {
             return $defaultTheme;
         }
 
@@ -9729,12 +9768,48 @@ MARKDOWN;
      */
     private function defaultPanelTheme(): string
     {
-        $theme = strtolower($this->input->text((string) $this->config->get('panel.default_theme', 'light'), 20));
-        if (!in_array($theme, ['light', 'dark'], true)) {
-            return 'light';
+        $theme = $this->normalizePanelThemeChoice(
+            (string) $this->config->get('panel.default_theme', 'corp'),
+            false
+        );
+        if (!is_string($theme)) {
+            return 'corp';
         }
 
         return $theme;
+    }
+
+    /**
+     * Normalizes panel-theme identifiers and maps legacy values.
+     *
+     * Legacy compatibility:
+     * - `light`/`default` map to `corp`
+     * - `dark` maps to `midnight`
+     */
+    private function normalizePanelThemeChoice(string $theme, bool $allowDefault): ?string
+    {
+        $normalized = strtolower(trim($theme));
+        if ($normalized === '') {
+            return $allowDefault ? 'default' : 'corp';
+        }
+
+        if ($allowDefault && $normalized === 'default') {
+            return 'default';
+        }
+
+        if (in_array($normalized, ['corp', 'ice', 'midnight'], true)) {
+            return $normalized;
+        }
+
+        if (in_array($normalized, ['light', 'raven', 'default'], true)) {
+            return 'corp';
+        }
+
+        if ($normalized === 'dark') {
+            return 'midnight';
+        }
+
+        return null;
     }
 
     /**

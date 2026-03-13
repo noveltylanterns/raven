@@ -24,7 +24,7 @@ Fields/options:
 - `Display Name`
 - `Email` (required)
 - `New Password` (optional, leave blank to keep current)
-- `Panel Theme` (`<Default>`, `Light`, `Dark`)
+- `Panel Theme` (`<Default>`, `Corporate`, `Ice`, `Midnight`)
 - `Avatar` file upload (`gif/jpg/jpeg/png`)
 - `Remove current avatar` checkbox (shown only when avatar exists)
 

@@ -360,25 +360,59 @@ $requirePanelLoginForExtension = static function () use (
 /**
  * Returns panel theme value for current user.
  */
-$defaultPanelTheme = static function () use ($app): string {
-    $theme = strtolower(trim((string) $app['config']->get('panel.default_theme', 'light')));
-    if (!in_array($theme, ['light', 'dark'], true)) {
-        return 'light';
+$normalizePanelTheme = static function (string $theme, bool $allowDefault): ?string {
+    $normalized = strtolower(trim($theme));
+    if ($normalized === '') {
+        return $allowDefault ? 'default' : 'corp';
     }
 
-    return $theme;
+    if ($allowDefault && $normalized === 'default') {
+        return 'default';
+    }
+
+    if (in_array($normalized, ['corp', 'ice', 'midnight'], true)) {
+        return $normalized;
+    }
+
+    if (in_array($normalized, ['light', 'raven', 'default'], true)) {
+        return 'corp';
+    }
+
+    if ($normalized === 'dark') {
+        return 'midnight';
+    }
+
+    return null;
 };
 
 /**
  * Returns panel theme value for current user.
  */
-$currentUserTheme = static function () use ($app, $defaultPanelTheme): string {
+$defaultPanelTheme = static function () use ($app): string {
+    $theme = strtolower(trim((string) $app['config']->get('panel.default_theme', 'corp')));
+    if (in_array($theme, ['light', 'raven', 'default', 'corp'], true)) {
+        return 'corp';
+    }
+    if (in_array($theme, ['dark', 'midnight'], true)) {
+        return 'midnight';
+    }
+    if ($theme === 'ice') {
+        return 'ice';
+    }
+
+    return 'corp';
+};
+
+/**
+ * Returns panel theme value for current user.
+ */
+$currentUserTheme = static function () use ($app, $defaultPanelTheme, $normalizePanelTheme): string {
     $theme = $defaultPanelTheme();
     $userId = $app['auth']->userId();
     if ($userId !== null) {
         $prefs = $app['auth']->userPreferences($userId);
-        $candidate = strtolower(trim((string) ($prefs['theme'] ?? 'default')));
-        if (in_array($candidate, ['default', 'light', 'dark'], true)) {
+        $candidate = $normalizePanelTheme((string) ($prefs['theme'] ?? 'default'), true);
+        if (is_string($candidate)) {
             $theme = $candidate === 'default' ? $defaultPanelTheme() : $candidate;
         }
     }
@@ -472,6 +506,28 @@ usort($systemExtensionNavItems, static function (array $a, array $b): int {
 $_SESSION['_raven_nav_extensions'] = $extensionNavItems;
 $_SESSION['_raven_nav_modules'] = $moduleNavItems;
 $_SESSION['_raven_nav_system_extensions'] = $systemExtensionNavItems;
+
+// Provide channel-aware shortcuts for Create Page sidebar/mobile accordion sublinks.
+$pageCreateChannelItems = [];
+if ($hasPanelPermissionBit(PanelAccess::PAGES_CREATE)) {
+    foreach ($app['channels']->listOptions() as $channelOption) {
+        if (!is_array($channelOption)) {
+            continue;
+        }
+
+        $channelName = trim((string) ($channelOption['name'] ?? ''));
+        $channelSlug = strtolower(trim((string) ($channelOption['slug'] ?? '')));
+        if ($channelName === '' || $channelSlug === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,127}$/', $channelSlug) !== 1) {
+            continue;
+        }
+
+        $pageCreateChannelItems[] = [
+            'label' => $channelName,
+            'slug' => $channelSlug,
+        ];
+    }
+}
+$_SESSION['_raven_nav_page_create_channels'] = $pageCreateChannelItems;
 
 $router = new Router();
 

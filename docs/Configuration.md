@@ -49,7 +49,7 @@ Tab behavior notes:
   - `site.default_theme` remains stored in `private/config.php` but is managed via Theme Manager / `rvn-theme` (not editable in Configuration)
 - `Panel` section:
   - `panel.path`
-  - `panel.default_theme`
+  - `panel.default_theme` (`Corporate`, `Ice`, `Midnight`)
   - `panel.brand_name` (`Branded Panel Name`)
   - `panel.brand_logo` (`Branded Panel Logo`, URL-prefixed filename/path input)
 - `Mail` section:
@@ -203,6 +203,7 @@ Path-specific normalization is centralized in `normalizeConfigFieldValue(...)` a
 Important rules include:
 
 - constrained enums (`site.enabled`, `database.driver`, `captcha.provider`, `mail.agent`, etc.)
+- `panel.default_theme` constrained to `corp`, `ice`, or `midnight` (legacy `light`/`dark` normalize to `corp`/`midnight`)
 - `user.auth.login` constrained to `email` or `username`
 - `user.auth.registration` constrained to `open`, `invite`, or `closed`
 - slug/prefix validation and collision checks for public route prefixes

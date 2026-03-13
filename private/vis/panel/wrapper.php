@@ -21,6 +21,7 @@
 /** @var bool|null $canManageConfiguration */
 /** @var string|null $userTheme */
 /** @var string|null $pagesNav */
+/** @var string|null $pagesNavChannel */
 /** @var string|null $pageTitle */
 
 use function Raven\Core\Support\e;
@@ -68,10 +69,20 @@ if (!is_bool($tagEnabled)) {
 }
 $userTheme = strtolower((string) ($userTheme ?? 'default'));
 $pagesNav = is_string($pagesNav ?? null) ? $pagesNav : null;
-if (!in_array($userTheme, ['default', 'light', 'dark'], true)) {
+$pagesNavChannel = strtolower(trim((string) ($pagesNavChannel ?? '')));
+if ($pagesNavChannel !== '' && preg_match('/^[a-z0-9][a-z0-9_-]{0,127}$/', $pagesNavChannel) !== 1) {
+    $pagesNavChannel = '';
+}
+if (!in_array($userTheme, ['default', 'corp', 'ice', 'midnight', 'light', 'dark'], true)) {
     // Guard against unexpected persisted values to keep class names predictable.
     $userTheme = 'default';
 }
+$panelThemeClass = match ($userTheme) {
+    'corp' => 'default',
+    'ice' => 'light',
+    'midnight' => 'dark',
+    default => $userTheme,
+};
 
 // Shared Welcome heading uses session-cached identity set by panel auth flow.
 /** @var mixed $rawPanelIdentity */
@@ -92,9 +103,11 @@ if ($welcomeName === '') {
 $rawExtensionNavItems = $_SESSION['_raven_nav_extensions'] ?? [];
 $rawModuleNavItems = $_SESSION['_raven_nav_modules'] ?? [];
 $rawSystemExtensionNavItems = $_SESSION['_raven_nav_system_extensions'] ?? [];
+$rawPageCreateChannelItems = $_SESSION['_raven_nav_page_create_channels'] ?? [];
 $extensionNavItems = [];
 $moduleNavItems = [];
 $systemExtensionNavItems = [];
+$pageCreateChannelItems = [];
 if (is_array($rawExtensionNavItems)) {
     foreach ($rawExtensionNavItems as $item) {
         if (!is_array($item)) {
@@ -155,6 +168,24 @@ if (is_array($rawSystemExtensionNavItems)) {
         ];
     }
 }
+if (is_array($rawPageCreateChannelItems)) {
+    foreach ($rawPageCreateChannelItems as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+
+        $label = trim((string) ($item['label'] ?? ''));
+        $slug = strtolower(trim((string) ($item['slug'] ?? '')));
+        if ($label === '' || $slug === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,127}$/', $slug) !== 1) {
+            continue;
+        }
+
+        $pageCreateChannelItems[] = [
+            'label' => $label,
+            'slug' => $slug,
+        ];
+    }
+}
 $showExtensionsCategory = $extensionNavItems !== [];
 $showModulesCategory = $moduleNavItems !== [];
 $systemNavItems = [
@@ -178,6 +209,9 @@ $systemNavItems = array_values(array_filter($systemNavItems, static function (ar
 usort($systemNavItems, static function (array $left, array $right): int {
     return strcasecmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? ''));
 });
+
+$currentSection = is_string($section) ? $section : '';
+$createPageAccordionOpen = $currentSection === 'pages' && $pagesNav === 'create';
 
 $siteName = trim((string) ($site['name'] ?? 'Raven CMS'));
 if ($siteName === '') {
@@ -319,9 +353,56 @@ if ($section === 'login') {
             border-top-color: var(--raven-surface);
             border-bottom-color: var(--raven-border);
         }
+
+        body#rvnp .rvnp-nav-subaccordion {
+            border: 0;
+            padding-bottom: 0;
+        }
+
+        body#rvnp .rvnp-nav-subsummary {
+            list-style: none;
+            cursor: pointer;
+            padding: var(--bs-nav-link-padding-y) var(--bs-nav-link-padding-x);
+            border-radius: var(--bs-nav-pills-border-radius);
+            color: var(--bs-nav-pills-link-color);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.35rem;
+        }
+
+        body#rvnp .rvnp-nav-subsummary::-webkit-details-marker {
+            display: none;
+        }
+
+        body#rvnp .rvnp-nav-subsummary::after {
+            content: "\f282";
+            font-family: "bootstrap-icons", sans-serif;
+            font-size: 0.72rem;
+            line-height: 1;
+            opacity: 0.8;
+            transition: transform 160ms ease;
+        }
+
+        body#rvnp details[open] > .rvnp-nav-subsummary::after {
+            transform: rotate(180deg);
+        }
+
+        body#rvnp .rvnp-nav-subsummary.active {
+            color: var(--bs-nav-pills-link-active-color);
+            background: var(--bs-nav-pills-link-active-bg);
+        }
+
+        body#rvnp .rvnp-nav-sublist {
+            margin-top: 0.25rem;
+            margin-left: 0.95rem;
+            border-left: 1px dashed var(--raven-border);
+            padding-left: 0.55rem;
+        }
     </style>
 </head>
-<body id="rvnp" class="theme-<?= e($userTheme) ?><?= $showSidebar ? ' has-sidebar' : '' ?>">
+<body id="rvnp" class="theme-<?= e($panelThemeClass) ?><?= $showSidebar ? ' has-sidebar' : '' ?>">
 <?php if ($showSidebar): ?>
     <!-- Mobile-only header navigation (xs/sm); sidebar appears from md upward. -->
     <!-- Navigation groups intentionally mirror desktop sidebar so IA remains consistent across breakpoints. -->
@@ -378,7 +459,28 @@ if ($section === 'login') {
                     <?php if ($canManageContent): ?>
                         <h2 class="h6 text-uppercase text-white-50">Content</h2>
                         <ul class="nav nav-pills flex-column gap-1 mb-3">
-                            <li class="nav-item"><a class="nav-link<?= ($section === 'pages' && $pagesNav === 'create') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages/edit">Create Page</a></li>
+                            <li class="nav-item">
+                                <details class="rvnp-nav-subaccordion"<?= $createPageAccordionOpen ? ' open' : '' ?>>
+                                    <summary class="rvnp-nav-subsummary<?= $createPageAccordionOpen ? ' active' : '' ?>">Create Page</summary>
+                                    <ul class="nav nav-pills flex-column gap-1 rvnp-nav-sublist">
+                                        <li class="nav-item">
+                                            <a class="nav-link<?= ($section === 'pages' && $pagesNav === 'create' && $pagesNavChannel === '') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages/edit">
+                                                In Root
+                                            </a>
+                                        </li>
+                                        <?php foreach ($pageCreateChannelItems as $channelItem): ?>
+                                            <li class="nav-item">
+                                                <a
+                                                    class="nav-link<?= ($section === 'pages' && $pagesNav === 'create' && $pagesNavChannel === (string) $channelItem['slug']) ? ' active' : '' ?>"
+                                                    href="<?= e($panelBase) ?>/pages/edit?channel=<?= e(rawurlencode((string) $channelItem['slug'])) ?>"
+                                                >
+                                                    In <?= e((string) $channelItem['label']) ?>
+                                                </a>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </details>
+                            </li>
                             <li class="nav-item"><a class="nav-link<?= ($section === 'pages' && $pagesNav === 'list') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages">List Pages</a></li>
                         </ul>
                     <?php endif; ?>
@@ -504,7 +606,28 @@ if ($section === 'login') {
                             <!-- Content group for publishing entities. -->
                             <h2 class="h6 text-uppercase text-muted">Content</h2>
                             <ul class="nav nav-pills flex-column gap-1 mb-3">
-                                <li class="nav-item"><a class="nav-link<?= ($section === 'pages' && $pagesNav === 'create') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages/edit">Create Page</a></li>
+                                <li class="nav-item">
+                                    <details class="rvnp-nav-subaccordion"<?= $createPageAccordionOpen ? ' open' : '' ?>>
+                                        <summary class="rvnp-nav-subsummary<?= $createPageAccordionOpen ? ' active' : '' ?>">Create Page</summary>
+                                        <ul class="nav nav-pills flex-column gap-1 rvnp-nav-sublist">
+                                            <li class="nav-item">
+                                                <a class="nav-link<?= ($section === 'pages' && $pagesNav === 'create' && $pagesNavChannel === '') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages/edit">
+                                                    In Root
+                                                </a>
+                                            </li>
+                                            <?php foreach ($pageCreateChannelItems as $channelItem): ?>
+                                                <li class="nav-item">
+                                                    <a
+                                                        class="nav-link<?= ($section === 'pages' && $pagesNav === 'create' && $pagesNavChannel === (string) $channelItem['slug']) ? ' active' : '' ?>"
+                                                        href="<?= e($panelBase) ?>/pages/edit?channel=<?= e(rawurlencode((string) $channelItem['slug'])) ?>"
+                                                    >
+                                                        In <?= e((string) $channelItem['label']) ?>
+                                                    </a>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </details>
+                                </li>
                                 <li class="nav-item"><a class="nav-link<?= ($section === 'pages' && $pagesNav === 'list') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages">List Pages</a></li>
                             </ul>
                         <?php endif; ?>

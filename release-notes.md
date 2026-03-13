@@ -12,6 +12,12 @@
 - Updated Configuration -> Users tab ordering so the auth block appears first and renamed that section heading from `Login Options` to `Registration Options`.
 - Updated `user.auth.registration` config label from `Enable Registration` to `Enable Public Registration`, and pinned it as the first field inside `Registration Options`.
 - Renamed `user.auth.login` field label in Configuration -> Users from `Login Identifier` to `Login Method`.
+- Updated panel navigation so `Create Page` now has expandable channel-specific shortcuts in both desktop sidebar and mobile nav.
+- Updated page editor create route to preselect channel from `/panel/pages/edit?channel={slug}` while keeping top-level nav categories as static headers.
+- Split panel theme choices into `Corporate` (`corp`), `Ice` (`ice`), and `Midnight` (`midnight`) with legacy `light`/`dark` values auto-normalized.
+- Updated `panel.default_theme` options in Configuration to `Corporate/Ice/Midnight` and changed default installs to `Corporate`.
+- Updated User Editor and Preferences `Panel Theme` options to `<Default>/Corporate/Ice/Midnight` (`<Default>` follows config default).
+- Separated `Ice` navigation chrome from `Corporate` while keeping main content palette aligned.
 
 ### March 11, 2026
 
