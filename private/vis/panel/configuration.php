@@ -312,6 +312,26 @@ foreach ($groupConfigFields as $groupField) {
 
     $sessionCookieConfigFields[] = $groupField;
 }
+if ($sessionLoginConfigFields !== []) {
+    $sessionLoginOrder = [
+        'user.auth.registration' => 10,
+        'user.auth.login' => 20,
+    ];
+    usort(
+        $sessionLoginConfigFields,
+        static function (array $left, array $right) use ($sessionLoginOrder): int {
+            $leftPath = (string) ($left['path'] ?? '');
+            $rightPath = (string) ($right['path'] ?? '');
+            $leftRank = (int) ($sessionLoginOrder[$leftPath] ?? 1000);
+            $rightRank = (int) ($sessionLoginOrder[$rightPath] ?? 1000);
+            if ($leftRank !== $rightRank) {
+                return $leftRank <=> $rightRank;
+            }
+
+            return strcasecmp($leftPath, $rightPath);
+        }
+    );
+}
 
 $profileContactOptionRows = [];
 $protectedProfileContactOptionTypes = ['email', 'phone', 'website', 'x'];
@@ -1060,25 +1080,25 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             <?php if ($sessionCookieConfigFields === [] && $sessionLoginConfigFields === [] && $sessionProfileConfigFields === [] && $sessionGroupConfigFields === []): ?>
                                 <p class="text-muted mb-0">No configuration fields available.</p>
                             <?php else: ?>
+                                <?php if ($sessionLoginConfigFields !== []): ?>
+                                    <h3>Registration Options</h3>
+                                    <?php foreach ($sessionLoginConfigFields as $sessionField): ?>
+                                        <?php $renderConfigField($sessionField); ?>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+
                                 <?php if ($sessionCookieConfigFields !== []): ?>
+                                    <?php if ($sessionLoginConfigFields !== []): ?>
+                                        <hr class="my-4">
+                                    <?php endif; ?>
                                     <h3>Cookie Settings</h3>
                                     <?php foreach ($sessionCookieConfigFields as $sessionField): ?>
                                         <?php $renderConfigField($sessionField); ?>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
 
-                                <?php if ($sessionLoginConfigFields !== []): ?>
-                                    <?php if ($sessionCookieConfigFields !== []): ?>
-                                        <hr class="my-4">
-                                    <?php endif; ?>
-                                    <h3>Login Options</h3>
-                                    <?php foreach ($sessionLoginConfigFields as $sessionField): ?>
-                                        <?php $renderConfigField($sessionField); ?>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-
                                 <?php if ($sessionProfileConfigFields !== []): ?>
-                                    <?php if ($sessionCookieConfigFields !== [] || $sessionLoginConfigFields !== []): ?>
+                                    <?php if ($sessionLoginConfigFields !== [] || $sessionCookieConfigFields !== []): ?>
                                         <hr class="my-4">
                                     <?php endif; ?>
                                     <h3>Profile Options</h3>
@@ -1088,7 +1108,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                 <?php endif; ?>
 
                                 <?php if ($sessionGroupConfigFields !== []): ?>
-                                    <?php if ($sessionCookieConfigFields !== [] || $sessionLoginConfigFields !== [] || $sessionProfileConfigFields !== []): ?>
+                                    <?php if ($sessionLoginConfigFields !== [] || $sessionCookieConfigFields !== [] || $sessionProfileConfigFields !== []): ?>
                                         <hr class="my-4">
                                     <?php endif; ?>
                                     <h3>Group Options</h3>

@@ -4555,11 +4555,11 @@ final class PanelController
         }
 
         if ($path === 'user.auth.login') {
-            return 'Login Identifier';
+            return 'Login Method';
         }
 
         if ($path === 'user.auth.registration') {
-            return 'Enable Registration';
+            return 'Enable Public Registration';
         }
 
         if ($path === 'user.prefix') {

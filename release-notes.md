@@ -9,6 +9,9 @@
 - Added panel invite-token administration at `/panel/users/invites`, including single-use/reusable token creation, batch single-use token generation, and expiry support.
 - Added public registration/login helper views and routes at `/register` and `/login`, with invite-token enforcement in invite-only mode.
 - Updated installer form UX so setup fields now render with grey placeholder suggestions instead of prefilled text values, allowing one-click typing without manual clearing.
+- Updated Configuration -> Users tab ordering so the auth block appears first and renamed that section heading from `Login Options` to `Registration Options`.
+- Updated `user.auth.registration` config label from `Enable Registration` to `Enable Public Registration`, and pinned it as the first field inside `Registration Options`.
+- Renamed `user.auth.login` field label in Configuration -> Users from `Login Identifier` to `Login Method`.
 
 ### March 11, 2026
 

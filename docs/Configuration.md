@@ -137,10 +137,15 @@ Grouped sections:
 
 Grouped sections:
 
+- `Registration Options`
 - `Cookie Settings`
-- `Login Options`
 - `Profile Options`
 - `Group Options`
+
+Notable options:
+
+- `user.auth.registration` is shown first in `Registration Options` as `Enable Public Registration`.
+- `user.auth.login` remains in `Registration Options` as `Login Method`.
 
 ### Field Input Types You’ll See
 
