@@ -59,12 +59,22 @@ $panelBase = '/' . trim($site['panel_path'], '/');
     <div class="card-body">
         <div class="d-flex align-items-start justify-content-between gap-2">
             <h1>Extension Manager</h1>
-            <button
-              type="button"
-              class="btn btn-primary btn-sm"
-              data-bs-toggle="modal"
-              data-bs-target="#create-extension-modal"
-              ><i class="bi bi-plus-square me-2" aria-hidden="true"></i>Create New Extension</button>
+            <div class="d-flex align-items-center gap-2">
+                <button
+                    type="button"
+                    class="btn btn-outline-primary btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#upload-extension-modal"
+                >
+                    <i class="bi bi-upload me-2" aria-hidden="true"></i>Upload Extension
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#create-extension-modal"
+                ><i class="bi bi-plus-square me-2" aria-hidden="true"></i>Create New Extension</button>
+            </div>
         </div>
         <p class="text-muted mb-2">Use this page to create, upload, enable, and disable Raven extensions.</p>
         <h5>Notes:</h5>
@@ -85,30 +95,6 @@ $panelBase = '/' . trim($site['panel_path'], '/');
 
 <section class="card">
     <div class="card-body">
-        <h2>Upload Extension</h2>
-        <form method="post" action="<?= e($panelBase) ?>/extensions/upload" enctype="multipart/form-data">
-            <?= $csrfField ?>
-
-            <div class="form-group">
-                <label for="extension_archive" class="form-label"><span class="h6">Formats Accepted:</span> <small>zip</small></label>
-                <input
-                    id="extension_archive"
-                    type="file"
-                    name="extension_archive"
-                    class="form-control"
-                    accept=".zip,application/zip"
-                    required
-                >
-                <div class="form-text">Archive must include a valid <code>ext.json</code> file!</div>
-            </div>
-
-            <button type="submit" class="btn btn-primary btn-lg">Click to Upload<i class="bi bi-upload ms-2" aria-hidden="true"></i></button>
-        </form>
-    </div>
-</section>
-
-<section class="card">
-    <div class="card-body">
         <h2>Installed Extensions</h2>
         <?php if ($extensions === []): ?>
             <p class="text-muted mb-0">No extensions found in <code>private/ext/</code>.</p>
@@ -119,9 +105,8 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                     <tr>
                         <th scope="col" data-sort-key="name" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Name</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="author" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Author</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="version" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Version</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="description" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Description</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" class="text-center">Action</th>
+                        <th scope="col" class="text-center">Actions</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -130,7 +115,6 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                         $directory = (string) ($extension['directory'] ?? '');
                         $extensionPanelPath = trim((string) ($extension['panel_path'] ?? ''), '/');
                         $name = (string) ($extension['name'] ?? $directory);
-                        $version = (string) ($extension['version'] ?? '');
                         $description = (string) ($extension['description'] ?? '');
                         $author = (string) ($extension['author'] ?? '');
                         $authorUrl = (string) ($extension['author_url'] ?? '');
@@ -145,14 +129,12 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                         $panelTarget = $extensionPanelPath !== '' ? ($panelBase . '/' . ltrim($extensionPanelPath, '/')) : '';
                         $canOpenSettings = $enabled && $panelTarget !== '';
                         $authorLabel = $author !== '' ? $author : '<none>';
-                        $versionLabel = $version !== '' ? $version : '<none>';
                         $descriptionLabel = $description !== '' ? $description : '<none>';
                         ?>
                         <tr
                             data-extensions-row="1"
                             data-sort-name="<?= e($nameLabel) ?>"
                             data-sort-author="<?= e($authorLabel) ?>"
-                            data-sort-version="<?= e($versionLabel) ?>"
                             data-sort-description="<?= e($descriptionLabel) ?>"
                         >
                             <td>
@@ -171,7 +153,6 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                     <?= e('<none>') ?>
                                 <?php endif; ?>
                             </td>
-                            <td><?= e($versionLabel) ?></td>
                             <td>
                                 <?= e($descriptionLabel) ?>
                                 <?php if (!$valid && $invalidReason !== ''): ?>
@@ -180,6 +161,17 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                             </td>
                             <td class="text-center">
                                 <div class="d-inline-flex align-items-center gap-1">
+                                    <form method="get" action="<?= e($panelBase) ?>/extensions/export" class="d-inline m-0">
+                                        <input type="hidden" name="extension" value="<?= e($directory) ?>">
+                                        <button
+                                            type="submit"
+                                            class="btn btn-outline-primary btn-sm"
+                                            title="Export"
+                                            aria-label="Export"
+                                        >
+                                            <i class="bi bi-download" aria-hidden="true"></i>
+                                        </button>
+                                    </form>
                                     <form method="post" action="<?= e($panelBase) ?>/extensions/toggle" class="d-inline m-0">
                                         <?= $csrfField ?>
                                         <input type="hidden" name="extension" value="<?= e($directory) ?>">
@@ -212,8 +204,9 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                             <input type="hidden" name="extension" value="<?= e($directory) ?>">
                                             <button
                                                 type="submit"
-                                                class="btn btn-danger btn-sm"
+                                                class="btn btn-outline-danger btn-sm"
                                                 aria-label="Delete"
+                                                title="Delete"
                                                 onclick="return confirm('Delete this extension from disk? This cannot be undone.');"
                                             >
                                                 <i class="bi bi-trash3" aria-hidden="true"></i>
@@ -230,6 +223,50 @@ $panelBase = '/' . trim($site['panel_path'], '/');
         <?php endif; ?>
     </div>
 </section>
+
+<div class="modal fade" id="upload-extension-modal" tabindex="-1" aria-labelledby="upload-extension-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title mb-0" id="upload-extension-modal-label">Upload Extension</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="<?= e($panelBase) ?>/extensions/upload" enctype="multipart/form-data">
+                <?= $csrfField ?>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="extension_archive" class="form-label"><span class="h6">Extension Archive</span> <small>(zip)</small></label>
+                        <input
+                            id="extension_archive"
+                            type="file"
+                            name="extension_archive"
+                            class="form-control"
+                            accept=".zip,application/zip"
+                            required
+                        >
+                        <div class="form-text">Archive must include a valid <code>ext.json</code> file at archive root.</div>
+                    </div>
+                    <div>
+                        <label for="extension_upload_slug" class="form-label">Slug Override (optional)</label>
+                        <input
+                            id="extension_upload_slug"
+                            type="text"
+                            name="upload_slug"
+                            class="form-control"
+                            maxlength="120"
+                            pattern="[a-z0-9][a-z0-9_-]*"
+                            placeholder="leave blank to derive from filename"
+                        >
+                        <div class="form-text">If left blank and the derived slug already exists, Raven appends <code>-copy</code> automatically.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Upload Extension</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <div class="modal fade" id="create-extension-modal" tabindex="-1" aria-labelledby="create-extension-modal-label" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -402,7 +439,6 @@ $panelBase = '/' . trim($site['panel_path'], '/');
         var sortAttrByKey = {
             name: 'data-sort-name',
             author: 'data-sort-author',
-            version: 'data-sort-version',
             description: 'data-sort-description'
         };
         function sortValue(row, key) {

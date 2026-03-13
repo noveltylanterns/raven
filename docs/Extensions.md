@@ -126,10 +126,11 @@ Alternative bootstrap path:
 
 The Extension Manager (`/extensions`) includes three practical control areas.
 
-Upload card:
+Upload modal (`Upload Extension`):
 
-- `Upload Extension`
-- `ZIP Archive` file input
+- `Extension Archive (zip)` file input
+- `Slug Override (optional)` input
+- If slug override is blank and derived slug exists, upload auto-renames using `-copy`.
 
 Create modal (`Create New Extension`):
 
@@ -185,3 +186,5 @@ If this document and [private/ext/AGENTS.md](../private/ext/AGENTS.md) ever dive
 - `Generate composer.json?`
 - `Click to Upload`
 - `Formats Accepted: zip`
+- `Extension Archive (zip)`
+- `Slug Override (optional)`

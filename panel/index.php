@@ -830,6 +830,10 @@ $router->add('POST', '/themes/upload', static function () use ($panelController)
     $panelController->themesUpload($_POST, $_FILES);
 });
 
+$router->add('GET', '/themes/export', static function () use ($panelController): void {
+    $panelController->themesExport($_GET);
+});
+
 $router->add('POST', '/themes/delete', static function () use ($panelController): void {
     $panelController->themesDelete($_POST);
 });
@@ -845,6 +849,10 @@ $router->add('POST', '/extensions/toggle', static function () use ($panelControl
 
 $router->add('POST', '/extensions/upload', static function () use ($panelController): void {
     $panelController->extensionsUpload($_POST, $_FILES);
+});
+
+$router->add('GET', '/extensions/export', static function () use ($panelController): void {
+    $panelController->extensionsExport($_GET);
 });
 
 $router->add('POST', '/extensions/create', static function () use ($panelController): void {

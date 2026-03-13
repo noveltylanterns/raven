@@ -34,14 +34,24 @@ $panelBase = '/' . trim($site['panel_path'], '/');
     <div class="card-body">
         <div class="d-flex align-items-start justify-content-between gap-2">
             <h1>Theme Manager</h1>
-            <button
-                type="button"
-                class="btn btn-primary btn-sm"
-                data-bs-toggle="modal"
-                data-bs-target="#create-theme-modal"
-            >
-                <i class="bi bi-plus-square me-2" aria-hidden="true"></i>Create New Theme
-            </button>
+            <div class="d-flex align-items-center gap-2">
+                <button
+                    type="button"
+                    class="btn btn-outline-primary btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#upload-theme-modal"
+                >
+                    <i class="bi bi-upload me-2" aria-hidden="true"></i>Upload Theme
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#create-theme-modal"
+                >
+                    <i class="bi bi-plus-square me-2" aria-hidden="true"></i>Create New Theme
+                </button>
+            </div>
         </div>
         <p class="text-muted mb-0">Manage installed public themes, switch the active theme, and scaffold new theme folders.</p>
     </div>
@@ -57,30 +67,6 @@ $panelBase = '/' . trim($site['panel_path'], '/');
 
 <section class="card">
     <div class="card-body">
-        <h2>Upload Theme</h2>
-        <form method="post" action="<?= e($panelBase) ?>/themes/upload" enctype="multipart/form-data">
-            <?= $csrfField ?>
-
-            <div class="form-group">
-                <label for="theme_archive" class="form-label"><span class="h6">Formats Accepted:</span> <small>zip</small></label>
-                <input
-                    id="theme_archive"
-                    type="file"
-                    name="theme_archive"
-                    class="form-control"
-                    accept=".zip,application/zip"
-                    required
-                >
-                <div class="form-text">Archive must include a valid <code>theme.json</code> file at archive root.</div>
-            </div>
-
-            <button type="submit" class="btn btn-primary btn-lg">Click to Upload<i class="bi bi-upload ms-2" aria-hidden="true"></i></button>
-        </form>
-    </div>
-</section>
-
-<section class="card">
-    <div class="card-body">
         <h2>Installed Themes</h2>
         <p class="text-muted">Active themes and stock themes cannot be deleted.</p>
         <?php if ($themes === []): ?>
@@ -93,9 +79,8 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                         <th scope="col">Name</th>
                         <th scope="col">Slug</th>
                         <th scope="col">Parent</th>
-                        <th scope="col">Assets</th>
                         <th scope="col">Status</th>
-                        <th scope="col" class="text-center">Action</th>
+                        <th scope="col" class="text-center">Actions</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -106,8 +91,6 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                         $isStock = (bool) ($theme['is_stock'] ?? false);
                         $parentTheme = (string) ($theme['parent_theme'] ?? '');
                         $isChildTheme = (bool) ($theme['is_child_theme'] ?? false);
-                        $hasCss = (bool) ($theme['has_css'] ?? false);
-                        $hasWrapper = (bool) ($theme['has_wrapper'] ?? false);
                         $isActive = $slug === $activeTheme;
                         ?>
                         <tr>
@@ -129,10 +112,6 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <span class="badge <?= $hasCss ? 'text-bg-success' : 'text-bg-danger' ?>">css/style.css</span>
-                                <span class="badge <?= $hasWrapper ? 'text-bg-success' : 'text-bg-danger' ?>">vis/wrapper.php</span>
-                            </td>
-                            <td>
                                 <?php if ($isActive): ?>
                                     <span class="badge text-bg-success">Active</span>
                                 <?php else: ?>
@@ -140,30 +119,47 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                 <?php endif; ?>
                             </td>
                             <td class="text-center">
-                                <form method="post" action="<?= e($panelBase) ?>/themes/enable" class="d-inline m-0 me-1">
-                                    <?= $csrfField ?>
-                                    <input type="hidden" name="theme" value="<?= e($slug) ?>">
-                                    <button
-                                        type="submit"
-                                        class="btn btn-sm <?= $isActive ? 'btn-secondary' : 'btn-success' ?>"
-                                        <?= $isActive ? 'disabled' : '' ?>
-                                    >
-                                        <?= $isActive ? 'Active' : 'Enable' ?>
-                                    </button>
-                                </form>
-                                <?php if (!$isActive && !$isStock): ?>
-                                    <form method="post" action="<?= e($panelBase) ?>/themes/delete" class="d-inline m-0">
+                                <div class="d-inline-flex align-items-center gap-1">
+                                    <form method="get" action="<?= e($panelBase) ?>/themes/export" class="d-inline m-0">
+                                        <input type="hidden" name="theme" value="<?= e($slug) ?>">
+                                        <button
+                                            type="submit"
+                                            class="btn btn-sm btn-outline-primary"
+                                            title="Export"
+                                            aria-label="Export"
+                                        >
+                                            <i class="bi bi-download" aria-hidden="true"></i>
+                                        </button>
+                                    </form>
+                                    <form method="post" action="<?= e($panelBase) ?>/themes/enable" class="d-inline m-0">
                                         <?= $csrfField ?>
                                         <input type="hidden" name="theme" value="<?= e($slug) ?>">
                                         <button
                                             type="submit"
-                                            class="btn btn-sm btn-outline-danger"
-                                            onclick="return confirm('Delete theme <?= e($slug) ?> from disk?');"
+                                            class="btn btn-sm <?= $isActive ? 'btn-secondary' : 'btn-success' ?>"
+                                            title="<?= e($isActive ? 'Active' : 'Enable') ?>"
+                                            aria-label="<?= e($isActive ? 'Active' : 'Enable') ?>"
+                                            <?= $isActive ? 'disabled' : '' ?>
                                         >
-                                            Delete
+                                            <i class="bi <?= $isActive ? 'bi-check-circle-fill' : 'bi-play-circle-fill' ?>" aria-hidden="true"></i>
                                         </button>
                                     </form>
-                                <?php endif; ?>
+                                    <?php if (!$isActive && !$isStock): ?>
+                                        <form method="post" action="<?= e($panelBase) ?>/themes/delete" class="d-inline m-0">
+                                            <?= $csrfField ?>
+                                            <input type="hidden" name="theme" value="<?= e($slug) ?>">
+                                            <button
+                                                type="submit"
+                                                class="btn btn-sm btn-outline-danger"
+                                                title="Delete"
+                                                aria-label="Delete"
+                                                onclick="return confirm('Delete theme <?= e($slug) ?> from disk?');"
+                                            >
+                                                <i class="bi bi-trash3" aria-hidden="true"></i>
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -173,6 +169,50 @@ $panelBase = '/' . trim($site['panel_path'], '/');
         <?php endif; ?>
     </div>
 </section>
+
+<div class="modal fade" id="upload-theme-modal" tabindex="-1" aria-labelledby="upload-theme-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title mb-0" id="upload-theme-modal-label">Upload Theme</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="<?= e($panelBase) ?>/themes/upload" enctype="multipart/form-data">
+                <?= $csrfField ?>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="theme_archive" class="form-label"><span class="h6">Theme Archive</span> <small>(zip)</small></label>
+                        <input
+                            id="theme_archive"
+                            type="file"
+                            name="theme_archive"
+                            class="form-control"
+                            accept=".zip,application/zip"
+                            required
+                        >
+                        <div class="form-text">Archive must include a valid <code>theme.json</code> file at archive root.</div>
+                    </div>
+                    <div>
+                        <label for="theme_upload_slug" class="form-label">Slug Override (optional)</label>
+                        <input
+                            id="theme_upload_slug"
+                            type="text"
+                            name="upload_slug"
+                            class="form-control"
+                            maxlength="80"
+                            pattern="[a-z0-9][a-z0-9_-]*"
+                            placeholder="leave blank to derive from filename"
+                        >
+                        <div class="form-text">If left blank and the derived slug already exists, Raven appends <code>-copy</code> automatically.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Upload Theme</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <div class="modal fade" id="create-theme-modal" tabindex="-1" aria-labelledby="create-theme-modal-label" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">

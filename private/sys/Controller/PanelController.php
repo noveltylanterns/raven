@@ -3712,7 +3712,8 @@ final class PanelController
             redirect($this->panelUrl('/themes'));
         }
 
-        $themeSlug = strtolower(trim($this->input->text($post['theme'] ?? null, 80)));
+        $themeSlug = strtolower(trim($this->input->text($post['upload_slug'] ?? ($post['theme'] ?? null), 80)));
+        $manualSlugProvided = $themeSlug !== '';
         if ($themeSlug === '') {
             $derivedSlug = $this->themeSlugFromArchiveFilename($archiveName);
             if (!is_string($derivedSlug)) {
@@ -3727,7 +3728,7 @@ final class PanelController
             redirect($this->panelUrl('/themes'));
         }
 
-        if ($this->isStockPublicThemeSlug($themeSlug)) {
+        if ($manualSlugProvided && $this->isStockPublicThemeSlug($themeSlug)) {
             $this->flash('error', 'That theme slug is reserved by a stock theme.');
             redirect($this->panelUrl('/themes'));
         }
@@ -3738,10 +3739,22 @@ final class PanelController
             redirect($this->panelUrl('/themes'));
         }
 
+        $initialThemeSlug = $themeSlug;
         $targetDirectory = $themesRoot . '/' . $themeSlug;
         if (file_exists($targetDirectory)) {
-            $this->flash('error', 'A theme directory with this slug already exists.');
-            redirect($this->panelUrl('/themes'));
+            if ($manualSlugProvided) {
+                $this->flash('error', 'A theme directory with this slug already exists.');
+                redirect($this->panelUrl('/themes'));
+            }
+
+            $resolvedThemeSlug = $this->nextAvailablePublicThemeSlug($themeSlug);
+            if ($resolvedThemeSlug === null) {
+                $this->flash('error', 'Failed to resolve an available theme slug for this upload.');
+                redirect($this->panelUrl('/themes'));
+            }
+
+            $themeSlug = $resolvedThemeSlug;
+            $targetDirectory = $themesRoot . '/' . $themeSlug;
         }
 
         if (!mkdir($targetDirectory, 0775, true) && !is_dir($targetDirectory)) {
@@ -3802,11 +3815,53 @@ final class PanelController
             redirect($this->panelUrl('/themes'));
         }
 
-        $this->flash(
-            'success',
-            'Theme uploaded to public/theme/' . $themeSlug . '/. Enable it from the Installed Themes list when ready.'
-        );
+        $message = 'Theme uploaded to public/theme/' . $themeSlug . '/. Enable it from the Installed Themes list when ready.';
+        if (!$manualSlugProvided && $themeSlug !== $initialThemeSlug) {
+            $message .= ' Existing slug detected; upload was renamed automatically.';
+        }
+        $this->flash('success', $message);
         redirect($this->panelUrl('/themes'));
+    }
+
+    /**
+     * Exports one installed public theme directory as a ZIP download.
+     *
+     * @param array<string, mixed> $query
+     */
+    public function themesExport(array $query): void
+    {
+        $this->requirePanelLogin();
+
+        if (!$this->requireRoutePermissionOrForbidden('themes', 'view')) {
+            return;
+        }
+
+        if (!class_exists(ZipArchive::class)) {
+            $this->flash('error', 'Theme export requires the PHP zip extension.');
+            redirect($this->panelUrl('/themes'));
+        }
+
+        $themeSlug = strtolower(trim($this->input->text($query['theme'] ?? null, 80)));
+        if (!$this->isSafePublicThemeSlug($themeSlug)) {
+            $this->flash('error', 'Invalid theme identifier.');
+            redirect($this->panelUrl('/themes'));
+        }
+
+        $themePath = $this->publicThemesRoot() . '/' . $themeSlug;
+        if (!is_dir($themePath)) {
+            $this->flash('error', 'Theme directory was not found on disk.');
+            redirect($this->panelUrl('/themes'));
+        }
+
+        try {
+            $archivePath = $this->buildZipArchiveFromDirectory($themePath, $themeSlug);
+        } catch (\RuntimeException $exception) {
+            $this->flash('error', 'Theme export failed: ' . $exception->getMessage());
+            redirect($this->panelUrl('/themes'));
+        }
+
+        $downloadFilename = 'theme-' . $themeSlug . '-' . gmdate('Ymd-His') . '.zip';
+        $this->streamDownloadFile($archivePath, $downloadFilename, 'application/zip');
     }
 
     /**
@@ -4111,9 +4166,24 @@ final class PanelController
             redirect($this->panelUrl('/extensions'));
         }
 
-        $extensionName = $this->extensionNameFromArchiveFilename($archiveName);
-        if ($extensionName === null) {
-            $this->flash('error', 'Could not derive a valid extension directory name from archive filename.');
+        $extensionName = strtolower(trim($this->input->text($post['upload_slug'] ?? null, 120)));
+        $manualSlugProvided = $extensionName !== '';
+        if ($extensionName === '') {
+            $derivedExtensionName = $this->extensionNameFromArchiveFilename($archiveName);
+            if ($derivedExtensionName === null) {
+                $this->flash('error', 'Could not derive a valid extension directory name from archive filename.');
+                redirect($this->panelUrl('/extensions'));
+            }
+            $extensionName = $derivedExtensionName;
+        }
+
+        if (!$this->isSafeExtensionDirectoryName($extensionName)) {
+            $this->flash('error', 'Extension directory must use lowercase letters, numbers, underscores, or dashes.');
+            redirect($this->panelUrl('/extensions'));
+        }
+
+        if ($manualSlugProvided && $this->isStockExtensionDirectory($extensionName)) {
+            $this->flash('error', 'That extension directory name is reserved by a stock extension.');
             redirect($this->panelUrl('/extensions'));
         }
 
@@ -4124,10 +4194,22 @@ final class PanelController
             redirect($this->panelUrl('/extensions'));
         }
 
+        $initialExtensionName = $extensionName;
         $targetDirectory = $this->extensionsBasePath() . '/' . $extensionName;
         if (file_exists($targetDirectory)) {
-            $this->flash('error', 'An extension directory with this name already exists.');
-            redirect($this->panelUrl('/extensions'));
+            if ($manualSlugProvided) {
+                $this->flash('error', 'An extension directory with this name already exists.');
+                redirect($this->panelUrl('/extensions'));
+            }
+
+            $resolvedExtensionName = $this->nextAvailableExtensionDirectoryName($extensionName);
+            if ($resolvedExtensionName === null) {
+                $this->flash('error', 'Failed to resolve an available extension directory name for this upload.');
+                redirect($this->panelUrl('/extensions'));
+            }
+
+            $extensionName = $resolvedExtensionName;
+            $targetDirectory = $this->extensionsBasePath() . '/' . $extensionName;
         }
 
         if (!mkdir($targetDirectory, 0775, true) && !is_dir($targetDirectory)) {
@@ -4202,11 +4284,53 @@ final class PanelController
             redirect($this->panelUrl('/extensions'));
         }
 
-        $this->flash(
-            'success',
-            'Extension uploaded to private/ext/' . $extensionName . '/. It is disabled by default.'
-        );
+        $message = 'Extension uploaded to private/ext/' . $extensionName . '/. It is disabled by default.';
+        if (!$manualSlugProvided && $extensionName !== $initialExtensionName) {
+            $message .= ' Existing slug detected; upload was renamed automatically.';
+        }
+        $this->flash('success', $message);
         redirect($this->panelUrl('/extensions'));
+    }
+
+    /**
+     * Exports one installed extension directory as a ZIP download.
+     *
+     * @param array<string, mixed> $query
+     */
+    public function extensionsExport(array $query): void
+    {
+        $this->requirePanelLogin();
+
+        if (!$this->requireRoutePermissionOrForbidden('extensions', 'view')) {
+            return;
+        }
+
+        if (!class_exists(ZipArchive::class)) {
+            $this->flash('error', 'Extension export requires the PHP zip extension.');
+            redirect($this->panelUrl('/extensions'));
+        }
+
+        $extensionName = strtolower(trim($this->input->text($query['extension'] ?? null, 120)));
+        if (!$this->isSafeExtensionDirectoryName($extensionName)) {
+            $this->flash('error', 'Invalid extension identifier.');
+            redirect($this->panelUrl('/extensions'));
+        }
+
+        $extensionPath = $this->extensionsBasePath() . '/' . $extensionName;
+        if (!is_dir($extensionPath)) {
+            $this->flash('error', 'Extension directory was not found on disk.');
+            redirect($this->panelUrl('/extensions'));
+        }
+
+        try {
+            $archivePath = $this->buildZipArchiveFromDirectory($extensionPath, $extensionName);
+        } catch (\RuntimeException $exception) {
+            $this->flash('error', 'Extension export failed: ' . $exception->getMessage());
+            redirect($this->panelUrl('/extensions'));
+        }
+
+        $downloadFilename = 'extension-' . $extensionName . '-' . gmdate('Ymd-His') . '.zip';
+        $this->streamDownloadFile($archivePath, $downloadFilename, 'application/zip');
     }
 
     /**
@@ -8318,6 +8442,143 @@ final class PanelController
     }
 
     /**
+     * Creates one temporary ZIP archive from a directory tree and returns archive path.
+     */
+    private function buildZipArchiveFromDirectory(string $sourceDirectory, string $archiveRoot): string
+    {
+        $sourceRoot = realpath($sourceDirectory);
+        if ($sourceRoot === false || !is_dir($sourceRoot)) {
+            throw new \RuntimeException('Source directory could not be resolved.');
+        }
+
+        $sanitizedRoot = preg_replace('/[^a-z0-9._-]+/i', '-', $archiveRoot) ?? '';
+        $sanitizedRoot = trim($sanitizedRoot, '-_.');
+        if ($sanitizedRoot === '') {
+            $sanitizedRoot = 'package';
+        }
+
+        $tmpArchivePath = $this->allocateTemporaryArchivePath();
+
+        $zip = new ZipArchive();
+        $opened = $zip->open($tmpArchivePath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        if ($opened !== true) {
+            @unlink($tmpArchivePath);
+            throw new \RuntimeException('Failed to initialize ZIP archive.');
+        }
+
+        try {
+            if (!$zip->addEmptyDir($sanitizedRoot)) {
+                throw new \RuntimeException('Failed to initialize ZIP root directory.');
+            }
+
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($sourceRoot, \FilesystemIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::SELF_FIRST
+            );
+
+            foreach ($iterator as $item) {
+                if ($item->isLink()) {
+                    continue;
+                }
+
+                $sourcePath = $item->getPathname();
+                $relativePath = ltrim(substr($sourcePath, strlen($sourceRoot)), DIRECTORY_SEPARATOR);
+                if ($relativePath === '') {
+                    continue;
+                }
+
+                $zipPath = $sanitizedRoot . '/' . str_replace('\\', '/', $relativePath);
+                if ($item->isDir()) {
+                    if (!$zip->addEmptyDir($zipPath)) {
+                        throw new \RuntimeException('Failed to add directory "' . $relativePath . '" to ZIP archive.');
+                    }
+                    continue;
+                }
+
+                if (!$zip->addFile($sourcePath, $zipPath)) {
+                    throw new \RuntimeException('Failed to add file "' . $relativePath . '" to ZIP archive.');
+                }
+            }
+        } catch (\Throwable $exception) {
+            $zip->close();
+            @unlink($tmpArchivePath);
+            throw new \RuntimeException($exception->getMessage() !== '' ? $exception->getMessage() : 'Failed to build ZIP archive.');
+        }
+
+        $zip->close();
+        return $tmpArchivePath;
+    }
+
+    /**
+     * Allocates one writable temporary file path for ZIP exports.
+     */
+    private function allocateTemporaryArchivePath(): string
+    {
+        $projectRoot = dirname(__DIR__, 3);
+        $candidateDirectories = [
+            (string) sys_get_temp_dir(),
+            $projectRoot . '/private/tmp',
+            $projectRoot . '/private/tmp/exports',
+        ];
+
+        foreach ($candidateDirectories as $candidateDirectory) {
+            $directory = trim($candidateDirectory);
+            if ($directory === '') {
+                continue;
+            }
+
+            if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
+                continue;
+            }
+
+            if (!is_writable($directory)) {
+                continue;
+            }
+
+            $path = @tempnam($directory, 'rvn-export-');
+            if (is_string($path) && $path !== '') {
+                return $path;
+            }
+        }
+
+        throw new \RuntimeException('Failed to allocate temporary archive path.');
+    }
+
+    /**
+     * Streams one local file as a download and removes it afterwards.
+     */
+    private function streamDownloadFile(string $path, string $downloadFilename, string $contentType): void
+    {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        $stream = fopen($path, 'rb');
+        if (!is_resource($stream)) {
+            @unlink($path);
+            http_response_code(500);
+            echo 'Failed to open export stream.';
+            return;
+        }
+
+        $size = (int) @filesize($path);
+        if ($size > 0) {
+            header('Content-Length: ' . $size);
+        }
+        header('Content-Type: ' . $contentType);
+        header('Content-Disposition: attachment; filename="' . $downloadFilename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+
+        if (fpassthru($stream) === false) {
+            http_response_code(500);
+        }
+
+        fclose($stream);
+        @unlink($path);
+    }
+
+    /**
      * Maps PHP upload error codes into extension-upload messages.
      */
     private function extensionUploadErrorMessage(int $code): string
@@ -10922,6 +11183,82 @@ MARKDOWN;
         }
 
         return $base;
+    }
+
+    /**
+     * Resolves the next available public-theme slug by appending copy suffixes.
+     */
+    private function nextAvailablePublicThemeSlug(string $baseSlug): ?string
+    {
+        $normalizedBase = strtolower(trim($baseSlug));
+        if (!$this->isSafePublicThemeSlug($normalizedBase)) {
+            return null;
+        }
+
+        $themesRoot = $this->publicThemesRoot();
+        $candidate = $normalizedBase;
+        if (!file_exists($themesRoot . '/' . $candidate)) {
+            return $candidate;
+        }
+
+        for ($attempt = 1; $attempt <= 250; $attempt++) {
+            $suffix = $attempt === 1 ? '-copy' : '-copy-' . $attempt;
+            $maxBaseLength = max(1, 64 - strlen($suffix));
+            $trimmedBase = substr($normalizedBase, 0, $maxBaseLength);
+            $trimmedBase = rtrim($trimmedBase, '-_');
+            if ($trimmedBase === '') {
+                $trimmedBase = 'theme';
+            }
+
+            $candidate = $trimmedBase . $suffix;
+            if (!$this->isSafePublicThemeSlug($candidate)) {
+                continue;
+            }
+
+            if (!file_exists($themesRoot . '/' . $candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolves the next available extension directory name by appending copy suffixes.
+     */
+    private function nextAvailableExtensionDirectoryName(string $baseName): ?string
+    {
+        $normalizedBase = strtolower(trim($baseName));
+        if (!$this->isSafeExtensionDirectoryName($normalizedBase)) {
+            return null;
+        }
+
+        $extensionsRoot = $this->extensionsBasePath();
+        $candidate = $normalizedBase;
+        if (!file_exists($extensionsRoot . '/' . $candidate)) {
+            return $candidate;
+        }
+
+        for ($attempt = 1; $attempt <= 500; $attempt++) {
+            $suffix = $attempt === 1 ? '-copy' : '-copy-' . $attempt;
+            $maxBaseLength = max(1, 120 - strlen($suffix));
+            $trimmedBase = substr($normalizedBase, 0, $maxBaseLength);
+            $trimmedBase = rtrim($trimmedBase, '-_');
+            if ($trimmedBase === '') {
+                $trimmedBase = 'extension';
+            }
+
+            $candidate = $trimmedBase . $suffix;
+            if (!$this->isSafeExtensionDirectoryName($candidate)) {
+                continue;
+            }
+
+            if (!file_exists($extensionsRoot . '/' . $candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     /**
