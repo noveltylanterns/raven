@@ -14,6 +14,7 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 /** @var array<string, mixed> $preferences */
+/** @var string|null $loginIdentifierMode */
 /** @var array<int, string> $themeOptions */
 /** @var array<string, array{label: string, url_prefix: string}> $profileContactOptions */
 /** @var string $avatarUploadLimitsNote */
@@ -21,6 +22,11 @@
 use function Raven\Core\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
+$loginIdentifierMode = strtolower(trim((string) ($loginIdentifierMode ?? 'email')));
+if (!in_array($loginIdentifierMode, ['email', 'username'], true)) {
+    $loginIdentifierMode = 'email';
+}
+$usernameRequiredForAuth = $loginIdentifierMode === 'username';
 $avatarPath = isset($preferences['avatar_path']) && is_string($preferences['avatar_path'])
     ? $preferences['avatar_path']
     : null;
@@ -118,9 +124,14 @@ $activeTab = in_array($requestedTab, ['account', 'profile'], true) ? $requestedT
                 <input class="form-control"
                     id="username"
                     name="username"
-                    required
+                    <?= $usernameRequiredForAuth ? 'required' : '' ?>
                     value="<?= e((string) ($preferences['username'] ?? '')) ?>"
                 >
+                <div class="form-text">
+                    <?= $usernameRequiredForAuth
+                        ? 'Required because panel login is set to Username mode.'
+                        : 'Optional because panel login is set to Email mode.' ?>
+                </div>
             </div>
 
             <div class="form-group">

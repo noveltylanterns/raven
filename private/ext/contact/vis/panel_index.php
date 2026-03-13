@@ -22,11 +22,6 @@ declare(strict_types=1);
 /** @var string $deletePath */
 /** @var string $csrfField */
 /** @var array{name?: string, version?: string, author?: string, description?: string, docs_url?: string} $extensionMeta */
-/** @var string $extensionDirectory */
-/** @var string $extensionPermissionAction */
-/** @var string $extensionPermissionRedirect */
-/** @var int $extensionRequiredPermissionBit */
-/** @var array<int, array{bit: int, label: string}> $extensionPermissionOptions */
 
 use function Raven\Core\Support\e;
 
@@ -49,36 +44,6 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
                         <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
                     </a>
                 <?php endif; ?>
-                <div class="dropdown">
-                    <button
-                        class="btn btn-warning btn-sm dropdown-toggle"
-                        type="button"
-                        data-bs-toggle="dropdown"
-                        aria-expanded="false"
-                    >
-                        <i class="bi bi-shield-lock me-2" aria-hidden="true"></i>Set Permission Mask
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <?php foreach ($extensionPermissionOptions as $option): ?>
-                            <?php $optionBit = (int) ($option['bit'] ?? 0); ?>
-                            <li>
-                                <form method="post" action="<?= e($extensionPermissionAction) ?>">
-                                    <?= $csrfField ?>
-                                    <input type="hidden" name="extension" value="<?= e($extensionDirectory) ?>">
-                                    <input type="hidden" name="permission_bit" value="<?= e((string) $optionBit) ?>">
-                                    <input type="hidden" name="redirect" value="<?= e($extensionPermissionRedirect) ?>">
-                                    <button
-                                        type="submit"
-                                        class="dropdown-item"
-                                    >
-                                        <i class="bi bi-patch-check me-2<?= $optionBit === $extensionRequiredPermissionBit ? ' text-success' : ' opacity-0' ?>" aria-hidden="true"></i>
-                                        <?= e((string) ($option['label'] ?? '')) ?>
-                                    </button>
-                                </form>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
             </div>
         </div>
         <h5>by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h5>

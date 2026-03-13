@@ -271,7 +271,8 @@ $sortMetaProperties($metaGeneralPropertyConfigFields);
 $sortMetaProperties($metaOpenGraphPropertyConfigFields);
 $sortMetaProperties($metaTwitterPropertyConfigFields);
 
-$sessionGeneralConfigFields = [];
+$sessionCookieConfigFields = [];
+$sessionLoginConfigFields = [];
 $sessionProfileConfigFields = [];
 $sessionGroupConfigFields = [];
 $sessionBruteForceConfigFields = [];
@@ -282,10 +283,15 @@ foreach ($sessionConfigFields as $sessionField) {
         continue;
     }
 
-    $sessionGeneralConfigFields[] = $sessionField;
+    $sessionCookieConfigFields[] = $sessionField;
 }
 foreach ($userConfigFields as $userField) {
     $userPath = (string) ($userField['path'] ?? '');
+    if (in_array($userPath, ['user.auth.login', 'user.auth.registration'], true)) {
+        $sessionLoginConfigFields[] = $userField;
+        continue;
+    }
+
     if (in_array($userPath, ['user.privacy', 'user.prefix'], true)) {
         $sessionProfileConfigFields[] = $userField;
         continue;
@@ -295,7 +301,7 @@ foreach ($userConfigFields as $userField) {
         continue;
     }
 
-    $sessionGeneralConfigFields[] = $userField;
+    $sessionCookieConfigFields[] = $userField;
 }
 foreach ($groupConfigFields as $groupField) {
     $groupPath = (string) ($groupField['path'] ?? '');
@@ -304,7 +310,7 @@ foreach ($groupConfigFields as $groupField) {
         continue;
     }
 
-    $sessionGeneralConfigFields[] = $groupField;
+    $sessionCookieConfigFields[] = $groupField;
 }
 
 $profileContactOptionRows = [];
@@ -345,7 +351,7 @@ if (is_array($rawProfileContactOptions)) {
     }
 }
 
-if ($sessionGeneralConfigFields !== []) {
+if ($sessionCookieConfigFields !== []) {
     $sessionGeneralOrder = [
         'session.cookie.domain' => 10,
         'session.cookie.prefix' => 20,
@@ -353,7 +359,7 @@ if ($sessionGeneralConfigFields !== []) {
     ];
 
     usort(
-        $sessionGeneralConfigFields,
+        $sessionCookieConfigFields,
         static function (array $left, array $right) use ($sessionGeneralOrder): int {
             $leftPath = (string) ($left['path'] ?? '');
             $rightPath = (string) ($right['path'] ?? '');
@@ -402,6 +408,8 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
     $isPanelDefaultThemeField = $path === 'panel.default_theme';
     $isPublicProfilesModeField = $path === 'user.privacy';
     $isShowGroupsField = $path === 'group.privacy';
+    $isUserLoginIdentifierField = $path === 'user.auth.login';
+    $isUserRegistrationModeField = $path === 'user.auth.registration';
     $isBooleanCheckboxField = $type === 'bool';
     $isDebugCheckboxField = str_starts_with($path, 'debug.');
     $isImageUploadTargetField = $path === 'media.images.upload_target';
@@ -449,7 +457,7 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
             $inputValue = ltrim($inputValue, '/');
         }
     }
-    $isRequired = in_array($path, ['site.domain', 'panel.path', 'site.enabled', 'database.driver', 'captcha.provider', 'mail.agent', 'content.default_editor', 'content.separator', 'panel.default_theme', 'session.cookie.name', 'user.privacy', 'group.privacy'], true);
+    $isRequired = in_array($path, ['site.domain', 'panel.path', 'site.enabled', 'database.driver', 'captcha.provider', 'mail.agent', 'content.default_editor', 'content.separator', 'panel.default_theme', 'session.cookie.name', 'user.privacy', 'group.privacy', 'user.auth.login', 'user.auth.registration'], true);
     $disableUriNote = match ($path) {
         'category.prefix' => ' (leave blank to disable category URIs)',
         'tag.prefix' => ' (leave blank to disable tag URIs)',
@@ -597,6 +605,27 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
                 <option value="public_limited"<?= (string) $field['value'] === 'public_limited' ? ' selected' : '' ?>>Public Limited</option>
                 <option value="private"<?= (string) $field['value'] === 'private' ? ' selected' : '' ?>>Private</option>
                 <option value="disabled"<?= (string) $field['value'] === 'disabled' ? ' selected' : '' ?>>Disabled</option>
+            </select>
+        <?php elseif ($isUserLoginIdentifierField): ?>
+            <select
+                class="form-select font-monospace"
+                id="<?= e($inputId) ?>"
+                name="<?= e($fieldName) ?>"
+                required
+            >
+                <option value="email"<?= (string) $field['value'] === 'email' ? ' selected' : '' ?>>Email</option>
+                <option value="username"<?= (string) $field['value'] === 'username' ? ' selected' : '' ?>>Username</option>
+            </select>
+        <?php elseif ($isUserRegistrationModeField): ?>
+            <select
+                class="form-select font-monospace"
+                id="<?= e($inputId) ?>"
+                name="<?= e($fieldName) ?>"
+                required
+            >
+                <option value="open"<?= (string) $field['value'] === 'open' ? ' selected' : '' ?>>Open</option>
+                <option value="invite"<?= (string) $field['value'] === 'invite' ? ' selected' : '' ?>>Invite</option>
+                <option value="closed"<?= (string) $field['value'] === 'closed' ? ' selected' : '' ?>>Closed</option>
             </select>
         <?php elseif ($isDomainPrefixedMetaPathField): ?>
             <div class="input-group">
@@ -1028,18 +1057,28 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             aria-labelledby="config-users-tab"
                             tabindex="0"
                         >
-                            <?php if ($sessionGeneralConfigFields === [] && $sessionProfileConfigFields === [] && $sessionGroupConfigFields === []): ?>
+                            <?php if ($sessionCookieConfigFields === [] && $sessionLoginConfigFields === [] && $sessionProfileConfigFields === [] && $sessionGroupConfigFields === []): ?>
                                 <p class="text-muted mb-0">No configuration fields available.</p>
                             <?php else: ?>
-                                <?php if ($sessionGeneralConfigFields !== []): ?>
+                                <?php if ($sessionCookieConfigFields !== []): ?>
                                     <h3>Cookie Settings</h3>
-                                    <?php foreach ($sessionGeneralConfigFields as $sessionField): ?>
+                                    <?php foreach ($sessionCookieConfigFields as $sessionField): ?>
+                                        <?php $renderConfigField($sessionField); ?>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+
+                                <?php if ($sessionLoginConfigFields !== []): ?>
+                                    <?php if ($sessionCookieConfigFields !== []): ?>
+                                        <hr class="my-4">
+                                    <?php endif; ?>
+                                    <h3>Login Options</h3>
+                                    <?php foreach ($sessionLoginConfigFields as $sessionField): ?>
                                         <?php $renderConfigField($sessionField); ?>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
 
                                 <?php if ($sessionProfileConfigFields !== []): ?>
-                                    <?php if ($sessionGeneralConfigFields !== []): ?>
+                                    <?php if ($sessionCookieConfigFields !== [] || $sessionLoginConfigFields !== []): ?>
                                         <hr class="my-4">
                                     <?php endif; ?>
                                     <h3>Profile Options</h3>
@@ -1049,7 +1088,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                 <?php endif; ?>
 
                                 <?php if ($sessionGroupConfigFields !== []): ?>
-                                    <?php if ($sessionGeneralConfigFields !== [] || $sessionProfileConfigFields !== []): ?>
+                                    <?php if ($sessionCookieConfigFields !== [] || $sessionLoginConfigFields !== [] || $sessionProfileConfigFields !== []): ?>
                                         <hr class="my-4">
                                     <?php endif; ?>
                                     <h3>Group Options</h3>
@@ -1059,7 +1098,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                 <?php endif; ?>
                             <?php endif; ?>
 
-                            <?php if ($sessionGeneralConfigFields !== [] || $sessionProfileConfigFields !== [] || $sessionGroupConfigFields !== []): ?>
+                            <?php if ($sessionCookieConfigFields !== [] || $sessionLoginConfigFields !== [] || $sessionProfileConfigFields !== [] || $sessionGroupConfigFields !== []): ?>
                                 <hr class="my-4">
                             <?php endif; ?>
                             <h3>Contact Options</h3>

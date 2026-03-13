@@ -1,3 +1,15 @@
+### March 13, 2026
+
+- Added configurable panel login identifier mode at `user.auth.login` with `email` or `username` options in System Configuration.
+- Updated panel login flow to honor `user.auth.login`, including email-identifier authentication and shared login-throttle handling.
+- Updated user editor and user preferences so username is optional when login mode is `email`, while remaining required in `username` mode.
+- New user rows now backfill blank `username` values from account email to keep mode switches easier.
+- Updated installer defaults so new installs set `user.auth.login` to `email` and allow blank initial admin username.
+- Added registration mode config at `user.auth.registration` with `open`, `invite`, and `closed` options (default `closed`).
+- Added panel invite-token administration at `/panel/users/invites`, including single-use/reusable token creation, batch single-use token generation, and expiry support.
+- Added public registration/login helper views and routes at `/register` and `/login`, with invite-token enforcement in invite-only mode.
+- Updated installer form UX so setup fields now render with grey placeholder suggestions instead of prefilled text values, allowing one-click typing without manual clearing.
+
 ### March 11, 2026
 
 - Rebooted repo structure from scratch

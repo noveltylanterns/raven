@@ -48,7 +48,8 @@ $panelController = new PanelController(
     $app['redirects'],
     $app['tags'],
     $app['taxonomy'],
-    $app['users']
+    $app['users'],
+    $app['invite_tokens']
 );
 
 $readConfigBool = static function (mixed $value, bool $default = true): bool {
@@ -256,25 +257,7 @@ $panelUrl = static function (string $suffix = '') use ($app): string {
     return rtrim($prefix, '/') . ($suffix === '/' ? '' : $suffix);
 };
 
-/**
- * Returns extension-assignable panel-side permission options.
- *
- * @return array<int, string>
- */
-$extensionPanelPermissionOptions = static function (): array {
-    return [
-        PanelAccess::PANEL_LOGIN => 'Access Dashboard',
-        PanelAccess::MANAGE_CONTENT => 'Manage Content',
-        PanelAccess::MANAGE_TAXONOMY => 'Manage Taxonomy',
-        PanelAccess::MANAGE_USERS => 'Manage Users',
-        PanelAccess::MANAGE_GROUPS => 'Manage Groups',
-        PanelAccess::MANAGE_CONFIGURATION => 'Manage System Configuration',
-    ];
-};
-
-$allowedExtensionPermissionBits = array_keys($extensionPanelPermissionOptions());
 $enabledState = ExtensionRegistry::enabledMap((string) $app['root']);
-$extensionPermissionState = ExtensionRegistry::permissionMap((string) $app['root'], $allowedExtensionPermissionBits);
 
 // Compute enabled, manifest-valid extensions once for panel nav and route registration.
 $enabledExtensions = [];
@@ -407,18 +390,13 @@ $currentUserTheme = static function () use ($app, $defaultPanelTheme): string {
  * Returns true when current user has one panel-side permission bit.
  */
 $hasPanelPermissionBit = static function (int $bit) use ($app): bool {
-    return match ($bit) {
-        PanelAccess::PANEL_LOGIN => $app['auth']->canAccessPanel(),
-        PanelAccess::MANAGE_CONTENT => $app['auth']->canManageContent(),
-        PanelAccess::MANAGE_TAXONOMY => $app['auth']->canManageTaxonomy(),
-        PanelAccess::MANAGE_USERS => $app['auth']->canManageUsers(),
-        PanelAccess::MANAGE_GROUPS => $app['auth']->canManageGroups(),
-        PanelAccess::MANAGE_CONFIGURATION => $app['auth']->canManageConfiguration(),
-        default => false,
-    };
+    return $app['auth']->hasPanelPermissionBit($bit);
 };
 
-$_SESSION['_raven_extension_permission_masks'] = $extensionPermissionState;
+// Resolve extension permission levels/bit assignments from controller-managed state.
+$extensionPermissionCatalog = $panelController->extensionPanelPermissionMapForDirectories(array_keys($enabledExtensionManifests));
+
+$_SESSION['_raven_extension_permission_masks'] = $extensionPermissionCatalog;
 $_SESSION['_raven_enabled_extensions'] = array_keys($enabledExtensions);
 
 // Build dedicated nav links by extension type.
@@ -438,9 +416,24 @@ foreach ($enabledExtensionManifests as $directoryName => $manifest) {
 
     $isSystemType = $type === 'system'
         || !empty($manifest['system_extension']);
-    $requiredPermissionBit = (int) ($extensionPermissionState[$directoryName] ?? PanelAccess::PANEL_LOGIN);
-    if (!in_array($requiredPermissionBit, $allowedExtensionPermissionBits, true)) {
-        $requiredPermissionBit = PanelAccess::PANEL_LOGIN;
+    $permissionMeta = $extensionPermissionCatalog[$directoryName] ?? null;
+    $requiredPermissionBit = 0;
+    if (is_array($permissionMeta)) {
+        $defaultLevel = strtolower(trim((string) ($permissionMeta['default_level'] ?? '')));
+        $levelRows = is_array($permissionMeta['levels'] ?? null) ? $permissionMeta['levels'] : [];
+        foreach ($levelRows as $levelRow) {
+            if (!is_array($levelRow)) {
+                continue;
+            }
+
+            $levelKey = strtolower(trim((string) ($levelRow['key'] ?? '')));
+            if ($defaultLevel !== '' && $levelKey !== $defaultLevel) {
+                continue;
+            }
+
+            $requiredPermissionBit = (int) ($levelRow['bit'] ?? 0);
+            break;
+        }
     }
 
     $item = [
@@ -454,7 +447,7 @@ foreach ($enabledExtensionManifests as $directoryName => $manifest) {
         continue;
     }
 
-    if (!$hasPanelPermissionBit($requiredPermissionBit)) {
+    if ($requiredPermissionBit <= 0 || !$hasPanelPermissionBit($requiredPermissionBit)) {
         continue;
     }
 
@@ -693,6 +686,22 @@ $router->add('POST', '/users/delete', static function () use ($panelController):
     $panelController->usersDelete($_POST);
 });
 
+$router->add('GET', '/users/invites', static function () use ($panelController): void {
+    $panelController->userInvites();
+});
+
+$router->add('POST', '/users/invites/create', static function () use ($panelController): void {
+    $panelController->userInvitesCreate($_POST);
+});
+
+$router->add('POST', '/users/invites/generate', static function () use ($panelController): void {
+    $panelController->userInvitesGenerate($_POST);
+});
+
+$router->add('POST', '/users/invites/delete', static function () use ($panelController): void {
+    $panelController->userInvitesDelete($_POST);
+});
+
 $router->add('GET', '/groups', static function () use ($panelController): void {
     $panelController->groupsList();
 });
@@ -807,9 +816,12 @@ $router->add('POST', '/extensions/permission', static function () use ($panelCon
 // - currentUserTheme: callable(): string current panel theme slug
 // - renderPublicNotFound: callable(): void themed public 404 responder
 // - extensionDirectory: enabled extension folder name
-// - extensionRequiredPermissionBit: required panel-side permission bit
-// - extensionPermissionOptions: panel-side permission options map
-// - setExtensionPermissionPath: route for updating extension permission bit
+// - extensionRequiredPermissionBit: required default extension permission bit
+// - extensionPermissionOptions: extension-level permission options map (`bit => label`)
+// - extensionPermissionBits: extension-level bit map (`key => bit`)
+// - extensionPermissionLevels: extension-level rows from manifest
+// - extensionDefaultPermissionLevel: default extension-level key
+// - requireExtensionPermission: callable(?string $levelKey = null): void
 foreach (array_keys($enabledExtensions) as $extensionName) {
     $routesFile = $app['root'] . '/private/ext/' . $extensionName . '/lib/routes_panel.php';
     if (!is_file($routesFile)) {
@@ -835,16 +847,47 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
     }
     $isSystemType = $type === 'system'
         || !empty($manifest['system_extension']);
-    $requiredPermissionBit = (int) ($extensionPermissionState[$extensionName] ?? PanelAccess::PANEL_LOGIN);
-    if (!in_array($requiredPermissionBit, $allowedExtensionPermissionBits, true)) {
-        $requiredPermissionBit = PanelAccess::PANEL_LOGIN;
+    $permissionMeta = $extensionPermissionCatalog[$extensionName] ?? null;
+    $levelRows = is_array($permissionMeta['levels'] ?? null) ? $permissionMeta['levels'] : [];
+    $defaultLevel = strtolower(trim((string) ($permissionMeta['default_level'] ?? '')));
+    $extensionPermissionBits = [];
+    $extensionPermissionOptions = [];
+    $requiredPermissionBit = 0;
+    foreach ($levelRows as $levelRow) {
+        if (!is_array($levelRow)) {
+            continue;
+        }
+
+        $levelKey = strtolower(trim((string) ($levelRow['key'] ?? '')));
+        if ($levelKey === '') {
+            continue;
+        }
+
+        $levelBit = (int) ($levelRow['bit'] ?? 0);
+        if ($levelBit <= 0) {
+            continue;
+        }
+
+        $levelLabel = trim((string) ($levelRow['label'] ?? ''));
+        if ($levelLabel === '') {
+            $levelLabel = ucfirst(str_replace(['-', '_'], ' ', $levelKey));
+        }
+
+        $extensionPermissionBits[$levelKey] = $levelBit;
+        $extensionPermissionOptions[$levelBit] = $levelLabel;
+        if ($requiredPermissionBit <= 0 && ($defaultLevel === '' || $levelKey === $defaultLevel)) {
+            $requiredPermissionBit = $levelBit;
+        }
+    }
+    if ($requiredPermissionBit <= 0 && $extensionPermissionBits !== []) {
+        $requiredPermissionBit = (int) reset($extensionPermissionBits);
     }
 
     $extensionRequirePanelAccess = $requirePanelLoginForExtension;
     if ($isSystemType) {
         $extensionRequirePanelAccess = static function () use ($requirePanelLoginForExtension, $app, $panelController): void {
             $requirePanelLoginForExtension();
-            if (!$app['auth']->canManageConfiguration()) {
+            if (!$app['auth']->hasPanelPermissionBit(PanelAccess::CONFIGURATION_VIEW)) {
                 $panelController->renderPublicNotFound();
                 exit;
             }
@@ -857,24 +900,51 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
             $panelController
         ): void {
             $requirePanelLoginForExtension();
-            if (!$hasPanelPermissionBit($requiredPermissionBit)) {
+            if ($requiredPermissionBit <= 0 || !$hasPanelPermissionBit($requiredPermissionBit)) {
                 $panelController->renderPublicNotFound();
                 exit;
             }
         };
     }
 
+    $requireExtensionPermission = static function (?string $levelKey = null) use (
+        $requirePanelLoginForExtension,
+        $hasPanelPermissionBit,
+        $extensionPermissionBits,
+        $requiredPermissionBit,
+        $panelController
+    ): void {
+        $requirePanelLoginForExtension();
+
+        $resolvedLevel = strtolower(trim((string) ($levelKey ?? '')));
+        $targetBit = 0;
+        if ($resolvedLevel !== '' && isset($extensionPermissionBits[$resolvedLevel])) {
+            $targetBit = (int) $extensionPermissionBits[$resolvedLevel];
+        } else {
+            $targetBit = (int) $requiredPermissionBit;
+        }
+
+        if ($targetBit <= 0 || !$hasPanelPermissionBit($targetBit)) {
+            $panelController->renderPublicNotFound();
+            exit;
+        }
+    };
+
     $registrar($router, [
         'app' => $app,
         'panelUrl' => $panelUrl,
         'requirePanelLogin' => $extensionRequirePanelAccess,
+        'requireExtensionPermission' => $requireExtensionPermission,
         'currentUserTheme' => $currentUserTheme,
         'renderPublicNotFound' => static function () use ($panelController): void {
             $panelController->renderPublicNotFound();
         },
         'extensionDirectory' => $extensionName,
         'extensionRequiredPermissionBit' => $requiredPermissionBit,
-        'extensionPermissionOptions' => $extensionPanelPermissionOptions(),
+        'extensionPermissionOptions' => $extensionPermissionOptions,
+        'extensionPermissionBits' => $extensionPermissionBits,
+        'extensionPermissionLevels' => $levelRows,
+        'extensionDefaultPermissionLevel' => $defaultLevel,
         'setExtensionPermissionPath' => $panelUrl('/extensions/permission'),
     ]);
 }

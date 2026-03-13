@@ -23,6 +23,7 @@ use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Core\View;
 use Raven\Core\View\TemplateTagEngine;
 use Raven\Repository\GroupRepository;
+use Raven\Repository\InviteTokenRepository;
 use Raven\Repository\PageImageRepository;
 use Raven\Repository\PageRepository;
 use Raven\Repository\RedirectRepository;
@@ -43,6 +44,7 @@ final class PublicController
     private RedirectRepository $redirects;
     private TaxonomyRepository $taxonomy;
     private UserRepository $users;
+    private InviteTokenRepository $inviteTokens;
     private InputSanitizer $input;
     private Csrf $csrf;
     /** @var array<string, EmbeddedFormRuntimeInterface> */
@@ -70,6 +72,7 @@ final class PublicController
         RedirectRepository $redirects,
         TaxonomyRepository $taxonomy,
         UserRepository $users,
+        InviteTokenRepository $inviteTokens,
         InputSanitizer $input,
         Csrf $csrf,
         array $extensionServices = []
@@ -84,6 +87,7 @@ final class PublicController
         $this->redirects = $redirects;
         $this->taxonomy = $taxonomy;
         $this->users = $users;
+        $this->inviteTokens = $inviteTokens;
         $this->input = $input;
         $this->csrf = $csrf;
         $this->embeddedFormRuntimes = $this->discoverEmbeddedFormRuntimes($extensionServices);
@@ -694,7 +698,7 @@ final class PublicController
             return;
         }
 
-        $normalizedUsername = $this->input->username($username);
+        $normalizedUsername = $this->normalizeProfileIdentifier($username);
         if ($normalizedUsername === null) {
             $this->notFound();
             return;
@@ -719,6 +723,32 @@ final class PublicController
             'site' => $this->siteData(),
             'profile' => $profile,
         ], 'wrapper');
+    }
+
+    /**
+     * Normalizes one profile-route identifier segment.
+     *
+     * Accepts canonical usernames and email-shaped values.
+     */
+    private function normalizeProfileIdentifier(string $rawIdentifier): ?string
+    {
+        $decoded = rawurldecode($rawIdentifier);
+        $normalizedText = $this->input->text($decoded, 254);
+        if ($normalizedText === '') {
+            return null;
+        }
+
+        $normalizedUsername = $this->input->username($normalizedText);
+        if ($normalizedUsername !== null && $normalizedUsername !== '') {
+            return $normalizedUsername;
+        }
+
+        $normalizedEmail = $this->input->email($normalizedText);
+        if ($normalizedEmail !== null && $normalizedEmail !== '') {
+            return $normalizedEmail;
+        }
+
+        return null;
     }
 
     /**
@@ -771,6 +801,157 @@ final class PublicController
             'group' => $group,
             'members' => $members,
         ], 'wrapper');
+    }
+
+    /**
+     * Renders public login helper page.
+     */
+    public function login(): void
+    {
+        if ($this->auth->isLoggedIn() && $this->auth->canAccessPanel()) {
+            \Raven\Core\Support\redirect($this->panelUrl('/'));
+        }
+
+        $this->renderPublic('login', [
+            'site' => $this->siteData(),
+            'csrfField' => $this->csrf->field(),
+            'flashSuccess' => $this->pullPublicFlash('success'),
+            'flashError' => $this->pullPublicFlash('error'),
+            'panelLoginPath' => $this->panelUrl('/login'),
+            'registrationPath' => '/register',
+            'registrationMode' => $this->registrationMode(),
+            'loginIdentifierMode' => $this->loginIdentifierMode(),
+            'loginIdentifierLabel' => $this->loginIdentifierMode() === 'email' ? 'Email' : 'Username',
+        ], 'wrapper');
+    }
+
+    /**
+     * Renders public registration page.
+     */
+    public function register(): void
+    {
+        $registrationMode = $this->registrationMode();
+        $loginIdentifierMode = $this->loginIdentifierMode();
+        $this->renderPublic('register', [
+            'site' => $this->siteData(),
+            'csrfField' => $this->csrf->field(),
+            'flashSuccess' => $this->pullPublicFlash('success'),
+            'flashError' => $this->pullPublicFlash('error'),
+            'registrationMode' => $registrationMode,
+            'registrationClosed' => $registrationMode === 'closed',
+            'registrationInvite' => $registrationMode === 'invite',
+            'loginIdentifierMode' => $loginIdentifierMode,
+            'usernameRequired' => $loginIdentifierMode === 'username',
+            'loginPath' => '/login',
+        ], 'wrapper');
+    }
+
+    /**
+     * Handles public registration submission.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function registerSubmit(array $post): void
+    {
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flashPublic('error', 'Invalid CSRF token.');
+            \Raven\Core\Support\redirect('/register');
+        }
+
+        $registrationMode = $this->registrationMode();
+        if ($registrationMode === 'closed') {
+            $this->flashPublic('error', 'Registration is currently closed.');
+            \Raven\Core\Support\redirect('/register');
+        }
+
+        $loginIdentifierMode = $this->loginIdentifierMode();
+        $rawUsername = $this->input->text($post['username'] ?? null, 254);
+        $normalizedUsername = $this->normalizeUserIdentifierValue($rawUsername);
+        $displayName = $this->input->text($post['display_name'] ?? null, 160);
+        $email = $this->input->email($post['email'] ?? null);
+        $password = $this->input->text($post['password'] ?? null, 255);
+        $passwordConfirm = $this->input->text($post['password_confirm'] ?? null, 255);
+        $inviteToken = $this->input->text($post['invite_token'] ?? null, 255);
+
+        $errors = [];
+        $usernameRequired = $loginIdentifierMode === 'username';
+        if ($usernameRequired && !is_string($normalizedUsername)) {
+            $errors[] = 'Username is required and must be valid.';
+        }
+        if (!$usernameRequired && $rawUsername !== '' && !is_string($normalizedUsername)) {
+            $errors[] = 'Username must be valid when provided.';
+        }
+        if ($email === null) {
+            $errors[] = 'A valid email address is required.';
+        }
+        if ($password === '' || strlen($password) < 8) {
+            $errors[] = 'Password must be at least 8 characters.';
+        }
+        if (!hash_equals($password, $passwordConfirm)) {
+            $errors[] = 'Password confirmation does not match.';
+        }
+
+        $usableInvite = null;
+        $now = time();
+        if ($registrationMode === 'invite') {
+            if ($inviteToken === '') {
+                $errors[] = 'Invite token is required in invite-only mode.';
+            } else {
+                $usableInvite = $this->inviteTokens->findUsableByToken($inviteToken, $now);
+                if ($usableInvite === null) {
+                    $errors[] = 'Invite token is invalid, expired, or already used.';
+                }
+            }
+        }
+
+        $groupIds = $this->registrationGroupIds();
+        if ($groupIds === []) {
+            $errors[] = 'Registration target group is unavailable. Contact an administrator.';
+        }
+
+        if ($errors !== []) {
+            $this->flashPublic('error', implode(' ', $errors));
+            \Raven\Core\Support\redirect('/register');
+        }
+
+        $savedUserId = null;
+        try {
+            $savedUserId = $this->users->save([
+                'id' => null,
+                'username' => is_string($normalizedUsername) ? $normalizedUsername : '',
+                'display_name' => $displayName !== '' ? $displayName : (string) $email,
+                'email' => (string) $email,
+                'theme' => 'default',
+                'password' => $password,
+                'group_ids' => $groupIds,
+                'contact_profiles' => [],
+                'set_avatar' => false,
+                'avatar_path' => null,
+            ]);
+
+            if (is_array($usableInvite)) {
+                $inviteId = (int) ($usableInvite['id'] ?? 0);
+                $isReusable = (int) ($usableInvite['is_reusable'] ?? 0) === 1;
+                if ($inviteId < 1 || !$this->inviteTokens->consume($inviteId, $isReusable, $now)) {
+                    if (is_int($savedUserId) && $savedUserId > 0) {
+                        try {
+                            $this->users->deleteById($savedUserId);
+                        } catch (\Throwable) {
+                            // Keep original consume failure message.
+                        }
+                    }
+
+                    $this->flashPublic('error', 'Invite token is no longer available. Please request a new token.');
+                    \Raven\Core\Support\redirect('/register');
+                }
+            }
+        } catch (\Throwable $exception) {
+            $this->flashPublic('error', $exception->getMessage() ?: 'Failed to create account.');
+            \Raven\Core\Support\redirect('/register');
+        }
+
+        $this->flashPublic('success', 'Account created. You can sign in if your account has dashboard access.');
+        \Raven\Core\Support\redirect('/login');
     }
 
     /**
@@ -2275,6 +2456,101 @@ final class PublicController
         }
 
         return $mode;
+    }
+
+    /**
+     * Resolves configured registration mode.
+     */
+    private function registrationMode(): string
+    {
+        $mode = strtolower(trim((string) $this->config->get('user.auth.registration', 'closed')));
+        if (!in_array($mode, ['open', 'invite', 'closed'], true)) {
+            return 'closed';
+        }
+
+        return $mode;
+    }
+
+    /**
+     * Resolves configured panel login identifier mode.
+     */
+    private function loginIdentifierMode(): string
+    {
+        $mode = strtolower(trim((string) $this->config->get('user.auth.login', 'email')));
+        if (!in_array($mode, ['email', 'username'], true)) {
+            return 'email';
+        }
+
+        return $mode;
+    }
+
+    /**
+     * Returns registration default group ids.
+     *
+     * @return array<int>
+     */
+    private function registrationGroupIds(): array
+    {
+        foreach (['user', 'guest', 'validating'] as $slug) {
+            $groupId = $this->groups->idBySlug($slug);
+            if (is_int($groupId) && $groupId > 0) {
+                return [$groupId];
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Normalizes one user identifier (username or email-shaped value).
+     */
+    private function normalizeUserIdentifierValue(string $rawValue): ?string
+    {
+        $normalizedText = $this->input->text($rawValue, 254);
+        if ($normalizedText === '') {
+            return null;
+        }
+
+        $normalizedUsername = $this->input->username($normalizedText);
+        if ($normalizedUsername !== null && $normalizedUsername !== '') {
+            return $normalizedUsername;
+        }
+
+        $normalizedEmail = $this->input->email($normalizedText);
+        if ($normalizedEmail !== null && $normalizedEmail !== '') {
+            return $normalizedEmail;
+        }
+
+        return null;
+    }
+
+    /**
+     * Stores one public flash message.
+     */
+    private function flashPublic(string $key, string $value): void
+    {
+        $_SESSION['_raven_public_flash'][$key] = $value;
+    }
+
+    /**
+     * Pulls and clears one public flash message.
+     */
+    private function pullPublicFlash(string $key): ?string
+    {
+        $value = $_SESSION['_raven_public_flash'][$key] ?? null;
+        unset($_SESSION['_raven_public_flash'][$key]);
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * Builds panel URL with configured panel-path prefix.
+     */
+    private function panelUrl(string $suffix = ''): string
+    {
+        $prefix = '/' . trim((string) $this->config->get('panel.path', 'panel'), '/');
+        $suffix = '/' . ltrim($suffix, '/');
+        return rtrim($prefix, '/') . ($suffix === '/' ? '' : $suffix);
     }
 
     /**

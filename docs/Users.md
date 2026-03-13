@@ -17,6 +17,7 @@ Maintenance note: keep this file updated whenever user structure, user routes, o
 What you can do:
 
 - `New User` (top and bottom action bars): opens create form.
+- `Invite Tokens` (top and bottom action bars): opens token administration for registration invites.
 - `Delete Selected` (top and bottom action bars): deletes checked rows after confirmation.
 - `Search` filter: filters rows by username, display name, email, or groups as you type.
 - `Filter by Group` dropdown: `All Groups` plus detected group names from the current list.
@@ -37,6 +38,21 @@ Columns shown:
 Important delete note:
 
 - You cannot delete your currently logged-in account from this screen.
+
+### Invite Tokens (`/users/invites`)
+
+What you can do:
+
+- create one token as `Single-use` or `Reusable`
+- set optional expiration datetime
+- generate a batch of randomized single-use tokens
+- delete existing tokens
+
+Important behavior:
+
+- generated token values are shown once immediately after creation/generation
+- stored rows keep only a token hint/hash, usage counters, and expiry metadata
+- `Reusable` tokens can be used multiple times until expiry; `Single-use` tokens expire after first successful use
 
 ### User Editor (`/users/edit` and `/users/edit/{id}`)
 
@@ -73,10 +89,15 @@ Group assignment notes:
 - Panel views:
   - `private/vis/panel/users/list.php`
   - `private/vis/panel/users/edit.php`
+  - `private/vis/panel/users/invites.php`
+  - `private/vis/login.php`
+  - `private/vis/register.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
+  - `private/sys/Controller/PublicController.php`
 - Persistence:
   - `private/sys/Repository/UserRepository.php`
+  - `private/sys/Repository/InviteTokenRepository.php`
   - `private/sys/Repository/GroupRepository.php` (group option lookups and role constraints)
 
 ### Panel Routes
@@ -88,8 +109,18 @@ Declared in `panel/index.php`:
 - `GET /users/edit/{id}` -> edit form
 - `POST /users/save` -> create/update
 - `POST /users/delete` -> delete (single or bulk)
+- `GET /users/invites` -> invite token list/admin
+- `POST /users/invites/create` -> create one token
+- `POST /users/invites/generate` -> generate single-use token batch
+- `POST /users/invites/delete` -> delete one token
 
 All state-changing routes use CSRF validation.
+
+Public routes (declared in `public/index.php`):
+
+- `GET /login` -> public login helper view
+- `GET /register` -> registration form
+- `POST /register` -> registration submit handler
 
 ### Controller Flow
 
@@ -121,6 +152,15 @@ All state-changing routes use CSRF validation.
   - Validates CSRF.
   - Blocks self-delete in both single and bulk flows.
   - Supports bulk delete with deleted/failed/skipped counters.
+- `userInvites()`
+  - Requires login + `Manage Users`.
+  - Renders invite token admin/list view.
+- `userInvitesCreate(array $post)` / `userInvitesGenerate(array $post)` / `userInvitesDelete(array $post)`
+  - Validate CSRF and mutate invite-token rows through `InviteTokenRepository`.
+- `PublicController::registerSubmit(array $post)`
+  - Enforces `user.auth.registration` mode (`open|invite|closed`).
+  - Requires invite token when mode is `invite`.
+  - Creates user via `UserRepository::save(...)` and consumes invite token atomically where possible.
 
 ### Data Model And Repository Behavior
 

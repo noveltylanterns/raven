@@ -858,13 +858,19 @@ final class UserRepository
         $setAvatar = (bool) ($data['set_avatar'] ?? false);
         $avatarPath = $data['avatar_path'] ?? null;
 
-        if ($username === '' || $email === '') {
-            throw new RuntimeException('Username and email are required.');
+        if ($email === '') {
+            throw new RuntimeException('Email is required.');
+        }
+
+        // Keep new rows switch-ready for username-login mode by backfilling
+        // undefined usernames from the account email.
+        if (($id === null || $id <= 0) && $username === '') {
+            $username = $email;
         }
 
         if ($id !== null && $id > 0) {
             // Update mode: enforce uniqueness against all other user rows.
-            if ($this->usernameExistsForOtherUser($id, $username)) {
+            if ($username !== '' && $this->usernameExistsForOtherUser($id, $username)) {
                 throw new RuntimeException('Username is already in use.');
             }
 
@@ -913,7 +919,7 @@ final class UserRepository
             return $id;
         }
 
-        if ($this->usernameExistsForOtherUser(0, $username)) {
+        if ($username !== '' && $this->usernameExistsForOtherUser(0, $username)) {
             throw new RuntimeException('Username is already in use.');
         }
 
@@ -981,6 +987,10 @@ final class UserRepository
      */
     public function usernameExistsForOtherUser(int $id, string $username): bool
     {
+        if (trim($username) === '') {
+            return false;
+        }
+
         $usersTable = $this->authTable('users');
 
         if ($id > 0) {

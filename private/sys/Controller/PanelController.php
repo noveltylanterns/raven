@@ -25,6 +25,7 @@ use Raven\Core\Security\InputSanitizer;
 use Raven\Core\View;
 use Raven\Repository\ChannelRepository;
 use Raven\Repository\GroupRepository;
+use Raven\Repository\InviteTokenRepository;
 use Raven\Repository\PageImageRepository;
 use Raven\Repository\PageRepository;
 use Raven\Repository\RedirectRepository;
@@ -57,6 +58,7 @@ final class PanelController
     private TagRepository $tags;
     private TaxonomyRepository $taxonomy;
     private UserRepository $users;
+    private InviteTokenRepository $inviteTokens;
     /** @var array<string, array{label: string, editor: string}>|null */
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
 
@@ -75,7 +77,8 @@ final class PanelController
         RedirectRepository $redirects,
         TagRepository $tags,
         TaxonomyRepository $taxonomy,
-        UserRepository $users
+        UserRepository $users,
+        InviteTokenRepository $inviteTokens
     ) {
         $this->view = $view;
         $this->config = $config;
@@ -92,6 +95,7 @@ final class PanelController
         $this->tags = $tags;
         $this->taxonomy = $taxonomy;
         $this->users = $users;
+        $this->inviteTokens = $inviteTokens;
     }
 
     /**
@@ -125,7 +129,7 @@ final class PanelController
     public function pagesList(): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageContentOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('pages', 'view')) {
             return;
         }
 
@@ -201,7 +205,8 @@ final class PanelController
     public function pagesEdit(?int $id = null): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageContentOrForbidden()) {
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('pages', $requiredAction)) {
             return;
         }
 
@@ -282,7 +287,9 @@ final class PanelController
     public function pagesSave(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageContentOrForbidden()) {
+        $id = $this->input->int($post['id'] ?? null, 1);
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('pages', $requiredAction)) {
             return;
         }
 
@@ -291,7 +298,6 @@ final class PanelController
             redirect($this->panelUrl('/pages'));
         }
 
-        $id = $this->input->int($post['id'] ?? null, 1);
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['content', 'meta', 'media'], 'content');
         $title = $this->input->text($post['title'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
@@ -418,7 +424,7 @@ final class PanelController
                 continue;
             }
 
-            $username = $this->input->username((string) ($entry['username'] ?? ''));
+            $username = $this->normalizeUserIdentifierValue((string) ($entry['username'] ?? ''));
             if ($username === null || $username === '') {
                 continue;
             }
@@ -806,7 +812,7 @@ final class PanelController
     public function pagesGalleryUpload(array $post, array $files): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageContentOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('pages', 'edit')) {
             return;
         }
 
@@ -874,7 +880,7 @@ final class PanelController
     public function pagesGalleryDelete(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageContentOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('pages', 'edit')) {
             return;
         }
 
@@ -941,7 +947,7 @@ final class PanelController
     public function pagesDelete(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageContentOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('pages', 'delete')) {
             return;
         }
 
@@ -1005,7 +1011,7 @@ final class PanelController
     public function channelsList(): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('channels', 'view')) {
             return;
         }
 
@@ -1039,7 +1045,8 @@ final class PanelController
     public function channelsEdit(?int $id = null): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('channels', $requiredAction)) {
             return;
         }
 
@@ -1089,7 +1096,9 @@ final class PanelController
     public function channelsSave(array $post, array $files = []): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        $id = $this->input->int($post['id'] ?? null, 1);
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('channels', $requiredAction)) {
             return;
         }
 
@@ -1098,7 +1107,6 @@ final class PanelController
             redirect($this->panelUrl('/channels'));
         }
 
-        $id = $this->input->int($post['id'] ?? null, 1);
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'content', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
@@ -1213,7 +1221,7 @@ final class PanelController
     public function channelsDelete(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('channels', 'delete')) {
             return;
         }
 
@@ -1296,7 +1304,7 @@ final class PanelController
             $this->renderPublicNotFound();
             return;
         }
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('categories', 'view')) {
             return;
         }
 
@@ -1334,7 +1342,8 @@ final class PanelController
             $this->renderPublicNotFound();
             return;
         }
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('categories', $requiredAction)) {
             return;
         }
 
@@ -1377,7 +1386,9 @@ final class PanelController
             $this->renderPublicNotFound();
             return;
         }
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        $id = $this->input->int($post['id'] ?? null, 1);
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('categories', $requiredAction)) {
             return;
         }
 
@@ -1386,7 +1397,6 @@ final class PanelController
             redirect($this->panelUrl('/categories'));
         }
 
-        $id = $this->input->int($post['id'] ?? null, 1);
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
@@ -1493,7 +1503,7 @@ final class PanelController
             $this->renderPublicNotFound();
             return;
         }
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('categories', 'delete')) {
             return;
         }
 
@@ -1576,7 +1586,7 @@ final class PanelController
             $this->renderPublicNotFound();
             return;
         }
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('tags', 'view')) {
             return;
         }
 
@@ -1614,7 +1624,8 @@ final class PanelController
             $this->renderPublicNotFound();
             return;
         }
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('tags', $requiredAction)) {
             return;
         }
 
@@ -1657,7 +1668,9 @@ final class PanelController
             $this->renderPublicNotFound();
             return;
         }
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        $id = $this->input->int($post['id'] ?? null, 1);
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('tags', $requiredAction)) {
             return;
         }
 
@@ -1666,7 +1679,6 @@ final class PanelController
             redirect($this->panelUrl('/tags'));
         }
 
-        $id = $this->input->int($post['id'] ?? null, 1);
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
@@ -1773,7 +1785,7 @@ final class PanelController
             $this->renderPublicNotFound();
             return;
         }
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('tags', 'delete')) {
             return;
         }
 
@@ -1852,7 +1864,7 @@ final class PanelController
     public function redirectsList(): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('redirects', 'view')) {
             return;
         }
 
@@ -1886,7 +1898,8 @@ final class PanelController
     public function redirectsEdit(?int $id = null): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('redirects', $requiredAction)) {
             return;
         }
 
@@ -1920,7 +1933,9 @@ final class PanelController
     public function redirectsSave(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        $id = $this->input->int($post['id'] ?? null, 1);
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('redirects', $requiredAction)) {
             return;
         }
 
@@ -1991,7 +2006,7 @@ final class PanelController
     public function redirectsDelete(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('redirects', 'delete')) {
             return;
         }
 
@@ -2052,7 +2067,7 @@ final class PanelController
     public function usersList(): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageUsersOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('users', 'view')) {
             return;
         }
 
@@ -2105,7 +2120,8 @@ final class PanelController
     public function usersEdit(?int $id = null): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageUsersOrForbidden()) {
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('users', $requiredAction)) {
             return;
         }
 
@@ -2121,6 +2137,7 @@ final class PanelController
         $this->view->render('panel/users/edit', [
             'site' => $this->siteData(),
             'userRow' => $user,
+            'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
             'profileContactOptions' => $this->profileContactOptions(),
             'profileRoutePrefix' => $this->profileRoutePrefix(),
             'profileRoutesEnabled' => $this->profileRoutesEnabledForRoutingTable(),
@@ -2149,7 +2166,9 @@ final class PanelController
     public function usersSave(array $post, array $files): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageUsersOrForbidden()) {
+        $id = $this->input->int($post['id'] ?? null, 1);
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('users', $requiredAction)) {
             return;
         }
 
@@ -2158,11 +2177,12 @@ final class PanelController
             redirect($this->panelUrl('/users'));
         }
 
-        $id = $this->input->int($post['id'] ?? null, 1);
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['account', 'permissions', 'profile'], 'account');
         $editPath = '/users/edit' . ($id !== null ? '/' . $id : '');
         $editUrl = $this->panelEditorUrlWithTab('/users/edit', $id, $activeTab, 'account');
-        $username = $this->input->username($post['username'] ?? null);
+        $loginIdentifierMode = $this->panelLoginIdentifierMode();
+        $rawUsername = $this->input->text($post['username'] ?? null, 254);
+        $username = $this->normalizeUserIdentifierValue($rawUsername);
         $displayName = $this->input->text($post['display_name'] ?? null, 160);
         $email = $this->input->email($post['email'] ?? null);
         $theme = $this->input->text($post['theme'] ?? null, 50);
@@ -2237,8 +2257,9 @@ final class PanelController
         // Manage System Configuration capability.
         if (!$actorIsSuperAdmin) {
             $configurationGroupIds = [];
+            $systemPanelBitsMask = PanelAccess::maskFromBits(PanelAccess::systemPanelBits());
             foreach ($groupPermissionMasks as $groupIdKey => $mask) {
-                if (($mask & PanelAccess::MANAGE_CONFIGURATION) === PanelAccess::MANAGE_CONFIGURATION) {
+                if (($mask & $systemPanelBitsMask) !== 0) {
                     $configurationGroupIds[] = $groupIdKey;
                 }
             }
@@ -2259,8 +2280,17 @@ final class PanelController
         }
 
         $allowedThemes = ['default', 'light', 'dark'];
-        if ($username === null || $email === null || !in_array($theme, $allowedThemes, true)) {
-            $this->flash('error', 'Valid username, email, and theme are required.');
+        $usernameRequired = $loginIdentifierMode === 'username';
+        $usernameInvalid = $usernameRequired
+            ? !is_string($username)
+            : ($rawUsername !== '' && !is_string($username));
+        if ($usernameInvalid || $email === null || !in_array($theme, $allowedThemes, true)) {
+            $this->flash(
+                'error',
+                $usernameRequired
+                    ? 'Valid username, email, and theme are required.'
+                    : 'Valid optional username, email, and theme are required.'
+            );
             redirect($editUrl);
         }
 
@@ -2353,7 +2383,7 @@ final class PanelController
             // Repository enforces uniqueness and applies password hashing.
             $savedId = $this->users->save([
                 'id' => $id,
-                'username' => (string) $username,
+                'username' => is_string($username) ? $username : '',
                 'display_name' => $displayName,
                 'email' => (string) $email,
                 'theme' => $theme,
@@ -2380,7 +2410,7 @@ final class PanelController
 
                 $this->users->save([
                     'id' => $savedId,
-                    'username' => (string) $username,
+                    'username' => is_string($username) ? $username : '',
                     'display_name' => $displayName,
                     'email' => (string) $email,
                     'theme' => $theme,
@@ -2427,7 +2457,7 @@ final class PanelController
     public function usersDelete(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageUsersOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('users', 'delete')) {
             return;
         }
 
@@ -2505,12 +2535,146 @@ final class PanelController
     }
 
     /**
+     * Lists registration invite tokens for user onboarding.
+     */
+    public function userInvites(): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->requireRoutePermissionOrForbidden('users', 'view')) {
+            return;
+        }
+
+        $this->view->render('panel/users/invites', [
+            'site' => $this->siteData(),
+            'inviteRows' => $this->inviteTokens->listForPanel(),
+            'inviteGeneratedTokens' => $this->pullFlashList('generated_invites'),
+            'inviteRegistrationMode' => $this->registrationMode(),
+            'inviteNowTs' => time(),
+            'csrfField' => $this->csrf->field(),
+            'flashSuccess' => $this->pullFlash('success'),
+            'flashError' => $this->pullFlash('error'),
+            'section' => 'users',
+            'showSidebar' => true,
+            'userTheme' => $this->currentUserTheme(),
+        ], 'panel/wrapper');
+    }
+
+    /**
+     * Creates one invite token from panel form input.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function userInvitesCreate(array $post): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->requireRoutePermissionOrForbidden('users', 'create')) {
+            return;
+        }
+
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flash('error', 'Invalid CSRF token.');
+            redirect($this->panelUrl('/users/invites'));
+        }
+
+        $inviteType = strtolower(trim((string) $this->input->text($post['invite_type'] ?? 'single', 20)));
+        $isReusable = $inviteType === 'reusable';
+
+        try {
+            $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
+        } catch (\RuntimeException $exception) {
+            $this->flash('error', $exception->getMessage());
+            redirect($this->panelUrl('/users/invites'));
+        }
+
+        try {
+            $token = $this->inviteTokens->createToken($isReusable, $expiresAt, $this->auth->userId());
+        } catch (\Throwable $exception) {
+            $this->flash('error', 'Failed to create invite token: ' . ($exception->getMessage() ?: 'Unknown error.'));
+            redirect($this->panelUrl('/users/invites'));
+        }
+
+        $this->flash('success', $isReusable ? 'Reusable invite token created.' : 'Single-use invite token created.');
+        $this->flashList('generated_invites', [$token]);
+        redirect($this->panelUrl('/users/invites'));
+    }
+
+    /**
+     * Generates a batch of single-use invite tokens from panel form input.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function userInvitesGenerate(array $post): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->requireRoutePermissionOrForbidden('users', 'create')) {
+            return;
+        }
+
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flash('error', 'Invalid CSRF token.');
+            redirect($this->panelUrl('/users/invites'));
+        }
+
+        $count = $this->input->int($post['count'] ?? null, 1, 100) ?? 10;
+
+        try {
+            $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
+        } catch (\RuntimeException $exception) {
+            $this->flash('error', $exception->getMessage());
+            redirect($this->panelUrl('/users/invites'));
+        }
+
+        try {
+            $tokens = $this->inviteTokens->createSingleUseBatch($count, $expiresAt, $this->auth->userId());
+        } catch (\Throwable $exception) {
+            $this->flash('error', 'Failed to generate invite tokens: ' . ($exception->getMessage() ?: 'Unknown error.'));
+            redirect($this->panelUrl('/users/invites'));
+        }
+
+        $this->flash('success', 'Generated ' . count($tokens) . ' single-use invite token' . (count($tokens) === 1 ? '' : 's') . '.');
+        $this->flashList('generated_invites', $tokens);
+        redirect($this->panelUrl('/users/invites'));
+    }
+
+    /**
+     * Deletes one invite token.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function userInvitesDelete(array $post): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->requireRoutePermissionOrForbidden('users', 'delete')) {
+            return;
+        }
+
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flash('error', 'Invalid CSRF token.');
+            redirect($this->panelUrl('/users/invites'));
+        }
+
+        $id = $this->input->int($post['id'] ?? null, 1);
+        if ($id === null) {
+            $this->flash('error', 'Invite token id is required.');
+            redirect($this->panelUrl('/users/invites'));
+        }
+
+        if (!$this->inviteTokens->deleteById($id)) {
+            $this->flash('error', 'Invite token was not found.');
+            redirect($this->panelUrl('/users/invites'));
+        }
+
+        $this->flash('success', 'Invite token deleted.');
+        redirect($this->panelUrl('/users/invites'));
+    }
+
+    /**
      * Lists groups for Usergroup management section.
      */
     public function groupsList(): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageGroupsOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('groups', 'view')) {
             return;
         }
 
@@ -2545,7 +2709,8 @@ final class PanelController
     public function groupsEdit(?int $id = null): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageGroupsOrForbidden()) {
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('groups', $requiredAction)) {
             return;
         }
 
@@ -2583,7 +2748,9 @@ final class PanelController
     public function groupsSave(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageGroupsOrForbidden()) {
+        $id = $this->input->int($post['id'] ?? null, 1);
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('groups', $requiredAction)) {
             return;
         }
 
@@ -2592,10 +2759,8 @@ final class PanelController
             redirect($this->panelUrl('/groups'));
         }
 
-        $id = $this->input->int($post['id'] ?? null, 1);
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'permissions'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 100);
-        $editPath = '/groups/edit' . ($id !== null ? '/' . $id : '');
         $editUrl = $this->panelEditorUrlWithTab('/groups/edit', $id, $activeTab, 'basic');
         $actorIsSuperAdmin = $this->auth->isSuperAdmin();
         $existingGroup = $id !== null ? $this->groups->findById($id) : null;
@@ -2635,6 +2800,19 @@ final class PanelController
         foreach ($validBits as $validBit) {
             $allValidBitsMask |= (int) $validBit;
         }
+        $editorStockMask = PanelAccess::PANEL_LOGIN
+            | PanelAccess::VIEW_PUBLIC_SITE
+            | PanelAccess::VIEW_PRIVATE_SITE
+            | PanelAccess::maskFromBits(PanelAccess::contentPanelBits());
+        $adminStockMask = PanelAccess::PANEL_LOGIN
+            | PanelAccess::VIEW_PUBLIC_SITE
+            | PanelAccess::VIEW_PRIVATE_SITE
+            | PanelAccess::VIEW_DISABLED_SITE
+            | PanelAccess::maskFromBits(array_merge(
+                PanelAccess::contentPanelBits(),
+                PanelAccess::taxonomyPanelBits(),
+                PanelAccess::usersPanelBits()
+            ));
 
         if (is_array($permissionBitsRaw)) {
             foreach ($permissionBitsRaw as $rawBit) {
@@ -2651,43 +2829,28 @@ final class PanelController
         } elseif ($isUserGroup) {
             $permissionMask &= (PanelAccess::VIEW_PUBLIC_SITE | PanelAccess::VIEW_PRIVATE_SITE);
         } elseif ($isEditorGroup) {
-            $permissionMask &= (
-                PanelAccess::VIEW_PUBLIC_SITE
-                | PanelAccess::VIEW_PRIVATE_SITE
-                | PanelAccess::PANEL_LOGIN
-                | PanelAccess::MANAGE_CONTENT
-            );
+            $permissionMask = $editorStockMask;
         } elseif ($isAdminGroup) {
-            $permissionMask = ($permissionMask & (
-                PanelAccess::VIEW_PUBLIC_SITE
-                | PanelAccess::VIEW_PRIVATE_SITE
-                | PanelAccess::VIEW_DISABLED_SITE
-                | PanelAccess::PANEL_LOGIN
-                | PanelAccess::MANAGE_CONTENT
-                | PanelAccess::MANAGE_TAXONOMY
-                | PanelAccess::MANAGE_USERS
-            )) | PanelAccess::VIEW_PRIVATE_SITE;
+            $permissionMask = $adminStockMask;
         } elseif ($isSuperAdminGroup) {
             $permissionMask = $allValidBitsMask;
         }
 
-        $requestedConfigurationPermission = ($permissionMask & PanelAccess::MANAGE_CONFIGURATION)
-            === PanelAccess::MANAGE_CONFIGURATION;
-        $existingConfigurationPermission = is_array($existingGroup)
-            && (((int) ($existingGroup['permission_mask'] ?? 0) & PanelAccess::MANAGE_CONFIGURATION)
-                === PanelAccess::MANAGE_CONFIGURATION);
-        if (!$actorIsSuperAdmin && $requestedConfigurationPermission !== $existingConfigurationPermission) {
-            $this->flash('error', 'Only Super Admin users can change Manage System Configuration permission.');
+        $systemBitsMask = PanelAccess::maskFromBits(PanelAccess::systemPanelBits());
+        $requestedSystemBits = $permissionMask & $systemBitsMask;
+        $existingSystemBits = is_array($existingGroup)
+            ? (((int) ($existingGroup['permission_mask'] ?? 0)) & $systemBitsMask)
+            : 0;
+        if (!$actorIsSuperAdmin && $requestedSystemBits !== $existingSystemBits) {
+            $this->flash('error', 'Only Super Admin users can change system administration permissions.');
             redirect($editUrl);
         }
         if (!$actorIsSuperAdmin) {
-            if ($existingConfigurationPermission) {
-                $permissionMask |= PanelAccess::MANAGE_CONFIGURATION;
-            } else {
-                $permissionMask &= ~PanelAccess::MANAGE_CONFIGURATION;
-            }
+            $permissionMask = ($permissionMask & (~$systemBitsMask)) | $existingSystemBits;
         }
         if (($permissionMask & PanelAccess::PANEL_LOGIN) !== PanelAccess::PANEL_LOGIN) {
+            $permissionMask &= ~PanelAccess::allStockPanelBitsMask();
+            $permissionMask &= ~$this->extensionPermissionBitsMask();
             $permissionMask &= ~PanelAccess::VIEW_DISABLED_SITE;
         }
 
@@ -2721,7 +2884,7 @@ final class PanelController
     public function groupsDelete(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireManageGroupsOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('groups', 'delete')) {
             return;
         }
 
@@ -2803,6 +2966,7 @@ final class PanelController
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
             'preferences' => $preferences,
+            'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
             'profileContactOptions' => $this->profileContactOptions(),
             'themeOptions' => ['default', 'light', 'dark'],
             'avatarUploadLimitsNote' => $this->avatarUploadLimitsNote(),
@@ -2838,7 +3002,9 @@ final class PanelController
             redirect($preferencesUrl);
         }
 
-        $username = $this->input->username($post['username'] ?? null);
+        $loginIdentifierMode = $this->panelLoginIdentifierMode();
+        $rawUsername = $this->input->text($post['username'] ?? null, 254);
+        $username = $this->normalizeUserIdentifierValue($rawUsername);
         $displayName = $this->input->text($post['display_name'] ?? null, 160);
         $email = $this->input->email($post['email'] ?? null);
         $theme = $this->input->text($post['theme'] ?? null, 50);
@@ -2849,10 +3015,15 @@ final class PanelController
 
         $allowedThemes = ['default', 'light', 'dark'];
         $errors = [];
+        $usernameRequired = $loginIdentifierMode === 'username';
 
         // Collect all validation errors first so users can fix in one pass.
-        if ($username === null) {
+        if ($usernameRequired && !is_string($username)) {
             $errors[] = 'Username must be 3-50 chars and contain only a-z, 0-9, _, -, .';
+        }
+
+        if (!$usernameRequired && $rawUsername !== '' && !is_string($username)) {
+            $errors[] = 'Optional username must be 3-50 chars and contain only a-z, 0-9, _, -, .';
         }
 
         if ($email === null) {
@@ -2929,7 +3100,7 @@ final class PanelController
         }
 
         $update = $this->auth->updateUserPreferences($userId, [
-            'username' => (string) $username,
+            'username' => is_string($username) ? $username : '',
             'display_name' => $displayName,
             'email' => (string) $email,
             'theme' => $theme,
@@ -2988,8 +3159,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
 
-        if (!$this->auth->canManageConfiguration()) {
-            $this->forbidden('Manage System Configuration permission is required for this section.');
+        if (!$this->requireRoutePermissionOrForbidden('configuration', 'view')) {
             return;
         }
 
@@ -2998,6 +3168,7 @@ final class PanelController
         $configSnapshot = $this->ensureContentEditorConfig($configSnapshot);
         $configSnapshot = $this->ensureTaxonomyRoutePrefixConfig($configSnapshot);
         $configSnapshot = $this->ensurePublicProfileConfig($configSnapshot);
+        $configSnapshot = $this->ensureUserAuthConfig($configSnapshot);
         $configSnapshot = $this->ensureSiteEnabledConfig($configSnapshot);
         $configSnapshot = $this->ensurePanelBrandingConfig($configSnapshot);
         $configSnapshot = $this->ensureCaptchaConfig($configSnapshot);
@@ -3028,8 +3199,7 @@ final class PanelController
         $this->requirePanelLogin();
         $activeConfigTab = $this->normalizeConfigEditorTab($post['_config_tab'] ?? 'basic');
 
-        if (!$this->auth->canManageConfiguration()) {
-            $this->forbidden('Manage System Configuration permission is required for this section.');
+        if (!$this->requireRoutePermissionOrForbidden('configuration', 'edit')) {
             return;
         }
 
@@ -3050,6 +3220,7 @@ final class PanelController
         $currentConfig = $this->ensureContentEditorConfig($currentConfig);
         $currentConfig = $this->ensureTaxonomyRoutePrefixConfig($currentConfig);
         $currentConfig = $this->ensurePublicProfileConfig($currentConfig);
+        $currentConfig = $this->ensureUserAuthConfig($currentConfig);
         $currentConfig = $this->ensureSiteEnabledConfig($currentConfig);
         $currentConfig = $this->ensurePanelBrandingConfig($currentConfig);
         $currentConfig = $this->ensureCaptchaConfig($currentConfig);
@@ -3096,6 +3267,7 @@ final class PanelController
         $nextConfig = $this->ensureContentEditorConfig($nextConfig);
         $nextConfig = $this->ensureTaxonomyRoutePrefixConfig($nextConfig);
         $nextConfig = $this->ensurePublicProfileConfig($nextConfig);
+        $nextConfig = $this->ensureUserAuthConfig($nextConfig);
         $nextConfig = $this->ensureSiteEnabledConfig($nextConfig);
         $nextConfig = $this->ensurePanelBrandingConfig($nextConfig);
         $nextConfig = $this->ensureCaptchaConfig($nextConfig);
@@ -3118,7 +3290,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
 
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('routing', 'view')) {
             return;
         }
 
@@ -3152,7 +3324,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
 
-        if (!$this->requireManageTaxonomyOrForbidden()) {
+        if (!$this->requireRoutePermissionOrForbidden('routing', 'view')) {
             return;
         }
 
@@ -3198,8 +3370,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
 
-        if (!$this->auth->canManageConfiguration()) {
-            $this->forbidden('Manage System Configuration permission is required for this section.');
+        if (!$this->requireRoutePermissionOrForbidden('themes', 'view')) {
             return;
         }
 
@@ -3228,8 +3399,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
 
-        if (!$this->auth->canManageConfiguration()) {
-            $this->forbidden('Manage System Configuration permission is required for this section.');
+        if (!$this->requireRoutePermissionOrForbidden('themes', 'edit')) {
             return;
         }
 
@@ -3271,8 +3441,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
 
-        if (!$this->auth->canManageConfiguration()) {
-            $this->forbidden('Manage System Configuration permission is required for this section.');
+        if (!$this->requireRoutePermissionOrForbidden('themes', 'create')) {
             return;
         }
 
@@ -3459,8 +3628,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
 
-        if (!$this->auth->canManageConfiguration()) {
-            $this->forbidden('Manage System Configuration permission is required for this section.');
+        if (!$this->requireRoutePermissionOrForbidden('themes', 'create')) {
             return;
         }
 
@@ -3613,8 +3781,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
 
-        if (!$this->auth->canManageConfiguration()) {
-            $this->forbidden('Manage System Configuration permission is required for this section.');
+        if (!$this->requireRoutePermissionOrForbidden('themes', 'delete')) {
             return;
         }
 
@@ -3662,8 +3829,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
 
-        if (!$this->auth->canManageConfiguration()) {
-            $this->forbidden('Manage System Configuration permission is required for this section.');
+        if (!$this->requireRoutePermissionOrForbidden('extensions', 'view')) {
             return;
         }
 
@@ -3695,8 +3861,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
 
-        if (!$this->auth->canManageConfiguration()) {
-            $this->forbidden('Manage System Configuration permission is required for this section.');
+        if (!$this->requireRoutePermissionOrForbidden('extensions', 'edit')) {
             return;
         }
 
@@ -3767,8 +3932,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
 
-        if (!$this->auth->canManageConfiguration()) {
-            $this->forbidden('Manage System Configuration permission is required for this section.');
+        if (!$this->requireRoutePermissionOrForbidden('extensions', 'edit')) {
             return;
         }
 
@@ -3776,64 +3940,8 @@ final class PanelController
             $this->flash('error', 'Invalid CSRF token.');
             redirect($this->panelUrl('/extensions'));
         }
-
-        $extensionName = $this->input->text($post['extension'] ?? null, 120);
-        if (!$this->isSafeExtensionDirectoryName($extensionName)) {
-            $this->flash('error', 'Invalid extension identifier.');
-            redirect($this->panelUrl('/extensions'));
-        }
-
-        $extensionPath = $this->extensionsBasePath() . '/' . $extensionName;
-        if (!is_dir($extensionPath)) {
-            $this->flash('error', 'Extension directory was not found on disk.');
-            redirect($this->panelUrl('/extensions'));
-        }
-
-        $manifest = $this->readExtensionManifest($extensionPath);
-        if (!($manifest['valid'] ?? false)) {
-            $this->flash('error', 'Extension metadata is invalid.');
-            redirect($this->panelUrl('/extensions'));
-        }
-
-        $extensionType = strtolower(trim((string) ($manifest['type'] ?? 'plugin')));
-        $isSystemType = $extensionType === 'system' || !empty($manifest['system_extension']);
-        if ($isSystemType || !in_array($extensionType, ['helper', 'content', 'plugin', 'module'], true)) {
-            $this->flash('error', 'Permission masks can only be set for helper/content/plugin/module extensions.');
-            redirect($this->panelUrl('/extensions'));
-        }
-
-        $permissionBit = $this->input->int($post['permission_bit'] ?? null, 1);
-        $permissionOptions = $this->extensionPanelPermissionDefinitions();
-        if ($permissionBit === null || !isset($permissionOptions[$permissionBit])) {
-            $this->flash('error', 'Invalid permission bit selection.');
-            redirect($this->panelUrl('/extensions'));
-        }
-
-        try {
-            $permissionMap = $this->loadExtensionPermissionMap();
-            $permissionMap[$extensionName] = $permissionBit;
-            $this->saveExtensionPermissionMap($permissionMap);
-        } catch (\RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
-            redirect($this->panelUrl('/extensions'));
-        }
-
-        $redirectInternalPath = trim($this->input->text($post['redirect'] ?? null, 200));
-        if (
-            $redirectInternalPath === ''
-            || !str_starts_with($redirectInternalPath, '/')
-            || str_starts_with($redirectInternalPath, '//')
-            || str_contains($redirectInternalPath, '://')
-        ) {
-            $redirectInternalPath = '/extensions';
-        }
-
-        $this->flash(
-            'success',
-            'Permission mask updated for "' . $extensionName . '" ('
-            . $permissionOptions[$permissionBit] . ').'
-        );
-        redirect($this->panelUrl($redirectInternalPath));
+        $this->flash('error', 'Extension permission levels are managed in Groups > Permissions.');
+        redirect($this->panelUrl('/extensions'));
     }
 
     /**
@@ -3849,8 +3957,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
 
-        if (!$this->auth->canManageConfiguration()) {
-            $this->forbidden('Manage System Configuration permission is required for this section.');
+        if (!$this->requireRoutePermissionOrForbidden('extensions', 'delete')) {
             return;
         }
 
@@ -3879,6 +3986,7 @@ final class PanelController
         // Prevent deleting active extensions so runtime behavior changes are deliberate.
         $enabledMap = $this->loadExtensionStateMap();
         $permissionMap = $this->loadExtensionPermissionMap();
+        $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
         if (!empty($enabledMap[$extensionName])) {
             $this->flash('error', 'Disable the extension before deleting it.');
             redirect($this->panelUrl('/extensions'));
@@ -3891,10 +3999,14 @@ final class PanelController
         }
 
         // Also clear stale state keys if present (defensive cleanup).
-        if (isset($enabledMap[$extensionName]) || isset($permissionMap[$extensionName])) {
-            unset($enabledMap[$extensionName], $permissionMap[$extensionName]);
+        if (
+            isset($enabledMap[$extensionName])
+            || isset($permissionMap[$extensionName])
+            || isset($permissionBitsMap[$extensionName])
+        ) {
+            unset($enabledMap[$extensionName], $permissionMap[$extensionName], $permissionBitsMap[$extensionName]);
             try {
-                $this->saveExtensionState($enabledMap, $permissionMap);
+                $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
             } catch (\RuntimeException $exception) {
                 $this->flash('error', 'Extension deleted, but state cleanup failed: ' . $exception->getMessage());
                 redirect($this->panelUrl('/extensions'));
@@ -3915,8 +4027,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
 
-        if (!$this->auth->canManageConfiguration()) {
-            $this->forbidden('Manage System Configuration permission is required for this section.');
+        if (!$this->requireRoutePermissionOrForbidden('extensions', 'create')) {
             return;
         }
 
@@ -4038,9 +4149,14 @@ final class PanelController
         try {
             $enabledMap = $this->loadExtensionStateMap();
             $permissionMap = $this->loadExtensionPermissionMap();
-            if (isset($enabledMap[$extensionName]) || isset($permissionMap[$extensionName])) {
-                unset($enabledMap[$extensionName], $permissionMap[$extensionName]);
-                $this->saveExtensionState($enabledMap, $permissionMap);
+            $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
+            if (
+                isset($enabledMap[$extensionName])
+                || isset($permissionMap[$extensionName])
+                || isset($permissionBitsMap[$extensionName])
+            ) {
+                unset($enabledMap[$extensionName], $permissionMap[$extensionName], $permissionBitsMap[$extensionName]);
+                $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
             }
         } catch (\RuntimeException $exception) {
             // Roll back extracted files when state finalization fails to avoid ambiguous activation state.
@@ -4065,8 +4181,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
 
-        if (!$this->auth->canManageConfiguration()) {
-            $this->forbidden('Manage System Configuration permission is required for this section.');
+        if (!$this->requireRoutePermissionOrForbidden('extensions', 'create')) {
             return;
         }
 
@@ -4177,9 +4292,14 @@ final class PanelController
         try {
             $enabledMap = $this->loadExtensionStateMap();
             $permissionMap = $this->loadExtensionPermissionMap();
-            if (isset($enabledMap[$extensionName]) || isset($permissionMap[$extensionName])) {
-                unset($enabledMap[$extensionName], $permissionMap[$extensionName]);
-                $this->saveExtensionState($enabledMap, $permissionMap);
+            $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
+            if (
+                isset($enabledMap[$extensionName])
+                || isset($permissionMap[$extensionName])
+                || isset($permissionBitsMap[$extensionName])
+            ) {
+                unset($enabledMap[$extensionName], $permissionMap[$extensionName], $permissionBitsMap[$extensionName]);
+                $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
             }
         } catch (\RuntimeException $exception) {
             $this->removeDirectoryRecursively($extensionPath);
@@ -4434,6 +4554,14 @@ final class PanelController
             return 'Enable Profiles';
         }
 
+        if ($path === 'user.auth.login') {
+            return 'Login Identifier';
+        }
+
+        if ($path === 'user.auth.registration') {
+            return 'Enable Registration';
+        }
+
         if ($path === 'user.prefix') {
             return 'Profile URL Prefix';
         }
@@ -4684,6 +4812,24 @@ final class PanelController
             $mode = strtolower(trim($value));
             if (!in_array($mode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
                 throw new \RuntimeException('user.privacy must be public_full, public_limited, private, or disabled.');
+            }
+
+            return $mode;
+        }
+
+        if ($path === 'user.auth.login') {
+            $mode = strtolower(trim($value));
+            if (!in_array($mode, ['email', 'username'], true)) {
+                throw new \RuntimeException('user.auth.login must be email or username.');
+            }
+
+            return $mode;
+        }
+
+        if ($path === 'user.auth.registration') {
+            $mode = strtolower(trim($value));
+            if (!in_array($mode, ['open', 'invite', 'closed'], true)) {
+                throw new \RuntimeException('user.auth.registration must be open, invite, or closed.');
             }
 
             return $mode;
@@ -5482,6 +5628,59 @@ final class PanelController
         $config['session'] = $session;
         $config['user'] = $user;
         $config['group'] = $group;
+        return $config;
+    }
+
+    /**
+     * Ensures user-auth login identifier config exists with safe defaults.
+     *
+     * @param array<string, mixed> $config
+     * @return array<string, mixed>
+     */
+    private function ensureUserAuthConfig(array $config): array
+    {
+        $user = $config['user'] ?? null;
+        if (!is_array($user)) {
+            $user = [];
+        }
+
+        $auth = $user['auth'] ?? null;
+        if (!is_array($auth)) {
+            $auth = [];
+        }
+
+        if (!array_key_exists('login', $auth)) {
+            $legacyMode = strtolower(trim((string) ($user['login'] ?? $user['login_mode'] ?? '')));
+            if (!in_array($legacyMode, ['email', 'username'], true)) {
+                $legacyMode = 'email';
+            }
+            $auth['login'] = $legacyMode;
+        } else {
+            $mode = strtolower(trim((string) ($auth['login'] ?? 'email')));
+            if (!in_array($mode, ['email', 'username'], true)) {
+                $mode = 'email';
+            }
+            $auth['login'] = $mode;
+        }
+
+        if (!array_key_exists('registration', $auth)) {
+            $legacyRegistration = strtolower(trim((string) ($user['registration'] ?? $user['registration_mode'] ?? '')));
+            if (!in_array($legacyRegistration, ['open', 'invite', 'closed'], true)) {
+                $legacyRegistration = 'closed';
+            }
+            $auth['registration'] = $legacyRegistration;
+        } else {
+            $registrationMode = strtolower(trim((string) ($auth['registration'] ?? 'closed')));
+            if (!in_array($registrationMode, ['open', 'invite', 'closed'], true)) {
+                $registrationMode = 'closed';
+            }
+            $auth['registration'] = $registrationMode;
+        }
+
+        unset($user['login'], $user['login_mode'], $user['registration'], $user['registration_mode']);
+        $user['auth'] = $auth;
+        $config['user'] = $user;
+
         return $config;
     }
 
@@ -6476,54 +6675,33 @@ final class PanelController
     }
 
     /**
-     * Enforces users-management permission for Users routes.
+     * Enforces one stock-route action permission for panel sections.
      */
-    private function requireManageUsersOrForbidden(): bool
+    private function requireRoutePermissionOrForbidden(string $routeKey, string $action): bool
     {
-        if ($this->auth->canManageUsers()) {
+        $routePermission = PanelAccess::stockPanelRoutePermission($routeKey);
+        if ($routePermission === null) {
+            $this->forbidden('Unknown panel route permission key.');
+            return false;
+        }
+
+        $normalizedAction = strtolower(trim($action));
+        if (!in_array($normalizedAction, ['view', 'create', 'edit', 'delete'], true)) {
+            $this->forbidden('Unknown panel route permission action.');
+            return false;
+        }
+
+        $requiredBit = (int) ($routePermission[$normalizedAction] ?? 0);
+        if ($requiredBit > 0 && $this->auth->hasPanelPermissionBit($requiredBit)) {
             return true;
         }
 
-        $this->forbidden('Manage Users permission is required for this section.');
-        return false;
-    }
-
-    /**
-     * Enforces group-management permission for groups section.
-     */
-    private function requireManageGroupsOrForbidden(): bool
-    {
-        if ($this->auth->canManageGroups()) {
-            return true;
-        }
-
-        $this->forbidden('Manage Groups permission is required for this section.');
-        return false;
-    }
-
-    /**
-     * Enforces content-management permission for pages/media.
-     */
-    private function requireManageContentOrForbidden(): bool
-    {
-        if ($this->auth->canManageContent()) {
-            return true;
-        }
-
-        $this->forbidden('Manage Content permission is required for this section.');
-        return false;
-    }
-
-    /**
-     * Enforces taxonomy-management permission for channels/categories/tag.
-     */
-    private function requireManageTaxonomyOrForbidden(): bool
-    {
-        if ($this->auth->canManageTaxonomy()) {
-            return true;
-        }
-
-        $this->forbidden('Manage Taxonomy permission is required for this section.');
+        $this->forbidden(
+            ucfirst($normalizedAction)
+            . ' '
+            . (string) ($routePermission['label'] ?? 'panel route')
+            . ' permission is required for this section.'
+        );
         return false;
     }
 
@@ -7033,6 +7211,7 @@ final class PanelController
 
         $enabledMap = $this->loadExtensionStateMap();
         $permissionMap = $this->loadExtensionPermissionMap();
+        $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
         $entries = scandir($this->extensionsBasePath()) ?: [];
         $extensions = [];
 
@@ -7099,8 +7278,13 @@ final class PanelController
         $activeKeyMap = array_flip($activeKeys);
         $cleanedEnabledMap = array_intersect_key($enabledMap, $activeKeyMap);
         $cleanedPermissionMap = array_intersect_key($permissionMap, $activeKeyMap);
-        if ($cleanedEnabledMap !== $enabledMap || $cleanedPermissionMap !== $permissionMap) {
-            $this->saveExtensionState($cleanedEnabledMap, $cleanedPermissionMap);
+        $cleanedPermissionBitsMap = array_intersect_key($permissionBitsMap, $activeKeyMap);
+        if (
+            $cleanedEnabledMap !== $enabledMap
+            || $cleanedPermissionMap !== $permissionMap
+            || $cleanedPermissionBitsMap !== $permissionBitsMap
+        ) {
+            $this->saveExtensionState($cleanedEnabledMap, $cleanedPermissionMap, $cleanedPermissionBitsMap);
         }
 
         return $extensions;
@@ -7119,11 +7303,15 @@ final class PanelController
      *   description: string,
      *   author: string,
      *   author_url: string,
-     *   homepage: string
+     *   homepage: string,
+     *   permission_levels: array<int, array{key: string, label: string}>,
+     *   default_permission_level: string
      * }
      */
     private function readExtensionManifest(string $extensionPath): array
     {
+        $defaultPermissionLevels = $this->defaultExtensionPermissionLevels('Extension');
+        $defaultPermissionLevel = (string) ($defaultPermissionLevels[0]['key'] ?? 'access');
         $directorySlug = trim((string) basename($extensionPath));
         if (!$this->isSafeExtensionDirectoryName($directorySlug)) {
             $directorySlug = '';
@@ -7142,6 +7330,8 @@ final class PanelController
                 'author' => '',
                 'author_url' => '',
                 'homepage' => '',
+                'permission_levels' => $defaultPermissionLevels,
+                'default_permission_level' => $defaultPermissionLevel,
             ];
         }
 
@@ -7158,6 +7348,8 @@ final class PanelController
                 'author' => '',
                 'author_url' => '',
                 'homepage' => '',
+                'permission_levels' => $defaultPermissionLevels,
+                'default_permission_level' => $defaultPermissionLevel,
             ];
         }
 
@@ -7175,6 +7367,8 @@ final class PanelController
                 'author' => '',
                 'author_url' => '',
                 'homepage' => '',
+                'permission_levels' => $defaultPermissionLevels,
+                'default_permission_level' => $defaultPermissionLevel,
             ];
         }
 
@@ -7191,6 +7385,8 @@ final class PanelController
                 'author' => '',
                 'author_url' => '',
                 'homepage' => '',
+                'permission_levels' => $defaultPermissionLevels,
+                'default_permission_level' => $defaultPermissionLevel,
             ];
         }
 
@@ -7198,6 +7394,8 @@ final class PanelController
         if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
             $type = 'plugin';
         }
+        $permissionLevels = $this->normalizeExtensionPermissionLevels($decoded['panel_permissions'] ?? null, $name);
+        $defaultPermissionLevel = (string) ($permissionLevels[0]['key'] ?? 'access');
         $panelPath = $directorySlug;
         $author = $this->input->text((string) ($decoded['author'] ?? ''), 120);
         $authorUrlRaw = trim((string) ($decoded['author_url'] ?? ''));
@@ -7230,6 +7428,8 @@ final class PanelController
                 'author' => $author,
                 'author_url' => $authorUrl,
                 'homepage' => $homepage,
+                'permission_levels' => $permissionLevels,
+                'default_permission_level' => $defaultPermissionLevel,
             ];
         }
 
@@ -7256,6 +7456,8 @@ final class PanelController
                     'author' => $author,
                     'author_url' => $authorUrl,
                     'homepage' => $homepage,
+                    'permission_levels' => $permissionLevels,
+                    'default_permission_level' => $defaultPermissionLevel,
                 ];
             }
 
@@ -7278,6 +7480,8 @@ final class PanelController
                     'author' => $author,
                     'author_url' => $authorUrl,
                     'homepage' => $homepage,
+                    'permission_levels' => $permissionLevels,
+                    'default_permission_level' => $defaultPermissionLevel,
                 ];
             }
         }
@@ -7293,7 +7497,75 @@ final class PanelController
             'author' => $author,
             'author_url' => $authorUrl,
             'homepage' => $homepage,
+            'permission_levels' => $permissionLevels,
+            'default_permission_level' => $defaultPermissionLevel,
         ];
+    }
+
+    /**
+     * Returns default extension permission levels for manifests without explicit levels.
+     *
+     * @return array<int, array{key: string, label: string}>
+     */
+    private function defaultExtensionPermissionLevels(string $extensionName): array
+    {
+        $label = trim($extensionName);
+        $label = $label !== '' ? 'Access ' . $label : 'Access';
+
+        return [[
+            'key' => 'access',
+            'label' => $label,
+        ]];
+    }
+
+    /**
+     * Normalizes extension-declared panel permission levels from ext.json.
+     *
+     * @return array<int, array{key: string, label: string}>
+     */
+    private function normalizeExtensionPermissionLevels(mixed $rawLevels, string $extensionName): array
+    {
+        $normalized = [];
+        if (is_array($rawLevels)) {
+            foreach ($rawLevels as $key => $entry) {
+                $levelKey = '';
+                $label = '';
+                if (is_array($entry)) {
+                    $levelKey = strtolower(trim((string) ($entry['key'] ?? '')));
+                    $label = trim((string) ($entry['label'] ?? ''));
+                } elseif (is_string($key)) {
+                    $levelKey = strtolower(trim($key));
+                    $label = trim((string) $entry);
+                }
+
+                if ($levelKey === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $levelKey) !== 1) {
+                    continue;
+                }
+
+                if ($label === '') {
+                    $label = ucwords(str_replace(['-', '_'], ' ', $levelKey));
+                }
+
+                $label = $this->input->text($label, 80);
+                if ($label === '') {
+                    continue;
+                }
+
+                $normalized[$levelKey] = [
+                    'key' => $levelKey,
+                    'label' => $label,
+                ];
+                if (count($normalized) >= 16) {
+                    break;
+                }
+            }
+        }
+
+        if ($normalized === []) {
+            return $this->defaultExtensionPermissionLevels($extensionName);
+        }
+
+        return array_values($normalized);
     }
 
     /**
@@ -7350,28 +7622,12 @@ final class PanelController
     }
 
     /**
-     * Returns panel-side permission bit options available for plugin extensions.
-     *
-     * @return array<int, string>
-     */
-    private function extensionPanelPermissionDefinitions(): array
-    {
-        return [
-            PanelAccess::PANEL_LOGIN => 'Access Dashboard',
-            PanelAccess::MANAGE_CONTENT => 'Manage Content',
-            PanelAccess::MANAGE_TAXONOMY => 'Manage Taxonomy',
-            PanelAccess::MANAGE_USERS => 'Manage Users',
-            PanelAccess::MANAGE_GROUPS => 'Manage Groups',
-            PanelAccess::MANAGE_CONFIGURATION => 'Manage System Configuration',
-        ];
-    }
-
-    /**
      * Loads extension enablement + permission-mask state from disk.
      *
      * @return array{
      *   enabled: array<string, bool>,
-     *   permissions: array<string, int>
+     *   permissions: array<string, int>,
+     *   permission_bits: array<string, array<string, int>>
      * }
      */
     private function loadExtensionStateData(): array
@@ -7381,6 +7637,7 @@ final class PanelController
             return [
                 'enabled' => [],
                 'permissions' => [],
+                'permission_bits' => [],
             ];
         }
 
@@ -7396,6 +7653,7 @@ final class PanelController
             return [
                 'enabled' => [],
                 'permissions' => [],
+                'permission_bits' => [],
             ];
         }
 
@@ -7413,6 +7671,11 @@ final class PanelController
         if (!is_array($rawPermissions)) {
             $rawPermissions = [];
         }
+        /** @var mixed $rawPermissionBits */
+        $rawPermissionBits = $loaded['permission_bits'] ?? [];
+        if (!is_array($rawPermissionBits)) {
+            $rawPermissionBits = [];
+        }
 
         $enabled = [];
         foreach ($rawEnabled as $name => $isEnabled) {
@@ -7426,7 +7689,6 @@ final class PanelController
             }
         }
 
-        $allowedPermissionBits = array_keys($this->extensionPanelPermissionDefinitions());
         $permissions = [];
         foreach ($rawPermissions as $name => $rawBit) {
             $directory = (string) $name;
@@ -7435,19 +7697,51 @@ final class PanelController
             }
 
             $bit = (int) $rawBit;
-            if (!in_array($bit, $allowedPermissionBits, true)) {
+            if ($bit <= 0) {
                 continue;
             }
 
             $permissions[$directory] = $bit;
         }
 
+        $permissionBits = [];
+        foreach ($rawPermissionBits as $name => $levelsRaw) {
+            $directory = (string) $name;
+            if (!$this->isSafeExtensionDirectoryName($directory) || !is_array($levelsRaw)) {
+                continue;
+            }
+
+            $normalizedLevels = [];
+            foreach ($levelsRaw as $levelKey => $rawBit) {
+                $level = strtolower(trim((string) $levelKey));
+                if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $level) !== 1) {
+                    continue;
+                }
+
+                $bit = (int) $rawBit;
+                if ($bit <= 0) {
+                    continue;
+                }
+
+                $normalizedLevels[$level] = $bit;
+            }
+
+            if ($normalizedLevels === []) {
+                continue;
+            }
+
+            ksort($normalizedLevels);
+            $permissionBits[$directory] = $normalizedLevels;
+        }
+
         ksort($enabled);
         ksort($permissions);
+        ksort($permissionBits);
 
         return [
             'enabled' => $enabled,
             'permissions' => $permissions,
+            'permission_bits' => $permissionBits,
         ];
     }
 
@@ -7472,6 +7766,16 @@ final class PanelController
     }
 
     /**
+     * Loads extension permission-bit map per extension level.
+     *
+     * @return array<string, array<string, int>>
+     */
+    private function loadExtensionPermissionBitsMap(): array
+    {
+        return $this->loadExtensionStateData()['permission_bits'];
+    }
+
+    /**
      * Saves enabled extension map to `private/ext/.state.php`.
      *
      * @param array<string, bool> $enabledMap
@@ -7479,7 +7783,8 @@ final class PanelController
     private function saveExtensionStateMap(array $enabledMap): void
     {
         $permissionMap = $this->loadExtensionPermissionMap();
-        $this->saveExtensionState($enabledMap, $permissionMap);
+        $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
+        $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
     }
 
     /**
@@ -7490,7 +7795,20 @@ final class PanelController
     private function saveExtensionPermissionMap(array $permissionMap): void
     {
         $enabledMap = $this->loadExtensionStateMap();
-        $this->saveExtensionState($enabledMap, $permissionMap);
+        $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
+        $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
+    }
+
+    /**
+     * Saves extension permission-bit map per extension level.
+     *
+     * @param array<string, array<string, int>> $permissionBitsMap
+     */
+    private function saveExtensionPermissionBitsMap(array $permissionBitsMap): void
+    {
+        $enabledMap = $this->loadExtensionStateMap();
+        $permissionMap = $this->loadExtensionPermissionMap();
+        $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
     }
 
     /**
@@ -7498,9 +7816,14 @@ final class PanelController
      *
      * @param array<string, bool> $enabledMap
      * @param array<string, int> $permissionMap
+     * @param array<string, array<string, int>> $permissionBitsMap
      */
-    private function saveExtensionState(array $enabledMap, array $permissionMap): void
+    private function saveExtensionState(array $enabledMap, array $permissionMap, array $permissionBitsMap = []): void
     {
+        if ($permissionBitsMap === []) {
+            $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
+        }
+
         $filteredEnabled = [];
         foreach ($enabledMap as $name => $isEnabled) {
             $directory = (string) $name;
@@ -7512,7 +7835,6 @@ final class PanelController
         }
         ksort($filteredEnabled);
 
-        $allowedPermissionBits = array_keys($this->extensionPanelPermissionDefinitions());
         $filteredPermissions = [];
         foreach ($permissionMap as $name => $rawBit) {
             $directory = (string) $name;
@@ -7521,7 +7843,7 @@ final class PanelController
             }
 
             $bit = (int) $rawBit;
-            if (!in_array($bit, $allowedPermissionBits, true)) {
+            if ($bit <= 0) {
                 continue;
             }
 
@@ -7529,9 +7851,41 @@ final class PanelController
         }
         ksort($filteredPermissions);
 
+        $filteredPermissionBits = [];
+        foreach ($permissionBitsMap as $name => $levelsRaw) {
+            $directory = (string) $name;
+            if (!$this->isSafeExtensionDirectoryName($directory) || !is_array($levelsRaw)) {
+                continue;
+            }
+
+            $normalizedLevels = [];
+            foreach ($levelsRaw as $levelKey => $rawBit) {
+                $level = strtolower(trim((string) $levelKey));
+                if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $level) !== 1) {
+                    continue;
+                }
+
+                $bit = (int) $rawBit;
+                if ($bit <= 0) {
+                    continue;
+                }
+
+                $normalizedLevels[$level] = $bit;
+            }
+
+            if ($normalizedLevels === []) {
+                continue;
+            }
+
+            ksort($normalizedLevels);
+            $filteredPermissionBits[$directory] = $normalizedLevels;
+        }
+        ksort($filteredPermissionBits);
+
         $export = var_export([
             'enabled' => $filteredEnabled,
             'permissions' => $filteredPermissions,
+            'permission_bits' => $filteredPermissionBits,
         ], true);
         $content = "<?php\n\n";
         $content .= "/**\n";
@@ -7554,6 +7908,250 @@ final class PanelController
         if (function_exists('opcache_invalidate')) {
             @opcache_invalidate($statePath, true);
         }
+    }
+
+    /**
+     * Returns extension permission metadata + assigned bits for matching directories.
+     *
+     * @param array<int, string> $directoryFilter
+     * @return array<string, array{
+     *   name: string,
+     *   type: string,
+     *   default_level: string,
+     *   levels: array<int, array{key: string, label: string, bit: int}>
+     * }>
+     */
+    public function extensionPanelPermissionMapForDirectories(array $directoryFilter = []): array
+    {
+        $catalog = $this->extensionPermissionCatalog($directoryFilter);
+        $bitMap = $this->ensureExtensionPermissionBits($catalog);
+        $result = [];
+
+        foreach ($catalog as $directory => $meta) {
+            $levels = [];
+            foreach ($meta['levels'] as $level) {
+                $levelKey = (string) ($level['key'] ?? '');
+                if ($levelKey === '') {
+                    continue;
+                }
+
+                $bit = (int) (($bitMap[$directory][$levelKey] ?? 0));
+                if ($bit <= 0) {
+                    continue;
+                }
+
+                $levels[] = [
+                    'key' => $levelKey,
+                    'label' => (string) ($level['label'] ?? $levelKey),
+                    'bit' => $bit,
+                ];
+            }
+
+            if ($levels === []) {
+                continue;
+            }
+
+            $result[$directory] = [
+                'name' => (string) ($meta['name'] ?? $directory),
+                'type' => (string) ($meta['type'] ?? 'plugin'),
+                'default_level' => (string) ($meta['default_level'] ?? ($levels[0]['key'] ?? 'access')),
+                'levels' => $levels,
+            ];
+        }
+
+        ksort($result);
+        return $result;
+    }
+
+    /**
+     * Discovers extension permission metadata for helper/content/plugin/module panel routes.
+     *
+     * @param array<int, string> $directoryFilter
+     * @return array<string, array{
+     *   name: string,
+     *   type: string,
+     *   default_level: string,
+     *   levels: array<int, array{key: string, label: string}>
+     * }>
+     */
+    private function extensionPermissionCatalog(array $directoryFilter = []): array
+    {
+        $this->ensureExtensionsDirectory();
+        $filter = [];
+        foreach ($directoryFilter as $directory) {
+            $normalized = strtolower(trim((string) $directory));
+            if ($this->isSafeExtensionDirectoryName($normalized)) {
+                $filter[$normalized] = true;
+            }
+        }
+
+        $entries = scandir($this->extensionsBasePath()) ?: [];
+        $catalog = [];
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
+                continue;
+            }
+            if (!$this->isSafeExtensionDirectoryName($entry)) {
+                continue;
+            }
+            if ($filter !== [] && !isset($filter[$entry])) {
+                continue;
+            }
+
+            $extensionPath = $this->extensionsBasePath() . '/' . $entry;
+            if (!is_dir($extensionPath) || !is_file($extensionPath . '/lib/routes_panel.php')) {
+                continue;
+            }
+
+            $manifest = $this->readExtensionManifest($extensionPath);
+            if (!($manifest['valid'] ?? false)) {
+                continue;
+            }
+
+            $type = strtolower(trim((string) ($manifest['type'] ?? 'plugin')));
+            $isSystemType = $type === 'system' || !empty($manifest['system_extension']);
+            if ($isSystemType || !in_array($type, ['helper', 'content', 'plugin', 'module'], true)) {
+                continue;
+            }
+
+            $levels = is_array($manifest['permission_levels'] ?? null)
+                ? $manifest['permission_levels']
+                : $this->defaultExtensionPermissionLevels((string) ($manifest['name'] ?? $entry));
+            $normalizedLevels = [];
+            foreach ($levels as $level) {
+                if (!is_array($level)) {
+                    continue;
+                }
+
+                $levelKey = strtolower(trim((string) ($level['key'] ?? '')));
+                if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $levelKey) !== 1) {
+                    continue;
+                }
+
+                $label = trim((string) ($level['label'] ?? ''));
+                if ($label === '') {
+                    $label = ucwords(str_replace(['-', '_'], ' ', $levelKey));
+                }
+
+                $normalizedLevels[$levelKey] = [
+                    'key' => $levelKey,
+                    'label' => $this->input->text($label, 80),
+                ];
+            }
+            if ($normalizedLevels === []) {
+                $normalizedLevels = [];
+                foreach ($this->defaultExtensionPermissionLevels((string) ($manifest['name'] ?? $entry)) as $defaultLevel) {
+                    $normalizedLevels[(string) $defaultLevel['key']] = $defaultLevel;
+                }
+            }
+
+            $defaultLevel = strtolower(trim((string) ($manifest['default_permission_level'] ?? '')));
+            if ($defaultLevel === '' || !isset($normalizedLevels[$defaultLevel])) {
+                $firstLevel = array_values($normalizedLevels)[0] ?? ['key' => 'access'];
+                $defaultLevel = (string) ($firstLevel['key'] ?? 'access');
+            }
+
+            $catalog[$entry] = [
+                'name' => (string) ($manifest['name'] ?? $entry),
+                'type' => $type,
+                'default_level' => $defaultLevel,
+                'levels' => array_values($normalizedLevels),
+            ];
+        }
+
+        ksort($catalog);
+        return $catalog;
+    }
+
+    /**
+     * Ensures stable permission-bit assignments for extension levels.
+     *
+     * @param array<string, array{
+     *   name: string,
+     *   type: string,
+     *   default_level: string,
+     *   levels: array<int, array{key: string, label: string}>
+     * }> $catalog
+     * @return array<string, array<string, int>>
+     */
+    private function ensureExtensionPermissionBits(array $catalog): array
+    {
+        $existing = $this->loadExtensionPermissionBitsMap();
+        $normalized = [];
+        $usedBits = [];
+        foreach ($existing as $directory => $levels) {
+            $normalized[$directory] = [];
+            foreach ($levels as $levelKey => $bit) {
+                $candidateBit = (int) $bit;
+                if ($candidateBit <= 0 || !$this->isPowerOfTwoBit($candidateBit) || isset($usedBits[$candidateBit])) {
+                    continue;
+                }
+
+                $normalized[$directory][(string) $levelKey] = $candidateBit;
+                $usedBits[$candidateBit] = true;
+            }
+            if ($normalized[$directory] === []) {
+                unset($normalized[$directory]);
+            }
+        }
+
+        $changed = $normalized !== $existing;
+        foreach ($catalog as $directory => $meta) {
+            $levels = is_array($meta['levels'] ?? null) ? $meta['levels'] : [];
+            foreach ($levels as $level) {
+                $levelKey = strtolower(trim((string) ($level['key'] ?? '')));
+                if ($levelKey === '') {
+                    continue;
+                }
+
+                $assignedBit = (int) ($normalized[$directory][$levelKey] ?? 0);
+                if ($assignedBit > 0 && $this->isPowerOfTwoBit($assignedBit) && isset($usedBits[$assignedBit])) {
+                    continue;
+                }
+
+                $nextBit = $this->nextAvailableExtensionPermissionBit($usedBits);
+                $normalized[$directory][$levelKey] = $nextBit;
+                $usedBits[$nextBit] = true;
+                $changed = true;
+            }
+        }
+
+        if ($changed) {
+            $this->saveExtensionPermissionBitsMap($normalized);
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Returns next available extension permission bit.
+     *
+     * @param array<int, bool> $usedBits
+     */
+    private function nextAvailableExtensionPermissionBit(array $usedBits): int
+    {
+        $bit = PanelAccess::EXTENSION_PERMISSION_START;
+        while (isset($usedBits[$bit])) {
+            if ($bit > intdiv(PHP_INT_MAX, 2)) {
+                throw new \RuntimeException('No free extension permission bits remain.');
+            }
+
+            $bit *= 2;
+        }
+
+        return $bit;
+    }
+
+    /**
+     * Returns true when one integer value is power-of-two.
+     */
+    private function isPowerOfTwoBit(int $bit): bool
+    {
+        if ($bit <= 0) {
+            return false;
+        }
+
+        return ($bit & ($bit - 1)) === 0;
     }
 
     /**
@@ -8612,21 +9210,92 @@ MARKDOWN;
     /**
      * Returns editable permission-bit definitions for usergroups UI.
      *
-     * @return array<int, array{bit: int, label: string}>
+     * @return array<int, array{
+     *   bit: int,
+     *   label: string,
+     *   section?: string,
+     *   group?: string,
+     *   action?: string,
+     *   extension?: string
+     * }>
      */
     private function permissionDefinitions(): array
     {
-        return [
-            ['bit' => PanelAccess::VIEW_PUBLIC_SITE, 'label' => 'View Public Site'],
-            ['bit' => PanelAccess::VIEW_PRIVATE_SITE, 'label' => 'View Private Site'],
-            ['bit' => PanelAccess::VIEW_DISABLED_SITE, 'label' => 'View Disabled Site'],
-            ['bit' => PanelAccess::PANEL_LOGIN, 'label' => 'Access Dashboard'],
-            ['bit' => PanelAccess::MANAGE_CONTENT, 'label' => 'Manage Content'],
-            ['bit' => PanelAccess::MANAGE_TAXONOMY, 'label' => 'Manage Taxonomy'],
-            ['bit' => PanelAccess::MANAGE_USERS, 'label' => 'Manage Users'],
-            ['bit' => PanelAccess::MANAGE_GROUPS, 'label' => 'Manage Groups'],
-            ['bit' => PanelAccess::MANAGE_CONFIGURATION, 'label' => 'Manage System Configuration'],
+        $definitions = [
+            ['bit' => PanelAccess::VIEW_PUBLIC_SITE, 'label' => 'View Public Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_public'],
+            ['bit' => PanelAccess::VIEW_PRIVATE_SITE, 'label' => 'View Private Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_private'],
+            ['bit' => PanelAccess::VIEW_DISABLED_SITE, 'label' => 'View Disabled Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_disabled'],
+            ['bit' => PanelAccess::PANEL_LOGIN, 'label' => 'Access Dashboard', 'section' => 'panel', 'group' => 'Panel', 'action' => 'login'],
         ];
+
+        foreach (PanelAccess::stockPanelRoutePermissions() as $routeKey => $routeDefinition) {
+            $groupLabel = (string) ($routeDefinition['label'] ?? ucfirst($routeKey));
+            foreach (['view', 'create', 'edit', 'delete'] as $action) {
+                $bit = (int) ($routeDefinition[$action] ?? 0);
+                if ($bit <= 0) {
+                    continue;
+                }
+
+                $definitions[] = [
+                    'bit' => $bit,
+                    'label' => $groupLabel . ': ' . ucfirst($action),
+                    'section' => 'panel',
+                    'group' => $groupLabel,
+                    'action' => $action,
+                ];
+            }
+        }
+
+        try {
+            $extensionPermissionMap = $this->extensionPanelPermissionMapForDirectories();
+        } catch (\Throwable) {
+            $extensionPermissionMap = [];
+        }
+
+        foreach ($extensionPermissionMap as $directory => $meta) {
+            $extensionLabel = trim((string) ($meta['name'] ?? $directory));
+            $levels = is_array($meta['levels'] ?? null) ? $meta['levels'] : [];
+            foreach ($levels as $level) {
+                $bit = (int) ($level['bit'] ?? 0);
+                if ($bit <= 0) {
+                    continue;
+                }
+
+                $levelLabel = trim((string) ($level['label'] ?? 'Access'));
+                $definitions[] = [
+                    'bit' => $bit,
+                    'label' => $extensionLabel . ': ' . $levelLabel,
+                    'section' => 'extension',
+                    'group' => $extensionLabel,
+                    'action' => (string) ($level['key'] ?? 'access'),
+                    'extension' => (string) $directory,
+                ];
+            }
+        }
+
+        return $definitions;
+    }
+
+    /**
+     * Returns combined bitmask for all extension-level permissions.
+     */
+    private function extensionPermissionBitsMask(): int
+    {
+        $mask = 0;
+        try {
+            $extensionPermissionMap = $this->extensionPanelPermissionMapForDirectories();
+        } catch (\Throwable) {
+            return 0;
+        }
+
+        foreach ($extensionPermissionMap as $meta) {
+            $levels = is_array($meta['levels'] ?? null) ? $meta['levels'] : [];
+            foreach ($levels as $level) {
+                $mask |= (int) ($level['bit'] ?? 0);
+            }
+        }
+
+        return $mask;
     }
 
     /**
@@ -9069,6 +9738,79 @@ MARKDOWN;
     }
 
     /**
+     * Resolves configured panel login identifier mode.
+     */
+    private function panelLoginIdentifierMode(): string
+    {
+        $mode = strtolower(trim((string) $this->config->get('user.auth.login', 'email')));
+        if (!in_array($mode, ['email', 'username'], true)) {
+            $mode = 'email';
+        }
+
+        return $mode;
+    }
+
+    /**
+     * Resolves configured public registration mode.
+     */
+    private function registrationMode(): string
+    {
+        $mode = strtolower(trim((string) $this->config->get('user.auth.registration', 'closed')));
+        if (!in_array($mode, ['open', 'invite', 'closed'], true)) {
+            $mode = 'closed';
+        }
+
+        return $mode;
+    }
+
+    /**
+     * Parses one optional invite-expiration datetime into a unix timestamp.
+     */
+    private function parseInviteExpirationTimestamp(mixed $rawValue): ?int
+    {
+        $value = trim((string) $this->input->text(is_string($rawValue) ? $rawValue : null, 40));
+        if ($value === '') {
+            return null;
+        }
+
+        $timestamp = strtotime($value);
+        if ($timestamp === false) {
+            throw new \RuntimeException('Invite expiration must be a valid date/time or left blank.');
+        }
+
+        if ($timestamp <= time()) {
+            throw new \RuntimeException('Invite expiration must be in the future.');
+        }
+
+        return $timestamp;
+    }
+
+    /**
+     * Normalizes one persisted/user-submitted identifier column value.
+     *
+     * Accepts canonical usernames and email-shaped values.
+     */
+    private function normalizeUserIdentifierValue(string $rawValue): ?string
+    {
+        $normalizedText = $this->input->text($rawValue, 254);
+        if ($normalizedText === '') {
+            return null;
+        }
+
+        $normalizedUsername = $this->input->username($normalizedText);
+        if ($normalizedUsername !== null && $normalizedUsername !== '') {
+            return $normalizedUsername;
+        }
+
+        $normalizedEmail = $this->input->email($normalizedText);
+        if ($normalizedEmail !== null && $normalizedEmail !== '') {
+            return $normalizedEmail;
+        }
+
+        return null;
+    }
+
+    /**
      * Builds panel-visible routing inventory rows for pages/channels/categories/tags/redirects/users/groups.
      *
      * @return array<int, array{
@@ -9096,10 +9838,13 @@ MARKDOWN;
         $profileRoutesEnabled = $this->profileRoutesEnabledForRoutingTable();
         $groupPrefix = $this->groupRoutePrefix();
         $groupRoutesEnabled = $this->groupRoutesEnabledForRoutingTable();
-        $canManageContent = $this->auth->canManageContent();
-        $canManageTaxonomy = $this->auth->canManageTaxonomy();
-        $canManageUsers = $this->auth->canManageUsers();
-        $canManageGroups = $this->auth->canManageGroups();
+        $canEditPages = $this->auth->hasPanelPermissionBit(PanelAccess::PAGES_EDIT);
+        $canEditChannels = $this->auth->hasPanelPermissionBit(PanelAccess::CHANNELS_EDIT);
+        $canEditCategories = $this->auth->hasPanelPermissionBit(PanelAccess::CATEGORIES_EDIT);
+        $canEditTags = $this->auth->hasPanelPermissionBit(PanelAccess::TAGS_EDIT);
+        $canEditRedirects = $this->auth->hasPanelPermissionBit(PanelAccess::REDIRECTS_EDIT);
+        $canEditUsers = $this->auth->hasPanelPermissionBit(PanelAccess::USERS_EDIT);
+        $canEditGroups = $this->auth->hasPanelPermissionBit(PanelAccess::GROUPS_EDIT);
         $groupRoutingEnabled = $groupRoutesEnabled && $groupPrefix !== '';
         $userRoutingEnabled = $profileRoutesEnabled && $profilePrefix !== '';
         $routingAuthData = $this->users->listRoutingData($groupRoutingEnabled, $userRoutingEnabled);
@@ -9179,7 +9924,7 @@ MARKDOWN;
                 'type_key' => 'channel',
                 'type_label' => 'Channel',
                 'source_label' => trim((string) ($channel['name'] ?? '')) !== '' ? (string) $channel['name'] : $channelSlug,
-                'edit_url' => $canManageTaxonomy ? $this->panelUrl('/channels/edit/' . $channelId) : '',
+                'edit_url' => $canEditChannels ? $this->panelUrl('/channels/edit/' . $channelId) : '',
                 'public_url' => $publicUrl,
                 'target_url' => $publicUrl,
                 'status_key' => $statusKey,
@@ -9223,7 +9968,7 @@ MARKDOWN;
                 'type_key' => 'page',
                 'type_label' => 'Page',
                 'source_label' => trim((string) ($page['title'] ?? '')) !== '' ? (string) $page['title'] : $pageSlug,
-                'edit_url' => $canManageContent ? $this->panelUrl('/pages/edit/' . $pageId) : '',
+                'edit_url' => $canEditPages ? $this->panelUrl('/pages/edit/' . $pageId) : '',
                 'public_url' => $publicUrl,
                 'target_url' => $publicUrl,
                 'status_key' => $statusKey,
@@ -9252,7 +9997,7 @@ MARKDOWN;
                     'source_label' => trim((string) ($category['name'] ?? '')) !== ''
                         ? (string) $category['name']
                         : $categorySlug,
-                    'edit_url' => $canManageTaxonomy ? $this->panelUrl('/categories/edit/' . $categoryId) : '',
+                    'edit_url' => $canEditCategories ? $this->panelUrl('/categories/edit/' . $categoryId) : '',
                     'public_url' => $publicUrl,
                     'target_url' => $publicUrl,
                     'status_key' => 'active',
@@ -9280,7 +10025,7 @@ MARKDOWN;
                     'type_key' => 'tag',
                     'type_label' => 'Tag',
                     'source_label' => trim((string) ($tag['name'] ?? '')) !== '' ? (string) $tag['name'] : $tagSlug,
-                    'edit_url' => $canManageTaxonomy ? $this->panelUrl('/tags/edit/' . $tagId) : '',
+                    'edit_url' => $canEditTags ? $this->panelUrl('/tags/edit/' . $tagId) : '',
                     'public_url' => $publicUrl,
                     'target_url' => $publicUrl,
                     'status_key' => 'active',
@@ -9328,7 +10073,7 @@ MARKDOWN;
                     'type_key' => 'group',
                     'type_label' => 'Group',
                     'source_label' => $groupName,
-                    'edit_url' => $canManageGroups ? $this->panelUrl('/groups/edit/' . $groupId) : '',
+                    'edit_url' => $canEditGroups ? $this->panelUrl('/groups/edit/' . $groupId) : '',
                     'public_url' => $publicUrl,
                     'target_url' => $publicUrl,
                     'status_key' => 'users_' . $memberCount,
@@ -9343,12 +10088,12 @@ MARKDOWN;
         if ($userRoutingEnabled) {
             foreach ($routingUsers as $user) {
                 $userId = (int) ($user['id'] ?? 0);
-                $username = $this->input->username((string) ($user['username'] ?? ''));
+                $username = $this->normalizeUserIdentifierValue((string) ($user['username'] ?? ''));
                 if ($userId <= 0 || $username === null) {
                     continue;
                 }
 
-                $publicUrl = '/' . $profilePrefix . '/' . $username;
+                $publicUrl = '/' . $profilePrefix . '/' . rawurlencode($username);
                 $conflictKey = strtolower($publicUrl);
                 $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
 
@@ -9367,7 +10112,7 @@ MARKDOWN;
                     'type_key' => 'user',
                     'type_label' => 'User',
                     'source_label' => $username,
-                    'edit_url' => $canManageUsers ? $this->panelUrl('/users/edit/' . $userId) : '',
+                    'edit_url' => $canEditUsers ? $this->panelUrl('/users/edit/' . $userId) : '',
                     'public_url' => $publicUrl,
                     'target_url' => $publicUrl,
                     'status_key' => $statusKey,
@@ -9408,7 +10153,7 @@ MARKDOWN;
                 'type_key' => 'redirect',
                 'type_label' => 'Redirect',
                 'source_label' => trim((string) ($redirect['title'] ?? '')) !== '' ? (string) $redirect['title'] : $redirectSlug,
-                'edit_url' => $canManageTaxonomy ? $this->panelUrl('/redirects/edit/' . $redirectId) : '',
+                'edit_url' => $canEditRedirects ? $this->panelUrl('/redirects/edit/' . $redirectId) : '',
                 'public_url' => $publicUrl,
                 'target_url' => trim((string) ($redirect['target_url'] ?? '')),
                 'status_key' => $statusKey,

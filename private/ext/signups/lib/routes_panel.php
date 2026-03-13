@@ -9,7 +9,6 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Routing\Router;
 use Raven\Repository\SignupFormRepository;
 use Raven\Repository\SignupSubmissionRepository;
@@ -24,10 +23,7 @@ use function Raven\Core\Support\redirect;
  *   panelUrl: callable(string): string,
  *   requirePanelLogin: callable(): void,
  *   currentUserTheme: callable(): string,
- *   extensionDirectory?: string,
- *   extensionRequiredPermissionBit?: int,
- *   extensionPermissionOptions?: array<int, string>,
- *   setExtensionPermissionPath?: string
+ *   extensionDirectory?: string
  * } $context
  */
 return static function (Router $router, array $context): void {
@@ -79,48 +75,6 @@ return static function (Router $router, array $context): void {
     $submissionsImportPath = $panelUrl('/signups/submissions/import');
     $savePath = $panelUrl('/signups/save');
     $deletePath = $panelUrl('/signups/delete');
-    $setExtensionPermissionPath = trim((string) ($context['setExtensionPermissionPath'] ?? $panelUrl('/extensions/permission')));
-    if ($setExtensionPermissionPath === '') {
-        $setExtensionPermissionPath = $panelUrl('/extensions/permission');
-    }
-    $extensionDirectory = trim((string) ($context['extensionDirectory'] ?? 'signups'));
-    if ($extensionDirectory === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $extensionDirectory) !== 1) {
-        $extensionDirectory = 'signups';
-    }
-    $permissionOptions = [
-        PanelAccess::PANEL_LOGIN => 'Access Dashboard',
-        PanelAccess::MANAGE_CONTENT => 'Manage Content',
-        PanelAccess::MANAGE_TAXONOMY => 'Manage Taxonomy',
-        PanelAccess::MANAGE_USERS => 'Manage Users',
-        PanelAccess::MANAGE_GROUPS => 'Manage Groups',
-        PanelAccess::MANAGE_CONFIGURATION => 'Manage System Configuration',
-    ];
-    /** @var mixed $rawPermissionOptions */
-    $rawPermissionOptions = $context['extensionPermissionOptions'] ?? [];
-    if (is_array($rawPermissionOptions)) {
-        foreach ($rawPermissionOptions as $bit => $label) {
-            $parsedBit = is_int($bit) ? $bit : (is_numeric((string) $bit) ? (int) $bit : null);
-            if ($parsedBit === null || !isset($permissionOptions[$parsedBit])) {
-                continue;
-            }
-
-            $labelText = trim((string) $label);
-            if ($labelText !== '') {
-                $permissionOptions[$parsedBit] = $labelText;
-            }
-        }
-    }
-    $extensionRequiredPermissionBit = (int) ($context['extensionRequiredPermissionBit'] ?? PanelAccess::PANEL_LOGIN);
-    if (!isset($permissionOptions[$extensionRequiredPermissionBit])) {
-        $extensionRequiredPermissionBit = PanelAccess::PANEL_LOGIN;
-    }
-    $permissionOptionList = [];
-    foreach ($permissionOptions as $bit => $label) {
-        $permissionOptionList[] = [
-            'bit' => $bit,
-            'label' => $label,
-        ];
-    }
     $extensionMeta = [
         'name' => 'Signup Sheets',
         'version' => '',
@@ -296,11 +250,7 @@ return static function (Router $router, array $context): void {
         $savePath,
         $deletePath,
         $listViewFile,
-        $extensionMeta,
-        $extensionDirectory,
-        $permissionOptionList,
-        $extensionRequiredPermissionBit,
-        $setExtensionPermissionPath
+        $extensionMeta
     ): void {
         $requirePanelLogin();
 
@@ -314,11 +264,6 @@ return static function (Router $router, array $context): void {
             'savePath' => $savePath,
             'deletePath' => $deletePath,
             'extensionMeta' => $extensionMeta,
-            'extensionDirectory' => $extensionDirectory,
-            'extensionPermissionOptions' => $permissionOptionList,
-            'extensionRequiredPermissionBit' => $extensionRequiredPermissionBit,
-            'extensionPermissionAction' => $setExtensionPermissionPath,
-            'extensionPermissionRedirect' => '/signups',
         ]);
     });
 

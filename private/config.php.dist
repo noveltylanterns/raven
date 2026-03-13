@@ -175,6 +175,11 @@ return array (
   ),
   'user' =>
   array (
+    'auth' =>
+    array (
+      'login' => 'email',
+      'registration' => 'closed',
+    ),
     'privacy' => 'disabled',
     'prefix' => 'user',
     'contact' =>

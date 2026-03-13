@@ -112,6 +112,32 @@ final class AuthService
     }
 
     /**
+     * Attempts credential login using email as the login identifier.
+     *
+     * Delight Auth authenticates by email directly, so no identifier lookup is needed.
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public function attemptLoginByEmail(string $email, string $password): array
+    {
+        try {
+            $this->auth->login($email, $password);
+            return ['ok' => true, 'message' => 'Login successful.'];
+        } catch (\Throwable $exception) {
+            error_log(
+                'Raven panel login failed for email "'
+                . $email
+                . '": '
+                . $exception::class
+                . ' - '
+                . $exception->getMessage()
+            );
+            // Keep login errors generic so auth backend details are not disclosed to users.
+            return ['ok' => false, 'message' => 'Invalid credentials.'];
+        }
+    }
+
+    /**
      * Returns true when one username+IP bucket is currently locked.
      */
     public function isLoginTemporarilyLocked(string $username, string $ipAddress, int $windowSeconds): bool
@@ -539,10 +565,6 @@ final class AuthService
 
         $errors = [];
 
-        if ($username === '') {
-            $errors[] = 'Username is required.';
-        }
-
         if ($email === '') {
             $errors[] = 'Email is required.';
         }
@@ -551,7 +573,7 @@ final class AuthService
             $errors[] = 'Password must be at least 8 characters.';
         }
 
-        if ($this->usernameExistsForOtherUser($userId, $username)) {
+        if ($username !== '' && $this->usernameExistsForOtherUser($userId, $username)) {
             $errors[] = 'Username is already in use.';
         }
 
@@ -728,6 +750,56 @@ final class AuthService
 
         $mask = $this->permissionMaskForUser($userId);
         return PanelAccess::canLoginPanel($mask);
+    }
+
+    /**
+     * Returns true when current user has one exact panel permission bit.
+     */
+    public function hasPanelPermissionBit(int $bit, ?int $userId = null): bool
+    {
+        if ($bit <= 0) {
+            return false;
+        }
+
+        $userId ??= $this->userId();
+        if ($userId === null) {
+            return false;
+        }
+
+        if (!$this->canAccessPanel($userId)) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($userId)) {
+            return true;
+        }
+
+        $mask = $this->permissionMaskForUser($userId);
+        return PanelAccess::hasPanelPermissionBit($mask, $bit);
+    }
+
+    /**
+     * Returns true when current user has at least one panel permission bit in list.
+     *
+     * @param array<int, int> $bits
+     */
+    public function hasAnyPanelPermissionBit(array $bits, ?int $userId = null): bool
+    {
+        $userId ??= $this->userId();
+        if ($userId === null) {
+            return false;
+        }
+
+        if (!$this->canAccessPanel($userId)) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($userId)) {
+            return true;
+        }
+
+        $mask = $this->permissionMaskForUser($userId);
+        return PanelAccess::hasAnyPanelPermissionBit($mask, $bits);
     }
 
     /**
@@ -1041,6 +1113,10 @@ final class AuthService
      */
     private function usernameExistsForOtherUser(int $userId, string $username): bool
     {
+        if (trim($username) === '') {
+            return false;
+        }
+
         $stmt = $this->authDb->prepare(
             'SELECT 1
              FROM ' . $this->authTable('users') . '

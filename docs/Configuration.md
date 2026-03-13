@@ -138,6 +138,7 @@ Grouped sections:
 Grouped sections:
 
 - `Cookie Settings`
+- `Login Options`
 - `Profile Options`
 - `Group Options`
 
@@ -197,6 +198,8 @@ Path-specific normalization is centralized in `normalizeConfigFieldValue(...)` a
 Important rules include:
 
 - constrained enums (`site.enabled`, `database.driver`, `captcha.provider`, `mail.agent`, etc.)
+- `user.auth.login` constrained to `email` or `username`
+- `user.auth.registration` constrained to `open`, `invite`, or `closed`
 - slug/prefix validation and collision checks for public route prefixes
 - cookie domain/prefix format validation
 - login throttling integer minimums
@@ -295,6 +298,8 @@ The following config keys are expected to appear in this document and in runtime
 - `session.brute.max`
 - `session.brute.window`
 - `session.brute.lock`
+- `user.auth.login`
+- `user.auth.registration`
 - `user.privacy`
 - `user.prefix`
 - `user.contact.email.label`

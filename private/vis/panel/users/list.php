@@ -80,6 +80,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
 
 <nav>
     <a class="btn btn-primary" href="<?= e($panelBase) ?>/users/edit"><i class="bi bi-person-plus me-2" aria-hidden="true"></i>New User</a>
+    <a class="btn btn-secondary" href="<?= e($panelBase) ?>/users/invites"><i class="bi bi-ticket-perforated me-2" aria-hidden="true"></i>Invite Tokens</a>
     <button
         type="submit"
         class="btn btn-danger"
@@ -285,6 +286,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
 
 <nav>
     <a class="btn btn-primary" href="<?= e($panelBase) ?>/users/edit"><i class="bi bi-person-plus me-2" aria-hidden="true"></i>New User</a>
+    <a class="btn btn-secondary" href="<?= e($panelBase) ?>/users/invites"><i class="bi bi-ticket-perforated me-2" aria-hidden="true"></i>Invite Tokens</a>
     <button
         type="submit"
         class="btn btn-danger"

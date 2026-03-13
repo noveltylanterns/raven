@@ -168,30 +168,60 @@ if ($defaultTablePrefix === '') {
 if ($existing === [] && strtolower($defaultTablePrefix) === 'raven_') {
     $defaultTablePrefix = 'rvn_';
 }
+$defaultDriver = strtolower(trim((string) ($defaultConfig['database']['driver'] ?? 'sqlite')));
+if (!in_array($defaultDriver, ['sqlite', 'mysql', 'pgsql'], true)) {
+    $defaultDriver = 'sqlite';
+}
+$defaultSiteName = trim((string) ($defaultConfig['site']['name'] ?? 'Raven CMS'));
+if ($defaultSiteName === '') {
+    $defaultSiteName = 'Raven CMS';
+}
+$defaultPanelPath = trim((string) ($defaultConfig['panel']['path'] ?? 'panel'));
+if ($defaultPanelPath === '') {
+    $defaultPanelPath = 'panel';
+}
 
-// Baseline defaults keep first render usable even when template file is missing.
+// Keep form values empty on first render so placeholders can guide typing without manual clearing.
 $form = [
-    'site_domain' => $defaultSiteDomain,
-    'site_name' => trim((string) ($defaultConfig['site']['name'] ?? 'Raven CMS')),
-    'panel_path' => trim((string) ($defaultConfig['panel']['path'] ?? 'panel')),
-    'db_driver' => strtolower(trim((string) ($defaultConfig['database']['driver'] ?? 'sqlite'))),
+    'site_domain' => '',
+    'site_name' => '',
+    'panel_path' => '',
+    'db_driver' => $defaultDriver,
+    'db_table_prefix' => '',
+    'mysql_host' => '',
+    'mysql_port' => '',
+    'mysql_dbname' => '',
+    'mysql_user' => '',
+    'mysql_password' => '',
+    'mysql_charset' => '',
+    'pgsql_host' => '',
+    'pgsql_port' => '',
+    'pgsql_dbname' => '',
+    'pgsql_user' => '',
+    'pgsql_password' => '',
+    'admin_username' => '',
+    'admin_display_name' => '',
+    'admin_email' => '',
+    'admin_password' => '',
+    'admin_password_confirm' => '',
+];
+$formPlaceholders = [
+    'site_domain' => $defaultSiteDomain !== '' ? $defaultSiteDomain : 'example.com',
+    'site_name' => $defaultSiteName,
+    'panel_path' => $defaultPanelPath,
     'db_table_prefix' => $defaultTablePrefix,
     'mysql_host' => trim((string) ($defaultConfig['database']['mysql']['host'] ?? '127.0.0.1')),
     'mysql_port' => trim((string) ($defaultConfig['database']['mysql']['port'] ?? '3306')),
     'mysql_dbname' => trim((string) ($defaultConfig['database']['mysql']['dbname'] ?? 'raven')),
     'mysql_user' => trim((string) ($defaultConfig['database']['mysql']['user'] ?? 'raven')),
-    'mysql_password' => '',
     'mysql_charset' => trim((string) ($defaultConfig['database']['mysql']['charset'] ?? 'utf8mb4')),
     'pgsql_host' => trim((string) ($defaultConfig['database']['pgsql']['host'] ?? '127.0.0.1')),
     'pgsql_port' => trim((string) ($defaultConfig['database']['pgsql']['port'] ?? '5432')),
     'pgsql_dbname' => trim((string) ($defaultConfig['database']['pgsql']['dbname'] ?? 'raven')),
     'pgsql_user' => trim((string) ($defaultConfig['database']['pgsql']['user'] ?? 'raven')),
-    'pgsql_password' => '',
-    'admin_username' => 'superadmin',
+    'admin_username' => 'optional',
     'admin_display_name' => 'Super Admin',
     'admin_email' => 'admin@example.com',
-    'admin_password' => '',
-    'admin_password_confirm' => '',
 ];
 
 $errors = [];
@@ -210,9 +240,10 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         $errors[] = 'Database driver must be sqlite, mysql, or pgsql.';
     }
 
-    $siteDomain = $form['site_domain'];
-    $siteName = $form['site_name'];
-    $panelPath = strtolower($form['panel_path']);
+    $siteDomain = $form['site_domain'] !== '' ? $form['site_domain'] : $formPlaceholders['site_domain'];
+    $siteName = $form['site_name'] !== '' ? $form['site_name'] : $formPlaceholders['site_name'];
+    $panelPathSource = $form['panel_path'] !== '' ? $form['panel_path'] : $formPlaceholders['panel_path'];
+    $panelPath = strtolower($panelPathSource);
 
     if ($siteDomain === '') {
         $errors[] = 'Site domain is required.';
@@ -224,29 +255,39 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         $errors[] = 'Panel path must contain only lowercase letters, numbers, underscores, or dashes.';
     }
 
-    $tablePrefix = preg_replace('/[^a-zA-Z0-9_]/', '', $form['db_table_prefix']) ?? '';
+    $tablePrefixSource = $form['db_table_prefix'] !== '' ? $form['db_table_prefix'] : $formPlaceholders['db_table_prefix'];
+    $tablePrefix = preg_replace('/[^a-zA-Z0-9_]/', '', $tablePrefixSource) ?? '';
     if ($driver === 'sqlite') {
         $sqliteBasePath = $sqliteDefaultBasePath;
     } else {
         $sqliteBasePath = $sqliteDefaultBasePath;
     }
 
-    $mysqlPort = (int) $form['mysql_port'];
+    $mysqlHost = $form['mysql_host'] !== '' ? $form['mysql_host'] : $formPlaceholders['mysql_host'];
+    $mysqlPortRaw = $form['mysql_port'] !== '' ? $form['mysql_port'] : $formPlaceholders['mysql_port'];
+    $mysqlPort = (int) $mysqlPortRaw;
+    $mysqlDbName = $form['mysql_dbname'] !== '' ? $form['mysql_dbname'] : $formPlaceholders['mysql_dbname'];
+    $mysqlUser = $form['mysql_user'] !== '' ? $form['mysql_user'] : $formPlaceholders['mysql_user'];
+    $mysqlCharset = $form['mysql_charset'] !== '' ? $form['mysql_charset'] : $formPlaceholders['mysql_charset'];
     if ($driver === 'mysql') {
-        if ($form['mysql_host'] === '' || $form['mysql_dbname'] === '' || $form['mysql_user'] === '') {
+        if ($mysqlHost === '' || $mysqlDbName === '' || $mysqlUser === '') {
             $errors[] = 'MySQL host, database, and user are required.';
         }
         if ($mysqlPort < 1 || $mysqlPort > 65535) {
             $errors[] = 'MySQL port must be between 1 and 65535.';
         }
-        if ($form['mysql_charset'] === '') {
+        if ($mysqlCharset === '') {
             $errors[] = 'MySQL charset is required.';
         }
     }
 
-    $pgsqlPort = (int) $form['pgsql_port'];
+    $pgsqlHost = $form['pgsql_host'] !== '' ? $form['pgsql_host'] : $formPlaceholders['pgsql_host'];
+    $pgsqlPortRaw = $form['pgsql_port'] !== '' ? $form['pgsql_port'] : $formPlaceholders['pgsql_port'];
+    $pgsqlPort = (int) $pgsqlPortRaw;
+    $pgsqlDbName = $form['pgsql_dbname'] !== '' ? $form['pgsql_dbname'] : $formPlaceholders['pgsql_dbname'];
+    $pgsqlUser = $form['pgsql_user'] !== '' ? $form['pgsql_user'] : $formPlaceholders['pgsql_user'];
     if ($driver === 'pgsql') {
-        if ($form['pgsql_host'] === '' || $form['pgsql_dbname'] === '' || $form['pgsql_user'] === '') {
+        if ($pgsqlHost === '' || $pgsqlDbName === '' || $pgsqlUser === '') {
             $errors[] = 'PostgreSQL host, database, and user are required.';
         }
         if ($pgsqlPort < 1 || $pgsqlPort > 65535) {
@@ -255,16 +296,21 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
     }
 
     $adminUsername = $form['admin_username'];
-    $adminDisplayName = $form['admin_display_name'] !== '' ? $form['admin_display_name'] : $adminUsername;
-    $adminEmail = $form['admin_email'];
+    $adminDisplayName = $form['admin_display_name'] !== ''
+        ? $form['admin_display_name']
+        : $formPlaceholders['admin_display_name'];
+    $adminEmail = $form['admin_email'] !== '' ? $form['admin_email'] : $formPlaceholders['admin_email'];
     $adminPassword = $form['admin_password'];
     $adminPasswordConfirm = $form['admin_password_confirm'];
 
-    if ($adminUsername === '' || preg_match('/^[a-zA-Z0-9_.-]{3,100}$/', $adminUsername) !== 1) {
-        $errors[] = 'Admin username must be 3-100 characters using letters, numbers, dot, underscore, or dash.';
+    if ($adminUsername !== '' && preg_match('/^[a-zA-Z0-9_.-]{3,100}$/', $adminUsername) !== 1) {
+        $errors[] = 'Admin username must be blank or 3-100 characters using letters, numbers, dot, underscore, or dash.';
     }
     if ($adminEmail === '' || filter_var($adminEmail, FILTER_VALIDATE_EMAIL) === false) {
         $errors[] = 'A valid admin email is required.';
+    }
+    if ($adminDisplayName === '') {
+        $adminDisplayName = $adminEmail;
     }
     if (strlen($adminPassword) < 8) {
         $errors[] = 'Admin password must be at least 8 characters.';
@@ -298,6 +344,10 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
             $nextConfig['panel']['brand_logo'] = '';
         }
         unset($nextConfig['public']);
+        $nextConfig['user'] = is_array($nextConfig['user'] ?? null) ? $nextConfig['user'] : [];
+        $nextConfig['user']['auth'] = is_array($nextConfig['user']['auth'] ?? null) ? $nextConfig['user']['auth'] : [];
+        $nextConfig['user']['auth']['login'] = 'email';
+        $nextConfig['user']['auth']['registration'] = 'closed';
 
         $nextConfig['database'] = [
             'driver' => $driver,
@@ -305,18 +355,18 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
                 'base_path' => $sqliteBasePath,
             ],
             'mysql' => [
-                'host' => $form['mysql_host'],
+                'host' => $mysqlHost,
                 'port' => $mysqlPort > 0 ? $mysqlPort : 3306,
-                'dbname' => $form['mysql_dbname'],
-                'user' => $form['mysql_user'],
+                'dbname' => $mysqlDbName,
+                'user' => $mysqlUser,
                 'password' => $form['mysql_password'],
-                'charset' => $form['mysql_charset'] !== '' ? $form['mysql_charset'] : 'utf8mb4',
+                'charset' => $mysqlCharset !== '' ? $mysqlCharset : 'utf8mb4',
             ],
             'pgsql' => [
-                'host' => $form['pgsql_host'],
+                'host' => $pgsqlHost,
                 'port' => $pgsqlPort > 0 ? $pgsqlPort : 5432,
-                'dbname' => $form['pgsql_dbname'],
-                'user' => $form['pgsql_user'],
+                'dbname' => $pgsqlDbName,
+                'user' => $pgsqlUser,
                 'password' => $form['pgsql_password'],
             ],
             'table_prefix' => $tablePrefix,
@@ -423,6 +473,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         .field.full { grid-column: 1 / -1; }
         label { font-size: 0.9rem; font-weight: 600; }
         input, select { border: 1px solid #b8c3d1; border-radius: 6px; padding: 0.5rem 0.55rem; font-size: 0.95rem; }
+        input::placeholder { color: #7d8998; opacity: 1; }
         .note { font-size: 0.86rem; color: #4d5b6b; margin-top: 0.25rem; }
         .alert { border-radius: 6px; padding: 0.8rem 0.9rem; margin-bottom: 1rem; }
         .alert.error { background: #fcebec; border: 1px solid #f3b4b8; color: #7a1f26; }
@@ -464,16 +515,16 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
             <div class="grid">
                 <div class="field">
                     <label for="site_domain">Domain</label>
-                    <input id="site_domain" name="site_domain" value="<?= installer_e($form['site_domain']) ?>" required>
+                    <input id="site_domain" name="site_domain" value="<?= installer_e($form['site_domain']) ?>" placeholder="<?= installer_e($formPlaceholders['site_domain']) ?>" required>
                     <div class="note">Example: <code>example.com</code></div>
                 </div>
                 <div class="field">
                     <label for="site_name">Site Name</label>
-                    <input id="site_name" name="site_name" value="<?= installer_e($form['site_name']) ?>" required>
+                    <input id="site_name" name="site_name" value="<?= installer_e($form['site_name']) ?>" placeholder="<?= installer_e($formPlaceholders['site_name']) ?>" required>
                 </div>
                 <div class="field">
                     <label for="panel_path">Panel Path</label>
-                    <input id="panel_path" name="panel_path" value="<?= installer_e($form['panel_path']) ?>" required>
+                    <input id="panel_path" name="panel_path" value="<?= installer_e($form['panel_path']) ?>" placeholder="<?= installer_e($formPlaceholders['panel_path']) ?>" required>
                     <div class="note">Example: <code>panel</code> for <code>/panel</code></div>
                 </div>
             </div>
@@ -492,7 +543,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
                 </div>
                 <div class="field" id="db_table_prefix_field">
                     <label for="db_table_prefix">Table Prefix (MySQL/PostgreSQL)</label>
-                    <input id="db_table_prefix" name="db_table_prefix" value="<?= installer_e($form['db_table_prefix']) ?>">
+                    <input id="db_table_prefix" name="db_table_prefix" value="<?= installer_e($form['db_table_prefix']) ?>" placeholder="<?= installer_e($formPlaceholders['db_table_prefix']) ?>">
                 </div>
             </div>
 
@@ -504,19 +555,19 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
             </div>
 
             <div class="grid" data-driver-section="mysql">
-                <div class="field"><label for="mysql_host">MySQL Host</label><input id="mysql_host" name="mysql_host" value="<?= installer_e($form['mysql_host']) ?>"></div>
-                <div class="field"><label for="mysql_port">MySQL Port</label><input id="mysql_port" name="mysql_port" value="<?= installer_e($form['mysql_port']) ?>"></div>
-                <div class="field"><label for="mysql_dbname">MySQL Database</label><input id="mysql_dbname" name="mysql_dbname" value="<?= installer_e($form['mysql_dbname']) ?>"></div>
-                <div class="field"><label for="mysql_user">MySQL User</label><input id="mysql_user" name="mysql_user" value="<?= installer_e($form['mysql_user']) ?>"></div>
+                <div class="field"><label for="mysql_host">MySQL Host</label><input id="mysql_host" name="mysql_host" value="<?= installer_e($form['mysql_host']) ?>" placeholder="<?= installer_e($formPlaceholders['mysql_host']) ?>"></div>
+                <div class="field"><label for="mysql_port">MySQL Port</label><input id="mysql_port" name="mysql_port" value="<?= installer_e($form['mysql_port']) ?>" placeholder="<?= installer_e($formPlaceholders['mysql_port']) ?>"></div>
+                <div class="field"><label for="mysql_dbname">MySQL Database</label><input id="mysql_dbname" name="mysql_dbname" value="<?= installer_e($form['mysql_dbname']) ?>" placeholder="<?= installer_e($formPlaceholders['mysql_dbname']) ?>"></div>
+                <div class="field"><label for="mysql_user">MySQL User</label><input id="mysql_user" name="mysql_user" value="<?= installer_e($form['mysql_user']) ?>" placeholder="<?= installer_e($formPlaceholders['mysql_user']) ?>"></div>
                 <div class="field"><label for="mysql_password">MySQL Password</label><input id="mysql_password" name="mysql_password" type="password" value="<?= installer_e($form['mysql_password']) ?>"></div>
-                <div class="field"><label for="mysql_charset">MySQL Charset</label><input id="mysql_charset" name="mysql_charset" value="<?= installer_e($form['mysql_charset']) ?>"></div>
+                <div class="field"><label for="mysql_charset">MySQL Charset</label><input id="mysql_charset" name="mysql_charset" value="<?= installer_e($form['mysql_charset']) ?>" placeholder="<?= installer_e($formPlaceholders['mysql_charset']) ?>"></div>
             </div>
 
             <div class="grid" data-driver-section="pgsql">
-                <div class="field"><label for="pgsql_host">PostgreSQL Host</label><input id="pgsql_host" name="pgsql_host" value="<?= installer_e($form['pgsql_host']) ?>"></div>
-                <div class="field"><label for="pgsql_port">PostgreSQL Port</label><input id="pgsql_port" name="pgsql_port" value="<?= installer_e($form['pgsql_port']) ?>"></div>
-                <div class="field"><label for="pgsql_dbname">PostgreSQL Database</label><input id="pgsql_dbname" name="pgsql_dbname" value="<?= installer_e($form['pgsql_dbname']) ?>"></div>
-                <div class="field"><label for="pgsql_user">PostgreSQL User</label><input id="pgsql_user" name="pgsql_user" value="<?= installer_e($form['pgsql_user']) ?>"></div>
+                <div class="field"><label for="pgsql_host">PostgreSQL Host</label><input id="pgsql_host" name="pgsql_host" value="<?= installer_e($form['pgsql_host']) ?>" placeholder="<?= installer_e($formPlaceholders['pgsql_host']) ?>"></div>
+                <div class="field"><label for="pgsql_port">PostgreSQL Port</label><input id="pgsql_port" name="pgsql_port" value="<?= installer_e($form['pgsql_port']) ?>" placeholder="<?= installer_e($formPlaceholders['pgsql_port']) ?>"></div>
+                <div class="field"><label for="pgsql_dbname">PostgreSQL Database</label><input id="pgsql_dbname" name="pgsql_dbname" value="<?= installer_e($form['pgsql_dbname']) ?>" placeholder="<?= installer_e($formPlaceholders['pgsql_dbname']) ?>"></div>
+                <div class="field"><label for="pgsql_user">PostgreSQL User</label><input id="pgsql_user" name="pgsql_user" value="<?= installer_e($form['pgsql_user']) ?>" placeholder="<?= installer_e($formPlaceholders['pgsql_user']) ?>"></div>
                 <div class="field"><label for="pgsql_password">PostgreSQL Password</label><input id="pgsql_password" name="pgsql_password" type="password" value="<?= installer_e($form['pgsql_password']) ?>"></div>
             </div>
         </div>
@@ -524,9 +575,13 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         <div class="card">
             <h2>First Super Admin</h2>
             <div class="grid">
-                <div class="field"><label for="admin_username">Username</label><input id="admin_username" name="admin_username" value="<?= installer_e($form['admin_username']) ?>" required></div>
-                <div class="field"><label for="admin_display_name">Display Name</label><input id="admin_display_name" name="admin_display_name" value="<?= installer_e($form['admin_display_name']) ?>"></div>
-                <div class="field"><label for="admin_email">Email</label><input id="admin_email" name="admin_email" type="email" value="<?= installer_e($form['admin_email']) ?>" required></div>
+                <div class="field">
+                    <label for="admin_username">Username (Optional)</label>
+                    <input id="admin_username" name="admin_username" value="<?= installer_e($form['admin_username']) ?>" placeholder="<?= installer_e($formPlaceholders['admin_username']) ?>">
+                    <div class="note">Panel login defaults to email mode on new installs.</div>
+                </div>
+                <div class="field"><label for="admin_display_name">Display Name</label><input id="admin_display_name" name="admin_display_name" value="<?= installer_e($form['admin_display_name']) ?>" placeholder="<?= installer_e($formPlaceholders['admin_display_name']) ?>"></div>
+                <div class="field"><label for="admin_email">Email</label><input id="admin_email" name="admin_email" type="email" value="<?= installer_e($form['admin_email']) ?>" placeholder="<?= installer_e($formPlaceholders['admin_email']) ?>" required></div>
                 <div class="field"><label for="admin_password">Password</label><input id="admin_password" name="admin_password" type="password" required></div>
                 <div class="field"><label for="admin_password_confirm">Confirm Password</label><input id="admin_password_confirm" name="admin_password_confirm" type="password" required></div>
             </div>

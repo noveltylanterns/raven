@@ -13,7 +13,7 @@
 /** @var array<string, mixed>|null $group */
 /** @var string $groupRoutePrefix */
 /** @var bool $groupRoutingEnabledSystemWide */
-/** @var array<int, array{bit: int, label: string}> $permissionDefinitions */
+/** @var array<int, array{bit: int, label: string, section?: string, group?: string, action?: string, extension?: string}> $permissionDefinitions */
 /** @var bool $canEditConfigurationBit */
 /** @var string $csrfField */
 /** @var string|null $flashSuccess */
@@ -60,6 +60,25 @@ $isUserGroup = $groupRoleSlug === 'user';
 $isEditorGroup = $groupRoleSlug === 'editor';
 $isAdminGroup = $groupRoleSlug === 'admin';
 $isSuperAdminGroup = $groupRoleSlug === 'super';
+$allDefinedBitsMask = 0;
+foreach ($permissionDefinitions as $permissionDefinitionRow) {
+    $allDefinedBitsMask |= (int) ($permissionDefinitionRow['bit'] ?? 0);
+}
+$editorStockMask = PanelAccess::PANEL_LOGIN
+    | $viewPublicSiteBit
+    | $viewPrivateSiteBit
+    | PanelAccess::maskFromBits(PanelAccess::contentPanelBits());
+$adminStockMask = PanelAccess::PANEL_LOGIN
+    | $viewPublicSiteBit
+    | $viewPrivateSiteBit
+    | $viewDisabledSiteBit
+    | PanelAccess::maskFromBits(array_merge(
+        PanelAccess::contentPanelBits(),
+        PanelAccess::taxonomyPanelBits(),
+        PanelAccess::usersPanelBits()
+    ));
+$systemPanelBits = PanelAccess::systemPanelBits();
+$systemPanelBitsMask = PanelAccess::maskFromBits($systemPanelBits);
 $routeEnabledChecked = ($isGuestLikeGroup || $isBannedGroup) ? false : $routeEnabledChecked;
 if ($isBannedGroup) {
     $permissionMask = 0;
@@ -68,31 +87,14 @@ if ($isBannedGroup) {
 } elseif ($isUserGroup) {
     $permissionMask &= ($viewPublicSiteBit | $viewPrivateSiteBit);
 } elseif ($isEditorGroup) {
-    $permissionMask &= ($viewPublicSiteBit | $viewPrivateSiteBit | PanelAccess::PANEL_LOGIN | PanelAccess::MANAGE_CONTENT);
+    $permissionMask = $editorStockMask;
 } elseif ($isAdminGroup) {
-    $permissionMask = ($permissionMask & (
-        $viewPublicSiteBit
-        | $viewPrivateSiteBit
-        | $viewDisabledSiteBit
-        | PanelAccess::PANEL_LOGIN
-        | PanelAccess::MANAGE_CONTENT
-        | PanelAccess::MANAGE_TAXONOMY
-        | PanelAccess::MANAGE_USERS
-    )) | $viewPrivateSiteBit;
+    $permissionMask = $adminStockMask;
 } elseif ($isSuperAdminGroup) {
-    $permissionMask = (
-        PanelAccess::VIEW_PUBLIC_SITE
-        | PanelAccess::VIEW_PRIVATE_SITE
-        | PanelAccess::VIEW_DISABLED_SITE
-        | PanelAccess::PANEL_LOGIN
-        | PanelAccess::MANAGE_CONTENT
-        | PanelAccess::MANAGE_TAXONOMY
-        | PanelAccess::MANAGE_USERS
-        | PanelAccess::MANAGE_GROUPS
-        | PanelAccess::MANAGE_CONFIGURATION
-    );
+    $permissionMask = $allDefinedBitsMask;
 }
 if (($permissionMask & PanelAccess::PANEL_LOGIN) !== PanelAccess::PANEL_LOGIN) {
+    $permissionMask &= ~PanelAccess::allStockPanelBitsMask();
     $permissionMask &= ~PanelAccess::VIEW_DISABLED_SITE;
 }
 $canDeleteGroup = $hasPersistedGroup && !$isStock;
@@ -119,10 +121,13 @@ if ($group !== null && $groupRoutingEnabledSystemWide && $routeEnabledChecked &&
 
 $publicPermissionDefinitions = [];
 $panelPermissionDefinitions = [];
+$extensionPermissionDefinitions = [];
 foreach ($permissionDefinitions as $permission) {
-    $bit = (int) ($permission['bit'] ?? 0);
-    if (in_array($bit, [$viewPublicSiteBit, $viewPrivateSiteBit, $viewDisabledSiteBit], true)) {
+    $section = strtolower(trim((string) ($permission['section'] ?? 'panel')));
+    if ($section === 'public') {
         $publicPermissionDefinitions[] = $permission;
+    } elseif ($section === 'extension') {
+        $extensionPermissionDefinitions[] = $permission;
     } else {
         $panelPermissionDefinitions[] = $permission;
     }
@@ -329,6 +334,7 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
                                     value="<?= $bit ?>"
                                     <?= $checked ? 'checked' : '' ?>
                                     <?= $lockedPermission ? 'disabled' : '' ?>
+                                    <?= $lockedPermission ? 'data-rvn-group-hard-disabled="1"' : '' ?>
                                     <?= $bit === $viewDisabledSiteBit ? 'data-rvn-group-view-disabled="1"' : '' ?>
                                 >
                                 <label class="form-check-label<?= $lockedPermission ? ' text-muted' : '' ?>" for="perm_<?= $bit ?>">
@@ -351,26 +357,32 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
                             ><?= e($panelIndexUrl) ?></code>
                         </p>
                         <?php if (!$canEditConfigurationBit): ?>
-                            <div class="form-text mb-2">Only Super Admin users can change Manage System Configuration.</div>
+                            <div class="form-text mb-2">Only Super Admin users can change system administration permissions.</div>
                         <?php endif; ?>
 
                         <?php foreach ($panelPermissionDefinitions as $permission): ?>
                             <?php
                             $bit = (int) $permission['bit'];
                             $checked = ($permissionMask & $bit) === $bit;
-                            $allowedForEditor = $isEditorGroup
-                                && in_array($bit, [PanelAccess::PANEL_LOGIN, PanelAccess::MANAGE_CONTENT], true);
-                            $allowedForAdmin = $isAdminGroup
-                                && in_array($bit, [
-                                    PanelAccess::PANEL_LOGIN,
-                                    PanelAccess::MANAGE_CONTENT,
-                                    PanelAccess::MANAGE_TAXONOMY,
-                                    PanelAccess::MANAGE_USERS,
-                                ], true);
-                            $configurationPermissionLocked = !$canEditConfigurationBit
-                                && $bit === PanelAccess::MANAGE_CONFIGURATION;
+                            $editorAllowedBits = array_merge([PanelAccess::PANEL_LOGIN], PanelAccess::contentPanelBits());
+                            $adminAllowedBits = array_merge(
+                                [PanelAccess::PANEL_LOGIN],
+                                PanelAccess::contentPanelBits(),
+                                PanelAccess::taxonomyPanelBits(),
+                                PanelAccess::usersPanelBits()
+                            );
+                            $allowedForEditor = $isEditorGroup && in_array($bit, $editorAllowedBits, true);
+                            $allowedForAdmin = $isAdminGroup && in_array($bit, $adminAllowedBits, true);
+                            $allowedForSuper = $isSuperAdminGroup;
+                            $configurationPermissionLocked = !$canEditConfigurationBit && in_array($bit, $systemPanelBits, true);
                             $lockedPermission = (($isBannedGroup || $isGuestLikeGroup || $isUserGroup || $isEditorGroup || $isAdminGroup || $isSuperAdminGroup)
-                                && !($allowedForEditor || $allowedForAdmin));
+                                && !($allowedForEditor || $allowedForAdmin || $allowedForSuper));
+                            $requiresPanelAccess = $bit !== PanelAccess::PANEL_LOGIN;
+                            $panelAccessEnabled = ($permissionMask & PanelAccess::PANEL_LOGIN) === PanelAccess::PANEL_LOGIN;
+                            if (!$lockedPermission && $requiresPanelAccess && !$panelAccessEnabled) {
+                                $lockedPermission = true;
+                                $checked = false;
+                            }
                             $lockedPermission = $lockedPermission || $configurationPermissionLocked;
                             ?>
                             <div class="form-check">
@@ -382,7 +394,9 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
                                     value="<?= $bit ?>"
                                     <?= $checked ? 'checked' : '' ?>
                                     <?= $lockedPermission ? 'disabled' : '' ?>
+                                    <?= $lockedPermission ? 'data-rvn-group-hard-disabled="1"' : '' ?>
                                     <?= $bit === PanelAccess::PANEL_LOGIN ? 'data-rvn-group-panel-login="1"' : '' ?>
+                                    <?= $requiresPanelAccess ? 'data-rvn-group-requires-panel-login="1"' : '' ?>
                                 >
                                 <label class="form-check-label<?= $lockedPermission ? ' text-muted' : '' ?>" for="perm_<?= $bit ?>">
                                     <?= e($permission['label']) ?>
@@ -393,6 +407,49 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
                             </div>
                         <?php endforeach; ?>
                     </div>
+
+                    <?php if ($extensionPermissionDefinitions !== []): ?>
+                        <div class="col-12">
+                            <h5>Extension Permissions</h5>
+                            <div class="form-text mb-2">Assign extension access levels per group.</div>
+                            <div class="row g-2">
+                                <?php foreach ($extensionPermissionDefinitions as $permission): ?>
+                                    <?php
+                                    $bit = (int) ($permission['bit'] ?? 0);
+                                    if ($bit <= 0) {
+                                        continue;
+                                    }
+
+                                    $checked = ($permissionMask & $bit) === $bit;
+                                    $lockedPermission = $isBannedGroup || $isGuestLikeGroup || $isUserGroup || $isEditorGroup || $isAdminGroup;
+                                    $panelAccessEnabled = ($permissionMask & PanelAccess::PANEL_LOGIN) === PanelAccess::PANEL_LOGIN;
+                                    if (!$lockedPermission && !$panelAccessEnabled) {
+                                        $lockedPermission = true;
+                                        $checked = false;
+                                    }
+                                    ?>
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <div class="form-check">
+                                            <input
+                                                class="form-check-input"
+                                                type="checkbox"
+                                                name="permission_bits[]"
+                                                id="perm_<?= $bit ?>"
+                                                value="<?= $bit ?>"
+                                                <?= $checked ? 'checked' : '' ?>
+                                                <?= $lockedPermission ? 'disabled' : '' ?>
+                                                <?= $lockedPermission ? 'data-rvn-group-hard-disabled="1"' : '' ?>
+                                                data-rvn-group-requires-panel-login="1"
+                                            >
+                                            <label class="form-check-label<?= $lockedPermission ? ' text-muted' : '' ?>" for="perm_<?= $bit ?>">
+                                                <?= e((string) ($permission['label'] ?? 'Extension Access')) ?>
+                                            </label>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </fieldset>
         </div>
@@ -416,6 +473,7 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
   (function () {
     var panelAccessToggle = document.querySelector('input[type="checkbox"][data-rvn-group-panel-login="1"]');
     var viewDisabledToggle = document.querySelector('input[type="checkbox"][data-rvn-group-view-disabled="1"]');
+    var panelDependentToggles = document.querySelectorAll('input[type="checkbox"][data-rvn-group-requires-panel-login="1"]');
     var syncDisabledSiteToggle = function () {
       if (!(viewDisabledToggle instanceof HTMLInputElement)) {
         return;
@@ -430,8 +488,30 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
       if (viewDisabledLabel instanceof HTMLElement) {
         viewDisabledLabel.classList.toggle('text-muted', !allowViewDisabled);
       }
+
+      panelDependentToggles.forEach(function (toggle) {
+        if (!(toggle instanceof HTMLInputElement)) {
+          return;
+        }
+        if (toggle.dataset.rvnGroupHardDisabled === '1') {
+          return;
+        }
+        if (toggle === viewDisabledToggle) {
+          return;
+        }
+
+        toggle.disabled = !allowViewDisabled;
+        if (!allowViewDisabled) {
+          toggle.checked = false;
+        }
+
+        var toggleLabel = document.querySelector('label[for="' + toggle.id + '"]');
+        if (toggleLabel instanceof HTMLElement) {
+          toggleLabel.classList.toggle('text-muted', !allowViewDisabled);
+        }
+      });
     };
-    if (panelAccessToggle instanceof HTMLInputElement && viewDisabledToggle instanceof HTMLInputElement) {
+    if (panelAccessToggle instanceof HTMLInputElement) {
       panelAccessToggle.addEventListener('change', syncDisabledSiteToggle);
       syncDisabledSiteToggle();
     }

@@ -155,6 +155,7 @@ $controller = new PublicController(
     $app['redirects'],
     $app['taxonomy'],
     $app['users'],
+    $app['invite_tokens'],
     $app['input'],
     $app['csrf'],
     is_array($app['extension_services'] ?? null) ? (array) $app['extension_services'] : []
@@ -239,6 +240,8 @@ $reservedPrefixes = array_values(array_unique(array_filter([
     'boot',
     'mce',
     'theme',
+    'login',
+    'register',
     $categoryPrefix,
     $tagPrefix,
     $profilePrefix,
@@ -250,6 +253,18 @@ $router = new Router();
 // Homepage route.
 $router->add('GET', '/', static function () use ($controller): void {
     $controller->home();
+});
+
+$router->add('GET', '/login', static function () use ($controller): void {
+    $controller->login();
+});
+
+$router->add('GET', '/register', static function () use ($controller): void {
+    $controller->register();
+});
+
+$router->add('POST', '/register', static function () use ($controller): void {
+    $controller->registerSubmit($_POST);
 });
 
 // Extension-agnostic embedded form submit endpoint.
@@ -365,9 +380,9 @@ if ($tagPrefix !== '') {
 if ($profilePrefix !== '') {
     $profileRouteBase = '/' . $profilePrefix;
     $router->add('GET', $profileRouteBase . '/{username}', static function (array $params) use ($controller, $input): void {
-        $username = $input->username($params['username'] ?? null);
+        $username = $input->text(rawurldecode((string) ($params['username'] ?? '')), 254);
 
-        if ($username === null) {
+        if ($username === '') {
             $controller->notFound();
             return;
         }
@@ -431,7 +446,11 @@ if (!in_array($method, ['GET', 'POST'], true)) {
     exit;
 }
 
-if (!$controller->enforceSiteAvailability()) {
+// Keep public auth helper routes reachable even when site mode is private/disabled.
+$bypassAvailabilityPaths = ['/login', '/register'];
+$bypassAvailability = in_array($path, $bypassAvailabilityPaths, true);
+
+if (!$bypassAvailability && !$controller->enforceSiteAvailability()) {
     exit;
 }
 

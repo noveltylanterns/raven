@@ -62,10 +62,14 @@ final class AuthController
             redirect($this->panelUrl('/'));
         }
 
+        $loginIdentifierMode = $this->loginIdentifierMode();
+
         $this->view->render('panel/login', [
             'site' => $this->siteData(),
             'csrfField' => $this->csrf->field(),
             'error' => $this->pullFlash('error'),
+            'loginIdentifierMode' => $loginIdentifierMode,
+            'loginIdentifierLabel' => $loginIdentifierMode === 'email' ? 'Email' : 'Username',
             // Login screen must not expose authenticated panel navigation.
             'showSidebar' => false,
             'section' => 'login',
@@ -83,29 +87,47 @@ final class AuthController
             redirect($this->panelUrl('/login'));
         }
 
-        // Username login is panel-default; keep simple normalized text rules.
-        $username = $this->input->text($post['username'] ?? null, 100);
+        $loginMode = $this->loginIdentifierMode();
+        // Keep one canonical posted field while accepting legacy names.
+        $identifierRaw = $this->input->text(
+            $post['identifier'] ?? ($loginMode === 'email' ? ($post['email'] ?? null) : ($post['username'] ?? null)),
+            254
+        );
         $password = $this->input->text($post['password'] ?? null, 255);
+        $identifier = null;
 
-        if ($username === '' || $password === '') {
-            $this->flash('error', 'Username and password are required.');
+        if ($loginMode === 'email') {
+            $identifier = $this->input->email($identifierRaw);
+        } else {
+            // Username-mode supports classic usernames and email-shaped values
+            // so installs that backfill username from email can switch modes cleanly.
+            $identifier = $this->normalizeUsernameModeIdentifier($identifierRaw);
+        }
+
+        if ($identifier === null || $password === '') {
+            $this->flash(
+                'error',
+                ($loginMode === 'email' ? 'Email' : 'Username') . ' and password are required.'
+            );
             redirect($this->panelUrl('/login'));
         }
 
-        if ($this->isLoginTemporarilyLocked($username)) {
+        if ($this->isLoginTemporarilyLocked($identifier)) {
             $this->flash('error', 'Too many login attempts. Please wait a few minutes and try again.');
             redirect($this->panelUrl('/login'));
         }
 
-        $result = $this->auth->attemptLoginByUsername($username, $password);
+        $result = $loginMode === 'email'
+            ? $this->auth->attemptLoginByEmail($identifier, $password)
+            : $this->auth->attemptLoginByUsername($identifier, $password);
 
         if (!$result['ok']) {
-            $this->recordFailedLoginAttempt($username);
+            $this->recordFailedLoginAttempt($identifier);
             $this->flash('error', 'Invalid credentials.');
             redirect($this->panelUrl('/login'));
         }
 
-        $this->clearFailedLoginAttempts($username);
+        $this->clearFailedLoginAttempts($identifier);
 
         if (!$this->auth->canAccessPanel()) {
             $this->auth->logout();
@@ -195,12 +217,12 @@ final class AuthController
     }
 
     /**
-     * Returns true when this username+IP bucket is currently locked.
+     * Returns true when this login-identifier+IP bucket is currently locked.
      */
-    private function isLoginTemporarilyLocked(string $username): bool
+    private function isLoginTemporarilyLocked(string $identifier): bool
     {
         return $this->auth->isLoginTemporarilyLocked(
-            $username,
+            $identifier,
             $this->clientIpAddress(),
             $this->loginAttemptWindowSeconds()
         );
@@ -209,10 +231,10 @@ final class AuthController
     /**
      * Records one failed login attempt and applies temporary lockout when threshold is exceeded.
      */
-    private function recordFailedLoginAttempt(string $username): void
+    private function recordFailedLoginAttempt(string $identifier): void
     {
         $this->auth->recordFailedLoginAttempt(
-            $username,
+            $identifier,
             $this->clientIpAddress(),
             $this->loginAttemptMax(),
             $this->loginAttemptWindowSeconds(),
@@ -221,11 +243,49 @@ final class AuthController
     }
 
     /**
-     * Clears failed-attempt state for one username+IP bucket after successful login.
+     * Clears failed-attempt state for one login-identifier+IP bucket after successful login.
      */
-    private function clearFailedLoginAttempts(string $username): void
+    private function clearFailedLoginAttempts(string $identifier): void
     {
-        $this->auth->clearFailedLoginAttempts($username, $this->clientIpAddress());
+        $this->auth->clearFailedLoginAttempts($identifier, $this->clientIpAddress());
+    }
+
+    /**
+     * Resolves panel login identifier mode from config.
+     */
+    private function loginIdentifierMode(): string
+    {
+        $mode = strtolower(trim((string) $this->config->get('user.auth.login', 'email')));
+        if (!in_array($mode, ['email', 'username'], true)) {
+            $mode = 'email';
+        }
+
+        return $mode;
+    }
+
+    /**
+     * Normalizes one submitted username-mode identifier.
+     *
+     * Accepts both canonical usernames and email-shaped identifiers.
+     */
+    private function normalizeUsernameModeIdentifier(string $rawIdentifier): ?string
+    {
+        $normalizedText = $this->input->text($rawIdentifier, 254);
+        if ($normalizedText === '') {
+            return null;
+        }
+
+        $normalizedUsername = $this->input->username($normalizedText);
+        if ($normalizedUsername !== null && $normalizedUsername !== '') {
+            return $normalizedUsername;
+        }
+
+        $normalizedEmail = $this->input->email($normalizedText);
+        if ($normalizedEmail !== null && $normalizedEmail !== '') {
+            return $normalizedEmail;
+        }
+
+        return null;
     }
 
     /**

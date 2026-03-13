@@ -11,6 +11,7 @@
 
 /** @var array<string, string> $site */
 /** @var array<string, mixed>|null $userRow */
+/** @var string|null $loginIdentifierMode */
 /** @var string $profileRoutePrefix */
 /** @var bool $profileRoutesEnabled */
 /** @var array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}> $groupOptions */
@@ -27,6 +28,11 @@ use Raven\Core\Auth\PanelAccess;
 use function Raven\Core\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
+$loginIdentifierMode = strtolower(trim((string) ($loginIdentifierMode ?? 'email')));
+if (!in_array($loginIdentifierMode, ['email', 'username'], true)) {
+    $loginIdentifierMode = 'email';
+}
+$usernameRequiredForAuth = $loginIdentifierMode === 'username';
 // Shared create/edit derivations keep template branching shallow.
 $userName = trim((string) ($userRow['username'] ?? ''));
 $userId = (int) ($userRow['id'] ?? 0);
@@ -188,7 +194,12 @@ $activeTab = in_array($requestedTab, ['account', 'permissions', 'profile'], true
         >
             <div class="form-group">
                 <label for="username" class="form-label">Username</label>
-                <input id="username" name="username" class="form-control" required value="<?= e((string) ($userRow['username'] ?? '')) ?>">
+                <input id="username" name="username" class="form-control"<?= $usernameRequiredForAuth ? ' required' : '' ?> value="<?= e((string) ($userRow['username'] ?? '')) ?>">
+                <div class="form-text">
+                    <?= $usernameRequiredForAuth
+                        ? 'Required because panel login is set to Username mode.'
+                        : 'Optional because panel login is set to Email mode.' ?>
+                </div>
             </div>
 
             <div class="form-group">
@@ -233,11 +244,12 @@ $activeTab = in_array($requestedTab, ['account', 'permissions', 'profile'], true
         >
             <fieldset class="mb-0">
                 <legend class="h5">Group Memberships</legend>
+                <?php $systemPanelBitsMask = PanelAccess::maskFromBits(PanelAccess::systemPanelBits()); ?>
                 <?php foreach ($groupOptions as $group): ?>
                     <?php
                     $groupId = (int) $group['id'];
                     $isSuperAdminGroup = strtolower(trim((string) ($group['slug'] ?? ''))) === 'super';
-                    $isConfigurationGroup = (((int) ($group['permission_mask'] ?? 0)) & PanelAccess::MANAGE_CONFIGURATION) === PanelAccess::MANAGE_CONFIGURATION;
+                    $isConfigurationGroup = (((int) ($group['permission_mask'] ?? 0)) & $systemPanelBitsMask) !== 0;
                     $isSelected = in_array($groupId, $selectedGroupIds, true);
                     $lockSuperAdminAssignment = $isSuperAdminGroup && !$canAssignSuperAdmin;
                     $lockConfigurationPromotion = !$canAssignConfigurationGroups && $isConfigurationGroup && !$isSelected && !$isSuperAdminGroup;
@@ -267,7 +279,7 @@ $activeTab = in_array($requestedTab, ['account', 'permissions', 'profile'], true
                     <div class="form-text text-muted">Only Super Admin users can assign the <code>Super Admin</code> group.</div>
                 <?php endif; ?>
                 <?php if (!$canAssignConfigurationGroups): ?>
-                    <div class="form-text text-muted">Only Super Admin users can assign groups with <code>Manage System Configuration</code>.</div>
+                    <div class="form-text text-muted">Only Super Admin users can assign groups with system administration access.</div>
                 <?php endif; ?>
             </fieldset>
         </div>

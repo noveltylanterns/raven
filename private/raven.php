@@ -21,6 +21,7 @@ use Raven\Core\View;
 use Raven\Repository\CategoryRepository;
 use Raven\Repository\ChannelRepository;
 use Raven\Repository\GroupRepository;
+use Raven\Repository\InviteTokenRepository;
 use Raven\Repository\PageImageRepository;
 use Raven\Repository\PageRepository;
 use Raven\Repository\RedirectRepository;
@@ -254,6 +255,7 @@ return (static function (): array {
         'categories' => new CategoryRepository($appDb, $driver, $prefix),
         'channels' => $channels,
         'groups' => new GroupRepository($appDb, $driver, $prefix),
+        'invite_tokens' => new InviteTokenRepository($authDb, $driver, $prefix),
         'page_images' => $pageImages,
         'page_image_manager' => new PageImageManager($config, $input, $pageImages, $root),
         'pages' => new PageRepository($appDb, $driver, $prefix, $channels, $categoryEnabled, $tagEnabled),

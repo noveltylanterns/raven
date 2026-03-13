@@ -42,6 +42,7 @@ final class SchemaManager
         $this->ensureEnabledExtensionSchemas($appDb, $driver, $prefix);
         // Auth schema must exist before user/group relationship seeding.
         $this->ensureAuthSchema($authDb, $driver, $prefix);
+        $this->ensureInviteTokenSchema($authDb, $driver, $prefix);
         $this->ensureStockGroups($appDb, $driver, $prefix);
         $this->ensureSeedPages($appDb, $driver, $prefix);
     }
@@ -571,11 +572,62 @@ final class SchemaManager
     }
 
     /**
-     * Inserts stock groups and keeps stock flag synchronized.
-     *
-     * Important: do not broadly overwrite `permission_mask` for existing rows here,
-     * because group editor changes must persist across requests. Super Admin and
-     * Banned are enforced exceptions normalized by policy.
+     * Ensures registration invite-token schema exists.
+     */
+    private function ensureInviteTokenSchema(PDO $authDb, string $driver, string $prefix): void
+    {
+        $table = $driver === 'sqlite' ? 'invite_tokens' : ($prefix . 'invite_tokens');
+
+        if ($driver === 'sqlite') {
+            $authDb->exec('CREATE TABLE IF NOT EXISTS invite_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                token_hash TEXT NOT NULL UNIQUE,
+                token_hint TEXT NOT NULL,
+                is_reusable INTEGER NOT NULL DEFAULT 0,
+                use_count INTEGER NOT NULL DEFAULT 0,
+                expires_at INTEGER NULL,
+                last_used_at INTEGER NULL,
+                created_at TEXT NOT NULL,
+                created_by_user_id INTEGER NULL
+            )');
+            $authDb->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_invite_tokens_token_hash ON invite_tokens (token_hash)');
+            $authDb->exec('CREATE INDEX IF NOT EXISTS idx_invite_tokens_expires_at ON invite_tokens (expires_at)');
+            return;
+        }
+
+        if ($driver === 'mysql') {
+            $authDb->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                token_hash CHAR(64) NOT NULL,
+                token_hint VARCHAR(16) NOT NULL,
+                is_reusable TINYINT(1) NOT NULL DEFAULT 0,
+                use_count INT UNSIGNED NOT NULL DEFAULT 0,
+                expires_at BIGINT UNSIGNED NULL,
+                last_used_at BIGINT UNSIGNED NULL,
+                created_at DATETIME NOT NULL,
+                created_by_user_id BIGINT UNSIGNED NULL,
+                UNIQUE KEY (token_hash),
+                INDEX (expires_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+            return;
+        }
+
+        $authDb->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
+            id BIGSERIAL PRIMARY KEY,
+            token_hash CHAR(64) NOT NULL UNIQUE,
+            token_hint VARCHAR(16) NOT NULL,
+            is_reusable SMALLINT NOT NULL DEFAULT 0,
+            use_count INTEGER NOT NULL DEFAULT 0,
+            expires_at BIGINT NULL,
+            last_used_at BIGINT NULL,
+            created_at TIMESTAMP NOT NULL,
+            created_by_user_id BIGINT NULL
+        )');
+        $authDb->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_expires_at ON ' . $table . ' (expires_at)');
+    }
+
+    /**
+     * Inserts stock groups and keeps stock role masks synchronized.
      */
     private function ensureStockGroups(PDO $db, string $driver, string $prefix): void
     {
@@ -645,34 +697,21 @@ final class SchemaManager
             $stockMaskBySlug[$slug] = (int) ($stockGroup['permission_mask'] ?? 0);
         }
 
-        // Super Admin must always carry full panel capability mask.
-        $superAdminMask = $stockMaskBySlug['super'] ?? null;
-        if (is_int($superAdminMask)) {
-            $forceSuperAdminMask = $db->prepare(
-                'UPDATE ' . $groupsTable . '
-                 SET permission_mask = :permission_mask
-                 WHERE LOWER(slug) = :slug
-                   AND is_stock = 1
-                   AND permission_mask <> :permission_mask'
-            );
-            $forceSuperAdminMask->execute([
-                ':slug' => 'super',
-                ':permission_mask' => $superAdminMask,
-            ]);
-        }
-
-        // Banned is immutable and always fully locked down.
-        $forceBannedMask = $db->prepare(
+        // Keep all stock role masks deterministic across installs/upgrades.
+        $syncStockMask = $db->prepare(
             'UPDATE ' . $groupsTable . '
-             SET permission_mask = 0,
+             SET permission_mask = :permission_mask,
                  route_enabled = 0
              WHERE LOWER(slug) = :slug
                AND is_stock = 1
-               AND (permission_mask <> 0 OR route_enabled <> 0)'
+               AND (permission_mask <> :permission_mask OR route_enabled <> 0)'
         );
-        $forceBannedMask->execute([
-            ':slug' => 'banned',
-        ]);
+        foreach ($stockMaskBySlug as $slug => $mask) {
+            $syncStockMask->execute([
+                ':slug' => $slug,
+                ':permission_mask' => (int) $mask,
+            ]);
+        }
 
     }
 

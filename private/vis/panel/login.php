@@ -12,10 +12,20 @@
 /** @var array<string, string> $site */
 /** @var string $csrfField */
 /** @var string|null $error */
+/** @var string|null $loginIdentifierMode */
+/** @var string|null $loginIdentifierLabel */
 
 use function Raven\Core\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
+$loginIdentifierMode = in_array(strtolower((string) ($loginIdentifierMode ?? 'email')), ['email', 'username'], true)
+    ? strtolower((string) ($loginIdentifierMode ?? 'email'))
+    : 'email';
+$loginIdentifierLabel = trim((string) ($loginIdentifierLabel ?? ''));
+if ($loginIdentifierLabel === '') {
+    $loginIdentifierLabel = $loginIdentifierMode === 'email' ? 'Email' : 'Username';
+}
+$loginIdentifierInputType = $loginIdentifierMode === 'email' ? 'email' : 'text';
 ?>
 <div class="rvnp-login-shell">
     <div class="card rvnp-login-card">
@@ -27,8 +37,8 @@ $panelBase = '/' . trim($site['panel_path'], '/');
             <form method="post" action="<?= e($panelBase) ?>/login" novalidate>
                 <?= $csrfField ?>
                 <div class="mb-3">
-                    <label for="username" class="form-label">Username</label>
-                    <input id="username" name="username" type="text" class="form-control" required>
+                    <label for="identifier" class="form-label"><?= e($loginIdentifierLabel) ?></label>
+                    <input id="identifier" name="identifier" type="<?= e($loginIdentifierInputType) ?>" class="form-control" required>
                 </div>
                 <div class="mb-3">
                     <label for="password" class="form-label">Password</label>

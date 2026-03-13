@@ -443,6 +443,19 @@ final class GroupRepository
             }
 
             $roleSlug = $isStock ? $existingSlug : strtolower($slug);
+            $editorStockMask = PanelAccess::PANEL_LOGIN
+                | PanelAccess::VIEW_PUBLIC_SITE
+                | PanelAccess::VIEW_PRIVATE_SITE
+                | PanelAccess::maskFromBits(PanelAccess::contentPanelBits());
+            $adminStockMask = PanelAccess::PANEL_LOGIN
+                | PanelAccess::VIEW_PUBLIC_SITE
+                | PanelAccess::VIEW_PRIVATE_SITE
+                | PanelAccess::VIEW_DISABLED_SITE
+                | PanelAccess::maskFromBits(array_merge(
+                    PanelAccess::contentPanelBits(),
+                    PanelAccess::taxonomyPanelBits(),
+                    PanelAccess::usersPanelBits()
+                ));
             if ($this->isBannedRoleSlug($roleSlug)) {
                 $routeEnabled = 0;
                 $mask = 0;
@@ -452,22 +465,9 @@ final class GroupRepository
             } elseif ($this->isUserRoleSlug($roleSlug)) {
                 $mask &= (PanelAccess::VIEW_PUBLIC_SITE | PanelAccess::VIEW_PRIVATE_SITE);
             } elseif ($this->isEditorRoleSlug($roleSlug)) {
-                $mask &= (
-                    PanelAccess::VIEW_PUBLIC_SITE
-                    | PanelAccess::VIEW_PRIVATE_SITE
-                    | PanelAccess::PANEL_LOGIN
-                    | PanelAccess::MANAGE_CONTENT
-                );
+                $mask = $editorStockMask;
             } elseif ($this->isAdminRoleSlug($roleSlug)) {
-                $mask = ($mask & (
-                    PanelAccess::VIEW_PUBLIC_SITE
-                    | PanelAccess::VIEW_PRIVATE_SITE
-                    | PanelAccess::VIEW_DISABLED_SITE
-                    | PanelAccess::PANEL_LOGIN
-                    | PanelAccess::MANAGE_CONTENT
-                    | PanelAccess::MANAGE_TAXONOMY
-                    | PanelAccess::MANAGE_USERS
-                )) | PanelAccess::VIEW_PRIVATE_SITE;
+                $mask = $adminStockMask;
             } elseif ($this->isSuperAdminRoleSlug($roleSlug)) {
                 $mask = (
                     PanelAccess::VIEW_PUBLIC_SITE
@@ -479,9 +479,11 @@ final class GroupRepository
                     | PanelAccess::MANAGE_USERS
                     | PanelAccess::MANAGE_GROUPS
                     | PanelAccess::MANAGE_CONFIGURATION
+                    | PanelAccess::allStockPanelBitsMask()
                 );
             }
             if (($mask & PanelAccess::PANEL_LOGIN) !== PanelAccess::PANEL_LOGIN) {
+                $mask &= ~PanelAccess::allStockPanelBitsMask();
                 $mask &= ~PanelAccess::VIEW_DISABLED_SITE;
             }
 
@@ -530,6 +532,7 @@ final class GroupRepository
             throw new RuntimeException('Group slug already exists.');
         }
         if (($mask & PanelAccess::PANEL_LOGIN) !== PanelAccess::PANEL_LOGIN) {
+            $mask &= ~PanelAccess::allStockPanelBitsMask();
             $mask &= ~PanelAccess::VIEW_DISABLED_SITE;
         }
 
