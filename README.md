@@ -43,15 +43,13 @@ So yeah, OpenAI said we aren't allowed to have an update mechanism. You have to 
 
 ## Building on Raven
 
-This is designed to be managed with Git. Everything sensitive to your local install is covered in your [.gitignore](.gitignore) file.
-
-There are several places in your local install that are ignored by the update process: Your **Theme** and **Extension** folders. They are designed to safely accomodate your modifications and preserve them through system updates. If you need further architectural info, I had Codex [document](docs/README.md) its work.
+There are several places in your local install that are going to be ignored by the future update process: Your **Theme** and **Extension** folders. They are designed to safely accomodate your modifications and preserve them through system updates. If you need further architectural info, I had Codex [document](docs/README.md) its work.
 
 ### Themes
 
 Raven supports public themes with child-theme fallback chains for rapid customization.
 
-The frontend now includes an EE-style brace-tag templating layer (`{site:name}`, `{if ...}`, `{each ...}`, etc.) that works in both custom theme views and core fallback views, while still allowing regular PHP in templates. Point your agent at [public/theme/AGENTS.md](public/theme/AGENTS.md) to build custom themes, then activate the theme in Theme Manager (or with `rvn-theme`).
+The frontend includes an ExpressionEngine-style brace-tag templating layer (`{site:name}`, `{if ...}`, `{each ...}`, etc.) that works in both custom theme views and core fallback views, while still allowing regular PHP in templates. Point your agent at [public/theme/AGENTS.md](public/theme/AGENTS.md) to build custom themes, then activate the theme in the Theme Manager.
 
 The default themes are all built using [Bootstrap](https://getbootstrap.com), but it is not a required dependency. If you have the coding know-how *(or know how to phrase it to the machine)* then you can build a frontend using whatever you want.
 
