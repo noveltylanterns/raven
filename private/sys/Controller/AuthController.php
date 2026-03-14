@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Controller;
 
+use lbuchs\WebAuthn\WebAuthn;
 use Raven\Core\Config;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
@@ -32,6 +33,10 @@ final class AuthController
 
     /** Default temporary lockout duration after too many failures. */
     private const DEFAULT_LOGIN_ATTEMPT_LOCK_SECONDS = 900;
+
+    private const SESSION_2FA_SELECTED_METHOD_KEY = '_raven_2fa_selected_method_key';
+    private const SESSION_2FA_WEBAUTHN_FAILED = '_raven_2fa_webauthn_failed';
+    private const SESSION_2FA_WEBAUTHN_CHALLENGE = '_raven_2fa_webauthn_challenge';
 
     private View $view;
     private Config $config;
@@ -59,6 +64,13 @@ final class AuthController
     public function showLogin(): void
     {
         if ($this->auth->isLoggedIn() && $this->auth->canAccessPanel()) {
+            $userId = $this->auth->userId();
+            if ($userId !== null && !$this->auth->isTwoFactorVerifiedForUser($userId)) {
+                if ($this->auth->pendingTwoFactorUserId() === $userId) {
+                    redirect($this->panelUrl('/login/2fa'));
+                }
+            }
+
             redirect($this->panelUrl('/'));
         }
 
@@ -140,7 +152,451 @@ final class AuthController
             session_regenerate_id(true);
         }
 
+        $userId = $this->auth->userId();
+        if ($userId === null) {
+            $this->auth->logout();
+            $this->flash('error', 'Unable to resolve logged-in user.');
+            redirect($this->panelUrl('/login'));
+        }
+
+        $interactiveMethods = $this->auth->interactiveTwoFactorMethodsForUser($userId);
+        if ($interactiveMethods !== []) {
+            $this->auth->beginTwoFactorChallenge($userId, $interactiveMethods);
+            unset($_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED], $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE]);
+
+            $preferredWebauthn = null;
+            foreach ($interactiveMethods as $method) {
+                if (!is_array($method)) {
+                    continue;
+                }
+
+                if (strtolower(trim((string) ($method['type'] ?? ''))) !== 'webauthn') {
+                    continue;
+                }
+
+                $methodKey = trim((string) ($method['key'] ?? ''));
+                if ($methodKey !== '') {
+                    $preferredWebauthn = $methodKey;
+                    break;
+                }
+            }
+
+            if ($preferredWebauthn !== null) {
+                $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = $preferredWebauthn;
+            } elseif (count($interactiveMethods) === 1) {
+                $singleKey = trim((string) ($interactiveMethods[0]['key'] ?? ''));
+                if ($singleKey !== '') {
+                    $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = $singleKey;
+                } else {
+                    unset($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY]);
+                }
+            } else {
+                unset($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY]);
+            }
+
+            redirect($this->panelUrl('/login/2fa'));
+        }
+
+        $this->auth->markTwoFactorVerified($userId);
+
         redirect($this->panelUrl('/'));
+    }
+
+    /**
+     * Shows interactive 2FA challenge form.
+     */
+    public function showLoginTwoFactor(): void
+    {
+        $userId = $this->auth->userId();
+        if ($userId === null || !$this->auth->canAccessPanel($userId)) {
+            $this->auth->logout();
+            redirect($this->panelUrl('/login'));
+        }
+
+        $pendingUserId = $this->auth->pendingTwoFactorUserId();
+        if ($pendingUserId === null || $pendingUserId !== $userId) {
+            redirect($this->panelUrl('/login'));
+        }
+
+        $pendingMethods = $this->auth->pendingTwoFactorMethods();
+        $selectedMethodKey = trim((string) ($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] ?? ''));
+        $selectedMethod = $this->pendingMethodByKey($pendingMethods, $selectedMethodKey);
+        $webauthnFailed = !empty($_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED]);
+        $totpMethods = $this->pendingMethodsByType($pendingMethods, 'totp');
+        $webauthnMethods = $this->pendingMethodsByType($pendingMethods, 'webauthn');
+        $hasWebauthn = $webauthnMethods !== [];
+        $showMethodPicker = !$hasWebauthn && count($totpMethods) > 1 && $selectedMethod === null;
+        $showTotpForm = $selectedMethod !== null && strtolower(trim((string) ($selectedMethod['type'] ?? ''))) === 'totp';
+        $showWebauthn = $hasWebauthn && (
+            $selectedMethod === null
+            || strtolower(trim((string) ($selectedMethod['type'] ?? ''))) === 'webauthn'
+        );
+        $fallbackMethods = [];
+        if ($showWebauthn && $webauthnFailed) {
+            foreach ($pendingMethods as $method) {
+                if (!is_array($method)) {
+                    continue;
+                }
+
+                $methodKey = trim((string) ($method['key'] ?? ''));
+                if ($methodKey === '') {
+                    continue;
+                }
+
+                if ($selectedMethod !== null && $methodKey === trim((string) ($selectedMethod['key'] ?? ''))) {
+                    continue;
+                }
+
+                $fallbackMethods[] = $method;
+            }
+        }
+
+        $this->view->render('panel/login_2fa', [
+            'site' => $this->siteData(),
+            'csrfField' => $this->csrf->field(),
+            'csrfToken' => $this->csrf->token(),
+            'error' => $this->pullFlash('error'),
+            'twoFactorMethods' => $pendingMethods,
+            'showMethodPicker' => $showMethodPicker,
+            'showTotpForm' => $showTotpForm,
+            'showWebauthnPrompt' => $showWebauthn,
+            'webauthnFailed' => $webauthnFailed,
+            'fallbackMethods' => $fallbackMethods,
+            'selectedMethod' => $selectedMethod,
+            'panelBaseUrl' => $this->panelUrl(''),
+            // 2FA screen remains outside authenticated panel navigation.
+            'showSidebar' => false,
+            'section' => 'login',
+            'userTheme' => $this->defaultPanelTheme(),
+        ], 'panel/wrapper');
+    }
+
+    /**
+     * Verifies interactive 2FA challenge.
+     */
+    public function loginTwoFactor(array $post): void
+    {
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flash('error', 'Invalid CSRF token.');
+            redirect($this->panelUrl('/login/2fa'));
+        }
+
+        $userId = $this->auth->userId();
+        $pendingUserId = $this->auth->pendingTwoFactorUserId();
+        if ($userId === null || $pendingUserId === null || $userId !== $pendingUserId) {
+            $this->auth->logout();
+            $this->flash('error', 'Your login session expired. Please log in again.');
+            redirect($this->panelUrl('/login'));
+        }
+
+        $pendingMethods = $this->auth->pendingTwoFactorMethods();
+        $selectedMethodKey = trim((string) ($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] ?? ''));
+        $selectedMethod = $this->pendingMethodByKey($pendingMethods, $selectedMethodKey);
+        if ($selectedMethod === null) {
+            $totpMethods = $this->pendingMethodsByType($pendingMethods, 'totp');
+            if (count($totpMethods) === 1) {
+                $selectedMethod = $totpMethods[0];
+                $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = (string) ($selectedMethod['key'] ?? '');
+            }
+        }
+
+        if ($selectedMethod === null || strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'totp') {
+            $this->flash('error', 'Choose a verification method first.');
+            redirect($this->panelUrl('/login/2fa'));
+        }
+
+        $totpCodeRaw = $this->input->text((string) ($post['totp_code'] ?? ''), 16);
+        $totpCode = preg_replace('/\D+/', '', $totpCodeRaw) ?? '';
+        if ($totpCode === '') {
+            $this->flash('error', 'Verification code is required.');
+            redirect($this->panelUrl('/login/2fa'));
+        }
+
+        if (!$this->auth->verifyPendingTotpCode($totpCode)) {
+            $this->flash('error', 'Invalid verification code.');
+            redirect($this->panelUrl('/login/2fa'));
+        }
+
+        unset(
+            $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY],
+            $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED],
+            $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE]
+        );
+        $this->auth->markTwoFactorVerified($pendingUserId);
+        redirect($this->panelUrl('/'));
+    }
+
+    /**
+     * Selects one pending 2FA method from login challenge list.
+     */
+    public function loginTwoFactorSelect(array $post): void
+    {
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flash('error', 'Invalid CSRF token.');
+            redirect($this->panelUrl('/login/2fa'));
+        }
+
+        $userId = $this->auth->userId();
+        $pendingUserId = $this->auth->pendingTwoFactorUserId();
+        if ($userId === null || $pendingUserId === null || $userId !== $pendingUserId) {
+            $this->auth->logout();
+            $this->flash('error', 'Your login session expired. Please log in again.');
+            redirect($this->panelUrl('/login'));
+        }
+
+        $pendingMethods = $this->auth->pendingTwoFactorMethods();
+        $methodKey = $this->input->text((string) ($post['method_key'] ?? ''), 200);
+        $selectedMethod = $this->pendingMethodByKey($pendingMethods, $methodKey);
+        if ($selectedMethod === null) {
+            $this->flash('error', 'Selected verification method is invalid.');
+            redirect($this->panelUrl('/login/2fa'));
+        }
+
+        $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = (string) ($selectedMethod['key'] ?? '');
+        if (strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'webauthn') {
+            unset($_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED]);
+        }
+        redirect($this->panelUrl('/login/2fa'));
+    }
+
+    /**
+     * Returns WebAuthn login assertion options for pending 2FA challenge.
+     */
+    public function loginTwoFactorWebauthnOptions(array $post): void
+    {
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
+            return;
+        }
+
+        $userId = $this->auth->userId();
+        $pendingUserId = $this->auth->pendingTwoFactorUserId();
+        if ($userId === null || $pendingUserId === null || $userId !== $pendingUserId) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Login session expired.'], 401);
+            return;
+        }
+
+        $pendingMethods = $this->auth->pendingTwoFactorMethods();
+        $selectedMethodKey = trim((string) ($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] ?? ''));
+        $selectedMethod = $this->pendingMethodByKey($pendingMethods, $selectedMethodKey);
+        if ($selectedMethod === null || strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'webauthn') {
+            $pendingWebauthn = $this->pendingMethodsByType($pendingMethods, 'webauthn');
+            if ($pendingWebauthn !== []) {
+                $selectedMethod = $pendingWebauthn[0];
+                $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = trim((string) ($selectedMethod['key'] ?? ''));
+            }
+        }
+
+        if ($selectedMethod === null || strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'webauthn') {
+            $this->jsonResponse(['ok' => false, 'message' => 'Choose a security key method first.'], 400);
+            return;
+        }
+
+        $selectedCredentialIdB64 = trim((string) ($selectedMethod['credential_id'] ?? ''));
+        if ($selectedCredentialIdB64 === '') {
+            $selectedKey = trim((string) ($selectedMethod['key'] ?? ''));
+            if (str_starts_with($selectedKey, 'webauthn:')) {
+                $selectedCredentialIdB64 = substr($selectedKey, strlen('webauthn:'));
+            }
+        }
+
+        if ($selectedCredentialIdB64 === '') {
+            $this->jsonResponse(['ok' => false, 'message' => 'Selected security key is invalid.'], 400);
+            return;
+        }
+
+        $preferences = $this->auth->userPreferences($userId);
+        if (!is_array($preferences)) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Unable to load user preferences.'], 500);
+            return;
+        }
+
+        $resolvedMethod = null;
+        foreach ((array) ($preferences['two_factor_methods'] ?? []) as $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            if (
+                strtolower(trim((string) ($method['type'] ?? ''))) !== 'webauthn'
+                || strtolower(trim((string) ($method['status'] ?? ''))) !== 'confirmed'
+            ) {
+                continue;
+            }
+
+            $credentialIdB64 = trim((string) ($method['credential_id'] ?? ''));
+            $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
+            if ($credentialIdB64 === '' || $credentialPublicKey === '') {
+                continue;
+            }
+
+            if ($credentialIdB64 !== $selectedCredentialIdB64) {
+                continue;
+            }
+
+            $resolvedMethod = $method;
+            break;
+        }
+
+        if (!is_array($resolvedMethod)) {
+            $this->jsonResponse(['ok' => false, 'message' => 'No WebAuthn methods are configured.'], 400);
+            return;
+        }
+
+        $credentialIdBinary = base64_decode($selectedCredentialIdB64, true);
+        if (!is_string($credentialIdBinary) || $credentialIdBinary === '') {
+            $this->jsonResponse(['ok' => false, 'message' => 'Selected security key is invalid.'], 400);
+            return;
+        }
+
+        $requireUserVerification = (bool) ($resolvedMethod['require_uv'] ?? false);
+
+        $webAuthn = $this->createWebAuthnServer();
+        if ($webAuthn === null) {
+            $this->jsonResponse(['ok' => false, 'message' => 'WebAuthn runtime is unavailable.'], 500);
+            return;
+        }
+
+        try {
+            $options = $webAuthn->getGetArgs(
+                [$credentialIdBinary],
+                60,
+                true,
+                true,
+                true,
+                true,
+                true,
+                $requireUserVerification
+            );
+            $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE] = $webAuthn->getChallenge()->getBinaryString();
+            $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = 'webauthn:' . $selectedCredentialIdB64;
+            $this->jsonResponse(['ok' => true, 'options' => $options], 200);
+        } catch (\Throwable $exception) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Failed to initialize WebAuthn challenge.'], 500);
+        }
+    }
+
+    /**
+     * Verifies WebAuthn assertion response for pending login challenge.
+     */
+    public function loginTwoFactorWebauthnVerify(array $post): void
+    {
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
+            return;
+        }
+
+        $userId = $this->auth->userId();
+        $pendingUserId = $this->auth->pendingTwoFactorUserId();
+        if ($userId === null || $pendingUserId === null || $userId !== $pendingUserId) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Login session expired.'], 401);
+            return;
+        }
+
+        $challenge = $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE] ?? null;
+        if (!is_string($challenge) || $challenge === '') {
+            $this->jsonResponse(['ok' => false, 'message' => 'WebAuthn challenge is missing.'], 400);
+            return;
+        }
+
+        $credentialIdBinary = base64_decode((string) ($post['id'] ?? ''), true);
+        $clientDataJSON = base64_decode((string) ($post['clientDataJSON'] ?? ''), true);
+        $authenticatorData = base64_decode((string) ($post['authenticatorData'] ?? ''), true);
+        $signature = base64_decode((string) ($post['signature'] ?? ''), true);
+        $credentialIdB64 = is_string($credentialIdBinary) ? base64_encode($credentialIdBinary) : '';
+        if (
+            !is_string($credentialIdBinary) || $credentialIdBinary === ''
+            || !is_string($clientDataJSON) || $clientDataJSON === ''
+            || !is_string($authenticatorData) || $authenticatorData === ''
+            || !is_string($signature) || $signature === ''
+        ) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Invalid WebAuthn payload.'], 400);
+            return;
+        }
+
+        $preferences = $this->auth->userPreferences($userId);
+        if (!is_array($preferences)) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Unable to load user preferences.'], 500);
+            return;
+        }
+
+        $credentialPublicKey = '';
+        $requiresUserVerification = false;
+        $previousSignatureCounter = null;
+        foreach ((array) ($preferences['two_factor_methods'] ?? []) as $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            if (
+                strtolower(trim((string) ($method['type'] ?? ''))) !== 'webauthn'
+                || strtolower(trim((string) ($method['status'] ?? ''))) !== 'confirmed'
+            ) {
+                continue;
+            }
+
+            if (trim((string) ($method['credential_id'] ?? '')) !== $credentialIdB64) {
+                continue;
+            }
+
+            $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
+            $counter = (int) ($method['signature_counter'] ?? 0);
+            $previousSignatureCounter = $counter >= 0 ? $counter : 0;
+            $requiresUserVerification = (bool) ($method['require_uv'] ?? false);
+            break;
+        }
+
+        if ($credentialPublicKey === '') {
+            $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED] = true;
+            $this->jsonResponse(['ok' => false, 'message' => 'Security key is not registered for this account.'], 400);
+            return;
+        }
+
+        if ($requiresUserVerification && !$this->authenticatorDataHasUserVerification($authenticatorData)) {
+            $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED] = true;
+            $this->jsonResponse([
+                'ok' => false,
+                'message' => 'This security key requires PIN/biometric verification.',
+            ], 400);
+            return;
+        }
+
+        $webAuthn = $this->createWebAuthnServer();
+        if ($webAuthn === null) {
+            $this->jsonResponse(['ok' => false, 'message' => 'WebAuthn runtime is unavailable.'], 500);
+            return;
+        }
+
+        try {
+            $webAuthn->processGet(
+                $clientDataJSON,
+                $authenticatorData,
+                $signature,
+                $credentialPublicKey,
+                $challenge,
+                $previousSignatureCounter,
+                false
+            );
+
+            $signatureCounter = $webAuthn->getSignatureCounter();
+            if (is_int($signatureCounter) && $signatureCounter >= 0) {
+                $this->auth->updateWebauthnSignatureCounter($userId, $credentialIdB64, $signatureCounter);
+            }
+
+            unset(
+                $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY],
+                $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED],
+                $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE]
+            );
+            $this->auth->markTwoFactorVerified($pendingUserId);
+            $this->jsonResponse(['ok' => true, 'redirect' => $this->panelUrl('/')], 200);
+        } catch (\Throwable $exception) {
+            $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED] = true;
+            $this->jsonResponse([
+                'ok' => false,
+                'message' => 'Security key verification failed. You can retry or use another method.',
+            ], 400);
+        }
     }
 
     /**
@@ -336,5 +792,133 @@ final class AuthController
         );
 
         return max(1, $configured);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $methods
+     */
+    private function pendingMethodByKey(array $methods, string $methodKey): ?array
+    {
+        $methodKey = trim($methodKey);
+        if ($methodKey === '') {
+            return null;
+        }
+
+        foreach ($methods as $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            if (trim((string) ($method['key'] ?? '')) === $methodKey) {
+                return $method;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $methods
+     * @return array<int, array<string, mixed>>
+     */
+    private function pendingMethodsByType(array $methods, string $type): array
+    {
+        $type = strtolower(trim($type));
+        if ($type === '') {
+            return [];
+        }
+
+        $filtered = [];
+        foreach ($methods as $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            if (strtolower(trim((string) ($method['type'] ?? ''))) !== $type) {
+                continue;
+            }
+
+            $filtered[] = $method;
+        }
+
+        return $filtered;
+    }
+
+    private function authenticatorDataHasUserVerification(string $authenticatorData): bool
+    {
+        if (strlen($authenticatorData) < 33) {
+            return false;
+        }
+
+        $flags = ord($authenticatorData[32]);
+        return ($flags & 0x04) === 0x04;
+    }
+
+    private function createWebAuthnServer(): ?WebAuthn
+    {
+        if (!class_exists(WebAuthn::class)) {
+            return null;
+        }
+
+        $rpName = trim((string) $this->config->get('site.name', 'Raven CMS'));
+        if ($rpName === '') {
+            $rpName = 'Raven CMS';
+        }
+
+        $rpId = $this->webAuthnRpId();
+        if ($rpId === '') {
+            return null;
+        }
+
+        try {
+            // Prefer privacy-preserving attestation ("none") to avoid exposing authenticator metadata.
+            return new WebAuthn($rpName, $rpId, ['none'], false);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function webAuthnRpId(): string
+    {
+        $host = strtolower(trim((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '')));
+        if ($host !== '') {
+            if (str_contains($host, ':')) {
+                $parts = explode(':', $host, 2);
+                $host = strtolower(trim((string) ($parts[0] ?? '')));
+            }
+
+            if ($host !== '' && preg_match('/^[a-z0-9.-]+$/', $host) === 1) {
+                return trim($host, '.');
+            }
+        }
+
+        $configuredDomain = trim((string) $this->config->get('site.domain', ''));
+        if ($configuredDomain === '') {
+            return '';
+        }
+
+        $parsedHost = (string) parse_url(
+            str_starts_with($configuredDomain, 'http://') || str_starts_with($configuredDomain, 'https://')
+                ? $configuredDomain
+                : ('https://' . $configuredDomain),
+            PHP_URL_HOST
+        );
+        $parsedHost = strtolower(trim($parsedHost));
+        if ($parsedHost === '' || preg_match('/^[a-z0-9.-]+$/', $parsedHost) !== 1) {
+            return '';
+        }
+
+        return trim($parsedHost, '.');
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function jsonResponse(array $payload, int $status = 200): void
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=UTF-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        echo json_encode($payload, JSON_UNESCAPED_SLASHES);
     }
 }

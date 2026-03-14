@@ -17,6 +17,7 @@
 /** @var string|null $loginIdentifierMode */
 /** @var array<int, string> $themeOptions */
 /** @var array<string, array{label: string, url_prefix: string}> $profileContactOptions */
+/** @var array<string, string> $twoFactorTypeOptions */
 /** @var string $avatarUploadLimitsNote */
 
 use function Raven\Core\Support\e;
@@ -36,6 +37,7 @@ $avatarThumbFilename = $avatarBase !== '' ? $avatarBase . '_thumb.jpg' : $avatar
 $avatarUrl = '/uploads/avatars/' . rawurlencode($avatarFilename);
 $avatarThumbUrl = '/uploads/avatars/' . rawurlencode($avatarThumbFilename);
 $profileContactOptions = is_array($profileContactOptions ?? null) ? $profileContactOptions : [];
+$twoFactorTypeOptions = is_array($twoFactorTypeOptions ?? null) ? $twoFactorTypeOptions : [];
 $contactProfilesRaw = is_array($preferences['contact_profiles'] ?? null) ? $preferences['contact_profiles'] : [];
 $contactProfiles = [];
 foreach ($contactProfilesRaw as $entry) {
@@ -59,7 +61,33 @@ foreach ($contactProfilesRaw as $entry) {
     ];
 }
 $requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
-$activeTab = in_array($requestedTab, ['account', 'profile'], true) ? $requestedTab : 'account';
+$activeTab = in_array($requestedTab, ['account', 'profile', 'security'], true) ? $requestedTab : 'account';
+$twoFactorMethodsRaw = is_array($preferences['two_factor_methods'] ?? null) ? $preferences['two_factor_methods'] : [];
+$twoFactorMethods = [];
+foreach ($twoFactorMethodsRaw as $methodRow) {
+    if (!is_array($methodRow)) {
+        continue;
+    }
+
+    $methodType = strtolower(trim((string) ($methodRow['type'] ?? '')));
+    if (!in_array($methodType, ['totp', 'webauthn', 'email'], true)) {
+        continue;
+    }
+
+    $twoFactorMethods[] = [
+        'type' => $methodType,
+        'label' => trim((string) ($methodRow['label'] ?? '')),
+        'status' => strtolower(trim((string) ($methodRow['status'] ?? ''))),
+        'secret' => trim((string) ($methodRow['secret'] ?? '')),
+        'credential_id' => trim((string) ($methodRow['credential_id'] ?? '')),
+        'credential_public_key' => trim((string) ($methodRow['credential_public_key'] ?? '')),
+        'signature_counter' => (int) ($methodRow['signature_counter'] ?? 0),
+        'require_uv' => (bool) ($methodRow['require_uv'] ?? false),
+        'email' => trim((string) ($methodRow['email'] ?? '')),
+        'provisioning_uri' => trim((string) ($methodRow['provisioning_uri'] ?? '')),
+        'qr_data_uri' => trim((string) ($methodRow['qr_data_uri'] ?? '')),
+    ];
+}
 $selectedTheme = strtolower(trim((string) ($preferences['theme'] ?? 'default')));
 if (in_array($selectedTheme, ['light', 'raven'], true)) {
     $selectedTheme = 'corp';
@@ -87,6 +115,397 @@ $themeLabels = [
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
 <?php endif; ?>
+
+<template id="preferences-two-factor-template">
+    <div class="border rounded p-2 mb-2" data-preferences-two-factor-row="1">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label">Type</label>
+                <select class="form-select" data-preferences-two-factor-key="type">
+                    <?php foreach ($twoFactorTypeOptions as $typeValue => $typeLabel): ?>
+                        <?php if ((string) $typeValue === 'none') { continue; } ?>
+                        <option value="<?= e((string) $typeValue) ?>"><?= e((string) $typeLabel) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Label</label>
+                <input type="text" class="form-control" data-preferences-two-factor-key="label" placeholder="My Authenticator / Office Key">
+            </div>
+            <div class="col-md-5" data-preferences-two-factor-section="totp" style="display:none;">
+                <label class="form-label">TOTP Secret / Confirm Code</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" data-preferences-two-factor-key="secret" placeholder="TOTP secret (auto if blank)">
+                    <input type="text" class="form-control" data-preferences-two-factor-key="verification_code" placeholder="6-digit code">
+                </div>
+            </div>
+            <div class="col-md-5" data-preferences-two-factor-section="webauthn" style="display:none;">
+                <label class="form-label">Credential ID</label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <input class="form-check-input mt-0 me-2" type="checkbox" data-preferences-two-factor-key="require_uv" value="1" aria-label="Require PIN/Biometric?">
+                        <span class="small">PIN/Bio</span>
+                    </span>
+                    <input type="text" class="form-control" data-preferences-two-factor-key="credential_id" placeholder="Pair a security key to populate this">
+                    <button type="button" class="btn btn-primary" data-preferences-two-factor-webauthn-register="1">Pair Security Key</button>
+                </div>
+                <div class="small d-none" data-preferences-two-factor-webauthn-feedback="1"></div>
+                <input type="hidden" data-preferences-two-factor-key="credential_public_key" value="">
+                <input type="hidden" data-preferences-two-factor-key="signature_counter" value="0">
+            </div>
+            <div class="col-md-5" data-preferences-two-factor-section="email" style="display:none;">
+                <label class="form-label">Target Email</label>
+                <input type="email" class="form-control" data-preferences-two-factor-key="target_email" placeholder="Defaults to account email if blank">
+            </div>
+            <div class="col-md-2 d-flex align-items-end justify-content-md-end">
+                <button type="button" class="btn btn-danger" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+            </div>
+        </div>
+    </div>
+</template>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var list = document.getElementById('preferences-two-factor-methods-list');
+    var addButton = document.getElementById('preferences-two-factor-add');
+    var template = document.getElementById('preferences-two-factor-template');
+
+    if (!(list instanceof HTMLElement) || !(addButton instanceof HTMLButtonElement) || !(template instanceof HTMLTemplateElement)) {
+      return;
+    }
+
+    var panelBase = <?= json_encode($panelBase, JSON_UNESCAPED_SLASHES) ?>;
+
+    function sectionVisible(row, sectionType, visible) {
+      var section = row.querySelector('[data-preferences-two-factor-section="' + sectionType + '"]');
+      if (!(section instanceof HTMLElement)) {
+        return;
+      }
+      section.style.display = visible ? '' : 'none';
+    }
+
+    function labelPlaceholderForType(methodType) {
+      if (methodType === 'totp') {
+        return 'Authenticator App';
+      }
+      if (methodType === 'webauthn') {
+        return 'My Key';
+      }
+      if (methodType === 'email') {
+        return 'My Email';
+      }
+      return '2FA Method Label';
+    }
+
+    function syncLabelPlaceholder(row, methodType) {
+      var labelField = row.querySelector('[data-preferences-two-factor-key="label"]');
+      if (!(labelField instanceof HTMLInputElement)) {
+        return;
+      }
+
+      labelField.placeholder = labelPlaceholderForType(methodType);
+    }
+
+    function syncRowSections(row) {
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      var typeField = row.querySelector('[data-preferences-two-factor-key="type"]');
+      if (!(typeField instanceof HTMLSelectElement)) {
+        return;
+      }
+
+      var methodType = String(typeField.value || '').trim().toLowerCase();
+      syncLabelPlaceholder(row, methodType);
+      sectionVisible(row, 'totp', methodType === 'totp');
+      sectionVisible(row, 'webauthn', methodType === 'webauthn');
+      sectionVisible(row, 'email', methodType === 'email');
+    }
+
+    function reindexRows() {
+      var rows = list.querySelectorAll('[data-preferences-two-factor-row="1"]');
+      rows.forEach(function (row, index) {
+        if (!(row instanceof HTMLElement)) {
+          return;
+        }
+
+        var fields = row.querySelectorAll('[data-preferences-two-factor-key]');
+        fields.forEach(function (field) {
+          if (!(field instanceof HTMLInputElement) && !(field instanceof HTMLSelectElement)) {
+            return;
+          }
+          var key = String(field.getAttribute('data-preferences-two-factor-key') || '').trim();
+          if (key === '') {
+            return;
+          }
+          field.name = 'two_factor_methods[' + index + '][' + key + ']';
+        });
+
+        syncRowSections(row);
+      });
+    }
+
+    function appendRow() {
+      var fragment = template.content.cloneNode(true);
+      list.appendChild(fragment);
+      reindexRows();
+    }
+
+    function recursiveBinaryStringToArrayBuffer(obj) {
+      var prefix = '=?BINARY?B?';
+      var suffix = '?=';
+      if (!obj || typeof obj !== 'object') {
+        return;
+      }
+
+      Object.keys(obj).forEach(function (key) {
+        var value = obj[key];
+        if (typeof value === 'string') {
+          if (value.slice(0, prefix.length) !== prefix || value.slice(-suffix.length) !== suffix) {
+            return;
+          }
+
+          var base64Value = value.slice(prefix.length, value.length - suffix.length);
+          var binaryString = window.atob(base64Value);
+          var bytes = new Uint8Array(binaryString.length);
+          for (var index = 0; index < binaryString.length; index += 1) {
+            bytes[index] = binaryString.charCodeAt(index);
+          }
+          obj[key] = bytes.buffer;
+          return;
+        }
+
+        recursiveBinaryStringToArrayBuffer(value);
+      });
+    }
+
+    function arrayBufferToBase64(buffer) {
+      var bytes = new Uint8Array(buffer);
+      var binary = '';
+      for (var index = 0; index < bytes.length; index += 1) {
+        binary += String.fromCharCode(bytes[index]);
+      }
+      return window.btoa(binary);
+    }
+
+    function csrfTokenValue() {
+      var csrfInput = document.querySelector('input[name="_csrf"]');
+      return csrfInput instanceof HTMLInputElement ? String(csrfInput.value || '') : '';
+    }
+
+    function collectCredentialIds() {
+      var ids = [];
+      var rows = list.querySelectorAll('[data-preferences-two-factor-row="1"]');
+      rows.forEach(function (row) {
+        if (!(row instanceof HTMLElement)) {
+          return;
+        }
+
+        var typeField = row.querySelector('[data-preferences-two-factor-key="type"]');
+        if (!(typeField instanceof HTMLSelectElement) || String(typeField.value || '').trim().toLowerCase() !== 'webauthn') {
+          return;
+        }
+
+        var credentialIdField = row.querySelector('[data-preferences-two-factor-key="credential_id"]');
+        if (!(credentialIdField instanceof HTMLInputElement)) {
+          return;
+        }
+
+        var credentialId = String(credentialIdField.value || '').trim();
+        if (credentialId !== '') {
+          ids.push(credentialId);
+        }
+      });
+
+      return ids;
+    }
+
+    function setWebauthnFeedback(row, message, level) {
+      var feedback = row.querySelector('[data-preferences-two-factor-webauthn-feedback="1"]');
+      if (!(feedback instanceof HTMLElement)) {
+        return;
+      }
+
+      var text = String(message || '').trim();
+      if (text === '') {
+        feedback.textContent = '';
+        feedback.classList.add('d-none');
+        feedback.classList.remove('text-success', 'text-danger', 'text-muted');
+        return;
+      }
+
+      feedback.classList.remove('d-none', 'text-success', 'text-danger', 'text-muted');
+      if (level === 'error') {
+        feedback.classList.add('text-danger');
+      } else if (level === 'success') {
+        feedback.classList.add('text-success');
+      } else {
+        feedback.classList.add('text-muted');
+      }
+      feedback.textContent = text;
+    }
+
+    async function pairWebauthnForRow(row, button) {
+      if (!(row instanceof HTMLElement) || !(button instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      if (
+        typeof window.PublicKeyCredential === 'undefined'
+        || !navigator.credentials
+        || typeof navigator.credentials.create !== 'function'
+      ) {
+        setWebauthnFeedback(row, 'This browser does not support WebAuthn registration.', 'error');
+        return;
+      }
+
+      var csrf = csrfTokenValue();
+      if (csrf === '') {
+        setWebauthnFeedback(row, 'Security token is missing. Refresh and try again.', 'error');
+        return;
+      }
+
+      button.disabled = true;
+      setWebauthnFeedback(row, 'Waiting for security key registration...', 'muted');
+
+      try {
+        var optionsForm = new URLSearchParams();
+        optionsForm.append('_csrf', csrf);
+        var requireUvField = row.querySelector('[data-preferences-two-factor-key="require_uv"]');
+        var requireUv = requireUvField instanceof HTMLInputElement && requireUvField.checked;
+        optionsForm.append('require_user_verification', requireUv ? '1' : '0');
+        collectCredentialIds().forEach(function (credentialId) {
+          optionsForm.append('exclude_credential_ids[]', credentialId);
+        });
+
+        var optionsResponse = await window.fetch(panelBase + '/preferences/2fa/webauthn/options', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: optionsForm.toString()
+        });
+        var optionsPayload = await optionsResponse.json();
+        if (!optionsResponse.ok || !optionsPayload || optionsPayload.ok !== true || !optionsPayload.options) {
+          throw new Error(optionsPayload && optionsPayload.message ? optionsPayload.message : 'Unable to start security key registration.');
+        }
+
+        recursiveBinaryStringToArrayBuffer(optionsPayload);
+        var credential = await navigator.credentials.create(optionsPayload.options);
+        if (!(credential instanceof PublicKeyCredential)) {
+          throw new Error('Security key registration response was invalid.');
+        }
+
+        var registerForm = new URLSearchParams();
+        registerForm.append('_csrf', csrf);
+        registerForm.append(
+          'clientDataJSON',
+          credential.response && credential.response.clientDataJSON
+            ? arrayBufferToBase64(credential.response.clientDataJSON)
+            : ''
+        );
+        registerForm.append(
+          'attestationObject',
+          credential.response && credential.response.attestationObject
+            ? arrayBufferToBase64(credential.response.attestationObject)
+            : ''
+        );
+
+        var registerResponse = await window.fetch(panelBase + '/preferences/2fa/webauthn/register', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: registerForm.toString()
+        });
+        var registerPayload = await registerResponse.json();
+        if (!registerResponse.ok || !registerPayload || registerPayload.ok !== true) {
+          throw new Error(registerPayload && registerPayload.message ? registerPayload.message : 'Security key registration failed.');
+        }
+
+        var credentialIdField = row.querySelector('[data-preferences-two-factor-key="credential_id"]');
+        var credentialPublicKeyField = row.querySelector('[data-preferences-two-factor-key="credential_public_key"]');
+        var signatureCounterField = row.querySelector('[data-preferences-two-factor-key="signature_counter"]');
+
+        if (credentialIdField instanceof HTMLInputElement) {
+          credentialIdField.value = String(registerPayload.credential_id || '');
+        }
+        if (credentialPublicKeyField instanceof HTMLInputElement) {
+          credentialPublicKeyField.value = String(registerPayload.credential_public_key || '');
+        }
+        if (signatureCounterField instanceof HTMLInputElement) {
+          signatureCounterField.value = String(registerPayload.signature_counter || 0);
+        }
+
+        setWebauthnFeedback(row, 'Security key paired. Save preferences to persist it.', 'success');
+      } catch (error) {
+        setWebauthnFeedback(
+          row,
+          error && typeof error.message === 'string' ? error.message : 'Security key registration failed.',
+          'error'
+        );
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    addButton.addEventListener('click', function () {
+      appendRow();
+    });
+
+    list.addEventListener('change', function (event) {
+      var target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      var row = target.closest('[data-preferences-two-factor-row="1"]');
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      if (target instanceof HTMLSelectElement && target.getAttribute('data-preferences-two-factor-key') === 'type') {
+        syncRowSections(row);
+      }
+
+    });
+
+    list.addEventListener('click', function (event) {
+      var target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      var removeButton = target.closest('[data-preferences-two-factor-remove="1"]');
+      if (removeButton instanceof HTMLElement) {
+        var removeRow = removeButton.closest('[data-preferences-two-factor-row="1"]');
+        if (removeRow instanceof HTMLElement) {
+          removeRow.remove();
+          reindexRows();
+        }
+        return;
+      }
+
+      var registerButton = target.closest('[data-preferences-two-factor-webauthn-register="1"]');
+      if (!(registerButton instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      var row = registerButton.closest('[data-preferences-two-factor-row="1"]');
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      void pairWebauthnForRow(row, registerButton);
+    });
+
+    reindexRows();
+  });
+</script>
 
 <?php if ($flashError !== null): ?>
 <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
@@ -123,6 +542,18 @@ $themeLabels = [
                 aria-controls="rvnp-editor-pane-profile"
                 aria-selected="<?= $activeTab === 'profile' ? 'true' : 'false' ?>"
             >Profile</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link<?= $activeTab === 'security' ? ' active' : '' ?>"
+                id="preferences-security-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#rvnp-editor-pane-security"
+                type="button"
+                role="tab"
+                aria-controls="rvnp-editor-pane-security"
+                aria-selected="<?= $activeTab === 'security' ? 'true' : 'false' ?>"
+            >Security</button>
         </li>
     </ul>
 
@@ -277,6 +708,143 @@ $themeLabels = [
                 <?php else: ?>
                     <div class="form-text text-muted">No contact types are configured in <code>user.contact</code>.</div>
                 <?php endif; ?>
+            </div>
+        </div>
+
+        <div
+            class="tab-pane fade<?= $activeTab === 'security' ? ' show active' : '' ?>"
+            id="rvnp-editor-pane-security"
+            role="tabpanel"
+            aria-labelledby="preferences-security-tab"
+            tabindex="0"
+        >
+            <div class="form-group mb-0">
+                <label class="form-label h3 d-block">Two-Factor Methods</label>
+                <p class="text-muted mb-2">Add multiple methods. Confirmed TOTP methods are enforced at panel login.</p>
+
+                <div id="preferences-two-factor-methods-list">
+                    <?php foreach ($twoFactorMethods as $index => $method): ?>
+                        <?php
+                        $methodType = (string) ($method['type'] ?? 'none');
+                        $methodLabel = (string) ($method['label'] ?? '');
+                        $methodStatus = strtolower((string) ($method['status'] ?? ''));
+                        $methodSecret = (string) ($method['secret'] ?? '');
+                        $methodCredentialId = (string) ($method['credential_id'] ?? '');
+                        $methodCredentialPublicKey = (string) ($method['credential_public_key'] ?? '');
+                        $methodSignatureCounter = (int) ($method['signature_counter'] ?? 0);
+                        $methodRequireUv = (bool) ($method['require_uv'] ?? false);
+                        $methodEmail = (string) ($method['email'] ?? '');
+                        $methodLabelPlaceholder = match ($methodType) {
+                            'totp' => 'Authenticator App',
+                            'webauthn' => 'My Key',
+                            'email' => 'My Email',
+                            default => '2FA Method Label',
+                        };
+                        ?>
+                        <div class="border rounded p-2 mb-2" data-preferences-two-factor-row="1">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-2">
+                                    <label class="form-label">Type</label>
+                                    <select class="form-select" data-preferences-two-factor-key="type" name="two_factor_methods[<?= (int) $index ?>][type]">
+                                        <?php foreach ($twoFactorTypeOptions as $typeValue => $typeLabel): ?>
+                                            <?php if ((string) $typeValue === 'none') { continue; } ?>
+                                            <option value="<?= e((string) $typeValue) ?>"<?= $methodType === (string) $typeValue ? ' selected' : '' ?>><?= e((string) $typeLabel) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Label</label>
+                                    <input
+                                        type="text"
+                                        class="form-control"
+                                        data-preferences-two-factor-key="label"
+                                        name="two_factor_methods[<?= (int) $index ?>][label]"
+                                        value="<?= e($methodLabel) ?>"
+                                        placeholder="<?= e($methodLabelPlaceholder) ?>"
+                                    >
+                                </div>
+                                <div class="col-md-5" data-preferences-two-factor-section="totp"<?= $methodType === 'totp' ? '' : ' style="display:none;"' ?>>
+                                    <label class="form-label">TOTP Secret / Confirm Code</label>
+                                    <div class="input-group">
+                                        <input
+                                            type="text"
+                                            class="form-control"
+                                            data-preferences-two-factor-key="secret"
+                                            name="two_factor_methods[<?= (int) $index ?>][secret]"
+                                            value="<?= e($methodSecret) ?>"
+                                            placeholder="TOTP secret (auto if blank)"
+                                        >
+                                        <input
+                                            type="text"
+                                            class="form-control"
+                                            data-preferences-two-factor-key="verification_code"
+                                            name="two_factor_methods[<?= (int) $index ?>][verification_code]"
+                                            value=""
+                                            placeholder="6-digit code"
+                                        >
+                                    </div>
+                                </div>
+                                <div class="col-md-5" data-preferences-two-factor-section="webauthn"<?= $methodType === 'webauthn' ? '' : ' style="display:none;"' ?>>
+                                    <label class="form-label">Credential ID</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <input
+                                                class="form-check-input mt-0 me-2"
+                                                type="checkbox"
+                                                data-preferences-two-factor-key="require_uv"
+                                                name="two_factor_methods[<?= (int) $index ?>][require_uv]"
+                                                value="1"
+                                                <?= $methodRequireUv ? ' checked' : '' ?>
+                                                aria-label="Require PIN/Biometric?"
+                                            >
+                                            <span class="small">PIN/Bio</span>
+                                        </span>
+                                        <input
+                                            type="text"
+                                            class="form-control"
+                                            data-preferences-two-factor-key="credential_id"
+                                            name="two_factor_methods[<?= (int) $index ?>][credential_id]"
+                                            value="<?= e($methodCredentialId) ?>"
+                                            placeholder="Pair a security key to populate this"
+                                        >
+                                        <button type="button" class="btn btn-primary" data-preferences-two-factor-webauthn-register="1">
+                                            <?= $methodStatus === 'confirmed' ? 'Re-pair Security Key' : 'Pair Security Key' ?>
+                                        </button>
+                                    </div>
+                                    <div class="small d-none" data-preferences-two-factor-webauthn-feedback="1"></div>
+                                    <input
+                                        type="hidden"
+                                        data-preferences-two-factor-key="credential_public_key"
+                                        name="two_factor_methods[<?= (int) $index ?>][credential_public_key]"
+                                        value="<?= e($methodCredentialPublicKey) ?>"
+                                    >
+                                    <input
+                                        type="hidden"
+                                        data-preferences-two-factor-key="signature_counter"
+                                        name="two_factor_methods[<?= (int) $index ?>][signature_counter]"
+                                        value="<?= (int) $methodSignatureCounter ?>"
+                                    >
+                                </div>
+                                <div class="col-md-5" data-preferences-two-factor-section="email"<?= $methodType === 'email' ? '' : ' style="display:none;"' ?>>
+                                    <label class="form-label">Target Email</label>
+                                    <input
+                                        type="email"
+                                        class="form-control"
+                                        data-preferences-two-factor-key="target_email"
+                                        name="two_factor_methods[<?= (int) $index ?>][target_email]"
+                                        value="<?= e($methodEmail) ?>"
+                                        placeholder="Defaults to account email if blank"
+                                    >
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end justify-content-md-end">
+                                    <button type="button" class="btn btn-danger" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <button type="button" class="btn btn-primary" id="preferences-two-factor-add">Add 2FA Method</button>
             </div>
         </div>
     </div>

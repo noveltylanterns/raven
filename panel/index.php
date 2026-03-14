@@ -315,7 +315,7 @@ $syncPanelIdentity = static function () use ($app): void {
 };
 
 /**
- * Returns true when current request targets direct panel root/login paths.
+ * Returns true when current request targets direct panel auth entry paths.
  */
 $isGuestPanelLoginEntryInternalPath = static function () use ($internalPath): bool {
     $path = '/' . ltrim($internalPath, '/');
@@ -323,7 +323,7 @@ $isGuestPanelLoginEntryInternalPath = static function () use ($internalPath): bo
         $path = rtrim($path, '/');
     }
 
-    return in_array($path, ['/', '/login'], true);
+    return in_array($path, ['/', '/login', '/login/2fa'], true);
 };
 
 /**
@@ -346,6 +346,21 @@ $requirePanelLoginForExtension = static function () use (
     }
 
     if (!$app['auth']->canAccessPanel()) {
+        $app['auth']->logout();
+        if ($isGuestPanelLoginEntryInternalPath()) {
+            redirect($panelUrl('/login'));
+        }
+
+        $panelController->renderPublicNotFound();
+        exit;
+    }
+
+    $userId = $app['auth']->userId();
+    if ($userId !== null && !$app['auth']->isTwoFactorVerifiedForUser($userId)) {
+        if ($app['auth']->pendingTwoFactorUserId() === $userId) {
+            redirect($panelUrl('/login/2fa'));
+        }
+
         $app['auth']->logout();
         if ($isGuestPanelLoginEntryInternalPath()) {
             redirect($panelUrl('/login'));
@@ -541,6 +556,26 @@ $router->add('GET', '/login', static function () use ($authController): void {
 
 $router->add('POST', '/login', static function () use ($authController): void {
     $authController->login($_POST);
+});
+
+$router->add('GET', '/login/2fa', static function () use ($authController): void {
+    $authController->showLoginTwoFactor();
+});
+
+$router->add('POST', '/login/2fa', static function () use ($authController): void {
+    $authController->loginTwoFactor($_POST);
+});
+
+$router->add('POST', '/login/2fa/select', static function () use ($authController): void {
+    $authController->loginTwoFactorSelect($_POST);
+});
+
+$router->add('POST', '/login/2fa/webauthn/options', static function () use ($authController): void {
+    $authController->loginTwoFactorWebauthnOptions($_POST);
+});
+
+$router->add('POST', '/login/2fa/webauthn/verify', static function () use ($authController): void {
+    $authController->loginTwoFactorWebauthnVerify($_POST);
 });
 
 $router->add('POST', '/logout', static function () use ($authController): void {
@@ -793,6 +828,14 @@ $router->add('GET', '/preferences', static function () use ($panelController): v
 
 $router->add('POST', '/preferences/save', static function () use ($panelController): void {
     $panelController->preferencesSave($_POST, $_FILES);
+});
+
+$router->add('POST', '/preferences/2fa/webauthn/options', static function () use ($panelController): void {
+    $panelController->preferencesWebauthnCreateOptions($_POST);
+});
+
+$router->add('POST', '/preferences/2fa/webauthn/register', static function () use ($panelController): void {
+    $panelController->preferencesWebauthnRegister($_POST);
 });
 
 // Configuration routes.

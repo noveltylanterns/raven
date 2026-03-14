@@ -31,8 +31,11 @@
         }
     ],
     "require": {
+        "bacon/bacon-qr-code": "^3.0",
         "php": "^8.5",
         "delight-im/auth": "^8.3",
+        "lbuchs/webauthn": "^2.1",
+        "robthree/twofactorauth": "^2.0",
         "tinymce/tinymce": "^7.9",
         "tualo/easymde": "^1.0",
         "twbs/bootstrap": "^5.3",

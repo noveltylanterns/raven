@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Auth;
 
 use PDO;
+use RobThree\Auth\TwoFactorAuth;
 use RuntimeException;
 
 /**
@@ -62,10 +63,15 @@ final class AuthService
      *   email: string,
      *   theme: string,
      *   avatar_path: string|null,
-     *   contact_profiles: array<int, array{type: string, value: string}>
+     *   contact_profiles: array<int, array{type: string, value: string}>,
+     *   two_factor_methods: array<int, array<string, mixed>>
      * }|null>
      */
     private array $userPreferencesCache = [];
+
+    private const SESSION_2FA_PENDING_USER_ID = '_raven_2fa_pending_user_id';
+    private const SESSION_2FA_PENDING_METHODS = '_raven_2fa_pending_methods';
+    private const SESSION_2FA_VERIFIED_USER_ID = '_raven_2fa_verified_user_id';
 
     public function __construct(PDO $authDb, PDO $appDb, string $driver, string $prefix)
     {
@@ -427,6 +433,7 @@ final class AuthService
         $this->auth->logOut();
         // Clear panel identity cache used by shared layout headings.
         unset($_SESSION['rvn-panel-identity']);
+        $this->clearTwoFactorSessionState();
         $this->clearPermissionCaches();
     }
 
@@ -449,6 +456,253 @@ final class AuthService
 
         $userId = (int) $this->auth->getUserId();
         return $userId > 0 ? $userId : null;
+    }
+
+    /**
+     * Returns true when current session has passed interactive 2FA requirements.
+     */
+    public function isTwoFactorVerifiedForUser(?int $userId = null): bool
+    {
+        $userId ??= $this->userId();
+        if ($userId === null) {
+            return false;
+        }
+
+        if (!$this->hasInteractiveTwoFactorMethod($userId)) {
+            return true;
+        }
+
+        return (int) ($_SESSION[self::SESSION_2FA_VERIFIED_USER_ID] ?? 0) === $userId;
+    }
+
+    /**
+     * Starts one interactive 2FA challenge after successful password auth.
+     *
+     * @param array<int, array<string, mixed>> $methods
+     */
+    public function beginTwoFactorChallenge(int $userId, array $methods): void
+    {
+        if ($userId <= 0) {
+            return;
+        }
+
+        $_SESSION[self::SESSION_2FA_PENDING_USER_ID] = $userId;
+        $_SESSION[self::SESSION_2FA_PENDING_METHODS] = $methods;
+        unset($_SESSION[self::SESSION_2FA_VERIFIED_USER_ID]);
+    }
+
+    /**
+     * Marks current session as 2FA-verified for one user.
+     */
+    public function markTwoFactorVerified(int $userId): void
+    {
+        if ($userId <= 0) {
+            return;
+        }
+
+        unset($_SESSION[self::SESSION_2FA_PENDING_USER_ID], $_SESSION[self::SESSION_2FA_PENDING_METHODS]);
+        $_SESSION[self::SESSION_2FA_VERIFIED_USER_ID] = $userId;
+    }
+
+    /**
+     * Returns pending 2FA challenge user id.
+     */
+    public function pendingTwoFactorUserId(): ?int
+    {
+        $pendingUserId = (int) ($_SESSION[self::SESSION_2FA_PENDING_USER_ID] ?? 0);
+        return $pendingUserId > 0 ? $pendingUserId : null;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function pendingTwoFactorMethods(): array
+    {
+        $raw = $_SESSION[self::SESSION_2FA_PENDING_METHODS] ?? null;
+        return is_array($raw) ? array_values($raw) : [];
+    }
+
+    public function clearTwoFactorChallenge(): void
+    {
+        unset($_SESSION[self::SESSION_2FA_PENDING_USER_ID], $_SESSION[self::SESSION_2FA_PENDING_METHODS]);
+    }
+
+    /**
+     * Returns only interactive methods that can currently be challenged.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function interactiveTwoFactorMethodsForUser(int $userId): array
+    {
+        $preferences = $this->userPreferences($userId);
+        if (!is_array($preferences)) {
+            return [];
+        }
+
+        $methods = is_array($preferences['two_factor_methods'] ?? null)
+            ? $preferences['two_factor_methods']
+            : [];
+        $interactive = [];
+        foreach ($methods as $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            $type = strtolower(trim((string) ($method['type'] ?? '')));
+            $status = strtolower(trim((string) ($method['status'] ?? '')));
+            if ($type === 'totp') {
+                if ($status !== 'confirmed') {
+                    continue;
+                }
+
+                $secret = strtoupper(trim((string) ($method['secret'] ?? '')));
+                if ($secret === '' || preg_match('/^[A-Z2-7]{16,128}$/', $secret) !== 1) {
+                    continue;
+                }
+
+                $interactive[] = [
+                    'type' => 'totp',
+                    'key' => 'totp:' . sha1($secret),
+                    'label' => trim((string) ($method['label'] ?? 'Authenticator App')),
+                ];
+                continue;
+            }
+
+            if ($type === 'webauthn') {
+                if ($status !== 'confirmed') {
+                    continue;
+                }
+
+                $credentialId = trim((string) ($method['credential_id'] ?? ''));
+                $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
+                if ($credentialId === '' || $credentialPublicKey === '') {
+                    continue;
+                }
+
+                $requireUv = (bool) ($method['require_uv'] ?? false);
+
+                $interactive[] = [
+                    'type' => 'webauthn',
+                    'key' => 'webauthn:' . $credentialId,
+                    'label' => trim((string) ($method['label'] ?? 'Security Key')),
+                    'credential_id' => $credentialId,
+                    'require_uv' => $requireUv,
+                ];
+            }
+        }
+
+        return $interactive;
+    }
+
+    /**
+     * Verifies one submitted TOTP code for pending 2FA session.
+     */
+    public function verifyPendingTotpCode(string $submittedCode): bool
+    {
+        $pendingUserId = $this->pendingTwoFactorUserId();
+        if ($pendingUserId === null) {
+            return false;
+        }
+
+        $submittedCode = trim($submittedCode);
+        if (preg_match('/^\d{6,8}$/', $submittedCode) !== 1) {
+            return false;
+        }
+
+        if (!class_exists(TwoFactorAuth::class)) {
+            return false;
+        }
+
+        $preferences = $this->userPreferences($pendingUserId);
+        if (!is_array($preferences)) {
+            return false;
+        }
+
+        $methods = is_array($preferences['two_factor_methods'] ?? null)
+            ? $preferences['two_factor_methods']
+            : [];
+        $authenticator = new TwoFactorAuth('Raven CMS');
+        foreach ($methods as $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            $type = strtolower(trim((string) ($method['type'] ?? '')));
+            $status = strtolower(trim((string) ($method['status'] ?? '')));
+            $secret = strtoupper(trim((string) ($method['secret'] ?? '')));
+            if ($type !== 'totp' || $status !== 'confirmed' || $secret === '') {
+                continue;
+            }
+
+            if ($authenticator->verifyCode($secret, $submittedCode, 1)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array{ok: bool, errors: array<int, string>}
+     */
+    public function updateUserTwoFactorMethods(int $userId, array $methods): array
+    {
+        if ($userId <= 0) {
+            return ['ok' => false, 'errors' => ['Invalid user id.']];
+        }
+
+        $normalized = $this->normalizeTwoFactorMethods($methods);
+        $encoded = $this->encodeTwoFactorMethods($normalized);
+
+        $stmt = $this->authDb->prepare(
+            'UPDATE ' . $this->authTable('users') . '
+             SET two_factor_methods = :two_factor_methods
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            ':two_factor_methods' => $encoded,
+            ':id' => $userId,
+        ]);
+
+        unset($this->userPreferencesCache[$userId]);
+        return ['ok' => true, 'errors' => []];
+    }
+
+    public function updateWebauthnSignatureCounter(int $userId, string $credentialId, int $signatureCounter): void
+    {
+        if ($userId <= 0 || $credentialId === '' || $signatureCounter < 0) {
+            return;
+        }
+
+        $preferences = $this->userPreferences($userId);
+        if (!is_array($preferences)) {
+            return;
+        }
+
+        $methods = is_array($preferences['two_factor_methods'] ?? null)
+            ? $preferences['two_factor_methods']
+            : [];
+        $updated = false;
+        foreach ($methods as $index => $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            if (
+                strtolower(trim((string) ($method['type'] ?? ''))) === 'webauthn'
+                && trim((string) ($method['credential_id'] ?? '')) === $credentialId
+            ) {
+                $methods[$index]['signature_counter'] = $signatureCounter;
+                $updated = true;
+                break;
+            }
+        }
+
+        if (!$updated) {
+            return;
+        }
+
+        $this->updateUserTwoFactorMethods($userId, $methods);
     }
 
     /**
@@ -491,7 +745,8 @@ final class AuthService
      *   email: string,
      *   theme: string,
      *   avatar_path: string|null,
-     *   contact_profiles: array<int, array{type: string, value: string}>
+     *   contact_profiles: array<int, array{type: string, value: string}>,
+     *   two_factor_methods: array<int, array<string, mixed>>
      * }|null
      */
     public function userPreferences(int $userId): ?array
@@ -501,7 +756,7 @@ final class AuthService
         }
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, display_name, email, theme, avatar_path, contact_profiles
+            'SELECT id, username, display_name, email, theme, avatar_path, contact_profiles, two_factor_methods
              FROM ' . $this->authTable('users') . '
              WHERE id = :id
              LIMIT 1'
@@ -526,6 +781,7 @@ final class AuthService
                 ? (string) $row['avatar_path']
                 : null,
             'contact_profiles' => $this->decodeContactProfiles($row['contact_profiles'] ?? null),
+            'two_factor_methods' => $this->decodeTwoFactorMethods($row['two_factor_methods'] ?? null),
         ];
 
         if ($userId > 0) {
@@ -545,6 +801,7 @@ final class AuthService
      *   theme: string,
      *   password: string|null,
      *   contact_profiles?: array<int, array{type: string, value: string}>,
+     *   two_factor_methods?: array<int, array<string, mixed>>,
      *   set_avatar: bool,
      *   avatar_path: string|null
      * } $payload
@@ -560,6 +817,8 @@ final class AuthService
         $password = $payload['password'] ?? null;
         $contactProfiles = $this->normalizeContactProfiles((array) ($payload['contact_profiles'] ?? []));
         $contactProfilesEncoded = $this->encodeContactProfiles($contactProfiles);
+        $twoFactorMethods = $this->normalizeTwoFactorMethods((array) ($payload['two_factor_methods'] ?? []));
+        $twoFactorMethodsEncoded = $this->encodeTwoFactorMethods($twoFactorMethods);
         $setAvatar = (bool) ($payload['set_avatar'] ?? false);
         $avatarPath = $payload['avatar_path'] ?? null;
 
@@ -591,6 +850,7 @@ final class AuthService
             'email = :email',
             'theme = :theme',
             'contact_profiles = :contact_profiles',
+            'two_factor_methods = :two_factor_methods',
         ];
 
         $params = [
@@ -599,6 +859,7 @@ final class AuthService
             ':email' => $email,
             ':theme' => $theme,
             ':contact_profiles' => $contactProfilesEncoded,
+            ':two_factor_methods' => $twoFactorMethodsEncoded,
             ':id' => $userId,
         ];
 
@@ -665,6 +926,153 @@ final class AuthService
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * @param mixed $raw
+     * @return array<int, array<string, mixed>>
+     */
+    private function decodeTwoFactorMethods(mixed $raw): array
+    {
+        if (!is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+
+        try {
+            /** @var mixed $decoded */
+            $decoded = json_decode($raw, true, 64, JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        return $this->normalizeTwoFactorMethods($decoded);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $methods
+     */
+    private function encodeTwoFactorMethods(array $methods): ?string
+    {
+        if ($methods === []) {
+            return null;
+        }
+
+        try {
+            return json_encode($methods, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @param array<int, mixed> $methods
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeTwoFactorMethods(array $methods): array
+    {
+        $normalized = [];
+        foreach ($methods as $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            $type = strtolower(trim((string) ($method['type'] ?? '')));
+            if (!in_array($type, ['totp', 'webauthn', 'email'], true)) {
+                continue;
+            }
+
+            $label = trim((string) ($method['label'] ?? ''));
+            if ($label === '') {
+                $label = match ($type) {
+                    'totp' => 'Authenticator App',
+                    'webauthn' => 'Security Key',
+                    default => 'Email Code',
+                };
+            }
+            if (mb_strlen($label) > 80) {
+                $label = mb_substr($label, 0, 80);
+            }
+
+            $status = strtolower(trim((string) ($method['status'] ?? '')));
+            if (!in_array($status, ['pending', 'confirmed', 'stub'], true)) {
+                $status = $type === 'totp' ? 'pending' : 'stub';
+            }
+
+            $addedAt = trim((string) ($method['added_at'] ?? ''));
+            if ($addedAt === '') {
+                $addedAt = gmdate('Y-m-d H:i:s');
+            }
+
+            $row = [
+                'type' => $type,
+                'label' => $label,
+                'status' => $status,
+                'added_at' => $addedAt,
+            ];
+
+            if ($type === 'totp') {
+                $secret = strtoupper(trim((string) ($method['secret'] ?? '')));
+                $secret = preg_replace('/[^A-Z2-7]/', '', $secret) ?? '';
+                if ($secret === '' || preg_match('/^[A-Z2-7]{16,128}$/', $secret) !== 1) {
+                    continue;
+                }
+
+                $row['secret'] = $secret;
+            } elseif ($type === 'webauthn') {
+                $credentialId = trim((string) ($method['credential_id'] ?? ''));
+                if ($credentialId !== '') {
+                    if (mb_strlen($credentialId) > 512) {
+                        $credentialId = mb_substr($credentialId, 0, 512);
+                    }
+
+                    $row['credential_id'] = $credentialId;
+                }
+
+                $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
+                if ($credentialPublicKey !== '') {
+                    if (mb_strlen($credentialPublicKey) > 4096) {
+                        $credentialPublicKey = mb_substr($credentialPublicKey, 0, 4096);
+                    }
+
+                    $row['credential_public_key'] = $credentialPublicKey;
+                }
+
+                $signatureCounter = (int) ($method['signature_counter'] ?? 0);
+                if ($signatureCounter < 0) {
+                    $signatureCounter = 0;
+                }
+                $row['signature_counter'] = $signatureCounter;
+
+                if (($row['credential_id'] ?? '') !== '' && ($row['credential_public_key'] ?? '') !== '') {
+                    $row['status'] = 'confirmed';
+                } else {
+                    $row['status'] = 'stub';
+                }
+
+                $row['require_uv'] = (bool) ($method['require_uv'] ?? false);
+            } else {
+                $email = trim((string) ($method['email'] ?? ''));
+                if ($email !== '') {
+                    if (mb_strlen($email) > 254) {
+                        $email = mb_substr($email, 0, 254);
+                    }
+
+                    $row['email'] = $email;
+                }
+            }
+
+            $dedupeKey = strtolower($type . "\n" . $label . "\n" . (string) ($row['secret'] ?? $row['credential_id'] ?? $row['email'] ?? ''));
+            $normalized[$dedupeKey] = $row;
+            if (count($normalized) >= 20) {
+                break;
+            }
+        }
+
+        return array_values($normalized);
     }
 
     /**
@@ -1094,6 +1502,20 @@ final class AuthService
         $this->permissionMaskForUserCache = [];
         $this->permissionMaskForGuestCache = null;
         $this->userPreferencesCache = [];
+    }
+
+    private function clearTwoFactorSessionState(): void
+    {
+        unset(
+            $_SESSION[self::SESSION_2FA_PENDING_USER_ID],
+            $_SESSION[self::SESSION_2FA_PENDING_METHODS],
+            $_SESSION[self::SESSION_2FA_VERIFIED_USER_ID]
+        );
+    }
+
+    private function hasInteractiveTwoFactorMethod(int $userId): bool
+    {
+        return $this->interactiveTwoFactorMethodsForUser($userId) !== [];
     }
 
     /**

@@ -27,6 +27,17 @@ Fields/options:
 - `Panel Theme` (`<Default>`, `Corporate`, `Ice`, `Midnight`)
 - `Avatar` file upload (`gif/jpg/jpeg/png`)
 - `Remove current avatar` checkbox (shown only when avatar exists)
+- `Two-Factor Methods` (Security tab)
+  - `Type` (`Authenticator App (TOTP)`, `Security Key (WebAuthn)`, `Email Code (Stub)`)
+  - `Label`
+  - `TOTP Secret / Confirm Code`
+  - `Scan QR`
+  - `Provisioning URI`
+  - `Credential ID`
+  - `Require PIN/Biometric?`
+  - `Pair Security Key`
+  - `Target Email`
+  - `Add 2FA Method`
 
 Behavior notes:
 
@@ -83,6 +94,7 @@ Declared in `panel/index.php`:
 - optional password hash update
 - theme update
 - optional avatar path update
+- `two_factor_methods` JSON persistence for multi-method 2FA entries
 
 Returned result shape:
 
@@ -107,3 +119,12 @@ When Preferences behavior changes, update this document in the same task. That i
 - `Add More Contact Information`
 - `Type`
 - `Value`
+- `Two-Factor Methods`
+- `Add 2FA Method`
+- `TOTP Secret / Confirm Code`
+- `Scan QR`
+- `Provisioning URI`
+- `Credential ID`
+- `Require PIN/Biometric?`
+- `Pair Security Key`
+- `Target Email`

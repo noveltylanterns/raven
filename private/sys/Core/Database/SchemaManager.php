@@ -1546,6 +1546,7 @@ final class SchemaManager
      * - theme: user theme preference
      * - avatar_path: local avatar filename under public/uploads/avatars
      * - contact_profiles: JSON-encoded contact rows for public profile rendering
+     * - two_factor_methods: JSON-encoded 2FA method rows for preferences/login
      */
     private function ensureAuthUserPreferenceColumns(PDO $db, string $driver, string $prefix): void
     {
@@ -1569,6 +1570,10 @@ final class SchemaManager
                 $db->exec('ALTER TABLE users ADD COLUMN contact_profiles TEXT NULL');
             }
 
+            if (!$this->authColumnExistsSqlite($db, $usersTable, 'two_factor_methods')) {
+                $db->exec('ALTER TABLE users ADD COLUMN two_factor_methods TEXT NULL');
+            }
+
             $db->exec("UPDATE users SET theme = 'default' WHERE theme IS NULL OR theme = ''");
             return;
         }
@@ -1590,6 +1595,10 @@ final class SchemaManager
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN contact_profiles TEXT NULL');
             }
 
+            if (!$this->authColumnExistsMySql($db, $usersTable, 'two_factor_methods')) {
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN two_factor_methods LONGTEXT NULL');
+            }
+
             $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
             return;
         }
@@ -1608,6 +1617,10 @@ final class SchemaManager
 
         if (!$this->authColumnExistsPgSql($db, $usersTable, 'contact_profiles')) {
             $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN contact_profiles TEXT NULL');
+        }
+
+        if (!$this->authColumnExistsPgSql($db, $usersTable, 'two_factor_methods')) {
+            $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN two_factor_methods TEXT NULL');
         }
 
         $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
