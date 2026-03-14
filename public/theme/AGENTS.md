@@ -1,6 +1,6 @@
 # Raven Theme System Agent Guide
 
-Last updated: 2026-03-05
+Last updated: 2026-03-14
 
 ## Scope
 - This file documents how Raven public theming works for all theme folders under `public/theme/`.
@@ -118,6 +118,7 @@ body { background: #fff; color: #212529; }
 - You can hand-write `css/style.css`, but the most update-proof and efficient approach is a single-entry `scss/style.scss` that compiles the full Bootstrap stack plus your overrides.
 - For most basic UI customization (type scale, spacing, colors, buttons, forms, utilities), the Sass pipeline is the preferred editing path.
 - `css/style.css` is a build artifact. Treat `scss/style.scss` (and partials) as source of truth, then recompile.
+- Never hand-edit `css/style.css` to mirror SCSS edits; compile from `scss/style.scss` so output always reflects the real Sass pipeline.
 - Preferred compiler: Dart Sass standalone CLI.
 - NPM-based Sass tooling is allowed, but adds Node/NPM dependency overhead and version drift risk; prefer the direct Dart Sass binary when possible.
 - Example compile command (Dart Sass CLI): `sass public/theme/{slug}/scss/style.scss public/theme/{slug}/css/style.css --style=expanded`.

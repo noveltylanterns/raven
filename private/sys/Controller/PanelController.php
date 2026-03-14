@@ -2164,6 +2164,15 @@ final class PanelController
         if (is_array($user)) {
             $normalizedTheme = $this->normalizePanelThemeChoice((string) ($user['theme'] ?? 'default'), true);
             $user['theme'] = $normalizedTheme ?? 'default';
+
+            if ($id !== null) {
+                $preferences = $this->auth->userPreferences($id);
+                $user['two_factor_methods'] = is_array($preferences['two_factor_methods'] ?? null)
+                    ? array_values((array) $preferences['two_factor_methods'])
+                    : [];
+            } else {
+                $user['two_factor_methods'] = [];
+            }
         }
         if ($id !== null && $user === null) {
             $this->flash('error', 'User not found.');
@@ -2177,6 +2186,7 @@ final class PanelController
             'userRow' => $user,
             'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
             'profileContactOptions' => $this->profileContactOptions(),
+            'twoFactorTypeOptions' => $this->twoFactorTypeOptions(),
             'profileRoutePrefix' => $this->profileRoutePrefix(),
             'profileRoutesEnabled' => $this->profileRoutesEnabledForRoutingTable(),
             'avatarUploadLimitsNote' => $this->avatarUploadLimitsNote(),
@@ -2228,14 +2238,28 @@ final class PanelController
         $password = $this->input->text($post['password'] ?? null, 255);
         $profileContactOptions = $this->profileContactOptions();
         $contactProfiles = $this->normalizeSubmittedContactProfiles($post['contact_profiles'] ?? null, $profileContactOptions);
+        $submittedTwoFactorMethodsPresent = isset($post['two_factor_methods_present'])
+            && (string) ($post['two_factor_methods_present'] ?? '') === '1';
+        $submittedTwoFactorMethods = $post['two_factor_methods'] ?? null;
+        $submittedTwoFactorMethodIndices = $this->normalizeSubmittedTwoFactorExistingIndices($submittedTwoFactorMethods);
         $removeAvatar = isset($post['remove_avatar']) && (string) $post['remove_avatar'] === '1';
 
         $existingUser = null;
+        $existingTwoFactorMethods = [];
+        $canUpdateTwoFactorMethods = false;
         if ($id !== null) {
             $existingUser = $this->users->findById($id);
             if ($existingUser === null) {
                 $this->flash('error', 'User not found.');
                 redirect($this->panelUrl('/users'));
+            }
+
+            $existingPreferences = $this->auth->userPreferences($id);
+            if (is_array($existingPreferences)) {
+                $existingTwoFactorMethods = is_array($existingPreferences['two_factor_methods'] ?? null)
+                    ? array_values($existingPreferences['two_factor_methods'])
+                    : [];
+                $canUpdateTwoFactorMethods = true;
             }
         }
 
@@ -2478,9 +2502,40 @@ final class PanelController
             redirect($editUrl);
         }
 
+        $twoFactorUpdateError = null;
+        if ($id !== null && $canUpdateTwoFactorMethods && $submittedTwoFactorMethodsPresent) {
+            $retainedTwoFactorMethods = [];
+            foreach ($submittedTwoFactorMethodIndices as $methodIndex) {
+                $method = $existingTwoFactorMethods[$methodIndex] ?? null;
+                if (!is_array($method)) {
+                    continue;
+                }
+
+                $retainedTwoFactorMethods[] = $method;
+            }
+
+            $twoFactorUpdate = $this->auth->updateUserTwoFactorMethods($savedId, $retainedTwoFactorMethods);
+            if (!(bool) ($twoFactorUpdate['ok'] ?? false)) {
+                $rawErrors = is_array($twoFactorUpdate['errors'] ?? null) ? $twoFactorUpdate['errors'] : [];
+                $messages = array_map(
+                    static fn (mixed $value): string => trim((string) $value),
+                    $rawErrors
+                );
+                $messages = array_values(array_filter($messages, static fn (string $value): bool => $value !== ''));
+                $twoFactorUpdateError = $messages !== []
+                    ? implode(' ', $messages)
+                    : 'User saved, but 2FA methods could not be updated.';
+            }
+        }
+
         // Remove old avatar when replaced/removed, while preserving current file.
         if ($avatarSet && is_string($currentAvatarPath) && $currentAvatarPath !== '' && $currentAvatarPath !== $avatarFilename) {
             $this->deleteAvatarFile($currentAvatarPath);
+        }
+
+        if ($twoFactorUpdateError !== null) {
+            $this->flash('error', $twoFactorUpdateError);
+            redirect($this->panelEditorUrlWithTab('/users/edit', $savedId, $activeTab, 'account'));
         }
 
         $this->flash('success', 'Changes saved.');
@@ -3178,6 +3233,66 @@ final class PanelController
 
         $this->flash('success', 'User preferences updated.');
         redirect($preferencesUrl);
+    }
+
+    /**
+     * Returns TOTP setup details (secret + URI + QR) for preferences flow.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function preferencesTotpSetup(array $post): void
+    {
+        $this->requirePanelLogin();
+
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
+            return;
+        }
+
+        $userId = $this->auth->userId();
+        if ($userId === null) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Login session expired.'], 401);
+            return;
+        }
+
+        $preferences = $this->auth->userPreferences($userId);
+        if (!is_array($preferences)) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Unable to load user preferences.'], 500);
+            return;
+        }
+
+        $secretRaw = strtoupper(trim((string) ($post['secret'] ?? '')));
+        $secret = preg_replace('/[^A-Z2-7]/', '', $secretRaw) ?? '';
+        if ($secret === '' || preg_match('/^[A-Z2-7]{16,128}$/', $secret) !== 1) {
+            $generatedSecret = $this->generateTotpSecret();
+            $secret = is_string($generatedSecret) ? $generatedSecret : '';
+        }
+
+        if ($secret === '' || preg_match('/^[A-Z2-7]{16,128}$/', $secret) !== 1) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Unable to generate a TOTP secret.'], 500);
+            return;
+        }
+
+        $accountEmail = (string) ($preferences['email'] ?? '');
+        $provisioningUri = $this->buildTotpProvisioningUri($accountEmail, $secret);
+        if ($provisioningUri === '') {
+            $this->jsonResponse(['ok' => false, 'message' => 'Unable to build TOTP provisioning data.'], 500);
+            return;
+        }
+
+        $accountAddress = $this->input->email($accountEmail);
+        if ($accountAddress === null) {
+            $accountAddress = 'account@local';
+        }
+
+        $this->jsonResponse([
+            'ok' => true,
+            'secret' => $secret,
+            'issuer' => $this->totpIssuer(),
+            'account' => $accountAddress,
+            'provisioning_uri' => $provisioningUri,
+            'qr_data_uri' => $this->buildQrDataUri($provisioningUri),
+        ], 200);
     }
 
     /**
@@ -11164,6 +11279,36 @@ MARKDOWN;
             'webauthn' => 'Security Key (WebAuthn)',
             'email' => 'Email Code (Stub)',
         ];
+    }
+
+    /**
+     * @param mixed $rawMethods
+     * @return array<int, int>
+     */
+    private function normalizeSubmittedTwoFactorExistingIndices(mixed $rawMethods): array
+    {
+        if (!is_array($rawMethods)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($rawMethods as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $existingIndex = $this->input->int($row['existing_index'] ?? null, 0, 1000);
+            if ($existingIndex === null) {
+                continue;
+            }
+
+            $normalized[$existingIndex] = $existingIndex;
+            if (count($normalized) >= 100) {
+                break;
+            }
+        }
+
+        return array_values($normalized);
     }
 
     /**

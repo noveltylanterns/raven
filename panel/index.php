@@ -830,6 +830,10 @@ $router->add('POST', '/preferences/save', static function () use ($panelControll
     $panelController->preferencesSave($_POST, $_FILES);
 });
 
+$router->add('POST', '/preferences/2fa/totp/setup', static function () use ($panelController): void {
+    $panelController->preferencesTotpSetup($_POST);
+});
+
 $router->add('POST', '/preferences/2fa/webauthn/options', static function () use ($panelController): void {
     $panelController->preferencesWebauthnCreateOptions($_POST);
 });

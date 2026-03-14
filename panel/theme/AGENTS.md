@@ -1,6 +1,6 @@
 # Raven Panel Theme Agent Guide
 
-Last updated: 2026-03-13
+Last updated: 2026-03-14
 
 ## Scope
 - This file documents admin-panel theming under `panel/theme/`.
@@ -47,9 +47,12 @@ Last updated: 2026-03-13
 ## Deterministic Panel Theme Build Recipe
 1. Start with `panel/theme/css/custom.css`.
 2. Add minimal scoped selectors and avoid editing `style.css`.
-3. Verify state variants: Corporate/Ice/Midnight body classes.
-4. Verify common UI surfaces: cards, forms, table headers, action buttons, sidebar/mobile nav.
-5. Only if Sass-level bootstrap variable changes are required, use `custom.scss -> custom.css`.
+3. If you changed `panel/theme/scss/style.scss`, compile with:
+   - `sass panel/theme/scss/style.scss panel/theme/css/style.css`
+4. Never hand-edit `panel/theme/css/style.css` to mirror SCSS changes; compile output instead.
+5. Verify state variants: Corporate/Ice/Midnight body classes.
+6. Verify common UI surfaces: cards, forms, table headers, action buttons, sidebar/mobile nav.
+7. Only if Sass-level bootstrap variable changes are required, use `custom.scss -> custom.css`.
 
 ## Canonical Minimal `custom.css`
 ```css

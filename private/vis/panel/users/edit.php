@@ -18,6 +18,7 @@
 /** @var bool $canAssignSuperAdmin */
 /** @var bool $canAssignConfigurationGroups */
 /** @var array<string, array{label: string, url_prefix: string}> $profileContactOptions */
+/** @var array<string, string> $twoFactorTypeOptions */
 /** @var array<int, string> $themeOptions */
 /** @var string $avatarUploadLimitsNote */
 /** @var string $csrfField */
@@ -52,6 +53,7 @@ $avatarThumbFilename = $avatarBase !== '' ? $avatarBase . '_thumb.jpg' : $avatar
 $avatarUrl = '/uploads/avatars/' . rawurlencode($avatarFilename);
 $avatarThumbUrl = '/uploads/avatars/' . rawurlencode($avatarThumbFilename);
 $profileContactOptions = is_array($profileContactOptions ?? null) ? $profileContactOptions : [];
+$twoFactorTypeOptions = is_array($twoFactorTypeOptions ?? null) ? $twoFactorTypeOptions : [];
 $contactProfilesRaw = is_array($userRow['contact_profiles'] ?? null) ? $userRow['contact_profiles'] : [];
 $contactProfiles = [];
 foreach ($contactProfilesRaw as $entry) {
@@ -72,6 +74,70 @@ foreach ($contactProfilesRaw as $entry) {
     $contactProfiles[] = [
         'type' => $type,
         'value' => $value,
+    ];
+}
+$twoFactorMethodsRaw = is_array($userRow['two_factor_methods'] ?? null) ? $userRow['two_factor_methods'] : [];
+$maskMiddle = static function (string $value, int $edgeChars = 10): string {
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+
+    if (mb_strlen($value) <= ($edgeChars * 2) + 3) {
+        return $value;
+    }
+
+    return mb_substr($value, 0, $edgeChars) . '...' . mb_substr($value, -$edgeChars);
+};
+$twoFactorMethods = [];
+foreach ($twoFactorMethodsRaw as $methodIndex => $methodRow) {
+    if (!is_array($methodRow)) {
+        continue;
+    }
+
+    $methodType = strtolower(trim((string) ($methodRow['type'] ?? '')));
+    if (!in_array($methodType, ['totp', 'webauthn', 'email'], true)) {
+        continue;
+    }
+
+    $methodLabel = trim((string) ($methodRow['label'] ?? ''));
+    if ($methodLabel === '') {
+        $methodLabel = match ($methodType) {
+            'totp' => 'Authenticator App',
+            'webauthn' => 'Security Key',
+            default => 'Email Code',
+        };
+    }
+
+    $methodStatus = strtolower(trim((string) ($methodRow['status'] ?? '')));
+    if (!in_array($methodStatus, ['pending', 'confirmed', 'stub'], true)) {
+        $methodStatus = $methodType === 'totp' ? 'pending' : 'stub';
+    }
+
+    $methodDetail = '';
+    if ($methodType === 'webauthn') {
+        $credentialId = trim((string) ($methodRow['credential_id'] ?? ''));
+        if ($credentialId !== '') {
+            $methodDetail = 'Credential: ' . $maskMiddle($credentialId);
+        }
+
+        if ((bool) ($methodRow['require_uv'] ?? false)) {
+            $methodDetail .= ($methodDetail !== '' ? ' ' : '') . '(PIN/Bio)';
+        }
+    } elseif ($methodType === 'email') {
+        $targetEmail = trim((string) ($methodRow['email'] ?? $methodRow['target_email'] ?? ''));
+        if ($targetEmail !== '') {
+            $methodDetail = $targetEmail;
+        }
+    }
+
+    $twoFactorMethods[] = [
+        'existing_index' => (int) $methodIndex,
+        'type' => $methodType,
+        'type_label' => (string) ($twoFactorTypeOptions[$methodType] ?? strtoupper($methodType)),
+        'label' => $methodLabel,
+        'status' => ucfirst($methodStatus),
+        'detail' => $methodDetail,
     ];
 }
 $normalizedDomain = trim((string) ($site['domain'] ?? ''));
@@ -247,6 +313,56 @@ $themeLabels = [
                     <?php endforeach; ?>
                 </select>
                 <div class="form-text"><code>&lt;Default&gt;</code> follows the system's configured default admin theme.</div>
+            </div>
+
+            <div class="form-group mt-3 mb-0">
+                <label class="form-label h3 d-block">Two-Factor Methods</label>
+                <p class="text-muted mb-2">Admins can remove methods here to recover locked-out users.</p>
+                <?php if ($hasPersistedUser): ?>
+                    <input type="hidden" name="two_factor_methods_present" value="1">
+                <?php endif; ?>
+                <?php if (!$hasPersistedUser): ?>
+                    <div class="form-text text-muted">Save this user first to manage 2FA methods.</div>
+                <?php elseif ($twoFactorMethods === []): ?>
+                    <div class="form-text text-muted">No 2FA methods are currently configured.</div>
+                <?php else: ?>
+                    <div id="user-two-factor-methods-list">
+                        <?php foreach ($twoFactorMethods as $index => $method): ?>
+                            <?php
+                            $methodTypeLabel = trim((string) ($method['type_label'] ?? ''));
+                            $methodLabel = trim((string) ($method['label'] ?? ''));
+                            $methodStatus = trim((string) ($method['status'] ?? ''));
+                            $methodDetail = trim((string) ($method['detail'] ?? ''));
+                            $methodDescription = trim($methodStatus . ($methodDetail !== '' ? ' | ' . $methodDetail : ''));
+                            ?>
+                            <div class="border rounded p-2 mb-2" data-preferences-two-factor-row="1" data-user-two-factor-row="1">
+                                <input
+                                    type="hidden"
+                                    data-user-two-factor-key="existing_index"
+                                    name="two_factor_methods[<?= (int) $index ?>][existing_index]"
+                                    value="<?= (int) ($method['existing_index'] ?? 0) ?>"
+                                >
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Type</label>
+                                        <input type="text" class="form-control" value="<?= e($methodTypeLabel) ?>" readonly>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Label</label>
+                                        <input type="text" class="form-control" value="<?= e($methodLabel) ?>" readonly>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Details</label>
+                                        <input type="text" class="form-control" value="<?= e($methodDescription) ?>" placeholder="Configured method" readonly>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end justify-content-md-end">
+                                        <button type="button" class="btn btn-danger" data-user-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -523,3 +639,48 @@ $themeLabels = [
   })();
 </script>
 <?php endif; ?>
+
+<script>
+  (function () {
+    var list = document.getElementById('user-two-factor-methods-list');
+    if (!(list instanceof HTMLElement)) {
+      return;
+    }
+
+    function reindexRows() {
+      var rows = list.querySelectorAll('[data-user-two-factor-row="1"]');
+      rows.forEach(function (row, index) {
+        if (!(row instanceof HTMLElement)) {
+          return;
+        }
+
+        var indexField = row.querySelector('[data-user-two-factor-key="existing_index"]');
+        if (indexField instanceof HTMLInputElement) {
+          indexField.name = 'two_factor_methods[' + index + '][existing_index]';
+        }
+      });
+    }
+
+    list.addEventListener('click', function (event) {
+      var target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      var removeButton = target.closest('[data-user-two-factor-remove="1"]');
+      if (!(removeButton instanceof HTMLElement)) {
+        return;
+      }
+
+      var row = removeButton.closest('[data-user-two-factor-row="1"]');
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      row.remove();
+      reindexRows();
+    });
+
+    reindexRows();
+  })();
+</script>

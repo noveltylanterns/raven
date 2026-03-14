@@ -117,8 +117,13 @@ $themeLabels = [
 <?php endif; ?>
 
 <template id="preferences-two-factor-template">
-    <div class="border rounded p-2 mb-2" data-preferences-two-factor-row="1">
-        <div class="row g-2 align-items-end">
+    <div
+        class="border rounded p-2 mb-2"
+        data-preferences-two-factor-row="1"
+        data-preferences-totp-provisioning-uri=""
+        data-preferences-totp-qr-data-uri=""
+    >
+        <div class="row g-2 align-items-end pb-4">
             <div class="col-md-2">
                 <label class="form-label">Type</label>
                 <select class="form-select" data-preferences-two-factor-key="type">
@@ -132,14 +137,16 @@ $themeLabels = [
                 <label class="form-label">Label</label>
                 <input type="text" class="form-control" data-preferences-two-factor-key="label" placeholder="My Authenticator / Office Key">
             </div>
-            <div class="col-md-5" data-preferences-two-factor-section="totp" style="display:none;">
+            <div class="col-md position-relative" data-preferences-two-factor-section="totp" style="display:none;">
                 <label class="form-label">TOTP Secret / Confirm Code</label>
                 <div class="input-group">
                     <input type="text" class="form-control" data-preferences-two-factor-key="secret" placeholder="TOTP secret (auto if blank)">
                     <input type="text" class="form-control" data-preferences-two-factor-key="verification_code" placeholder="6-digit code">
+                    <button type="button" class="btn btn-outline-secondary" data-preferences-two-factor-totp-setup="1">Setup TOTP</button>
                 </div>
+                <div class="small text-muted d-none position-absolute start-0 end-0" style="top:calc(100% + 0.2rem);" data-preferences-two-factor-totp-feedback="1"></div>
             </div>
-            <div class="col-md-5" data-preferences-two-factor-section="webauthn" style="display:none;">
+            <div class="col-md position-relative" data-preferences-two-factor-section="webauthn" style="display:none;">
                 <label class="form-label">Credential ID</label>
                 <div class="input-group">
                     <span class="input-group-text">
@@ -149,20 +156,76 @@ $themeLabels = [
                     <input type="text" class="form-control" data-preferences-two-factor-key="credential_id" placeholder="Pair a security key to populate this">
                     <button type="button" class="btn btn-primary" data-preferences-two-factor-webauthn-register="1">Pair Security Key</button>
                 </div>
-                <div class="small d-none" data-preferences-two-factor-webauthn-feedback="1"></div>
+                <div class="small d-none position-absolute start-0 end-0" style="top:calc(100% + 0.2rem);" data-preferences-two-factor-webauthn-feedback="1"></div>
                 <input type="hidden" data-preferences-two-factor-key="credential_public_key" value="">
                 <input type="hidden" data-preferences-two-factor-key="signature_counter" value="0">
             </div>
-            <div class="col-md-5" data-preferences-two-factor-section="email" style="display:none;">
+            <div class="col-md" data-preferences-two-factor-section="email" style="display:none;">
                 <label class="form-label">Target Email</label>
                 <input type="email" class="form-control" data-preferences-two-factor-key="target_email" placeholder="Defaults to account email if blank">
             </div>
-            <div class="col-md-2 d-flex align-items-end justify-content-md-end">
+            <div class="col-auto ps-md-0 d-flex align-items-end">
                 <button type="button" class="btn btn-danger" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
             </div>
         </div>
     </div>
 </template>
+<div class="modal fade" id="preferences-totp-setup-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5">TOTP Setup</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ol class="mb-3 ps-3">
+                    <li>Scan the QR code with your authenticator app.</li>
+                    <li>If scan is unavailable, enter the manual key.</li>
+                    <li>Enter the app's 6-digit code in this row, then save preferences.</li>
+                </ol>
+
+                <div class="text-center mb-3">
+                    <img
+                        src=""
+                        alt="TOTP QR Code"
+                        class="img-fluid border rounded p-2"
+                        style="max-width: 220px;"
+                        data-preferences-totp-modal-qr="1"
+                    >
+                    <div class="small text-muted mt-2" data-preferences-totp-modal-qr-empty="1" style="display:none;">
+                        QR image is unavailable in this environment. Use the manual key below.
+                    </div>
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Manual Key</label>
+                    <code
+                        class="d-block small border rounded p-2 text-break"
+                        style="cursor: copy;"
+                        title="Click to copy"
+                        role="button"
+                        tabindex="0"
+                        data-preferences-totp-modal-secret="1"
+                    ></code>
+                    <div class="small text-muted mt-1" data-preferences-totp-modal-secret-copy="1">Click to copy.</div>
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label">Provisioning URI</label>
+                    <code
+                        class="d-block small border rounded p-2 text-break"
+                        style="cursor: copy; max-height: 6.5rem; overflow: auto;"
+                        title="Click to copy"
+                        role="button"
+                        tabindex="0"
+                        data-preferences-totp-modal-uri="1"
+                    ></code>
+                    <div class="small text-muted mt-1" data-preferences-totp-modal-uri-copy="1">Click to copy.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     var list = document.getElementById('preferences-two-factor-methods-list');
@@ -174,6 +237,23 @@ $themeLabels = [
     }
 
     var panelBase = <?= json_encode($panelBase, JSON_UNESCAPED_SLASHES) ?>;
+    var totpModalEl = document.getElementById('preferences-totp-setup-modal');
+    var totpModalQr = totpModalEl instanceof HTMLElement ? totpModalEl.querySelector('[data-preferences-totp-modal-qr="1"]') : null;
+    var totpModalQrEmpty = totpModalEl instanceof HTMLElement ? totpModalEl.querySelector('[data-preferences-totp-modal-qr-empty="1"]') : null;
+    var totpModalSecret = totpModalEl instanceof HTMLElement ? totpModalEl.querySelector('[data-preferences-totp-modal-secret="1"]') : null;
+    var totpModalUri = totpModalEl instanceof HTMLElement ? totpModalEl.querySelector('[data-preferences-totp-modal-uri="1"]') : null;
+    var totpModalSecretCopy = totpModalEl instanceof HTMLElement ? totpModalEl.querySelector('[data-preferences-totp-modal-secret-copy="1"]') : null;
+    var totpModalUriCopy = totpModalEl instanceof HTMLElement ? totpModalEl.querySelector('[data-preferences-totp-modal-uri-copy="1"]') : null;
+    var totpModal = null;
+
+    if (
+      totpModalEl instanceof HTMLElement
+      && typeof window.bootstrap !== 'undefined'
+      && window.bootstrap
+      && typeof window.bootstrap.Modal === 'function'
+    ) {
+      totpModal = new window.bootstrap.Modal(totpModalEl);
+    }
 
     function sectionVisible(row, sectionType, visible) {
       var section = row.querySelector('[data-preferences-two-factor-section="' + sectionType + '"]');
@@ -251,6 +331,134 @@ $themeLabels = [
       reindexRows();
     }
 
+    function setTotpFeedback(row, message, level) {
+      var feedback = row.querySelector('[data-preferences-two-factor-totp-feedback="1"]');
+      if (!(feedback instanceof HTMLElement)) {
+        return;
+      }
+
+      var text = String(message || '').trim();
+      feedback.classList.remove('d-none', 'text-danger', 'text-success', 'text-muted');
+      if (text === '') {
+        feedback.textContent = '';
+        feedback.classList.add('d-none');
+        return;
+      }
+
+      if (level === 'error') {
+        feedback.classList.add('text-danger');
+      } else if (level === 'success') {
+        feedback.classList.add('text-success');
+      } else {
+        feedback.classList.add('text-muted');
+      }
+      feedback.textContent = text;
+    }
+
+    function showTotpSetupModal(payload) {
+      var secret = String(payload && payload.secret ? payload.secret : '').trim();
+      var provisioningUri = String(payload && payload.provisioning_uri ? payload.provisioning_uri : '').trim();
+      var qrDataUri = String(payload && payload.qr_data_uri ? payload.qr_data_uri : '').trim();
+
+      if (totpModalSecret instanceof HTMLElement) {
+        totpModalSecret.textContent = secret;
+      }
+      if (totpModalUri instanceof HTMLElement) {
+        totpModalUri.textContent = provisioningUri;
+      }
+      if (totpModalSecretCopy instanceof HTMLElement) {
+        totpModalSecretCopy.textContent = 'Click to copy.';
+      }
+      if (totpModalUriCopy instanceof HTMLElement) {
+        totpModalUriCopy.textContent = 'Click to copy.';
+      }
+
+      if (totpModalQr instanceof HTMLImageElement) {
+        if (qrDataUri !== '') {
+          totpModalQr.src = qrDataUri;
+          totpModalQr.style.display = '';
+        } else {
+          totpModalQr.removeAttribute('src');
+          totpModalQr.style.display = 'none';
+        }
+      }
+
+      if (totpModalQrEmpty instanceof HTMLElement) {
+        totpModalQrEmpty.style.display = qrDataUri === '' ? '' : 'none';
+      }
+
+      if (totpModal !== null) {
+        totpModal.show();
+        return;
+      }
+
+      window.alert(
+        'Manual setup key: ' + secret + '\n\nProvisioning URI:\n' + provisioningUri
+      );
+    }
+
+    async function copyTextValue(value) {
+      var text = String(value || '').trim();
+      if (text === '') {
+        return false;
+      }
+
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+
+      var fallback = document.createElement('textarea');
+      fallback.value = text;
+      fallback.setAttribute('readonly', 'readonly');
+      fallback.style.position = 'absolute';
+      fallback.style.left = '-9999px';
+      document.body.appendChild(fallback);
+      fallback.select();
+      var copied = false;
+      try {
+        copied = document.execCommand('copy');
+      } finally {
+        document.body.removeChild(fallback);
+      }
+      return copied;
+    }
+
+    function copyHintElement(key) {
+      if (key === 'secret') {
+        return totpModalSecretCopy instanceof HTMLElement ? totpModalSecretCopy : null;
+      }
+      if (key === 'uri') {
+        return totpModalUriCopy instanceof HTMLElement ? totpModalUriCopy : null;
+      }
+      return null;
+    }
+
+    async function copyTotpModalField(key) {
+      var source = null;
+      if (key === 'secret') {
+        source = totpModalSecret instanceof HTMLElement ? totpModalSecret : null;
+      } else if (key === 'uri') {
+        source = totpModalUri instanceof HTMLElement ? totpModalUri : null;
+      }
+
+      if (!(source instanceof HTMLElement)) {
+        return;
+      }
+
+      var copied = false;
+      try {
+        copied = await copyTextValue(source.textContent || '');
+      } catch (error) {
+        copied = false;
+      }
+
+      var hint = copyHintElement(key);
+      if (hint instanceof HTMLElement) {
+        hint.textContent = copied ? 'Copied.' : 'Copy failed.';
+      }
+    }
+
     function recursiveBinaryStringToArrayBuffer(obj) {
       var prefix = '=?BINARY?B?';
       var suffix = '?=';
@@ -291,6 +499,66 @@ $themeLabels = [
     function csrfTokenValue() {
       var csrfInput = document.querySelector('input[name="_csrf"]');
       return csrfInput instanceof HTMLInputElement ? String(csrfInput.value || '') : '';
+    }
+
+    async function setupTotpForRow(row, button) {
+      if (!(row instanceof HTMLElement) || !(button instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      var csrf = csrfTokenValue();
+      if (csrf === '') {
+        setTotpFeedback(row, 'Security token is missing. Refresh and try again.', 'error');
+        return;
+      }
+
+      var secretField = row.querySelector('[data-preferences-two-factor-key="secret"]');
+      var secret = secretField instanceof HTMLInputElement
+        ? String(secretField.value || '').toUpperCase().replace(/[^A-Z2-7]/g, '')
+        : '';
+
+      button.disabled = true;
+      setTotpFeedback(row, 'Generating setup details...', 'muted');
+
+      try {
+        var setupForm = new URLSearchParams();
+        setupForm.append('_csrf', csrf);
+        if (secret !== '') {
+          setupForm.append('secret', secret);
+        }
+
+        var setupResponse = await window.fetch(panelBase + '/preferences/2fa/totp/setup', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: setupForm.toString()
+        });
+        var setupPayload = await setupResponse.json();
+        if (!setupResponse.ok || !setupPayload || setupPayload.ok !== true) {
+          throw new Error(setupPayload && setupPayload.message ? setupPayload.message : 'Unable to prepare TOTP setup.');
+        }
+
+        var resolvedSecret = String(setupPayload.secret || '').trim();
+        if (secretField instanceof HTMLInputElement && resolvedSecret !== '') {
+          secretField.value = resolvedSecret;
+        }
+
+        row.setAttribute('data-preferences-totp-provisioning-uri', String(setupPayload.provisioning_uri || ''));
+        row.setAttribute('data-preferences-totp-qr-data-uri', String(setupPayload.qr_data_uri || ''));
+        showTotpSetupModal(setupPayload);
+        setTotpFeedback(row, 'Setup details ready. Enter a 6-digit code and save preferences.', 'success');
+      } catch (error) {
+        setTotpFeedback(
+          row,
+          error && typeof error.message === 'string' ? error.message : 'Unable to prepare TOTP setup.',
+          'error'
+        );
+      } finally {
+        button.disabled = false;
+      }
     }
 
     function collectCredentialIds() {
@@ -457,6 +725,50 @@ $themeLabels = [
       appendRow();
     });
 
+    if (totpModalEl instanceof HTMLElement) {
+      totpModalEl.addEventListener('click', function (event) {
+        var target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+
+        var secretBlock = target.closest('[data-preferences-totp-modal-secret="1"]');
+        if (secretBlock instanceof HTMLElement) {
+          void copyTotpModalField('secret');
+          return;
+        }
+
+        var uriBlock = target.closest('[data-preferences-totp-modal-uri="1"]');
+        if (uriBlock instanceof HTMLElement) {
+          void copyTotpModalField('uri');
+        }
+      });
+
+      totpModalEl.addEventListener('keydown', function (event) {
+        var target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+
+        if (event.key !== 'Enter' && event.key !== ' ') {
+          return;
+        }
+
+        var secretBlock = target.closest('[data-preferences-totp-modal-secret="1"]');
+        if (secretBlock instanceof HTMLElement) {
+          event.preventDefault();
+          void copyTotpModalField('secret');
+          return;
+        }
+
+        var uriBlock = target.closest('[data-preferences-totp-modal-uri="1"]');
+        if (uriBlock instanceof HTMLElement) {
+          event.preventDefault();
+          void copyTotpModalField('uri');
+        }
+      });
+    }
+
     list.addEventListener('change', function (event) {
       var target = event.target;
       if (!(target instanceof HTMLElement)) {
@@ -477,6 +789,15 @@ $themeLabels = [
     list.addEventListener('click', function (event) {
       var target = event.target;
       if (!(target instanceof Element)) {
+        return;
+      }
+
+      var totpSetupButton = target.closest('[data-preferences-two-factor-totp-setup="1"]');
+      if (totpSetupButton instanceof HTMLButtonElement) {
+        var totpRow = totpSetupButton.closest('[data-preferences-two-factor-row="1"]');
+        if (totpRow instanceof HTMLElement) {
+          void setupTotpForRow(totpRow, totpSetupButton);
+        }
         return;
       }
 
@@ -663,7 +984,7 @@ $themeLabels = [
                         $contactValue = (string) ($contactProfile['value'] ?? '');
                         ?>
                         <div class="border rounded p-2 mb-2" data-preferences-contact-row="1">
-                            <div class="row g-2 align-items-end">
+                            <div class="row g-2 align-items-end pb-4">
                                 <div class="col-md-4">
                                     <label class="form-label">Type</label>
                                     <select
@@ -734,6 +1055,8 @@ $themeLabels = [
                         $methodSignatureCounter = (int) ($method['signature_counter'] ?? 0);
                         $methodRequireUv = (bool) ($method['require_uv'] ?? false);
                         $methodEmail = (string) ($method['email'] ?? '');
+                        $methodProvisioningUri = (string) ($method['provisioning_uri'] ?? '');
+                        $methodQrDataUri = (string) ($method['qr_data_uri'] ?? '');
                         $methodLabelPlaceholder = match ($methodType) {
                             'totp' => 'Authenticator App',
                             'webauthn' => 'My Key',
@@ -741,7 +1064,12 @@ $themeLabels = [
                             default => '2FA Method Label',
                         };
                         ?>
-                        <div class="border rounded p-2 mb-2" data-preferences-two-factor-row="1">
+                        <div
+                            class="border rounded p-2 mb-2"
+                            data-preferences-two-factor-row="1"
+                            data-preferences-totp-provisioning-uri="<?= e($methodProvisioningUri) ?>"
+                            data-preferences-totp-qr-data-uri="<?= e($methodQrDataUri) ?>"
+                        >
                             <div class="row g-2 align-items-end">
                                 <div class="col-md-2">
                                     <label class="form-label">Type</label>
@@ -763,7 +1091,7 @@ $themeLabels = [
                                         placeholder="<?= e($methodLabelPlaceholder) ?>"
                                     >
                                 </div>
-                                <div class="col-md-5" data-preferences-two-factor-section="totp"<?= $methodType === 'totp' ? '' : ' style="display:none;"' ?>>
+                                <div class="col-md position-relative" data-preferences-two-factor-section="totp"<?= $methodType === 'totp' ? '' : ' style="display:none;"' ?>>
                                     <label class="form-label">TOTP Secret / Confirm Code</label>
                                     <div class="input-group">
                                         <input
@@ -782,9 +1110,11 @@ $themeLabels = [
                                             value=""
                                             placeholder="6-digit code"
                                         >
+                                        <button type="button" class="btn btn-outline-secondary" data-preferences-two-factor-totp-setup="1">Setup TOTP</button>
                                     </div>
+                                    <div class="small text-muted d-none position-absolute start-0 end-0" style="top:calc(100% + 0.2rem);" data-preferences-two-factor-totp-feedback="1"></div>
                                 </div>
-                                <div class="col-md-5" data-preferences-two-factor-section="webauthn"<?= $methodType === 'webauthn' ? '' : ' style="display:none;"' ?>>
+                                <div class="col-md position-relative" data-preferences-two-factor-section="webauthn"<?= $methodType === 'webauthn' ? '' : ' style="display:none;"' ?>>
                                     <label class="form-label">Credential ID</label>
                                     <div class="input-group">
                                         <span class="input-group-text">
@@ -811,7 +1141,7 @@ $themeLabels = [
                                             <?= $methodStatus === 'confirmed' ? 'Re-pair Security Key' : 'Pair Security Key' ?>
                                         </button>
                                     </div>
-                                    <div class="small d-none" data-preferences-two-factor-webauthn-feedback="1"></div>
+                                    <div class="small d-none position-absolute start-0 end-0" style="top:calc(100% + 0.2rem);" data-preferences-two-factor-webauthn-feedback="1"></div>
                                     <input
                                         type="hidden"
                                         data-preferences-two-factor-key="credential_public_key"
@@ -825,7 +1155,7 @@ $themeLabels = [
                                         value="<?= (int) $methodSignatureCounter ?>"
                                     >
                                 </div>
-                                <div class="col-md-5" data-preferences-two-factor-section="email"<?= $methodType === 'email' ? '' : ' style="display:none;"' ?>>
+                                <div class="col-md" data-preferences-two-factor-section="email"<?= $methodType === 'email' ? '' : ' style="display:none;"' ?>>
                                     <label class="form-label">Target Email</label>
                                     <input
                                         type="email"
@@ -836,7 +1166,7 @@ $themeLabels = [
                                         placeholder="Defaults to account email if blank"
                                     >
                                 </div>
-                                <div class="col-md-2 d-flex align-items-end justify-content-md-end">
+                                <div class="col-auto ps-md-0 d-flex align-items-end">
                                     <button type="button" class="btn btn-danger" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
                                 </div>
                             </div>

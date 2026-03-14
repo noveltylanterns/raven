@@ -449,7 +449,11 @@ final class AuthController
             return;
         }
 
-        $requireUserVerification = (bool) ($resolvedMethod['require_uv'] ?? false);
+        // Honor per-key PIN/Bio toggle strictly: unchecked maps to "discouraged"
+        // instead of library default "preferred", which can still prompt UV.
+        $requireUserVerification = (bool) ($resolvedMethod['require_uv'] ?? false)
+            ? 'required'
+            : 'discouraged';
 
         $webAuthn = $this->createWebAuthnServer();
         if ($webAuthn === null) {
