@@ -312,8 +312,8 @@ The following config keys are expected to appear in this document and in runtime
 - `user.contact.email.url_prefix`
 - `user.contact.phone.label`
 - `user.contact.phone.url_prefix`
-- `user.contact.website.label`
-- `user.contact.website.url_prefix`
+- `user.contact.website.label` (legacy key; normalized to `user.contact.homepage.label` on save)
+- `user.contact.website.url_prefix` (legacy key; normalized to `user.contact.homepage.url_prefix` on save)
 - `user.contact.homepage.label`
 - `user.contact.homepage.url_prefix`
 - `user.contact.x.label`

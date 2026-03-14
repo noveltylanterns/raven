@@ -12,6 +12,8 @@ declare(strict_types=1);
 namespace Raven\Core\Auth;
 
 use PDO;
+use Raven\Lib\Auth\ContactProfileNormalizer;
+use Raven\Lib\Auth\LoginThrottleService;
 use Raven\Lib\Security\RecoveryPhrase;
 use Raven\Lib\Security\TotpService;
 use Raven\Lib\Security\TwoFactorMethodKey;
@@ -39,6 +41,8 @@ final class AuthService
 
     /** Delight Auth instance. */
     private mixed $auth;
+    private LoginThrottleService $loginThrottle;
+    private ContactProfileNormalizer $contactProfileNormalizer;
 
     /**
      * Request-local cache for user group lookups.
@@ -83,6 +87,8 @@ final class AuthService
         $this->appDb = $appDb;
         $this->driver = $driver;
         $this->prefix = $driver === 'sqlite' ? '' : $prefix;
+        $this->loginThrottle = new LoginThrottleService($appDb, $driver, $prefix);
+        $this->contactProfileNormalizer = new ContactProfileNormalizer();
 
         $this->bootstrapDelightAuth();
     }
@@ -152,30 +158,7 @@ final class AuthService
      */
     public function isLoginTemporarilyLocked(string $username, string $ipAddress, int $windowSeconds): bool
     {
-        $windowSeconds = max(1, $windowSeconds);
-        $this->pruneExpiredLoginFailureRows($windowSeconds, $windowSeconds);
-
-        $normalizedUsername = $this->normalizeLoginFailureUsername($username);
-        $normalizedIp = $this->normalizeLoginFailureIp($ipAddress);
-        $bucketHash = $this->loginFailureBucketHash($normalizedUsername, $normalizedIp);
-        $row = $this->loadLoginFailureRow($bucketHash);
-
-        if ($row === null) {
-            return false;
-        }
-
-        $now = time();
-        $lockedUntil = (int) ($row['locked_until'] ?? 0);
-        if ($lockedUntil > $now) {
-            return true;
-        }
-
-        $firstFailedAt = (int) ($row['first_failed_at'] ?? 0);
-        if ($firstFailedAt === 0 || ($now - $firstFailedAt) > $windowSeconds) {
-            $this->deleteLoginFailureRow($bucketHash);
-        }
-
-        return false;
+        return $this->loginThrottle->isTemporarilyLocked($username, $ipAddress, $windowSeconds);
     }
 
     /**
@@ -188,39 +171,7 @@ final class AuthService
         int $windowSeconds,
         int $lockSeconds
     ): void {
-        $maxAttempts = max(1, $maxAttempts);
-        $windowSeconds = max(1, $windowSeconds);
-        $lockSeconds = max(1, $lockSeconds);
-        $this->pruneExpiredLoginFailureRows($windowSeconds, $lockSeconds);
-
-        $normalizedUsername = $this->normalizeLoginFailureUsername($username);
-        $normalizedIp = $this->normalizeLoginFailureIp($ipAddress);
-        $bucketHash = $this->loginFailureBucketHash($normalizedUsername, $normalizedIp);
-        $existing = $this->loadLoginFailureRow($bucketHash);
-
-        $now = time();
-        $firstFailedAt = (int) ($existing['first_failed_at'] ?? 0);
-        $failureCount = (int) ($existing['failure_count'] ?? 0);
-
-        if ($firstFailedAt === 0 || ($now - $firstFailedAt) > $windowSeconds) {
-            $firstFailedAt = $now;
-            $failureCount = 0;
-        }
-
-        $failureCount++;
-        $lockedUntil = $failureCount >= $maxAttempts
-            ? ($now + $lockSeconds)
-            : 0;
-
-        $this->upsertLoginFailureRow(
-            $bucketHash,
-            $normalizedUsername,
-            $normalizedIp,
-            $firstFailedAt,
-            $now,
-            $failureCount,
-            $lockedUntil
-        );
+        $this->loginThrottle->recordFailure($username, $ipAddress, $maxAttempts, $windowSeconds, $lockSeconds);
     }
 
     /**
@@ -228,10 +179,7 @@ final class AuthService
      */
     public function clearFailedLoginAttempts(string $username, string $ipAddress): void
     {
-        $normalizedUsername = $this->normalizeLoginFailureUsername($username);
-        $normalizedIp = $this->normalizeLoginFailureIp($ipAddress);
-        $bucketHash = $this->loginFailureBucketHash($normalizedUsername, $normalizedIp);
-        $this->deleteLoginFailureRow($bucketHash);
+        $this->loginThrottle->clearFailures($username, $ipAddress);
     }
 
     /**
@@ -254,179 +202,6 @@ final class AuthService
         }
 
         return $email;
-    }
-
-    /**
-     * Returns one throttle row by hash, or null when absent.
-     *
-     * @return array{first_failed_at: int|string, failure_count: int|string, locked_until: int|string}|null
-     */
-    private function loadLoginFailureRow(string $bucketHash): ?array
-    {
-        $stmt = $this->appDb->prepare(
-            'SELECT first_failed_at, failure_count, locked_until
-             FROM ' . $this->loginFailureTable() . '
-             WHERE bucket_hash = :bucket_hash
-             LIMIT 1'
-        );
-        $stmt->execute([':bucket_hash' => $bucketHash]);
-        $row = $stmt->fetch();
-
-        return is_array($row) ? $row : null;
-    }
-
-    /**
-     * Inserts or updates one throttle bucket using backend-specific upsert SQL.
-     */
-    private function upsertLoginFailureRow(
-        string $bucketHash,
-        string $normalizedUsername,
-        string $normalizedIp,
-        int $firstFailedAt,
-        int $lastFailedAt,
-        int $failureCount,
-        int $lockedUntil
-    ): void {
-        $table = $this->loginFailureTable();
-        $nowText = gmdate('Y-m-d H:i:s');
-        $params = [
-            ':bucket_hash' => $bucketHash,
-            ':username_normalized' => $normalizedUsername,
-            ':ip_address' => $normalizedIp,
-            ':first_failed_at' => $firstFailedAt,
-            ':last_failed_at' => $lastFailedAt,
-            ':failure_count' => $failureCount,
-            ':locked_until' => $lockedUntil,
-            ':created_at' => $nowText,
-            ':updated_at' => $nowText,
-        ];
-
-        if ($this->driver === 'sqlite') {
-            $sql = 'INSERT INTO ' . $table . ' (
-                        bucket_hash, username_normalized, ip_address,
-                        first_failed_at, last_failed_at, failure_count, locked_until,
-                        created_at, updated_at
-                    ) VALUES (
-                        :bucket_hash, :username_normalized, :ip_address,
-                        :first_failed_at, :last_failed_at, :failure_count, :locked_until,
-                        :created_at, :updated_at
-                    )
-                    ON CONFLICT(bucket_hash) DO UPDATE SET
-                        username_normalized = excluded.username_normalized,
-                        ip_address = excluded.ip_address,
-                        first_failed_at = excluded.first_failed_at,
-                        last_failed_at = excluded.last_failed_at,
-                        failure_count = excluded.failure_count,
-                        locked_until = excluded.locked_until,
-                        updated_at = excluded.updated_at';
-        } elseif ($this->driver === 'mysql') {
-            $sql = 'INSERT INTO ' . $table . ' (
-                        bucket_hash, username_normalized, ip_address,
-                        first_failed_at, last_failed_at, failure_count, locked_until,
-                        created_at, updated_at
-                    ) VALUES (
-                        :bucket_hash, :username_normalized, :ip_address,
-                        :first_failed_at, :last_failed_at, :failure_count, :locked_until,
-                        :created_at, :updated_at
-                    )
-                    ON DUPLICATE KEY UPDATE
-                        username_normalized = VALUES(username_normalized),
-                        ip_address = VALUES(ip_address),
-                        first_failed_at = VALUES(first_failed_at),
-                        last_failed_at = VALUES(last_failed_at),
-                        failure_count = VALUES(failure_count),
-                        locked_until = VALUES(locked_until),
-                        updated_at = VALUES(updated_at)';
-        } else {
-            $sql = 'INSERT INTO ' . $table . ' (
-                        bucket_hash, username_normalized, ip_address,
-                        first_failed_at, last_failed_at, failure_count, locked_until,
-                        created_at, updated_at
-                    ) VALUES (
-                        :bucket_hash, :username_normalized, :ip_address,
-                        :first_failed_at, :last_failed_at, :failure_count, :locked_until,
-                        :created_at, :updated_at
-                    )
-                    ON CONFLICT (bucket_hash) DO UPDATE SET
-                        username_normalized = EXCLUDED.username_normalized,
-                        ip_address = EXCLUDED.ip_address,
-                        first_failed_at = EXCLUDED.first_failed_at,
-                        last_failed_at = EXCLUDED.last_failed_at,
-                        failure_count = EXCLUDED.failure_count,
-                        locked_until = EXCLUDED.locked_until,
-                        updated_at = EXCLUDED.updated_at';
-        }
-
-        $stmt = $this->appDb->prepare($sql);
-        $stmt->execute($params);
-    }
-
-    /**
-     * Deletes one throttle bucket by hash.
-     */
-    private function deleteLoginFailureRow(string $bucketHash): void
-    {
-        $stmt = $this->appDb->prepare(
-            'DELETE FROM ' . $this->loginFailureTable() . '
-             WHERE bucket_hash = :bucket_hash'
-        );
-        $stmt->execute([':bucket_hash' => $bucketHash]);
-    }
-
-    /**
-     * Prunes old unlocked rows so failure tracking table stays compact.
-     */
-    private function pruneExpiredLoginFailureRows(int $windowSeconds, int $lockSeconds): void
-    {
-        $windowSeconds = max(1, $windowSeconds);
-        $lockSeconds = max(1, $lockSeconds);
-        $retentionSeconds = max($windowSeconds, $lockSeconds, 86400);
-        $now = time();
-        $staleBefore = $now - $retentionSeconds;
-
-        $stmt = $this->appDb->prepare(
-            'DELETE FROM ' . $this->loginFailureTable() . '
-             WHERE locked_until <= :now
-               AND last_failed_at < :stale_before'
-        );
-        $stmt->execute([
-            ':now' => $now,
-            ':stale_before' => $staleBefore,
-        ]);
-    }
-
-    /**
-     * Returns normalized login identifier used for throttle bucketing.
-     */
-    private function normalizeLoginFailureUsername(string $username): string
-    {
-        $normalized = strtolower(trim($username));
-        if ($normalized === '') {
-            return 'unknown';
-        }
-
-        return substr($normalized, 0, 100);
-    }
-
-    /**
-     * Returns normalized IP value used for throttle bucketing.
-     */
-    private function normalizeLoginFailureIp(string $ipAddress): string
-    {
-        $candidate = trim($ipAddress);
-        if ($candidate === '' || filter_var($candidate, FILTER_VALIDATE_IP) === false) {
-            return 'unknown';
-        }
-
-        return substr($candidate, 0, 64);
-    }
-
-    /**
-     * Returns deterministic hash key for one login-failure bucket.
-     */
-    private function loginFailureBucketHash(string $normalizedUsername, string $normalizedIp): string
-    {
-        return hash('sha256', $normalizedUsername . '|' . $normalizedIp);
     }
 
     /**
@@ -1057,67 +832,7 @@ final class AuthService
      */
     private function normalizeContactProfiles(array $profiles): array
     {
-        $normalized = [];
-        foreach ($profiles as $profile) {
-            if (!is_array($profile)) {
-                continue;
-            }
-
-            $type = strtolower(trim((string) ($profile['type'] ?? '')));
-            $value = trim((string) ($profile['value'] ?? ''));
-            if ($type === '' || $value === '') {
-                continue;
-            }
-
-            $type = preg_replace('/[^a-z0-9-]+/', '-', $type) ?? '';
-            $type = trim($type, '-');
-            $type = preg_replace('/-+/', '-', $type) ?? '';
-            if ($type === '') {
-                continue;
-            }
-
-            if (mb_strlen($type) > 80) {
-                $type = mb_substr($type, 0, 80);
-            }
-            if (mb_strlen($value) > 255) {
-                $value = mb_substr($value, 0, 255);
-            }
-            if ($value === '') {
-                continue;
-            }
-
-            $dedupeKey = strtolower($type . "\n" . $value);
-            $normalized[$dedupeKey] = [
-                'type' => $type,
-                'value' => $value,
-            ];
-
-            if (count($normalized) >= 20) {
-                break;
-            }
-        }
-
-        $result = array_values($normalized);
-        usort(
-            $result,
-            static function (array $left, array $right): int {
-                $leftType = strtolower(trim((string) ($left['type'] ?? '')));
-                $rightType = strtolower(trim((string) ($right['type'] ?? '')));
-                if ($leftType !== $rightType) {
-                    return $leftType <=> $rightType;
-                }
-
-                $leftValue = strtolower(trim((string) ($left['value'] ?? '')));
-                $rightValue = strtolower(trim((string) ($right['value'] ?? '')));
-                if ($leftValue !== $rightValue) {
-                    return $leftValue <=> $rightValue;
-                }
-
-                return 0;
-            }
-        );
-
-        return $result;
+        return $this->contactProfileNormalizer->normalize($profiles, 20);
     }
 
     /**
@@ -1570,18 +1285,6 @@ final class AuthService
         }
 
         return $this->prefix . $base;
-    }
-
-    /**
-     * Returns login-failure tracking table name for active backend mode.
-     */
-    private function loginFailureTable(): string
-    {
-        if ($this->driver === 'sqlite') {
-            return 'auth.login_failures';
-        }
-
-        return $this->prefix . 'login_failures';
     }
 
     /**

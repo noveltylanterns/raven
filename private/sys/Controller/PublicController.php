@@ -17,6 +17,10 @@ use Raven\Core\Auth\AuthService;
 use Raven\Core\Config;
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Core\Extension\ExtensionRegistry;
+use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Http\SessionFlash;
+use Raven\Lib\Pagination\Pagination;
+use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Core\Theme\PublicThemeRegistry;
@@ -47,6 +51,8 @@ final class PublicController
     private InviteTokenRepository $inviteTokens;
     private InputSanitizer $input;
     private Csrf $csrf;
+    private SessionFlash $publicFlash;
+    private LoginIdentifierResolver $identifierResolver;
     /** @var array<string, EmbeddedFormRuntimeInterface> */
     private array $embeddedFormRuntimes = [];
     private TemplateTagEngine $templateTags;
@@ -90,6 +96,8 @@ final class PublicController
         $this->inviteTokens = $inviteTokens;
         $this->input = $input;
         $this->csrf = $csrf;
+        $this->publicFlash = new SessionFlash('_raven_public_flash');
+        $this->identifierResolver = new LoginIdentifierResolver();
         $this->embeddedFormRuntimes = $this->discoverEmbeddedFormRuntimes($extensionServices);
         $this->templateTags = new TemplateTagEngine(dirname(__DIR__, 3) . '/private/tmp/template_tag_cache');
     }
@@ -2476,12 +2484,7 @@ final class PublicController
      */
     private function loginIdentifierMode(): string
     {
-        $mode = strtolower(trim((string) $this->config->get('user.auth.login', 'email')));
-        if (!in_array($mode, ['email', 'username'], true)) {
-            return 'email';
-        }
-
-        return $mode;
+        return $this->identifierResolver->modeFromConfig($this->config);
     }
 
     /**
@@ -2506,22 +2509,7 @@ final class PublicController
      */
     private function normalizeUserIdentifierValue(string $rawValue): ?string
     {
-        $normalizedText = $this->input->text($rawValue, 254);
-        if ($normalizedText === '') {
-            return null;
-        }
-
-        $normalizedUsername = $this->input->username($normalizedText);
-        if ($normalizedUsername !== null && $normalizedUsername !== '') {
-            return $normalizedUsername;
-        }
-
-        $normalizedEmail = $this->input->email($normalizedText);
-        if ($normalizedEmail !== null && $normalizedEmail !== '') {
-            return $normalizedEmail;
-        }
-
-        return null;
+        return $this->identifierResolver->normalizeUsernameOrEmail($this->input, $rawValue);
     }
 
     /**
@@ -2529,7 +2517,7 @@ final class PublicController
      */
     private function flashPublic(string $key, string $value): void
     {
-        $_SESSION['_raven_public_flash'][$key] = $value;
+        $this->publicFlash->put($key, $value);
     }
 
     /**
@@ -2537,10 +2525,7 @@ final class PublicController
      */
     private function pullPublicFlash(string $key): ?string
     {
-        $value = $_SESSION['_raven_public_flash'][$key] ?? null;
-        unset($_SESSION['_raven_public_flash'][$key]);
-
-        return is_string($value) ? $value : null;
+        return $this->publicFlash->pull($key);
     }
 
     /**
@@ -2548,9 +2533,7 @@ final class PublicController
      */
     private function panelUrl(string $suffix = ''): string
     {
-        $prefix = '/' . trim((string) $this->config->get('panel.path', 'panel'), '/');
-        $suffix = '/' . ltrim($suffix, '/');
-        return rtrim($prefix, '/') . ($suffix === '/' ? '' : $suffix);
+        return PanelUrl::fromConfig($this->config, $suffix);
     }
 
     /**
@@ -2558,17 +2541,7 @@ final class PublicController
      */
     private function normalizeTaxonomyRoutePrefix(string $configured, string $fallback, bool $allowBlank = false): string
     {
-        $configured = trim($configured);
-        if ($allowBlank && $configured === '') {
-            return '';
-        }
-
-        $slug = $this->input->slug($configured);
-        if ($slug === null || $slug === '') {
-            return $fallback;
-        }
-
-        return $slug;
+        return PanelUrl::normalizeRoutePrefix($this->input, $configured, $fallback, $allowBlank);
     }
 
     /**
@@ -2579,25 +2552,7 @@ final class PublicController
      */
     private function decoratePaginationForTemplate(array $pagination): array
     {
-        $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
-        $current = max(1, (int) ($pagination['current'] ?? 1));
-        $basePath = trim((string) ($pagination['base_path'] ?? ''));
-        if ($basePath === '') {
-            $basePath = '/';
-        }
-
-        $links = [];
-        for ($i = 1; $i <= $totalPages; $i++) {
-            $links[] = [
-                'label' => (string) $i,
-                // Page 1 omits the extra segment by specification.
-                'href' => $basePath . ($i === 1 ? '' : '/' . $i),
-                'is_current' => $i === $current,
-            ];
-        }
-
-        $pagination['links'] = $links;
-        return $pagination;
+        return Pagination::decorateTemplateLinks($pagination);
     }
 
     /**

@@ -20,6 +20,11 @@ use Raven\Core\Config;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Media\PageImageManager;
 use Raven\Core\Theme\PublicThemeRegistry;
+use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Http\HttpResponse;
+use Raven\Lib\Http\SessionFlash;
+use Raven\Lib\Pagination\Pagination;
+use Raven\Lib\Routing\PanelUrl;
 use Raven\Repository\CategoryRepository;
 use Raven\Core\Security\AvatarValidator;
 use Raven\Lib\Security\Csrf;
@@ -55,6 +60,9 @@ final class PanelController
     private AuthService $auth;
     private InputSanitizer $input;
     private Csrf $csrf;
+    private SessionFlash $flash;
+    private SessionFlash $flashList;
+    private LoginIdentifierResolver $identifierResolver;
     private PageImageRepository $pageImages;
     private PageImageManager $pageImageManager;
     private CategoryRepository $categories;
@@ -92,6 +100,9 @@ final class PanelController
         $this->auth = $auth;
         $this->input = $input;
         $this->csrf = $csrf;
+        $this->flash = new SessionFlash('_raven_flash');
+        $this->flashList = new SessionFlash('_raven_flash_list');
+        $this->identifierResolver = new LoginIdentifierResolver();
         $this->pageImages = $pageImages;
         $this->pageImageManager = $pageImageManager;
         $this->categories = $categories;
@@ -7292,10 +7303,7 @@ final class PanelController
      */
     private function panelUrl(string $suffix): string
     {
-        $prefix = '/' . trim((string) $this->config->get('panel.path', 'panel'), '/');
-        $suffix = '/' . ltrim($suffix, '/');
-
-        return rtrim($prefix, '/') . ($suffix === '/' ? '' : $suffix);
+        return PanelUrl::fromConfig($this->config, $suffix);
     }
 
     /**
@@ -7305,18 +7313,7 @@ final class PanelController
      */
     private function panelPaginationState(int $totalItems, int $requestedPage, int $perPage): array
     {
-        $totalItems = max(0, $totalItems);
-        $perPage = max(1, $perPage);
-        $totalPages = max(1, (int) ceil($totalItems / $perPage));
-        $currentPage = min(max(1, $requestedPage), $totalPages);
-
-        return [
-            'current' => $currentPage,
-            'per_page' => $perPage,
-            'total_items' => $totalItems,
-            'total_pages' => $totalPages,
-            'offset' => ($currentPage - 1) * $perPage,
-        ];
+        return Pagination::state($totalItems, $requestedPage, $perPage);
     }
 
     /**
@@ -7328,24 +7325,7 @@ final class PanelController
      */
     private function panelPaginationViewData(string $path, array $pagination, array $query = []): array
     {
-        $normalizedQuery = [];
-        foreach ($query as $key => $value) {
-            $stringValue = trim((string) ($value ?? ''));
-            if ($stringValue === '') {
-                continue;
-            }
-
-            $normalizedQuery[$key] = $stringValue;
-        }
-
-        return [
-            'current' => (int) ($pagination['current'] ?? 1),
-            'per_page' => (int) ($pagination['per_page'] ?? 50),
-            'total_items' => (int) ($pagination['total_items'] ?? 0),
-            'total_pages' => (int) ($pagination['total_pages'] ?? 1),
-            'base_path' => $this->panelUrl($path),
-            'query' => $normalizedQuery,
-        ];
+        return Pagination::panelViewData($this->panelUrl($path), $pagination, $query);
     }
 
     /**
@@ -7353,7 +7333,7 @@ final class PanelController
      */
     private function flash(string $key, string $value): void
     {
-        $_SESSION['_raven_flash'][$key] = $value;
+        $this->flash->put($key, $value);
     }
 
     /**
@@ -7361,10 +7341,7 @@ final class PanelController
      */
     private function pullFlash(string $key): ?string
     {
-        $value = $_SESSION['_raven_flash'][$key] ?? null;
-        unset($_SESSION['_raven_flash'][$key]);
-
-        return is_string($value) ? $value : null;
+        return $this->flash->pull($key);
     }
 
     /**
@@ -7388,7 +7365,7 @@ final class PanelController
             return;
         }
 
-        $_SESSION['_raven_flash_list'][$key] = $normalized;
+        $this->flashList->putList($key, $normalized);
     }
 
     /**
@@ -7398,8 +7375,7 @@ final class PanelController
      */
     private function pullFlashList(string $key): ?array
     {
-        $value = $_SESSION['_raven_flash_list'][$key] ?? null;
-        unset($_SESSION['_raven_flash_list'][$key]);
+        $value = $this->flashList->pullList($key);
         if (!is_array($value)) {
             return null;
         }
@@ -10507,22 +10483,7 @@ MARKDOWN;
      */
     private function normalizeUserIdentifierValue(string $rawValue): ?string
     {
-        $normalizedText = $this->input->text($rawValue, 254);
-        if ($normalizedText === '') {
-            return null;
-        }
-
-        $normalizedUsername = $this->input->username($normalizedText);
-        if ($normalizedUsername !== null && $normalizedUsername !== '') {
-            return $normalizedUsername;
-        }
-
-        $normalizedEmail = $this->input->email($normalizedText);
-        if ($normalizedEmail !== null && $normalizedEmail !== '') {
-            return $normalizedEmail;
-        }
-
-        return null;
+        return $this->identifierResolver->normalizeUsernameOrEmail($this->input, $rawValue);
     }
 
     /**
@@ -11113,9 +11074,26 @@ MARKDOWN;
         return [
             'email' => ['label' => 'Email', 'url_prefix' => 'mailto:'],
             'phone' => ['label' => 'Phone', 'url_prefix' => 'tel:'],
-            'website' => ['label' => 'Website', 'url_prefix' => 'https://'],
+            'homepage' => ['label' => 'Homepage', 'url_prefix' => 'https://'],
             'x' => ['label' => 'X', 'url_prefix' => 'https://x.com/'],
         ];
+    }
+
+    /**
+     * Canonicalizes profile-contact type slugs, including legacy aliases.
+     */
+    private function normalizeProfileContactOptionTypeSlug(string $type): string
+    {
+        $normalized = $this->input->slug($type);
+        if ($normalized === null || $normalized === '') {
+            return '';
+        }
+
+        if ($normalized === 'website') {
+            return 'homepage';
+        }
+
+        return $normalized;
     }
 
     /**
@@ -11127,7 +11105,7 @@ MARKDOWN;
     {
         $defaults = $this->defaultProfileContactOptions();
         $required = [];
-        foreach (['email', 'phone', 'website', 'x'] as $slug) {
+        foreach (['email', 'phone', 'homepage', 'x'] as $slug) {
             if (!isset($defaults[$slug])) {
                 continue;
             }
@@ -11149,13 +11127,19 @@ MARKDOWN;
         $defaults = $this->defaultProfileContactOptions();
         $requiredDefaults = $this->requiredProfileContactOptions();
         $normalized = [];
+        $priorities = [];
         foreach ($source as $key => $definition) {
             if (!is_string($key) && !is_int($key)) {
                 continue;
             }
 
-            $slug = $this->input->slug((string) $key);
-            if ($slug === null || $slug === '') {
+            $rawSlug = $this->input->slug((string) $key);
+            if ($rawSlug === null || $rawSlug === '') {
+                continue;
+            }
+
+            $slug = $this->normalizeProfileContactOptionTypeSlug($rawSlug);
+            if ($slug === '') {
                 continue;
             }
 
@@ -11176,11 +11160,18 @@ MARKDOWN;
             }
             $safePrefix = trim($safePrefix);
 
-            if (!isset($normalized[$slug])) {
+            $priority = $rawSlug === $slug ? 1 : 0;
+            $existingPriority = $priorities[$slug] ?? -1;
+            if ($priority < $existingPriority) {
+                continue;
+            }
+
+            if (!isset($normalized[$slug]) || $priority >= $existingPriority) {
                 $normalized[$slug] = [
                     'label' => $safeLabel,
                     'url_prefix' => $safePrefix,
                 ];
+                $priorities[$slug] = $priority;
             }
         }
 
@@ -11220,8 +11211,8 @@ MARKDOWN;
                 continue;
             }
 
-            $type = $this->input->slug((string) ($entry['type'] ?? ''));
-            if ($type === null || $type === '') {
+            $type = $this->normalizeProfileContactOptionTypeSlug((string) ($entry['type'] ?? ''));
+            if ($type === '') {
                 continue;
             }
 
@@ -11279,8 +11270,8 @@ MARKDOWN;
                 continue;
             }
 
-            $type = $this->input->slug((string) ($row['type'] ?? ''));
-            if ($type === null || !array_key_exists($type, $allowedOptions)) {
+            $type = $this->normalizeProfileContactOptionTypeSlug((string) ($row['type'] ?? ''));
+            if ($type === '' || !array_key_exists($type, $allowedOptions)) {
                 continue;
             }
 
@@ -11389,10 +11380,7 @@ MARKDOWN;
      */
     private function jsonResponse(array $payload, int $status = 200): void
     {
-        http_response_code($status);
-        header('Content-Type: application/json; charset=UTF-8');
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-        echo json_encode($payload, JSON_UNESCAPED_SLASHES);
+        HttpResponse::json($payload, $status, true);
     }
 
     /**

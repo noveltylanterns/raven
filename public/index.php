@@ -15,6 +15,7 @@ use Raven\Lib\Profiling\RequestProfiler;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Routing\RouteRequest;
 use Raven\Lib\Routing\Router;
+use Raven\Lib\Routing\PanelUrl;
 
 use function Raven\Core\Support\request_path;
 
@@ -164,14 +165,6 @@ $controller = new PublicController(
 
 $input = $app['input'];
 
-$readOptionalRoutePrefix = static function (string $rawValue, string $fallback) use ($input): string {
-    $rawValue = trim($rawValue);
-    if ($rawValue === '') {
-        return '';
-    }
-
-    return $input->slug($rawValue) ?? $fallback;
-};
 $readConfigBool = static function (mixed $value, bool $default = true): bool {
     if (is_bool($value)) {
         return $value;
@@ -198,13 +191,13 @@ $panelPath = (string) $app['config']->get('panel.path', 'panel');
 $categoryEnabled = $readConfigBool($app['config']->get('category.enabled', true), true);
 $tagEnabled = $readConfigBool($app['config']->get('tag.enabled', true), true);
 $categoryPrefix = $categoryEnabled
-    ? $readOptionalRoutePrefix((string) $app['config']->get('category.prefix', 'cat'), 'cat')
+    ? PanelUrl::normalizeRoutePrefix($input, (string) $app['config']->get('category.prefix', 'cat'), 'cat', true)
     : '';
 $tagPrefix = $tagEnabled
-    ? $readOptionalRoutePrefix((string) $app['config']->get('tag.prefix', 'tag'), 'tag')
+    ? PanelUrl::normalizeRoutePrefix($input, (string) $app['config']->get('tag.prefix', 'tag'), 'tag', true)
     : '';
-$profilePrefix = $readOptionalRoutePrefix((string) $app['config']->get('user.prefix', 'user'), 'user');
-$groupPrefix = $readOptionalRoutePrefix((string) $app['config']->get('group.prefix', 'group'), 'group');
+$profilePrefix = PanelUrl::normalizeRoutePrefix($input, (string) $app['config']->get('user.prefix', 'user'), 'user', true);
+$groupPrefix = PanelUrl::normalizeRoutePrefix($input, (string) $app['config']->get('group.prefix', 'group'), 'group', true);
 
 // Keep category/tag prefixes distinct even if config is manually edited to collide.
 if ($categoryPrefix !== '' && $tagPrefix !== '' && $categoryPrefix === $tagPrefix) {

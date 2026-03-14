@@ -6,6 +6,9 @@
 - Added an immediate backlog note in `debug/release/todo.md` to harden TOTP provisioning crypto parameters for authenticator compatibility/security warnings.
 - Fixed panel login 2FA fallback rendering so WebAuthn failures now keep alternate methods (like TOTP app) available in-page without requiring a full page reload.
 - Added `Recovery Code` as a first-class 2FA method with generated 12-word phrases, `Reusable` toggle support, and one-time self-deletion on successful login when reuse is disabled.
+- Fixed profile contact option normalization so legacy `website` keys are canonicalized to `homepage` and no longer reappear after saving Configuration.
+- Extracted shared core helpers to `private/lib/` (`SessionFlash`, `HttpResponse`, `PanelUrl`, `LoginThrottleService`, `ContactProfileNormalizer`, `LoginIdentifierResolver`, `SessionCookiePolicy`, `Pagination`) and rewired controllers/bootstrap/auth core to use them.
+- Updated `AGENTS.md` private file-tree appendix for `private/lib/` and `private/sys/` to reflect current module responsibilities after declutter work.
 
 ### March 13, 2026
 

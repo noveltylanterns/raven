@@ -15,6 +15,7 @@ use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\SchemaManager;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Media\PageImageManager;
+use Raven\Lib\Session\SessionCookiePolicy;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Core\View;
@@ -118,96 +119,8 @@ return (static function (): array {
     $config = new Config($root . '/private/config.php');
 
     // Initialize session early for auth, CSRF, and flash messaging.
-    $sessionName = trim((string) $config->get('session.cookie.name', 'session'));
-    if (!preg_match('/^[a-zA-Z0-9_-]{1,64}$/', $sessionName)) {
-        $sessionName = 'session';
-    }
-
-    $cookiePrefix = trim((string) $config->get('session.cookie.prefix', 'rvn_'));
-    if ($cookiePrefix !== '' && preg_match('/^[a-zA-Z0-9_-]{1,40}$/', $cookiePrefix) === 1) {
-        $prefixedSessionName = $cookiePrefix . $sessionName;
-        if (preg_match('/^[a-zA-Z0-9_-]{1,64}$/', $prefixedSessionName) === 1) {
-            $sessionName = $prefixedSessionName;
-        }
-    }
-
-    $cookieDomain = strtolower(trim((string) $config->get('session.cookie.domain', '')));
-    if (
-        $cookieDomain !== ''
-        && (
-            preg_match('/[:\/\s]/', $cookieDomain) === 1
-            || preg_match('/^\.?[a-z0-9-]+(?:\.[a-z0-9-]+)*$/', $cookieDomain) !== 1
-        )
-    ) {
-        $cookieDomain = '';
-    }
-
-    // Guard against domain-move lockouts: if configured cookie domain does not
-    // match the current request host, fall back to host-only cookies.
-    $requestHost = strtolower(trim((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '')));
-    if ($requestHost !== '') {
-        // Proxies may provide a host list; keep only the first value.
-        if (str_contains($requestHost, ',')) {
-            $requestHost = trim((string) explode(',', $requestHost, 2)[0]);
-        }
-
-        if (str_starts_with($requestHost, '[')) {
-            // IPv6 literal host format: [addr]:port
-            $closingBracketPos = strpos($requestHost, ']');
-            if ($closingBracketPos !== false) {
-                $requestHost = substr($requestHost, 1, $closingBracketPos - 1);
-            }
-        } else {
-            // Strip :port from host:port while preserving raw IPv6 addresses.
-            $lastColonPos = strrpos($requestHost, ':');
-            if ($lastColonPos !== false && substr_count($requestHost, ':') === 1) {
-                $maybePort = substr($requestHost, $lastColonPos + 1);
-                if ($maybePort !== '' && ctype_digit($maybePort)) {
-                    $requestHost = substr($requestHost, 0, $lastColonPos);
-                }
-            }
-        }
-
-        $requestHost = rtrim($requestHost, '.');
-    }
-
-    if ($cookieDomain !== '' && $requestHost !== '') {
-        $cookieDomainForMatch = ltrim($cookieDomain, '.');
-        $hostMatchesCookieDomain = $requestHost === $cookieDomainForMatch
-            || str_ends_with($requestHost, '.' . $cookieDomainForMatch);
-        if (!$hostMatchesCookieDomain) {
-            $cookieDomain = '';
-        }
-    }
-
-    if (session_status() !== PHP_SESSION_ACTIVE) {
-        // Keep session files in project-private storage outside web roots.
-        $sessionPath = $root . '/private/tmp/sessions';
-        if (!is_dir($sessionPath)) {
-            mkdir($sessionPath, 0775, true);
-        }
-
-        ini_set('session.save_path', $sessionPath);
-        // Strict mode rejects uninitialized session IDs and reduces fixation risk.
-        ini_set('session.use_strict_mode', '1');
-
-        // Harden session cookies while staying compatible with local HTTP development.
-        $httpsValue = strtolower((string) ($_SERVER['HTTPS'] ?? ''));
-        $isHttps = ($httpsValue !== '' && $httpsValue !== 'off')
-            || (int) ($_SERVER['SERVER_PORT'] ?? 0) === 443;
-        $cookieParams = session_get_cookie_params();
-        session_set_cookie_params([
-            'lifetime' => (int) ($cookieParams['lifetime'] ?? 0),
-            'path' => (string) ($cookieParams['path'] ?? '/'),
-            'domain' => $cookieDomain !== '' ? $cookieDomain : (string) ($cookieParams['domain'] ?? ''),
-            'secure' => $isHttps,
-            'httponly' => true,
-            'samesite' => 'Lax',
-        ]);
-
-        session_name($sessionName);
-        session_start();
-    }
+    $sessionCookiePolicy = new SessionCookiePolicy();
+    $sessionCookiePolicy->startIfNeeded($config, $root, $_SERVER);
 
     $databaseConfig = (array) $config->get('database', []);
     $connectionFactory = new ConnectionFactory($databaseConfig);

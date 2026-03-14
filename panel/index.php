@@ -15,6 +15,7 @@ use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Debug\DebugToolbarRenderer;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Profiling\RequestProfiler;
+use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Routing\RouteRequest;
 use Raven\Lib\Routing\Router;
 
@@ -81,7 +82,7 @@ $tagEnabled = $readConfigBool($app['config']->get('tag.enabled', true), true);
  * Normalizes request path into panel-internal path.
  */
 $requestedPath = request_path();
-$configuredPanelPrefix = '/' . trim((string) $app['config']->get('panel.path', 'panel'), '/');
+$configuredPanelPrefix = PanelUrl::fromConfig($app['config']);
 
 $internalPath = $requestedPath;
 
@@ -253,9 +254,7 @@ if ($servePanelThemeAsset($internalPath, $requestMethod)) {
  * Builds panel URL with configured prefix.
  */
 $panelUrl = static function (string $suffix = '') use ($app): string {
-    $prefix = '/' . trim((string) $app['config']->get('panel.path', 'panel'), '/');
-    $suffix = '/' . ltrim($suffix, '/');
-    return rtrim($prefix, '/') . ($suffix === '/' ? '' : $suffix);
+    return PanelUrl::fromConfig($app['config'], $suffix);
 };
 
 $enabledState = ExtensionRegistry::enabledMap((string) $app['root']);

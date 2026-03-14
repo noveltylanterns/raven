@@ -12,6 +12,10 @@ declare(strict_types=1);
 namespace Raven\Controller;
 
 use Raven\Core\Config;
+use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Http\HttpResponse;
+use Raven\Lib\Http\SessionFlash;
+use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\TwoFactorChallengeHelper;
@@ -45,6 +49,8 @@ final class AuthController
     private AuthService $auth;
     private InputSanitizer $input;
     private Csrf $csrf;
+    private SessionFlash $flash;
+    private LoginIdentifierResolver $identifierResolver;
 
     public function __construct(
         View $view,
@@ -58,6 +64,8 @@ final class AuthController
         $this->auth = $auth;
         $this->input = $input;
         $this->csrf = $csrf;
+        $this->flash = new SessionFlash('_raven_flash');
+        $this->identifierResolver = new LoginIdentifierResolver();
     }
 
     /**
@@ -118,11 +126,22 @@ final class AuthController
             $identifier = $this->normalizeUsernameModeIdentifier($identifierRaw);
         }
 
-        if ($identifier === null || $password === '') {
+        if ($identifierRaw === '' || $password === '') {
             $this->flash(
                 'error',
                 ($loginMode === 'email' ? 'Email' : 'Username') . ' and password are required.'
             );
+            redirect($this->panelUrl('/login'));
+        }
+
+        if ($identifier === null) {
+            if ($this->isLoginTemporarilyLocked($identifierRaw)) {
+                $this->flash('error', 'Too many login attempts. Please wait a few minutes and try again.');
+                redirect($this->panelUrl('/login'));
+            }
+
+            $this->recordFailedLoginAttempt($identifierRaw);
+            $this->flash('error', 'Invalid credentials.');
             redirect($this->panelUrl('/login'));
         }
 
@@ -633,7 +652,7 @@ final class AuthController
      */
     private function flash(string $key, string $value): void
     {
-        $_SESSION['_raven_flash'][$key] = $value;
+        $this->flash->put($key, $value);
     }
 
     /**
@@ -641,10 +660,7 @@ final class AuthController
      */
     private function pullFlash(string $key): ?string
     {
-        $value = $_SESSION['_raven_flash'][$key] ?? null;
-        unset($_SESSION['_raven_flash'][$key]);
-
-        return is_string($value) ? $value : null;
+        return $this->flash->pull($key);
     }
 
     /**
@@ -652,10 +668,7 @@ final class AuthController
      */
     private function panelUrl(string $suffix): string
     {
-        $prefix = '/' . trim((string) $this->config->get('panel.path', 'panel'), '/');
-        $suffix = '/' . ltrim($suffix, '/');
-
-        return rtrim($prefix, '/') . ($suffix === '/' ? '' : $suffix);
+        return PanelUrl::fromConfig($this->config, $suffix);
     }
 
     /**
@@ -731,12 +744,7 @@ final class AuthController
      */
     private function loginIdentifierMode(): string
     {
-        $mode = strtolower(trim((string) $this->config->get('user.auth.login', 'email')));
-        if (!in_array($mode, ['email', 'username'], true)) {
-            $mode = 'email';
-        }
-
-        return $mode;
+        return $this->identifierResolver->modeFromConfig($this->config);
     }
 
     /**
@@ -746,22 +754,7 @@ final class AuthController
      */
     private function normalizeUsernameModeIdentifier(string $rawIdentifier): ?string
     {
-        $normalizedText = $this->input->text($rawIdentifier, 254);
-        if ($normalizedText === '') {
-            return null;
-        }
-
-        $normalizedUsername = $this->input->username($normalizedText);
-        if ($normalizedUsername !== null && $normalizedUsername !== '') {
-            return $normalizedUsername;
-        }
-
-        $normalizedEmail = $this->input->email($normalizedText);
-        if ($normalizedEmail !== null && $normalizedEmail !== '') {
-            return $normalizedEmail;
-        }
-
-        return null;
+        return $this->identifierResolver->normalizeUsernameOrEmail($this->input, $rawIdentifier);
     }
 
     /**
@@ -813,9 +806,6 @@ final class AuthController
      */
     private function jsonResponse(array $payload, int $status = 200): void
     {
-        http_response_code($status);
-        header('Content-Type: application/json; charset=UTF-8');
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-        echo json_encode($payload, JSON_UNESCAPED_SLASHES);
+        HttpResponse::json($payload, $status, true);
     }
 }

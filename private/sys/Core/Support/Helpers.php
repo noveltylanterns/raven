@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Raven\Core\Support;
 
+use Raven\Lib\Http\HttpResponse;
+
 /**
  * Escapes text for safe HTML output.
  */
@@ -26,8 +28,7 @@ function e(string $value): string
  */
 function redirect(string $to, int $status = 302): never
 {
-    header('Location: ' . $to, true, $status);
-    exit;
+    HttpResponse::redirect($to, $status);
 }
 
 /**
