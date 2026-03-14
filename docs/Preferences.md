@@ -28,11 +28,15 @@ Fields/options:
 - `Avatar` file upload (`gif/jpg/jpeg/png`)
 - `Remove current avatar` checkbox (shown only when avatar exists)
 - `Two-Factor Methods` (Security tab)
-  - `Setup TOTP`
+  - `Setup App`
+  - `Setup TOTP` (legacy label)
   - `Manual Key`
-  - `Type` (`Authenticator App (TOTP)`, `Security Key (WebAuthn)`, `Email Code (Stub)`)
+  - `Type` (`Authenticator App (TOTP)`, `Recovery Code`, `Security Key (WebAuthn)`, `Email Code (Stub)`)
   - `Label`
   - `TOTP Secret / Confirm Code`
+  - `Recovery Phrase`
+  - `Reusable`
+  - `Generate`
   - `Scan QR`
   - `Provisioning URI`
   - `Credential ID`
@@ -46,6 +50,8 @@ Behavior notes:
 - Password changes require minimum 8 characters.
 - `<Default>` theme follows system configured panel default theme.
 - Avatar upload shows current avatar preview when present.
+- Recovery phrases are generated as 12 random words.
+- Non-reusable recovery phrases are one-time login methods and are removed after successful use.
 
 ## 2) Developer And Agent Internals
 
@@ -64,6 +70,7 @@ Declared in `panel/index.php`:
 
 - `GET /preferences` -> form
 - `POST /preferences/save` -> save
+- `POST /preferences/2fa/recovery/generate` -> generate one 12-word recovery phrase
 
 ### Controller Flow
 
@@ -123,9 +130,13 @@ When Preferences behavior changes, update this document in the same task. That i
 - `Value`
 - `Two-Factor Methods`
 - `Setup TOTP`
+- `Setup App`
 - `Manual Key`
 - `Add 2FA Method`
 - `TOTP Secret / Confirm Code`
+- `Recovery Phrase`
+- `Reusable`
+- `Generate`
 - `Scan QR`
 - `Provisioning URI`
 - `Credential ID`

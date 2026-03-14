@@ -96,7 +96,7 @@ foreach ($twoFactorMethodsRaw as $methodIndex => $methodRow) {
     }
 
     $methodType = strtolower(trim((string) ($methodRow['type'] ?? '')));
-    if (!in_array($methodType, ['totp', 'webauthn', 'email'], true)) {
+    if (!in_array($methodType, ['totp', 'recovery', 'webauthn', 'email'], true)) {
         continue;
     }
 
@@ -104,6 +104,7 @@ foreach ($twoFactorMethodsRaw as $methodIndex => $methodRow) {
     if ($methodLabel === '') {
         $methodLabel = match ($methodType) {
             'totp' => 'Authenticator App',
+            'recovery' => 'Recovery Code',
             'webauthn' => 'Security Key',
             default => 'Email Code',
         };
@@ -124,6 +125,12 @@ foreach ($twoFactorMethodsRaw as $methodIndex => $methodRow) {
         if ((bool) ($methodRow['require_uv'] ?? false)) {
             $methodDetail .= ($methodDetail !== '' ? ' ' : '') . '(PIN/Bio)';
         }
+    } elseif ($methodType === 'recovery') {
+        $recoveryCode = trim((string) ($methodRow['recovery_code'] ?? ''));
+        if ($recoveryCode !== '') {
+            $methodDetail = 'Phrase: ' . $maskMiddle($recoveryCode, 14);
+        }
+        $methodDetail .= ($methodDetail !== '' ? ' ' : '') . ((bool) ($methodRow['reusable'] ?? false) ? '(Reusable)' : '(One-time)');
     } elseif ($methodType === 'email') {
         $targetEmail = trim((string) ($methodRow['email'] ?? $methodRow['target_email'] ?? ''));
         if ($targetEmail !== '') {

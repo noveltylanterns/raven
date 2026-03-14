@@ -77,6 +77,7 @@ Fields/options:
 - `Group Memberships` (multi-select checkboxes)
 - `Two-Factor Methods` (existing users)
   - read-only method entries with `Type`, `Label`, and `Details`
+  - recovery entries show masked phrase details and whether they are one-time or reusable
   - per-method remove action for recovery workflows
 
 Group assignment notes:
@@ -205,6 +206,8 @@ When user behavior changes, update this document in the same task. That includes
 - `Add More Contact Information`
 - `Two-Factor Methods`
 - `Details`
+- `Recovery Code`
+- `Reusable`
 - `Value`
 - `Next`
 - `Previous`

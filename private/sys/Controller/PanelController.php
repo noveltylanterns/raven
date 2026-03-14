@@ -24,6 +24,11 @@ use Raven\Repository\CategoryRepository;
 use Raven\Core\Security\AvatarValidator;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Security\QrCodeService;
+use Raven\Lib\Security\RecoveryPhrase;
+use Raven\Lib\Security\TotpService;
+use Raven\Lib\Security\TwoFactorMethodNormalizer;
+use Raven\Lib\Security\WebAuthnService;
 use Raven\Core\View;
 use Raven\Repository\ChannelRepository;
 use Raven\Repository\GroupRepository;
@@ -45,7 +50,6 @@ final class PanelController
     /** Fixed side length for generated avatar thumbnail JPEG files. */
     private const AVATAR_THUMB_SIZE = 120;
     private const SESSION_WEBAUTHN_PREFERENCES_CHALLENGE = '_raven_preferences_webauthn_challenge';
-
     private View $view;
     private Config $config;
     private AuthService $auth;
@@ -3261,20 +3265,19 @@ final class PanelController
             return;
         }
 
-        $secretRaw = strtoupper(trim((string) ($post['secret'] ?? '')));
-        $secret = preg_replace('/[^A-Z2-7]/', '', $secretRaw) ?? '';
-        if ($secret === '' || preg_match('/^[A-Z2-7]{16,128}$/', $secret) !== 1) {
-            $generatedSecret = $this->generateTotpSecret();
+        $secret = TotpService::normalizeSecret((string) ($post['secret'] ?? ''));
+        if (!TotpService::isValidSecret($secret)) {
+            $generatedSecret = TotpService::generateSecret($this->totpIssuer());
             $secret = is_string($generatedSecret) ? $generatedSecret : '';
         }
 
-        if ($secret === '' || preg_match('/^[A-Z2-7]{16,128}$/', $secret) !== 1) {
+        if (!TotpService::isValidSecret($secret)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Unable to generate a TOTP secret.'], 500);
             return;
         }
 
         $accountEmail = (string) ($preferences['email'] ?? '');
-        $provisioningUri = $this->buildTotpProvisioningUri($accountEmail, $secret);
+        $provisioningUri = TotpService::provisioningUri($this->totpIssuer(), $accountEmail, $secret);
         if ($provisioningUri === '') {
             $this->jsonResponse(['ok' => false, 'message' => 'Unable to build TOTP provisioning data.'], 500);
             return;
@@ -3291,7 +3294,39 @@ final class PanelController
             'issuer' => $this->totpIssuer(),
             'account' => $accountAddress,
             'provisioning_uri' => $provisioningUri,
-            'qr_data_uri' => $this->buildQrDataUri($provisioningUri),
+            'qr_data_uri' => QrCodeService::dataUriSvgBase64($provisioningUri, 220),
+        ], 200);
+    }
+
+    /**
+     * Returns one generated 12-word recovery phrase for preferences 2FA flow.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function preferencesRecoveryCodeGenerate(array $post): void
+    {
+        $this->requirePanelLogin();
+
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
+            return;
+        }
+
+        $userId = $this->auth->userId();
+        if ($userId === null) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Login session expired.'], 401);
+            return;
+        }
+
+        $recoveryCode = RecoveryPhrase::generate(12);
+        if (!is_string($recoveryCode) || !RecoveryPhrase::isValid($recoveryCode, 12)) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Unable to generate a recovery phrase.'], 500);
+            return;
+        }
+
+        $this->jsonResponse([
+            'ok' => true,
+            'recovery_code' => $recoveryCode,
         ], 200);
     }
 
@@ -11276,6 +11311,7 @@ MARKDOWN;
         return [
             'none' => '<none>',
             'totp' => 'Authenticator App (TOTP)',
+            'recovery' => 'Recovery Code',
             'webauthn' => 'Security Key (WebAuthn)',
             'email' => 'Email Code (Stub)',
         ];
@@ -11321,103 +11357,7 @@ MARKDOWN;
             return [];
         }
 
-        $normalized = [];
-        foreach ($rawMethods as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-
-            $type = strtolower(trim((string) ($row['type'] ?? '')));
-            if ($type === '' || $type === 'none') {
-                continue;
-            }
-
-            if (!in_array($type, ['totp', 'webauthn', 'email'], true)) {
-                continue;
-            }
-
-            $label = $this->input->text((string) ($row['label'] ?? ''), 80);
-            if ($label === '') {
-                $label = match ($type) {
-                    'totp' => 'Authenticator App',
-                    'webauthn' => 'Security Key',
-                    default => 'Email Code',
-                };
-            }
-
-            $method = [
-                'type' => $type,
-                'label' => $label,
-                'status' => $type === 'totp' ? 'pending' : 'stub',
-                'added_at' => trim((string) ($row['added_at'] ?? '')) !== ''
-                    ? trim((string) ($row['added_at'] ?? ''))
-                    : gmdate('Y-m-d H:i:s'),
-            ];
-
-            if ($type === 'totp') {
-                $secretRaw = strtoupper(trim((string) ($row['secret'] ?? '')));
-                $secret = preg_replace('/[^A-Z2-7]/', '', $secretRaw) ?? '';
-                if ($secret === '') {
-                    $generated = $this->generateTotpSecret();
-                    $secret = is_string($generated) ? $generated : '';
-                }
-
-                if ($secret === '' || preg_match('/^[A-Z2-7]{16,128}$/', $secret) !== 1) {
-                    continue;
-                }
-
-                $method['secret'] = $secret;
-                $verificationCodeRaw = trim((string) ($row['verification_code'] ?? ''));
-                $verificationCode = preg_replace('/\D+/', '', $verificationCodeRaw) ?? '';
-                if ($verificationCode !== '' && $this->verifyTotpCode($secret, $verificationCode)) {
-                    $method['status'] = 'confirmed';
-                }
-            } elseif ($type === 'webauthn') {
-                $credentialId = $this->input->text((string) ($row['credential_id'] ?? ''), 512);
-                if ($credentialId !== '') {
-                    $method['credential_id'] = $credentialId;
-                }
-
-                $credentialPublicKey = trim((string) ($row['credential_public_key'] ?? ''));
-                if ($credentialPublicKey !== '') {
-                    if (mb_strlen($credentialPublicKey) > 4096) {
-                        $credentialPublicKey = mb_substr($credentialPublicKey, 0, 4096);
-                    }
-                    $method['credential_public_key'] = $credentialPublicKey;
-                }
-
-                $signatureCounter = (int) ($row['signature_counter'] ?? 0);
-                if ($signatureCounter < 0) {
-                    $signatureCounter = 0;
-                }
-                $method['signature_counter'] = $signatureCounter;
-
-                if (($method['credential_id'] ?? '') !== '' && ($method['credential_public_key'] ?? '') !== '') {
-                    $method['status'] = 'confirmed';
-                } else {
-                    $method['status'] = 'stub';
-                }
-
-                $method['require_uv'] = isset($row['require_uv']) && (string) ($row['require_uv'] ?? '') === '1';
-            } else {
-                $email = $this->input->email((string) ($row['target_email'] ?? ''));
-                if ($email === null) {
-                    $email = $this->input->email($fallbackEmail);
-                }
-                if ($email !== null) {
-                    $method['email'] = $email;
-                }
-            }
-
-            $dedupeValue = (string) ($method['secret'] ?? $method['credential_id'] ?? $method['email'] ?? '');
-            $dedupeKey = strtolower($type . "\n" . $label . "\n" . $dedupeValue);
-            $normalized[$dedupeKey] = $method;
-            if (count($normalized) >= 20) {
-                break;
-            }
-        }
-
-        return array_values($normalized);
+        return TwoFactorMethodNormalizer::normalizeSubmitted($rawMethods, $fallbackEmail, $this->totpIssuer());
     }
 
     /**
@@ -11426,132 +11366,7 @@ MARKDOWN;
      */
     private function prepareTwoFactorMethodsForView(array $methods, string $fallbackEmail): array
     {
-        $prepared = [];
-        foreach ($methods as $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            $type = strtolower(trim((string) ($method['type'] ?? '')));
-            if (!in_array($type, ['totp', 'webauthn', 'email'], true)) {
-                continue;
-            }
-
-            $status = strtolower(trim((string) ($method['status'] ?? '')));
-            if (!in_array($status, ['pending', 'confirmed', 'stub'], true)) {
-                $status = $type === 'totp' ? 'pending' : 'stub';
-            }
-
-            $label = trim((string) ($method['label'] ?? ''));
-            if ($label === '') {
-                $label = match ($type) {
-                    'totp' => 'Authenticator App',
-                    'webauthn' => 'Security Key',
-                    default => 'Email Code',
-                };
-            }
-
-            $row = [
-                'type' => $type,
-                'label' => $label,
-                'status' => $status,
-            ];
-
-            if ($type === 'totp') {
-                $secret = strtoupper(trim((string) ($method['secret'] ?? '')));
-                $secret = preg_replace('/[^A-Z2-7]/', '', $secret) ?? '';
-                if ($secret === '' || preg_match('/^[A-Z2-7]{16,128}$/', $secret) !== 1) {
-                    continue;
-                }
-
-                $row['secret'] = $secret;
-                $provisioningUri = $this->buildTotpProvisioningUri($fallbackEmail, $secret);
-                if ($provisioningUri !== '') {
-                    $row['provisioning_uri'] = $provisioningUri;
-                    $qrDataUri = $this->buildQrDataUri($provisioningUri);
-                    if ($qrDataUri !== '') {
-                        $row['qr_data_uri'] = $qrDataUri;
-                    }
-                }
-            } elseif ($type === 'webauthn') {
-                $credentialId = trim((string) ($method['credential_id'] ?? ''));
-                if ($credentialId !== '') {
-                    $row['credential_id'] = $credentialId;
-                }
-
-                $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
-                if ($credentialPublicKey !== '') {
-                    $row['credential_public_key'] = $credentialPublicKey;
-                }
-
-                $signatureCounter = (int) ($method['signature_counter'] ?? 0);
-                if ($signatureCounter < 0) {
-                    $signatureCounter = 0;
-                }
-                $row['signature_counter'] = $signatureCounter;
-
-                if (($row['credential_id'] ?? '') !== '' && ($row['credential_public_key'] ?? '') !== '') {
-                    $row['status'] = 'confirmed';
-                } else {
-                    $row['status'] = 'stub';
-                }
-
-                $row['require_uv'] = (bool) ($method['require_uv'] ?? false);
-            } else {
-                $email = $this->input->email((string) ($method['email'] ?? ''));
-                if ($email === null) {
-                    $email = $this->input->email($fallbackEmail);
-                }
-                if ($email !== null) {
-                    $row['email'] = $email;
-                }
-            }
-
-            $row['status_label'] = match ((string) $row['status']) {
-                'confirmed' => 'Confirmed',
-                'pending' => 'Pending',
-                default => 'Stub',
-            };
-            $prepared[] = $row;
-            if (count($prepared) >= 20) {
-                break;
-            }
-        }
-
-        return $prepared;
-    }
-
-    private function generateTotpSecret(): ?string
-    {
-        if (!class_exists(\RobThree\Auth\TwoFactorAuth::class)) {
-            return null;
-        }
-
-        try {
-            $totp = new \RobThree\Auth\TwoFactorAuth($this->totpIssuer());
-            $secret = strtoupper(trim((string) $totp->createSecret()));
-            if ($secret === '' || preg_match('/^[A-Z2-7]{16,128}$/', $secret) !== 1) {
-                return null;
-            }
-
-            return $secret;
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private function verifyTotpCode(string $secret, string $code): bool
-    {
-        if (!class_exists(\RobThree\Auth\TwoFactorAuth::class)) {
-            return false;
-        }
-
-        try {
-            $totp = new \RobThree\Auth\TwoFactorAuth($this->totpIssuer());
-            return $totp->verifyCode($secret, $code, 1);
-        } catch (\Throwable) {
-            return false;
-        }
+        return TwoFactorMethodNormalizer::prepareForView($methods, $fallbackEmail, $this->totpIssuer());
     }
 
     private function totpIssuer(): string
@@ -11560,99 +11375,13 @@ MARKDOWN;
         return $issuer !== '' ? $issuer : 'Raven CMS';
     }
 
-    private function buildTotpProvisioningUri(string $email, string $secret): string
-    {
-        $issuer = $this->totpIssuer();
-        $account = $this->input->email($email);
-        if ($account === null) {
-            $account = 'account@local';
-        }
-
-        $label = rawurlencode($issuer . ':' . $account);
-        $encodedIssuer = rawurlencode($issuer);
-
-        return 'otpauth://totp/' . $label . '?secret=' . rawurlencode($secret) . '&issuer=' . $encodedIssuer . '&digits=6&period=30';
-    }
-
-    private function buildQrDataUri(string $payload): string
-    {
-        if (
-            !class_exists(\BaconQrCode\Writer::class)
-            || !class_exists(\BaconQrCode\Renderer\ImageRenderer::class)
-            || !class_exists(\BaconQrCode\Renderer\RendererStyle\RendererStyle::class)
-            || !class_exists(\BaconQrCode\Renderer\Image\SvgImageBackEnd::class)
-        ) {
-            return '';
-        }
-
-        try {
-            $renderer = new \BaconQrCode\Renderer\ImageRenderer(
-                new \BaconQrCode\Renderer\RendererStyle\RendererStyle(220),
-                new \BaconQrCode\Renderer\Image\SvgImageBackEnd()
-            );
-            $writer = new \BaconQrCode\Writer($renderer);
-            $svg = $writer->writeString($payload);
-            return 'data:image/svg+xml;base64,' . base64_encode($svg);
-        } catch (\Throwable) {
-            return '';
-        }
-    }
-
     private function createWebAuthnServer(): ?WebAuthn
     {
-        if (!class_exists(WebAuthn::class)) {
-            return null;
-        }
-
-        $rpName = trim((string) $this->config->get('site.name', 'Raven CMS'));
-        if ($rpName === '') {
-            $rpName = 'Raven CMS';
-        }
-
-        $rpId = $this->webAuthnRpId();
-        if ($rpId === '') {
-            return null;
-        }
-
-        try {
-            // Prefer privacy-preserving attestation ("none") to avoid exposing authenticator metadata.
-            return new WebAuthn($rpName, $rpId, ['none'], false);
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private function webAuthnRpId(): string
-    {
-        $host = strtolower(trim((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '')));
-        if ($host !== '') {
-            if (str_contains($host, ':')) {
-                $parts = explode(':', $host, 2);
-                $host = strtolower(trim((string) ($parts[0] ?? '')));
-            }
-
-            if ($host !== '' && preg_match('/^[a-z0-9.-]+$/', $host) === 1) {
-                return trim($host, '.');
-            }
-        }
-
-        $configuredDomain = trim((string) $this->config->get('site.domain', ''));
-        if ($configuredDomain === '') {
-            return '';
-        }
-
-        $parsedHost = (string) parse_url(
-            str_starts_with($configuredDomain, 'http://') || str_starts_with($configuredDomain, 'https://')
-                ? $configuredDomain
-                : ('https://' . $configuredDomain),
-            PHP_URL_HOST
+        return WebAuthnService::createServer(
+            (string) $this->config->get('site.name', 'Raven CMS'),
+            (string) $this->config->get('site.domain', ''),
+            $_SERVER
         );
-        $parsedHost = strtolower(trim($parsedHost));
-        if ($parsedHost === '' || preg_match('/^[a-z0-9.-]+$/', $parsedHost) !== 1) {
-            return '';
-        }
-
-        return trim($parsedHost, '.');
     }
 
     /**

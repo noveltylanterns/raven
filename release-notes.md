@@ -3,6 +3,9 @@
 - Updated extension-type documentation to match the current manifest schema (`helper`, `content`, `plugin`, `module`, `system`) in `README.md` and `docs/Extensions.md`.
 - Clarified extension capability notes in docs so `lib/routes_public.php` is documented as `module`-only and extension permission masks are described as applying to non-system extensions.
 - Synced `docs/Preferences.md` and `docs/Users.md` UI-label coverage for panel 2FA controls (`Setup TOTP`, `Manual Key`, `Two-Factor Methods`, `Details`) and re-validated docs smoke coverage.
+- Added an immediate backlog note in `debug/release/todo.md` to harden TOTP provisioning crypto parameters for authenticator compatibility/security warnings.
+- Fixed panel login 2FA fallback rendering so WebAuthn failures now keep alternate methods (like TOTP app) available in-page without requiring a full page reload.
+- Added `Recovery Code` as a first-class 2FA method with generated 12-word phrases, `Reusable` toggle support, and one-time self-deletion on successful login when reuse is disabled.
 
 ### March 13, 2026
 

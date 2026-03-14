@@ -334,7 +334,7 @@ if ($sessionLoginConfigFields !== []) {
 }
 
 $profileContactOptionRows = [];
-$protectedProfileContactOptionTypes = ['email', 'phone', 'website', 'x'];
+$protectedProfileContactOptionTypes = ['email', 'phone', 'homepage', 'x'];
 $rawProfileContactOptions = $configSnapshot['user']['contact'] ?? null;
 if (is_array($rawProfileContactOptions)) {
     foreach ($rawProfileContactOptions as $optionType => $optionConfig) {
@@ -1135,7 +1135,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             <?php endif; ?>
                             <h3>Contact Options</h3>
                             <div class="form-text mb-2">Configure available contact types for user profiles. Add custom rows as needed.</div>
-                            <div class="form-text mb-2"><code>email</code>, <code>phone</code>, <code>website</code>, and <code>x</code> are required and cannot be deleted.</div>
+                            <div class="form-text mb-2"><code>email</code>, <code>phone</code>, <code>homepage</code>, and <code>x</code> are required and cannot be deleted.</div>
                             <div id="config-contact-options-list">
                                 <?php foreach ($profileContactOptionRows as $index => $contactOption): ?>
                                     <?php
@@ -1187,7 +1187,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                     </div>
                                 <?php endforeach; ?>
                             </div>
-                            <button type="button" class="btn btn-outline-primary btn-sm" id="config-contact-option-add">Add Contact Option</button>
+                            <button type="button" class="btn btn-primary btn-sm" id="config-contact-option-add">Add Contact Option</button>
                         </div>
         </div>
         </section>

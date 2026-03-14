@@ -17,6 +17,7 @@
 /** @var bool $webauthnFailed */
 /** @var array<int, array<string, mixed>> $fallbackMethods */
 /** @var array<string, mixed>|null $selectedMethod */
+/** @var string $selectedMethodType */
 /** @var string $panelBaseUrl */
 
 use function Raven\Core\Support\e;
@@ -29,6 +30,7 @@ $panelBase = '/' . $panelBase;
 $twoFactorMethods = is_array($twoFactorMethods ?? null) ? $twoFactorMethods : [];
 $fallbackMethods = is_array($fallbackMethods ?? null) ? $fallbackMethods : [];
 $selectedMethod = is_array($selectedMethod ?? null) ? $selectedMethod : null;
+$selectedMethodType = strtolower(trim((string) ($selectedMethodType ?? '')));
 $csrfToken = trim((string) ($csrfToken ?? ''));
 ?>
 <div class="rvnp-login-shell">
@@ -73,24 +75,27 @@ $csrfToken = trim((string) ($csrfToken ?? ''));
                 <?php
                 $selectedLabel = trim((string) ($selectedMethod['label'] ?? ''));
                 if ($selectedLabel === '') {
-                    $selectedLabel = 'Authenticator App';
+                    $selectedLabel = $selectedMethodType === 'recovery'
+                        ? 'Recovery Code'
+                        : 'Authenticator App';
                 }
+                $isRecovery = $selectedMethodType === 'recovery';
                 ?>
                 <form method="post" action="<?= e($panelBase) ?>/login/2fa" novalidate>
                     <?= $csrfField ?>
                     <p class="text-muted mb-2">Method: <?= e($selectedLabel) ?></p>
                     <div class="mb-3">
-                        <label for="totp_code" class="form-label">Verification Code</label>
+                        <label for="verification_code" class="form-label"><?= e($isRecovery ? 'Recovery Phrase' : 'Verification Code') ?></label>
                         <input
-                            id="totp_code"
-                            name="totp_code"
-                            type="text"
+                            id="verification_code"
+                            name="verification_code"
+                            type="<?= e($isRecovery ? 'password' : 'text') ?>"
                             class="form-control"
                             required
-                            autocomplete="one-time-code"
-                            inputmode="numeric"
-                            pattern="[0-9]{6,8}"
-                            placeholder="123456"
+                            autocomplete="<?= e($isRecovery ? 'off' : 'one-time-code') ?>"
+                            inputmode="<?= e($isRecovery ? 'text' : 'numeric') ?>"
+                            <?= $isRecovery ? '' : 'pattern="[0-9]{6,8}"' ?>
+                            placeholder="<?= e($isRecovery ? 'twelve-word recovery phrase' : '123456') ?>"
                         >
                     </div>
                     <div class="text-center">

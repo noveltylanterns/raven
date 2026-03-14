@@ -70,7 +70,7 @@ foreach ($twoFactorMethodsRaw as $methodRow) {
     }
 
     $methodType = strtolower(trim((string) ($methodRow['type'] ?? '')));
-    if (!in_array($methodType, ['totp', 'webauthn', 'email'], true)) {
+    if (!in_array($methodType, ['totp', 'recovery', 'webauthn', 'email'], true)) {
         continue;
     }
 
@@ -79,6 +79,8 @@ foreach ($twoFactorMethodsRaw as $methodRow) {
         'label' => trim((string) ($methodRow['label'] ?? '')),
         'status' => strtolower(trim((string) ($methodRow['status'] ?? ''))),
         'secret' => trim((string) ($methodRow['secret'] ?? '')),
+        'recovery_code' => trim((string) ($methodRow['recovery_code'] ?? '')),
+        'reusable' => (bool) ($methodRow['reusable'] ?? false),
         'credential_id' => trim((string) ($methodRow['credential_id'] ?? '')),
         'credential_public_key' => trim((string) ($methodRow['credential_public_key'] ?? '')),
         'signature_counter' => (int) ($methodRow['signature_counter'] ?? 0),
@@ -133,7 +135,7 @@ $themeLabels = [
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3" data-preferences-two-factor-section="label">
                 <label class="form-label">Label</label>
                 <input type="text" class="form-control" data-preferences-two-factor-key="label" placeholder="My Authenticator / Office Key">
             </div>
@@ -163,6 +165,31 @@ $themeLabels = [
             <div class="col-md" data-preferences-two-factor-section="email" style="display:none;">
                 <label class="form-label">Target Email</label>
                 <input type="email" class="form-control" data-preferences-two-factor-key="target_email" placeholder="Defaults to account email if blank">
+            </div>
+            <div class="col-md position-relative" data-preferences-two-factor-section="recovery" style="display:none;">
+                <label class="form-label">Recovery Phrase</label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <input
+                            class="form-check-input mt-0 me-2"
+                            type="checkbox"
+                            data-preferences-two-factor-key="reusable"
+                            value="1"
+                            aria-label="Reusable"
+                        >
+                        <span class="small">Reusable</span>
+                    </span>
+                    <input
+                        type="password"
+                        class="form-control"
+                        data-preferences-two-factor-key="recovery_code"
+                        placeholder="Generate 12-word recovery phrase"
+                        title="Click to copy"
+                        autocomplete="off"
+                    >
+                    <button type="button" class="btn btn-primary" data-preferences-two-factor-recovery-generate="1">Generate</button>
+                </div>
+                <div class="small text-muted mt-1" data-preferences-two-factor-recovery-copy-hint="1">Click phrase to copy.</div>
             </div>
             <div class="col-auto ps-md-0 d-flex align-items-end">
                 <button type="button" class="btn btn-danger" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
@@ -267,6 +294,9 @@ $themeLabels = [
       if (methodType === 'totp') {
         return 'Authenticator App';
       }
+      if (methodType === 'recovery') {
+        return '';
+      }
       if (methodType === 'webauthn') {
         return 'My Key';
       }
@@ -285,6 +315,15 @@ $themeLabels = [
       labelField.placeholder = labelPlaceholderForType(methodType);
     }
 
+    function syncLabelVisibility(row, methodType) {
+      var labelSection = row.querySelector('[data-preferences-two-factor-section="label"]');
+      if (!(labelSection instanceof HTMLElement)) {
+        return;
+      }
+
+      labelSection.style.display = methodType === 'recovery' ? 'none' : '';
+    }
+
     function syncRowSections(row) {
       if (!(row instanceof HTMLElement)) {
         return;
@@ -297,7 +336,9 @@ $themeLabels = [
 
       var methodType = String(typeField.value || '').trim().toLowerCase();
       syncLabelPlaceholder(row, methodType);
+      syncLabelVisibility(row, methodType);
       sectionVisible(row, 'totp', methodType === 'totp');
+      sectionVisible(row, 'recovery', methodType === 'recovery');
       sectionVisible(row, 'webauthn', methodType === 'webauthn');
       sectionVisible(row, 'email', methodType === 'email');
     }
@@ -561,6 +602,64 @@ $themeLabels = [
       }
     }
 
+    function recoveryCopyHintElement(row) {
+      var hint = row.querySelector('[data-preferences-two-factor-recovery-copy-hint="1"]');
+      return hint instanceof HTMLElement ? hint : null;
+    }
+
+    function setRecoveryCopyHint(row, message) {
+      var hint = recoveryCopyHintElement(row);
+      if (!(hint instanceof HTMLElement)) {
+        return;
+      }
+      hint.textContent = String(message || '').trim() || 'Click phrase to copy.';
+    }
+
+    async function generateRecoveryForRow(row, button) {
+      if (!(row instanceof HTMLElement) || !(button instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      var csrf = csrfTokenValue();
+      if (csrf === '') {
+        setRecoveryCopyHint(row, 'Security token missing.');
+        return;
+      }
+
+      var field = row.querySelector('[data-preferences-two-factor-key="recovery_code"]');
+      if (!(field instanceof HTMLInputElement)) {
+        return;
+      }
+
+      button.disabled = true;
+      setRecoveryCopyHint(row, 'Generating recovery phrase...');
+      try {
+        var response = await window.fetch(panelBase + '/preferences/2fa/recovery/generate', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: new URLSearchParams({ _csrf: csrf }).toString()
+        });
+        var payload = await response.json();
+        if (!response.ok || !payload || payload.ok !== true) {
+          throw new Error(payload && payload.message ? payload.message : 'Unable to generate recovery phrase.');
+        }
+
+        field.value = String(payload.recovery_code || '');
+        setRecoveryCopyHint(row, 'Generated. Click phrase to copy.');
+      } catch (error) {
+        setRecoveryCopyHint(
+          row,
+          error && typeof error.message === 'string' ? error.message : 'Unable to generate recovery phrase.'
+        );
+      } finally {
+        button.disabled = false;
+      }
+    }
+
     function collectCredentialIds() {
       var ids = [];
       var rows = list.querySelectorAll('[data-preferences-two-factor-row="1"]');
@@ -782,6 +881,18 @@ $themeLabels = [
 
       if (target instanceof HTMLSelectElement && target.getAttribute('data-preferences-two-factor-key') === 'type') {
         syncRowSections(row);
+        var selectedType = String(target.value || '').trim().toLowerCase();
+        if (selectedType === 'recovery') {
+          var recoveryField = row.querySelector('[data-preferences-two-factor-key="recovery_code"]');
+          var generateButton = row.querySelector('[data-preferences-two-factor-recovery-generate="1"]');
+          if (
+            recoveryField instanceof HTMLInputElement
+            && generateButton instanceof HTMLButtonElement
+            && String(recoveryField.value || '').trim() === ''
+          ) {
+            void generateRecoveryForRow(row, generateButton);
+          }
+        }
       }
 
     });
@@ -798,6 +909,26 @@ $themeLabels = [
         if (totpRow instanceof HTMLElement) {
           void setupTotpForRow(totpRow, totpSetupButton);
         }
+        return;
+      }
+
+      var recoveryGenerateButton = target.closest('[data-preferences-two-factor-recovery-generate="1"]');
+      if (recoveryGenerateButton instanceof HTMLButtonElement) {
+        var recoveryGenerateRow = recoveryGenerateButton.closest('[data-preferences-two-factor-row="1"]');
+        if (recoveryGenerateRow instanceof HTMLElement) {
+          void generateRecoveryForRow(recoveryGenerateRow, recoveryGenerateButton);
+        }
+        return;
+      }
+
+      var recoveryCodeField = target.closest('[data-preferences-two-factor-key="recovery_code"]');
+      if (recoveryCodeField instanceof HTMLInputElement) {
+        void copyTextValue(recoveryCodeField.value).then(function (copied) {
+          var recoveryRow = recoveryCodeField.closest('[data-preferences-two-factor-row="1"]');
+          if (recoveryRow instanceof HTMLElement) {
+            setRecoveryCopyHint(recoveryRow, copied ? 'Copied.' : 'Copy failed.');
+          }
+        });
         return;
       }
 
@@ -1041,7 +1172,7 @@ $themeLabels = [
         >
             <div class="form-group mb-0">
                 <label class="form-label h3 d-block">Two-Factor Methods</label>
-                <p class="text-muted mb-2">Add multiple methods. Confirmed TOTP methods are enforced at panel login.</p>
+                <p class="text-muted mb-2">Add multiple methods. Confirmed methods are enforced at panel login.</p>
 
                 <div id="preferences-two-factor-methods-list">
                     <?php foreach ($twoFactorMethods as $index => $method): ?>
@@ -1050,6 +1181,8 @@ $themeLabels = [
                         $methodLabel = (string) ($method['label'] ?? '');
                         $methodStatus = strtolower((string) ($method['status'] ?? ''));
                         $methodSecret = (string) ($method['secret'] ?? '');
+                        $methodRecoveryCode = (string) ($method['recovery_code'] ?? '');
+                        $methodReusable = (bool) ($method['reusable'] ?? false);
                         $methodCredentialId = (string) ($method['credential_id'] ?? '');
                         $methodCredentialPublicKey = (string) ($method['credential_public_key'] ?? '');
                         $methodSignatureCounter = (int) ($method['signature_counter'] ?? 0);
@@ -1059,6 +1192,7 @@ $themeLabels = [
                         $methodQrDataUri = (string) ($method['qr_data_uri'] ?? '');
                         $methodLabelPlaceholder = match ($methodType) {
                             'totp' => 'Authenticator App',
+                            'recovery' => '',
                             'webauthn' => 'My Key',
                             'email' => 'My Email',
                             default => '2FA Method Label',
@@ -1080,7 +1214,7 @@ $themeLabels = [
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-3" data-preferences-two-factor-section="label"<?= $methodType === 'recovery' ? ' style="display:none;"' : '' ?>>
                                     <label class="form-label">Label</label>
                                     <input
                                         type="text"
@@ -1165,6 +1299,35 @@ $themeLabels = [
                                         value="<?= e($methodEmail) ?>"
                                         placeholder="Defaults to account email if blank"
                                     >
+                                </div>
+                                <div class="col-md position-relative" data-preferences-two-factor-section="recovery"<?= $methodType === 'recovery' ? '' : ' style="display:none;"' ?>>
+                                    <label class="form-label">Recovery Phrase</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <input
+                                                class="form-check-input mt-0 me-2"
+                                                type="checkbox"
+                                                data-preferences-two-factor-key="reusable"
+                                                name="two_factor_methods[<?= (int) $index ?>][reusable]"
+                                                value="1"
+                                                <?= $methodReusable ? ' checked' : '' ?>
+                                                aria-label="Reusable"
+                                            >
+                                            <span class="small">Reusable</span>
+                                        </span>
+                                        <input
+                                            type="password"
+                                            class="form-control"
+                                            data-preferences-two-factor-key="recovery_code"
+                                            name="two_factor_methods[<?= (int) $index ?>][recovery_code]"
+                                            value="<?= e($methodRecoveryCode) ?>"
+                                            placeholder="Generate 12-word recovery phrase"
+                                            title="Click to copy"
+                                            autocomplete="off"
+                                        >
+                                        <button type="button" class="btn btn-primary" data-preferences-two-factor-recovery-generate="1">Generate</button>
+                                    </div>
+                                    <div class="small text-muted mt-1" data-preferences-two-factor-recovery-copy-hint="1">Click phrase to copy.</div>
                                 </div>
                                 <div class="col-auto ps-md-0 d-flex align-items-end">
                                     <button type="button" class="btn btn-danger" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>

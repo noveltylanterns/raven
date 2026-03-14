@@ -12,7 +12,11 @@ declare(strict_types=1);
 namespace Raven\Core\Auth;
 
 use PDO;
-use RobThree\Auth\TwoFactorAuth;
+use Raven\Lib\Security\RecoveryPhrase;
+use Raven\Lib\Security\TotpService;
+use Raven\Lib\Security\TwoFactorMethodKey;
+use Raven\Lib\Security\TwoFactorMethodNormalizer;
+use Raven\Lib\Security\TwoFactorMethodRules;
 use RuntimeException;
 
 /**
@@ -548,22 +552,42 @@ final class AuthService
                 continue;
             }
 
-            $type = strtolower(trim((string) ($method['type'] ?? '')));
-            $status = strtolower(trim((string) ($method['status'] ?? '')));
+            $type = TwoFactorMethodRules::normalizeType((string) ($method['type'] ?? ''));
+            $status = TwoFactorMethodRules::normalizeStatus((string) ($method['status'] ?? ''), $type);
             if ($type === 'totp') {
                 if ($status !== 'confirmed') {
                     continue;
                 }
 
-                $secret = strtoupper(trim((string) ($method['secret'] ?? '')));
-                if ($secret === '' || preg_match('/^[A-Z2-7]{16,128}$/', $secret) !== 1) {
+                $secret = TotpService::normalizeSecret((string) ($method['secret'] ?? ''));
+                if (!TotpService::isValidSecret($secret)) {
                     continue;
                 }
 
                 $interactive[] = [
                     'type' => 'totp',
-                    'key' => 'totp:' . sha1($secret),
-                    'label' => trim((string) ($method['label'] ?? 'Authenticator App')),
+                    'key' => TwoFactorMethodKey::forTotpSecret($secret),
+                    'label' => TwoFactorMethodRules::normalizeLabel((string) ($method['label'] ?? ''), 'totp'),
+                ];
+                continue;
+            }
+
+            if ($type === 'recovery') {
+                if ($status !== 'confirmed') {
+                    continue;
+                }
+
+                $recoveryCode = RecoveryPhrase::normalize((string) ($method['recovery_code'] ?? ''));
+                if (!RecoveryPhrase::isValid($recoveryCode, 12)) {
+                    continue;
+                }
+
+                $interactive[] = [
+                    'type' => 'recovery',
+                    'key' => TwoFactorMethodKey::forRecoveryPhrase($recoveryCode),
+                    'label' => (bool) ($method['reusable'] ?? false)
+                        ? 'Recovery Code (Reusable)'
+                        : 'Recovery Code',
                 ];
                 continue;
             }
@@ -583,8 +607,8 @@ final class AuthService
 
                 $interactive[] = [
                     'type' => 'webauthn',
-                    'key' => 'webauthn:' . $credentialId,
-                    'label' => trim((string) ($method['label'] ?? 'Security Key')),
+                    'key' => TwoFactorMethodKey::forWebauthnCredentialId($credentialId),
+                    'label' => TwoFactorMethodRules::normalizeLabel((string) ($method['label'] ?? ''), 'webauthn'),
                     'credential_id' => $credentialId,
                     'require_uv' => $requireUv,
                 ];
@@ -604,12 +628,8 @@ final class AuthService
             return false;
         }
 
-        $submittedCode = trim($submittedCode);
-        if (preg_match('/^\d{6,8}$/', $submittedCode) !== 1) {
-            return false;
-        }
-
-        if (!class_exists(TwoFactorAuth::class)) {
+        $submittedCode = TotpService::normalizeCode($submittedCode);
+        if (!TotpService::isValidCode($submittedCode)) {
             return false;
         }
 
@@ -621,22 +641,83 @@ final class AuthService
         $methods = is_array($preferences['two_factor_methods'] ?? null)
             ? $preferences['two_factor_methods']
             : [];
-        $authenticator = new TwoFactorAuth('Raven CMS');
         foreach ($methods as $method) {
             if (!is_array($method)) {
                 continue;
             }
 
-            $type = strtolower(trim((string) ($method['type'] ?? '')));
-            $status = strtolower(trim((string) ($method['status'] ?? '')));
-            $secret = strtoupper(trim((string) ($method['secret'] ?? '')));
-            if ($type !== 'totp' || $status !== 'confirmed' || $secret === '') {
+            $type = TwoFactorMethodRules::normalizeType((string) ($method['type'] ?? ''));
+            $status = TwoFactorMethodRules::normalizeStatus((string) ($method['status'] ?? ''), $type);
+            $secret = TotpService::normalizeSecret((string) ($method['secret'] ?? ''));
+            if ($type !== 'totp' || $status !== 'confirmed' || !TotpService::isValidSecret($secret)) {
                 continue;
             }
 
-            if ($authenticator->verifyCode($secret, $submittedCode, 1)) {
+            if (TotpService::verifyCode($secret, $submittedCode, 1, 'Raven CMS')) {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    /**
+     * Verifies one submitted recovery phrase for pending 2FA session.
+     *
+     * Non-reusable recovery methods are removed after one successful verification.
+     */
+    public function verifyPendingRecoveryCode(string $submittedPhrase, string $selectedMethodKey = ''): bool
+    {
+        $pendingUserId = $this->pendingTwoFactorUserId();
+        if ($pendingUserId === null) {
+            return false;
+        }
+
+        $normalizedSubmittedPhrase = RecoveryPhrase::normalize($submittedPhrase);
+        if (!RecoveryPhrase::isValid($normalizedSubmittedPhrase, 12)) {
+            return false;
+        }
+
+        $selectedMethodKey = trim($selectedMethodKey);
+        $expectedMethodKey = TwoFactorMethodKey::forRecoveryPhrase($normalizedSubmittedPhrase);
+        if ($selectedMethodKey !== '' && $selectedMethodKey !== $expectedMethodKey) {
+            return false;
+        }
+
+        $preferences = $this->userPreferences($pendingUserId);
+        if (!is_array($preferences)) {
+            return false;
+        }
+
+        $methods = is_array($preferences['two_factor_methods'] ?? null)
+            ? array_values($preferences['two_factor_methods'])
+            : [];
+        foreach ($methods as $index => $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            $type = TwoFactorMethodRules::normalizeType((string) ($method['type'] ?? ''));
+            $status = TwoFactorMethodRules::normalizeStatus((string) ($method['status'] ?? ''), $type);
+            if ($type !== 'recovery' || $status !== 'confirmed') {
+                continue;
+            }
+
+            $recoveryCode = RecoveryPhrase::normalize((string) ($method['recovery_code'] ?? ''));
+            if (!RecoveryPhrase::isValid($recoveryCode, 12) || $recoveryCode !== $normalizedSubmittedPhrase) {
+                continue;
+            }
+
+            $isReusable = (bool) ($method['reusable'] ?? false);
+            if (!$isReusable) {
+                unset($methods[$index]);
+                $updated = $this->updateUserTwoFactorMethods($pendingUserId, array_values($methods));
+                if (!(bool) ($updated['ok'] ?? false)) {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         return false;
@@ -651,7 +732,7 @@ final class AuthService
             return ['ok' => false, 'errors' => ['Invalid user id.']];
         }
 
-        $normalized = $this->normalizeTwoFactorMethods($methods);
+        $normalized = TwoFactorMethodNormalizer::normalizeStored($methods);
         $encoded = $this->encodeTwoFactorMethods($normalized);
 
         $stmt = $this->authDb->prepare(
@@ -817,7 +898,7 @@ final class AuthService
         $password = $payload['password'] ?? null;
         $contactProfiles = $this->normalizeContactProfiles((array) ($payload['contact_profiles'] ?? []));
         $contactProfilesEncoded = $this->encodeContactProfiles($contactProfiles);
-        $twoFactorMethods = $this->normalizeTwoFactorMethods((array) ($payload['two_factor_methods'] ?? []));
+        $twoFactorMethods = TwoFactorMethodNormalizer::normalizeStored((array) ($payload['two_factor_methods'] ?? []));
         $twoFactorMethodsEncoded = $this->encodeTwoFactorMethods($twoFactorMethods);
         $setAvatar = (bool) ($payload['set_avatar'] ?? false);
         $avatarPath = $payload['avatar_path'] ?? null;
@@ -949,7 +1030,7 @@ final class AuthService
             return [];
         }
 
-        return $this->normalizeTwoFactorMethods($decoded);
+        return TwoFactorMethodNormalizer::normalizeStored($decoded);
     }
 
     /**
@@ -966,113 +1047,6 @@ final class AuthService
         } catch (\Throwable) {
             return null;
         }
-    }
-
-    /**
-     * @param array<int, mixed> $methods
-     * @return array<int, array<string, mixed>>
-     */
-    private function normalizeTwoFactorMethods(array $methods): array
-    {
-        $normalized = [];
-        foreach ($methods as $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            $type = strtolower(trim((string) ($method['type'] ?? '')));
-            if (!in_array($type, ['totp', 'webauthn', 'email'], true)) {
-                continue;
-            }
-
-            $label = trim((string) ($method['label'] ?? ''));
-            if ($label === '') {
-                $label = match ($type) {
-                    'totp' => 'Authenticator App',
-                    'webauthn' => 'Security Key',
-                    default => 'Email Code',
-                };
-            }
-            if (mb_strlen($label) > 80) {
-                $label = mb_substr($label, 0, 80);
-            }
-
-            $status = strtolower(trim((string) ($method['status'] ?? '')));
-            if (!in_array($status, ['pending', 'confirmed', 'stub'], true)) {
-                $status = $type === 'totp' ? 'pending' : 'stub';
-            }
-
-            $addedAt = trim((string) ($method['added_at'] ?? ''));
-            if ($addedAt === '') {
-                $addedAt = gmdate('Y-m-d H:i:s');
-            }
-
-            $row = [
-                'type' => $type,
-                'label' => $label,
-                'status' => $status,
-                'added_at' => $addedAt,
-            ];
-
-            if ($type === 'totp') {
-                $secret = strtoupper(trim((string) ($method['secret'] ?? '')));
-                $secret = preg_replace('/[^A-Z2-7]/', '', $secret) ?? '';
-                if ($secret === '' || preg_match('/^[A-Z2-7]{16,128}$/', $secret) !== 1) {
-                    continue;
-                }
-
-                $row['secret'] = $secret;
-            } elseif ($type === 'webauthn') {
-                $credentialId = trim((string) ($method['credential_id'] ?? ''));
-                if ($credentialId !== '') {
-                    if (mb_strlen($credentialId) > 512) {
-                        $credentialId = mb_substr($credentialId, 0, 512);
-                    }
-
-                    $row['credential_id'] = $credentialId;
-                }
-
-                $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
-                if ($credentialPublicKey !== '') {
-                    if (mb_strlen($credentialPublicKey) > 4096) {
-                        $credentialPublicKey = mb_substr($credentialPublicKey, 0, 4096);
-                    }
-
-                    $row['credential_public_key'] = $credentialPublicKey;
-                }
-
-                $signatureCounter = (int) ($method['signature_counter'] ?? 0);
-                if ($signatureCounter < 0) {
-                    $signatureCounter = 0;
-                }
-                $row['signature_counter'] = $signatureCounter;
-
-                if (($row['credential_id'] ?? '') !== '' && ($row['credential_public_key'] ?? '') !== '') {
-                    $row['status'] = 'confirmed';
-                } else {
-                    $row['status'] = 'stub';
-                }
-
-                $row['require_uv'] = (bool) ($method['require_uv'] ?? false);
-            } else {
-                $email = trim((string) ($method['email'] ?? ''));
-                if ($email !== '') {
-                    if (mb_strlen($email) > 254) {
-                        $email = mb_substr($email, 0, 254);
-                    }
-
-                    $row['email'] = $email;
-                }
-            }
-
-            $dedupeKey = strtolower($type . "\n" . $label . "\n" . (string) ($row['secret'] ?? $row['credential_id'] ?? $row['email'] ?? ''));
-            $normalized[$dedupeKey] = $row;
-            if (count($normalized) >= 20) {
-                break;
-            }
-        }
-
-        return array_values($normalized);
     }
 
     /**

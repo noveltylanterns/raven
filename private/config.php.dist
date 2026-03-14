@@ -194,9 +194,9 @@ return array (
         'label' => 'Phone',
         'url_prefix' => 'tel:',
       ),
-      'website' =>
+      'homepage' =>
       array (
-        'label' => 'Website',
+        'label' => 'Homepage',
         'url_prefix' => 'https://',
       ),
       'x' =>

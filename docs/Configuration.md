@@ -314,6 +314,8 @@ The following config keys are expected to appear in this document and in runtime
 - `user.contact.phone.url_prefix`
 - `user.contact.website.label`
 - `user.contact.website.url_prefix`
+- `user.contact.homepage.label`
+- `user.contact.homepage.url_prefix`
 - `user.contact.x.label`
 - `user.contact.x.url_prefix`
 - `group.privacy`

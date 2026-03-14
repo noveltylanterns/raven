@@ -834,6 +834,10 @@ $router->add('POST', '/preferences/2fa/totp/setup', static function () use ($pan
     $panelController->preferencesTotpSetup($_POST);
 });
 
+$router->add('POST', '/preferences/2fa/recovery/generate', static function () use ($panelController): void {
+    $panelController->preferencesRecoveryCodeGenerate($_POST);
+});
+
 $router->add('POST', '/preferences/2fa/webauthn/options', static function () use ($panelController): void {
     $panelController->preferencesWebauthnCreateOptions($_POST);
 });

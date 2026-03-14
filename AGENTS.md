@@ -164,6 +164,14 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Security/CsrfTokenStoreInterface.php` - Contract for CSRF token persistence backends.
 - `/private/lib/Security/InputSanitizer.php` - Reusable scalar input sanitization and validation utility.
 - `/private/lib/Security/PhpSessionTokenStore.php` - Default CSRF token-store implementation backed by PHP sessions.
+- `/private/lib/Security/QrCodeService.php` - Shared QR-code rendering helper for SVG data-URI generation.
+- `/private/lib/Security/RecoveryPhrase.php` - Shared recovery-phrase generator, normalization, and validation helper for 2FA.
+- `/private/lib/Security/TotpService.php` - Shared TOTP secret/code normalization, verification, and provisioning-URI helper.
+- `/private/lib/Security/TwoFactorChallengeHelper.php` - Shared helper for pending 2FA method lookup/filter/fallback selection logic.
+- `/private/lib/Security/TwoFactorMethodKey.php` - Shared helpers for building/parsing interactive 2FA method keys.
+- `/private/lib/Security/TwoFactorMethodNormalizer.php` - Shared full normalization for submitted/stored/rendered 2FA method rows.
+- `/private/lib/Security/TwoFactorMethodRules.php` - Shared 2FA method type/label/status normalization and dedupe rules.
+- `/private/lib/Security/WebAuthnService.php` - Shared WebAuthn server bootstrap, RP-id resolution, and authenticator UV-flag helper.
 - `/private/lib/Security/tests/InputSanitizerSmoke.php` - Standalone smoke test for library-level InputSanitizer behavior.
 
 #### /private/raven.php

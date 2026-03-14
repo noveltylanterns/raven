@@ -11,10 +11,12 @@ declare(strict_types=1);
 
 namespace Raven\Controller;
 
-use lbuchs\WebAuthn\WebAuthn;
 use Raven\Core\Config;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Security\TwoFactorChallengeHelper;
+use Raven\Lib\Security\TwoFactorMethodKey;
+use Raven\Lib\Security\WebAuthnService;
 use Raven\Core\View;
 use Raven\Core\Auth\AuthService;
 
@@ -220,36 +222,21 @@ final class AuthController
 
         $pendingMethods = $this->auth->pendingTwoFactorMethods();
         $selectedMethodKey = trim((string) ($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] ?? ''));
-        $selectedMethod = $this->pendingMethodByKey($pendingMethods, $selectedMethodKey);
+        $selectedMethod = TwoFactorChallengeHelper::findByKey($pendingMethods, $selectedMethodKey);
         $webauthnFailed = !empty($_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED]);
-        $totpMethods = $this->pendingMethodsByType($pendingMethods, 'totp');
-        $webauthnMethods = $this->pendingMethodsByType($pendingMethods, 'webauthn');
+        $codeMethods = TwoFactorChallengeHelper::codeMethods($pendingMethods);
+        $webauthnMethods = TwoFactorChallengeHelper::filterByType($pendingMethods, 'webauthn');
         $hasWebauthn = $webauthnMethods !== [];
-        $showMethodPicker = !$hasWebauthn && count($totpMethods) > 1 && $selectedMethod === null;
-        $showTotpForm = $selectedMethod !== null && strtolower(trim((string) ($selectedMethod['type'] ?? ''))) === 'totp';
+        $selectedMethodType = strtolower(trim((string) ($selectedMethod['type'] ?? '')));
+        $showMethodPicker = !$hasWebauthn && count($codeMethods) > 1 && $selectedMethod === null;
+        $showTotpForm = in_array($selectedMethodType, ['totp', 'recovery'], true);
         $showWebauthn = $hasWebauthn && (
             $selectedMethod === null
-            || strtolower(trim((string) ($selectedMethod['type'] ?? ''))) === 'webauthn'
+            || $selectedMethodType === 'webauthn'
         );
-        $fallbackMethods = [];
-        if ($showWebauthn && $webauthnFailed) {
-            foreach ($pendingMethods as $method) {
-                if (!is_array($method)) {
-                    continue;
-                }
-
-                $methodKey = trim((string) ($method['key'] ?? ''));
-                if ($methodKey === '') {
-                    continue;
-                }
-
-                if ($selectedMethod !== null && $methodKey === trim((string) ($selectedMethod['key'] ?? ''))) {
-                    continue;
-                }
-
-                $fallbackMethods[] = $method;
-            }
-        }
+        $fallbackMethods = $showWebauthn
+            ? TwoFactorChallengeHelper::fallbackMethods($pendingMethods, $selectedMethod)
+            : [];
 
         $this->view->render('panel/login_2fa', [
             'site' => $this->siteData(),
@@ -263,6 +250,7 @@ final class AuthController
             'webauthnFailed' => $webauthnFailed,
             'fallbackMethods' => $fallbackMethods,
             'selectedMethod' => $selectedMethod,
+            'selectedMethodType' => $selectedMethodType,
             'panelBaseUrl' => $this->panelUrl(''),
             // 2FA screen remains outside authenticated panel navigation.
             'showSidebar' => false,
@@ -291,30 +279,46 @@ final class AuthController
 
         $pendingMethods = $this->auth->pendingTwoFactorMethods();
         $selectedMethodKey = trim((string) ($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] ?? ''));
-        $selectedMethod = $this->pendingMethodByKey($pendingMethods, $selectedMethodKey);
+        $selectedMethod = TwoFactorChallengeHelper::findByKey($pendingMethods, $selectedMethodKey);
         if ($selectedMethod === null) {
-            $totpMethods = $this->pendingMethodsByType($pendingMethods, 'totp');
-            if (count($totpMethods) === 1) {
-                $selectedMethod = $totpMethods[0];
+            $codeMethods = TwoFactorChallengeHelper::codeMethods($pendingMethods);
+            if (count($codeMethods) === 1) {
+                $selectedMethod = $codeMethods[0];
                 $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = (string) ($selectedMethod['key'] ?? '');
             }
         }
 
-        if ($selectedMethod === null || strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'totp') {
+        $selectedMethodType = strtolower(trim((string) ($selectedMethod['type'] ?? '')));
+        if ($selectedMethod === null || !in_array($selectedMethodType, ['totp', 'recovery'], true)) {
             $this->flash('error', 'Choose a verification method first.');
             redirect($this->panelUrl('/login/2fa'));
         }
 
-        $totpCodeRaw = $this->input->text((string) ($post['totp_code'] ?? ''), 16);
-        $totpCode = preg_replace('/\D+/', '', $totpCodeRaw) ?? '';
-        if ($totpCode === '') {
-            $this->flash('error', 'Verification code is required.');
-            redirect($this->panelUrl('/login/2fa'));
-        }
+        $verificationValue = $this->input->text(
+            (string) ($post['verification_code'] ?? $post['totp_code'] ?? ''),
+            512
+        );
+        if ($selectedMethodType === 'totp') {
+            $totpCode = preg_replace('/\D+/', '', $verificationValue) ?? '';
+            if ($totpCode === '') {
+                $this->flash('error', 'Verification code is required.');
+                redirect($this->panelUrl('/login/2fa'));
+            }
 
-        if (!$this->auth->verifyPendingTotpCode($totpCode)) {
-            $this->flash('error', 'Invalid verification code.');
-            redirect($this->panelUrl('/login/2fa'));
+            if (!$this->auth->verifyPendingTotpCode($totpCode)) {
+                $this->flash('error', 'Invalid verification code.');
+                redirect($this->panelUrl('/login/2fa'));
+            }
+        } else {
+            if (trim($verificationValue) === '') {
+                $this->flash('error', 'Recovery phrase is required.');
+                redirect($this->panelUrl('/login/2fa'));
+            }
+
+            if (!$this->auth->verifyPendingRecoveryCode($verificationValue, (string) ($selectedMethod['key'] ?? ''))) {
+                $this->flash('error', 'Invalid recovery phrase.');
+                redirect($this->panelUrl('/login/2fa'));
+            }
         }
 
         unset(
@@ -346,7 +350,7 @@ final class AuthController
 
         $pendingMethods = $this->auth->pendingTwoFactorMethods();
         $methodKey = $this->input->text((string) ($post['method_key'] ?? ''), 200);
-        $selectedMethod = $this->pendingMethodByKey($pendingMethods, $methodKey);
+        $selectedMethod = TwoFactorChallengeHelper::findByKey($pendingMethods, $methodKey);
         if ($selectedMethod === null) {
             $this->flash('error', 'Selected verification method is invalid.');
             redirect($this->panelUrl('/login/2fa'));
@@ -378,9 +382,9 @@ final class AuthController
 
         $pendingMethods = $this->auth->pendingTwoFactorMethods();
         $selectedMethodKey = trim((string) ($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] ?? ''));
-        $selectedMethod = $this->pendingMethodByKey($pendingMethods, $selectedMethodKey);
+        $selectedMethod = TwoFactorChallengeHelper::findByKey($pendingMethods, $selectedMethodKey);
         if ($selectedMethod === null || strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'webauthn') {
-            $pendingWebauthn = $this->pendingMethodsByType($pendingMethods, 'webauthn');
+            $pendingWebauthn = TwoFactorChallengeHelper::filterByType($pendingMethods, 'webauthn');
             if ($pendingWebauthn !== []) {
                 $selectedMethod = $pendingWebauthn[0];
                 $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = trim((string) ($selectedMethod['key'] ?? ''));
@@ -395,9 +399,7 @@ final class AuthController
         $selectedCredentialIdB64 = trim((string) ($selectedMethod['credential_id'] ?? ''));
         if ($selectedCredentialIdB64 === '') {
             $selectedKey = trim((string) ($selectedMethod['key'] ?? ''));
-            if (str_starts_with($selectedKey, 'webauthn:')) {
-                $selectedCredentialIdB64 = substr($selectedKey, strlen('webauthn:'));
-            }
+            $selectedCredentialIdB64 = TwoFactorMethodKey::extractWebauthnCredentialId($selectedKey);
         }
 
         if ($selectedCredentialIdB64 === '') {
@@ -455,7 +457,11 @@ final class AuthController
             ? 'required'
             : 'discouraged';
 
-        $webAuthn = $this->createWebAuthnServer();
+        $webAuthn = WebAuthnService::createServer(
+            (string) $this->config->get('site.name', 'Raven CMS'),
+            (string) $this->config->get('site.domain', ''),
+            $_SERVER
+        );
         if ($webAuthn === null) {
             $this->jsonResponse(['ok' => false, 'message' => 'WebAuthn runtime is unavailable.'], 500);
             return;
@@ -473,7 +479,7 @@ final class AuthController
                 $requireUserVerification
             );
             $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE] = $webAuthn->getChallenge()->getBinaryString();
-            $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = 'webauthn:' . $selectedCredentialIdB64;
+            $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = TwoFactorMethodKey::forWebauthnCredentialId($selectedCredentialIdB64);
             $this->jsonResponse(['ok' => true, 'options' => $options], 200);
         } catch (\Throwable $exception) {
             $this->jsonResponse(['ok' => false, 'message' => 'Failed to initialize WebAuthn challenge.'], 500);
@@ -556,7 +562,7 @@ final class AuthController
             return;
         }
 
-        if ($requiresUserVerification && !$this->authenticatorDataHasUserVerification($authenticatorData)) {
+        if ($requiresUserVerification && !WebAuthnService::authenticatorDataHasUserVerification($authenticatorData)) {
             $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED] = true;
             $this->jsonResponse([
                 'ok' => false,
@@ -565,7 +571,11 @@ final class AuthController
             return;
         }
 
-        $webAuthn = $this->createWebAuthnServer();
+        $webAuthn = WebAuthnService::createServer(
+            (string) $this->config->get('site.name', 'Raven CMS'),
+            (string) $this->config->get('site.domain', ''),
+            $_SERVER
+        );
         if ($webAuthn === null) {
             $this->jsonResponse(['ok' => false, 'message' => 'WebAuthn runtime is unavailable.'], 500);
             return;
@@ -796,123 +806,6 @@ final class AuthController
         );
 
         return max(1, $configured);
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $methods
-     */
-    private function pendingMethodByKey(array $methods, string $methodKey): ?array
-    {
-        $methodKey = trim($methodKey);
-        if ($methodKey === '') {
-            return null;
-        }
-
-        foreach ($methods as $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            if (trim((string) ($method['key'] ?? '')) === $methodKey) {
-                return $method;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $methods
-     * @return array<int, array<string, mixed>>
-     */
-    private function pendingMethodsByType(array $methods, string $type): array
-    {
-        $type = strtolower(trim($type));
-        if ($type === '') {
-            return [];
-        }
-
-        $filtered = [];
-        foreach ($methods as $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            if (strtolower(trim((string) ($method['type'] ?? ''))) !== $type) {
-                continue;
-            }
-
-            $filtered[] = $method;
-        }
-
-        return $filtered;
-    }
-
-    private function authenticatorDataHasUserVerification(string $authenticatorData): bool
-    {
-        if (strlen($authenticatorData) < 33) {
-            return false;
-        }
-
-        $flags = ord($authenticatorData[32]);
-        return ($flags & 0x04) === 0x04;
-    }
-
-    private function createWebAuthnServer(): ?WebAuthn
-    {
-        if (!class_exists(WebAuthn::class)) {
-            return null;
-        }
-
-        $rpName = trim((string) $this->config->get('site.name', 'Raven CMS'));
-        if ($rpName === '') {
-            $rpName = 'Raven CMS';
-        }
-
-        $rpId = $this->webAuthnRpId();
-        if ($rpId === '') {
-            return null;
-        }
-
-        try {
-            // Prefer privacy-preserving attestation ("none") to avoid exposing authenticator metadata.
-            return new WebAuthn($rpName, $rpId, ['none'], false);
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private function webAuthnRpId(): string
-    {
-        $host = strtolower(trim((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '')));
-        if ($host !== '') {
-            if (str_contains($host, ':')) {
-                $parts = explode(':', $host, 2);
-                $host = strtolower(trim((string) ($parts[0] ?? '')));
-            }
-
-            if ($host !== '' && preg_match('/^[a-z0-9.-]+$/', $host) === 1) {
-                return trim($host, '.');
-            }
-        }
-
-        $configuredDomain = trim((string) $this->config->get('site.domain', ''));
-        if ($configuredDomain === '') {
-            return '';
-        }
-
-        $parsedHost = (string) parse_url(
-            str_starts_with($configuredDomain, 'http://') || str_starts_with($configuredDomain, 'https://')
-                ? $configuredDomain
-                : ('https://' . $configuredDomain),
-            PHP_URL_HOST
-        );
-        $parsedHost = strtolower(trim($parsedHost));
-        if ($parsedHost === '' || preg_match('/^[a-z0-9.-]+$/', $parsedHost) !== 1) {
-            return '';
-        }
-
-        return trim($parsedHost, '.');
     }
 
     /**
