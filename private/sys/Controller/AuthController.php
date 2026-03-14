@@ -16,6 +16,7 @@ use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Routing\PanelUrl;
+use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\TwoFactorChallengeHelper;
@@ -51,6 +52,7 @@ final class AuthController
     private Csrf $csrf;
     private SessionFlash $flash;
     private LoginIdentifierResolver $identifierResolver;
+    private ?SiteContextBuilder $siteContextBuilder = null;
 
     public function __construct(
         View $view,
@@ -678,12 +680,16 @@ final class AuthController
      */
     private function siteData(): array
     {
-        return [
-            'name' => (string) $this->config->get('site.name', 'Raven CMS'),
-            'panel_path' => (string) $this->config->get('panel.path', 'panel'),
-            'panel_brand_name' => (string) $this->config->get('panel.brand_name', ''),
-            'panel_brand_logo' => (string) $this->config->get('panel.brand_logo', ''),
-        ];
+        return $this->siteContextBuilder()->panel($this->config, null, null, false);
+    }
+
+    private function siteContextBuilder(): SiteContextBuilder
+    {
+        if (!$this->siteContextBuilder instanceof SiteContextBuilder) {
+            $this->siteContextBuilder = new SiteContextBuilder();
+        }
+
+        return $this->siteContextBuilder;
     }
 
     /**

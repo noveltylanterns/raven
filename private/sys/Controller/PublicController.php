@@ -19,11 +19,13 @@ use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Content\MarkdownRenderer;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Pagination\Pagination;
 use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Routing\RedirectTargetValidator;
+use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Core\Theme\PublicThemeRegistry;
@@ -64,6 +66,8 @@ final class PublicController
     private ?array $enabledExtensionMap = null;
     /** @var array<string, array{label: string, editor: string}>|null */
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
+    private ?SiteContextBuilder $siteContextBuilder = null;
+    private ?MarkdownRenderer $markdownRenderer = null;
     /**
      * Request-local cache of enabled embedded forms keyed by type then slug.
      *
@@ -1202,31 +1206,22 @@ final class PublicController
     {
         $publicTheme = $this->currentPublicThemeSlug();
         $configuredDomain = (string) $this->config->get('site.domain', 'localhost');
+        $publicThemeCss = $this->currentPublicThemeCssSlug($publicTheme);
 
-        return [
-            'name' => (string) $this->config->get('site.name', 'Raven CMS'),
-            'domain' => $configuredDomain,
-            'panel_path' => (string) $this->config->get('panel.path', 'panel'),
-            'current_url' => $this->currentRequestUrl($configuredDomain),
-            'apple_touch_icon' => trim((string) $this->config->get('meta.apple_touch_icon', '')),
-            'robots' => trim((string) $this->config->get('meta.robots', 'index,follow')),
-            'twitter_card' => trim((string) $this->config->get('meta.twitter.card', '')),
-            'twitter_site' => trim((string) $this->config->get('meta.twitter.site', '')),
-            'twitter_creator' => trim((string) $this->config->get('meta.twitter.creator', '')),
-            'twitter_image' => $this->absoluteMetaImageUrl(
+        return $this->siteContextBuilder()->publicBase(
+            $this->config,
+            $this->currentRequestUrl($configuredDomain),
+            $publicTheme,
+            $publicThemeCss,
+            $this->absoluteMetaImageUrl(
                 trim((string) $this->config->get('meta.twitter.image', '')),
                 $configuredDomain
             ),
-            'og_image' => $this->absoluteMetaImageUrl(
+            $this->absoluteMetaImageUrl(
                 trim((string) $this->config->get('meta.opengraph.image', '')),
                 $configuredDomain
-            ),
-            'og_type' => trim((string) $this->config->get('meta.opengraph.type', 'website')),
-            'og_locale' => trim((string) $this->config->get('meta.opengraph.locale', 'en_US')),
-            'public_theme' => $publicTheme,
-            // CSS may live only in a parent theme for child-theme setups.
-            'public_theme_css' => $this->currentPublicThemeCssSlug($publicTheme),
-        ];
+            )
+        );
     }
 
     /**
@@ -1977,178 +1972,7 @@ final class PublicController
      */
     private function simpleMarkdownToHtml(string $markdown): string
     {
-        $markdown = str_replace(["\r\n", "\r"], "\n", $markdown);
-        $markdown = trim($markdown);
-        if ($markdown === '') {
-            return '';
-        }
-
-        // Extract fenced code blocks before paragraph chunking so blank lines inside
-        // code fences are preserved.
-        $codeBlockPlaceholders = [];
-        $processedLines = [];
-        $isInFence = false;
-        $fenceChar = '';
-        $fenceLength = 0;
-        $fenceLines = [];
-        $lines = preg_split('/\n/', $markdown) ?: [];
-        foreach ($lines as $line) {
-            if (!$isInFence) {
-                if (preg_match('/^([`~]{3,})(?:\s*[a-z0-9_-]+)?\s*$/i', $line, $matches) === 1) {
-                    $fence = (string) ($matches[1] ?? '');
-                    if ($fence !== '') {
-                        $isInFence = true;
-                        $fenceChar = substr($fence, 0, 1);
-                        $fenceLength = strlen($fence);
-                        $fenceLines = [];
-                        continue;
-                    }
-                }
-
-                $processedLines[] = $line;
-                continue;
-            }
-
-            $closingFencePattern = '/^' . preg_quote($fenceChar, '/') . '{' . $fenceLength . ',}\s*$/';
-            if (preg_match($closingFencePattern, $line) === 1) {
-                $token = '__RAVEN_FENCED_CODE_' . count($codeBlockPlaceholders) . '__';
-                $codeBlockPlaceholders[$token] = '<pre><code>' . $this->escapeHtml(implode("\n", $fenceLines)) . '</code></pre>';
-                $processedLines[] = '';
-                $processedLines[] = $token;
-                $processedLines[] = '';
-                $isInFence = false;
-                $fenceChar = '';
-                $fenceLength = 0;
-                $fenceLines = [];
-                continue;
-            }
-
-            $fenceLines[] = $line;
-        }
-
-        if ($isInFence) {
-            $token = '__RAVEN_FENCED_CODE_' . count($codeBlockPlaceholders) . '__';
-            $codeBlockPlaceholders[$token] = '<pre><code>' . $this->escapeHtml(implode("\n", $fenceLines)) . '</code></pre>';
-            $processedLines[] = '';
-            $processedLines[] = $token;
-            $processedLines[] = '';
-        }
-
-        $markdown = trim(implode("\n", $processedLines));
-        if ($markdown === '') {
-            return '';
-        }
-
-        $parts = [];
-        $paragraphLines = [];
-        $lines = preg_split('/\n/', $markdown) ?: [];
-        $lineCount = count($lines);
-        $lineIndex = 0;
-
-        $flushParagraph = function () use (&$paragraphLines, &$parts): void {
-            if ($paragraphLines === []) {
-                return;
-            }
-
-            $paragraphText = trim(implode("\n", $paragraphLines));
-            $paragraphLines = [];
-            if ($paragraphText === '') {
-                return;
-            }
-
-            $parts[] = '<p>' . nl2br($this->renderMarkdownInline($paragraphText), false) . '</p>';
-        };
-
-        while ($lineIndex < $lineCount) {
-            $line = (string) ($lines[$lineIndex] ?? '');
-            $trimmedLine = trim($line);
-
-            if ($trimmedLine === '') {
-                $flushParagraph();
-                $lineIndex++;
-                continue;
-            }
-
-            if (isset($codeBlockPlaceholders[$trimmedLine])) {
-                $flushParagraph();
-                $parts[] = (string) $codeBlockPlaceholders[$trimmedLine];
-                $lineIndex++;
-                continue;
-            }
-
-            if (preg_match('/^(#{1,6})\s+(.+)$/', $trimmedLine, $headingMatches) === 1) {
-                $flushParagraph();
-                $level = strlen((string) ($headingMatches[1] ?? '#'));
-                $text = (string) ($headingMatches[2] ?? '');
-                $parts[] = '<h' . $level . '>' . $this->renderMarkdownInline($text) . '</h' . $level . '>';
-                $lineIndex++;
-                continue;
-            }
-
-            if (preg_match('/^[-*+]\s+(.+)$/', $trimmedLine, $listMatches) === 1) {
-                $flushParagraph();
-                $items = [];
-                while ($lineIndex < $lineCount) {
-                    $listLine = trim((string) ($lines[$lineIndex] ?? ''));
-                    if (preg_match('/^[-*+]\s+(.+)$/', $listLine, $itemMatches) !== 1) {
-                        break;
-                    }
-
-                    $items[] = '<li>' . $this->renderMarkdownInline((string) ($itemMatches[1] ?? '')) . '</li>';
-                    $lineIndex++;
-                }
-
-                if ($items !== []) {
-                    $parts[] = '<ul>' . implode('', $items) . '</ul>';
-                }
-                continue;
-            }
-
-            if (preg_match('/^\d+\.\s+(.+)$/', $trimmedLine, $orderedListMatches) === 1) {
-                $flushParagraph();
-                $items = [];
-                while ($lineIndex < $lineCount) {
-                    $listLine = trim((string) ($lines[$lineIndex] ?? ''));
-                    if (preg_match('/^\d+\.\s+(.+)$/', $listLine, $itemMatches) !== 1) {
-                        break;
-                    }
-
-                    $items[] = '<li>' . $this->renderMarkdownInline((string) ($itemMatches[1] ?? '')) . '</li>';
-                    $lineIndex++;
-                }
-
-                if ($items !== []) {
-                    $parts[] = '<ol>' . implode('', $items) . '</ol>';
-                }
-                continue;
-            }
-
-            if (preg_match('/^>\s?.+$/', $trimmedLine) === 1) {
-                $flushParagraph();
-                $quoteLines = [];
-                while ($lineIndex < $lineCount) {
-                    $quoteLine = trim((string) ($lines[$lineIndex] ?? ''));
-                    if (preg_match('/^>\s?.+$/', $quoteLine) !== 1) {
-                        break;
-                    }
-
-                    $quoteLines[] = (string) preg_replace('/^>\s?/', '', $quoteLine);
-                    $lineIndex++;
-                }
-
-                if ($quoteLines !== []) {
-                    $quoteText = implode("\n", $quoteLines);
-                    $parts[] = '<blockquote><p>' . nl2br($this->renderMarkdownInline($quoteText), false) . '</p></blockquote>';
-                }
-                continue;
-            }
-
-            $paragraphLines[] = $line;
-            $lineIndex++;
-        }
-
-        $flushParagraph();
-        return implode("\n", $parts);
+        return $this->markdownRenderer()->toHtml($markdown);
     }
 
     /**
@@ -2156,34 +1980,7 @@ final class PublicController
      */
     private function renderMarkdownInline(string $text): string
     {
-        $escaped = $this->escapeHtml($text);
-        $codePlaceholders = [];
-        $escaped = preg_replace_callback('/`([^`]+)`/', function (array $matches) use (&$codePlaceholders): string {
-            $token = '%%RAVENCODE' . count($codePlaceholders) . '%%';
-            $codePlaceholders[$token] = '<code>' . $this->escapeHtml((string) ($matches[1] ?? '')) . '</code>';
-            return $token;
-        }, $escaped) ?? $escaped;
-
-        $escaped = preg_replace_callback('/\[(.+?)\]\((.+?)\)/', function (array $matches): string {
-            $label = (string) ($matches[1] ?? '');
-            $url = $this->normalizeMarkdownLinkUrl((string) ($matches[2] ?? ''));
-            if ($url === null) {
-                return $this->escapeHtml($label);
-            }
-
-            return '<a href="' . $this->escapeHtml($url) . '">' . $this->escapeHtml($label) . '</a>';
-        }, $escaped) ?? $escaped;
-
-        $escaped = preg_replace('/\*\*([^*]+)\*\*/', '<strong>$1</strong>', $escaped) ?? $escaped;
-        $escaped = preg_replace('/__([^_]+)__/', '<strong>$1</strong>', $escaped) ?? $escaped;
-        $escaped = preg_replace('/\*([^*\n]+)\*/', '<em>$1</em>', $escaped) ?? $escaped;
-        $escaped = preg_replace('/_([^_\n]+)_/', '<em>$1</em>', $escaped) ?? $escaped;
-
-        foreach ($codePlaceholders as $token => $html) {
-            $escaped = str_replace($token, $html, $escaped);
-        }
-
-        return $escaped;
+        return $this->markdownRenderer()->renderInline($text);
     }
 
     /**
@@ -2191,51 +1988,7 @@ final class PublicController
      */
     private function normalizeMarkdownLinkUrl(string $url): ?string
     {
-        $url = html_entity_decode(trim($url), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        if ($url === '') {
-            return null;
-        }
-
-        // Support standard markdown link syntax variants:
-        // - [label](https://example.com "Title")
-        // - [label](<https://example.com>)
-        if (preg_match('/^(<[^>]+>|\\S+)(?:\\s+["\'][^"\']*["\'])?$/u', $url, $matches) === 1) {
-            $url = (string) ($matches[1] ?? $url);
-        }
-        $url = trim($url, "<> \t\n\r\0\x0B");
-        if ($url === '') {
-            return null;
-        }
-
-        // Reject control characters and dangerous protocol-relative URLs.
-        if (preg_match('/[\x00-\x1F\x7F]/', $url) === 1 || str_starts_with($url, '//')) {
-            return null;
-        }
-
-        // Keep same-page fragment links.
-        if (str_starts_with($url, '#')) {
-            return $url;
-        }
-
-        if (str_starts_with($url, '/')) {
-            return $url;
-        }
-
-        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
-        if ($scheme !== '') {
-            if (!in_array($scheme, ['http', 'https'], true)) {
-                return null;
-            }
-
-            return filter_var($url, FILTER_VALIDATE_URL) === false ? null : $url;
-        }
-
-        // Keep relative links (`./file.md`, `../dir/file.md`, `docs/file.md`, etc).
-        if (str_contains($url, '\\')) {
-            return null;
-        }
-
-        return $url;
+        return $this->markdownRenderer()->normalizeLinkUrl($url);
     }
 
     /**
@@ -2416,6 +2169,24 @@ final class PublicController
     private function panelUrl(string $suffix = ''): string
     {
         return PanelUrl::fromConfig($this->config, $suffix);
+    }
+
+    private function siteContextBuilder(): SiteContextBuilder
+    {
+        if (!$this->siteContextBuilder instanceof SiteContextBuilder) {
+            $this->siteContextBuilder = new SiteContextBuilder();
+        }
+
+        return $this->siteContextBuilder;
+    }
+
+    private function markdownRenderer(): MarkdownRenderer
+    {
+        if (!$this->markdownRenderer instanceof MarkdownRenderer) {
+            $this->markdownRenderer = new MarkdownRenderer();
+        }
+
+        return $this->markdownRenderer;
     }
 
     /**

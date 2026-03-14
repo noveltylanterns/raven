@@ -22,13 +22,17 @@ use Raven\Core\Media\PageImageManager;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Lib\Archive\ArchivePackageService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Config\ConfigEditorNormalizer;
 use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Extension\ExtensionStateStore;
+use Raven\Lib\Extension\ExtensionScaffoldService;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Pagination\Pagination;
 use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Routing\RedirectTargetValidator;
+use Raven\Lib\Theme\ThemeScaffoldService;
 use Raven\Repository\CategoryRepository;
 use Raven\Core\Security\AvatarValidator;
 use Raven\Lib\Security\Csrf;
@@ -38,6 +42,7 @@ use Raven\Lib\Security\RecoveryPhrase;
 use Raven\Lib\Security\TotpService;
 use Raven\Lib\Security\TwoFactorMethodNormalizer;
 use Raven\Lib\Security\WebAuthnService;
+use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\View\ThemeFallbackRenderer;
 use Raven\Core\View;
 use Raven\Repository\ChannelRepository;
@@ -83,6 +88,11 @@ final class PanelController
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
     private ?ArchivePackageService $archivePackages = null;
     private ?ThemeFallbackRenderer $publicFallbackRenderer = null;
+    private ?ExtensionStateStore $extensionStateStore = null;
+    private ?ExtensionScaffoldService $extensionScaffoldService = null;
+    private ?ThemeScaffoldService $themeScaffoldService = null;
+    private ?SiteContextBuilder $siteContextBuilder = null;
+    private ?ConfigEditorNormalizer $configEditorNormalizer = null;
 
     public function __construct(
         View $view,
@@ -5617,29 +5627,11 @@ final class PanelController
      */
     private function normalizeMetaAbsoluteUrlPathValue(string $siteDomain, string $rawPathOrUrl, bool $allowAbsoluteUrlPaste = true): string
     {
-        $rawPathOrUrl = trim($rawPathOrUrl);
-        if ($rawPathOrUrl === '') {
-            return '';
-        }
-
-        if (preg_match('/^https?:\/\//i', $rawPathOrUrl) === 1) {
-            if (!$allowAbsoluteUrlPaste) {
-                throw new \RuntimeException('OpenGraph Image must be a local file path relative to site.domain, not a full URL.');
-            }
-
-            if (filter_var($rawPathOrUrl, FILTER_VALIDATE_URL) === false) {
-                throw new \RuntimeException('Meta URL fields must be valid absolute URLs or URL paths.');
-            }
-
-            return $rawPathOrUrl;
-        }
-
-        $normalizedDomain = $this->normalizeDomainHostForUrlPrefix($siteDomain);
-        if ($normalizedDomain === '') {
-            throw new \RuntimeException('site.domain must be set before saving URL-path meta fields.');
-        }
-
-        return 'https://' . $normalizedDomain . '/' . ltrim($rawPathOrUrl, '/');
+        return $this->configEditorNormalizer()->normalizeMetaAbsoluteUrlPathValue(
+            $siteDomain,
+            $rawPathOrUrl,
+            $allowAbsoluteUrlPaste
+        );
     }
 
     /**
@@ -5647,21 +5639,7 @@ final class PanelController
      */
     private function normalizeDomainHostForUrlPrefix(string $rawDomain): string
     {
-        $rawDomain = trim($rawDomain);
-        if ($rawDomain === '') {
-            return '';
-        }
-
-        if (str_contains($rawDomain, '://')) {
-            $parsedHost = trim((string) parse_url($rawDomain, PHP_URL_HOST));
-            $parsedPort = parse_url($rawDomain, PHP_URL_PORT);
-            if ($parsedHost !== '') {
-                return $parsedHost . (is_int($parsedPort) && $parsedPort > 0 ? ':' . $parsedPort : '');
-            }
-        }
-
-        $rawDomain = preg_replace('/[\/?#].*$/', '', $rawDomain) ?? $rawDomain;
-        return trim($rawDomain);
+        return $this->configEditorNormalizer()->normalizeDomainHostForUrlPrefix($rawDomain);
     }
 
     /**
@@ -5669,11 +5647,7 @@ final class PanelController
      */
     private function normalizeConfigInt(string $path, string $value): int
     {
-        if ($value === '' || filter_var($value, FILTER_VALIDATE_INT) === false) {
-            throw new \RuntimeException($path . ' must be an integer.');
-        }
-
-        return (int) $value;
+        return $this->configEditorNormalizer()->normalizeInt($path, $value);
     }
 
     /**
@@ -5681,11 +5655,7 @@ final class PanelController
      */
     private function normalizeConfigFloat(string $path, string $value): float
     {
-        if ($value === '' || !is_numeric($value)) {
-            throw new \RuntimeException($path . ' must be numeric.');
-        }
-
-        return (float) $value;
+        return $this->configEditorNormalizer()->normalizeFloat($path, $value);
     }
 
     /**
@@ -5693,17 +5663,7 @@ final class PanelController
      */
     private function normalizeConfigBool(string $path, string $value): bool
     {
-        $normalized = strtolower($value);
-
-        if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
-            return true;
-        }
-
-        if (in_array($normalized, ['0', 'false', 'no', 'off'], true)) {
-            return false;
-        }
-
-        throw new \RuntimeException($path . ' must be a boolean (true/false).');
+        return $this->configEditorNormalizer()->normalizeBool($path, $value);
     }
 
     /**
@@ -5711,74 +5671,7 @@ final class PanelController
      */
     private function normalizeImageConfigValue(string $path, string $value): int|string|bool
     {
-        if ($path === 'media.images.upload_target') {
-            $target = strtolower($value);
-            if ($target !== 'local') {
-                throw new \RuntimeException('media.images.upload_target currently supports only local.');
-            }
-
-            return $target;
-        }
-
-        if ($path === 'media.images.strip_exif') {
-            return $this->normalizeConfigBool($path, $value);
-        }
-
-        if ($path === 'media.images.max_filesize_kb') {
-            $size = $this->normalizeConfigInt($path, $value);
-            if ($size < 0) {
-                throw new \RuntimeException($path . ' must be 0 or greater.');
-            }
-
-            return $size;
-        }
-
-        if ($path === 'media.images.max_files_per_upload') {
-            $count = $this->normalizeConfigInt($path, $value);
-            if ($count < 0) {
-                throw new \RuntimeException($path . ' must be 0 or greater.');
-            }
-
-            return $count;
-        }
-
-        if ($path === 'media.images.allowed_extensions') {
-            $normalized = strtolower($value);
-            $parts = array_map('trim', explode(',', $normalized));
-            $parts = array_values(array_filter($parts, static fn (string $ext): bool => $ext !== ''));
-            if ($parts === []) {
-                // Empty allow list is allowed and blocks all image uploads.
-                return '';
-            }
-
-            foreach ($parts as $ext) {
-                if (!preg_match('/^[a-z0-9]+$/', $ext)) {
-                    throw new \RuntimeException($path . ' may only contain comma-separated alphanumeric extensions.');
-                }
-            }
-
-            // Save canonical comma-separated list so downstream checks are deterministic.
-            return implode(',', array_values(array_unique($parts)));
-        }
-
-        $dimensionPaths = [
-            'media.images.small.width',
-            'media.images.small.height',
-            'media.images.med.width',
-            'media.images.med.height',
-            'media.images.large.width',
-            'media.images.large.height',
-        ];
-        if (in_array($path, $dimensionPaths, true)) {
-            $dimension = $this->normalizeConfigInt($path, $value);
-            if ($dimension < 0) {
-                throw new \RuntimeException($path . ' must be 0 or greater.');
-            }
-
-            return $dimension;
-        }
-
-        return $value;
+        return $this->configEditorNormalizer()->normalizeImageConfigValue($path, $value);
     }
 
     /**
@@ -8043,7 +7936,7 @@ final class PanelController
      */
     private function extensionsBasePath(): string
     {
-        return dirname(__DIR__, 2) . '/ext';
+        return $this->extensionStateStore()->basePath();
     }
 
     /**
@@ -8051,7 +7944,7 @@ final class PanelController
      */
     private function extensionsStateFilePath(): string
     {
-        return $this->extensionsBasePath() . '/.state.php';
+        return $this->extensionStateStore()->stateFilePath();
     }
 
     /**
@@ -8059,14 +7952,7 @@ final class PanelController
      */
     private function ensureExtensionsDirectory(): void
     {
-        $basePath = $this->extensionsBasePath();
-        if (is_dir($basePath)) {
-            return;
-        }
-
-        if (!mkdir($basePath, 0775, true) && !is_dir($basePath)) {
-            throw new \RuntimeException('Failed to create private/ext directory.');
-        }
+        $this->extensionStateStore()->ensureDirectory();
     }
 
     /**
@@ -8080,117 +7966,7 @@ final class PanelController
      */
     private function loadExtensionStateData(): array
     {
-        $statePath = $this->extensionsStateFilePath();
-        if (!is_file($statePath)) {
-            return [
-                'enabled' => [],
-                'permissions' => [],
-                'permission_bits' => [],
-            ];
-        }
-
-        // Force fresh reads when PHP opcache uses delayed timestamp revalidation.
-        clearstatcache(true, $statePath);
-        if (function_exists('opcache_invalidate')) {
-            @opcache_invalidate($statePath, true);
-        }
-
-        /** @var mixed $loaded */
-        $loaded = require $statePath;
-        if (!is_array($loaded)) {
-            return [
-                'enabled' => [],
-                'permissions' => [],
-                'permission_bits' => [],
-            ];
-        }
-
-        /** @var mixed $rawEnabled */
-        $rawEnabled = array_key_exists('enabled', $loaded) ? $loaded['enabled'] : $loaded;
-        if (!array_key_exists('enabled', $loaded) && array_key_exists('permissions', $loaded)) {
-            $rawEnabled = [];
-        }
-        if (!is_array($rawEnabled)) {
-            $rawEnabled = [];
-        }
-
-        /** @var mixed $rawPermissions */
-        $rawPermissions = $loaded['permissions'] ?? [];
-        if (!is_array($rawPermissions)) {
-            $rawPermissions = [];
-        }
-        /** @var mixed $rawPermissionBits */
-        $rawPermissionBits = $loaded['permission_bits'] ?? [];
-        if (!is_array($rawPermissionBits)) {
-            $rawPermissionBits = [];
-        }
-
-        $enabled = [];
-        foreach ($rawEnabled as $name => $isEnabled) {
-            $directory = (string) $name;
-            if (!$this->isSafeExtensionDirectoryName($directory)) {
-                continue;
-            }
-
-            if ((bool) $isEnabled) {
-                $enabled[$directory] = true;
-            }
-        }
-
-        $permissions = [];
-        foreach ($rawPermissions as $name => $rawBit) {
-            $directory = (string) $name;
-            if (!$this->isSafeExtensionDirectoryName($directory)) {
-                continue;
-            }
-
-            $bit = (int) $rawBit;
-            if ($bit <= 0) {
-                continue;
-            }
-
-            $permissions[$directory] = $bit;
-        }
-
-        $permissionBits = [];
-        foreach ($rawPermissionBits as $name => $levelsRaw) {
-            $directory = (string) $name;
-            if (!$this->isSafeExtensionDirectoryName($directory) || !is_array($levelsRaw)) {
-                continue;
-            }
-
-            $normalizedLevels = [];
-            foreach ($levelsRaw as $levelKey => $rawBit) {
-                $level = strtolower(trim((string) $levelKey));
-                if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $level) !== 1) {
-                    continue;
-                }
-
-                $bit = (int) $rawBit;
-                if ($bit <= 0) {
-                    continue;
-                }
-
-                $normalizedLevels[$level] = $bit;
-            }
-
-            if ($normalizedLevels === []) {
-                continue;
-            }
-
-            ksort($normalizedLevels);
-            $permissionBits[$directory] = $normalizedLevels;
-        }
-
-        ksort($enabled);
-        ksort($permissions);
-        ksort($permissionBits);
-
-        return [
-            'enabled' => $enabled,
-            'permissions' => $permissions,
-            'permission_bits' => $permissionBits,
-        ];
+        return $this->extensionStateStore()->loadStateData();
     }
 
     /**
@@ -8200,7 +7976,7 @@ final class PanelController
      */
     private function loadExtensionStateMap(): array
     {
-        return $this->loadExtensionStateData()['enabled'];
+        return $this->extensionStateStore()->loadEnabledMap();
     }
 
     /**
@@ -8210,7 +7986,7 @@ final class PanelController
      */
     private function loadExtensionPermissionMap(): array
     {
-        return $this->loadExtensionStateData()['permissions'];
+        return $this->extensionStateStore()->loadPermissionMap();
     }
 
     /**
@@ -8220,7 +7996,7 @@ final class PanelController
      */
     private function loadExtensionPermissionBitsMap(): array
     {
-        return $this->loadExtensionStateData()['permission_bits'];
+        return $this->extensionStateStore()->loadPermissionBitsMap();
     }
 
     /**
@@ -8230,9 +8006,7 @@ final class PanelController
      */
     private function saveExtensionStateMap(array $enabledMap): void
     {
-        $permissionMap = $this->loadExtensionPermissionMap();
-        $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
-        $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
+        $this->extensionStateStore()->saveEnabledMap($enabledMap);
     }
 
     /**
@@ -8242,9 +8016,7 @@ final class PanelController
      */
     private function saveExtensionPermissionMap(array $permissionMap): void
     {
-        $enabledMap = $this->loadExtensionStateMap();
-        $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
-        $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
+        $this->extensionStateStore()->savePermissionMap($permissionMap);
     }
 
     /**
@@ -8254,9 +8026,7 @@ final class PanelController
      */
     private function saveExtensionPermissionBitsMap(array $permissionBitsMap): void
     {
-        $enabledMap = $this->loadExtensionStateMap();
-        $permissionMap = $this->loadExtensionPermissionMap();
-        $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
+        $this->extensionStateStore()->savePermissionBitsMap($permissionBitsMap);
     }
 
     /**
@@ -8268,94 +8038,7 @@ final class PanelController
      */
     private function saveExtensionState(array $enabledMap, array $permissionMap, array $permissionBitsMap = []): void
     {
-        if ($permissionBitsMap === []) {
-            $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
-        }
-
-        $filteredEnabled = [];
-        foreach ($enabledMap as $name => $isEnabled) {
-            $directory = (string) $name;
-            if (!$this->isSafeExtensionDirectoryName($directory) || !$isEnabled) {
-                continue;
-            }
-
-            $filteredEnabled[$directory] = true;
-        }
-        ksort($filteredEnabled);
-
-        $filteredPermissions = [];
-        foreach ($permissionMap as $name => $rawBit) {
-            $directory = (string) $name;
-            if (!$this->isSafeExtensionDirectoryName($directory)) {
-                continue;
-            }
-
-            $bit = (int) $rawBit;
-            if ($bit <= 0) {
-                continue;
-            }
-
-            $filteredPermissions[$directory] = $bit;
-        }
-        ksort($filteredPermissions);
-
-        $filteredPermissionBits = [];
-        foreach ($permissionBitsMap as $name => $levelsRaw) {
-            $directory = (string) $name;
-            if (!$this->isSafeExtensionDirectoryName($directory) || !is_array($levelsRaw)) {
-                continue;
-            }
-
-            $normalizedLevels = [];
-            foreach ($levelsRaw as $levelKey => $rawBit) {
-                $level = strtolower(trim((string) $levelKey));
-                if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $level) !== 1) {
-                    continue;
-                }
-
-                $bit = (int) $rawBit;
-                if ($bit <= 0) {
-                    continue;
-                }
-
-                $normalizedLevels[$level] = $bit;
-            }
-
-            if ($normalizedLevels === []) {
-                continue;
-            }
-
-            ksort($normalizedLevels);
-            $filteredPermissionBits[$directory] = $normalizedLevels;
-        }
-        ksort($filteredPermissionBits);
-
-        $export = var_export([
-            'enabled' => $filteredEnabled,
-            'permissions' => $filteredPermissions,
-            'permission_bits' => $filteredPermissionBits,
-        ], true);
-        $content = "<?php\n\n";
-        $content .= "/**\n";
-        $content .= " * RAVEN CMS\n";
-        $content .= " * ~/private/ext/.state.php\n";
-        $content .= " * Persisted extension enablement map and permission settings managed by panel.\n";
-        $content .= " * Docs: https://raven.lanterns.io\n";
-        $content .= " */\n\n";
-        $content .= "declare(strict_types=1);\n\n";
-        $content .= "return " . $export . ";\n";
-
-        $written = file_put_contents($this->extensionsStateFilePath(), $content, LOCK_EX);
-        if ($written === false) {
-            throw new \RuntimeException('Failed to persist extension state.');
-        }
-
-        // Ensure immediate visibility of state changes on the next request.
-        $statePath = $this->extensionsStateFilePath();
-        clearstatcache(true, $statePath);
-        if (function_exists('opcache_invalidate')) {
-            @opcache_invalidate($statePath, true);
-        }
+        $this->extensionStateStore()->saveState($enabledMap, $permissionMap, $permissionBitsMap);
     }
 
     /**
@@ -8691,125 +8374,12 @@ final class PanelController
         bool $generateComposerFile = false
     ): void
     {
-        $type = strtolower(trim((string) ($meta['type'] ?? 'plugin')));
-        if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
-            $type = 'plugin';
-        }
-        $generatesPanelRoutes = true;
-        $generatesPublicRoutes = $type === 'module';
-        $generatesShortcodes = in_array($type, ['helper', 'plugin', 'module'], true);
-        $generatesContentBlocks = in_array($type, ['content', 'plugin', 'module'], true);
-        if (!mkdir($extensionPath, 0700, true) && !is_dir($extensionPath)) {
-            throw new \RuntimeException('Failed to create extension directory.');
-        }
-
-        $libPath = $extensionPath . '/lib';
-        if (!mkdir($libPath, 0700, true) && !is_dir($libPath)) {
-            throw new \RuntimeException('Failed to create extension lib directory.');
-        }
-
-        $visPath = $extensionPath . '/vis';
-        if ($generatesPanelRoutes && !mkdir($visPath, 0700, true) && !is_dir($visPath)) {
-            throw new \RuntimeException('Failed to create extension vis directory.');
-        }
-
-        $manifestPath = $extensionPath . '/ext.json';
-        $bootstrapPath = $extensionPath . '/ext.php';
-        $routesPath = $extensionPath . '/lib/routes_panel.php';
-        $publicRoutesPath = $extensionPath . '/lib/routes_public.php';
-        $schemaPath = $extensionPath . '/lib/schema.php';
-        $shortcodesPath = $extensionPath . '/lib/shortcodes.php';
-        $fieldsPath = $extensionPath . '/lib/fields.php';
-        $composerPath = $extensionPath . '/composer.json';
-        $panelIndexViewPath = $visPath . '/panel_index.php';
-        $publicIndexViewPath = $visPath . '/public_index.php';
-        $agentsFilePath = $extensionPath . '/AGENTS.md';
-
-        $manifestContent = $this->renderExtensionManifestJson($meta);
-        $bootstrapContent = $this->renderExtensionBootstrapSkeleton($meta);
-        $schemaContent = $this->renderExtensionSchemaSkeleton($meta);
-        $shortcodesContent = $this->renderExtensionShortcodesSkeleton($meta);
-        $fieldsContent = $this->renderExtensionFieldsSkeleton($meta);
-        $publicViewContent = $this->renderExtensionPublicViewSkeleton($meta);
-        $agentsContent = $this->renderExtensionAgentsSkeleton($meta);
-        $composerContent = $this->renderExtensionComposerSkeleton($meta);
-
-        if (file_put_contents($manifestPath, $manifestContent, LOCK_EX) === false) {
-            throw new \RuntimeException('Failed to write ext.json.');
-        }
-
-        if (file_put_contents($bootstrapPath, $bootstrapContent, LOCK_EX) === false) {
-            throw new \RuntimeException('Failed to write ext.php.');
-        }
-
-        if (file_put_contents($schemaPath, $schemaContent, LOCK_EX) === false) {
-            throw new \RuntimeException('Failed to write lib/schema.php.');
-        }
-
-        if ($generatesShortcodes && file_put_contents($shortcodesPath, $shortcodesContent, LOCK_EX) === false) {
-            throw new \RuntimeException('Failed to write lib/shortcodes.php.');
-        }
-
-        if ($generatesContentBlocks && file_put_contents($fieldsPath, $fieldsContent, LOCK_EX) === false) {
-            throw new \RuntimeException('Failed to write lib/fields.php.');
-        }
-
-        if ($generateComposerFile && file_put_contents($composerPath, $composerContent, LOCK_EX) === false) {
-            throw new \RuntimeException('Failed to write composer.json.');
-        }
-
-        if ($generatesPanelRoutes) {
-            $routesContent = $this->renderExtensionRoutesSkeleton($meta);
-            $viewContent = $this->renderExtensionPanelViewSkeleton($meta);
-
-            if (file_put_contents($routesPath, $routesContent, LOCK_EX) === false) {
-                throw new \RuntimeException('Failed to write lib/routes_panel.php.');
-            }
-
-            if (file_put_contents($panelIndexViewPath, $viewContent, LOCK_EX) === false) {
-                throw new \RuntimeException('Failed to write vis/panel_index.php.');
-            }
-        }
-        if ($generatesPublicRoutes) {
-            $publicRoutesContent = $this->renderExtensionPublicRoutesSkeleton($meta);
-            if (file_put_contents($publicRoutesPath, $publicRoutesContent, LOCK_EX) === false) {
-                throw new \RuntimeException('Failed to write lib/routes_public.php.');
-            }
-            if (file_put_contents($publicIndexViewPath, $publicViewContent, LOCK_EX) === false) {
-                throw new \RuntimeException('Failed to write vis/public_index.php.');
-            }
-        }
-        if ($generateAgentsFile && file_put_contents($agentsFilePath, $agentsContent, LOCK_EX) === false) {
-            throw new \RuntimeException('Failed to write AGENTS.md.');
-        }
-
-        // Keep scaffold file modes aligned with private-directory policy.
-        @chmod($extensionPath, 0700);
-        @chmod($manifestPath, 0600);
-        @chmod($bootstrapPath, 0600);
-        @chmod($schemaPath, 0600);
-        if ($generatesShortcodes) {
-            @chmod($shortcodesPath, 0600);
-        }
-        if ($generatesContentBlocks) {
-            @chmod($fieldsPath, 0600);
-        }
-        @chmod($libPath, 0700);
-        if ($generatesPanelRoutes) {
-            @chmod($visPath, 0700);
-            @chmod($routesPath, 0600);
-            @chmod($panelIndexViewPath, 0600);
-        }
-        if ($generatesPublicRoutes) {
-            @chmod($publicRoutesPath, 0600);
-            @chmod($publicIndexViewPath, 0600);
-        }
-        if ($generateAgentsFile) {
-            @chmod($agentsFilePath, 0600);
-        }
-        if ($generateComposerFile) {
-            @chmod($composerPath, 0600);
-        }
+        $this->extensionScaffoldService()->createSkeleton(
+            $extensionPath,
+            $meta,
+            $generateAgentsFile,
+            $generateComposerFile
+        );
     }
 
     /**
@@ -11442,103 +11012,13 @@ MARKDOWN;
         bool $generatePackageFile = false
     ): void
     {
-        if (!is_dir($themePath) && !mkdir($themePath, 0775, true) && !is_dir($themePath)) {
-            throw new \RuntimeException('Failed to create theme directory.');
-        }
-
-        $safeNameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
-        $wrapper = "<?php\n\n"
-            . "/**\n"
-            . " * RAVEN CMS\n"
-            . " * ~/public/theme/" . $meta['slug'] . "/vis/wrapper.php\n"
-            . " * " . $safeNameForDoc . " theme wrapper template.\n"
-            . " * Docs: https://raven.lanterns.io\n"
-            . " */\n\n"
-            . "declare(strict_types=1);\n\n"
-            . "if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {\n"
-            . "    http_response_code(404);\n"
-            . "    exit;\n"
-            . "}\n"
-            . "?>\n"
-            . "<!doctype html>\n"
-            . "<html lang=\"en\">\n"
-            . "<head>\n"
-            . "    <meta charset=\"utf-8\">\n"
-            . "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
-            . "    <title>{view_meta:document_title}</title>\n"
-            . "    <meta name=\"description\" content=\"{view_meta:description}\">\n"
-            . "    <link rel=\"stylesheet\" href=\"/theme/{site:public_theme_css}/css/style.css\">\n"
-            . "</head>\n"
-            . "<body>\n"
-            . "{raw:content}\n"
-            . "</body>\n"
-            . "</html>\n";
-
-        $home = "<?php\n\n"
-            . "/**\n"
-            . " * RAVEN CMS\n"
-            . " * ~/public/theme/" . $meta['slug'] . "/vis/home.php\n"
-            . " * " . $safeNameForDoc . " homepage template scaffold.\n"
-            . " * Docs: https://raven.lanterns.io\n"
-            . " */\n\n"
-            . "declare(strict_types=1);\n\n"
-            . "if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {\n"
-            . "    http_response_code(404);\n"
-            . "    exit;\n"
-            . "}\n"
-            . "?>\n"
-            . "<section class=\"container py-4\">\n"
-            . "    <h1>{site:name}</h1>\n"
-            . "    {if page:display_title_resolved}<h2>{page:title}</h2>{/if}\n"
-            . "    <div>{raw:page:content}</div>\n"
-            . "</section>\n";
-
-        $css = "/* RAVEN CMS */\n"
-            . "/* ~/public/theme/" . $meta['slug'] . "/css/style.css */\n"
-            . "/* " . $safeNameForDoc . " public-theme stylesheet scaffold. */\n\n"
-            . ":root {\n"
-            . "  --rvn-theme-bg: #f6f7fb;\n"
-            . "  --rvn-theme-fg: #1d2433;\n"
-            . "  --rvn-theme-accent: #2f5ee5;\n"
-            . "}\n\n"
-            . "body {\n"
-            . "  background: var(--rvn-theme-bg);\n"
-            . "  color: var(--rvn-theme-fg);\n"
-            . "  font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif;\n"
-            . "}\n\n"
-            . "a {\n"
-            . "  color: var(--rvn-theme-accent);\n"
-            . "}\n";
-
-        $this->writePublicThemeManifest(
-            $themePath . '/theme.json',
-            [
-                'name' => $meta['name'],
-                'is_child_theme' => $meta['is_child_theme'],
-                'parent_theme' => $meta['is_child_theme'] ? $meta['parent_theme'] : '',
-            ]
+        $this->themeScaffoldService()->createSkeleton(
+            $themePath,
+            $meta,
+            $generateAgentsFile,
+            $generateComposerFile,
+            $generatePackageFile
         );
-        $this->writePublicThemeScaffoldFile($themePath . '/css/style.css', $css);
-        $this->writePublicThemeScaffoldFile($themePath . '/vis/wrapper.php', $wrapper);
-        $this->writePublicThemeScaffoldFile($themePath . '/vis/home.php', $home);
-        if ($generateAgentsFile) {
-            $this->writePublicThemeScaffoldFile(
-                $themePath . '/AGENTS.md',
-                $this->publicThemeAgentsFileContent($meta)
-            );
-        }
-        if ($generateComposerFile) {
-            $this->writePublicThemeScaffoldFile(
-                $themePath . '/composer.json',
-                $this->publicThemeComposerFileContent($meta)
-            );
-        }
-        if ($generatePackageFile) {
-            $this->writePublicThemeScaffoldFile(
-                $themePath . '/package.json',
-                $this->publicThemePackageFileContent($meta)
-            );
-        }
     }
 
     /**
@@ -11553,29 +11033,7 @@ MARKDOWN;
      */
     private function publicThemeAgentsFileContent(array $meta): string
     {
-        $name = trim((string) ($meta['name'] ?? 'Theme'));
-        $slug = trim((string) ($meta['slug'] ?? 'theme'));
-        $isChildTheme = !empty($meta['is_child_theme']);
-        $parentTheme = trim((string) ($meta['parent_theme'] ?? ''));
-
-        $content = "# {$name} Theme Agent Guide\n\n";
-        $content .= "Last updated: " . gmdate('Y-m-d') . "\n\n";
-        $content .= "## Scope\n";
-        $content .= "- This file applies only to `public/theme/{$slug}/`.\n";
-        $content .= "- Follow project-wide theme contracts in `public/theme/AGENTS.md`.\n";
-        if ($isChildTheme && $parentTheme !== '') {
-            $content .= "- This theme is a child theme of `{$parentTheme}`.\n";
-        }
-        $content .= "\n## Required Files\n";
-        $content .= "- `theme.json`\n";
-        $content .= "- `vis/wrapper.php`\n";
-        $content .= "- `css/style.css`\n";
-        $content .= "\n## Safety Rules\n";
-        $content .= "- Keep customizations inside this theme directory.\n";
-        $content .= "- Do not edit core templates under `private/vis/` for theme-only changes.\n";
-        $content .= "- Use escaped brace tags by default; reserve `{raw:...}` for trusted HTML only.\n";
-
-        return $content;
+        return $this->themeScaffoldService()->agentsFileContent($meta);
     }
 
     /**
@@ -11588,35 +11046,7 @@ MARKDOWN;
      */
     private function publicThemeComposerFileContent(array $meta): string
     {
-        $slug = strtolower(trim((string) ($meta['slug'] ?? 'theme')));
-        $slug = preg_replace('/[^a-z0-9_-]+/', '-', $slug) ?? 'theme';
-        $slug = trim($slug, '-_');
-        if ($slug === '') {
-            $slug = 'theme';
-        }
-
-        $name = trim((string) ($meta['name'] ?? 'Raven Theme'));
-        if ($name === '') {
-            $name = 'Raven Theme';
-        }
-
-        $payload = [
-            'name' => 'noveltylanterns/raven-theme-' . $slug,
-            'description' => $name . ' public theme package for Raven CMS.',
-            'type' => 'project',
-            'version' => '0.1.0',
-            'license' => 'GPL-3.0-or-later',
-            'require' => [
-                'php' => '^8.5',
-            ],
-        ];
-
-        $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
-        if (!is_string($encoded)) {
-            throw new \RuntimeException('Failed to generate theme composer.json content.');
-        }
-
-        return $encoded . "\n";
+        return $this->themeScaffoldService()->composerFileContent($meta);
     }
 
     /**
@@ -11629,34 +11059,7 @@ MARKDOWN;
      */
     private function publicThemePackageFileContent(array $meta): string
     {
-        $slug = strtolower(trim((string) ($meta['slug'] ?? 'theme')));
-        $slug = preg_replace('/[^a-z0-9_-]+/', '-', $slug) ?? 'theme';
-        $slug = trim($slug, '-_');
-        if ($slug === '') {
-            $slug = 'theme';
-        }
-
-        $name = trim((string) ($meta['name'] ?? 'Raven Theme'));
-        if ($name === '') {
-            $name = 'Raven Theme';
-        }
-
-        $payload = [
-            'name' => '@raven/theme-' . $slug,
-            'version' => '0.1.0',
-            'private' => true,
-            'description' => $name . ' frontend theme package for Raven CMS.',
-            'scripts' => [
-                'build' => 'echo "Add your theme build pipeline here"',
-            ],
-        ];
-
-        $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
-        if (!is_string($encoded)) {
-            throw new \RuntimeException('Failed to generate theme package.json content.');
-        }
-
-        return $encoded . "\n";
+        return $this->themeScaffoldService()->packageFileContent($meta);
     }
 
     /**
@@ -11840,6 +11243,51 @@ MARKDOWN;
         return $this->archivePackages;
     }
 
+    private function extensionStateStore(): ExtensionStateStore
+    {
+        if (!$this->extensionStateStore instanceof ExtensionStateStore) {
+            $this->extensionStateStore = new ExtensionStateStore(dirname(__DIR__, 2) . '/ext');
+        }
+
+        return $this->extensionStateStore;
+    }
+
+    private function extensionScaffoldService(): ExtensionScaffoldService
+    {
+        if (!$this->extensionScaffoldService instanceof ExtensionScaffoldService) {
+            $this->extensionScaffoldService = new ExtensionScaffoldService();
+        }
+
+        return $this->extensionScaffoldService;
+    }
+
+    private function themeScaffoldService(): ThemeScaffoldService
+    {
+        if (!$this->themeScaffoldService instanceof ThemeScaffoldService) {
+            $this->themeScaffoldService = new ThemeScaffoldService();
+        }
+
+        return $this->themeScaffoldService;
+    }
+
+    private function siteContextBuilder(): SiteContextBuilder
+    {
+        if (!$this->siteContextBuilder instanceof SiteContextBuilder) {
+            $this->siteContextBuilder = new SiteContextBuilder();
+        }
+
+        return $this->siteContextBuilder;
+    }
+
+    private function configEditorNormalizer(): ConfigEditorNormalizer
+    {
+        if (!$this->configEditorNormalizer instanceof ConfigEditorNormalizer) {
+            $this->configEditorNormalizer = new ConfigEditorNormalizer();
+        }
+
+        return $this->configEditorNormalizer;
+    }
+
     private function publicFallbackRenderer(): ThemeFallbackRenderer
     {
         if (!$this->publicFallbackRenderer instanceof ThemeFallbackRenderer) {
@@ -11862,24 +11310,11 @@ MARKDOWN;
     private function publicSiteDataForNotFound(): array
     {
         $publicTheme = $this->activePublicThemeSlug();
-
-        return [
-            'name' => (string) $this->config->get('site.name', 'Raven CMS'),
-            'domain' => (string) $this->config->get('site.domain', 'localhost'),
-            'panel_path' => (string) $this->config->get('panel.path', 'panel'),
-            'current_url' => '',
-            'apple_touch_icon' => trim((string) $this->config->get('meta.apple_touch_icon', '')),
-            'robots' => trim((string) $this->config->get('meta.robots', 'index,follow')),
-            'twitter_card' => trim((string) $this->config->get('meta.twitter.card', '')),
-            'twitter_site' => trim((string) $this->config->get('meta.twitter.site', '')),
-            'twitter_creator' => trim((string) $this->config->get('meta.twitter.creator', '')),
-            'twitter_image' => trim((string) $this->config->get('meta.twitter.image', '')),
-            'og_image' => trim((string) $this->config->get('meta.opengraph.image', '')),
-            'og_type' => trim((string) $this->config->get('meta.opengraph.type', 'website')),
-            'og_locale' => trim((string) $this->config->get('meta.opengraph.locale', 'en_US')),
-            'public_theme' => $publicTheme,
-            'public_theme_css' => $this->activePublicThemeCssSlug($publicTheme),
-        ];
+        return $this->siteContextBuilder()->publicFallback(
+            $this->config,
+            $publicTheme,
+            $this->activePublicThemeCssSlug($publicTheme)
+        );
     }
 
     /**
@@ -11889,14 +11324,11 @@ MARKDOWN;
      */
     private function siteData(): array
     {
-        return [
-            'name' => (string) $this->config->get('site.name', 'Raven CMS'),
-            'panel_path' => (string) $this->config->get('panel.path', 'panel'),
-            'domain' => (string) $this->config->get('site.domain', 'localhost'),
-            'panel_brand_name' => (string) $this->config->get('panel.brand_name', ''),
-            'panel_brand_logo' => (string) $this->config->get('panel.brand_logo', ''),
-            'category_enabled' => $this->categoryEnabled(),
-            'tag_enabled' => $this->tagEnabled(),
-        ];
+        return $this->siteContextBuilder()->panel(
+            $this->config,
+            $this->categoryEnabled(),
+            $this->tagEnabled(),
+            true
+        );
     }
 }
