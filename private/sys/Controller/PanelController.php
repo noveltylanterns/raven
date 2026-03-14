@@ -22,16 +22,21 @@ use Raven\Core\Media\PageImageManager;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Lib\Archive\ArchivePackageService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Config\ConfigSnapshotSanitizer;
 use Raven\Lib\Config\ConfigEditorNormalizer;
 use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Extension\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\ExtensionScaffoldService;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\SessionFlash;
+use Raven\Lib\Media\AvatarUploadService;
 use Raven\Lib\Pagination\Pagination;
 use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Routing\RedirectTargetValidator;
+use Raven\Lib\Routing\RoutingInventoryBuilder;
+use Raven\Lib\Theme\ThemeCloneService;
 use Raven\Lib\Theme\ThemeScaffoldService;
 use Raven\Repository\CategoryRepository;
 use Raven\Core\Security\AvatarValidator;
@@ -62,8 +67,6 @@ use function Raven\Core\Support\redirect;
  */
 final class PanelController
 {
-    /** Fixed side length for generated avatar thumbnail JPEG files. */
-    private const AVATAR_THUMB_SIZE = 120;
     private const SESSION_WEBAUTHN_PREFERENCES_CHALLENGE = '_raven_preferences_webauthn_challenge';
     private View $view;
     private Config $config;
@@ -93,6 +96,11 @@ final class PanelController
     private ?ThemeScaffoldService $themeScaffoldService = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
     private ?ConfigEditorNormalizer $configEditorNormalizer = null;
+    private ?RoutingInventoryBuilder $routingInventoryBuilder = null;
+    private ?ExtensionPermissionCatalogService $extensionPermissionCatalogService = null;
+    private ?AvatarUploadService $avatarUploadService = null;
+    private ?ConfigSnapshotSanitizer $configSnapshotSanitizer = null;
+    private ?ThemeCloneService $themeCloneService = null;
 
     public function __construct(
         View $view,
@@ -5685,21 +5693,7 @@ final class PanelController
      */
     private function removeSqliteDatabaseFilesConfig(array $config): array
     {
-        $database = $config['database'] ?? null;
-        if (!is_array($database)) {
-            return $config;
-        }
-
-        $sqlite = $database['sqlite'] ?? null;
-        if (!is_array($sqlite)) {
-            return $config;
-        }
-
-        unset($sqlite['files']);
-        $database['sqlite'] = $sqlite;
-        $config['database'] = $database;
-
-        return $config;
+        return $this->configSnapshotSanitizer()->removeSqliteDatabaseFiles($config);
     }
 
     /**
@@ -7850,13 +7844,7 @@ final class PanelController
      */
     private function defaultExtensionPermissionLevels(string $extensionName): array
     {
-        $label = trim($extensionName);
-        $label = $label !== '' ? 'Access ' . $label : 'Access';
-
-        return [[
-            'key' => 'access',
-            'label' => $label,
-        ]];
+        return $this->extensionPermissionCatalogService()->defaultPermissionLevels($extensionName);
     }
 
     /**
@@ -7866,47 +7854,7 @@ final class PanelController
      */
     private function normalizeExtensionPermissionLevels(mixed $rawLevels, string $extensionName): array
     {
-        $normalized = [];
-        if (is_array($rawLevels)) {
-            foreach ($rawLevels as $key => $entry) {
-                $levelKey = '';
-                $label = '';
-                if (is_array($entry)) {
-                    $levelKey = strtolower(trim((string) ($entry['key'] ?? '')));
-                    $label = trim((string) ($entry['label'] ?? ''));
-                } elseif (is_string($key)) {
-                    $levelKey = strtolower(trim($key));
-                    $label = trim((string) $entry);
-                }
-
-                if ($levelKey === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $levelKey) !== 1) {
-                    continue;
-                }
-
-                if ($label === '') {
-                    $label = ucwords(str_replace(['-', '_'], ' ', $levelKey));
-                }
-
-                $label = $this->input->text($label, 80);
-                if ($label === '') {
-                    continue;
-                }
-
-                $normalized[$levelKey] = [
-                    'key' => $levelKey,
-                    'label' => $label,
-                ];
-                if (count($normalized) >= 16) {
-                    break;
-                }
-            }
-        }
-
-        if ($normalized === []) {
-            return $this->defaultExtensionPermissionLevels($extensionName);
-        }
-
-        return array_values($normalized);
+        return $this->extensionPermissionCatalogService()->normalizePermissionLevels($rawLevels, $extensionName);
     }
 
     /**
@@ -8054,235 +8002,10 @@ final class PanelController
      */
     public function extensionPanelPermissionMapForDirectories(array $directoryFilter = []): array
     {
-        $catalog = $this->extensionPermissionCatalog($directoryFilter);
-        $bitMap = $this->ensureExtensionPermissionBits($catalog);
-        $result = [];
-
-        foreach ($catalog as $directory => $meta) {
-            $levels = [];
-            foreach ($meta['levels'] as $level) {
-                $levelKey = (string) ($level['key'] ?? '');
-                if ($levelKey === '') {
-                    continue;
-                }
-
-                $bit = (int) (($bitMap[$directory][$levelKey] ?? 0));
-                if ($bit <= 0) {
-                    continue;
-                }
-
-                $levels[] = [
-                    'key' => $levelKey,
-                    'label' => (string) ($level['label'] ?? $levelKey),
-                    'bit' => $bit,
-                ];
-            }
-
-            if ($levels === []) {
-                continue;
-            }
-
-            $result[$directory] = [
-                'name' => (string) ($meta['name'] ?? $directory),
-                'type' => (string) ($meta['type'] ?? 'plugin'),
-                'default_level' => (string) ($meta['default_level'] ?? ($levels[0]['key'] ?? 'access')),
-                'levels' => $levels,
-            ];
-        }
-
-        ksort($result);
-        return $result;
-    }
-
-    /**
-     * Discovers extension permission metadata for helper/content/plugin/module panel routes.
-     *
-     * @param array<int, string> $directoryFilter
-     * @return array<string, array{
-     *   name: string,
-     *   type: string,
-     *   default_level: string,
-     *   levels: array<int, array{key: string, label: string}>
-     * }>
-     */
-    private function extensionPermissionCatalog(array $directoryFilter = []): array
-    {
-        $this->ensureExtensionsDirectory();
-        $filter = [];
-        foreach ($directoryFilter as $directory) {
-            $normalized = strtolower(trim((string) $directory));
-            if ($this->isSafeExtensionDirectoryName($normalized)) {
-                $filter[$normalized] = true;
-            }
-        }
-
-        $entries = scandir($this->extensionsBasePath()) ?: [];
-        $catalog = [];
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
-                continue;
-            }
-            if (!$this->isSafeExtensionDirectoryName($entry)) {
-                continue;
-            }
-            if ($filter !== [] && !isset($filter[$entry])) {
-                continue;
-            }
-
-            $extensionPath = $this->extensionsBasePath() . '/' . $entry;
-            if (!is_dir($extensionPath) || !is_file($extensionPath . '/lib/routes_panel.php')) {
-                continue;
-            }
-
-            $manifest = $this->readExtensionManifest($extensionPath);
-            if (!($manifest['valid'] ?? false)) {
-                continue;
-            }
-
-            $type = strtolower(trim((string) ($manifest['type'] ?? 'plugin')));
-            $isSystemType = $type === 'system' || !empty($manifest['system_extension']);
-            if ($isSystemType || !in_array($type, ['helper', 'content', 'plugin', 'module'], true)) {
-                continue;
-            }
-
-            $levels = is_array($manifest['permission_levels'] ?? null)
-                ? $manifest['permission_levels']
-                : $this->defaultExtensionPermissionLevels((string) ($manifest['name'] ?? $entry));
-            $normalizedLevels = [];
-            foreach ($levels as $level) {
-                if (!is_array($level)) {
-                    continue;
-                }
-
-                $levelKey = strtolower(trim((string) ($level['key'] ?? '')));
-                if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $levelKey) !== 1) {
-                    continue;
-                }
-
-                $label = trim((string) ($level['label'] ?? ''));
-                if ($label === '') {
-                    $label = ucwords(str_replace(['-', '_'], ' ', $levelKey));
-                }
-
-                $normalizedLevels[$levelKey] = [
-                    'key' => $levelKey,
-                    'label' => $this->input->text($label, 80),
-                ];
-            }
-            if ($normalizedLevels === []) {
-                $normalizedLevels = [];
-                foreach ($this->defaultExtensionPermissionLevels((string) ($manifest['name'] ?? $entry)) as $defaultLevel) {
-                    $normalizedLevels[(string) $defaultLevel['key']] = $defaultLevel;
-                }
-            }
-
-            $defaultLevel = strtolower(trim((string) ($manifest['default_permission_level'] ?? '')));
-            if ($defaultLevel === '' || !isset($normalizedLevels[$defaultLevel])) {
-                $firstLevel = array_values($normalizedLevels)[0] ?? ['key' => 'access'];
-                $defaultLevel = (string) ($firstLevel['key'] ?? 'access');
-            }
-
-            $catalog[$entry] = [
-                'name' => (string) ($manifest['name'] ?? $entry),
-                'type' => $type,
-                'default_level' => $defaultLevel,
-                'levels' => array_values($normalizedLevels),
-            ];
-        }
-
-        ksort($catalog);
-        return $catalog;
-    }
-
-    /**
-     * Ensures stable permission-bit assignments for extension levels.
-     *
-     * @param array<string, array{
-     *   name: string,
-     *   type: string,
-     *   default_level: string,
-     *   levels: array<int, array{key: string, label: string}>
-     * }> $catalog
-     * @return array<string, array<string, int>>
-     */
-    private function ensureExtensionPermissionBits(array $catalog): array
-    {
-        $existing = $this->loadExtensionPermissionBitsMap();
-        $normalized = [];
-        $usedBits = [];
-        foreach ($existing as $directory => $levels) {
-            $normalized[$directory] = [];
-            foreach ($levels as $levelKey => $bit) {
-                $candidateBit = (int) $bit;
-                if ($candidateBit <= 0 || !$this->isPowerOfTwoBit($candidateBit) || isset($usedBits[$candidateBit])) {
-                    continue;
-                }
-
-                $normalized[$directory][(string) $levelKey] = $candidateBit;
-                $usedBits[$candidateBit] = true;
-            }
-            if ($normalized[$directory] === []) {
-                unset($normalized[$directory]);
-            }
-        }
-
-        $changed = $normalized !== $existing;
-        foreach ($catalog as $directory => $meta) {
-            $levels = is_array($meta['levels'] ?? null) ? $meta['levels'] : [];
-            foreach ($levels as $level) {
-                $levelKey = strtolower(trim((string) ($level['key'] ?? '')));
-                if ($levelKey === '') {
-                    continue;
-                }
-
-                $assignedBit = (int) ($normalized[$directory][$levelKey] ?? 0);
-                if ($assignedBit > 0 && $this->isPowerOfTwoBit($assignedBit) && isset($usedBits[$assignedBit])) {
-                    continue;
-                }
-
-                $nextBit = $this->nextAvailableExtensionPermissionBit($usedBits);
-                $normalized[$directory][$levelKey] = $nextBit;
-                $usedBits[$nextBit] = true;
-                $changed = true;
-            }
-        }
-
-        if ($changed) {
-            $this->saveExtensionPermissionBitsMap($normalized);
-        }
-
-        return $normalized;
-    }
-
-    /**
-     * Returns next available extension permission bit.
-     *
-     * @param array<int, bool> $usedBits
-     */
-    private function nextAvailableExtensionPermissionBit(array $usedBits): int
-    {
-        $bit = PanelAccess::EXTENSION_PERMISSION_START;
-        while (isset($usedBits[$bit])) {
-            if ($bit > intdiv(PHP_INT_MAX, 2)) {
-                throw new \RuntimeException('No free extension permission bits remain.');
-            }
-
-            $bit *= 2;
-        }
-
-        return $bit;
-    }
-
-    /**
-     * Returns true when one integer value is power-of-two.
-     */
-    private function isPowerOfTwoBit(int $bit): bool
-    {
-        if ($bit <= 0) {
-            return false;
-        }
-
-        return ($bit & ($bit - 1)) === 0;
+        return $this->extensionPermissionCatalogService()->panelPermissionMapForDirectories(
+            $directoryFilter,
+            fn (string $extensionPath): array => $this->readExtensionManifest($extensionPath)
+        );
     }
 
     /**
@@ -9251,321 +8974,7 @@ MARKDOWN;
      */
     private function storeSanitizedAvatarUpload(array $upload, string $destination): ?string
     {
-        $tmpPath = (string) ($upload['tmp_name'] ?? '');
-        if ($tmpPath === '' || !is_uploaded_file($tmpPath) || !is_file($tmpPath)) {
-            return 'Failed to read uploaded avatar file.';
-        }
-
-        $extension = strtolower((string) pathinfo($destination, PATHINFO_EXTENSION));
-        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif'], true)) {
-            return 'Avatar upload format is not supported.';
-        }
-
-        $imagickError = null;
-        $stored = false;
-        if (class_exists(\Imagick::class)) {
-            $imagickError = $this->storeSanitizedAvatarWithImagick($tmpPath, $destination, $extension);
-            if ($imagickError === null) {
-                $stored = true;
-            }
-        }
-
-        if (!$stored && function_exists('imagecreatefromstring')) {
-            $gdError = $this->storeSanitizedAvatarWithGd($tmpPath, $destination, $extension);
-            if ($gdError === null) {
-                $stored = true;
-            } else {
-                return $gdError;
-            }
-        }
-
-        if (!$stored && $imagickError !== null) {
-            return $imagickError;
-        }
-
-        if (!$stored) {
-            return 'Avatar processing requires Imagick or GD extension.';
-        }
-
-        $thumbnailPath = dirname($destination) . '/' . $this->avatarThumbnailFilename((string) basename($destination));
-        $thumbError = $this->storeAvatarThumbnail($destination, $thumbnailPath);
-        if ($thumbError !== null) {
-            @unlink($destination);
-            @unlink($thumbnailPath);
-            return $thumbError;
-        }
-
-        @chmod($destination, 0640);
-        @chmod($thumbnailPath, 0640);
-
-        return null;
-    }
-
-    /**
-     * Re-encodes avatar upload with Imagick to strip metadata/profiles.
-     */
-    private function storeSanitizedAvatarWithImagick(string $tmpPath, string $destination, string $extension): ?string
-    {
-        try {
-            $image = new \Imagick();
-            $image->readImage($tmpPath);
-            $image = $image->coalesceImages();
-
-            $format = $extension === 'jpg' ? 'jpeg' : $extension;
-            foreach ($image as $frame) {
-                if ($frame instanceof \Imagick) {
-                    if (method_exists($frame, 'autoOrientImage')) {
-                        $frame->autoOrientImage();
-                    }
-                    $frame->stripImage();
-                    $frame->setImageFormat($format);
-                    if ($format === 'jpeg') {
-                        $frame->setImageCompression(\Imagick::COMPRESSION_JPEG);
-                        $frame->setImageCompressionQuality(90);
-                    }
-                }
-            }
-
-            if ($format === 'gif') {
-                $written = $image->writeImages($destination, true);
-            } else {
-                $image->setFirstIterator();
-                $written = $image->writeImage($destination);
-            }
-
-            $image->clear();
-            $image->destroy();
-
-            if (!$written || !is_file($destination)) {
-                @unlink($destination);
-                return 'Failed to store uploaded avatar file.';
-            }
-
-            return null;
-        } catch (\Throwable) {
-            @unlink($destination);
-            return 'Failed to sanitize avatar upload.';
-        }
-    }
-
-    /**
-     * Re-encodes avatar upload with GD fallback to strip metadata/profiles.
-     */
-    private function storeSanitizedAvatarWithGd(string $tmpPath, string $destination, string $extension): ?string
-    {
-        $bytes = @file_get_contents($tmpPath);
-        if ($bytes === false || $bytes === '') {
-            return 'Failed to read uploaded avatar file.';
-        }
-
-        $image = @imagecreatefromstring($bytes);
-        if (!is_object($image)) {
-            return 'Failed to sanitize avatar upload.';
-        }
-
-        try {
-            $written = false;
-            if ($extension === 'jpg' || $extension === 'jpeg') {
-                $written = imagejpeg($image, $destination, 90);
-            } elseif ($extension === 'png') {
-                imagealphablending($image, false);
-                imagesavealpha($image, true);
-                $written = imagepng($image, $destination, 6);
-            } elseif ($extension === 'gif') {
-                $written = imagegif($image, $destination);
-            }
-        } finally {
-            imagedestroy($image);
-        }
-
-        if (!$written || !is_file($destination)) {
-            @unlink($destination);
-            return 'Failed to store uploaded avatar file.';
-        }
-
-        return null;
-    }
-
-    /**
-     * Generates one fixed-size avatar thumbnail JPEG beside stored original.
-     */
-    private function storeAvatarThumbnail(string $sourcePath, string $destination): ?string
-    {
-        $sourceInfo = @getimagesize($sourcePath);
-        if (!is_array($sourceInfo) || !isset($sourceInfo[0], $sourceInfo[1])) {
-            return 'Failed to generate avatar thumbnail.';
-        }
-
-        $sourceWidth = (int) $sourceInfo[0];
-        $sourceHeight = (int) $sourceInfo[1];
-        if ($sourceWidth < 1 || $sourceHeight < 1) {
-            return 'Failed to generate avatar thumbnail.';
-        }
-
-        if ($sourceWidth <= self::AVATAR_THUMB_SIZE && $sourceHeight <= self::AVATAR_THUMB_SIZE) {
-            // Small avatars should keep exact sanitized bytes for thumb path.
-            if (!@copy($sourcePath, $destination) || !is_file($destination)) {
-                @unlink($destination);
-                return 'Failed to generate avatar thumbnail.';
-            }
-
-            return null;
-        }
-
-        $imagickError = null;
-        if (class_exists(\Imagick::class)) {
-            $imagickError = $this->storeAvatarThumbnailWithImagick($sourcePath, $destination);
-            if ($imagickError === null) {
-                return null;
-            }
-        }
-
-        if (function_exists('imagecreatefromstring')) {
-            return $this->storeAvatarThumbnailWithGd($sourcePath, $destination);
-        }
-
-        if ($imagickError !== null) {
-            return $imagickError;
-        }
-
-        return 'Avatar thumbnail generation requires Imagick or GD extension.';
-    }
-
-    /**
-     * Generates one avatar thumbnail using Imagick.
-     */
-    private function storeAvatarThumbnailWithImagick(string $sourcePath, string $destination): ?string
-    {
-        try {
-            $image = new \Imagick();
-            // Restrict to first frame so animated GIF avatars produce deterministic thumbs.
-            $image->readImage($sourcePath . '[0]');
-
-            if (method_exists($image, 'autoOrientImage')) {
-                $image->autoOrientImage();
-            }
-
-            $sourceWidth = (int) $image->getImageWidth();
-            $sourceHeight = (int) $image->getImageHeight();
-            if ($sourceWidth < 1 || $sourceHeight < 1) {
-                $image->clear();
-                $image->destroy();
-                return 'Failed to generate avatar thumbnail.';
-            }
-
-            $cropSize = min($sourceWidth, $sourceHeight);
-            $cropX = (int) floor(($sourceWidth - $cropSize) / 2);
-            $cropY = (int) floor(($sourceHeight - $cropSize) / 2);
-
-            // Crop to centered square before resizing so thumb fill is always exact 120x120.
-            $image->cropImage($cropSize, $cropSize, $cropX, $cropY);
-            $image->setImagePage(0, 0, 0, 0);
-            $image->resizeImage(
-                self::AVATAR_THUMB_SIZE,
-                self::AVATAR_THUMB_SIZE,
-                \Imagick::FILTER_LANCZOS,
-                1.0,
-                true
-            );
-
-            $image->setImageBackgroundColor('#ffffff');
-            if (defined('Imagick::LAYERMETHOD_FLATTEN')) {
-                $flattened = $image->mergeImageLayers(\Imagick::LAYERMETHOD_FLATTEN);
-                if ($flattened instanceof \Imagick) {
-                    $image->clear();
-                    $image->destroy();
-                    $image = $flattened;
-                }
-            }
-
-            $image->setImageFormat('jpeg');
-            $image->setImageCompression(\Imagick::COMPRESSION_JPEG);
-            $image->setImageCompressionQuality(85);
-            $image->stripImage();
-
-            $written = $image->writeImage($destination);
-            $image->clear();
-            $image->destroy();
-
-            if (!$written || !is_file($destination)) {
-                @unlink($destination);
-                return 'Failed to generate avatar thumbnail.';
-            }
-
-            return null;
-        } catch (\Throwable) {
-            @unlink($destination);
-            return 'Failed to generate avatar thumbnail.';
-        }
-    }
-
-    /**
-     * Generates one avatar thumbnail using GD.
-     */
-    private function storeAvatarThumbnailWithGd(string $sourcePath, string $destination): ?string
-    {
-        $bytes = @file_get_contents($sourcePath);
-        if ($bytes === false || $bytes === '') {
-            return 'Failed to generate avatar thumbnail.';
-        }
-
-        $source = @imagecreatefromstring($bytes);
-        if (!is_object($source)) {
-            return 'Failed to generate avatar thumbnail.';
-        }
-
-        $sourceWidth = imagesx($source);
-        $sourceHeight = imagesy($source);
-        if ($sourceWidth < 1 || $sourceHeight < 1) {
-            imagedestroy($source);
-            return 'Failed to generate avatar thumbnail.';
-        }
-
-        $cropSize = min($sourceWidth, $sourceHeight);
-        $cropX = (int) floor(($sourceWidth - $cropSize) / 2);
-        $cropY = (int) floor(($sourceHeight - $cropSize) / 2);
-
-        $thumbnail = imagecreatetruecolor(self::AVATAR_THUMB_SIZE, self::AVATAR_THUMB_SIZE);
-        if (!is_object($thumbnail)) {
-            imagedestroy($source);
-            return 'Failed to generate avatar thumbnail.';
-        }
-
-        try {
-            $white = imagecolorallocate($thumbnail, 255, 255, 255);
-            imagefilledrectangle($thumbnail, 0, 0, self::AVATAR_THUMB_SIZE, self::AVATAR_THUMB_SIZE, $white);
-
-            $written = imagecopyresampled(
-                $thumbnail,
-                $source,
-                0,
-                0,
-                $cropX,
-                $cropY,
-                self::AVATAR_THUMB_SIZE,
-                self::AVATAR_THUMB_SIZE,
-                $cropSize,
-                $cropSize
-            );
-            if (!$written) {
-                return 'Failed to generate avatar thumbnail.';
-            }
-
-            if (!imagejpeg($thumbnail, $destination, 85)) {
-                @unlink($destination);
-                return 'Failed to generate avatar thumbnail.';
-            }
-        } finally {
-            imagedestroy($thumbnail);
-            imagedestroy($source);
-        }
-
-        if (!is_file($destination)) {
-            @unlink($destination);
-            return 'Failed to generate avatar thumbnail.';
-        }
-
-        return null;
+        return $this->avatarUploadService()->storeSanitizedUpload($upload, $destination);
     }
 
     /**
@@ -9573,12 +8982,7 @@ MARKDOWN;
      */
     private function avatarStorageDirectory(): string
     {
-        $avatarsDir = dirname(__DIR__, 3) . '/public/uploads/avatars';
-        if (!is_dir($avatarsDir)) {
-            @mkdir($avatarsDir, 0775, true);
-        }
-
-        return $avatarsDir;
+        return $this->avatarUploadService()->storageDirectory(dirname(__DIR__, 3));
     }
 
     /**
@@ -9586,16 +8990,7 @@ MARKDOWN;
      */
     private function normalizeAvatarExtension(string $extension): ?string
     {
-        $normalized = strtolower(trim($extension));
-        if ($normalized === 'jpeg') {
-            $normalized = 'jpg';
-        }
-
-        if (!in_array($normalized, ['jpg', 'png', 'gif'], true)) {
-            return null;
-        }
-
-        return $normalized;
+        return $this->avatarUploadService()->normalizeExtension($extension);
     }
 
     /**
@@ -9603,22 +8998,7 @@ MARKDOWN;
      */
     private function avatarFilenameForUserId(int $userId, string $extension): string
     {
-        $normalizedExtension = $this->normalizeAvatarExtension($extension) ?? 'jpg';
-
-        return (string) $userId . '.' . $normalizedExtension;
-    }
-
-    /**
-     * Returns deterministic thumbnail filename for one avatar filename.
-     */
-    private function avatarThumbnailFilename(string $filename): string
-    {
-        $base = (string) pathinfo($filename, PATHINFO_FILENAME);
-        if ($base === '') {
-            $base = 'avatar';
-        }
-
-        return $base . '_thumb.jpg';
+        return $this->avatarUploadService()->filenameForUserId($userId, $extension);
     }
 
     /**
@@ -9626,22 +9006,7 @@ MARKDOWN;
      */
     private function deleteAvatarFile(string $filename): void
     {
-        // Normalize to basename to prevent path traversal on deletion.
-        $safeName = basename($filename);
-        if ($safeName === '' || $safeName === '.' || $safeName === '..') {
-            return;
-        }
-
-        $path = dirname(__DIR__, 3) . '/public/uploads/avatars/' . $safeName;
-        if (is_file($path)) {
-            @unlink($path);
-        }
-
-        // Keep thumbnail lifecycle tied to original avatar lifecycle.
-        $thumbPath = dirname(__DIR__, 3) . '/public/uploads/avatars/' . $this->avatarThumbnailFilename($safeName);
-        if (is_file($thumbPath)) {
-            @unlink($thumbPath);
-        }
+        $this->avatarUploadService()->deleteAvatarFile(dirname(__DIR__, 3), $filename);
     }
 
     /**
@@ -9795,376 +9160,74 @@ MARKDOWN;
      */
     private function routingRowsForPanel(): array
     {
-        $rows = [];
-        $pathUsage = [];
-        $reservedPrefixes = $this->reservedPublicPrefixes();
-        $channelIndexTemplateExists = $this->channelIndexTemplateExistsForRouting();
         $categoryPrefix = $this->categoryRoutePrefix();
         $tagPrefix = $this->tagRoutePrefix();
         $profilePrefix = $this->profileRoutePrefix();
         $profileRoutesEnabled = $this->profileRoutesEnabledForRoutingTable();
         $groupPrefix = $this->groupRoutePrefix();
         $groupRoutesEnabled = $this->groupRoutesEnabledForRoutingTable();
-        $canEditPages = $this->auth->hasPanelPermissionBit(PanelAccess::PAGES_EDIT);
-        $canEditChannels = $this->auth->hasPanelPermissionBit(PanelAccess::CHANNELS_EDIT);
-        $canEditCategories = $this->auth->hasPanelPermissionBit(PanelAccess::CATEGORIES_EDIT);
-        $canEditTags = $this->auth->hasPanelPermissionBit(PanelAccess::TAGS_EDIT);
-        $canEditRedirects = $this->auth->hasPanelPermissionBit(PanelAccess::REDIRECTS_EDIT);
-        $canEditUsers = $this->auth->hasPanelPermissionBit(PanelAccess::USERS_EDIT);
-        $canEditGroups = $this->auth->hasPanelPermissionBit(PanelAccess::GROUPS_EDIT);
+
         $groupRoutingEnabled = $groupRoutesEnabled && $groupPrefix !== '';
         $userRoutingEnabled = $profileRoutesEnabled && $profilePrefix !== '';
         $routingAuthData = $this->users->listRoutingData($groupRoutingEnabled, $userRoutingEnabled);
         $routingGroups = is_array($routingAuthData['groups'] ?? null) ? $routingAuthData['groups'] : [];
         $routingUsers = is_array($routingAuthData['users'] ?? null) ? $routingAuthData['users'] : [];
-        $categoryRoutesEnabled = $categoryPrefix !== '';
-        $tagRoutesEnabled = $tagPrefix !== '';
+
         $taxonomyRoutingData = $this->taxonomy->listRoutingInventoryData(
-            $categoryRoutesEnabled,
-            $tagRoutesEnabled,
+            $categoryPrefix !== '',
+            $tagPrefix !== '',
             true
         );
-        $channelRoutingOptions = is_array($taxonomyRoutingData['channels'] ?? null)
-            ? $taxonomyRoutingData['channels']
-            : [];
-        $categoryRoutingOptions = is_array($taxonomyRoutingData['categories'] ?? null)
-            ? $taxonomyRoutingData['categories']
-            : [];
-        $tagRoutingOptions = is_array($taxonomyRoutingData['tags'] ?? null)
-            ? $taxonomyRoutingData['tags']
-            : [];
-        $redirectRoutingRows = is_array($taxonomyRoutingData['redirects'] ?? null)
-            ? $taxonomyRoutingData['redirects']
-            : [];
-        $pagesForRouting = $this->pages->listAllForRouting();
-        $channelsById = [];
-        foreach ($channelRoutingOptions as $channelOption) {
-            $channelId = (int) ($channelOption['id'] ?? 0);
-            if ($channelId > 0) {
-                $channelsById[$channelId] = [
-                    'slug' => (string) ($channelOption['slug'] ?? ''),
-                    'name' => (string) ($channelOption['name'] ?? ''),
-                    'page_route_mode' => $this->normalizeChannelPageRouteMode(
-                        (string) ($channelOption['page_route_mode'] ?? 'slug')
-                    ),
-                    'page_url_separator' => $this->normalizeChannelPageUrlSeparator(
-                        (string) ($channelOption['page_url_separator'] ?? 'inherit')
-                    ),
-                ];
-            }
-        }
-        foreach ($pagesForRouting as &$pageForRouting) {
-            $channelId = (int) ($pageForRouting['channel_id'] ?? 0);
-            $pageForRouting['channel_slug'] = (string) ($channelsById[$channelId]['slug'] ?? '');
-            $pageForRouting['channel_name'] = (string) ($channelsById[$channelId]['name'] ?? '');
-            $pageForRouting['channel_page_route_mode'] = (string) ($channelsById[$channelId]['page_route_mode'] ?? 'slug');
-            $pageForRouting['channel_page_url_separator'] = (string) ($channelsById[$channelId]['page_url_separator'] ?? 'inherit');
-        }
-        unset($pageForRouting);
-        $channelLandingMap = $this->channelLandingMapFromPagesForRouting($pagesForRouting);
 
-        foreach ($channelRoutingOptions as $channel) {
-            $channelId = (int) ($channel['id'] ?? 0);
-            $channelSlug = trim((string) ($channel['slug'] ?? ''));
-            if ($channelId <= 0 || $channelSlug === '') {
-                continue;
-            }
-
-            $landingSlug = trim((string) ($channelLandingMap[$channelSlug] ?? ''));
-            $hasLanding = $landingSlug !== '';
-            $statusKey = $hasLanding ? 'active' : 'missing';
-            $statusLabel = $hasLanding
-                ? 'Active'
-                : ($channelIndexTemplateExists ? 'Missing Index' : 'Missing Template');
-            $notes = $hasLanding
-                ? ('Channel landing resolves using slug "' . $landingSlug . '".')
-                : 'No published channel landing page found (requires slug home or index).';
-            if (in_array($channelSlug, $reservedPrefixes, true)) {
-                $notes = 'Reserved prefix; this channel route is not publicly reachable.';
-            }
-
-            $publicUrl = '/' . $channelSlug;
-            $conflictKey = strtolower($publicUrl);
-            $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
-
-            $rows[] = [
-                'type_key' => 'channel',
-                'type_label' => 'Channel',
-                'source_label' => trim((string) ($channel['name'] ?? '')) !== '' ? (string) $channel['name'] : $channelSlug,
-                'edit_url' => $canEditChannels ? $this->panelUrl('/channels/edit/' . $channelId) : '',
-                'public_url' => $publicUrl,
-                'target_url' => $publicUrl,
-                'status_key' => $statusKey,
-                'status_label' => $statusLabel,
-                'notes' => $notes,
-                'is_conflict' => false,
-                '_conflict_key' => $conflictKey,
-            ];
-        }
-
-        foreach ($pagesForRouting as $page) {
-            $pageId = (int) ($page['id'] ?? 0);
-            $pageSlug = trim((string) ($page['slug'] ?? ''));
-            if ($pageId <= 0 || $pageSlug === '') {
-                continue;
-            }
-
-            $channelSlug = trim((string) ($page['channel_slug'] ?? ''));
-            $publicUrl = $this->routingPublicPathForPage(
+        return $this->routingInventoryBuilder()->buildRows([
+            'reserved_prefixes' => $this->reservedPublicPrefixes(),
+            'channel_index_template_exists' => $this->channelIndexTemplateExistsForRouting(),
+            'category_prefix' => $categoryPrefix,
+            'tag_prefix' => $tagPrefix,
+            'profile_prefix' => $profilePrefix,
+            'profile_routes_enabled' => $profileRoutesEnabled,
+            'group_prefix' => $groupPrefix,
+            'group_routes_enabled' => $groupRoutesEnabled,
+            'can_edit_pages' => $this->auth->hasPanelPermissionBit(PanelAccess::PAGES_EDIT),
+            'can_edit_channels' => $this->auth->hasPanelPermissionBit(PanelAccess::CHANNELS_EDIT),
+            'can_edit_categories' => $this->auth->hasPanelPermissionBit(PanelAccess::CATEGORIES_EDIT),
+            'can_edit_tags' => $this->auth->hasPanelPermissionBit(PanelAccess::TAGS_EDIT),
+            'can_edit_redirects' => $this->auth->hasPanelPermissionBit(PanelAccess::REDIRECTS_EDIT),
+            'can_edit_users' => $this->auth->hasPanelPermissionBit(PanelAccess::USERS_EDIT),
+            'can_edit_groups' => $this->auth->hasPanelPermissionBit(PanelAccess::GROUPS_EDIT),
+            'routing_groups' => $routingGroups,
+            'routing_users' => $routingUsers,
+            'channel_routing_options' => is_array($taxonomyRoutingData['channels'] ?? null)
+                ? $taxonomyRoutingData['channels']
+                : [],
+            'category_routing_options' => is_array($taxonomyRoutingData['categories'] ?? null)
+                ? $taxonomyRoutingData['categories']
+                : [],
+            'tag_routing_options' => is_array($taxonomyRoutingData['tags'] ?? null)
+                ? $taxonomyRoutingData['tags']
+                : [],
+            'redirect_routing_rows' => is_array($taxonomyRoutingData['redirects'] ?? null)
+                ? $taxonomyRoutingData['redirects']
+                : [],
+            'pages_for_routing' => $this->pages->listAllForRouting(),
+            'build_page_public_path' => fn (
+                string $pageSlug,
+                string $channelSlug,
+                string $publishedAt,
+                string $channelPageRouteMode,
+                string $channelPageUrlSeparator
+            ): string => $this->routingPublicPathForPage(
                 $pageSlug,
                 $channelSlug,
-                (string) ($page['published_at'] ?? ''),
-                (string) ($page['channel_page_route_mode'] ?? 'slug'),
-                (string) ($page['channel_page_url_separator'] ?? 'inherit')
-            );
-
-            $statusKey = (int) ($page['is_published'] ?? 0) === 1 ? 'published' : 'draft';
-            $statusLabel = $statusKey === 'published' ? 'Published' : 'Draft';
-            $notes = '';
-
-            if ($channelSlug === '' && in_array($pageSlug, $reservedPrefixes, true)) {
-                $notes = 'Reserved prefix; this root-level page route is not publicly reachable.';
-            } elseif ($channelSlug !== '' && in_array($channelSlug, $reservedPrefixes, true)) {
-                $notes = 'Reserved channel prefix; this channeled page route is not publicly reachable.';
-            }
-
-            $conflictKey = strtolower($publicUrl);
-            $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
-
-            $rows[] = [
-                'type_key' => 'page',
-                'type_label' => 'Page',
-                'source_label' => trim((string) ($page['title'] ?? '')) !== '' ? (string) $page['title'] : $pageSlug,
-                'edit_url' => $canEditPages ? $this->panelUrl('/pages/edit/' . $pageId) : '',
-                'public_url' => $publicUrl,
-                'target_url' => $publicUrl,
-                'status_key' => $statusKey,
-                'status_label' => $statusLabel,
-                'notes' => $notes,
-                'is_conflict' => false,
-                '_conflict_key' => $conflictKey,
-            ];
-        }
-
-        if ($categoryRoutesEnabled) {
-            foreach ($categoryRoutingOptions as $category) {
-                $categoryId = (int) ($category['id'] ?? 0);
-                $categorySlug = trim((string) ($category['slug'] ?? ''));
-                if ($categoryId <= 0 || $categorySlug === '') {
-                    continue;
-                }
-
-                $publicUrl = '/' . $categoryPrefix . '/' . $categorySlug;
-                $conflictKey = strtolower($publicUrl);
-                $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
-
-                $rows[] = [
-                    'type_key' => 'category',
-                    'type_label' => 'Category',
-                    'source_label' => trim((string) ($category['name'] ?? '')) !== ''
-                        ? (string) $category['name']
-                        : $categorySlug,
-                    'edit_url' => $canEditCategories ? $this->panelUrl('/categories/edit/' . $categoryId) : '',
-                    'public_url' => $publicUrl,
-                    'target_url' => $publicUrl,
-                    'status_key' => 'active',
-                    'status_label' => 'Active',
-                    'notes' => '',
-                    'is_conflict' => false,
-                    '_conflict_key' => $conflictKey,
-                ];
-            }
-        }
-
-        if ($tagRoutesEnabled) {
-            foreach ($tagRoutingOptions as $tag) {
-                $tagId = (int) ($tag['id'] ?? 0);
-                $tagSlug = trim((string) ($tag['slug'] ?? ''));
-                if ($tagId <= 0 || $tagSlug === '') {
-                    continue;
-                }
-
-                $publicUrl = '/' . $tagPrefix . '/' . $tagSlug;
-                $conflictKey = strtolower($publicUrl);
-                $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
-
-                $rows[] = [
-                    'type_key' => 'tag',
-                    'type_label' => 'Tag',
-                    'source_label' => trim((string) ($tag['name'] ?? '')) !== '' ? (string) $tag['name'] : $tagSlug,
-                    'edit_url' => $canEditTags ? $this->panelUrl('/tags/edit/' . $tagId) : '',
-                    'public_url' => $publicUrl,
-                    'target_url' => $publicUrl,
-                    'status_key' => 'active',
-                    'status_label' => 'Active',
-                    'notes' => '',
-                    'is_conflict' => false,
-                    '_conflict_key' => $conflictKey,
-                ];
-            }
-        }
-
-        if ($groupRoutingEnabled) {
-            foreach ($routingGroups as $group) {
-                $groupId = (int) ($group['id'] ?? 0);
-                $groupName = trim((string) ($group['name'] ?? ''));
-                if ($groupId <= 0 || $groupName === '') {
-                    continue;
-                }
-                $groupRoleSlug = strtolower(trim((string) ($group['slug'] ?? '')));
-                if (in_array($groupRoleSlug, ['guest', 'validating', 'banned'], true)) {
-                    continue;
-                }
-
-                $routeEnabled = (int) ($group['route_enabled'] ?? 0) === 1;
-                if (!$routeEnabled) {
-                    continue;
-                }
-
-                $groupSlug = $this->input->slug((string) ($group['slug'] ?? ''));
-                if ($groupSlug === null || $groupSlug === '') {
-                    $groupSlug = $this->slugifyGroupName($groupName);
-                }
-                if ($groupSlug === '') {
-                    continue;
-                }
-
-                $publicUrl = '/' . $groupPrefix . '/' . $groupSlug;
-                $conflictKey = strtolower($publicUrl);
-                $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
-
-                $memberCount = max(0, (int) ($group['member_count'] ?? 0));
-                $statusLabel = $memberCount . ' Users';
-
-                $rows[] = [
-                    'type_key' => 'group',
-                    'type_label' => 'Group',
-                    'source_label' => $groupName,
-                    'edit_url' => $canEditGroups ? $this->panelUrl('/groups/edit/' . $groupId) : '',
-                    'public_url' => $publicUrl,
-                    'target_url' => $publicUrl,
-                    'status_key' => 'users_' . $memberCount,
-                    'status_label' => $statusLabel,
-                    'notes' => '',
-                    'is_conflict' => false,
-                    '_conflict_key' => $conflictKey,
-                ];
-            }
-        }
-
-        if ($userRoutingEnabled) {
-            foreach ($routingUsers as $user) {
-                $userId = (int) ($user['id'] ?? 0);
-                $username = $this->normalizeUserIdentifierValue((string) ($user['username'] ?? ''));
-                if ($userId <= 0 || $username === null) {
-                    continue;
-                }
-
-                $publicUrl = '/' . $profilePrefix . '/' . rawurlencode($username);
-                $conflictKey = strtolower($publicUrl);
-                $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
-
-                $groupStatusLabel = trim((string) ($user['groups_text'] ?? ''));
-                if ($groupStatusLabel === '') {
-                    $groupStatusLabel = 'No Groups';
-                }
-
-                $statusKey = 'groups_' . strtolower(preg_replace('/[^a-z0-9]+/i', '-', $groupStatusLabel) ?? 'none');
-                $statusKey = trim($statusKey, '-');
-                if ($statusKey === '') {
-                    $statusKey = 'groups_none';
-                }
-
-                $rows[] = [
-                    'type_key' => 'user',
-                    'type_label' => 'User',
-                    'source_label' => $username,
-                    'edit_url' => $canEditUsers ? $this->panelUrl('/users/edit/' . $userId) : '',
-                    'public_url' => $publicUrl,
-                    'target_url' => $publicUrl,
-                    'status_key' => $statusKey,
-                    'status_label' => $groupStatusLabel,
-                    'notes' => '',
-                    'is_conflict' => false,
-                    '_conflict_key' => $conflictKey,
-                ];
-            }
-        }
-
-        foreach ($redirectRoutingRows as $redirect) {
-            $redirectId = (int) ($redirect['id'] ?? 0);
-            $redirectSlug = trim((string) ($redirect['slug'] ?? ''));
-            if ($redirectId <= 0 || $redirectSlug === '') {
-                continue;
-            }
-
-            $channelSlug = trim((string) ($redirect['channel_slug'] ?? ''));
-            $publicUrl = $channelSlug === ''
-                ? '/' . $redirectSlug
-                : '/' . $channelSlug . '/' . $redirectSlug;
-
-            $statusKey = (int) ($redirect['is_active'] ?? 0) === 1 ? 'active' : 'inactive';
-            $statusLabel = $statusKey === 'active' ? 'Active' : 'Inactive';
-            $notes = '';
-
-            if ($channelSlug === '' && in_array($redirectSlug, $reservedPrefixes, true)) {
-                $notes = 'Reserved prefix; this root-level redirect route is not publicly reachable.';
-            } elseif ($channelSlug !== '' && in_array($channelSlug, $reservedPrefixes, true)) {
-                $notes = 'Reserved channel prefix; this channeled redirect route is not publicly reachable.';
-            }
-
-            $conflictKey = strtolower($publicUrl);
-            $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
-
-            $rows[] = [
-                'type_key' => 'redirect',
-                'type_label' => 'Redirect',
-                'source_label' => trim((string) ($redirect['title'] ?? '')) !== '' ? (string) $redirect['title'] : $redirectSlug,
-                'edit_url' => $canEditRedirects ? $this->panelUrl('/redirects/edit/' . $redirectId) : '',
-                'public_url' => $publicUrl,
-                'target_url' => trim((string) ($redirect['target_url'] ?? '')),
-                'status_key' => $statusKey,
-                'status_label' => $statusLabel,
-                'notes' => $notes,
-                'is_conflict' => false,
-                '_conflict_key' => $conflictKey,
-            ];
-        }
-
-        foreach ($rows as $index => $row) {
-            $conflictKey = (string) ($row['_conflict_key'] ?? '');
-            if ($conflictKey === '') {
-                continue;
-            }
-
-            $usageCount = (int) ($pathUsage[$conflictKey] ?? 0);
-            if ($usageCount <= 1) {
-                unset($rows[$index]['_conflict_key']);
-                continue;
-            }
-
-            $rows[$index]['is_conflict'] = true;
-            $suffix = 'Path conflict with ' . (string) ($usageCount - 1) . ' other route(s).';
-            $existingNotes = trim((string) ($rows[$index]['notes'] ?? ''));
-            $rows[$index]['notes'] = $existingNotes === '' ? $suffix : ($existingNotes . ' ' . $suffix);
-            unset($rows[$index]['_conflict_key']);
-        }
-
-        usort($rows, static function (array $a, array $b): int {
-            $pathCompare = strcasecmp((string) ($a['public_url'] ?? ''), (string) ($b['public_url'] ?? ''));
-            if ($pathCompare !== 0) {
-                return $pathCompare;
-            }
-
-            $typeCompare = strcasecmp((string) ($a['type_label'] ?? ''), (string) ($b['type_label'] ?? ''));
-            if ($typeCompare !== 0) {
-                return $typeCompare;
-            }
-
-            return strcasecmp((string) ($a['source_label'] ?? ''), (string) ($b['source_label'] ?? ''));
-        });
-
-        return $rows;
+                $publishedAt,
+                $channelPageRouteMode,
+                $channelPageUrlSeparator
+            ),
+            'channel_landing_map_builder' => fn (array $pagesForRouting): array => $this->channelLandingMapFromPagesForRouting($pagesForRouting),
+            'panel_url' => fn (string $suffix): string => $this->panelUrl($suffix),
+            'normalize_user_identifier' => fn (string $raw): ?string => $this->normalizeUserIdentifierValue($raw),
+            'slugify_group_name' => fn (string $name): string => $this->slugifyGroupName($name),
+        ]);
     }
 
     /**
@@ -11110,54 +10173,7 @@ MARKDOWN;
      */
     private function copyDirectoryRecursively(string $sourceDirectory, string $targetDirectory): void
     {
-        if (!is_dir($sourceDirectory)) {
-            throw new \RuntimeException('Clone source directory not found: ' . $sourceDirectory);
-        }
-
-        $sourceRoot = realpath($sourceDirectory);
-        if ($sourceRoot === false || !is_dir($sourceRoot)) {
-            throw new \RuntimeException('Failed to resolve clone source directory.');
-        }
-
-        if (!is_dir($targetDirectory) && !mkdir($targetDirectory, 0775, true) && !is_dir($targetDirectory)) {
-            throw new \RuntimeException('Failed to create clone target directory.');
-        }
-
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($sourceRoot, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::SELF_FIRST
-        );
-
-        foreach ($iterator as $item) {
-            $sourcePath = $item->getPathname();
-            if ($item->isLink()) {
-                throw new \RuntimeException('Theme clone source contains symlinks, which are not supported.');
-            }
-
-            $relativePath = ltrim(substr($sourcePath, strlen($sourceRoot)), DIRECTORY_SEPARATOR);
-            if ($relativePath === '') {
-                continue;
-            }
-
-            $targetPath = rtrim($targetDirectory, '/\\') . '/' . str_replace('\\', '/', $relativePath);
-            if ($item->isDir()) {
-                if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {
-                    throw new \RuntimeException('Failed to create clone directory: ' . $targetPath);
-                }
-                continue;
-            }
-
-            $targetDir = dirname($targetPath);
-            if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
-                throw new \RuntimeException('Failed to create clone directory: ' . $targetDir);
-            }
-
-            if (!copy($sourcePath, $targetPath)) {
-                throw new \RuntimeException('Failed to copy clone file: ' . $relativePath);
-            }
-
-            @chmod($targetPath, 0644);
-        }
+        $this->themeCloneService()->copyDirectoryRecursively($sourceDirectory, $targetDirectory);
     }
 
     /**
@@ -11286,6 +10302,54 @@ MARKDOWN;
         }
 
         return $this->configEditorNormalizer;
+    }
+
+    private function routingInventoryBuilder(): RoutingInventoryBuilder
+    {
+        if (!$this->routingInventoryBuilder instanceof RoutingInventoryBuilder) {
+            $this->routingInventoryBuilder = new RoutingInventoryBuilder($this->input);
+        }
+
+        return $this->routingInventoryBuilder;
+    }
+
+    private function extensionPermissionCatalogService(): ExtensionPermissionCatalogService
+    {
+        if (!$this->extensionPermissionCatalogService instanceof ExtensionPermissionCatalogService) {
+            $this->extensionPermissionCatalogService = new ExtensionPermissionCatalogService(
+                $this->extensionStateStore(),
+                $this->input
+            );
+        }
+
+        return $this->extensionPermissionCatalogService;
+    }
+
+    private function avatarUploadService(): AvatarUploadService
+    {
+        if (!$this->avatarUploadService instanceof AvatarUploadService) {
+            $this->avatarUploadService = new AvatarUploadService();
+        }
+
+        return $this->avatarUploadService;
+    }
+
+    private function configSnapshotSanitizer(): ConfigSnapshotSanitizer
+    {
+        if (!$this->configSnapshotSanitizer instanceof ConfigSnapshotSanitizer) {
+            $this->configSnapshotSanitizer = new ConfigSnapshotSanitizer();
+        }
+
+        return $this->configSnapshotSanitizer;
+    }
+
+    private function themeCloneService(): ThemeCloneService
+    {
+        if (!$this->themeCloneService instanceof ThemeCloneService) {
+            $this->themeCloneService = new ThemeCloneService();
+        }
+
+        return $this->themeCloneService;
     }
 
     private function publicFallbackRenderer(): ThemeFallbackRenderer

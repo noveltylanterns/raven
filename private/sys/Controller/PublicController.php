@@ -20,6 +20,7 @@ use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Content\MarkdownRenderer;
+use Raven\Lib\Http\RequestContextResolver;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Pagination\Pagination;
 use Raven\Lib\Routing\ChannelRoutePolicy;
@@ -68,6 +69,7 @@ final class PublicController
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
     private ?MarkdownRenderer $markdownRenderer = null;
+    private ?RequestContextResolver $requestContextResolver = null;
     /**
      * Request-local cache of enabled embedded forms keyed by type then slug.
      *
@@ -1459,24 +1461,7 @@ final class PublicController
      */
     private function currentRequestUrl(string $configuredDomain): string
     {
-        $scheme = $this->resolveRequestScheme();
-        $host = $this->resolveRequestHost($configuredDomain);
-
-        $requestUri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
-        $path = (string) parse_url($requestUri, PHP_URL_PATH);
-        if ($path === '' || !str_starts_with($path, '/')) {
-            $path = '/';
-        }
-
-        $query = (string) parse_url($requestUri, PHP_URL_QUERY);
-        $query = str_replace(["\r", "\n", "\0"], '', $query);
-
-        $url = $scheme . '://' . $host . $path;
-        if ($query !== '') {
-            $url .= '?' . $query;
-        }
-
-        return $url;
+        return $this->requestContextResolver()->currentRequestUrl($configuredDomain);
     }
 
     /**
@@ -1484,22 +1469,7 @@ final class PublicController
      */
     private function resolveRequestScheme(): string
     {
-        $forwarded = strtolower(trim((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')));
-        if (in_array($forwarded, ['http', 'https'], true)) {
-            return $forwarded;
-        }
-
-        $requestScheme = strtolower(trim((string) ($_SERVER['REQUEST_SCHEME'] ?? '')));
-        if (in_array($requestScheme, ['http', 'https'], true)) {
-            return $requestScheme;
-        }
-
-        $https = (string) ($_SERVER['HTTPS'] ?? '');
-        if ($https !== '' && strtolower($https) !== 'off' && $https !== '0') {
-            return 'https';
-        }
-
-        return 'http';
+        return $this->requestContextResolver()->resolveRequestScheme();
     }
 
     /**
@@ -1507,58 +1477,7 @@ final class PublicController
      */
     private function resolveRequestHost(string $configuredDomain): string
     {
-        $configured = trim($configuredDomain);
-
-        if ($configured !== '') {
-            if (str_contains($configured, '://')) {
-                $parsedHost = trim((string) parse_url($configured, PHP_URL_HOST));
-                $parsedPort = parse_url($configured, PHP_URL_PORT);
-                if ($parsedHost !== '') {
-                    $candidate = $parsedHost;
-                    if (is_int($parsedPort) && $parsedPort > 0) {
-                        $candidate .= ':' . $parsedPort;
-                    }
-
-                    if ($this->isValidHostWithOptionalPort($candidate)) {
-                        return $candidate;
-                    }
-                }
-            }
-
-            // Strip any accidental path/query suffix from domain config.
-            $configured = preg_replace('/[\/?#].*$/', '', $configured) ?? $configured;
-            if ($this->isValidHostWithOptionalPort($configured)) {
-                return $configured;
-            }
-        }
-
-        $serverHost = trim((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost'));
-        if ($this->isValidHostWithOptionalPort($serverHost)) {
-            return $serverHost;
-        }
-
-        return 'localhost';
-    }
-
-    /**
-     * Returns true when a host[:port] value is safe for URL composition.
-     */
-    private function isValidHostWithOptionalPort(string $value): bool
-    {
-        if ($value === '' || str_contains($value, '/') || str_contains($value, '\\')) {
-            return false;
-        }
-
-        if (preg_match('/[\r\n\0]/', $value) === 1) {
-            return false;
-        }
-
-        if (preg_match('/^[a-z0-9.-]+(?::\d{1,5})?$/i', $value) === 1) {
-            return true;
-        }
-
-        // Accept bracketed IPv6 hosts with optional port.
-        return preg_match('/^\[[a-f0-9:]+\](?::\d{1,5})?$/i', $value) === 1;
+        return $this->requestContextResolver()->resolveRequestHost($configuredDomain);
     }
 
     /**
@@ -2189,6 +2108,15 @@ final class PublicController
         return $this->markdownRenderer;
     }
 
+    private function requestContextResolver(): RequestContextResolver
+    {
+        if (!$this->requestContextResolver instanceof RequestContextResolver) {
+            $this->requestContextResolver = new RequestContextResolver();
+        }
+
+        return $this->requestContextResolver;
+    }
+
     /**
      * Normalizes one taxonomy route-prefix value and falls back safely.
      */
@@ -2694,22 +2622,7 @@ final class PublicController
      */
     private function normalizeClientIp(string $rawIp): ?string
     {
-        $rawIp = trim($rawIp);
-        if ($rawIp === '') {
-            return null;
-        }
-
-        // Keep only the first address in chained forwarding values.
-        if (str_contains($rawIp, ',')) {
-            $parts = explode(',', $rawIp);
-            $rawIp = trim((string) ($parts[0] ?? ''));
-        }
-
-        if ($rawIp === '' || filter_var($rawIp, FILTER_VALIDATE_IP) === false) {
-            return null;
-        }
-
-        return $this->input->text($rawIp, 45);
+        return $this->requestContextResolver()->normalizeClientIp($rawIp);
     }
 
     /**
@@ -2717,27 +2630,7 @@ final class PublicController
      */
     private function resolveClientHostname(?string $ipAddress): ?string
     {
-        if ($ipAddress === null || $ipAddress === '') {
-            return null;
-        }
-
-        $rawHostname = @gethostbyaddr($ipAddress);
-        if (!is_string($rawHostname)) {
-            return null;
-        }
-
-        $hostname = strtolower(trim($rawHostname));
-        if ($hostname === '' || $hostname === $ipAddress || filter_var($hostname, FILTER_VALIDATE_IP) !== false) {
-            return null;
-        }
-
-        // Remove optional trailing dot from fully-qualified DNS names.
-        $hostname = rtrim($hostname, '.');
-        if ($hostname === '' || str_contains($hostname, '..') || preg_match('/[^a-z0-9.-]/', $hostname) === 1) {
-            return null;
-        }
-
-        return $this->input->text($hostname, 255);
+        return $this->requestContextResolver()->resolveClientHostname($ipAddress);
     }
 
     /**

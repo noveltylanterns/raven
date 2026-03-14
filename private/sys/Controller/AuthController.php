@@ -14,6 +14,7 @@ namespace Raven\Controller;
 use Raven\Core\Config;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Http\HttpResponse;
+use Raven\Lib\Http\RequestContextResolver;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Site\SiteContextBuilder;
@@ -53,6 +54,7 @@ final class AuthController
     private SessionFlash $flash;
     private LoginIdentifierResolver $identifierResolver;
     private ?SiteContextBuilder $siteContextBuilder = null;
+    private ?RequestContextResolver $requestContextResolver = null;
 
     public function __construct(
         View $view,
@@ -768,7 +770,9 @@ final class AuthController
      */
     private function clientIpAddress(): string
     {
-        return trim((string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+        $normalized = $this->requestContextResolver()->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+
+        return $normalized ?? 'unknown';
     }
 
     /**
@@ -805,6 +809,15 @@ final class AuthController
         );
 
         return max(1, $configured);
+    }
+
+    private function requestContextResolver(): RequestContextResolver
+    {
+        if (!$this->requestContextResolver instanceof RequestContextResolver) {
+            $this->requestContextResolver = new RequestContextResolver();
+        }
+
+        return $this->requestContextResolver;
     }
 
     /**

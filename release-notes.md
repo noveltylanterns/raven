@@ -1,3 +1,7 @@
+# Release Notes
+
+*The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
+
 ### March 14, 2026
 
 - Updated extension-type documentation to match the current manifest schema (`helper`, `content`, `plugin`, `module`, `system`) in `README.md` and `docs/Extensions.md`.
@@ -10,6 +14,7 @@
 - Extracted shared core helpers to `private/lib/` (`SessionFlash`, `HttpResponse`, `PanelUrl`, `LoginThrottleService`, `ContactProfileNormalizer`, `LoginIdentifierResolver`, `SessionCookiePolicy`, `Pagination`) and rewired controllers/bootstrap/auth core to use them.
 - Added second-wave `private/lib/` modularization for config/routing/archive/view concerns (`ConfigValueParser`, `DebugToolbarConfigResolver`, `RedirectTargetValidator`, `ChannelRoutePolicy`, `ArchivePackageService`, `ThemeFallbackRenderer`) and rewired panel/public entrypoints + controllers to use them.
 - Added third-wave `private/lib/` modularization for extension/theme scaffolding, extension state persistence, site-context payload assembly, config-editor normalization, and markdown rendering (`ExtensionStateStore`, `ExtensionScaffoldService`, `ThemeScaffoldService`, `SiteContextBuilder`, `ConfigEditorNormalizer`, `MarkdownRenderer`) and rewired auth/panel/public controllers to delegate these concerns.
+- Added fourth-wave `private/lib/` modularization for routing inventory assembly, extension permission catalog+bit allocation, avatar upload/thumbnail lifecycle, config-snapshot sanitization, theme directory cloning, and shared request-context resolution (`RoutingInventoryBuilder`, `ExtensionPermissionCatalogService`, `AvatarUploadService`, `ConfigSnapshotSanitizer`, `ThemeCloneService`, `RequestContextResolver`) with panel/public/auth controllers rewired to delegate these helpers.
 - Updated `AGENTS.md` private file-tree appendix for `private/lib/` and `private/sys/` to reflect current module responsibilities after declutter work.
 
 ### March 13, 2026
