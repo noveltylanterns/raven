@@ -17,8 +17,8 @@ use Raven\Core\Auth\AuthService;
 use Raven\Core\Config;
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Core\Extension\ExtensionRegistry;
-use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Content\BodyBlockPolicy;
 use Raven\Lib\Content\MarkdownRenderer;
 use Raven\Lib\Extension\EmbeddedFormRuntimeService;
 use Raven\Lib\Http\RequestContextResolver;
@@ -28,6 +28,8 @@ use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Routing\RedirectTargetValidator;
+use Raven\Lib\Routing\RouteConfigService;
+use Raven\Lib\Security\CaptchaService;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
@@ -74,6 +76,9 @@ final class PublicController
     private ?PublicTemplateResolver $publicTemplateResolver = null;
     private ?EmbeddedFormRuntimeService $embeddedFormRuntimeService = null;
     private ?ProfileContactService $profileContactService = null;
+    private ?RouteConfigService $routeConfigService = null;
+    private ?BodyBlockPolicy $bodyBlockPolicy = null;
+    private ?CaptchaService $captchaService = null;
     public function __construct(
         View $view,
         Config $config,
@@ -416,10 +421,7 @@ final class PublicController
      */
     private function resolveChannelPageUrlSeparator(string $channelValue): string
     {
-        return ChannelRoutePolicy::resolveSeparator(
-            $channelValue,
-            (string) $this->config->get('content.separator', '-')
-        );
+        return $this->routeConfigService()->resolveChannelPageUrlSeparator($channelValue);
     }
 
     /**
@@ -1443,23 +1445,7 @@ final class PublicController
      */
     private function normalizeBodyBlockCssId(mixed $value): string
     {
-        if (!is_scalar($value) && $value !== null) {
-            return '';
-        }
-
-        $id = str_replace("\0", '', trim((string) ($value ?? '')));
-        $id = ltrim($id, '#');
-        if ($id === '') {
-            return '';
-        }
-
-        if (mb_strlen($id) > 120) {
-            $id = mb_substr($id, 0, 120);
-        }
-
-        return preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/', $id) === 1
-            ? $id
-            : '';
+        return $this->bodyBlockPolicy()->normalizeCssId($value);
     }
 
     /**
@@ -1467,36 +1453,7 @@ final class PublicController
      */
     private function normalizeBodyBlockCssClassList(mixed $value): string
     {
-        if (!is_scalar($value) && $value !== null) {
-            return '';
-        }
-
-        $raw = str_replace("\0", '', trim((string) ($value ?? '')));
-        if ($raw === '') {
-            return '';
-        }
-
-        $classMap = [];
-        $classes = [];
-        foreach (preg_split('/[\s,]+/', $raw) ?: [] as $token) {
-            $token = ltrim(trim((string) $token), '.');
-            if ($token === '' || preg_match('/^[a-zA-Z0-9_-]{1,80}$/', $token) !== 1) {
-                continue;
-            }
-
-            $key = strtolower($token);
-            if (isset($classMap[$key])) {
-                continue;
-            }
-
-            $classMap[$key] = true;
-            $classes[] = $token;
-            if (count($classes) >= 12) {
-                break;
-            }
-        }
-
-        return implode(' ', $classes);
+        return $this->bodyBlockPolicy()->normalizeCssClassList($value);
     }
 
     /**
@@ -1504,13 +1461,7 @@ final class PublicController
      */
     private function normalizePageBodyBlockType(string $value): string
     {
-        $type = strtolower(trim($value));
-        if ($type === '') {
-            return 'tinymce';
-        }
-
-        $definitions = $this->pageBodyBlockTypeDefinitions();
-        return array_key_exists($type, $definitions) ? $type : 'tinymce';
+        return $this->bodyBlockPolicy()->normalizeType($value, $this->pageBodyBlockTypeDefinitions());
     }
 
     /**
@@ -1518,16 +1469,7 @@ final class PublicController
      */
     private function pageBodyBlockEditorMode(string $type): string
     {
-        $normalized = strtolower(trim($type));
-        if ($normalized === '') {
-            return 'tinymce';
-        }
-
-        $definitions = $this->pageBodyBlockTypeDefinitions();
-        $editor = strtolower(trim((string) ($definitions[$normalized]['editor'] ?? 'tinymce')));
-        return in_array($editor, ['tinymce', 'plaintext', 'autobr', 'markdown', 'markdown_file', 'gallery'], true)
-            ? $editor
-            : 'tinymce';
+        return $this->bodyBlockPolicy()->editorMode($type, $this->pageBodyBlockTypeDefinitions());
     }
 
     /**
@@ -1541,14 +1483,7 @@ final class PublicController
             return $this->pageBodyBlockTypeDefinitionsCache;
         }
 
-        $definitions = [
-            'tinymce' => ['label' => 'Rich Text', 'editor' => 'tinymce'],
-            'plaintext' => ['label' => 'Plaintext', 'editor' => 'plaintext'],
-            'autobr' => ['label' => 'Auto <br>', 'editor' => 'autobr'],
-            'markdown' => ['label' => 'Markdown', 'editor' => 'markdown'],
-            'markdown_file' => ['label' => 'Markdown File', 'editor' => 'markdown_file'],
-            'image_gallery' => ['label' => 'Image Gallery', 'editor' => 'gallery'],
-        ];
+        $definitions = $this->bodyBlockPolicy()->defaultDefinitions();
 
         $root = dirname(__DIR__, 3);
         foreach (ExtensionRegistry::enabledDirectories($root, true) as $extensionName) {
@@ -1571,30 +1506,11 @@ final class PublicController
                 continue;
             }
 
-            foreach ($fields as $entry) {
-                $slug = $this->input->slug((string) ($entry['slug'] ?? ''));
-                if ($slug === null || $slug === '') {
-                    continue;
-                }
-
-                $normalizedSlug = str_replace('-', '_', strtolower($slug));
-                $normalizedExtension = str_replace('-', '_', strtolower($extensionName));
-                $type = 'content_' . $normalizedExtension . '_' . $normalizedSlug;
-                if (isset($definitions[$type]) || preg_match('/^[a-z0-9_]{1,120}$/', $type) !== 1) {
-                    continue;
-                }
-
-                $label = $this->input->text((string) ($entry['label'] ?? ''), 120);
-                $editor = strtolower(trim((string) ($entry['editor'] ?? 'tinymce')));
-                if ($label === '' || !in_array($editor, ['tinymce', 'plaintext', 'autobr', 'markdown', 'markdown_file'], true)) {
-                    continue;
-                }
-
-                $definitions[$type] = [
-                    'label' => $label,
-                    'editor' => $editor,
-                ];
-            }
+            $definitions = $this->bodyBlockPolicy()->normalizeExtensionDefinitions(
+                (string) $extensionName,
+                $fields,
+                $definitions
+            );
         }
 
         $this->pageBodyBlockTypeDefinitionsCache = $definitions;
@@ -1726,11 +1642,7 @@ final class PublicController
      */
     private function categoryRoutePrefix(): string
     {
-        if (!$this->categoryEnabled()) {
-            return '';
-        }
-
-        return $this->normalizeTaxonomyRoutePrefix((string) $this->config->get('category.prefix', 'cat'), 'cat', true);
+        return $this->routeConfigService()->categoryRoutePrefix();
     }
 
     /**
@@ -1738,11 +1650,7 @@ final class PublicController
      */
     private function tagRoutePrefix(): string
     {
-        if (!$this->tagEnabled()) {
-            return '';
-        }
-
-        return $this->normalizeTaxonomyRoutePrefix((string) $this->config->get('tag.prefix', 'tag'), 'tag', true);
+        return $this->routeConfigService()->tagRoutePrefix();
     }
 
     /**
@@ -1750,7 +1658,7 @@ final class PublicController
      */
     private function categoryEnabled(): bool
     {
-        return $this->configBool($this->config->get('category.enabled', true), true);
+        return $this->routeConfigService()->categoryEnabled();
     }
 
     /**
@@ -1758,7 +1666,7 @@ final class PublicController
      */
     private function tagEnabled(): bool
     {
-        return $this->configBool($this->config->get('tag.enabled', true), true);
+        return $this->routeConfigService()->tagEnabled();
     }
 
     /**
@@ -1766,7 +1674,7 @@ final class PublicController
      */
     private function configBool(mixed $value, bool $default = false): bool
     {
-        return ConfigValueParser::bool($value, $default);
+        return $this->routeConfigService()->configBool($value, $default);
     }
 
     /**
@@ -1774,7 +1682,7 @@ final class PublicController
      */
     private function profileRoutePrefix(): string
     {
-        return $this->normalizeTaxonomyRoutePrefix((string) $this->config->get('user.prefix', 'user'), 'user', true);
+        return $this->routeConfigService()->profileRoutePrefix();
     }
 
     /**
@@ -1782,12 +1690,7 @@ final class PublicController
      */
     private function profileMode(): string
     {
-        $mode = strtolower(trim((string) $this->config->get('user.privacy', 'disabled')));
-        if (!in_array($mode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
-            return 'disabled';
-        }
-
-        return $mode;
+        return $this->routeConfigService()->profileMode();
     }
 
     /**
@@ -1795,7 +1698,7 @@ final class PublicController
      */
     private function groupRoutePrefix(): string
     {
-        return $this->normalizeTaxonomyRoutePrefix((string) $this->config->get('group.prefix', 'group'), 'group', true);
+        return $this->routeConfigService()->groupRoutePrefix();
     }
 
     /**
@@ -1803,15 +1706,7 @@ final class PublicController
      */
     private function groupMode(): string
     {
-        $mode = strtolower(trim((string) $this->config->get('group.privacy', 'disabled')));
-        if ($mode === 'public') {
-            $mode = 'public_full';
-        }
-        if (!in_array($mode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
-            return 'disabled';
-        }
-
-        return $mode;
+        return $this->routeConfigService()->groupMode();
     }
 
     /**
@@ -1819,12 +1714,7 @@ final class PublicController
      */
     private function registrationMode(): string
     {
-        $mode = strtolower(trim((string) $this->config->get('user.auth.registration', 'closed')));
-        if (!in_array($mode, ['open', 'invite', 'closed'], true)) {
-            return 'closed';
-        }
-
-        return $mode;
+        return $this->routeConfigService()->registrationMode();
     }
 
     /**
@@ -1938,12 +1828,39 @@ final class PublicController
         return $this->profileContactService;
     }
 
+    private function routeConfigService(): RouteConfigService
+    {
+        if (!$this->routeConfigService instanceof RouteConfigService) {
+            $this->routeConfigService = new RouteConfigService($this->config, $this->input);
+        }
+
+        return $this->routeConfigService;
+    }
+
+    private function bodyBlockPolicy(): BodyBlockPolicy
+    {
+        if (!$this->bodyBlockPolicy instanceof BodyBlockPolicy) {
+            $this->bodyBlockPolicy = new BodyBlockPolicy($this->input);
+        }
+
+        return $this->bodyBlockPolicy;
+    }
+
+    private function captchaService(): CaptchaService
+    {
+        if (!$this->captchaService instanceof CaptchaService) {
+            $this->captchaService = new CaptchaService($this->config, $this->input);
+        }
+
+        return $this->captchaService;
+    }
+
     /**
      * Normalizes one taxonomy route-prefix value and falls back safely.
      */
     private function normalizeTaxonomyRoutePrefix(string $configured, string $fallback, bool $allowBlank = false): string
     {
-        return PanelUrl::normalizeRoutePrefix($this->input, $configured, $fallback, $allowBlank);
+        return $this->routeConfigService()->normalizeRoutePrefix($configured, $fallback, $allowBlank);
     }
 
     /**
@@ -2382,122 +2299,14 @@ final class PublicController
     }
 
     /**
-     * Returns configured captcha provider for public form handling.
-     */
-    private function captchaProvider(): string
-    {
-        $provider = strtolower($this->input->text((string) $this->config->get('captcha.provider', 'none'), 20));
-        if (!in_array($provider, ['none', 'hcaptcha', 'recaptcha2', 'recaptcha3'], true)) {
-            return 'none';
-        }
-
-        return $provider;
-    }
-
-    /**
-     * Returns normalized public captcha site key for one provider.
-     */
-    private function captchaSiteKey(string $provider): string
-    {
-        return match ($provider) {
-            'hcaptcha' => $this->input->text((string) $this->config->get('captcha.hcaptcha.public_key', ''), 500),
-            'recaptcha2' => $this->input->text((string) $this->config->get('captcha.recaptcha2.public_key', ''), 500),
-            'recaptcha3' => $this->input->text((string) $this->config->get('captcha.recaptcha3.public_key', ''), 500),
-            default => '',
-        };
-    }
-
-    /**
-     * Returns normalized captcha secret key for one provider.
-     */
-    private function captchaSecretKey(string $provider): string
-    {
-        return match ($provider) {
-            'hcaptcha' => $this->input->text((string) $this->config->get('captcha.hcaptcha.secret_key', ''), 500),
-            'recaptcha2' => $this->input->text((string) $this->config->get('captcha.recaptcha2.secret_key', ''), 500),
-            'recaptcha3' => $this->input->text((string) $this->config->get('captcha.recaptcha3.secret_key', ''), 500),
-            default => '',
-        };
-    }
-
-    /**
-     * Returns submit payload field name for one captcha provider.
-     */
-    private function captchaResponseField(string $provider): string
-    {
-        return $provider === 'hcaptcha' ? 'h-captcha-response' : 'g-recaptcha-response';
-    }
-
-    /**
      * Verifies configured public captcha response in current request.
      *
      * @return string|null One user-facing validation error, or null when captcha passes.
      */
     private function validatePublicCaptcha(): ?string
     {
-        $provider = $this->captchaProvider();
-        if ($provider === 'none') {
-            return null;
-        }
-
-        $siteKey = $this->captchaSiteKey($provider);
-        $secretKey = $this->captchaSecretKey($provider);
-        if ($siteKey === '' || $secretKey === '') {
-            return 'Captcha is not configured right now. Please try again later.';
-        }
-
-        $responseField = $this->captchaResponseField($provider);
-        $captchaToken = $this->input->text((string) ($_POST[$responseField] ?? ''), 6000);
-        if ($captchaToken === '') {
-            return 'Please complete the captcha challenge.';
-        }
-
         $remoteIp = $this->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
-        if (!$this->verifyCaptchaToken($provider, $secretKey, $captchaToken, $remoteIp)) {
-            return 'Captcha verification failed. Please try again.';
-        }
-
-        return null;
-    }
-
-    /**
-     * Performs server-side token verification against configured captcha provider.
-     */
-    private function verifyCaptchaToken(string $provider, string $secretKey, string $captchaToken, ?string $remoteIp): bool
-    {
-        $endpoint = $provider === 'hcaptcha'
-            ? 'https://api.hcaptcha.com/siteverify'
-            : 'https://www.google.com/recaptcha/api/siteverify';
-
-        $payload = [
-            'secret' => $secretKey,
-            'response' => $captchaToken,
-        ];
-        if ($remoteIp !== null && $remoteIp !== '') {
-            $payload['remoteip'] = $remoteIp;
-        }
-
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'POST',
-                'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
-                'content' => http_build_query($payload, '', '&', PHP_QUERY_RFC3986),
-                'timeout' => 8,
-                'ignore_errors' => true,
-            ],
-        ]);
-
-        $rawResponse = @file_get_contents($endpoint, false, $context);
-        if (!is_string($rawResponse) || trim($rawResponse) === '') {
-            return false;
-        }
-
-        $decoded = json_decode($rawResponse, true);
-        if (!is_array($decoded)) {
-            return false;
-        }
-
-        return !empty($decoded['success']);
+        return $this->captchaService()->validateSubmission($_POST, $remoteIp);
     }
 
     /**
@@ -2505,85 +2314,9 @@ final class PublicController
      */
     private function publicCaptchaMarkup(): string
     {
-        $provider = $this->captchaProvider();
-        if ($provider === 'none') {
-            return '';
-        }
-
-        $siteKey = $this->captchaSiteKey($provider);
-        if ($siteKey === '') {
-            return '<div class="col-12"><div class="alert alert-warning mb-0" role="alert">Captcha is currently unavailable.</div></div>';
-        }
-
-        $widgetClass = $provider === 'hcaptcha' ? 'h-captcha' : 'g-recaptcha';
-        $scriptSrc = match ($provider) {
-            'hcaptcha' => 'https://js.hcaptcha.com/1/api.js',
-            'recaptcha3' => 'https://www.google.com/recaptcha/api.js?render=' . rawurlencode($siteKey),
-            default => 'https://www.google.com/recaptcha/api.js',
-        };
-        $escapedSiteKey = htmlspecialchars($siteKey, ENT_QUOTES, 'UTF-8');
-        $escapedScriptSrc = htmlspecialchars($scriptSrc, ENT_QUOTES, 'UTF-8');
-
-        $scriptMarkup = '';
-        if (!$this->captchaScriptIncluded) {
-            $scriptMarkup = '<script src="' . $escapedScriptSrc . '" async defer></script>';
-            if ($provider === 'recaptcha3') {
-                $siteKeyJson = json_encode($siteKey, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
-                if (!is_string($siteKeyJson) || $siteKeyJson === '') {
-                    $siteKeyJson = '""';
-                }
-
-                $scriptMarkup .= '<script>'
-                    . '(function(){'
-                    . 'if(window.__ravenRecaptcha3Bound){return;}'
-                    . 'window.__ravenRecaptcha3Bound=true;'
-                    . 'var siteKey=' . $siteKeyJson . ';'
-                    . 'document.addEventListener("submit",function(event){'
-                    . 'var form=event.target;'
-                    . 'if(!(form instanceof HTMLFormElement)){return;}'
-                    . 'if(!form.querySelector(\'[data-rvn-captcha-provider="recaptcha3"]\')){return;}'
-                    . 'if(String(form.getAttribute("data-rvn-recaptcha3-submitting")||"")==="1"){return;}'
-                    . 'event.preventDefault();'
-                    . 'form.setAttribute("data-rvn-recaptcha3-submitting","1");'
-                    . 'var tokenField=form.querySelector(\'input[name="g-recaptcha-response"]\');'
-                    . 'if(!(tokenField instanceof HTMLInputElement)){'
-                    . 'tokenField=document.createElement("input");'
-                    . 'tokenField.type="hidden";'
-                    . 'tokenField.name="g-recaptcha-response";'
-                    . 'form.appendChild(tokenField);'
-                    . '}'
-                    . 'var submitWithoutToken=function(){'
-                    . 'form.removeAttribute("data-rvn-recaptcha3-submitting");'
-                    . 'form.submit();'
-                    . '};'
-                    . 'if(!window.grecaptcha||typeof window.grecaptcha.ready!=="function"||typeof window.grecaptcha.execute!=="function"){'
-                    . 'submitWithoutToken();'
-                    . 'return;'
-                    . '}'
-                    . 'window.grecaptcha.ready(function(){'
-                    . 'window.grecaptcha.execute(siteKey,{action:"submit"}).then(function(token){'
-                    . 'tokenField.value=String(token||"");'
-                    . 'form.removeAttribute("data-rvn-recaptcha3-submitting");'
-                    . 'form.submit();'
-                    . '}).catch(function(){submitWithoutToken();});'
-                    . '});'
-                    . '},true);'
-                    . '})();'
-                    . '</script>';
-            }
-            $this->captchaScriptIncluded = true;
-        }
-
-        if ($provider === 'recaptcha3') {
-            return $scriptMarkup
-                . '<div class="col-12">'
-                . '<input type="hidden" name="g-recaptcha-response" value="">'
-                . '<div class="small text-muted" data-rvn-captcha-provider="recaptcha3">Protected by reCAPTCHA.</div>'
-                . '</div>';
-        }
-
-        return $scriptMarkup
-            . '<div class="col-12"><div class="' . $widgetClass . '" data-theme="dark" data-sitekey="' . $escapedSiteKey . '"></div></div>';
+        $markup = $this->captchaService()->publicMarkup($this->captchaScriptIncluded);
+        $this->captchaScriptIncluded = (bool) ($markup['script_included'] ?? $this->captchaScriptIncluded);
+        return (string) ($markup['markup'] ?? '');
     }
 
     /**

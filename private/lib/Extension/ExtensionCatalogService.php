@@ -1,0 +1,424 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Raven\Lib\Extension;
+
+use Raven\Core\Extension\ExtensionRegistry;
+use Raven\Lib\Security\InputSanitizer;
+
+/**
+ * Shared extension catalog and manifest validation service for panel workflows.
+ */
+final class ExtensionCatalogService
+{
+    private string $projectRoot;
+    private ExtensionStateStore $stateStore;
+    private ExtensionPermissionCatalogService $permissionCatalog;
+    private InputSanitizer $input;
+
+    public function __construct(
+        string $projectRoot,
+        ExtensionStateStore $stateStore,
+        ExtensionPermissionCatalogService $permissionCatalog,
+        InputSanitizer $input
+    ) {
+        $this->projectRoot = rtrim($projectRoot, '/\\');
+        $this->stateStore = $stateStore;
+        $this->permissionCatalog = $permissionCatalog;
+        $this->input = $input;
+    }
+
+    /**
+     * @param callable(string): array<int, array<string, mixed>> $formsProvider
+     * @return array<int, array{
+     *   directory: string,
+     *   type: string,
+     *   panel_path: string,
+     *   has_panel_routes: bool,
+     *   name: string,
+     *   version: string,
+     *   description: string,
+     *   author: string,
+     *   author_url: string,
+     *   homepage: string,
+     *   valid: bool,
+     *   invalid_reason: string,
+     *   enabled: bool,
+     *   is_stock: bool,
+     *   can_delete: bool,
+     *   delete_block_reason: string
+     * }>
+     */
+    public function listForPanel(callable $formsProvider): array
+    {
+        $this->stateStore->ensureDirectory();
+
+        $enabledMap = $this->stateStore->loadEnabledMap();
+        $permissionMap = $this->stateStore->loadPermissionMap();
+        $permissionBitsMap = $this->stateStore->loadPermissionBitsMap();
+        $entries = scandir($this->stateStore->basePath()) ?: [];
+        $extensions = [];
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
+                continue;
+            }
+
+            if (!$this->isSafeExtensionDirectoryName($entry)) {
+                continue;
+            }
+
+            $extensionPath = $this->stateStore->basePath() . '/' . $entry;
+            if (!is_dir($extensionPath)) {
+                continue;
+            }
+
+            $manifest = $this->readManifest($extensionPath, $formsProvider);
+            $isValid = (bool) ($manifest['valid'] ?? false);
+            $isEnabled = $isValid && !empty($enabledMap[$entry]);
+            $hasPanelRoutes = is_file($extensionPath . '/lib/routes_panel.php');
+            $isStock = $this->isStockExtensionDirectory($entry);
+            $canDelete = !$isStock && !$isEnabled;
+            $deleteBlockReason = '';
+            if ($isStock) {
+                $deleteBlockReason = 'Stock extension cannot be deleted.';
+            } elseif ($isEnabled) {
+                $deleteBlockReason = 'Disable extension before deleting.';
+            }
+
+            $extensions[] = [
+                'directory' => $entry,
+                'type' => (string) ($manifest['type'] ?? 'plugin'),
+                'panel_path' => $hasPanelRoutes ? $entry : '',
+                'has_panel_routes' => $hasPanelRoutes,
+                'name' => $manifest['name'] !== '' ? $manifest['name'] : $entry,
+                'version' => (string) ($manifest['version'] ?? ''),
+                'description' => (string) ($manifest['description'] ?? ''),
+                'author' => (string) ($manifest['author'] ?? ''),
+                'author_url' => (string) ($manifest['author_url'] ?? ''),
+                'homepage' => (string) ($manifest['homepage'] ?? ''),
+                'valid' => $isValid,
+                'invalid_reason' => (string) ($manifest['invalid_reason'] ?? ''),
+                'enabled' => $isEnabled,
+                'is_stock' => $isStock,
+                'can_delete' => $canDelete,
+                'delete_block_reason' => $deleteBlockReason,
+            ];
+        }
+
+        usort($extensions, static function (array $a, array $b): int {
+            return strnatcasecmp((string) $a['directory'], (string) $b['directory']);
+        });
+
+        $activeKeys = array_map(
+            static fn (array $extension): string => !empty($extension['valid']) ? (string) $extension['directory'] : '',
+            $extensions
+        );
+        $activeKeys = array_values(array_filter($activeKeys, static fn (string $value): bool => $value !== ''));
+        $activeKeyMap = array_flip($activeKeys);
+        $cleanedEnabledMap = array_intersect_key($enabledMap, $activeKeyMap);
+        $cleanedPermissionMap = array_intersect_key($permissionMap, $activeKeyMap);
+        $cleanedPermissionBitsMap = array_intersect_key($permissionBitsMap, $activeKeyMap);
+        if (
+            $cleanedEnabledMap !== $enabledMap
+            || $cleanedPermissionMap !== $permissionMap
+            || $cleanedPermissionBitsMap !== $permissionBitsMap
+        ) {
+            $this->stateStore->saveState($cleanedEnabledMap, $cleanedPermissionMap, $cleanedPermissionBitsMap);
+        }
+
+        return $extensions;
+    }
+
+    /**
+     * @param callable(string): array<int, array<string, mixed>> $formsProvider
+     * @return array{
+     *   valid: bool,
+     *   invalid_reason: string,
+     *   type: string,
+     *   panel_path: string,
+     *   name: string,
+     *   version: string,
+     *   description: string,
+     *   author: string,
+     *   author_url: string,
+     *   homepage: string,
+     *   permission_levels: array<int, array{key: string, label: string}>,
+     *   default_permission_level: string
+     * }
+     */
+    public function readManifest(string $extensionPath, callable $formsProvider): array
+    {
+        $defaultPermissionLevels = $this->defaultPermissionLevels('Extension');
+        $defaultPermissionLevel = (string) ($defaultPermissionLevels[0]['key'] ?? 'access');
+        $directorySlug = trim((string) basename($extensionPath));
+        if (!$this->isSafeExtensionDirectoryName($directorySlug)) {
+            $directorySlug = '';
+        }
+
+        $manifestPath = rtrim($extensionPath, '/') . '/ext.json';
+        if (!is_file($manifestPath)) {
+            return [
+                'valid' => false,
+                'invalid_reason' => 'Missing required ext.json manifest.',
+                'type' => 'plugin',
+                'panel_path' => '',
+                'name' => '',
+                'version' => '',
+                'description' => '',
+                'author' => '',
+                'author_url' => '',
+                'homepage' => '',
+                'permission_levels' => $defaultPermissionLevels,
+                'default_permission_level' => $defaultPermissionLevel,
+            ];
+        }
+
+        $raw = file_get_contents($manifestPath);
+        if ($raw === false || trim($raw) === '') {
+            return [
+                'valid' => false,
+                'invalid_reason' => 'ext.json is empty or unreadable.',
+                'type' => 'plugin',
+                'panel_path' => '',
+                'name' => '',
+                'version' => '',
+                'description' => '',
+                'author' => '',
+                'author_url' => '',
+                'homepage' => '',
+                'permission_levels' => $defaultPermissionLevels,
+                'default_permission_level' => $defaultPermissionLevel,
+            ];
+        }
+
+        /** @var mixed $decoded */
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return [
+                'valid' => false,
+                'invalid_reason' => 'ext.json must contain a JSON object.',
+                'type' => 'plugin',
+                'panel_path' => '',
+                'name' => '',
+                'version' => '',
+                'description' => '',
+                'author' => '',
+                'author_url' => '',
+                'homepage' => '',
+                'permission_levels' => $defaultPermissionLevels,
+                'default_permission_level' => $defaultPermissionLevel,
+            ];
+        }
+
+        $name = $this->input->text((string) ($decoded['name'] ?? ''), 120);
+        if ($name === '') {
+            return [
+                'valid' => false,
+                'invalid_reason' => 'ext.json must include a non-empty "name" value.',
+                'type' => 'plugin',
+                'panel_path' => '',
+                'name' => '',
+                'version' => '',
+                'description' => '',
+                'author' => '',
+                'author_url' => '',
+                'homepage' => '',
+                'permission_levels' => $defaultPermissionLevels,
+                'default_permission_level' => $defaultPermissionLevel,
+            ];
+        }
+
+        $type = strtolower(trim((string) ($decoded['type'] ?? 'plugin')));
+        if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
+            $type = 'plugin';
+        }
+        $permissionLevels = $this->normalizePermissionLevels($decoded['panel_permissions'] ?? null, $name);
+        $defaultPermissionLevel = (string) ($permissionLevels[0]['key'] ?? 'access');
+        $panelPath = $directorySlug;
+        $author = $this->input->text((string) ($decoded['author'] ?? ''), 120);
+        $authorUrlRaw = trim((string) ($decoded['author_url'] ?? ''));
+        $authorUrl = '';
+        if ($authorUrlRaw !== '' && filter_var($authorUrlRaw, FILTER_VALIDATE_URL) !== false) {
+            $scheme = strtolower((string) parse_url($authorUrlRaw, PHP_URL_SCHEME));
+            if (in_array($scheme, ['http', 'https'], true)) {
+                $authorUrl = $authorUrlRaw;
+            }
+        }
+        $homepageRaw = trim((string) ($decoded['docs_url'] ?? ($decoded['homepage'] ?? '')));
+        $homepage = '';
+        if ($homepageRaw !== '' && filter_var($homepageRaw, FILTER_VALIDATE_URL) !== false) {
+            $scheme = strtolower((string) parse_url($homepageRaw, PHP_URL_SCHEME));
+            if (in_array($scheme, ['http', 'https'], true)) {
+                $homepage = $homepageRaw;
+            }
+        }
+
+        $typeContractError = $this->extensionTypeContractError($extensionPath, $type);
+        if ($typeContractError !== null) {
+            return [
+                'valid' => false,
+                'invalid_reason' => $typeContractError,
+                'type' => $type,
+                'panel_path' => $panelPath,
+                'name' => $name,
+                'version' => $this->input->text((string) ($decoded['version'] ?? ''), 80),
+                'description' => $this->input->text((string) ($decoded['description'] ?? ''), 1000),
+                'author' => $author,
+                'author_url' => $authorUrl,
+                'homepage' => $homepage,
+                'permission_levels' => $permissionLevels,
+                'default_permission_level' => $defaultPermissionLevel,
+            ];
+        }
+
+        if ($directorySlug !== '') {
+            $shortcodesError = ExtensionRegistry::shortcodesValidationError(
+                $this->projectRoot,
+                $directorySlug,
+                [
+                    'extension' => $directorySlug,
+                    'forms' => $formsProvider,
+                ]
+            );
+            if ($shortcodesError !== null) {
+                return [
+                    'valid' => false,
+                    'invalid_reason' => 'Invalid lib/shortcodes.php: ' . $shortcodesError,
+                    'type' => $type,
+                    'panel_path' => $panelPath,
+                    'name' => $name,
+                    'version' => $this->input->text((string) ($decoded['version'] ?? ''), 80),
+                    'description' => $this->input->text((string) ($decoded['description'] ?? ''), 1000),
+                    'author' => $author,
+                    'author_url' => $authorUrl,
+                    'homepage' => $homepage,
+                    'permission_levels' => $permissionLevels,
+                    'default_permission_level' => $defaultPermissionLevel,
+                ];
+            }
+
+            $fieldsError = ExtensionRegistry::fieldsValidationError(
+                $this->projectRoot,
+                $directorySlug,
+                [
+                    'extension' => $directorySlug,
+                ]
+            );
+            if ($fieldsError !== null) {
+                return [
+                    'valid' => false,
+                    'invalid_reason' => 'Invalid lib/fields.php: ' . $fieldsError,
+                    'type' => $type,
+                    'panel_path' => $panelPath,
+                    'name' => $name,
+                    'version' => $this->input->text((string) ($decoded['version'] ?? ''), 80),
+                    'description' => $this->input->text((string) ($decoded['description'] ?? ''), 1000),
+                    'author' => $author,
+                    'author_url' => $authorUrl,
+                    'homepage' => $homepage,
+                    'permission_levels' => $permissionLevels,
+                    'default_permission_level' => $defaultPermissionLevel,
+                ];
+            }
+        }
+
+        return [
+            'valid' => true,
+            'invalid_reason' => '',
+            'type' => $type,
+            'panel_path' => $panelPath,
+            'name' => $name,
+            'version' => $this->input->text((string) ($decoded['version'] ?? ''), 80),
+            'description' => $this->input->text((string) ($decoded['description'] ?? ''), 1000),
+            'author' => $author,
+            'author_url' => $authorUrl,
+            'homepage' => $homepage,
+            'permission_levels' => $permissionLevels,
+            'default_permission_level' => $defaultPermissionLevel,
+        ];
+    }
+
+    /**
+     * @return array<int, array{key: string, label: string}>
+     */
+    public function defaultPermissionLevels(string $extensionName): array
+    {
+        return $this->permissionCatalog->defaultPermissionLevels($extensionName);
+    }
+
+    /**
+     * @return array<int, array{key: string, label: string}>
+     */
+    public function normalizePermissionLevels(mixed $rawLevels, string $extensionName): array
+    {
+        return $this->permissionCatalog->normalizePermissionLevels($rawLevels, $extensionName);
+    }
+
+    /**
+     * @param array<int, string> $directoryFilter
+     * @param callable(string): array<string, mixed>|null $manifestReader
+     * @return array<string, array{
+     *   name: string,
+     *   type: string,
+     *   default_level: string,
+     *   levels: array<int, array{key: string, label: string, bit: int}>
+     * }>
+     */
+    public function panelPermissionMapForDirectories(array $directoryFilter, callable $manifestReader): array
+    {
+        return $this->permissionCatalog->panelPermissionMapForDirectories($directoryFilter, $manifestReader);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function stockExtensionDirectories(): array
+    {
+        return ['contact', 'database', 'phpinfo', 'signups'];
+    }
+
+    public function isStockExtensionDirectory(string $directoryName): bool
+    {
+        $normalized = strtolower(trim($directoryName));
+        return in_array($normalized, $this->stockExtensionDirectories(), true);
+    }
+
+    public function isSafeExtensionDirectoryName(string $name): bool
+    {
+        return (bool) preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/', $name);
+    }
+
+    public function extensionNameFromArchiveFilename(string $archiveName): ?string
+    {
+        $base = strtolower($this->input->text((string) pathinfo($archiveName, PATHINFO_FILENAME), 120));
+        $base = preg_replace('/[^a-z0-9_-]+/', '-', $base) ?? '';
+        $base = trim($base, '-_');
+
+        if ($base === '' || !$this->isSafeExtensionDirectoryName($base)) {
+            return null;
+        }
+
+        return $base;
+    }
+
+    private function extensionTypeContractError(string $extensionPath, string $type): ?string
+    {
+        $hasPublicRoutes = is_file(rtrim($extensionPath, '/') . '/lib/routes_public.php');
+        $hasShortcodes = is_file(rtrim($extensionPath, '/') . '/lib/shortcodes.php');
+        $hasFields = is_file(rtrim($extensionPath, '/') . '/lib/fields.php');
+
+        if ($hasPublicRoutes && $type !== 'module') {
+            return 'Only module extensions may define lib/routes_public.php.';
+        }
+        if ($hasShortcodes && !in_array($type, ['helper', 'plugin', 'module'], true)) {
+            return 'Only helper/plugin/module extensions may define lib/shortcodes.php.';
+        }
+        if ($hasFields && !in_array($type, ['content', 'plugin', 'module'], true)) {
+            return 'Only content/plugin/module extensions may define lib/fields.php.';
+        }
+
+        return null;
+    }
+}

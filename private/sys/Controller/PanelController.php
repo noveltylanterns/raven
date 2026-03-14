@@ -25,7 +25,8 @@ use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Config\ConfigEditorSchemaService;
 use Raven\Lib\Config\ConfigSnapshotSanitizer;
 use Raven\Lib\Config\ConfigEditorNormalizer;
-use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Content\BodyBlockPolicy;
+use Raven\Lib\Extension\ExtensionCatalogService;
 use Raven\Lib\Extension\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\ExtensionScaffoldService;
@@ -38,6 +39,7 @@ use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Routing\RedirectTargetValidator;
+use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Routing\RoutingInventoryBuilder;
 use Raven\Lib\Theme\ThemeCloneService;
 use Raven\Lib\Theme\ThemeScaffoldService;
@@ -107,6 +109,9 @@ final class PanelController
     private ?ConfigEditorSchemaService $configEditorSchemaService = null;
     private ?TaxonomyImageService $taxonomyImageService = null;
     private ?ProfileContactService $profileContactService = null;
+    private ?RouteConfigService $routeConfigService = null;
+    private ?BodyBlockPolicy $bodyBlockPolicy = null;
+    private ?ExtensionCatalogService $extensionCatalogService = null;
 
     public function __construct(
         View $view,
@@ -599,23 +604,7 @@ final class PanelController
      */
     private function normalizeBodyBlockCssId(mixed $value): string
     {
-        if (!is_scalar($value) && $value !== null) {
-            return '';
-        }
-
-        $id = str_replace("\0", '', trim((string) ($value ?? '')));
-        $id = ltrim($id, '#');
-        if ($id === '') {
-            return '';
-        }
-
-        if (mb_strlen($id) > 120) {
-            $id = mb_substr($id, 0, 120);
-        }
-
-        return preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/', $id) === 1
-            ? $id
-            : '';
+        return $this->bodyBlockPolicy()->normalizeCssId($value);
     }
 
     /**
@@ -623,36 +612,7 @@ final class PanelController
      */
     private function normalizeBodyBlockCssClassList(mixed $value): string
     {
-        if (!is_scalar($value) && $value !== null) {
-            return '';
-        }
-
-        $raw = str_replace("\0", '', trim((string) ($value ?? '')));
-        if ($raw === '') {
-            return '';
-        }
-
-        $classMap = [];
-        $classes = [];
-        foreach (preg_split('/[\s,]+/', $raw) ?: [] as $token) {
-            $token = ltrim(trim((string) $token), '.');
-            if ($token === '' || preg_match('/^[a-zA-Z0-9_-]{1,80}$/', $token) !== 1) {
-                continue;
-            }
-
-            $key = strtolower($token);
-            if (isset($classMap[$key])) {
-                continue;
-            }
-
-            $classMap[$key] = true;
-            $classes[] = $token;
-            if (count($classes) >= 12) {
-                break;
-            }
-        }
-
-        return implode(' ', $classes);
+        return $this->bodyBlockPolicy()->normalizeCssClassList($value);
     }
 
     /**
@@ -722,10 +682,7 @@ final class PanelController
      */
     private function resolveChannelPageUrlSeparator(string $channelValue): string
     {
-        return ChannelRoutePolicy::resolveSeparator(
-            $channelValue,
-            (string) $this->config->get('content.separator', '-')
-        );
+        return $this->routeConfigService()->resolveChannelPageUrlSeparator($channelValue);
     }
 
     /**
@@ -733,13 +690,7 @@ final class PanelController
      */
     private function normalizeBodyBlockType(string $value): string
     {
-        $type = strtolower(trim($value));
-        if ($type === '') {
-            return 'tinymce';
-        }
-
-        $definitions = $this->pageEditorBodyBlockTypeDefinitions();
-        return array_key_exists($type, $definitions) ? $type : 'tinymce';
+        return $this->bodyBlockPolicy()->normalizeType($value, $this->pageEditorBodyBlockTypeDefinitions());
     }
 
     /**
@@ -747,16 +698,7 @@ final class PanelController
      */
     private function bodyBlockEditorMode(string $type): string
     {
-        $normalized = strtolower(trim($type));
-        if ($normalized === '') {
-            return 'tinymce';
-        }
-
-        $definitions = $this->pageEditorBodyBlockTypeDefinitions();
-        $editor = strtolower(trim((string) ($definitions[$normalized]['editor'] ?? 'tinymce')));
-        return in_array($editor, ['tinymce', 'plaintext', 'autobr', 'markdown', 'markdown_file', 'gallery'], true)
-            ? $editor
-            : 'tinymce';
+        return $this->bodyBlockPolicy()->editorMode($type, $this->pageEditorBodyBlockTypeDefinitions());
     }
 
     /**
@@ -770,14 +712,7 @@ final class PanelController
             return $this->pageBodyBlockTypeDefinitionsCache;
         }
 
-        $definitions = [
-            'tinymce' => ['label' => 'Rich Text', 'editor' => 'tinymce'],
-            'plaintext' => ['label' => 'Plaintext', 'editor' => 'plaintext'],
-            'autobr' => ['label' => 'Auto <br>', 'editor' => 'autobr'],
-            'markdown' => ['label' => 'Markdown', 'editor' => 'markdown'],
-            'markdown_file' => ['label' => 'Markdown File', 'editor' => 'markdown_file'],
-            'image_gallery' => ['label' => 'Image Gallery', 'editor' => 'gallery'],
-        ];
+        $definitions = $this->bodyBlockPolicy()->defaultDefinitions();
 
         foreach ($this->extensionProvidedBodyBlocksForEditor($this->loadExtensionStateMap()) as $type => $entry) {
             if (isset($definitions[$type])) {
@@ -834,33 +769,11 @@ final class PanelController
                 continue;
             }
 
-            foreach ($fields as $entry) {
-                $slug = $this->input->slug((string) ($entry['slug'] ?? ''));
-                if ($slug === null || $slug === '') {
-                    continue;
-                }
-
-                $normalizedSlug = str_replace('-', '_', strtolower($slug));
-                $normalizedExtension = str_replace('-', '_', strtolower($extensionName));
-                $type = 'content_' . $normalizedExtension . '_' . $normalizedSlug;
-                if (!preg_match('/^[a-z0-9_]{1,120}$/', $type)) {
-                    continue;
-                }
-
-                $label = $this->input->text((string) ($entry['label'] ?? ''), 120);
-                $editor = strtolower(trim((string) ($entry['editor'] ?? 'tinymce')));
-                if ($label === '' || !in_array($editor, ['tinymce', 'plaintext', 'autobr', 'markdown', 'markdown_file'], true)) {
-                    continue;
-                }
-                if (isset($definitions[$type])) {
-                    continue;
-                }
-
-                $definitions[$type] = [
-                    'label' => $label,
-                    'editor' => $editor,
-                ];
-            }
+            $definitions = $this->bodyBlockPolicy()->normalizeExtensionDefinitions(
+                (string) $extensionName,
+                $fields,
+                $definitions
+            );
         }
 
         uasort($definitions, static function (array $left, array $right): int {
@@ -6361,87 +6274,9 @@ final class PanelController
      */
     private function listExtensionsForPanel(): array
     {
-        $this->ensureExtensionsDirectory();
-
-        $enabledMap = $this->loadExtensionStateMap();
-        $permissionMap = $this->loadExtensionPermissionMap();
-        $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
-        $entries = scandir($this->extensionsBasePath()) ?: [];
-        $extensions = [];
-
-        foreach ($entries as $entry) {
-            // Ignore hidden/system files and keep extensions folder namespace explicit.
-            if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
-                continue;
-            }
-
-            if (!$this->isSafeExtensionDirectoryName($entry)) {
-                continue;
-            }
-
-            $extensionPath = $this->extensionsBasePath() . '/' . $entry;
-            if (!is_dir($extensionPath)) {
-                continue;
-            }
-
-            $manifest = $this->readExtensionManifest($extensionPath);
-            $isValid = (bool) ($manifest['valid'] ?? false);
-            $isEnabled = $isValid && !empty($enabledMap[$entry]);
-            $hasPanelRoutes = is_file($extensionPath . '/lib/routes_panel.php');
-            $isStock = $this->isStockExtensionDirectory($entry);
-            $canDelete = !$isStock && !$isEnabled;
-            $deleteBlockReason = '';
-            if ($isStock) {
-                $deleteBlockReason = 'Stock extension cannot be deleted.';
-            } elseif ($isEnabled) {
-                $deleteBlockReason = 'Disable extension before deleting.';
-            }
-
-            $extensions[] = [
-                'directory' => $entry,
-                'type' => (string) ($manifest['type'] ?? 'plugin'),
-                'panel_path' => $hasPanelRoutes ? $entry : '',
-                'has_panel_routes' => $hasPanelRoutes,
-                'name' => $manifest['name'] !== '' ? $manifest['name'] : $entry,
-                'version' => $manifest['version'],
-                'description' => $manifest['description'],
-                'author' => $manifest['author'],
-                'author_url' => $manifest['author_url'],
-                'homepage' => $manifest['homepage'],
-                'valid' => $isValid,
-                'invalid_reason' => (string) ($manifest['invalid_reason'] ?? ''),
-                // Invalid extensions can never be active, even if stale state says otherwise.
-                'enabled' => $isEnabled,
-                'is_stock' => $isStock,
-                'can_delete' => $canDelete,
-                'delete_block_reason' => $deleteBlockReason,
-            ];
-        }
-
-        // Keep extension lists deterministic for stable UI ordering.
-        usort($extensions, static function (array $a, array $b): int {
-            return strnatcasecmp((string) $a['directory'], (string) $b['directory']);
-        });
-
-        // Remove stale state entries for extension folders that no longer exist.
-        $activeKeys = array_map(
-            static fn (array $extension): string => !empty($extension['valid']) ? (string) $extension['directory'] : '',
-            $extensions
+        return $this->extensionCatalogService()->listForPanel(
+            fn (string $tableName): array => $this->taxonomy->listEnabledExtensionForms($tableName)
         );
-        $activeKeys = array_values(array_filter($activeKeys, static fn (string $value): bool => $value !== ''));
-        $activeKeyMap = array_flip($activeKeys);
-        $cleanedEnabledMap = array_intersect_key($enabledMap, $activeKeyMap);
-        $cleanedPermissionMap = array_intersect_key($permissionMap, $activeKeyMap);
-        $cleanedPermissionBitsMap = array_intersect_key($permissionBitsMap, $activeKeyMap);
-        if (
-            $cleanedEnabledMap !== $enabledMap
-            || $cleanedPermissionMap !== $permissionMap
-            || $cleanedPermissionBitsMap !== $permissionBitsMap
-        ) {
-            $this->saveExtensionState($cleanedEnabledMap, $cleanedPermissionMap, $cleanedPermissionBitsMap);
-        }
-
-        return $extensions;
     }
 
     /**
@@ -6464,238 +6299,10 @@ final class PanelController
      */
     private function readExtensionManifest(string $extensionPath): array
     {
-        $defaultPermissionLevels = $this->defaultExtensionPermissionLevels('Extension');
-        $defaultPermissionLevel = (string) ($defaultPermissionLevels[0]['key'] ?? 'access');
-        $directorySlug = trim((string) basename($extensionPath));
-        if (!$this->isSafeExtensionDirectoryName($directorySlug)) {
-            $directorySlug = '';
-        }
-
-        $manifestPath = rtrim($extensionPath, '/') . '/ext.json';
-        if (!is_file($manifestPath)) {
-            return [
-                'valid' => false,
-                'invalid_reason' => 'Missing required ext.json manifest.',
-                'type' => 'plugin',
-                'panel_path' => '',
-                'name' => '',
-                'version' => '',
-                'description' => '',
-                'author' => '',
-                'author_url' => '',
-                'homepage' => '',
-                'permission_levels' => $defaultPermissionLevels,
-                'default_permission_level' => $defaultPermissionLevel,
-            ];
-        }
-
-        $raw = file_get_contents($manifestPath);
-        if ($raw === false || trim($raw) === '') {
-            return [
-                'valid' => false,
-                'invalid_reason' => 'ext.json is empty or unreadable.',
-                'type' => 'plugin',
-                'panel_path' => '',
-                'name' => '',
-                'version' => '',
-                'description' => '',
-                'author' => '',
-                'author_url' => '',
-                'homepage' => '',
-                'permission_levels' => $defaultPermissionLevels,
-                'default_permission_level' => $defaultPermissionLevel,
-            ];
-        }
-
-        /** @var mixed $decoded */
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            return [
-                'valid' => false,
-                'invalid_reason' => 'ext.json must contain a JSON object.',
-                'type' => 'plugin',
-                'panel_path' => '',
-                'name' => '',
-                'version' => '',
-                'description' => '',
-                'author' => '',
-                'author_url' => '',
-                'homepage' => '',
-                'permission_levels' => $defaultPermissionLevels,
-                'default_permission_level' => $defaultPermissionLevel,
-            ];
-        }
-
-        $name = $this->input->text((string) ($decoded['name'] ?? ''), 120);
-        if ($name === '') {
-            return [
-                'valid' => false,
-                'invalid_reason' => 'ext.json must include a non-empty "name" value.',
-                'type' => 'plugin',
-                'panel_path' => '',
-                'name' => '',
-                'version' => '',
-                'description' => '',
-                'author' => '',
-                'author_url' => '',
-                'homepage' => '',
-                'permission_levels' => $defaultPermissionLevels,
-                'default_permission_level' => $defaultPermissionLevel,
-            ];
-        }
-
-        $type = strtolower(trim((string) ($decoded['type'] ?? 'plugin')));
-        if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
-            $type = 'plugin';
-        }
-        $permissionLevels = $this->normalizeExtensionPermissionLevels($decoded['panel_permissions'] ?? null, $name);
-        $defaultPermissionLevel = (string) ($permissionLevels[0]['key'] ?? 'access');
-        $panelPath = $directorySlug;
-        $author = $this->input->text((string) ($decoded['author'] ?? ''), 120);
-        $authorUrlRaw = trim((string) ($decoded['author_url'] ?? ''));
-        $authorUrl = '';
-        if ($authorUrlRaw !== '' && filter_var($authorUrlRaw, FILTER_VALIDATE_URL) !== false) {
-            $scheme = strtolower((string) parse_url($authorUrlRaw, PHP_URL_SCHEME));
-            if (in_array($scheme, ['http', 'https'], true)) {
-                $authorUrl = $authorUrlRaw;
-            }
-        }
-        $homepageRaw = trim((string) ($decoded['docs_url'] ?? ($decoded['homepage'] ?? '')));
-        $homepage = '';
-        if ($homepageRaw !== '' && filter_var($homepageRaw, FILTER_VALIDATE_URL) !== false) {
-            $scheme = strtolower((string) parse_url($homepageRaw, PHP_URL_SCHEME));
-            if (in_array($scheme, ['http', 'https'], true)) {
-                $homepage = $homepageRaw;
-            }
-        }
-
-        $typeContractError = $this->extensionTypeContractError($extensionPath, $type);
-        if ($typeContractError !== null) {
-            return [
-                'valid' => false,
-                'invalid_reason' => $typeContractError,
-                'type' => $type,
-                'panel_path' => $panelPath,
-                'name' => $name,
-                'version' => $this->input->text((string) ($decoded['version'] ?? ''), 80),
-                'description' => $this->input->text((string) ($decoded['description'] ?? ''), 1000),
-                'author' => $author,
-                'author_url' => $authorUrl,
-                'homepage' => $homepage,
-                'permission_levels' => $permissionLevels,
-                'default_permission_level' => $defaultPermissionLevel,
-            ];
-        }
-
-        if ($directorySlug !== '') {
-            $shortcodesError = ExtensionRegistry::shortcodesValidationError(
-                dirname(__DIR__, 3),
-                $directorySlug,
-                [
-                    'extension' => $directorySlug,
-                    'forms' => function (string $tableName): array {
-                        return $this->taxonomy->listEnabledExtensionForms($tableName);
-                    },
-                ]
-            );
-            if ($shortcodesError !== null) {
-                return [
-                    'valid' => false,
-                    'invalid_reason' => 'Invalid lib/shortcodes.php: ' . $shortcodesError,
-                    'type' => $type,
-                    'panel_path' => $panelPath,
-                    'name' => $name,
-                    'version' => $this->input->text((string) ($decoded['version'] ?? ''), 80),
-                    'description' => $this->input->text((string) ($decoded['description'] ?? ''), 1000),
-                    'author' => $author,
-                    'author_url' => $authorUrl,
-                    'homepage' => $homepage,
-                    'permission_levels' => $permissionLevels,
-                    'default_permission_level' => $defaultPermissionLevel,
-                ];
-            }
-
-            $fieldsError = ExtensionRegistry::fieldsValidationError(
-                dirname(__DIR__, 3),
-                $directorySlug,
-                [
-                    'extension' => $directorySlug,
-                ]
-            );
-            if ($fieldsError !== null) {
-                return [
-                    'valid' => false,
-                    'invalid_reason' => 'Invalid lib/fields.php: ' . $fieldsError,
-                    'type' => $type,
-                    'panel_path' => $panelPath,
-                    'name' => $name,
-                    'version' => $this->input->text((string) ($decoded['version'] ?? ''), 80),
-                    'description' => $this->input->text((string) ($decoded['description'] ?? ''), 1000),
-                    'author' => $author,
-                    'author_url' => $authorUrl,
-                    'homepage' => $homepage,
-                    'permission_levels' => $permissionLevels,
-                    'default_permission_level' => $defaultPermissionLevel,
-                ];
-            }
-        }
-
-        return [
-            'valid' => true,
-            'invalid_reason' => '',
-            'type' => $type,
-            'panel_path' => $panelPath,
-            'name' => $name,
-            'version' => $this->input->text((string) ($decoded['version'] ?? ''), 80),
-            'description' => $this->input->text((string) ($decoded['description'] ?? ''), 1000),
-            'author' => $author,
-            'author_url' => $authorUrl,
-            'homepage' => $homepage,
-            'permission_levels' => $permissionLevels,
-            'default_permission_level' => $defaultPermissionLevel,
-        ];
-    }
-
-    /**
-     * Returns default extension permission levels for manifests without explicit levels.
-     *
-     * @return array<int, array{key: string, label: string}>
-     */
-    private function defaultExtensionPermissionLevels(string $extensionName): array
-    {
-        return $this->extensionPermissionCatalogService()->defaultPermissionLevels($extensionName);
-    }
-
-    /**
-     * Normalizes extension-declared panel permission levels from ext.json.
-     *
-     * @return array<int, array{key: string, label: string}>
-     */
-    private function normalizeExtensionPermissionLevels(mixed $rawLevels, string $extensionName): array
-    {
-        return $this->extensionPermissionCatalogService()->normalizePermissionLevels($rawLevels, $extensionName);
-    }
-
-    /**
-     * Validates extension type capability boundaries against on-disk files.
-     */
-    private function extensionTypeContractError(string $extensionPath, string $type): ?string
-    {
-        $hasPublicRoutes = is_file(rtrim($extensionPath, '/') . '/lib/routes_public.php');
-        $hasShortcodes = is_file(rtrim($extensionPath, '/') . '/lib/shortcodes.php');
-        $hasFields = is_file(rtrim($extensionPath, '/') . '/lib/fields.php');
-
-        if ($hasPublicRoutes && $type !== 'module') {
-            return 'Only module extensions may define lib/routes_public.php.';
-        }
-        if ($hasShortcodes && !in_array($type, ['helper', 'plugin', 'module'], true)) {
-            return 'Only helper/plugin/module extensions may define lib/shortcodes.php.';
-        }
-        if ($hasFields && !in_array($type, ['content', 'plugin', 'module'], true)) {
-            return 'Only content/plugin/module extensions may define lib/fields.php.';
-        }
-
-        return null;
+        return $this->extensionCatalogService()->readManifest(
+            $extensionPath,
+            fn (string $tableName): array => $this->taxonomy->listEnabledExtensionForms($tableName)
+        );
     }
 
     /**
@@ -6821,7 +6428,7 @@ final class PanelController
      */
     public function extensionPanelPermissionMapForDirectories(array $directoryFilter = []): array
     {
-        return $this->extensionPermissionCatalogService()->panelPermissionMapForDirectories(
+        return $this->extensionCatalogService()->panelPermissionMapForDirectories(
             $directoryFilter,
             fn (string $extensionPath): array => $this->readExtensionManifest($extensionPath)
         );
@@ -6834,7 +6441,7 @@ final class PanelController
      */
     private function stockExtensionDirectories(): array
     {
-        return ['contact', 'database', 'phpinfo', 'signups'];
+        return $this->extensionCatalogService()->stockExtensionDirectories();
     }
 
     /**
@@ -6842,8 +6449,7 @@ final class PanelController
      */
     private function isStockExtensionDirectory(string $directoryName): bool
     {
-        $normalized = strtolower(trim($directoryName));
-        return in_array($normalized, $this->stockExtensionDirectories(), true);
+        return $this->extensionCatalogService()->isStockExtensionDirectory($directoryName);
     }
 
     /**
@@ -6851,7 +6457,7 @@ final class PanelController
      */
     private function isSafeExtensionDirectoryName(string $name): bool
     {
-        return (bool) preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/', $name);
+        return $this->extensionCatalogService()->isSafeExtensionDirectoryName($name);
     }
 
     /**
@@ -6859,15 +6465,7 @@ final class PanelController
      */
     private function extensionNameFromArchiveFilename(string $archiveName): ?string
     {
-        $base = strtolower($this->input->text((string) pathinfo($archiveName, PATHINFO_FILENAME), 120));
-        $base = preg_replace('/[^a-z0-9_-]+/', '-', $base) ?? '';
-        $base = trim($base, '-_');
-
-        if ($base === '' || !$this->isSafeExtensionDirectoryName($base)) {
-            return null;
-        }
-
-        return $base;
+        return $this->extensionCatalogService()->extensionNameFromArchiveFilename($archiveName);
     }
 
     /**
@@ -7174,12 +6772,7 @@ final class PanelController
      */
     private function registrationMode(): string
     {
-        $mode = strtolower(trim((string) $this->config->get('user.auth.registration', 'closed')));
-        if (!in_array($mode, ['open', 'invite', 'closed'], true)) {
-            $mode = 'closed';
-        }
-
-        return $mode;
+        return $this->routeConfigService()->registrationMode();
     }
 
     /**
@@ -7640,11 +7233,7 @@ final class PanelController
      */
     private function categoryRoutePrefix(): string
     {
-        if (!$this->categoryEnabled()) {
-            return '';
-        }
-
-        return $this->normalizePublicRoutePrefix((string) $this->config->get('category.prefix', 'cat'), 'cat', true);
+        return $this->routeConfigService()->categoryRoutePrefix();
     }
 
     /**
@@ -7652,11 +7241,7 @@ final class PanelController
      */
     private function tagRoutePrefix(): string
     {
-        if (!$this->tagEnabled()) {
-            return '';
-        }
-
-        return $this->normalizePublicRoutePrefix((string) $this->config->get('tag.prefix', 'tag'), 'tag', true);
+        return $this->routeConfigService()->tagRoutePrefix();
     }
 
     /**
@@ -7664,7 +7249,7 @@ final class PanelController
      */
     private function categoryEnabled(): bool
     {
-        return $this->configBool($this->config->get('category.enabled', true), true);
+        return $this->routeConfigService()->categoryEnabled();
     }
 
     /**
@@ -7672,7 +7257,7 @@ final class PanelController
      */
     private function tagEnabled(): bool
     {
-        return $this->configBool($this->config->get('tag.enabled', true), true);
+        return $this->routeConfigService()->tagEnabled();
     }
 
     /**
@@ -7680,7 +7265,7 @@ final class PanelController
      */
     private function configBool(mixed $value, bool $default = false): bool
     {
-        return ConfigValueParser::bool($value, $default);
+        return $this->routeConfigService()->configBool($value, $default);
     }
 
     /**
@@ -7688,7 +7273,7 @@ final class PanelController
      */
     private function profileRoutePrefix(): string
     {
-        return $this->normalizePublicRoutePrefix((string) $this->config->get('user.prefix', 'user'), 'user', true);
+        return $this->routeConfigService()->profileRoutePrefix();
     }
 
     /**
@@ -7696,12 +7281,7 @@ final class PanelController
      */
     private function profileRoutesEnabledForRoutingTable(): bool
     {
-        if ($this->profileRoutePrefix() === '') {
-            return false;
-        }
-
-        $mode = strtolower(trim((string) $this->config->get('user.privacy', 'disabled')));
-        return in_array($mode, ['public_full', 'public_limited', 'private'], true);
+        return $this->routeConfigService()->profileRoutesEnabledForRoutingTable();
     }
 
     /**
@@ -7709,7 +7289,7 @@ final class PanelController
      */
     private function groupRoutePrefix(): string
     {
-        return $this->normalizePublicRoutePrefix((string) $this->config->get('group.prefix', 'group'), 'group', true);
+        return $this->routeConfigService()->groupRoutePrefix();
     }
 
     /**
@@ -7717,15 +7297,7 @@ final class PanelController
      */
     private function groupRoutesEnabledForRoutingTable(): bool
     {
-        if ($this->groupRoutePrefix() === '') {
-            return false;
-        }
-
-        $mode = strtolower(trim((string) $this->config->get('group.privacy', 'disabled')));
-        if ($mode === 'public') {
-            $mode = 'public_full';
-        }
-        return in_array($mode, ['public_full', 'public_limited', 'private'], true);
+        return $this->routeConfigService()->groupRoutesEnabledForRoutingTable();
     }
 
     /**
@@ -7751,17 +7323,7 @@ final class PanelController
      */
     private function normalizePublicRoutePrefix(string $value, string $fallback, bool $allowBlank = false): string
     {
-        $value = trim($value);
-        if ($allowBlank && $value === '') {
-            return '';
-        }
-
-        $slug = $this->input->slug($value);
-        if ($slug === null || $slug === '') {
-            return $fallback;
-        }
-
-        return $slug;
+        return $this->routeConfigService()->normalizeRoutePrefix($value, $fallback, $allowBlank);
     }
 
     /**
@@ -8228,6 +7790,24 @@ final class PanelController
         return $this->profileContactService;
     }
 
+    private function routeConfigService(): RouteConfigService
+    {
+        if (!$this->routeConfigService instanceof RouteConfigService) {
+            $this->routeConfigService = new RouteConfigService($this->config, $this->input);
+        }
+
+        return $this->routeConfigService;
+    }
+
+    private function bodyBlockPolicy(): BodyBlockPolicy
+    {
+        if (!$this->bodyBlockPolicy instanceof BodyBlockPolicy) {
+            $this->bodyBlockPolicy = new BodyBlockPolicy($this->input);
+        }
+
+        return $this->bodyBlockPolicy;
+    }
+
     private function configEditorSchemaService(): ConfigEditorSchemaService
     {
         if (!$this->configEditorSchemaService instanceof ConfigEditorSchemaService) {
@@ -8268,6 +7848,20 @@ final class PanelController
         }
 
         return $this->extensionPermissionCatalogService;
+    }
+
+    private function extensionCatalogService(): ExtensionCatalogService
+    {
+        if (!$this->extensionCatalogService instanceof ExtensionCatalogService) {
+            $this->extensionCatalogService = new ExtensionCatalogService(
+                dirname(__DIR__, 3),
+                $this->extensionStateStore(),
+                $this->extensionPermissionCatalogService(),
+                $this->input
+            );
+        }
+
+        return $this->extensionCatalogService;
     }
 
     private function avatarUploadService(): AvatarUploadService

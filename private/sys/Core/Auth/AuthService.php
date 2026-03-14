@@ -12,8 +12,10 @@ declare(strict_types=1);
 namespace Raven\Core\Auth;
 
 use PDO;
+use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\ContactProfileNormalizer;
 use Raven\Lib\Auth\LoginThrottleService;
+use Raven\Lib\Auth\PermissionMaskService;
 use Raven\Lib\Security\RecoveryPhrase;
 use Raven\Lib\Security\TotpService;
 use Raven\Lib\Security\TwoFactorMethodKey;
@@ -42,7 +44,8 @@ final class AuthService
     /** Delight Auth instance. */
     private mixed $auth;
     private LoginThrottleService $loginThrottle;
-    private ContactProfileNormalizer $contactProfileNormalizer;
+    private AuthPayloadCodec $authPayloadCodec;
+    private PermissionMaskService $permissionMaskService;
 
     /**
      * Request-local cache for user group lookups.
@@ -50,16 +53,6 @@ final class AuthService
      * @var array<int, array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>>
      */
     private array $groupsForUserCache = [];
-
-    /**
-     * Request-local cache for merged permission masks by user id.
-     *
-     * @var array<int, int>
-     */
-    private array $permissionMaskForUserCache = [];
-
-    /** Request-local cache for guest permission mask lookup. */
-    private ?int $permissionMaskForGuestCache = null;
 
     /**
      * Request-local cache for user preference rows by user id.
@@ -88,7 +81,8 @@ final class AuthService
         $this->driver = $driver;
         $this->prefix = $driver === 'sqlite' ? '' : $prefix;
         $this->loginThrottle = new LoginThrottleService($appDb, $driver, $prefix);
-        $this->contactProfileNormalizer = new ContactProfileNormalizer();
+        $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
+        $this->permissionMaskService = new PermissionMaskService($appDb, $driver, $prefix);
 
         $this->bootstrapDelightAuth();
     }
@@ -748,22 +742,7 @@ final class AuthService
      */
     private function decodeContactProfiles(mixed $raw): array
     {
-        if (!is_string($raw) || trim($raw) === '') {
-            return [];
-        }
-
-        try {
-            /** @var mixed $decoded */
-            $decoded = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
-        } catch (\Throwable) {
-            return [];
-        }
-
-        if (!is_array($decoded)) {
-            return [];
-        }
-
-        return $this->normalizeContactProfiles($decoded);
+        return $this->authPayloadCodec->decodeContactProfiles($raw);
     }
 
     /**
@@ -773,15 +752,7 @@ final class AuthService
      */
     private function encodeContactProfiles(array $profiles): ?string
     {
-        if ($profiles === []) {
-            return null;
-        }
-
-        try {
-            return json_encode($profiles, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-        } catch (\Throwable) {
-            return null;
-        }
+        return $this->authPayloadCodec->encodeContactProfiles($profiles);
     }
 
     /**
@@ -790,22 +761,7 @@ final class AuthService
      */
     private function decodeTwoFactorMethods(mixed $raw): array
     {
-        if (!is_string($raw) || trim($raw) === '') {
-            return [];
-        }
-
-        try {
-            /** @var mixed $decoded */
-            $decoded = json_decode($raw, true, 64, JSON_THROW_ON_ERROR);
-        } catch (\Throwable) {
-            return [];
-        }
-
-        if (!is_array($decoded)) {
-            return [];
-        }
-
-        return TwoFactorMethodNormalizer::normalizeStored($decoded);
+        return $this->authPayloadCodec->decodeTwoFactorMethods($raw);
     }
 
     /**
@@ -813,15 +769,7 @@ final class AuthService
      */
     private function encodeTwoFactorMethods(array $methods): ?string
     {
-        if ($methods === []) {
-            return null;
-        }
-
-        try {
-            return json_encode($methods, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-        } catch (\Throwable) {
-            return null;
-        }
+        return $this->authPayloadCodec->encodeTwoFactorMethods($methods);
     }
 
     /**
@@ -832,7 +780,7 @@ final class AuthService
      */
     private function normalizeContactProfiles(array $profiles): array
     {
-        return $this->contactProfileNormalizer->normalize($profiles, 20);
+        return $this->authPayloadCodec->normalizeContactProfiles($profiles);
     }
 
     /**
@@ -1131,29 +1079,7 @@ final class AuthService
      */
     private function permissionMaskForUser(int $userId): int
     {
-        if ($userId > 0 && array_key_exists($userId, $this->permissionMaskForUserCache)) {
-            return $this->permissionMaskForUserCache[$userId];
-        }
-
-        $mask = 0;
-
-        foreach ($this->groupsForUser($userId) as $group) {
-            // Banned membership is a hard deny that overrides all other group grants.
-            if (strtolower(trim((string) ($group['slug'] ?? ''))) === 'banned') {
-                if ($userId > 0) {
-                    $this->permissionMaskForUserCache[$userId] = 0;
-                }
-                return 0;
-            }
-
-            $mask |= (int) $group['permission_mask'];
-        }
-
-        if ($userId > 0) {
-            $this->permissionMaskForUserCache[$userId] = $mask;
-        }
-
-        return $mask;
+        return $this->permissionMaskService->maskForUser($userId, $this->groupsForUser($userId));
     }
 
     /**
@@ -1161,25 +1087,7 @@ final class AuthService
      */
     private function permissionMaskForGuest(): int
     {
-        if ($this->permissionMaskForGuestCache !== null) {
-            return $this->permissionMaskForGuestCache;
-        }
-
-        $groupsTable = $this->groupTable('groups');
-
-        $stmt = $this->appDb->prepare(
-            'SELECT permission_mask
-             FROM ' . $groupsTable . '
-             WHERE LOWER(slug) = :slug
-             LIMIT 1'
-        );
-        $stmt->execute([':slug' => 'guest']);
-        $mask = $stmt->fetchColumn();
-
-        $resolvedMask = $mask === false ? 0 : (int) $mask;
-        $this->permissionMaskForGuestCache = $resolvedMask;
-
-        return $resolvedMask;
+        return $this->permissionMaskService->maskForGuest();
     }
 
     /**
@@ -1188,8 +1096,7 @@ final class AuthService
     private function clearPermissionCaches(): void
     {
         $this->groupsForUserCache = [];
-        $this->permissionMaskForUserCache = [];
-        $this->permissionMaskForGuestCache = null;
+        $this->permissionMaskService->clearCaches();
         $this->userPreferencesCache = [];
     }
 
@@ -1216,7 +1123,8 @@ final class AuthService
             return;
         }
 
-        unset($this->groupsForUserCache[$userId], $this->permissionMaskForUserCache[$userId]);
+        unset($this->groupsForUserCache[$userId]);
+        $this->permissionMaskService->invalidateUser($userId);
     }
 
     /**
