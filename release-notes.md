@@ -1,3 +1,9 @@
+### March 14, 2026
+
+- Updated extension-type documentation to match the current manifest schema (`helper`, `content`, `plugin`, `module`, `system`) in `README.md` and `docs/Extensions.md`.
+- Clarified extension capability notes in docs so `lib/routes_public.php` is documented as `module`-only and extension permission masks are described as applying to non-system extensions.
+- Synced `docs/Preferences.md` and `docs/Users.md` UI-label coverage for panel 2FA controls (`Setup TOTP`, `Manual Key`, `Two-Factor Methods`, `Details`) and re-validated docs smoke coverage.
+
 ### March 13, 2026
 
 - Added configurable panel login identifier mode at `user.auth.login` with `email` or `username` options in System Configuration.

@@ -42,7 +42,7 @@ Shared state file:
 State keys:
 
 - `enabled`: map of `{extension_slug => true}`
-- `permissions`: map of `{extension_slug => panel_permission_bit}` for basic extensions
+- `permissions`: map of `{extension_slug => panel_permission_bit}` for non-system extensions
 
 Types:
 
@@ -106,7 +106,7 @@ Also:
 2. Add `ext.json` first.
 3. Add `ext.php` and `lib/schema.php` for service/storage behavior.
 4. Add `lib/routes_panel.php` + `vis/` only when panel pages are needed.
-5. Add `lib/routes_public.php` only when public endpoints are needed.
+5. Add `lib/routes_public.php` only for `module` extensions that need public endpoints.
 6. Add `lib/shortcodes.php` only when editor shortcode insertion is needed.
 7. Add extension-local state files only when necessary.
 8. Enable extension in Extension Manager.
@@ -156,7 +156,7 @@ Common manifest fields:
 - `name` (required)
 - `version`
 - `description`
-- `type` (`basic`, `system`, or `helper`)
+- `type` (`helper`, `content`, `plugin`, `module`, or `system`)
 - `author`
 - `homepage`
 - `system_extension` (optional behavior flag)
@@ -179,6 +179,9 @@ If this document and [private/ext/AGENTS.md](../private/ext/AGENTS.md) ever dive
 - `Select plugin type...`
 - `plugin`
 - `content`
+- `helper`
+- `module`
+- `system`
 - `Author Name`
 - `Author URL`
 - `Documentation`

@@ -28,6 +28,8 @@ Fields/options:
 - `Avatar` file upload (`gif/jpg/jpeg/png`)
 - `Remove current avatar` checkbox (shown only when avatar exists)
 - `Two-Factor Methods` (Security tab)
+  - `Setup TOTP`
+  - `Manual Key`
   - `Type` (`Authenticator App (TOTP)`, `Security Key (WebAuthn)`, `Email Code (Stub)`)
   - `Label`
   - `TOTP Secret / Confirm Code`
@@ -120,6 +122,8 @@ When Preferences behavior changes, update this document in the same task. That i
 - `Type`
 - `Value`
 - `Two-Factor Methods`
+- `Setup TOTP`
+- `Manual Key`
 - `Add 2FA Method`
 - `TOTP Secret / Confirm Code`
 - `Scan QR`

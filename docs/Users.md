@@ -75,6 +75,9 @@ Fields/options:
   - file upload (`gif/jpg/jpeg/png`)
   - optional `Remove current avatar` checkbox when avatar exists
 - `Group Memberships` (multi-select checkboxes)
+- `Two-Factor Methods` (existing users)
+  - read-only method entries with `Type`, `Label`, and `Details`
+  - per-method remove action for recovery workflows
 
 Group assignment notes:
 
@@ -200,6 +203,8 @@ When user behavior changes, update this document in the same task. That includes
 - `Profile`
 - `Contact Information`
 - `Add More Contact Information`
+- `Two-Factor Methods`
+- `Details`
 - `Value`
 - `Next`
 - `Previous`
