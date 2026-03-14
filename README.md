@@ -72,11 +72,13 @@ If you need to add content types, helper functions, or even whole new parts of t
 
 There are several extension types:
 
-- **Helper:** A half-extension. No views, just provides additional functionality to other scripts.
-- **Basic:** You can build permissions-gated admin panel pages for these.
-- **Content:** Adds content types. *(Not fully implemented. Coming before v1.)*
-- **System:** Provides deep-level administrative utilties only visible to top-level admins.
-- **Stock:** Raven comes with several bundled extensions to serve as examples. They cannot be deleted, but they are disabled by-default *(opt-in)* on all new installs.
+- **Helper:** Utility extensions for reusable logic and shortcodes. No public routes.
+- **Content:** Content-model extensions that can provide custom editor fields. No public routes.
+- **Plugin:** Combined helper/content extensions that can provide both shortcodes and custom fields.
+- **Module:** Full-stack extensions that can expose both panel routes and public routes.
+- **System:** Administrative extensions shown under the System area for high-level configuration workflows.
+
+Raven also ships with several useful bundled stock extensions. They are disabled by default on new installs. These official Stock extensions **cannot** be deleted.
 
 Point your Agent at [private/ext/AGENTS.md](private/ext/AGENTS.md) to get started with building Raven extensions, or generate a skeleton in your panel's [Extension Manager](docs/Extensions.md).
 
