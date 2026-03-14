@@ -142,7 +142,7 @@ $themeLabels = [
                 <div class="input-group">
                     <input type="text" class="form-control" data-preferences-two-factor-key="secret" placeholder="TOTP secret (auto if blank)">
                     <input type="text" class="form-control" data-preferences-two-factor-key="verification_code" placeholder="6-digit code">
-                    <button type="button" class="btn btn-secondary" data-preferences-two-factor-totp-setup="1">Setup TOTP</button>
+                    <button type="button" class="btn btn-primary" data-preferences-two-factor-totp-setup="1">Setup TOTP</button>
                 </div>
                 <div class="small text-muted d-none position-absolute start-0 end-0" style="top:calc(100% + 0.2rem);" data-preferences-two-factor-totp-feedback="1"></div>
             </div>
@@ -1110,7 +1110,7 @@ $themeLabels = [
                                             value=""
                                             placeholder="6-digit code"
                                         >
-                                        <button type="button" class="btn btn-secondary" data-preferences-two-factor-totp-setup="1">Setup TOTP</button>
+                                        <button type="button" class="btn btn-primary" data-preferences-two-factor-totp-setup="1">Setup TOTP</button>
                                     </div>
                                     <div class="small text-muted d-none position-absolute start-0 end-0" style="top:calc(100% + 0.2rem);" data-preferences-two-factor-totp-feedback="1"></div>
                                 </div>
