@@ -22,6 +22,7 @@ use Raven\Core\Media\PageImageManager;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Lib\Archive\ArchivePackageService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Config\ConfigEditorSchemaService;
 use Raven\Lib\Config\ConfigSnapshotSanitizer;
 use Raven\Lib\Config\ConfigEditorNormalizer;
 use Raven\Lib\Config\ConfigValueParser;
@@ -31,7 +32,9 @@ use Raven\Lib\Extension\ExtensionScaffoldService;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Media\AvatarUploadService;
+use Raven\Lib\Media\TaxonomyImageService;
 use Raven\Lib\Pagination\Pagination;
+use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Routing\RedirectTargetValidator;
@@ -101,6 +104,9 @@ final class PanelController
     private ?AvatarUploadService $avatarUploadService = null;
     private ?ConfigSnapshotSanitizer $configSnapshotSanitizer = null;
     private ?ThemeCloneService $themeCloneService = null;
+    private ?ConfigEditorSchemaService $configEditorSchemaService = null;
+    private ?TaxonomyImageService $taxonomyImageService = null;
+    private ?ProfileContactService $profileContactService = null;
 
     public function __construct(
         View $view,
@@ -4852,34 +4858,7 @@ final class PanelController
      */
     private function flattenConfigFields(array $config, array $segments = []): array
     {
-        $fields = [];
-
-        foreach ($config as $key => $value) {
-            $pathSegments = [...$segments, (string) $key];
-
-            if (is_array($value)) {
-                // Continue walking nested config sections until leaf scalar values.
-                $fields = array_merge($fields, $this->flattenConfigFields($value, $pathSegments));
-                continue;
-            }
-
-            $path = implode('.', $pathSegments);
-            // SQLite DB filenames are core-managed and intentionally hidden
-            // from the configuration editor to keep installs consistent.
-            // Public default theme is managed by Theme Manager / rvn-theme only.
-            if ($path === 'site.default_theme' || str_starts_with($path, 'database.sqlite.files.')) {
-                continue;
-            }
-            $fields[] = [
-                'path' => $path,
-                'segments' => $pathSegments,
-                'label' => $this->labelFromPath($path),
-                'type' => $this->detectConfigScalarType($value),
-                'value' => $this->stringifyConfigScalar($value),
-            ];
-        }
-
-        return $fields;
+        return $this->configEditorSchemaService()->flattenFields($config, $segments);
     }
 
     /**
@@ -4887,235 +4866,7 @@ final class PanelController
      */
     private function labelFromPath(string $path): string
     {
-        if ($path === 'media.images.max_filesize_kb') {
-            return 'Max Filesize (KB)';
-        }
-
-        if ($path === 'media.avatars.max_filesize_kb') {
-            return 'Max Avatar Filesize (KB)';
-        }
-
-        if ($path === 'media.avatars.max_width') {
-            return 'Max Avatar Width (px)';
-        }
-
-        if ($path === 'media.avatars.max_height') {
-            return 'Max Avatar Height (px)';
-        }
-
-        if ($path === 'media.avatars.allowed_extensions') {
-            return 'Allowed Avatar Extensions';
-        }
-
-        if ($path === 'media.images.small.width') {
-            return 'Small Width (px)';
-        }
-
-        if ($path === 'media.images.small.height') {
-            return 'Small Height (px)';
-        }
-
-        if ($path === 'media.images.med.width') {
-            return 'Medium Width (px)';
-        }
-
-        if ($path === 'media.images.med.height') {
-            return 'Medium Height (px)';
-        }
-
-        if ($path === 'media.images.large.width') {
-            return 'Large Width (px)';
-        }
-
-        if ($path === 'media.images.large.height') {
-            return 'Large Height (px)';
-        }
-
-        if ($path === 'captcha.hcaptcha.public_key') {
-            return 'Site Key';
-        }
-
-        if ($path === 'captcha.recaptcha2.public_key') {
-            return 'Site Key';
-        }
-
-        if ($path === 'captcha.recaptcha3.public_key') {
-            return 'Site Key';
-        }
-
-        if ($path === 'panel.path') {
-            return 'Panel Path';
-        }
-
-        if ($path === 'panel.default_theme') {
-            return 'Default Panel Theme';
-        }
-
-        if ($path === 'panel.brand_name') {
-            return 'Branded Panel Name';
-        }
-
-        if ($path === 'panel.brand_logo') {
-            return 'Branded Panel Logo';
-        }
-
-        if ($path === 'site.default_theme') {
-            return 'Default Site Theme';
-        }
-
-        if ($path === 'site.enabled') {
-            return 'Site Visibility';
-        }
-
-        if ($path === 'mail.agent') {
-            return 'Mail Agent';
-        }
-
-        if ($path === 'mail.sender_address') {
-            return 'Mail Sender Address';
-        }
-
-        if ($path === 'mail.sender_name') {
-            return 'Mail Sender Name';
-        }
-
-        if ($path === 'content.default_editor') {
-            return 'Default Text Editor';
-        }
-
-        if ($path === 'content.separator') {
-            return 'Default Page URL Separator';
-        }
-
-        if ($path === 'category.prefix') {
-            return 'Category URL Prefix';
-        }
-
-        if ($path === 'category.pagination') {
-            return 'Pagination';
-        }
-
-        if ($path === 'tag.prefix') {
-            return 'Tag URL Prefix';
-        }
-
-        if ($path === 'tag.pagination') {
-            return 'Pagination';
-        }
-
-        if ($path === 'meta.twitter.card') {
-            return 'Twitter Card';
-        }
-
-        if ($path === 'meta.twitter.site') {
-            return 'Twitter Site';
-        }
-
-        if ($path === 'meta.twitter.creator') {
-            return 'Twitter Creator';
-        }
-
-        if ($path === 'meta.twitter.image') {
-            return 'Twitter Image';
-        }
-
-        if ($path === 'meta.apple_touch_icon') {
-            return 'Apple Touch Icon';
-        }
-
-        if ($path === 'meta.opengraph.type') {
-            return 'OpenGraph Type';
-        }
-
-        if ($path === 'meta.opengraph.locale') {
-            return 'OpenGraph Locale';
-        }
-
-        if ($path === 'meta.opengraph.image') {
-            return 'OpenGraph Image';
-        }
-
-        if ($path === 'session.cookie.name') {
-            return 'Cookie Name';
-        }
-
-        if ($path === 'session.cookie.domain') {
-            return 'Cookie Domain';
-        }
-
-        if ($path === 'session.cookie.prefix') {
-            return 'Cookie Prefix';
-        }
-
-        if ($path === 'user.privacy') {
-            return 'Enable Profiles';
-        }
-
-        if ($path === 'user.auth.login') {
-            return 'Login Method';
-        }
-
-        if ($path === 'user.auth.registration') {
-            return 'Enable Public Registration';
-        }
-
-        if ($path === 'user.prefix') {
-            return 'Profile URL Prefix';
-        }
-
-        if ($path === 'group.privacy') {
-            return 'Show Groups';
-        }
-
-        if ($path === 'group.prefix') {
-            return 'Group URL Prefix';
-        }
-
-        if ($path === 'session.brute.max') {
-            return 'Max Login Failures';
-        }
-
-        if ($path === 'session.brute.window') {
-            return 'Login Failure Window (Seconds)';
-        }
-
-        if ($path === 'session.brute.lock') {
-            return 'Login Lock Duration (Seconds)';
-        }
-
-        if ($path === 'debug.show_public') {
-            return 'Enable Output Profiler on Public Views';
-        }
-
-        if ($path === 'debug.show_private') {
-            return 'Enable Output Profiler on Panel Views';
-        }
-
-        if ($path === 'debug.show_benchmarks') {
-            return 'Benchmarks';
-        }
-
-        if ($path === 'debug.show_queries') {
-            return 'SQL Queries';
-        }
-
-        if ($path === 'debug.show_trace') {
-            return 'Render Stack Trace';
-        }
-
-        if ($path === 'debug.show_request') {
-            return 'Request Data';
-        }
-
-        if ($path === 'debug.show_environment') {
-            return 'Environment';
-        }
-
-        $segments = explode('.', $path);
-        $leaf = (string) end($segments);
-        $leaf = str_replace('_', ' ', $leaf);
-
-        return ucwords($leaf);
+        return $this->configEditorSchemaService()->labelFromPath($path);
     }
 
     /**
@@ -5123,13 +4874,7 @@ final class PanelController
      */
     private function detectConfigScalarType(mixed $value): string
     {
-        return match (true) {
-            is_int($value) => 'int',
-            is_float($value) => 'float',
-            is_bool($value) => 'bool',
-            $value === null => 'null',
-            default => 'string',
-        };
+        return $this->configEditorSchemaService()->detectScalarType($value);
     }
 
     /**
@@ -5137,15 +4882,7 @@ final class PanelController
      */
     private function stringifyConfigScalar(mixed $value): string
     {
-        if (is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
-
-        if ($value === null) {
-            return '';
-        }
-
-        return (string) $value;
+        return $this->configEditorSchemaService()->stringifyScalar($value);
     }
 
     /**
@@ -5156,25 +4893,7 @@ final class PanelController
      */
     private function readNestedConfigValue(array $submitted, array $segments): string
     {
-        $cursor = $submitted;
-
-        foreach ($segments as $segment) {
-            if (!is_array($cursor) || !array_key_exists($segment, $cursor)) {
-                return '';
-            }
-
-            $cursor = $cursor[$segment];
-        }
-
-        if (is_string($cursor)) {
-            return $cursor;
-        }
-
-        if (is_int($cursor) || is_float($cursor) || is_bool($cursor)) {
-            return (string) $cursor;
-        }
-
-        return '';
+        return $this->configEditorSchemaService()->readNestedValue($submitted, $segments);
     }
 
     /**
@@ -5185,21 +4904,7 @@ final class PanelController
      */
     private function setNestedConfigValue(array &$config, array $segments, mixed $value): void
     {
-        $cursor = &$config;
-        $lastIndex = count($segments) - 1;
-
-        foreach ($segments as $index => $segment) {
-            if ($index === $lastIndex) {
-                $cursor[$segment] = $value;
-                return;
-            }
-
-            if (!isset($cursor[$segment]) || !is_array($cursor[$segment])) {
-                $cursor[$segment] = [];
-            }
-
-            $cursor = &$cursor[$segment];
-        }
+        $this->configEditorSchemaService()->setNestedValue($config, $segments, $value);
     }
 
     /**
@@ -5704,28 +5409,7 @@ final class PanelController
      */
     private function ensureContentEditorConfig(array $config): array
     {
-        $content = $config['content'] ?? null;
-        if (!is_array($content)) {
-            $content = [];
-        }
-
-        if (!array_key_exists('default_editor', $content) && array_key_exists('default_text_editor', $content)) {
-            $content['default_editor'] = $content['default_text_editor'];
-        }
-        if (!array_key_exists('separator', $content) && array_key_exists('page_url_separator', $content)) {
-            $content['separator'] = $content['page_url_separator'];
-        }
-
-        $content['default_editor'] = $this->normalizeBodyTextEditorOption(
-            (string) ($content['default_editor'] ?? 'tinymce')
-        );
-        $content['separator'] = $this->normalizeGlobalPageUrlSeparator(
-            (string) ($content['separator'] ?? '-')
-        );
-        unset($content['default_text_editor'], $content['page_url_separator']);
-
-        $config['content'] = $content;
-        return $config;
+        return $this->configEditorSchemaService()->ensureContentEditorConfig($config);
     }
 
     /**
@@ -5736,93 +5420,7 @@ final class PanelController
      */
     private function ensureTaxonomyRoutePrefixConfig(array $config): array
     {
-        $category = $config['category'] ?? null;
-        if (!is_array($category)) {
-            $category = [];
-        }
-        $legacyCategories = $config['categories'] ?? null;
-        if (is_array($legacyCategories)) {
-            if (!array_key_exists('enabled', $category) && array_key_exists('enabled', $legacyCategories)) {
-                $category['enabled'] = $legacyCategories['enabled'];
-            }
-            if (!array_key_exists('prefix', $category) && array_key_exists('prefix', $legacyCategories)) {
-                $category['prefix'] = $legacyCategories['prefix'];
-            }
-            if (!array_key_exists('pagination', $category) && array_key_exists('pagination', $legacyCategories)) {
-                $category['pagination'] = $legacyCategories['pagination'];
-            }
-        }
-
-        $tag = $config['tag'] ?? null;
-        if (!is_array($tag)) {
-            $tag = [];
-        }
-        $legacyTags = $config['tags'] ?? null;
-        if (is_array($legacyTags)) {
-            if (!array_key_exists('enabled', $tag) && array_key_exists('enabled', $legacyTags)) {
-                $tag['enabled'] = $legacyTags['enabled'];
-            }
-            if (!array_key_exists('prefix', $tag) && array_key_exists('prefix', $legacyTags)) {
-                $tag['prefix'] = $legacyTags['prefix'];
-            }
-            if (!array_key_exists('pagination', $tag) && array_key_exists('pagination', $legacyTags)) {
-                $tag['pagination'] = $legacyTags['pagination'];
-            }
-        }
-
-        if (!array_key_exists('enabled', $category)) {
-            $category['enabled'] = true;
-        } else {
-            $category['enabled'] = $this->configBool($category['enabled'], true);
-        }
-
-        if (!array_key_exists('prefix', $category)) {
-            $category['prefix'] = 'cat';
-        } else {
-            $rawCategoryPrefix = trim((string) ($category['prefix'] ?? ''));
-            if ($rawCategoryPrefix === '') {
-                $category['prefix'] = '';
-            } else {
-                $categoryPrefix = $this->input->slug($rawCategoryPrefix);
-                $category['prefix'] = $categoryPrefix ?? '';
-            }
-        }
-
-        if (!array_key_exists('pagination', $category)) {
-            $category['pagination'] = 10;
-        } else {
-            $category['pagination'] = max(1, (int) ($category['pagination'] ?? 10));
-        }
-
-        if (!array_key_exists('enabled', $tag)) {
-            $tag['enabled'] = true;
-        } else {
-            $tag['enabled'] = $this->configBool($tag['enabled'], true);
-        }
-
-        if (!array_key_exists('prefix', $tag)) {
-            $tag['prefix'] = 'tag';
-        } else {
-            $rawTagPrefix = trim((string) ($tag['prefix'] ?? ''));
-            if ($rawTagPrefix === '') {
-                $tag['prefix'] = '';
-            } else {
-                $tagPrefix = $this->input->slug($rawTagPrefix);
-                $tag['prefix'] = $tagPrefix ?? '';
-            }
-        }
-
-        if (!array_key_exists('pagination', $tag)) {
-            $tag['pagination'] = 10;
-        } else {
-            $tag['pagination'] = max(1, (int) ($tag['pagination'] ?? 10));
-        }
-
-        $config['category'] = $category;
-        $config['tag'] = $tag;
-        // Old taxonomy/pagination keys are removed to keep config layout canonical.
-        unset($config['categories'], $config['tags'], $config['tagging'], $config['pagination']);
-        return $config;
+        return $this->configEditorSchemaService()->ensureTaxonomyRoutePrefixConfig($config);
     }
 
     /**
@@ -5833,168 +5431,7 @@ final class PanelController
      */
     private function ensurePublicProfileConfig(array $config): array
     {
-        $session = $config['session'] ?? null;
-        if (!is_array($session)) {
-            $session = [];
-        }
-
-        $legacyProfileMode = strtolower(trim((string) ($session['profile_mode'] ?? '')));
-        $legacyProfilePrefix = trim((string) ($session['profile_prefix'] ?? ''));
-        $legacyProfileContact = $session['profile_contact_options'] ?? null;
-        $legacyGroupMode = strtolower(trim((string) ($session['show_groups'] ?? '')));
-        $legacyGroupPrefix = trim((string) ($session['group_prefix'] ?? ''));
-        $legacySessionName = trim((string) ($session['name'] ?? ''));
-        $legacyCookieDomain = strtolower(trim((string) ($session['cookie_domain'] ?? '')));
-        $legacyCookiePrefix = trim((string) ($session['cookie_prefix'] ?? ''));
-        $legacyBruteMax = (int) ($session['login_attempt_max'] ?? 5);
-        $legacyBruteWindow = (int) ($session['login_attempt_window_seconds'] ?? 600);
-        $legacyBruteLock = (int) ($session['login_attempt_lock_seconds'] ?? 900);
-        unset(
-            $session['profile_mode'],
-            $session['profile_prefix'],
-            $session['profile_contact_options'],
-            $session['show_groups'],
-            $session['group_prefix'],
-            $session['name'],
-            $session['cookie_domain'],
-            $session['cookie_prefix'],
-            $session['login_attempt_max'],
-            $session['login_attempt_window_seconds'],
-            $session['login_attempt_lock_seconds']
-        );
-
-        $cookie = $session['cookie'] ?? null;
-        if (!is_array($cookie)) {
-            $cookie = [];
-        }
-
-        if (!array_key_exists('name', $cookie)) {
-            $cookie['name'] = $legacySessionName !== '' ? $legacySessionName : 'session';
-        } else {
-            $cookie['name'] = trim((string) ($cookie['name'] ?? ''));
-        }
-        if ($cookie['name'] === '' || preg_match('/^[a-zA-Z0-9_-]{1,64}$/', (string) $cookie['name']) !== 1) {
-            $cookie['name'] = 'session';
-        }
-
-        if (!array_key_exists('domain', $cookie)) {
-            $cookie['domain'] = $legacyCookieDomain;
-        } else {
-            $cookie['domain'] = strtolower(trim((string) ($cookie['domain'] ?? '')));
-        }
-        $cookieDomain = (string) ($cookie['domain'] ?? '');
-        if (
-            $cookieDomain !== ''
-            && (
-                preg_match('/[:\/\s]/', $cookieDomain) === 1
-                || preg_match('/^\.?[a-z0-9-]+(?:\.[a-z0-9-]+)*$/', $cookieDomain) !== 1
-            )
-        ) {
-            $cookie['domain'] = '';
-        }
-
-        if (!array_key_exists('prefix', $cookie)) {
-            $cookie['prefix'] = $legacyCookiePrefix !== '' ? $legacyCookiePrefix : 'rvn_';
-        } else {
-            $cookie['prefix'] = trim((string) ($cookie['prefix'] ?? ''));
-        }
-        $cookiePrefix = (string) ($cookie['prefix'] ?? '');
-        if ($cookiePrefix !== '' && preg_match('/^[a-zA-Z0-9_-]{1,40}$/', $cookiePrefix) !== 1) {
-            $cookie['prefix'] = '';
-        }
-
-        $brute = $session['brute'] ?? null;
-        if (!is_array($brute)) {
-            $brute = [];
-        }
-        if (!array_key_exists('max', $brute)) {
-            $brute['max'] = $legacyBruteMax;
-        }
-        if (!array_key_exists('window', $brute)) {
-            $brute['window'] = $legacyBruteWindow;
-        }
-        if (!array_key_exists('lock', $brute)) {
-            $brute['lock'] = $legacyBruteLock;
-        }
-        $brute['max'] = max(1, (int) ($brute['max'] ?? 5));
-        $brute['window'] = max(1, (int) ($brute['window'] ?? 600));
-        $brute['lock'] = max(1, (int) ($brute['lock'] ?? 900));
-
-        $session['cookie'] = $cookie;
-        $session['brute'] = $brute;
-
-        $user = $config['user'] ?? null;
-        if (!is_array($user)) {
-            $user = [];
-        }
-
-        if (!array_key_exists('privacy', $user)) {
-            $user['privacy'] = in_array($legacyProfileMode, ['public_full', 'public_limited', 'private', 'disabled'], true)
-                ? $legacyProfileMode
-                : 'disabled';
-        } else {
-            $rawProfileMode = strtolower(trim((string) ($user['privacy'] ?? '')));
-            if (!in_array($rawProfileMode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
-                $rawProfileMode = 'disabled';
-            }
-            $user['privacy'] = $rawProfileMode;
-        }
-
-        if (!array_key_exists('prefix', $user)) {
-            $user['prefix'] = $legacyProfilePrefix !== '' ? $legacyProfilePrefix : 'user';
-        } else {
-            $rawProfilePrefix = trim((string) ($user['prefix'] ?? ''));
-            if ($rawProfilePrefix === '') {
-                $user['prefix'] = '';
-            } else {
-                $profilePrefix = $this->input->slug($rawProfilePrefix);
-                $user['prefix'] = $profilePrefix ?? '';
-            }
-        }
-
-        $user['contact'] = $this->normalizeProfileContactOptionsConfig(
-            array_key_exists('contact', $user) ? $user['contact'] : $legacyProfileContact
-        );
-
-        $group = $config['group'] ?? null;
-        if (!is_array($group)) {
-            $group = [];
-        }
-
-        if (!array_key_exists('privacy', $group)) {
-            if ($legacyGroupMode === 'public') {
-                $legacyGroupMode = 'public_full';
-            }
-            $group['privacy'] = in_array($legacyGroupMode, ['public_full', 'public_limited', 'private', 'disabled'], true)
-                ? $legacyGroupMode
-                : 'disabled';
-        } else {
-            $rawShowGroups = strtolower(trim((string) ($group['privacy'] ?? '')));
-            if ($rawShowGroups === 'public') {
-                $rawShowGroups = 'public_full';
-            }
-            if (!in_array($rawShowGroups, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
-                $rawShowGroups = 'disabled';
-            }
-            $group['privacy'] = $rawShowGroups;
-        }
-
-        if (!array_key_exists('prefix', $group)) {
-            $group['prefix'] = $legacyGroupPrefix !== '' ? $legacyGroupPrefix : 'group';
-        } else {
-            $rawGroupPrefix = trim((string) ($group['prefix'] ?? ''));
-            if ($rawGroupPrefix === '') {
-                $group['prefix'] = '';
-            } else {
-                $groupPrefix = $this->input->slug($rawGroupPrefix);
-                $group['prefix'] = $groupPrefix ?? '';
-            }
-        }
-
-        $config['session'] = $session;
-        $config['user'] = $user;
-        $config['group'] = $group;
-        return $config;
+        return $this->configEditorSchemaService()->ensurePublicProfileConfig($config);
     }
 
     /**
@@ -6005,49 +5442,7 @@ final class PanelController
      */
     private function ensureUserAuthConfig(array $config): array
     {
-        $user = $config['user'] ?? null;
-        if (!is_array($user)) {
-            $user = [];
-        }
-
-        $auth = $user['auth'] ?? null;
-        if (!is_array($auth)) {
-            $auth = [];
-        }
-
-        if (!array_key_exists('login', $auth)) {
-            $legacyMode = strtolower(trim((string) ($user['login'] ?? $user['login_mode'] ?? '')));
-            if (!in_array($legacyMode, ['email', 'username'], true)) {
-                $legacyMode = 'email';
-            }
-            $auth['login'] = $legacyMode;
-        } else {
-            $mode = strtolower(trim((string) ($auth['login'] ?? 'email')));
-            if (!in_array($mode, ['email', 'username'], true)) {
-                $mode = 'email';
-            }
-            $auth['login'] = $mode;
-        }
-
-        if (!array_key_exists('registration', $auth)) {
-            $legacyRegistration = strtolower(trim((string) ($user['registration'] ?? $user['registration_mode'] ?? '')));
-            if (!in_array($legacyRegistration, ['open', 'invite', 'closed'], true)) {
-                $legacyRegistration = 'closed';
-            }
-            $auth['registration'] = $legacyRegistration;
-        } else {
-            $registrationMode = strtolower(trim((string) ($auth['registration'] ?? 'closed')));
-            if (!in_array($registrationMode, ['open', 'invite', 'closed'], true)) {
-                $registrationMode = 'closed';
-            }
-            $auth['registration'] = $registrationMode;
-        }
-
-        unset($user['login'], $user['login_mode'], $user['registration'], $user['registration_mode']);
-        $user['auth'] = $auth;
-        $config['user'] = $user;
-
-        return $config;
+        return $this->configEditorSchemaService()->ensureUserAuthConfig($config);
     }
 
     /**
@@ -6058,38 +5453,7 @@ final class PanelController
      */
     private function ensureSiteEnabledConfig(array $config): array
     {
-        $site = $config['site'] ?? null;
-        if (!is_array($site)) {
-            $site = [];
-        }
-
-        if (!array_key_exists('enabled', $site)) {
-            $site['enabled'] = 'public';
-        } else {
-            $mode = strtolower(trim((string) ($site['enabled'] ?? '')));
-            if (!in_array($mode, ['public', 'private', 'disabled'], true)) {
-                $mode = 'public';
-            }
-            $site['enabled'] = $mode;
-        }
-
-        if (!array_key_exists('default_theme', $site)) {
-            $site['default_theme'] = 'raven';
-        } else {
-            $configuredTheme = strtolower(trim((string) ($site['default_theme'] ?? '')));
-            $options = $this->publicThemeOptions();
-            if (isset($options[$configuredTheme])) {
-                $site['default_theme'] = $configuredTheme;
-            } elseif (isset($options['raven'])) {
-                $site['default_theme'] = 'raven';
-            } else {
-                $slugs = array_keys($options);
-                $site['default_theme'] = (string) ($slugs[0] ?? 'raven');
-            }
-        }
-
-        $config['site'] = $site;
-        return $config;
+        return $this->configEditorSchemaService()->ensureSiteEnabledConfig($config, $this->publicThemeOptions());
     }
 
     /**
@@ -6100,40 +5464,10 @@ final class PanelController
      */
     private function ensurePanelBrandingConfig(array $config): array
     {
-        $panel = $config['panel'] ?? null;
-        if (!is_array($panel)) {
-            $panel = [];
-        }
-
-        if (!array_key_exists('path', $panel)) {
-            $panel['path'] = 'panel';
-        } else {
-            $panelPath = $this->input->slug((string) ($panel['path'] ?? ''));
-            $panel['path'] = $panelPath ?? 'panel';
-        }
-
-        if (!array_key_exists('default_theme', $panel)) {
-            $panel['default_theme'] = 'corp';
-        } else {
-            $configuredTheme = $this->normalizePanelThemeChoice((string) ($panel['default_theme'] ?? ''), false);
-            $panel['default_theme'] = is_string($configuredTheme) ? $configuredTheme : 'corp';
-        }
-
-        if (!array_key_exists('brand_name', $panel)) {
-            $siteName = trim((string) ($config['site']['name'] ?? 'Raven CMS'));
-            $panel['brand_name'] = $siteName !== '' ? $siteName : 'Raven CMS';
-        } else {
-            $panel['brand_name'] = trim((string) ($panel['brand_name'] ?? ''));
-        }
-
-        if (!array_key_exists('brand_logo', $panel)) {
-            $panel['brand_logo'] = '';
-        } else {
-            $panel['brand_logo'] = trim((string) ($panel['brand_logo'] ?? ''));
-        }
-
-        $config['panel'] = $panel;
-        return $config;
+        return $this->configEditorSchemaService()->ensurePanelBrandingConfig(
+            $config,
+            fn (string $theme, bool $allowDefault): ?string => $this->normalizePanelThemeChoice($theme, $allowDefault)
+        );
     }
 
     /**
@@ -6144,44 +5478,7 @@ final class PanelController
      */
     private function ensureCaptchaConfig(array $config): array
     {
-        $captcha = $config['captcha'] ?? null;
-        if (!is_array($captcha)) {
-            $captcha = [];
-        }
-
-        $provider = strtolower(trim((string) ($captcha['provider'] ?? 'none')));
-        if (!in_array($provider, ['none', 'hcaptcha', 'recaptcha2', 'recaptcha3'], true)) {
-            $provider = 'none';
-        }
-        $captcha['provider'] = $provider;
-
-        $hcaptcha = $captcha['hcaptcha'] ?? null;
-        if (!is_array($hcaptcha)) {
-            $hcaptcha = [];
-        }
-        $hcaptcha['public_key'] = trim((string) ($hcaptcha['public_key'] ?? ''));
-        $hcaptcha['secret_key'] = trim((string) ($hcaptcha['secret_key'] ?? ''));
-
-        $recaptcha2 = $captcha['recaptcha2'] ?? null;
-        if (!is_array($recaptcha2)) {
-            $recaptcha2 = [];
-        }
-        $recaptcha2['public_key'] = trim((string) ($recaptcha2['public_key'] ?? ''));
-        $recaptcha2['secret_key'] = trim((string) ($recaptcha2['secret_key'] ?? ''));
-
-        $recaptcha3 = $captcha['recaptcha3'] ?? null;
-        if (!is_array($recaptcha3)) {
-            $recaptcha3 = [];
-        }
-        $recaptcha3['public_key'] = trim((string) ($recaptcha3['public_key'] ?? ''));
-        $recaptcha3['secret_key'] = trim((string) ($recaptcha3['secret_key'] ?? ''));
-
-        $captcha['hcaptcha'] = $hcaptcha;
-        $captcha['recaptcha2'] = $recaptcha2;
-        $captcha['recaptcha3'] = $recaptcha3;
-        $config['captcha'] = $captcha;
-
-        return $config;
+        return $this->configEditorSchemaService()->ensureCaptchaConfig($config);
     }
 
     /**
@@ -6192,35 +5489,7 @@ final class PanelController
      */
     private function ensureMailConfig(array $config): array
     {
-        $mail = $config['mail'] ?? null;
-        if (!is_array($mail)) {
-            $mail = [];
-        }
-
-        $agent = strtolower(trim((string) ($mail['agent'] ?? 'php_mail')));
-        if (!in_array($agent, ['php_mail'], true)) {
-            $agent = 'php_mail';
-        }
-        $mail['agent'] = $agent;
-        unset($mail['prefix']);
-
-        $senderName = $this->input->text((string) ($mail['sender_name'] ?? 'Postmaster'), 120);
-        if ($senderName === '') {
-            $senderName = 'Postmaster';
-        }
-        $mail['sender_name'] = $senderName;
-
-        $senderAddressRaw = trim((string) ($mail['sender_address'] ?? ''));
-        if ($senderAddressRaw === '') {
-            $mail['sender_address'] = '';
-        } else {
-            $normalizedAddress = $this->input->email($senderAddressRaw);
-            $mail['sender_address'] = $normalizedAddress ?? '';
-        }
-
-        $config['mail'] = $mail;
-
-        return $config;
+        return $this->configEditorSchemaService()->ensureMailConfig($config);
     }
 
     /**
@@ -6231,57 +5500,7 @@ final class PanelController
      */
     private function ensureDebugToolbarConfig(array $config): array
     {
-        $debug = $config['debug'] ?? null;
-        if (!is_array($debug)) {
-            $debug = [];
-        }
-
-        $toBool = static function (mixed $value, bool $default): bool {
-            if (is_bool($value)) {
-                return $value;
-            }
-
-            if (is_int($value) || is_float($value)) {
-                return ((int) $value) !== 0;
-            }
-
-            if (is_string($value)) {
-                $normalized = strtolower(trim($value));
-                if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
-                    return true;
-                }
-                if (in_array($normalized, ['0', 'false', 'no', 'off', ''], true)) {
-                    return false;
-                }
-            }
-
-            return $default;
-        };
-
-        if (!array_key_exists('show_public', $debug) && array_key_exists('show_on_public', $debug)) {
-            $debug['show_public'] = $debug['show_on_public'];
-        }
-        if (!array_key_exists('show_private', $debug) && array_key_exists('show_on_panel', $debug)) {
-            $debug['show_private'] = $debug['show_on_panel'];
-        }
-        if (!array_key_exists('show_private', $debug) && array_key_exists('show_on_private', $debug)) {
-            $debug['show_private'] = $debug['show_on_private'];
-        }
-        if (!array_key_exists('show_trace', $debug) && array_key_exists('show_stack_trace', $debug)) {
-            $debug['show_trace'] = $debug['show_stack_trace'];
-        }
-
-        $debug['show_public'] = $toBool($debug['show_public'] ?? false, false);
-        $debug['show_private'] = $toBool($debug['show_private'] ?? false, false);
-        $debug['show_benchmarks'] = $toBool($debug['show_benchmarks'] ?? true, true);
-        $debug['show_queries'] = $toBool($debug['show_queries'] ?? true, true);
-        $debug['show_trace'] = $toBool($debug['show_trace'] ?? true, true);
-        $debug['show_request'] = $toBool($debug['show_request'] ?? true, true);
-        $debug['show_environment'] = $toBool($debug['show_environment'] ?? true, true);
-        unset($debug['show_on_public'], $debug['show_on_panel'], $debug['show_on_private'], $debug['show_stack_trace']);
-
-        $config['debug'] = $debug;
-        return $config;
+        return $this->configEditorSchemaService()->ensureDebugToolbarConfig($config);
     }
 
     /**
@@ -6368,26 +5587,7 @@ final class PanelController
      */
     private function taxonomyAllowedImageExtensions(): array
     {
-        $raw = strtolower(trim((string) $this->config->get('media.images.allowed_extensions', 'gif,jpg,jpeg,png')));
-        if ($raw === '') {
-            return [];
-        }
-
-        $parts = array_map('trim', explode(',', $raw));
-        $allowed = [];
-        foreach ($parts as $part) {
-            if ($part === 'jpeg') {
-                $part = 'jpg';
-            }
-
-            if ($part === '' || preg_match('/^[a-z0-9]+$/', $part) !== 1) {
-                continue;
-            }
-
-            $allowed[$part] = $part;
-        }
-
-        return array_values($allowed);
+        return $this->taxonomyImageService()->allowedImageExtensions();
     }
 
     /**
@@ -6395,8 +5595,7 @@ final class PanelController
      */
     private function taxonomyAllowedImageExtensionsLabel(): string
     {
-        $allowed = $this->taxonomyAllowedImageExtensions();
-        return $allowed === [] ? 'none (uploads disabled)' : implode(', ', $allowed);
+        return $this->taxonomyImageService()->allowedImageExtensionsLabel();
     }
 
     /**
@@ -6404,12 +5603,7 @@ final class PanelController
      */
     private function taxonomyMaxImageFilesizeKb(): ?int
     {
-        $bytes = $this->resolveMediaMaxFilesizeBytes('images', 10485760);
-        if ($bytes <= 0) {
-            return null;
-        }
-
-        return (int) max(1, ceil($bytes / 1024));
+        return $this->taxonomyImageService()->maxImageFilesizeKb();
     }
 
     /**
@@ -6419,20 +5613,7 @@ final class PanelController
      */
     private function taxonomyImageVariantSpecs(): array
     {
-        return [
-            'sm' => [
-                'width' => max(0, (int) $this->config->get('media.images.small.width', 200)),
-                'height' => max(0, (int) $this->config->get('media.images.small.height', 200)),
-            ],
-            'md' => [
-                'width' => max(0, (int) $this->config->get('media.images.med.width', 600)),
-                'height' => max(0, (int) $this->config->get('media.images.med.height', 600)),
-            ],
-            'lg' => [
-                'width' => max(0, (int) $this->config->get('media.images.large.width', 1000)),
-                'height' => max(0, (int) $this->config->get('media.images.large.height', 1000)),
-            ],
-        ];
+        return $this->taxonomyImageService()->imageVariantSpecs();
     }
 
     /**
@@ -6443,22 +5624,7 @@ final class PanelController
      */
     private function taxonomyImagePathsFromRecord(?array $record): array
     {
-        $paths = [];
-        foreach ([
-            'cover_image_path',
-            'cover_image_sm_path',
-            'cover_image_md_path',
-            'cover_image_lg_path',
-            'preview_image_path',
-            'preview_image_sm_path',
-            'preview_image_md_path',
-            'preview_image_lg_path',
-        ] as $key) {
-            $raw = trim((string) ($record[$key] ?? ''));
-            $paths[$key] = $raw !== '' ? $raw : null;
-        }
-
-        return $paths;
+        return $this->taxonomyImageService()->imagePathsFromRecord($record);
     }
 
     /**
@@ -6468,21 +5634,7 @@ final class PanelController
      */
     private function taxonomyImageKeysForSlot(string $slot): array
     {
-        if ($slot === 'cover') {
-            return [
-                'cover_image_path',
-                'cover_image_sm_path',
-                'cover_image_md_path',
-                'cover_image_lg_path',
-            ];
-        }
-
-        return [
-            'preview_image_path',
-            'preview_image_sm_path',
-            'preview_image_md_path',
-            'preview_image_lg_path',
-        ];
+        return $this->taxonomyImageService()->imageKeysForSlot($slot);
     }
 
     /**
@@ -6494,25 +5646,7 @@ final class PanelController
      */
     private function taxonomyRemovedPaths(array $currentPaths, array $nextPaths): array
     {
-        $nextLookup = [];
-        foreach ($nextPaths as $path) {
-            $normalized = trim((string) $path);
-            if ($normalized !== '') {
-                $nextLookup[$normalized] = true;
-            }
-        }
-
-        $removed = [];
-        foreach ($currentPaths as $path) {
-            $normalized = trim((string) $path);
-            if ($normalized === '' || isset($nextLookup[$normalized])) {
-                continue;
-            }
-
-            $removed[$normalized] = $normalized;
-        }
-
-        return array_values($removed);
+        return $this->taxonomyImageService()->removedPaths($currentPaths, $nextPaths);
     }
 
     /**
@@ -6522,19 +5656,7 @@ final class PanelController
      */
     private function cleanupTaxonomyImagePathSets(string $taxonomyType, int $taxonomyId, array $pathSets): void
     {
-        $paths = [];
-        foreach ($pathSets as $pathSet) {
-            foreach ($pathSet as $path) {
-                $normalized = trim((string) $path);
-                if ($normalized === '') {
-                    continue;
-                }
-
-                $paths[$normalized] = $normalized;
-            }
-        }
-
-        $this->deleteTaxonomyStoredPaths($taxonomyType, $taxonomyId, array_values($paths));
+        $this->taxonomyImageService()->cleanupPathSets($taxonomyType, $taxonomyId, $pathSets);
     }
 
     /**
@@ -6544,62 +5666,7 @@ final class PanelController
      */
     private function deleteTaxonomyStoredPaths(string $taxonomyType, int $taxonomyId, array $paths): void
     {
-        if (!in_array($taxonomyType, ['categories', 'channels', 'tags'], true) || $taxonomyId < 1) {
-            return;
-        }
-
-        $projectRoot = dirname(__DIR__, 3);
-        $prefix = 'uploads/' . $taxonomyType . '/' . $taxonomyId . '/';
-
-        foreach ($paths as $path) {
-            $normalized = ltrim(trim((string) $path), '/');
-            if (
-                $normalized === ''
-                || str_contains($normalized, '..')
-                || str_contains($normalized, "\0")
-                || str_contains($normalized, '\\')
-                || !str_starts_with($normalized, $prefix)
-            ) {
-                continue;
-            }
-
-            $absolute = $projectRoot . '/public/' . $normalized;
-            if (is_file($absolute)) {
-                @unlink($absolute);
-            }
-        }
-
-        $this->removeTaxonomyDirectoryIfEmpty($taxonomyType, $taxonomyId);
-    }
-
-    /**
-     * Removes empty taxonomy image directory after file deletion.
-     */
-    private function removeTaxonomyDirectoryIfEmpty(string $taxonomyType, int $taxonomyId): void
-    {
-        if (!in_array($taxonomyType, ['categories', 'channels', 'tags'], true) || $taxonomyId < 1) {
-            return;
-        }
-
-        $directory = dirname(__DIR__, 3) . '/public/uploads/' . $taxonomyType . '/' . $taxonomyId;
-        if (!is_dir($directory)) {
-            return;
-        }
-
-        $entries = scandir($directory);
-        if ($entries === false) {
-            return;
-        }
-
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..') {
-                continue;
-            }
-
-            return;
-        }
-
-        @rmdir($directory);
+        $this->taxonomyImageService()->deleteStoredPaths($taxonomyType, $taxonomyId, $paths);
     }
 
     /**
@@ -6623,255 +5690,7 @@ final class PanelController
      */
     private function storeTaxonomyImageUpload(string $taxonomyType, int $taxonomyId, string $slot, array $upload): array
     {
-        if (
-            !in_array($taxonomyType, ['categories', 'channels', 'tags'], true)
-            || $taxonomyId < 1
-            || !in_array($slot, ['cover', 'preview'], true)
-        ) {
-            return ['ok' => false, 'error' => 'Invalid taxonomy image target.'];
-        }
-
-        if (!class_exists(\Imagick::class)) {
-            return ['ok' => false, 'error' => 'Image upload requires Imagick (ImageMagick) extension.'];
-        }
-
-        $uploadError = (int) ($upload['error'] ?? UPLOAD_ERR_NO_FILE);
-        if ($uploadError !== UPLOAD_ERR_OK) {
-            return ['ok' => false, 'error' => $this->taxonomyUploadErrorMessage($uploadError)];
-        }
-
-        $tmpPath = trim((string) ($upload['tmp_name'] ?? ''));
-        if ($tmpPath === '' || !is_uploaded_file($tmpPath) || !is_file($tmpPath)) {
-            return ['ok' => false, 'error' => 'Uploaded image could not be validated as an upload.'];
-        }
-
-        $uploadTarget = strtolower((string) $this->config->get('media.images.upload_target', 'local'));
-        if ($uploadTarget !== 'local') {
-            return ['ok' => false, 'error' => 'Only local image storage is supported in this build.'];
-        }
-
-        $maxBytes = $this->resolveMediaMaxFilesizeBytes('images', 10485760);
-        $size = (int) ($upload['size'] ?? 0);
-        if ($size <= 0 || ($maxBytes > 0 && $size > $maxBytes)) {
-            return ['ok' => false, 'error' => 'Image exceeds configured max filesize.'];
-        }
-
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $detectedMime = $finfo !== false ? (string) finfo_file($finfo, $tmpPath) : '';
-        if ($finfo !== false) {
-            finfo_close($finfo);
-        }
-
-        $mimeToExt = [
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/gif' => 'gif',
-        ];
-        if (!isset($mimeToExt[$detectedMime])) {
-            return ['ok' => false, 'error' => 'Only gif/jpg/jpeg/png images are supported.'];
-        }
-        $canonicalExtension = $mimeToExt[$detectedMime];
-
-        $allowedExtensions = $this->taxonomyAllowedImageExtensions();
-        if ($allowedExtensions === [] || !in_array($canonicalExtension, $allowedExtensions, true)) {
-            return ['ok' => false, 'error' => 'Detected image format is not allowed by current configuration.'];
-        }
-
-        $originalName = (string) ($upload['name'] ?? 'upload');
-        $pathInfo = pathinfo($originalName);
-        $originalExtension = strtolower((string) ($pathInfo['extension'] ?? ''));
-        $originalExtension = $originalExtension === 'jpeg' ? 'jpg' : $originalExtension;
-        if ($originalExtension !== '' && $originalExtension !== $canonicalExtension) {
-            return ['ok' => false, 'error' => 'Uploaded extension does not match detected image bytes.'];
-        }
-
-        $dimensions = @getimagesize($tmpPath);
-        if (!is_array($dimensions) || !isset($dimensions[0], $dimensions[1])) {
-            return ['ok' => false, 'error' => 'Failed to read image dimensions.'];
-        }
-
-        $projectRoot = dirname(__DIR__, 3);
-        $relativeDirectory = 'uploads/' . $taxonomyType . '/' . $taxonomyId;
-        $absoluteDirectory = $projectRoot . '/public/' . $relativeDirectory;
-        if (!is_dir($absoluteDirectory) && !mkdir($absoluteDirectory, 0750, true) && !is_dir($absoluteDirectory)) {
-            return ['ok' => false, 'error' => 'Failed to create taxonomy image directory.'];
-        }
-
-        try {
-            $token = bin2hex(random_bytes(16));
-        } catch (\Throwable) {
-            return ['ok' => false, 'error' => 'Failed to initialize image storage token.'];
-        }
-
-        $baseFilename = $slot . '_' . $token;
-        $originalFilename = $baseFilename . '.' . $canonicalExtension;
-        $originalStoredPath = $relativeDirectory . '/' . $originalFilename;
-        $originalAbsolutePath = $projectRoot . '/public/' . $originalStoredPath;
-        $writtenPaths = [];
-
-        try {
-            $source = new \Imagick();
-            $source->readImage($tmpPath);
-            $source->setIteratorIndex(0);
-            $this->autoOrientTaxonomyImage($source);
-
-            if ((bool) $this->config->get('media.images.strip_exif', true)) {
-                $source->stripImage();
-            }
-
-            $source->setImageFormat($canonicalExtension === 'jpg' ? 'jpeg' : $canonicalExtension);
-            if ($canonicalExtension === 'jpg') {
-                $source->setImageCompressionQuality(85);
-            }
-
-            if (!$source->writeImage($originalAbsolutePath)) {
-                throw new \RuntimeException('Failed to store processed source image.');
-            }
-            @chmod($originalAbsolutePath, 0640);
-            $writtenPaths[] = $originalStoredPath;
-
-            $sourceWidth = (int) $source->getImageWidth();
-            $sourceHeight = (int) $source->getImageHeight();
-            $paths = [
-                $slot . '_image_path' => $originalStoredPath,
-            ];
-
-            foreach ($this->taxonomyImageVariantSpecs() as $variantKey => $spec) {
-                $variant = clone $source;
-                $target = $this->resolveTaxonomyVariantSize(
-                    $sourceWidth,
-                    $sourceHeight,
-                    (int) ($spec['width'] ?? 0),
-                    (int) ($spec['height'] ?? 0)
-                );
-
-                if ($target['width'] !== $sourceWidth || $target['height'] !== $sourceHeight) {
-                    $variant->resizeImage(
-                        $target['width'],
-                        $target['height'],
-                        \Imagick::FILTER_LANCZOS,
-                        1.0,
-                        false
-                    );
-                }
-
-                if ($canonicalExtension === 'jpg') {
-                    $variant->setImageCompressionQuality(85);
-                }
-
-                $variantFilename = $baseFilename . '_' . $variantKey . '.' . $canonicalExtension;
-                $variantStoredPath = $relativeDirectory . '/' . $variantFilename;
-                $variantAbsolutePath = $projectRoot . '/public/' . $variantStoredPath;
-
-                if (!$variant->writeImage($variantAbsolutePath)) {
-                    throw new \RuntimeException('Failed to store generated image variant.');
-                }
-
-                @chmod($variantAbsolutePath, 0640);
-                $writtenPaths[] = $variantStoredPath;
-                $paths[$slot . '_image_' . $variantKey . '_path'] = $variantStoredPath;
-            }
-
-            return [
-                'ok' => true,
-                'paths' => $paths,
-            ];
-        } catch (\Throwable $exception) {
-            $this->deleteTaxonomyStoredPaths($taxonomyType, $taxonomyId, $writtenPaths);
-            return [
-                'ok' => false,
-                'error' => $exception->getMessage() !== '' ? $exception->getMessage() : 'Image processing failed.',
-            ];
-        }
-    }
-
-    /**
-     * Resolves one contain-style target size for taxonomy image variants.
-     *
-     * @return array{width: int, height: int}
-     */
-    private function resolveTaxonomyVariantSize(int $sourceWidth, int $sourceHeight, int $maxWidth, int $maxHeight): array
-    {
-        if ($sourceWidth < 1 || $sourceHeight < 1) {
-            return ['width' => 1, 'height' => 1];
-        }
-
-        if ($maxWidth <= 0 && $maxHeight <= 0) {
-            return ['width' => $sourceWidth, 'height' => $sourceHeight];
-        }
-
-        if ($maxWidth <= 0) {
-            $scale = min(1.0, $maxHeight / $sourceHeight);
-        } elseif ($maxHeight <= 0) {
-            $scale = min(1.0, $maxWidth / $sourceWidth);
-        } else {
-            $scale = min(1.0, $maxWidth / $sourceWidth, $maxHeight / $sourceHeight);
-        }
-
-        $targetWidth = max(1, (int) round($sourceWidth * $scale));
-        $targetHeight = max(1, (int) round($sourceHeight * $scale));
-
-        if ($maxWidth > 0) {
-            $targetWidth = min($targetWidth, $maxWidth);
-        }
-        if ($maxHeight > 0) {
-            $targetHeight = min($targetHeight, $maxHeight);
-        }
-
-        return ['width' => $targetWidth, 'height' => $targetHeight];
-    }
-
-    /**
-     * Applies EXIF orientation transform for taxonomy image storage.
-     */
-    private function autoOrientTaxonomyImage(\Imagick $image): void
-    {
-        $orientation = $image->getImageOrientation();
-        switch ($orientation) {
-            case \Imagick::ORIENTATION_TOPRIGHT:
-                $image->flopImage();
-                break;
-            case \Imagick::ORIENTATION_BOTTOMRIGHT:
-                $image->rotateImage('#000', 180);
-                break;
-            case \Imagick::ORIENTATION_BOTTOMLEFT:
-                $image->flipImage();
-                break;
-            case \Imagick::ORIENTATION_LEFTTOP:
-                $image->flopImage();
-                $image->rotateImage('#000', 90);
-                break;
-            case \Imagick::ORIENTATION_RIGHTTOP:
-                $image->rotateImage('#000', 90);
-                break;
-            case \Imagick::ORIENTATION_RIGHTBOTTOM:
-                $image->flopImage();
-                $image->rotateImage('#000', -90);
-                break;
-            case \Imagick::ORIENTATION_LEFTBOTTOM:
-                $image->rotateImage('#000', -90);
-                break;
-            default:
-                break;
-        }
-
-        $image->setImageOrientation(\Imagick::ORIENTATION_TOPLEFT);
-    }
-
-    /**
-     * Maps PHP upload error codes into taxonomy-upload messages.
-     */
-    private function taxonomyUploadErrorMessage(int $code): string
-    {
-        return match ($code) {
-            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'Uploaded image exceeds upload size limits.',
-            UPLOAD_ERR_PARTIAL => 'Uploaded image was only partially received.',
-            UPLOAD_ERR_NO_FILE => 'Please choose an image file to upload.',
-            UPLOAD_ERR_NO_TMP_DIR => 'Server temporary upload directory is missing.',
-            UPLOAD_ERR_CANT_WRITE => 'Server failed to write uploaded image.',
-            UPLOAD_ERR_EXTENSION => 'A server extension blocked the upload.',
-            default => 'Image upload failed with an unknown error.',
-        };
+        return $this->taxonomyImageService()->storeUpload($taxonomyType, $taxonomyId, $slot, $upload);
     }
 
     /**
@@ -8106,753 +6925,6 @@ final class PanelController
     }
 
     /**
-     * Returns JSON content for one generated extension manifest.
-     *
-     * @param array{
-     *   name: string,
-     *   version: string,
-     *   description: string,
-     *   type: string,
-     *   author: string,
-     *   homepage: string,
-     *   author_url: string
-     * } $meta
-     */
-    private function renderExtensionManifestJson(array $meta): string
-    {
-        $manifest = [
-            'name' => $meta['name'],
-            'version' => $meta['version'],
-            'description' => $meta['description'],
-            'type' => $meta['type'],
-        ];
-
-        if ($meta['author'] !== '') {
-            $manifest['author'] = $meta['author'];
-        }
-
-        if ($meta['author_url'] !== '') {
-            $manifest['author_url'] = $meta['author_url'];
-        }
-
-        if ($meta['homepage'] !== '') {
-            $manifest['docs_url'] = $meta['homepage'];
-        }
-
-        $encoded = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        if (!is_string($encoded) || $encoded === '') {
-            throw new \RuntimeException('Failed to encode extension manifest JSON.');
-        }
-
-        return $encoded . "\n";
-    }
-
-    /**
-     * Returns generated `composer.json` scaffold content.
-     *
-     * @param array{
-     *   directory: string,
-     *   name: string,
-     *   description: string,
-     *   author: string,
-     *   author_url: string
-     * } $meta
-     */
-    private function renderExtensionComposerSkeleton(array $meta): string
-    {
-        $directory = strtolower(trim((string) ($meta['directory'] ?? 'extension')));
-        $directory = preg_replace('/[^a-z0-9._-]+/', '-', $directory) ?? 'extension';
-        $directory = trim($directory, '-');
-        if ($directory === '') {
-            $directory = 'extension';
-        }
-
-        $composer = [
-            'name' => 'raven/' . $directory,
-            'description' => trim((string) ($meta['description'] ?? '')) !== ''
-                ? (string) $meta['description']
-                : ((string) ($meta['name'] ?? 'Raven Extension') . ' extension for Raven CMS.'),
-            'type' => 'library',
-            'require' => new \stdClass(),
-        ];
-
-        $authorName = trim((string) ($meta['author'] ?? ''));
-        $authorUrl = trim((string) ($meta['author_url'] ?? ''));
-        if ($authorName !== '' || $authorUrl !== '') {
-            $author = [];
-            if ($authorName !== '') {
-                $author['name'] = $authorName;
-            }
-            if ($authorUrl !== '') {
-                $author['homepage'] = $authorUrl;
-            }
-            $composer['authors'] = [$author];
-        }
-
-        $encoded = json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        if (!is_string($encoded) || $encoded === '') {
-            throw new \RuntimeException('Failed to encode composer.json scaffold.');
-        }
-
-        return $encoded . "\n";
-    }
-
-    /**
-     * Returns generated `ext.php` scaffold content.
-     *
-     * @param array{
-     *   directory: string,
-     *   name: string
-     * } $meta
-     */
-    private function renderExtensionBootstrapSkeleton(array $meta): string
-    {
-        $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
-        $directoryLiteral = var_export($meta['directory'], true);
-        $content = <<<'PHP'
-<?php
-
-/**
- * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/ext.php
- * __NAME_DOC__ extension service bootstrap provider.
- * Docs: https://raven.lanterns.io
- */
-
-declare(strict_types=1);
-
-/**
- * Registers extension-owned services into shared app container.
- *
- * @param array<string, mixed> $app
- */
-return static function (array &$app): void {
-    $extensionKey = __DIRECTORY_LITERAL__;
-
-    /** @var mixed $rawExtensionServices */
-    $rawExtensionServices = $app['extension_services'] ?? [];
-    if (!is_array($rawExtensionServices)) {
-        $rawExtensionServices = [];
-    }
-
-    /** @var mixed $rawServices */
-    $rawServices = $rawExtensionServices[$extensionKey] ?? [];
-    if (!is_array($rawServices)) {
-        $rawServices = [];
-    }
-
-    // Register extension services here, for example:
-    // $rawServices['repository'] = new MyRepository(...);
-
-    $rawExtensionServices[$extensionKey] = $rawServices;
-    $app['extension_services'] = $rawExtensionServices;
-};
-PHP;
-
-        return str_replace(
-            ['__DIRECTORY__', '__NAME_DOC__', '__DIRECTORY_LITERAL__'],
-            [$meta['directory'], $nameForDoc, $directoryLiteral],
-            $content
-        ) . "\n";
-    }
-
-    /**
-     * Returns generated `lib/routes_panel.php` scaffold content.
-     *
-     * @param array{
-     *   directory: string,
-     *   name: string,
-     *   type: string
-     * } $meta
-     */
-    private function renderExtensionRoutesSkeleton(array $meta): string
-    {
-        $routePath = '/' . ltrim((string) ($meta['directory'] ?? ''), '/');
-        $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
-        $routePathLiteral = var_export($routePath, true);
-        $sectionLiteral = var_export((string) ($meta['directory'] ?? ''), true);
-        $directoryLiteral = var_export($meta['directory'], true);
-        $nameLiteral = var_export($meta['name'], true);
-        $typeLiteral = var_export($meta['type'], true);
-        $panelPathLiteral = var_export((string) ($meta['directory'] ?? ''), true);
-        $content = <<<'PHP'
-<?php
-
-/**
- * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/lib/routes_panel.php
- * __NAME_DOC__ extension panel route registration.
- * Docs: https://raven.lanterns.io
- */
-
-// Inline note: Generated extension scaffold route registrar.
-
-declare(strict_types=1);
-
-use Raven\Lib\Routing\Router;
-
-/**
- * Registers __NAME_DOC__ routes into the panel router.
- *
- * @param array{
- *   app: array<string, mixed>,
- *   panelUrl: callable(string): string,
- *   requirePanelLogin: callable(): void,
- *   currentUserTheme: callable(): string
- * } $context
- */
-return static function (Router $router, array $context): void {
-    /** @var array<string, mixed> $app */
-    $app = (array) ($context['app'] ?? []);
-
-    /** @var callable(): void $requirePanelLogin */
-    $requirePanelLogin = $context['requirePanelLogin'] ?? static function (): void {};
-
-    /** @var callable(): string $currentUserTheme */
-    $currentUserTheme = $context['currentUserTheme'] ?? static fn (): string => 'light';
-
-    if (!isset($app['view'], $app['config'], $app['csrf'])) {
-        return;
-    }
-
-    $extensionRoot = dirname(__DIR__);
-    $viewFile = $extensionRoot . '/vis/panel_index.php';
-    $routePath = __ROUTE_PATH_LITERAL__;
-    $section = __SECTION_LITERAL__;
-    $extensionManifestFile = $extensionRoot . '/ext.json';
-    $extensionMeta = [
-        'directory' => __DIRECTORY_LITERAL__,
-        'name' => __NAME_LITERAL__,
-        'type' => __TYPE_LITERAL__,
-        'panel_path' => __PANEL_PATH_LITERAL__,
-        'version' => '',
-        'author' => '',
-        'description' => '',
-        'docs_url' => 'https://raven.lanterns.io',
-    ];
-    if (is_file($extensionManifestFile)) {
-        $manifestRaw = file_get_contents($extensionManifestFile);
-        if ($manifestRaw !== false && trim($manifestRaw) !== '') {
-            /** @var mixed $manifestDecoded */
-            $manifestDecoded = json_decode($manifestRaw, true);
-            if (is_array($manifestDecoded)) {
-                $manifestName = trim((string) ($manifestDecoded['name'] ?? ''));
-                if ($manifestName !== '') {
-                    $extensionMeta['name'] = $manifestName;
-                }
-
-                $extensionMeta['version'] = trim((string) ($manifestDecoded['version'] ?? ''));
-                $extensionMeta['author'] = trim((string) ($manifestDecoded['author'] ?? ''));
-                $extensionMeta['description'] = trim((string) ($manifestDecoded['description'] ?? ''));
-
-                $docsUrlRaw = trim((string) ($manifestDecoded['docs_url'] ?? ($manifestDecoded['homepage'] ?? '')));
-                if ($docsUrlRaw !== '' && filter_var($docsUrlRaw, FILTER_VALIDATE_URL) !== false) {
-                    $docsScheme = strtolower((string) parse_url($docsUrlRaw, PHP_URL_SCHEME));
-                    if (in_array($docsScheme, ['http', 'https'], true)) {
-                        $extensionMeta['docs_url'] = $docsUrlRaw;
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Renders extension body inside the shared panel layout.
-     */
-    $renderExtensionView = static function () use (
-        $app,
-        $viewFile,
-        $currentUserTheme,
-        $section,
-        $extensionMeta
-    ): void {
-        if (!is_file($viewFile)) {
-            http_response_code(500);
-            echo 'Extension view template is missing.';
-            return;
-        }
-
-        $site = [
-            'name' => (string) $app['config']->get('site.name', 'Raven CMS'),
-            'panel_path' => (string) $app['config']->get('panel.path', 'panel'),
-            'panel_brand_name' => (string) $app['config']->get('panel.brand_name', ''),
-            'panel_brand_logo' => (string) $app['config']->get('panel.brand_logo', ''),
-        ];
-        $csrfField = $app['csrf']->field();
-
-        ob_start();
-        require $viewFile;
-        $body = (string) ob_get_clean();
-
-        $app['view']->render('panel/wrapper', [
-            'site' => $site,
-            'csrfField' => $csrfField,
-            'section' => $section,
-            'showSidebar' => true,
-            'userTheme' => $currentUserTheme(),
-            'content' => $body,
-        ]);
-    };
-
-    $router->add('GET', $routePath, static function () use ($requirePanelLogin, $renderExtensionView): void {
-        $requirePanelLogin();
-        $renderExtensionView();
-    });
-};
-PHP;
-
-        return str_replace(
-            [
-                '__DIRECTORY__',
-                '__NAME_DOC__',
-                '__DIRECTORY_LITERAL__',
-                '__NAME_LITERAL__',
-                '__TYPE_LITERAL__',
-                '__PANEL_PATH_LITERAL__',
-                '__ROUTE_PATH_LITERAL__',
-                '__SECTION_LITERAL__',
-            ],
-            [
-                $meta['directory'],
-                $nameForDoc,
-                $directoryLiteral,
-                $nameLiteral,
-                $typeLiteral,
-                $panelPathLiteral,
-                $routePathLiteral,
-                $sectionLiteral,
-            ],
-            $content
-        ) . "\n";
-    }
-
-    /**
-     * Returns generated `lib/routes_public.php` scaffold content.
-     *
-     * @param array{
-     *   directory: string,
-     *   name: string
-     * } $meta
-     */
-    private function renderExtensionPublicRoutesSkeleton(array $meta): string
-    {
-        $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
-        $content = <<<'PHP'
-<?php
-
-/**
- * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/lib/routes_public.php
- * __NAME_DOC__ extension public route registration.
- * Docs: https://raven.lanterns.io
- */
-
-declare(strict_types=1);
-
-use Raven\Lib\Routing\Router;
-
-/**
- * Registers extension routes into the public router.
- *
- * @param array{
- *   app: array<string, mixed>,
- *   controller: object,
- *   input: mixed,
- *   extensionDirectory: string
- * } $context
- */
-return static function (Router $router, array $context): void {
-    // Add public extension routes here. Keep routes extension-owned and avoid core edits.
-    // Generated public view stub is available at: /vis/public_index.php
-    // Example:
-    // $router->add('GET', '/my-extension', static function () use ($context): void { ... });
-};
-PHP;
-
-        return str_replace(
-            ['__DIRECTORY__', '__NAME_DOC__'],
-            [$meta['directory'], $nameForDoc],
-            $content
-        ) . "\n";
-    }
-
-    /**
-     * Returns generated `lib/schema.php` scaffold content.
-     *
-     * @param array{
-     *   directory: string,
-     *   name: string
-     * } $meta
-     */
-    private function renderExtensionSchemaSkeleton(array $meta): string
-    {
-        $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
-        $content = <<<'PHP'
-<?php
-
-/**
- * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/lib/schema.php
- * __NAME_DOC__ extension schema provider.
- * Docs: https://raven.lanterns.io
- */
-
-declare(strict_types=1);
-
-/**
- * Ensures extension-owned schema changes (tables/columns/indexes).
- *
- * @param array<string, mixed> $context
- */
-return static function (array $context): void {
-    if (
-        !isset($context['db'], $context['driver'], $context['table'])
-        || !$context['db'] instanceof \PDO
-        || !is_callable($context['table'])
-    ) {
-        return;
-    }
-
-    $db = $context['db'];
-    $driver = (string) $context['driver'];
-    $tableResolver = $context['table'];
-
-    // Resolve one logical table to the active backend:
-    // $table = $tableResolver('ext___DIRECTORY__');
-    //
-    // Keep schema operations idempotent. This provider runs on bootstrap/install.
-    //
-    // Example:
-    // if ($driver === 'sqlite') {
-    //     $db->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (...)');
-    // }
-};
-PHP;
-
-        return str_replace(
-            ['__DIRECTORY__', '__NAME_DOC__'],
-            [$meta['directory'], $nameForDoc],
-            $content
-        ) . "\n";
-    }
-
-    /**
-     * Returns generated `lib/shortcodes.php` scaffold content.
-     *
-     * @param array{
-     *   directory: string,
-     *   name: string
-     * } $meta
-     */
-    private function renderExtensionShortcodesSkeleton(array $meta): string
-    {
-        $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
-        $content = <<<'PHP'
-<?php
-
-/**
- * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/lib/shortcodes.php
- * __NAME_DOC__ extension shortcode provider.
- * Docs: https://raven.lanterns.io
- */
-
-declare(strict_types=1);
-
-/**
- * Returns editor-insertable shortcode entries.
- *
- * @return array<int, array{label: string, shortcode: string}>
- */
-return static function (): array {
-    return [];
-};
-PHP;
-
-        return str_replace(
-            ['__DIRECTORY__', '__NAME_DOC__'],
-            [$meta['directory'], $nameForDoc],
-            $content
-        ) . "\n";
-    }
-
-    /**
-     * Returns generated `lib/fields.php` scaffold content for content/plugin/module extensions.
-     *
-     * @param array{
-     *   directory: string,
-     *   name: string
-     * } $meta
-     */
-    private function renderExtensionFieldsSkeleton(array $meta): string
-    {
-        $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
-        $content = <<<'PHP'
-<?php
-
-/**
- * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/lib/fields.php
- * __NAME_DOC__ fields provider.
- * Docs: https://raven.lanterns.io
- */
-
-declare(strict_types=1);
-
-/**
- * Returns page-editor body-block definitions exposed by this extension.
- *
- * Each row supports:
- * - slug: unique block key within this extension
- * - label: panel-visible menu label
- * - editor: tinymce|plaintext|autobr|markdown|markdown_file
- *
- * @return array<int, array{slug: string, label: string, editor: string}>
- */
-return static function (): array {
-    return [
-        [
-            'slug' => 'example',
-            'label' => 'Example Content',
-            'editor' => 'tinymce',
-        ],
-    ];
-};
-PHP;
-
-        return str_replace(
-            ['__DIRECTORY__', '__NAME_DOC__'],
-            [$meta['directory'], $nameForDoc],
-            $content
-        ) . "\n";
-    }
-
-    /**
-     * Returns generated `vis/public_index.php` scaffold content for module extensions.
-     *
-     * @param array{
-     *   name: string,
-     *   directory: string
-     * } $meta
-     */
-    private function renderExtensionPublicViewSkeleton(array $meta): string
-    {
-        $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
-        $content = <<<'PHP'
-<?php
-
-/**
- * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/vis/public_index.php
- * __NAME_DOC__ extension public view scaffold.
- * Docs: https://raven.lanterns.io
- */
-
-declare(strict_types=1);
-
-if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
-    http_response_code(404);
-    exit;
-}
-?>
-<section class="card">
-    <div class="card-body">
-        <h1 class="h4 mb-2">__NAME_DOC__</h1>
-        <p class="mb-0 text-muted">Generated public extension view scaffold.</p>
-    </div>
-</section>
-PHP;
-
-        return str_replace(
-            ['__DIRECTORY__', '__NAME_DOC__'],
-            [$meta['directory'], $nameForDoc],
-            $content
-        ) . "\n";
-    }
-
-    /**
-     * Returns generated `vis/panel_index.php` scaffold content.
-     *
-     * @param array{
-     *   name: string,
-     *   directory: string,
-     *   type: string
-     * } $meta
-     */
-    private function renderExtensionPanelViewSkeleton(array $meta): string
-    {
-        $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
-        $type = strtolower(trim((string) ($meta['type'] ?? 'plugin')));
-        if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
-            $type = 'plugin';
-        }
-        $generatesPublicRoutes = $type === 'module';
-        $generatesShortcodes = in_array($type, ['helper', 'plugin', 'module'], true);
-        $generatesContentBlocks = in_array($type, ['content', 'plugin', 'module'], true);
-        $starterFiles = [
-            'private/ext/__DIRECTORY__/ext.php',
-            'private/ext/__DIRECTORY__/lib/routes_panel.php',
-            'private/ext/__DIRECTORY__/lib/schema.php',
-        ];
-        if ($generatesPublicRoutes) {
-            $starterFiles[] = 'private/ext/__DIRECTORY__/lib/routes_public.php';
-            $starterFiles[] = 'private/ext/__DIRECTORY__/vis/public_index.php';
-        }
-        if ($generatesShortcodes) {
-            $starterFiles[] = 'private/ext/__DIRECTORY__/lib/shortcodes.php';
-        }
-        if ($generatesContentBlocks) {
-            $starterFiles[] = 'private/ext/__DIRECTORY__/lib/fields.php';
-        }
-        $starterFiles[] = 'private/ext/__DIRECTORY__/vis/panel_index.php';
-        $starterFilesListHtml = '';
-        foreach ($starterFiles as $starterFile) {
-            $starterFilesListHtml .= "\n            <li><code>" . $starterFile . "</code></li>";
-        }
-        $content = <<<'PHP'
-<?php
-
-/**
- * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/vis/panel_index.php
- * __NAME_DOC__ extension panel index view.
- * Docs: https://raven.lanterns.io
- */
-
-// Inline note: Generated extension scaffold view.
-
-declare(strict_types=1);
-
-/** @var array<string, string> $site */
-/** @var array{name?: string, version?: string, author?: string, description?: string, docs_url?: string, directory?: string} $extensionMeta */
-/** @var string $csrfField */
-
-use function Raven\Core\Support\e;
-
-$extensionName = trim((string) ($extensionMeta['name'] ?? 'Extension'));
-$extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));
-$extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
-$extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
-$extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.lanterns.io'));
-?>
-<div class="card mb-3">
-    <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start gap-3">
-            <div>
-                <h1 class="mb-1">
-                    <?= e($extensionName !== '' ? $extensionName : 'Extension') ?>
-                    <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
-                </h1>
-                <h6 class="mb-2">by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h6>
-                <p class="mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'Generated starter extension page.') ?></p>
-            </div>
-            <?php if ($extensionDocsUrl !== ''): ?>
-                <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                    <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
-                </a>
-            <?php endif; ?>
-        </div>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-body">
-        <p class="text-muted mb-3">
-            This is the generated starter page for <code><?= e((string) ($extensionMeta['directory'] ?? '')) ?></code>.
-        </p>
-        <p class="mb-2">Edit these generated files to build this extension:</p>
-        <ul class="mb-0">
-__STARTER_FILES_LIST__
-        </ul>
-    </div>
-</div>
-PHP;
-
-        return str_replace(
-            ['__DIRECTORY__', '__NAME_DOC__', '__STARTER_FILES_LIST__'],
-            [$meta['directory'], $nameForDoc, $starterFilesListHtml],
-            $content
-        ) . "\n";
-    }
-
-    /**
-     * Returns generated `AGENTS.md` extension-local guidance.
-     *
-     * @param array{
-     *   name: string,
-     *   directory: string,
-     *   type: string
-     * } $meta
-     */
-    private function renderExtensionAgentsSkeleton(array $meta): string
-    {
-        $name = trim(str_replace(["\r", "\n"], [' ', ' '], (string) ($meta['name'] ?? 'Extension')));
-        if ($name === '') {
-            $name = 'Extension';
-        }
-
-        $directory = trim((string) ($meta['directory'] ?? ''));
-        $directory = $directory !== '' ? $directory : 'example_extension';
-        $type = strtolower(trim((string) ($meta['type'] ?? 'plugin')));
-        if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
-            $type = 'plugin';
-        }
-        $generatesPublicRoutes = $type === 'module';
-        $generatesShortcodes = in_array($type, ['helper', 'plugin', 'module'], true);
-        $generatesContentBlocks = in_array($type, ['content', 'plugin', 'module'], true);
-        $starterFiles = [
-            '- `ext.json`',
-            '- `ext.php`',
-            '- `lib/schema.php`',
-            '- `lib/routes_panel.php`',
-            '- `vis/panel_index.php`',
-        ];
-        if ($generatesPublicRoutes) {
-            $starterFiles[] = '- `lib/routes_public.php`';
-            $starterFiles[] = '- `vis/public_index.php`';
-        }
-        if ($generatesShortcodes) {
-            $starterFiles[] = '- `lib/shortcodes.php`';
-        }
-        if ($generatesContentBlocks) {
-            $starterFiles[] = '- `lib/fields.php`';
-        }
-        $starterFilesMarkdown = implode("\n", $starterFiles);
-
-        $content = <<<'MARKDOWN'
-# __NAME__ Extension Guide
-
-This file applies to this extension only:
-
-- `private/ext/__DIRECTORY__/`
-
-For Raven-wide extension contracts not restated here, use:
-
-- [private/ext/AGENTS.md](../AGENTS.md)
-
-## Local Scope
-
-- Keep extension logic and state self-contained under this directory.
-- Do not modify Raven core files for extension-only behavior.
-- Keep panel routes and state-changing handlers protected by login + CSRF + sanitization.
-
-## Starter Files
-
-__STARTER_FILES__
-
-## Update Discipline
-
-- Update this file when this extension's local contracts, routes, or storage conventions change.
-MARKDOWN;
-
-        return str_replace(
-            ['__NAME__', '__DIRECTORY__', '__STARTER_FILES__'],
-            [$name, $directory, $starterFilesMarkdown],
-            $content
-        ) . "\n";
-    }
-
-    /**
      * Converts user input to bounded float or null.
      */
     private function normalizeNullableFloat(mixed $value, float $min, float $max): ?float
@@ -9408,12 +7480,7 @@ MARKDOWN;
      */
     private function defaultProfileContactOptions(): array
     {
-        return [
-            'email' => ['label' => 'Email', 'url_prefix' => 'mailto:'],
-            'phone' => ['label' => 'Phone', 'url_prefix' => 'tel:'],
-            'homepage' => ['label' => 'Homepage', 'url_prefix' => 'https://'],
-            'x' => ['label' => 'X', 'url_prefix' => 'https://x.com/'],
-        ];
+        return $this->profileContactService()->defaultOptions();
     }
 
     /**
@@ -9421,16 +7488,7 @@ MARKDOWN;
      */
     private function normalizeProfileContactOptionTypeSlug(string $type): string
     {
-        $normalized = $this->input->slug($type);
-        if ($normalized === null || $normalized === '') {
-            return '';
-        }
-
-        if ($normalized === 'website') {
-            return 'homepage';
-        }
-
-        return $normalized;
+        return $this->profileContactService()->normalizeTypeSlug($type);
     }
 
     /**
@@ -9440,17 +7498,7 @@ MARKDOWN;
      */
     private function requiredProfileContactOptions(): array
     {
-        $defaults = $this->defaultProfileContactOptions();
-        $required = [];
-        foreach (['email', 'phone', 'homepage', 'x'] as $slug) {
-            if (!isset($defaults[$slug])) {
-                continue;
-            }
-
-            $required[$slug] = $defaults[$slug];
-        }
-
-        return $required;
+        return $this->profileContactService()->requiredOptions();
     }
 
     /**
@@ -9460,74 +7508,7 @@ MARKDOWN;
      */
     private function normalizeProfileContactOptionsConfig(mixed $raw): array
     {
-        $source = is_array($raw) ? $raw : $this->defaultProfileContactOptions();
-        $defaults = $this->defaultProfileContactOptions();
-        $requiredDefaults = $this->requiredProfileContactOptions();
-        $normalized = [];
-        $priorities = [];
-        foreach ($source as $key => $definition) {
-            if (!is_string($key) && !is_int($key)) {
-                continue;
-            }
-
-            $rawSlug = $this->input->slug((string) $key);
-            if ($rawSlug === null || $rawSlug === '') {
-                continue;
-            }
-
-            $slug = $this->normalizeProfileContactOptionTypeSlug($rawSlug);
-            if ($slug === '') {
-                continue;
-            }
-
-            $defaultLabel = (string) ($defaults[$slug]['label'] ?? ucwords(str_replace('-', ' ', $slug)));
-            $defaultPrefix = (string) ($defaults[$slug]['url_prefix'] ?? '');
-
-            $safeLabel = $defaultLabel;
-            $safePrefix = $defaultPrefix;
-            if (is_array($definition)) {
-                $safeLabel = $this->input->text((string) ($definition['label'] ?? $defaultLabel), 80);
-                $safePrefix = $this->input->text((string) ($definition['url_prefix'] ?? $defaultPrefix), 255);
-            } else {
-                $safeLabel = $this->input->text((string) $definition, 80);
-            }
-
-            if ($safeLabel === '') {
-                continue;
-            }
-            $safePrefix = trim($safePrefix);
-
-            $priority = $rawSlug === $slug ? 1 : 0;
-            $existingPriority = $priorities[$slug] ?? -1;
-            if ($priority < $existingPriority) {
-                continue;
-            }
-
-            if (!isset($normalized[$slug]) || $priority >= $existingPriority) {
-                $normalized[$slug] = [
-                    'label' => $safeLabel,
-                    'url_prefix' => $safePrefix,
-                ];
-                $priorities[$slug] = $priority;
-            }
-        }
-
-        foreach ($requiredDefaults as $requiredSlug => $requiredConfig) {
-            if (isset($normalized[$requiredSlug])) {
-                continue;
-            }
-
-            $normalized[$requiredSlug] = [
-                'label' => (string) ($requiredConfig['label'] ?? ucwords(str_replace('-', ' ', $requiredSlug))),
-                'url_prefix' => trim((string) ($requiredConfig['url_prefix'] ?? '')),
-            ];
-        }
-
-        if ($normalized === []) {
-            return $requiredDefaults;
-        }
-
-        return $normalized;
+        return $this->profileContactService()->normalizeOptionsConfig($raw);
     }
 
     /**
@@ -9538,42 +7519,7 @@ MARKDOWN;
      */
     private function normalizeSubmittedProfileContactOptionsConfig(mixed $rawOptions): array
     {
-        if (!is_array($rawOptions)) {
-            return [];
-        }
-
-        $normalized = [];
-        foreach ($rawOptions as $entry) {
-            if (!is_array($entry)) {
-                continue;
-            }
-
-            $type = $this->normalizeProfileContactOptionTypeSlug((string) ($entry['type'] ?? ''));
-            if ($type === '') {
-                continue;
-            }
-
-            $label = $this->input->text((string) ($entry['label'] ?? ''), 80);
-            if ($label === '') {
-                continue;
-            }
-
-            $urlPrefix = trim($this->input->text((string) ($entry['url_prefix'] ?? ''), 255));
-            if (isset($normalized[$type])) {
-                continue;
-            }
-
-            $normalized[$type] = [
-                'label' => $label,
-                'url_prefix' => $urlPrefix,
-            ];
-
-            if (count($normalized) >= 100) {
-                break;
-            }
-        }
-
-        return $normalized;
+        return $this->profileContactService()->normalizeSubmittedOptions($rawOptions);
     }
 
     /**
@@ -9583,7 +7529,7 @@ MARKDOWN;
      */
     private function profileContactOptions(): array
     {
-        return $this->normalizeProfileContactOptionsConfig(
+        return $this->profileContactService()->normalizeOptionsConfig(
             $this->config->get('user.contact', $this->defaultProfileContactOptions())
         );
     }
@@ -9597,38 +7543,7 @@ MARKDOWN;
      */
     private function normalizeSubmittedContactProfiles(mixed $rawProfiles, array $allowedOptions): array
     {
-        if (!is_array($rawProfiles) || $allowedOptions === []) {
-            return [];
-        }
-
-        $normalized = [];
-        foreach ($rawProfiles as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-
-            $type = $this->normalizeProfileContactOptionTypeSlug((string) ($row['type'] ?? ''));
-            if ($type === '' || !array_key_exists($type, $allowedOptions)) {
-                continue;
-            }
-
-            $value = $this->input->text((string) ($row['value'] ?? ''), 255);
-            if ($value === '') {
-                continue;
-            }
-
-            $dedupeKey = strtolower($type . "\n" . $value);
-            $normalized[$dedupeKey] = [
-                'type' => $type,
-                'value' => $value,
-            ];
-
-            if (count($normalized) >= 20) {
-                break;
-            }
-        }
-
-        return array_values($normalized);
+        return $this->profileContactService()->normalizeSubmittedProfiles($rawProfiles, $allowedOptions);
     }
 
     /**
@@ -10302,6 +8217,36 @@ MARKDOWN;
         }
 
         return $this->configEditorNormalizer;
+    }
+
+    private function profileContactService(): ProfileContactService
+    {
+        if (!$this->profileContactService instanceof ProfileContactService) {
+            $this->profileContactService = new ProfileContactService($this->input);
+        }
+
+        return $this->profileContactService;
+    }
+
+    private function configEditorSchemaService(): ConfigEditorSchemaService
+    {
+        if (!$this->configEditorSchemaService instanceof ConfigEditorSchemaService) {
+            $this->configEditorSchemaService = new ConfigEditorSchemaService(
+                $this->input,
+                $this->profileContactService()
+            );
+        }
+
+        return $this->configEditorSchemaService;
+    }
+
+    private function taxonomyImageService(): TaxonomyImageService
+    {
+        if (!$this->taxonomyImageService instanceof TaxonomyImageService) {
+            $this->taxonomyImageService = new TaxonomyImageService($this->config, dirname(__DIR__, 3));
+        }
+
+        return $this->taxonomyImageService;
     }
 
     private function routingInventoryBuilder(): RoutingInventoryBuilder

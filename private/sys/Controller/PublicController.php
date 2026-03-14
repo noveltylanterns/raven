@@ -20,15 +20,18 @@ use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Content\MarkdownRenderer;
+use Raven\Lib\Extension\EmbeddedFormRuntimeService;
 use Raven\Lib\Http\RequestContextResolver;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Pagination\Pagination;
+use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Routing\RedirectTargetValidator;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\View\PublicTemplateResolver;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Core\View;
 use Raven\Core\View\TemplateTagEngine;
@@ -63,20 +66,14 @@ final class PublicController
     private array $embeddedFormRuntimes = [];
     private TemplateTagEngine $templateTags;
     private bool $captchaScriptIncluded = false;
-    /** @var array<string, bool>|null */
-    private ?array $enabledExtensionMap = null;
     /** @var array<string, array{label: string, editor: string}>|null */
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
     private ?MarkdownRenderer $markdownRenderer = null;
     private ?RequestContextResolver $requestContextResolver = null;
-    /**
-     * Request-local cache of enabled embedded forms keyed by type then slug.
-     *
-     * @var array<string, array<string, array<string, mixed>>>
-     */
-    private array $embeddedFormLookupCache = [];
-
+    private ?PublicTemplateResolver $publicTemplateResolver = null;
+    private ?EmbeddedFormRuntimeService $embeddedFormRuntimeService = null;
+    private ?ProfileContactService $profileContactService = null;
     public function __construct(
         View $view,
         Config $config,
@@ -910,12 +907,7 @@ final class PublicController
      */
     private function defaultProfileContactOptions(): array
     {
-        return [
-            'email' => ['label' => 'Email', 'url_prefix' => 'mailto:'],
-            'phone' => ['label' => 'Phone', 'url_prefix' => 'tel:'],
-            'website' => ['label' => 'Website', 'url_prefix' => 'https://'],
-            'x' => ['label' => 'X', 'url_prefix' => 'https://x.com/'],
-        ];
+        return $this->profileContactService()->defaultOptions();
     }
 
     /**
@@ -925,17 +917,7 @@ final class PublicController
      */
     private function requiredProfileContactOptions(): array
     {
-        $defaults = $this->defaultProfileContactOptions();
-        $required = [];
-        foreach (['email', 'phone', 'website', 'x'] as $slug) {
-            if (!isset($defaults[$slug])) {
-                continue;
-            }
-
-            $required[$slug] = $defaults[$slug];
-        }
-
-        return $required;
+        return $this->profileContactService()->requiredOptions();
     }
 
     /**
@@ -945,63 +927,9 @@ final class PublicController
      */
     private function profileContactOptions(): array
     {
-        /** @var mixed $raw */
-        $raw = $this->config->get('user.contact', $this->defaultProfileContactOptions());
-        $source = is_array($raw) ? $raw : $this->defaultProfileContactOptions();
-        $defaults = $this->defaultProfileContactOptions();
-        $requiredDefaults = $this->requiredProfileContactOptions();
-        $normalized = [];
-
-        foreach ($source as $key => $definition) {
-            if (!is_string($key) && !is_int($key)) {
-                continue;
-            }
-
-            $slug = $this->input->slug((string) $key);
-            if ($slug === null || $slug === '') {
-                continue;
-            }
-
-            $defaultLabel = (string) ($defaults[$slug]['label'] ?? ucwords(str_replace('-', ' ', $slug)));
-            $defaultPrefix = (string) ($defaults[$slug]['url_prefix'] ?? '');
-            $label = $defaultLabel;
-            $prefix = $defaultPrefix;
-
-            if (is_array($definition)) {
-                $label = $this->input->text((string) ($definition['label'] ?? $defaultLabel), 80);
-                $prefix = $this->input->text((string) ($definition['url_prefix'] ?? $defaultPrefix), 255);
-            } else {
-                $label = $this->input->text((string) $definition, 80);
-            }
-
-            if ($label === '') {
-                continue;
-            }
-
-            if (!isset($normalized[$slug])) {
-                $normalized[$slug] = [
-                    'label' => $label,
-                    'url_prefix' => trim($prefix),
-                ];
-            }
-        }
-
-        foreach ($requiredDefaults as $requiredSlug => $requiredConfig) {
-            if (isset($normalized[$requiredSlug])) {
-                continue;
-            }
-
-            $normalized[$requiredSlug] = [
-                'label' => (string) ($requiredConfig['label'] ?? ucwords(str_replace('-', ' ', $requiredSlug))),
-                'url_prefix' => trim((string) ($requiredConfig['url_prefix'] ?? '')),
-            ];
-        }
-
-        if ($normalized === []) {
-            return $requiredDefaults;
-        }
-
-        return $normalized;
+        return $this->profileContactService()->normalizeOptionsConfig(
+            $this->config->get('user.contact', $this->defaultProfileContactOptions())
+        );
     }
 
     /**
@@ -1012,47 +940,7 @@ final class PublicController
      */
     private function decoratePublicProfileContacts(array $profile): array
     {
-        $options = $this->profileContactOptions();
-        $rawEntries = is_array($profile['contact_profiles'] ?? null) ? $profile['contact_profiles'] : [];
-        $entries = [];
-
-        foreach ($rawEntries as $entry) {
-            if (!is_array($entry)) {
-                continue;
-            }
-
-            $type = $this->input->slug((string) ($entry['type'] ?? ''));
-            if ($type === null || $type === '') {
-                continue;
-            }
-
-            $value = $this->input->text((string) ($entry['value'] ?? ''), 255);
-            if ($value === '') {
-                continue;
-            }
-
-            $option = $options[$type] ?? [
-                'label' => ucwords(str_replace('-', ' ', $type)),
-                'url_prefix' => '',
-            ];
-            $label = (string) ($option['label'] ?? $type);
-            $urlPrefix = trim((string) ($option['url_prefix'] ?? ''));
-            $href = $this->resolveProfileContactHref($value, $urlPrefix);
-
-            $entries[] = [
-                'type' => $type,
-                'label' => $label,
-                'value' => $value,
-                'href' => $href,
-            ];
-
-            if (count($entries) >= 20) {
-                break;
-            }
-        }
-
-        $profile['contact_profiles'] = $entries;
-        return $profile;
+        return $this->profileContactService()->decorateProfileContacts($profile, $this->profileContactOptions());
     }
 
     /**
@@ -1060,28 +948,7 @@ final class PublicController
      */
     private function resolveProfileContactHref(string $value, string $urlPrefix): ?string
     {
-        $value = trim($value);
-        if ($value === '') {
-            return null;
-        }
-
-        if (preg_match('/^[a-z][a-z0-9+.-]*:/i', $value) === 1) {
-            return $value;
-        }
-
-        if ($urlPrefix === '') {
-            if (preg_match('#^https?://#i', $value) === 1) {
-                return $value;
-            }
-
-            return null;
-        }
-
-        if (str_ends_with($urlPrefix, '/')) {
-            return $urlPrefix . ltrim($value, '@/');
-        }
-
-        return $urlPrefix . $value;
+        return $this->profileContactService()->resolveProfileContactHref($value, $urlPrefix);
     }
 
     /**
@@ -1095,7 +962,7 @@ final class PublicController
             return;
         }
 
-        if (!$this->isExtensionEnabled($runtime->extensionKey())) {
+        if (!$this->embeddedFormRuntimeService()->isRuntimeEnabled($runtime)) {
             $this->notFound();
             return;
         }
@@ -1128,8 +995,7 @@ final class PublicController
      */
     private function embeddedFormRuntime(string $type): ?EmbeddedFormRuntimeInterface
     {
-        $normalized = strtolower(trim($type));
-        return $this->embeddedFormRuntimes[$normalized] ?? null;
+        return $this->embeddedFormRuntimeService()->runtime($type, $this->embeddedFormRuntimes);
     }
 
     /**
@@ -1289,82 +1155,10 @@ final class PublicController
      */
     private function twitterCreatorFromContactProfiles(array $profiles): string
     {
-        if ($profiles === []) {
-            return '';
-        }
-
-        $contactOptions = $this->profileContactOptions();
-        foreach ($profiles as $profile) {
-            if (!is_array($profile)) {
-                continue;
-            }
-
-            $type = $this->input->slug((string) ($profile['type'] ?? ''));
-            $value = trim((string) ($profile['value'] ?? ''));
-            if ($type === null || $type === '' || $value === '') {
-                continue;
-            }
-
-            $urlPrefix = trim((string) ($contactOptions[$type]['url_prefix'] ?? ''));
-            if (!$this->isTwitterProfileContactType($type, $urlPrefix)) {
-                continue;
-            }
-
-            $creator = $this->normalizeTwitterCreatorHandle($value);
-            if ($creator !== '') {
-                return $creator;
-            }
-        }
-
-        return '';
-    }
-
-    /**
-     * Returns true when a profile-contact type/prefix maps to Twitter/X.
-     */
-    private function isTwitterProfileContactType(string $type, string $urlPrefix): bool
-    {
-        if (in_array($type, ['x', 'twitter'], true)) {
-            return true;
-        }
-
-        $prefix = strtolower($urlPrefix);
-        return str_contains($prefix, 'x.com') || str_contains($prefix, 'twitter.com');
-    }
-
-    /**
-     * Converts one contact value into a `twitter:creator` handle (`@username`).
-     */
-    private function normalizeTwitterCreatorHandle(string $value): string
-    {
-        $raw = trim(str_replace(["\r", "\n", "\0"], '', $value));
-        if ($raw === '') {
-            return '';
-        }
-
-        if (preg_match('#^https?://#i', $raw) === 1) {
-            $host = strtolower((string) parse_url($raw, PHP_URL_HOST));
-            if (str_starts_with($host, 'www.')) {
-                $host = substr($host, 4);
-            }
-            if (!in_array($host, ['x.com', 'twitter.com'], true)) {
-                return '';
-            }
-
-            $raw = (string) parse_url($raw, PHP_URL_PATH);
-        }
-
-        $raw = trim(preg_replace('/[?#].*$/', '', $raw) ?? '');
-        $raw = ltrim($raw, '@/');
-        if (str_contains($raw, '/')) {
-            $raw = (string) explode('/', $raw, 2)[0];
-        }
-
-        if ($raw === '' || preg_match('/^[A-Za-z0-9_]{1,30}$/', $raw) !== 1) {
-            return '';
-        }
-
-        return '@' . $raw;
+        return $this->profileContactService()->twitterCreatorFromProfiles(
+            $profiles,
+            $this->profileContactOptions()
+        );
     }
 
     /**
@@ -2117,6 +1911,33 @@ final class PublicController
         return $this->requestContextResolver;
     }
 
+    private function publicTemplateResolver(): PublicTemplateResolver
+    {
+        if (!$this->publicTemplateResolver instanceof PublicTemplateResolver) {
+            $this->publicTemplateResolver = new PublicTemplateResolver($this->input);
+        }
+
+        return $this->publicTemplateResolver;
+    }
+
+    private function embeddedFormRuntimeService(): EmbeddedFormRuntimeService
+    {
+        if (!$this->embeddedFormRuntimeService instanceof EmbeddedFormRuntimeService) {
+            $this->embeddedFormRuntimeService = new EmbeddedFormRuntimeService($this->input, dirname(__DIR__, 3));
+        }
+
+        return $this->embeddedFormRuntimeService;
+    }
+
+    private function profileContactService(): ProfileContactService
+    {
+        if (!$this->profileContactService instanceof ProfileContactService) {
+            $this->profileContactService = new ProfileContactService($this->input);
+        }
+
+        return $this->profileContactService;
+    }
+
     /**
      * Normalizes one taxonomy route-prefix value and falls back safely.
      */
@@ -2452,16 +2273,10 @@ final class PublicController
      */
     private function currentPublicThemeViewsRoots(): array
     {
-        $roots = [];
-        $themeSlug = $this->currentPublicThemeSlug();
-        foreach ($this->currentPublicThemeInheritanceChain($themeSlug) as $candidateThemeSlug) {
-            $themeViewsRoot = $this->publicThemesRoot() . '/' . $candidateThemeSlug . '/vis';
-            if (is_dir($themeViewsRoot)) {
-                $roots[] = $themeViewsRoot;
-            }
-        }
-
-        return $roots;
+        return $this->publicTemplateResolver()->currentThemeViewsRoots(
+            $this->publicThemesRoot(),
+            $this->currentPublicThemeSlug()
+        );
     }
 
     /**
@@ -2469,20 +2284,7 @@ final class PublicController
      */
     private function resolvePublicTemplateFile(string $template, string ...$roots): ?string
     {
-        $relative = trim($template, '/') . '.php';
-
-        foreach ($roots as $root) {
-            if ($root === '') {
-                continue;
-            }
-
-            $candidate = rtrim($root, '/\\') . '/' . $relative;
-            if (is_file($candidate)) {
-                return $candidate;
-            }
-        }
-
-        return null;
+        return $this->publicTemplateResolver()->resolveTemplateFile($template, ...$roots);
     }
 
     /**
@@ -2494,21 +2296,10 @@ final class PublicController
      */
     private function resolveChannelTemplateName(string $channelSlug): string
     {
-        $normalizedSlug = $this->input->slug($channelSlug);
-        if ($normalizedSlug === null) {
-            return 'channels/index';
-        }
-
         $themeViewsRoots = $this->currentPublicThemeViewsRoots();
         $coreViewsRoot = dirname(__DIR__, 3) . '/private/vis';
         $lookupRoots = [...$themeViewsRoots, $coreViewsRoot];
-
-        $slugTemplate = 'channels/' . $normalizedSlug;
-        if ($this->resolvePublicTemplateFile($slugTemplate, ...$lookupRoots) !== null) {
-            return $slugTemplate;
-        }
-
-        return 'channels/index';
+        return $this->publicTemplateResolver()->resolveChannelTemplateName($channelSlug, ...$lookupRoots);
     }
 
     /**
@@ -2523,18 +2314,7 @@ final class PublicController
         $themeViewsRoots = $this->currentPublicThemeViewsRoots();
         $coreViewsRoot = dirname(__DIR__, 3) . '/private/vis';
         $lookupRoots = [...$themeViewsRoots, $coreViewsRoot];
-
-        if ($channelSlug !== null) {
-            $normalizedSlug = $this->input->slug($channelSlug);
-            if ($normalizedSlug !== null) {
-                $channelTemplate = 'pages/' . $normalizedSlug;
-                if ($this->resolvePublicTemplateFile($channelTemplate, ...$lookupRoots) !== null) {
-                    return $channelTemplate;
-                }
-            }
-        }
-
-        return 'pages/index';
+        return $this->publicTemplateResolver()->resolvePageTemplateName($channelSlug, ...$lookupRoots);
     }
 
     /**
@@ -2546,21 +2326,10 @@ final class PublicController
      */
     private function resolveCategoryTemplateName(string $categorySlug): string
     {
-        $normalizedSlug = $this->input->slug($categorySlug);
-        if ($normalizedSlug === null) {
-            return 'categories/index';
-        }
-
         $themeViewsRoots = $this->currentPublicThemeViewsRoots();
         $coreViewsRoot = dirname(__DIR__, 3) . '/private/vis';
         $lookupRoots = [...$themeViewsRoots, $coreViewsRoot];
-
-        $slugTemplate = 'categories/' . $normalizedSlug;
-        if ($this->resolvePublicTemplateFile($slugTemplate, ...$lookupRoots) !== null) {
-            return $slugTemplate;
-        }
-
-        return 'categories/index';
+        return $this->publicTemplateResolver()->resolveCategoryTemplateName($categorySlug, ...$lookupRoots);
     }
 
     /**
@@ -2572,21 +2341,10 @@ final class PublicController
      */
     private function resolveTagTemplateName(string $tagSlug): string
     {
-        $normalizedSlug = $this->input->slug($tagSlug);
-        if ($normalizedSlug === null) {
-            return 'tags/index';
-        }
-
         $themeViewsRoots = $this->currentPublicThemeViewsRoots();
         $coreViewsRoot = dirname(__DIR__, 3) . '/private/vis';
         $lookupRoots = [...$themeViewsRoots, $coreViewsRoot];
-
-        $slugTemplate = 'tags/' . $normalizedSlug;
-        if ($this->resolvePublicTemplateFile($slugTemplate, ...$lookupRoots) !== null) {
-            return $slugTemplate;
-        }
-
-        return 'tags/index';
+        return $this->publicTemplateResolver()->resolveTagTemplateName($tagSlug, ...$lookupRoots);
     }
 
     /**
@@ -2604,17 +2362,7 @@ final class PublicController
      */
     private function sanitizePublicReturnPath(string $rawPath): string
     {
-        $rawPath = trim($rawPath);
-        if ($rawPath === '' || str_contains($rawPath, "\0") || str_contains($rawPath, '\\')) {
-            return '/';
-        }
-
-        $path = (string) parse_url($rawPath, PHP_URL_PATH);
-        if ($path === '' || !str_starts_with($path, '/') || str_starts_with($path, '//')) {
-            return '/';
-        }
-
-        return $path;
+        return $this->embeddedFormRuntimeService()->sanitizeReturnPath($rawPath);
     }
 
     /**
@@ -2843,147 +2591,11 @@ final class PublicController
      */
     private function renderEmbeddedForms(string $html): string
     {
-        if ($html === '') {
-            return '';
-        }
-
-        $shortcodePattern = $this->embeddedFormShortcodePattern();
-        if ($shortcodePattern === null) {
-            return $html;
-        }
-
-        return (string) preg_replace_callback(
-            $shortcodePattern,
-            function (array $matches): string {
-                $type = strtolower((string) ($matches[1] ?? ''));
-                $rawArgumentChunk = (string) ($matches[2] ?? '');
-                $slug = $this->extractEmbeddedFormSlug($rawArgumentChunk);
-                if ($type === '' || $slug === '') {
-                    return '';
-                }
-
-                $definition = $this->findEmbeddedFormDefinition($type, $slug);
-                if ($definition === null) {
-                    return '';
-                }
-
-                return $this->embeddedFormMarkup($type, $definition);
-            },
-            $html
+        return $this->embeddedFormRuntimeService()->renderShortcodes(
+            $html,
+            $this->embeddedFormRuntimes,
+            fn (string $type, array $definition): string => $this->embeddedFormMarkup($type, $definition)
         );
-    }
-
-    /**
-     * Extracts one shortcode form slug from raw shortcode arguments.
-     *
-     * Supported formats:
-     * - `slug="my-form"`
-     * - `slug='my-form'`
-     * - `slug=my-form`
-     * - `my-form`
-     */
-    private function extractEmbeddedFormSlug(string $rawArgs): string
-    {
-        $args = html_entity_decode($rawArgs, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $args = trim($args);
-        if ($args === '') {
-            return '';
-        }
-
-        // Handle explicit `slug=...` first (quoted or unquoted).
-        if (preg_match('/(?:^|\s)slug\s*=\s*(?:"([^"]+)"|\'([^\']+)\'|([a-z0-9_-]+))/i', $args, $matches) === 1) {
-            $candidate = '';
-            for ($index = 1; $index <= 3; $index++) {
-                $value = trim((string) ($matches[$index] ?? ''));
-                if ($value !== '') {
-                    $candidate = $value;
-                    break;
-                }
-            }
-
-            $slug = $this->input->slug($candidate);
-            return $slug ?? '';
-        }
-
-        // Also allow compact shorthand: `[type my-form]`.
-        if (preg_match('/^([a-z0-9_-]+)\s*$/i', $args, $matches) === 1) {
-            $slug = $this->input->slug((string) ($matches[1] ?? ''));
-            return $slug ?? '';
-        }
-
-        return '';
-    }
-
-    /**
-     * Finds one enabled embedded form definition by shortcode type + slug.
-     *
-     * @return array<string, mixed>|null
-     */
-    private function findEmbeddedFormDefinition(string $type, string $slug): ?array
-    {
-        $type = strtolower(trim($type));
-        $slug = strtolower(trim($slug));
-        if ($type === '' || $slug === '') {
-            return null;
-        }
-
-        $runtime = $this->embeddedFormRuntime($type);
-        if ($runtime === null || !$this->isExtensionEnabled($runtime->extensionKey())) {
-            return null;
-        }
-
-        $lookup = $this->extensionFormLookupByType($type);
-        $definition = $lookup[$slug] ?? null;
-        return is_array($definition) ? $definition : null;
-    }
-
-    /**
-     * Returns enabled extension form definitions keyed by slug for one type.
-     *
-     * @return array<string, array<string, mixed>>
-     */
-    private function extensionFormLookupByType(string $type): array
-    {
-        if (isset($this->embeddedFormLookupCache[$type])) {
-            return $this->embeddedFormLookupCache[$type];
-        }
-
-        $runtime = $this->embeddedFormRuntime($type);
-        if ($runtime === null) {
-            $this->embeddedFormLookupCache[$type] = [];
-            return [];
-        }
-
-        $forms = $runtime->listEnabledForms();
-        $lookup = [];
-        foreach ($forms as $form) {
-            if (!is_array($form)) {
-                continue;
-            }
-
-            $slug = $this->input->slug((string) ($form['slug'] ?? ''));
-            if ($slug === '') {
-                continue;
-            }
-
-            $lookup[strtolower($slug)] = $form;
-        }
-
-        $this->embeddedFormLookupCache[$type] = $lookup;
-        return $lookup;
-    }
-
-    /**
-     * Returns true when one extension is enabled in `private/ext/.state.php`.
-     */
-    private function isExtensionEnabled(string $extensionName): bool
-    {
-        if ($this->enabledExtensionMap === null) {
-            $root = dirname(__DIR__, 3);
-            $this->enabledExtensionMap = ExtensionRegistry::enabledMap($root);
-        }
-
-        return !empty($this->enabledExtensionMap[$extensionName]);
     }
 
     /**
@@ -3005,24 +2617,6 @@ final class PublicController
             $this->csrf->field(),
             $this->publicCaptchaMarkup()
         );
-    }
-
-    /**
-     * Returns regex used to resolve embedded-form shortcodes from HTML blocks.
-     */
-    private function embeddedFormShortcodePattern(): ?string
-    {
-        $types = array_keys($this->embeddedFormRuntimes);
-        if ($types === []) {
-            return null;
-        }
-
-        $escapedTypes = array_map(
-            static fn (string $token): string => preg_quote($token, '/'),
-            $types
-        );
-
-        return '/\[(' . implode('|', $escapedTypes) . ')\b([^\]]*)\]/i';
     }
 
 }
