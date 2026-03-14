@@ -345,17 +345,17 @@ $themeLabels = [
                                 <div class="row g-2 align-items-end">
                                     <div class="col-md-3">
                                         <label class="form-label">Type</label>
-                                        <input type="text" class="form-control" value="<?= e($methodTypeLabel) ?>" readonly>
+                                        <input type="text" class="form-control" value="<?= e($methodTypeLabel) ?>" disabled>
                                     </div>
                                     <div class="col-md-3">
                                         <label class="form-label">Label</label>
-                                        <input type="text" class="form-control" value="<?= e($methodLabel) ?>" readonly>
+                                        <input type="text" class="form-control" value="<?= e($methodLabel) ?>" disabled>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md">
                                         <label class="form-label">Details</label>
-                                        <input type="text" class="form-control" value="<?= e($methodDescription) ?>" placeholder="Configured method" readonly>
+                                        <input type="text" class="form-control" value="<?= e($methodDescription) ?>" placeholder="Configured method" disabled>
                                     </div>
-                                    <div class="col-md-2 d-flex align-items-end justify-content-md-end">
+                                    <div class="col-auto ps-md-0 d-flex align-items-end">
                                         <button type="button" class="btn btn-danger" data-user-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
                                     </div>
                                 </div>
