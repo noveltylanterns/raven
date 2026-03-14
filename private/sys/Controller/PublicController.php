@@ -17,10 +17,13 @@ use Raven\Core\Auth\AuthService;
 use Raven\Core\Config;
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Core\Extension\ExtensionRegistry;
+use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Pagination\Pagination;
+use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\PanelUrl;
+use Raven\Lib\Routing\RedirectTargetValidator;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Core\Theme\PublicThemeRegistry;
@@ -402,32 +405,7 @@ final class PublicController
      */
     private function normalizeChannelPageRouteMode(string $value): string
     {
-        $mode = strtolower(trim($value));
-        return in_array($mode, ['slug', 'date_slug'], true)
-            ? $mode
-            : 'slug';
-    }
-
-    /**
-     * Normalizes channel-level page-url separator override values.
-     */
-    private function normalizeChannelPageUrlSeparator(string $value): string
-    {
-        $separator = trim($value);
-        return in_array($separator, ['inherit', '-', '_'], true)
-            ? $separator
-            : 'inherit';
-    }
-
-    /**
-     * Normalizes global default page-url separator values.
-     */
-    private function normalizeGlobalPageUrlSeparator(string $value): string
-    {
-        $separator = trim($value);
-        return in_array($separator, ['-', '_'], true)
-            ? $separator
-            : '-';
+        return ChannelRoutePolicy::normalizeRouteMode($value);
     }
 
     /**
@@ -435,12 +413,8 @@ final class PublicController
      */
     private function resolveChannelPageUrlSeparator(string $channelValue): string
     {
-        $normalizedChannel = $this->normalizeChannelPageUrlSeparator($channelValue);
-        if ($normalizedChannel !== 'inherit') {
-            return $normalizedChannel;
-        }
-
-        return $this->normalizeGlobalPageUrlSeparator(
+        return ChannelRoutePolicy::resolveSeparator(
+            $channelValue,
             (string) $this->config->get('content.separator', '-')
         );
     }
@@ -450,21 +424,7 @@ final class PublicController
      */
     private function normalizeChannelPageSlugForLookup(string $segment, string $wordSeparator): ?string
     {
-        $segment = strtolower(trim($segment));
-        if ($segment === '') {
-            return null;
-        }
-
-        if (preg_match('/^[a-z0-9][a-z0-9_-]*$/', $segment) !== 1) {
-            return null;
-        }
-
-        $resolvedSeparator = $this->resolveChannelPageUrlSeparator($wordSeparator);
-        if ($resolvedSeparator === '_') {
-            $segment = str_replace('_', '-', $segment);
-        }
-
-        return $this->input->slug($segment);
+        return ChannelRoutePolicy::normalizeSlugForLookup($this->input, $segment, $wordSeparator);
     }
 
     /**
@@ -474,27 +434,7 @@ final class PublicController
      */
     private function parseChannelDateSlugSegment(string $segment, string $wordSeparator): ?array
     {
-        $segment = strtolower(trim($segment));
-        if ($segment === '') {
-            return null;
-        }
-
-        if (preg_match('/^(\d{4}-\d{2}-\d{2})-(.+)$/', $segment, $matches) !== 1) {
-            return null;
-        }
-
-        $slug = $this->normalizeChannelPageSlugForLookup(
-            (string) ($matches[2] ?? ''),
-            $wordSeparator
-        );
-        if ($slug === null || $slug === '') {
-            return null;
-        }
-
-        return [
-            'date' => (string) ($matches[1] ?? ''),
-            'slug' => $slug,
-        ];
+        return ChannelRoutePolicy::parseDateSlugSegment($this->input, $segment, $wordSeparator);
     }
 
     /**
@@ -507,40 +447,14 @@ final class PublicController
         string $wordSeparator
     ): string
     {
-        $normalizedSlug = $this->input->slug($slug);
-        if ($normalizedSlug === null || $normalizedSlug === '') {
-            return '';
-        }
-
-        $resolvedSeparator = $this->resolveChannelPageUrlSeparator($wordSeparator);
-        $routeSlug = $resolvedSeparator === '_'
-            ? str_replace('-', '_', $normalizedSlug)
-            : $normalizedSlug;
-        $mode = $this->normalizeChannelPageRouteMode($routeMode);
-        if ($mode !== 'date_slug') {
-            return $routeSlug;
-        }
-
-        $datePrefix = $this->channelPageDatePrefix($publishedAt);
-        return $datePrefix . '-' . $routeSlug;
-    }
-
-    /**
-     * Extracts one `YYYY-MM-DD` prefix from a publish timestamp.
-     */
-    private function channelPageDatePrefix(string $publishedAt): string
-    {
-        $publishedAt = trim($publishedAt);
-        if ($publishedAt !== '' && preg_match('/^\d{4}-\d{2}-\d{2}/', $publishedAt, $matches) === 1) {
-            return (string) ($matches[0] ?? gmdate('Y-m-d'));
-        }
-
-        $timestamp = $publishedAt !== '' ? strtotime($publishedAt) : false;
-        if ($timestamp === false || $timestamp <= 0) {
-            $timestamp = time();
-        }
-
-        return gmdate('Y-m-d', $timestamp);
+        return ChannelRoutePolicy::buildRouteSegment(
+            $this->input,
+            $slug,
+            $publishedAt,
+            $routeMode,
+            $wordSeparator,
+            (string) $this->config->get('content.separator', '-')
+        );
     }
 
     /**
@@ -560,6 +474,7 @@ final class PublicController
 
         // Default behavior is temporary redirect; status configuration can be added later.
         \Raven\Core\Support\redirect($targetUrl, 302);
+        return true;
     }
 
     /**
@@ -567,21 +482,7 @@ final class PublicController
      */
     private function isAllowedRedirectTargetUrl(string $targetUrl): bool
     {
-        if ($targetUrl === '' || str_contains($targetUrl, ' ')) {
-            return false;
-        }
-
-        if (str_starts_with($targetUrl, '/')) {
-            // Block protocol-relative URLs (`//host`) to avoid bypassing scheme validation.
-            return !str_starts_with($targetUrl, '//');
-        }
-
-        if (filter_var($targetUrl, FILTER_VALIDATE_URL) === false) {
-            return false;
-        }
-
-        $scheme = strtolower((string) parse_url($targetUrl, PHP_URL_SCHEME));
-        return in_array($scheme, ['http', 'https'], true);
+        return RedirectTargetValidator::isAllowedHttpOrRootPath($targetUrl);
     }
 
     /**
@@ -2399,26 +2300,7 @@ final class PublicController
      */
     private function configBool(mixed $value, bool $default = false): bool
     {
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        if (is_int($value) || is_float($value)) {
-            return ((int) $value) !== 0;
-        }
-
-        if (is_string($value)) {
-            $normalized = strtolower(trim($value));
-            if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
-                return true;
-            }
-
-            if (in_array($normalized, ['0', 'false', 'no', 'off'], true)) {
-                return false;
-            }
-        }
-
-        return $default;
+        return ConfigValueParser::bool($value, $default);
     }
 
     /**

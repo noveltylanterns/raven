@@ -15,6 +15,7 @@ use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\SchemaManager;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Media\PageImageManager;
+use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Session\SessionCookiePolicy;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
@@ -140,29 +141,8 @@ return (static function (): array {
     $input = new InputSanitizer();
     $pageImages = new PageImageRepository($appDb, $driver, $prefix);
     $channels = new ChannelRepository($appDb, $driver, $prefix, $root . '/private/dat/channel');
-    $readConfigBool = static function (mixed $value, bool $default = true): bool {
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        if (is_int($value) || is_float($value)) {
-            return ((int) $value) !== 0;
-        }
-
-        if (is_string($value)) {
-            $normalized = strtolower(trim($value));
-            if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
-                return true;
-            }
-            if (in_array($normalized, ['0', 'false', 'no', 'off'], true)) {
-                return false;
-            }
-        }
-
-        return $default;
-    };
-    $categoryEnabled = $readConfigBool($config->get('category.enabled', true), true);
-    $tagEnabled = $readConfigBool($config->get('tag.enabled', true), true);
+    $categoryEnabled = ConfigValueParser::bool($config->get('category.enabled', true), true);
+    $tagEnabled = ConfigValueParser::bool($config->get('tag.enabled', true), true);
     $app = [
         'root' => $root,
         'config' => $config,

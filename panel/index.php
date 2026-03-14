@@ -14,6 +14,8 @@ use Raven\Controller\PanelController;
 use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Debug\DebugToolbarRenderer;
 use Raven\Core\Extension\ExtensionRegistry;
+use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Debug\DebugToolbarConfigResolver;
 use Raven\Lib\Profiling\RequestProfiler;
 use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Routing\RouteRequest;
@@ -54,29 +56,8 @@ $panelController = new PanelController(
     $app['invite_tokens']
 );
 
-$readConfigBool = static function (mixed $value, bool $default = true): bool {
-    if (is_bool($value)) {
-        return $value;
-    }
-
-    if (is_int($value) || is_float($value)) {
-        return ((int) $value) !== 0;
-    }
-
-    if (is_string($value)) {
-        $normalized = strtolower(trim($value));
-        if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
-            return true;
-        }
-        if (in_array($normalized, ['0', 'false', 'no', 'off'], true)) {
-            return false;
-        }
-    }
-
-    return $default;
-};
-$categoryEnabled = $readConfigBool($app['config']->get('category.enabled', true), true);
-$tagEnabled = $readConfigBool($app['config']->get('tag.enabled', true), true);
+$categoryEnabled = ConfigValueParser::bool($app['config']->get('category.enabled', true), true);
+$tagEnabled = ConfigValueParser::bool($app['config']->get('tag.enabled', true), true);
 
 /**
  * Normalizes request path into panel-internal path.
@@ -1065,36 +1046,7 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
 }
 
 $method = $requestMethod;
-$parseDebugBool = static function (mixed $value, bool $default): bool {
-    if (is_bool($value)) {
-        return $value;
-    }
-
-    if (is_int($value) || is_float($value)) {
-        return ((int) $value) !== 0;
-    }
-
-    if (is_string($value)) {
-        $normalized = strtolower(trim($value));
-        if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
-            return true;
-        }
-        if (in_array($normalized, ['0', 'false', 'no', 'off', ''], true)) {
-            return false;
-        }
-    }
-
-    return $default;
-};
-$debugToolbarSettings = [
-    'show_on_public' => $parseDebugBool($app['config']->get('debug.show_public', false), false),
-    'show_on_panel' => $parseDebugBool($app['config']->get('debug.show_private', false), false),
-    'show_benchmarks' => $parseDebugBool($app['config']->get('debug.show_benchmarks', true), true),
-    'show_queries' => $parseDebugBool($app['config']->get('debug.show_queries', true), true),
-    'show_stack_trace' => $parseDebugBool($app['config']->get('debug.show_trace', true), true),
-    'show_request' => $parseDebugBool($app['config']->get('debug.show_request', true), true),
-    'show_environment' => $parseDebugBool($app['config']->get('debug.show_environment', true), true),
-];
+$debugToolbarSettings = DebugToolbarConfigResolver::fromConfig($app['config']);
 $debugToolbarEnabled = false;
 
 if (

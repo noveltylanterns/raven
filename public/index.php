@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 use Raven\Controller\PublicController;
 use Raven\Core\Debug\DebugToolbarRenderer;
+use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Debug\DebugToolbarConfigResolver;
 use Raven\Lib\Profiling\RequestProfiler;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Routing\RouteRequest;
@@ -65,36 +67,7 @@ if ($configuredPanelPath !== '' && ($requestPath === $configuredPanelPrefix || s
 $app = require dirname(__DIR__) . '/private/raven.php';
 
 $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-$parseDebugBool = static function (mixed $value, bool $default): bool {
-    if (is_bool($value)) {
-        return $value;
-    }
-
-    if (is_int($value) || is_float($value)) {
-        return ((int) $value) !== 0;
-    }
-
-    if (is_string($value)) {
-        $normalized = strtolower(trim($value));
-        if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
-            return true;
-        }
-        if (in_array($normalized, ['0', 'false', 'no', 'off', ''], true)) {
-            return false;
-        }
-    }
-
-    return $default;
-};
-$debugToolbarSettings = [
-    'show_on_public' => $parseDebugBool($app['config']->get('debug.show_public', false), false),
-    'show_on_panel' => $parseDebugBool($app['config']->get('debug.show_private', false), false),
-    'show_benchmarks' => $parseDebugBool($app['config']->get('debug.show_benchmarks', true), true),
-    'show_queries' => $parseDebugBool($app['config']->get('debug.show_queries', true), true),
-    'show_stack_trace' => $parseDebugBool($app['config']->get('debug.show_trace', true), true),
-    'show_request' => $parseDebugBool($app['config']->get('debug.show_request', true), true),
-    'show_environment' => $parseDebugBool($app['config']->get('debug.show_environment', true), true),
-];
+$debugToolbarSettings = DebugToolbarConfigResolver::fromConfig($app['config']);
 $debugToolbarEnabled = false;
 
 if (
@@ -165,31 +138,9 @@ $controller = new PublicController(
 
 $input = $app['input'];
 
-$readConfigBool = static function (mixed $value, bool $default = true): bool {
-    if (is_bool($value)) {
-        return $value;
-    }
-
-    if (is_int($value) || is_float($value)) {
-        return ((int) $value) !== 0;
-    }
-
-    if (is_string($value)) {
-        $normalized = strtolower(trim($value));
-        if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
-            return true;
-        }
-        if (in_array($normalized, ['0', 'false', 'no', 'off'], true)) {
-            return false;
-        }
-    }
-
-    return $default;
-};
-
 $panelPath = (string) $app['config']->get('panel.path', 'panel');
-$categoryEnabled = $readConfigBool($app['config']->get('category.enabled', true), true);
-$tagEnabled = $readConfigBool($app['config']->get('tag.enabled', true), true);
+$categoryEnabled = ConfigValueParser::bool($app['config']->get('category.enabled', true), true);
+$tagEnabled = ConfigValueParser::bool($app['config']->get('tag.enabled', true), true);
 $categoryPrefix = $categoryEnabled
     ? PanelUrl::normalizeRoutePrefix($input, (string) $app['config']->get('category.prefix', 'cat'), 'cat', true)
     : '';

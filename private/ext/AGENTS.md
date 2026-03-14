@@ -1,6 +1,6 @@
 # Raven Extension Agent Guide
 
-Last updated: 2026-03-05
+Last updated: 2026-03-14
 
 ## Scope
 - This file defines the extension-authoring contract for `private/ext/`.
@@ -213,6 +213,12 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - Keep extension code isolated under `private/ext/{extension_slug}/`.
 - Repeated warning: core edits for extension behavior can break long-term compatibility and future upgrades.
 - Repeated warning: if behavior can be implemented inside extension routes/vis/state, do not touch core.
+
+## Core `private/lib` Boundary
+- `private/lib/` is core-owned shared runtime code and is not an extension storage location.
+- Extensions must not create, modify, or persist extension files under `private/lib/`.
+- Extension code should stay inside `private/ext/{extension_slug}/` (including extension-local `lib/` files).
+- Extensions may consume/call core `Raven\Lib\...` classes when needed, but must treat them as read-only implementation dependencies.
 
 ## Extension Directory Contract
 - Root: `private/ext/`

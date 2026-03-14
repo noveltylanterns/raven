@@ -20,11 +20,15 @@ use Raven\Core\Config;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Media\PageImageManager;
 use Raven\Core\Theme\PublicThemeRegistry;
+use Raven\Lib\Archive\ArchivePackageService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Pagination\Pagination;
+use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\PanelUrl;
+use Raven\Lib\Routing\RedirectTargetValidator;
 use Raven\Repository\CategoryRepository;
 use Raven\Core\Security\AvatarValidator;
 use Raven\Lib\Security\Csrf;
@@ -34,6 +38,7 @@ use Raven\Lib\Security\RecoveryPhrase;
 use Raven\Lib\Security\TotpService;
 use Raven\Lib\Security\TwoFactorMethodNormalizer;
 use Raven\Lib\Security\WebAuthnService;
+use Raven\Lib\View\ThemeFallbackRenderer;
 use Raven\Core\View;
 use Raven\Repository\ChannelRepository;
 use Raven\Repository\GroupRepository;
@@ -76,6 +81,8 @@ final class PanelController
     private InviteTokenRepository $inviteTokens;
     /** @var array<string, array{label: string, editor: string}>|null */
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
+    private ?ArchivePackageService $archivePackages = null;
+    private ?ThemeFallbackRenderer $publicFallbackRenderer = null;
 
     public function __construct(
         View $view,
@@ -667,10 +674,7 @@ final class PanelController
      */
     private function normalizeChannelPageRouteMode(string $value): string
     {
-        $mode = strtolower(trim($value));
-        return in_array($mode, ['slug', 'date_slug'], true)
-            ? $mode
-            : 'slug';
+        return ChannelRoutePolicy::normalizeRouteMode($value);
     }
 
     /**
@@ -678,10 +682,7 @@ final class PanelController
      */
     private function normalizeChannelPageUrlSeparator(string $value): string
     {
-        $separator = trim($value);
-        return in_array($separator, ['inherit', '-', '_'], true)
-            ? $separator
-            : 'inherit';
+        return ChannelRoutePolicy::normalizeChannelSeparator($value);
     }
 
     /**
@@ -689,10 +690,7 @@ final class PanelController
      */
     private function normalizeGlobalPageUrlSeparator(string $value): string
     {
-        $separator = trim($value);
-        return in_array($separator, ['-', '_'], true)
-            ? $separator
-            : '-';
+        return ChannelRoutePolicy::normalizeGlobalSeparator($value);
     }
 
     /**
@@ -700,12 +698,8 @@ final class PanelController
      */
     private function resolveChannelPageUrlSeparator(string $channelValue): string
     {
-        $normalizedChannel = $this->normalizeChannelPageUrlSeparator($channelValue);
-        if ($normalizedChannel !== 'inherit') {
-            return $normalizedChannel;
-        }
-
-        return $this->normalizeGlobalPageUrlSeparator(
+        return ChannelRoutePolicy::resolveSeparator(
+            $channelValue,
             (string) $this->config->get('content.separator', '-')
         );
     }
@@ -4062,7 +4056,7 @@ final class PanelController
 
         $uploadError = (int) ($rawUpload['error'] ?? UPLOAD_ERR_NO_FILE);
         if ($uploadError !== UPLOAD_ERR_OK) {
-            $this->flash('error', $this->themeUploadErrorMessage($uploadError));
+            $this->flash('error', $this->archivePackages()->uploadErrorMessage($uploadError, 'Theme archive'));
             redirect($this->panelUrl('/themes'));
         }
 
@@ -4136,40 +4130,15 @@ final class PanelController
             redirect($this->panelUrl('/themes'));
         }
 
-        $zip = new ZipArchive();
-        $opened = $zip->open($tmpPath);
-        if ($opened !== true) {
-            $this->removeDirectoryRecursively($targetDirectory);
-            $this->flash('error', 'Failed to read uploaded ZIP archive.');
-            redirect($this->panelUrl('/themes'));
-        }
-
         try {
-            if ($zip->numFiles < 1) {
-                throw new \RuntimeException('Theme archive is empty.');
-            }
-
-            // Validate all entry paths before extraction to block zip-slip paths.
-            for ($index = 0; $index < $zip->numFiles; $index++) {
-                $entryName = $zip->getNameIndex($index);
-                if (!is_string($entryName) || !$this->isSafeZipEntryPath($entryName)) {
-                    throw new \RuntimeException('Archive contains unsafe file paths.');
-                }
-            }
-
-            if (!$zip->extractTo($targetDirectory)) {
-                throw new \RuntimeException('Failed to extract theme archive.');
-            }
+            $this->archivePackages()->extractUploadedZip($tmpPath, $targetDirectory);
         } catch (\Throwable $exception) {
-            $zip->close();
             $this->removeDirectoryRecursively($targetDirectory);
             $this->flash('error', $exception->getMessage() !== '' ? $exception->getMessage() : 'Theme upload failed.');
             redirect($this->panelUrl('/themes'));
         }
 
-        $zip->close();
-
-        if (!$this->directoryHasFiles($targetDirectory)) {
+        if (!$this->archivePackages()->directoryHasFiles($targetDirectory)) {
             $this->removeDirectoryRecursively($targetDirectory);
             $this->flash('error', 'Extracted theme directory is empty.');
             redirect($this->panelUrl('/themes'));
@@ -4228,14 +4197,14 @@ final class PanelController
         }
 
         try {
-            $archivePath = $this->buildZipArchiveFromDirectory($themePath, $themeSlug);
+            $archivePath = $this->archivePackages()->buildZipArchiveFromDirectory($themePath, $themeSlug);
         } catch (\RuntimeException $exception) {
             $this->flash('error', 'Theme export failed: ' . $exception->getMessage());
             redirect($this->panelUrl('/themes'));
         }
 
         $downloadFilename = 'theme-' . $themeSlug . '-' . gmdate('Ymd-His') . '.zip';
-        $this->streamDownloadFile($archivePath, $downloadFilename, 'application/zip');
+        $this->archivePackages()->streamDownloadFile($archivePath, $downloadFilename, 'application/zip');
     }
 
     /**
@@ -4516,7 +4485,7 @@ final class PanelController
 
         $uploadError = (int) ($rawUpload['error'] ?? UPLOAD_ERR_NO_FILE);
         if ($uploadError !== UPLOAD_ERR_OK) {
-            $this->flash('error', $this->extensionUploadErrorMessage($uploadError));
+            $this->flash('error', $this->archivePackages()->uploadErrorMessage($uploadError, 'Extension archive'));
             redirect($this->panelUrl('/extensions'));
         }
 
@@ -4591,40 +4560,15 @@ final class PanelController
             redirect($this->panelUrl('/extensions'));
         }
 
-        $zip = new ZipArchive();
-        $opened = $zip->open($tmpPath);
-        if ($opened !== true) {
-            $this->removeDirectoryRecursively($targetDirectory);
-            $this->flash('error', 'Failed to read uploaded ZIP archive.');
-            redirect($this->panelUrl('/extensions'));
-        }
-
         try {
-            if ($zip->numFiles < 1) {
-                throw new \RuntimeException('Extension archive is empty.');
-            }
-
-            // Validate all entry paths before extraction to block zip-slip paths.
-            for ($index = 0; $index < $zip->numFiles; $index++) {
-                $entryName = $zip->getNameIndex($index);
-                if (!is_string($entryName) || !$this->isSafeZipEntryPath($entryName)) {
-                    throw new \RuntimeException('Archive contains unsafe file paths.');
-                }
-            }
-
-            if (!$zip->extractTo($targetDirectory)) {
-                throw new \RuntimeException('Failed to extract extension archive.');
-            }
+            $this->archivePackages()->extractUploadedZip($tmpPath, $targetDirectory);
         } catch (\Throwable $exception) {
-            $zip->close();
             $this->removeDirectoryRecursively($targetDirectory);
             $this->flash('error', $exception->getMessage() !== '' ? $exception->getMessage() : 'Extension upload failed.');
             redirect($this->panelUrl('/extensions'));
         }
 
-        $zip->close();
-
-        if (!$this->directoryHasFiles($targetDirectory)) {
+        if (!$this->archivePackages()->directoryHasFiles($targetDirectory)) {
             $this->removeDirectoryRecursively($targetDirectory);
             $this->flash('error', 'Extracted extension directory is empty.');
             redirect($this->panelUrl('/extensions'));
@@ -4697,14 +4641,14 @@ final class PanelController
         }
 
         try {
-            $archivePath = $this->buildZipArchiveFromDirectory($extensionPath, $extensionName);
+            $archivePath = $this->archivePackages()->buildZipArchiveFromDirectory($extensionPath, $extensionName);
         } catch (\RuntimeException $exception) {
             $this->flash('error', 'Extension export failed: ' . $exception->getMessage());
             redirect($this->panelUrl('/extensions'));
         }
 
         $downloadFilename = 'extension-' . $extensionName . '-' . gmdate('Ymd-His') . '.zip';
-        $this->streamDownloadFile($archivePath, $downloadFilename, 'application/zip');
+        $this->archivePackages()->streamDownloadFile($archivePath, $downloadFilename, 'application/zip');
     }
 
     /**
@@ -7070,21 +7014,7 @@ final class PanelController
      */
     private function isAllowedRedirectTargetUrl(string $targetUrl): bool
     {
-        if ($targetUrl === '' || str_contains($targetUrl, ' ')) {
-            return false;
-        }
-
-        if (str_starts_with($targetUrl, '/')) {
-            // Block protocol-relative URLs (`//host`) to avoid bypassing scheme validation.
-            return !str_starts_with($targetUrl, '//');
-        }
-
-        if (filter_var($targetUrl, FILTER_VALIDATE_URL) === false) {
-            return false;
-        }
-
-        $scheme = strtolower((string) parse_url($targetUrl, PHP_URL_SCHEME));
-        return in_array($scheme, ['http', 'https'], true);
+        return RedirectTargetValidator::isAllowedHttpOrRootPath($targetUrl);
     }
 
     /**
@@ -7274,7 +7204,9 @@ final class PanelController
     {
         http_response_code(404);
 
-        $templateFile = $this->resolvePublicFallbackTemplateFile('messages/404');
+        $renderer = $this->publicFallbackRenderer();
+        $activeTheme = $this->activePublicThemeSlug();
+        $templateFile = $renderer->resolveTemplateFile('messages/404', $activeTheme);
         if ($templateFile === null) {
             header('Content-Type: text/plain; charset=utf-8');
             echo 'Not Found';
@@ -7282,17 +7214,17 @@ final class PanelController
         }
 
         $site = $this->publicSiteDataForNotFound();
-        $content = $this->renderPublicFallbackTemplateFile($templateFile, [
+        $content = $renderer->renderFile($templateFile, [
             'site' => $site,
         ]);
 
-        $layoutFile = $this->resolvePublicFallbackTemplateFile('wrapper');
+        $layoutFile = $renderer->resolveTemplateFile('wrapper', $activeTheme);
         if ($layoutFile === null) {
             echo $content;
             return;
         }
 
-        echo $this->renderPublicFallbackTemplateFile($layoutFile, [
+        echo $renderer->renderFile($layoutFile, [
             'site' => $site,
             'content' => $content,
         ]);
@@ -8714,64 +8646,6 @@ final class PanelController
     }
 
     /**
-     * Validates ZIP entry paths to prevent zip-slip traversal.
-     */
-    private function isSafeZipEntryPath(string $entryName): bool
-    {
-        $path = str_replace('\\', '/', trim($entryName));
-        if ($path === '') {
-            return false;
-        }
-
-        if (str_starts_with($path, '/') || preg_match('/^[A-Za-z]:\\//', $path)) {
-            return false;
-        }
-
-        if (str_contains($path, "\0")) {
-            return false;
-        }
-
-        $segments = explode('/', $path);
-        foreach ($segments as $segment) {
-            // Empty segments can happen on directory entries that end with `/`.
-            if ($segment === '') {
-                continue;
-            }
-
-            if ($segment === '.' || $segment === '..') {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * Returns true when directory contains at least one file or child directory.
-     */
-    private function directoryHasFiles(string $directory): bool
-    {
-        if (!is_dir($directory)) {
-            return false;
-        }
-
-        $entries = scandir($directory);
-        if ($entries === false) {
-            return false;
-        }
-
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..') {
-                continue;
-            }
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
      * Removes a directory tree recursively; used for failed extension uploads.
      */
     private function removeDirectoryRecursively(string $directory): void
@@ -8794,159 +8668,6 @@ final class PanelController
         }
 
         @rmdir($directory);
-    }
-
-    /**
-     * Creates one temporary ZIP archive from a directory tree and returns archive path.
-     */
-    private function buildZipArchiveFromDirectory(string $sourceDirectory, string $archiveRoot): string
-    {
-        $sourceRoot = realpath($sourceDirectory);
-        if ($sourceRoot === false || !is_dir($sourceRoot)) {
-            throw new \RuntimeException('Source directory could not be resolved.');
-        }
-
-        $sanitizedRoot = preg_replace('/[^a-z0-9._-]+/i', '-', $archiveRoot) ?? '';
-        $sanitizedRoot = trim($sanitizedRoot, '-_.');
-        if ($sanitizedRoot === '') {
-            $sanitizedRoot = 'package';
-        }
-
-        $tmpArchivePath = $this->allocateTemporaryArchivePath();
-
-        $zip = new ZipArchive();
-        $opened = $zip->open($tmpArchivePath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-        if ($opened !== true) {
-            @unlink($tmpArchivePath);
-            throw new \RuntimeException('Failed to initialize ZIP archive.');
-        }
-
-        try {
-            if (!$zip->addEmptyDir($sanitizedRoot)) {
-                throw new \RuntimeException('Failed to initialize ZIP root directory.');
-            }
-
-            $iterator = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($sourceRoot, \FilesystemIterator::SKIP_DOTS),
-                \RecursiveIteratorIterator::SELF_FIRST
-            );
-
-            foreach ($iterator as $item) {
-                if ($item->isLink()) {
-                    continue;
-                }
-
-                $sourcePath = $item->getPathname();
-                $relativePath = ltrim(substr($sourcePath, strlen($sourceRoot)), DIRECTORY_SEPARATOR);
-                if ($relativePath === '') {
-                    continue;
-                }
-
-                $zipPath = $sanitizedRoot . '/' . str_replace('\\', '/', $relativePath);
-                if ($item->isDir()) {
-                    if (!$zip->addEmptyDir($zipPath)) {
-                        throw new \RuntimeException('Failed to add directory "' . $relativePath . '" to ZIP archive.');
-                    }
-                    continue;
-                }
-
-                if (!$zip->addFile($sourcePath, $zipPath)) {
-                    throw new \RuntimeException('Failed to add file "' . $relativePath . '" to ZIP archive.');
-                }
-            }
-        } catch (\Throwable $exception) {
-            $zip->close();
-            @unlink($tmpArchivePath);
-            throw new \RuntimeException($exception->getMessage() !== '' ? $exception->getMessage() : 'Failed to build ZIP archive.');
-        }
-
-        $zip->close();
-        return $tmpArchivePath;
-    }
-
-    /**
-     * Allocates one writable temporary file path for ZIP exports.
-     */
-    private function allocateTemporaryArchivePath(): string
-    {
-        $projectRoot = dirname(__DIR__, 3);
-        $candidateDirectories = [
-            (string) sys_get_temp_dir(),
-            $projectRoot . '/private/tmp',
-            $projectRoot . '/private/tmp/exports',
-        ];
-
-        foreach ($candidateDirectories as $candidateDirectory) {
-            $directory = trim($candidateDirectory);
-            if ($directory === '') {
-                continue;
-            }
-
-            if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
-                continue;
-            }
-
-            if (!is_writable($directory)) {
-                continue;
-            }
-
-            $path = @tempnam($directory, 'rvn-export-');
-            if (is_string($path) && $path !== '') {
-                return $path;
-            }
-        }
-
-        throw new \RuntimeException('Failed to allocate temporary archive path.');
-    }
-
-    /**
-     * Streams one local file as a download and removes it afterwards.
-     */
-    private function streamDownloadFile(string $path, string $downloadFilename, string $contentType): void
-    {
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-
-        $stream = fopen($path, 'rb');
-        if (!is_resource($stream)) {
-            @unlink($path);
-            http_response_code(500);
-            echo 'Failed to open export stream.';
-            return;
-        }
-
-        $size = (int) @filesize($path);
-        if ($size > 0) {
-            header('Content-Length: ' . $size);
-        }
-        header('Content-Type: ' . $contentType);
-        header('Content-Disposition: attachment; filename="' . $downloadFilename . '"');
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-        header('Pragma: no-cache');
-
-        if (fpassthru($stream) === false) {
-            http_response_code(500);
-        }
-
-        fclose($stream);
-        @unlink($path);
-    }
-
-    /**
-     * Maps PHP upload error codes into extension-upload messages.
-     */
-    private function extensionUploadErrorMessage(int $code): string
-    {
-        return match ($code) {
-            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'Extension archive exceeds server upload limits.',
-            UPLOAD_ERR_PARTIAL => 'Extension archive upload was only partially received.',
-            UPLOAD_ERR_NO_FILE => 'Please choose a ZIP file to upload.',
-            UPLOAD_ERR_NO_TMP_DIR => 'Server temporary upload directory is missing.',
-            UPLOAD_ERR_CANT_WRITE => 'Server failed to write uploaded extension archive.',
-            UPLOAD_ERR_EXTENSION => 'A server extension blocked the extension upload.',
-            default => 'Extension upload failed with an unknown error.',
-        };
     }
 
     /**
@@ -10896,36 +10617,19 @@ MARKDOWN;
             return '/' . $normalizedSlug;
         }
 
-        $normalizedMode = $this->normalizeChannelPageRouteMode($channelPageRouteMode);
-        $resolvedSeparator = $this->resolveChannelPageUrlSeparator($channelPageUrlSeparator);
-        $routeSlug = $resolvedSeparator === '_'
-            ? str_replace('-', '_', $normalizedSlug)
-            : $normalizedSlug;
-        $routeSegment = $routeSlug;
-        if ($normalizedMode === 'date_slug') {
-            $datePrefix = $this->routingDatePrefixFromPublishedAt($publishedAt);
-            $routeSegment = $datePrefix . '-' . $routeSlug;
+        $routeSegment = ChannelRoutePolicy::buildRouteSegment(
+            $this->input,
+            $normalizedSlug,
+            $publishedAt,
+            $channelPageRouteMode,
+            $channelPageUrlSeparator,
+            (string) $this->config->get('content.separator', '-')
+        );
+        if ($routeSegment === '') {
+            $routeSegment = $normalizedSlug;
         }
 
         return '/' . $normalizedChannel . '/' . $routeSegment;
-    }
-
-    /**
-     * Returns one `YYYY-MM-DD` date prefix for channel date-slug routes.
-     */
-    private function routingDatePrefixFromPublishedAt(string $publishedAt): string
-    {
-        $publishedAt = trim($publishedAt);
-        if ($publishedAt !== '' && preg_match('/^\d{4}-\d{2}-\d{2}/', $publishedAt, $matches) === 1) {
-            return (string) ($matches[0] ?? gmdate('Y-m-d'));
-        }
-
-        $timestamp = $publishedAt !== '' ? strtotime($publishedAt) : false;
-        if ($timestamp === false || $timestamp <= 0) {
-            $timestamp = time();
-        }
-
-        return gmdate('Y-m-d', $timestamp);
     }
 
     /**
@@ -11428,26 +11132,7 @@ MARKDOWN;
      */
     private function configBool(mixed $value, bool $default = false): bool
     {
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        if (is_int($value) || is_float($value)) {
-            return ((int) $value) !== 0;
-        }
-
-        if (is_string($value)) {
-            $normalized = strtolower(trim($value));
-            if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
-                return true;
-            }
-
-            if (in_array($normalized, ['0', 'false', 'no', 'off'], true)) {
-                return false;
-            }
-        }
-
-        return $default;
+        return ConfigValueParser::bool($value, $default);
     }
 
     /**
@@ -11737,22 +11422,6 @@ MARKDOWN;
     {
         $normalized = strtolower(trim($slug));
         return in_array($normalized, $this->stockPublicThemeSlugs(), true);
-    }
-
-    /**
-     * Maps PHP upload error codes into theme-upload messages.
-     */
-    private function themeUploadErrorMessage(int $code): string
-    {
-        return match ($code) {
-            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'Theme archive exceeds server upload limits.',
-            UPLOAD_ERR_PARTIAL => 'Theme archive upload was only partially received.',
-            UPLOAD_ERR_NO_FILE => 'Please choose a ZIP file to upload.',
-            UPLOAD_ERR_NO_TMP_DIR => 'Server temporary upload directory is missing.',
-            UPLOAD_ERR_CANT_WRITE => 'Server failed to write uploaded theme archive.',
-            UPLOAD_ERR_EXTENSION => 'A server extension blocked the theme upload.',
-            default => 'Theme upload failed with an unknown error.',
-        };
     }
 
     /**
@@ -12162,51 +11831,27 @@ MARKDOWN;
         return $themeSlug;
     }
 
-    /**
-     * Returns ordered public template lookup roots, child theme first.
-     *
-     * @return array<int, string>
-     */
-    private function publicFallbackTemplateRoots(): array
+    private function archivePackages(): ArchivePackageService
     {
-        $roots = [];
-        $themeSlug = $this->activePublicThemeSlug();
-        foreach ($this->activePublicThemeInheritanceChain($themeSlug) as $candidateThemeSlug) {
-            $themeViewsRoot = $this->publicThemesRoot() . '/' . $candidateThemeSlug . '/views';
-            if (is_dir($themeViewsRoot)) {
-                $roots[] = $themeViewsRoot;
-            }
+        if (!$this->archivePackages instanceof ArchivePackageService) {
+            $this->archivePackages = new ArchivePackageService(dirname(__DIR__, 3));
         }
 
-        $roots[] = dirname(__DIR__, 3) . '/private/vis';
-        return $roots;
+        return $this->archivePackages;
     }
 
-    /**
-     * Resolves one public fallback template path from ordered roots.
-     */
-    private function resolvePublicFallbackTemplateFile(string $template): ?string
+    private function publicFallbackRenderer(): ThemeFallbackRenderer
     {
-        $relative = trim($template, '/') . '.php';
-        foreach ($this->publicFallbackTemplateRoots() as $root) {
-            $candidate = rtrim($root, '/\\') . '/' . $relative;
-            if (is_file($candidate)) {
-                return $candidate;
-            }
+        if (!$this->publicFallbackRenderer instanceof ThemeFallbackRenderer) {
+            $projectRoot = dirname(__DIR__, 3);
+            $this->publicFallbackRenderer = new ThemeFallbackRenderer(
+                $this->publicThemesRoot(),
+                $projectRoot . '/private/vis',
+                $projectRoot . '/private/tmp/template_tag_cache'
+            );
         }
 
-        return null;
-    }
-
-    /**
-     * Executes one resolved public fallback template file in isolated scope.
-     *
-     * @param array<string, mixed> $data
-     */
-    private function renderPublicFallbackTemplateFile(string $file, array $data): string
-    {
-        $templateTags = new \Raven\Core\View\TemplateTagEngine(dirname(__DIR__, 3) . '/private/tmp/template_tag_cache');
-        return $templateTags->renderFile($file, $data);
+        return $this->publicFallbackRenderer;
     }
 
     /**
