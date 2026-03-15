@@ -34,7 +34,7 @@ Last updated: 2026-03-11
 	- Read `debug/release/AGENTS.md` and follow that file for release execution rules.
 	- If a task requires Build-level powers/authority, you are to ask for explicit permission to summon the Code Raven.
 - Base Raven architecture remains in `AGENTS.md` and `README.md`.
-- All files within `debug/` must NEVER be mentioned in files outside of `debug`, and ESPECIALLY NOT in ANY `AGENTS.md` not under `debug/`, nor documentation files!!!
+- All files within `debug/release/` must NEVER be mentioned in files outside of `debug/release/`, and ESPECIALLY NOT in ANY `AGENTS.md` not under `debug/release/`, nor documentation files!!!
 
 ## Available Debug Tools
 - Config key-tree sync:
