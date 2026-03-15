@@ -199,6 +199,7 @@ $form = [
     'pgsql_dbname' => '',
     'pgsql_user' => '',
     'pgsql_password' => '',
+    'enable_usernames' => '',
     'admin_username' => '',
     'admin_display_name' => '',
     'admin_email' => '',
@@ -295,7 +296,8 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         }
     }
 
-    $adminUsername = $form['admin_username'];
+    $enableUsernames = (string) ($form['enable_usernames'] ?? '') === '1';
+    $adminUsername = $enableUsernames ? $form['admin_username'] : '';
     $adminDisplayName = $form['admin_display_name'] !== ''
         ? $form['admin_display_name']
         : $formPlaceholders['admin_display_name'];
@@ -303,8 +305,8 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
     $adminPassword = $form['admin_password'];
     $adminPasswordConfirm = $form['admin_password_confirm'];
 
-    if ($adminUsername !== '' && preg_match('/^[a-zA-Z0-9_.-]{3,100}$/', $adminUsername) !== 1) {
-        $errors[] = 'Admin username must be blank or 3-100 characters using letters, numbers, dot, underscore, or dash.';
+    if ($enableUsernames && preg_match('/^[a-zA-Z0-9_.-]{3,100}$/', $adminUsername) !== 1) {
+        $errors[] = 'Admin username is required and must be 3-100 characters using letters, numbers, dot, underscore, or dash.';
     }
     if ($adminEmail === '' || filter_var($adminEmail, FILTER_VALIDATE_EMAIL) === false) {
         $errors[] = 'A valid admin email is required.';
@@ -346,7 +348,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         unset($nextConfig['public']);
         $nextConfig['user'] = is_array($nextConfig['user'] ?? null) ? $nextConfig['user'] : [];
         $nextConfig['user']['auth'] = is_array($nextConfig['user']['auth'] ?? null) ? $nextConfig['user']['auth'] : [];
-        $nextConfig['user']['auth']['login'] = 'email';
+        $nextConfig['user']['auth']['login'] = $enableUsernames ? 'username' : 'email';
         $nextConfig['user']['auth']['registration'] = 'closed';
 
         $nextConfig['database'] = [
@@ -575,10 +577,23 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         <div class="card">
             <h2>First Super Admin</h2>
             <div class="grid">
-                <div class="field">
-                    <label for="admin_username">Username (Optional)</label>
-                    <input id="admin_username" name="admin_username" value="<?= installer_e($form['admin_username']) ?>" placeholder="<?= installer_e($formPlaceholders['admin_username']) ?>">
-                    <div class="note">Panel login defaults to email mode on new installs.</div>
+                <div class="field full">
+                    <label for="enable_usernames" style="display:flex;align-items:center;gap:0.45rem;">
+                        <input id="enable_usernames" name="enable_usernames" type="checkbox" value="1"<?= (string) ($form['enable_usernames'] ?? '') === '1' ? ' checked' : '' ?>>
+                        <span>Enable usernames for panel login</span>
+                    </label>
+                    <div class="note">When enabled, login mode is set to username and an admin username is required.</div>
+                </div>
+                <div class="field" id="admin_username_field"<?= (string) ($form['enable_usernames'] ?? '') === '1' ? '' : ' style="display:none;"' ?>>
+                    <label for="admin_username">Username</label>
+                    <input
+                        id="admin_username"
+                        name="admin_username"
+                        value="<?= installer_e($form['admin_username']) ?>"
+                        placeholder="<?= installer_e($formPlaceholders['admin_username']) ?>"
+                        <?= (string) ($form['enable_usernames'] ?? '') === '1' ? 'required' : 'disabled' ?>
+                    >
+                    <div class="note">Used as the panel login identifier when usernames are enabled.</div>
                 </div>
                 <div class="field"><label for="admin_display_name">Display Name</label><input id="admin_display_name" name="admin_display_name" value="<?= installer_e($form['admin_display_name']) ?>" placeholder="<?= installer_e($formPlaceholders['admin_display_name']) ?>"></div>
                 <div class="field"><label for="admin_email">Email</label><input id="admin_email" name="admin_email" type="email" value="<?= installer_e($form['admin_email']) ?>" placeholder="<?= installer_e($formPlaceholders['admin_email']) ?>" required></div>
@@ -600,6 +615,9 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
     }
     var tablePrefixField = document.getElementById('db_table_prefix_field');
     var tablePrefixInput = document.getElementById('db_table_prefix');
+    var enableUsernamesInput = document.getElementById('enable_usernames');
+    var adminUsernameField = document.getElementById('admin_username_field');
+    var adminUsernameInput = document.getElementById('admin_username');
 
     function syncDriverSections() {
       var selected = driverSelect.value;
@@ -622,6 +640,22 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
 
     driverSelect.addEventListener('change', syncDriverSections);
     syncDriverSections();
+
+    function syncUsernameFields() {
+      var enabled = enableUsernamesInput instanceof HTMLInputElement && enableUsernamesInput.checked;
+      if (adminUsernameField instanceof HTMLElement) {
+        adminUsernameField.style.display = enabled ? '' : 'none';
+      }
+      if (adminUsernameInput instanceof HTMLInputElement) {
+        adminUsernameInput.disabled = !enabled;
+        adminUsernameInput.required = enabled;
+      }
+    }
+
+    if (enableUsernamesInput instanceof HTMLInputElement) {
+      enableUsernamesInput.addEventListener('change', syncUsernameFields);
+    }
+    syncUsernameFields();
   })();
 </script>
 </body>

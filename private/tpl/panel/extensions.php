@@ -309,14 +309,14 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                             <div class="form-text">Lowercase letters, numbers, underscores, and dashes only.</div>
                         </div>
                         <div class="col-md-2">
-                            <label for="extension_version" class="form-label">Version</label>
+                            <label for="extension_version" class="form-label">Version (Optional)</label>
                             <input
                                 id="extension_version"
                                 type="text"
                                 name="version"
                                 class="form-control"
                                 maxlength="80"
-                                value="0.1.0"
+                                placeholder="0.1.0"
                             >
                         </div>
                         <div class="col-md-5">

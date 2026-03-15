@@ -2038,7 +2038,7 @@ function raven_cli_extension_scaffold_files(string $extensionPath, array $meta, 
 {
     $slug = (string) ($meta['slug'] ?? 'extension');
     $name = (string) ($meta['name'] ?? $slug);
-    $version = (string) ($meta['version'] ?? '0.1.0');
+    $version = trim((string) ($meta['version'] ?? ''));
     $description = (string) ($meta['description'] ?? '');
     $type = (string) ($meta['type'] ?? 'plugin');
     $author = (string) ($meta['author'] ?? '');
@@ -2047,12 +2047,14 @@ function raven_cli_extension_scaffold_files(string $extensionPath, array $meta, 
 
     $manifest = [
         'name' => $name,
-        'version' => $version,
         'description' => $description,
         'type' => $type,
         'author' => $author,
         'homepage' => $homepage,
     ];
+    if ($version !== '') {
+        $manifest['version'] = $version;
+    }
 
     $files = [];
     $files['ext.json'] = json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n";
@@ -2196,7 +2198,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         $context->renderHelpHeader('ext');
         $context->info('Usage: private/bin/rvn-ext <action> [options]');
         $context->info('Actions: list, enable, disable, create, import, delete');
-        $context->info('Options: --slug, --archive, --type, --name, --version, --description, --author, --homepage');
+        $context->info('Options: --slug, --archive, --type, --name, --version (optional), --description, --author, --homepage');
         return 0;
     }
 
@@ -2432,7 +2434,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 throw new RuntimeException('Invalid extension type.');
             }
 
-            $version = trim((string) raven_cli_option($options, 'version', '0.1.0'));
+            $version = trim((string) raven_cli_option($options, 'version', ''));
             $description = trim((string) raven_cli_option($options, 'description', ''));
             $author = trim((string) raven_cli_option($options, 'author', ''));
             $homepage = trim((string) raven_cli_option($options, 'homepage', ''));

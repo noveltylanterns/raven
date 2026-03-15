@@ -45,6 +45,13 @@
 - Rewired `ChannelRepository`, `PageRepository`, `UserRepository`, and `GroupRepository` to delegate these concerns through `private/lib/`, and refreshed `AGENTS.md` private file-tree delegation summaries.
 - Moved runtime temp/cache/session/export paths from `private/tmp` to root `.tmp` while keeping installer lock state at `private/dat/install.lock`, and updated runtime/docs/config references accordingly.
 - Migrated template directory conventions from `vis/` to `tpl/` across core fallback templates, stock public theme templates, extension templates, runtime resolver/scaffold paths, CLI generators, and documentation references.
+- Updated panel 2FA preferences UX so TOTP secrets are generated via setup, rendered read-only, and copyable directly from the input.
+- Fixed a panel 2FA session regression where adding/rotating a security key in preferences could force logout on the next request.
+- Updated panel navigation so `Create Page` collapses to a direct link when no channel-specific shortcuts are available.
+- Updated account editors so username fields are shown only in username-login mode, while preserving existing usernames when fields are hidden in email-login mode.
+- Updated installer account setup with an explicit `Enable usernames for panel login` toggle, conditionally showing/requiring the username field and setting login mode accordingly.
+- Reworked Group Editor panel permissions into a matrix layout for route/action bits below `Access Dashboard` while keeping permission-lock behavior intact.
+- Made extension manifest `version` optional in panel/CLI scaffold generation and removed version keys from stock extension manifests.
 
 ### March 13, 2026
 

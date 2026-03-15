@@ -142,7 +142,16 @@ $themeLabels = [
             <div class="col-md position-relative" data-preferences-two-factor-section="totp" style="display:none;">
                 <label class="form-label">TOTP Secret / Confirm Code</label>
                 <div class="input-group">
-                    <input type="text" class="form-control" data-preferences-two-factor-key="secret" placeholder="TOTP secret (auto if blank)">
+                    <input
+                        type="text"
+                        class="form-control"
+                        data-preferences-two-factor-key="secret"
+                        data-preferences-two-factor-secret-copy="1"
+                        placeholder="Click Setup App to generate secret"
+                        title="Click to copy"
+                        autocomplete="off"
+                        readonly
+                    >
                     <input type="text" class="form-control" data-preferences-two-factor-key="verification_code" placeholder="6-digit code">
                     <button type="button" class="btn btn-primary" data-preferences-two-factor-totp-setup="1">Setup App</button>
                 </div>
@@ -932,6 +941,17 @@ $themeLabels = [
         return;
       }
 
+      var totpSecretField = target.closest('[data-preferences-two-factor-secret-copy="1"]');
+      if (totpSecretField instanceof HTMLInputElement) {
+        void copyTextValue(totpSecretField.value).then(function (copied) {
+          var totpRow = totpSecretField.closest('[data-preferences-two-factor-row="1"]');
+          if (totpRow instanceof HTMLElement) {
+            setTotpFeedback(totpRow, copied ? 'Secret copied.' : 'Copy failed.', copied ? 'muted' : 'error');
+          }
+        });
+        return;
+      }
+
       var removeButton = target.closest('[data-preferences-two-factor-remove="1"]');
       if (removeButton instanceof HTMLElement) {
         var removeRow = removeButton.closest('[data-preferences-two-factor-row="1"]');
@@ -953,6 +973,30 @@ $themeLabels = [
       }
 
       void pairWebauthnForRow(row, registerButton);
+    });
+
+    list.addEventListener('keydown', function (event) {
+      var target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      if (!(event instanceof KeyboardEvent) || (event.key !== 'Enter' && event.key !== ' ')) {
+        return;
+      }
+
+      var totpSecretField = target.closest('[data-preferences-two-factor-secret-copy="1"]');
+      if (!(totpSecretField instanceof HTMLInputElement)) {
+        return;
+      }
+
+      event.preventDefault();
+      void copyTextValue(totpSecretField.value).then(function (copied) {
+        var row = totpSecretField.closest('[data-preferences-two-factor-row="1"]');
+        if (row instanceof HTMLElement) {
+          setTotpFeedback(row, copied ? 'Secret copied.' : 'Copy failed.', copied ? 'muted' : 'error');
+        }
+      });
     });
 
     reindexRows();
@@ -1017,20 +1061,18 @@ $themeLabels = [
             aria-labelledby="preferences-account-tab"
             tabindex="0"
         >
+            <?php if ($usernameRequiredForAuth): ?>
             <div class="form-group">
                 <label class="form-label" for="username">Username</label>
                 <input class="form-control"
                     id="username"
                     name="username"
-                    <?= $usernameRequiredForAuth ? 'required' : '' ?>
+                    required
                     value="<?= e((string) ($preferences['username'] ?? '')) ?>"
                 >
-                <div class="form-text">
-                    <?= $usernameRequiredForAuth
-                        ? 'Required because panel login is set to Username mode.'
-                        : 'Optional because panel login is set to Email mode.' ?>
-                </div>
+                <div class="form-text">Required because panel login is set to Username mode.</div>
             </div>
+            <?php endif; ?>
 
             <div class="form-group">
                 <label class="form-label" for="display_name">Display Name</label>

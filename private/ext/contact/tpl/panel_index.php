@@ -36,7 +36,9 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
         <div class="d-flex align-items-start justify-content-between gap-2">
             <h1>
                 <?= e($extensionName !== '' ? $extensionName : 'Contact Forms') ?>
-                <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
+                <?php if ($extensionVersion !== ''): ?>
+                    <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion) ?></small>
+                <?php endif; ?>
             </h1>
             <div class="d-flex flex-wrap gap-2">
                 <?php if ($extensionDocsUrl !== ''): ?>

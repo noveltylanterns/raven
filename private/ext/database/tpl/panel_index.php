@@ -43,7 +43,9 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
         <div class="d-flex align-items-start justify-content-between gap-2">
             <h1>
                 <?= e($extensionName !== '' ? $extensionName : 'Database Manager') ?>
-                <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
+                <?php if ($extensionVersion !== ''): ?>
+                    <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion) ?></small>
+                <?php endif; ?>
             </h1>
             <?php if ($extensionDocsUrl !== ''): ?>
             <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">

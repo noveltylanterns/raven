@@ -212,6 +212,7 @@ usort($systemNavItems, static function (array $left, array $right): int {
 
 $currentSection = is_string($section) ? $section : '';
 $createPageAccordionOpen = $currentSection === 'pages' && $pagesNav === 'create';
+$showCreatePageAccordion = $pageCreateChannelItems !== [];
 
 $siteName = trim((string) ($site['name'] ?? 'Raven CMS'));
 if ($siteName === '') {
@@ -460,6 +461,7 @@ if ($section === 'login') {
                         <h2 class="h6 text-uppercase text-white-50">Content</h2>
                         <ul class="nav nav-pills flex-column gap-1 mb-3">
                             <li class="nav-item">
+                                <?php if ($showCreatePageAccordion): ?>
                                 <details class="rvnp-nav-subaccordion"<?= $createPageAccordionOpen ? ' open' : '' ?>>
                                     <summary class="rvnp-nav-subsummary<?= $createPageAccordionOpen ? ' active' : '' ?>">Create Page</summary>
                                     <ul class="nav nav-pills flex-column gap-1 rvnp-nav-sublist">
@@ -480,6 +482,9 @@ if ($section === 'login') {
                                         <?php endforeach; ?>
                                     </ul>
                                 </details>
+                                <?php else: ?>
+                                    <a class="nav-link<?= ($section === 'pages' && $pagesNav === 'create') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages/edit">Create Page</a>
+                                <?php endif; ?>
                             </li>
                             <li class="nav-item"><a class="nav-link<?= ($section === 'pages' && $pagesNav === 'list') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages">List Pages</a></li>
                         </ul>
@@ -607,6 +612,7 @@ if ($section === 'login') {
                             <h2 class="h6 text-uppercase text-muted">Content</h2>
                             <ul class="nav nav-pills flex-column gap-1 mb-3">
                                 <li class="nav-item">
+                                    <?php if ($showCreatePageAccordion): ?>
                                     <details class="rvnp-nav-subaccordion"<?= $createPageAccordionOpen ? ' open' : '' ?>>
                                         <summary class="rvnp-nav-subsummary<?= $createPageAccordionOpen ? ' active' : '' ?>">Create Page</summary>
                                         <ul class="nav nav-pills flex-column gap-1 rvnp-nav-sublist">
@@ -627,6 +633,9 @@ if ($section === 'login') {
                                             <?php endforeach; ?>
                                         </ul>
                                     </details>
+                                    <?php else: ?>
+                                        <a class="nav-link<?= ($section === 'pages' && $pagesNav === 'create') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages/edit">Create Page</a>
+                                    <?php endif; ?>
                                 </li>
                                 <li class="nav-item"><a class="nav-link<?= ($section === 'pages' && $pagesNav === 'list') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages">List Pages</a></li>
                             </ul>

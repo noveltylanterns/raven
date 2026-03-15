@@ -1,0 +1,498 @@
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/debug/util/profile-public-pages.php
+ * Query/timing profiler for public frontend route/view types.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+use Raven\Controller\PublicController;
+use Raven\Lib\Profiling\RequestProfiler;
+use Raven\Repository\GroupRepository;
+use Raven\Repository\PageRepository;
+use Raven\Repository\TaxonomyRepository;
+use Raven\Repository\UserRepository;
+
+error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
+ini_set('display_errors', '0');
+
+/**
+ * Profiles public routes/views against current runtime config and data.
+ */
+final class PublicRouteProfilerRunner
+{
+    private string $root;
+
+    /** @var array<int, string> */
+    private array $events = [];
+
+    public function __construct(string $root)
+    {
+        $this->root = rtrim($root, '/');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function events(): array
+    {
+        return $this->events;
+    }
+
+    public function run(): void
+    {
+        $scenarios = $this->buildScenarios();
+        if ($scenarios === []) {
+            $this->events[] = 'public_profile_result=FAIL';
+            $this->events[] = 'error=No profile scenarios resolved from current public config/data.';
+            return;
+        }
+
+        foreach ($scenarios as $scenario) {
+            $result = $this->profileScenario($scenario);
+            $this->events[] = sprintf(
+                'public.%s status=%d queries=%d total_ms=%.1f sql_ms=%.1f duplicates=%d body_bytes=%d',
+                $scenario['key'],
+                $result['status'],
+                $result['queries'],
+                $result['total_ms'],
+                $result['sql_ms'],
+                $result['duplicate_count'],
+                $result['body_bytes']
+            );
+
+            foreach ($result['duplicate_sql'] as $index => $entry) {
+                $this->events[] = sprintf(
+                    'public.%s.duplicate.%d count=%d sql=%s',
+                    $scenario['key'],
+                    $index + 1,
+                    (int) ($entry['count'] ?? 0),
+                    (string) ($entry['sql'] ?? '')
+                );
+            }
+
+            foreach ($result['sql'] as $index => $sql) {
+                $this->events[] = 'public.' . $scenario['key'] . '.sql.' . ($index + 1) . '=' . $sql;
+            }
+        }
+
+        $this->events[] = 'public_profile_result=PASS';
+    }
+
+    /**
+     * @return array<int, array{
+     *   key: string,
+     *   uri: string,
+     *   handler: callable(PublicController): void
+     * }>
+     */
+    private function buildScenarios(): array
+    {
+        $app = $this->bootstrapApp('/');
+        /** @var PageRepository $pages */
+        $pages = $app['pages'];
+        /** @var TaxonomyRepository $taxonomy */
+        $taxonomy = $app['taxonomy'];
+        /** @var UserRepository $users */
+        $users = $app['users'];
+        /** @var GroupRepository $groups */
+        $groups = $app['groups'];
+        /** @var array<string, mixed> $configSnapshot */
+        $configSnapshot = $app['config']->all();
+
+        $categoryPrefix = $this->normalizedOptionalPrefix(
+            (string) (($configSnapshot['categories']['prefix'] ?? 'cat')),
+            'cat'
+        );
+        $tagPrefix = $this->normalizedOptionalPrefix(
+            (string) (($configSnapshot['tags']['prefix'] ?? 'tag')),
+            'tag'
+        );
+        $profilePrefix = $this->normalizedOptionalPrefix(
+            (string) (($configSnapshot['session']['profile_prefix'] ?? 'user')),
+            'user'
+        );
+        $groupPrefix = $this->normalizedOptionalPrefix(
+            (string) (($configSnapshot['session']['group_prefix'] ?? 'group')),
+            'group'
+        );
+        $profileMode = strtolower(trim((string) ($configSnapshot['session']['profile_mode'] ?? 'disabled')));
+        $groupMode = strtolower(trim((string) ($configSnapshot['session']['show_groups'] ?? 'disabled')));
+        $profileRoutesEnabled = $profilePrefix !== '' && in_array($profileMode, ['public_full', 'public_limited', 'private'], true);
+        $groupRoutesEnabled = $groupPrefix !== '' && in_array($groupMode, ['public', 'private'], true);
+
+        $taxonomyRouting = $taxonomy->listRoutingInventoryData($categoryPrefix !== '', $tagPrefix !== '', true);
+        $channels = is_array($taxonomyRouting['channels'] ?? null) ? $taxonomyRouting['channels'] : [];
+        $categories = is_array($taxonomyRouting['categories'] ?? null) ? $taxonomyRouting['categories'] : [];
+        $tags = is_array($taxonomyRouting['tags'] ?? null) ? $taxonomyRouting['tags'] : [];
+        $pagesForRouting = $pages->listAllForRouting();
+        $channelSlugById = [];
+        foreach ($channels as $channel) {
+            $channelId = (int) ($channel['id'] ?? 0);
+            $channelSlug = trim((string) ($channel['slug'] ?? ''));
+            if ($channelId > 0 && $channelSlug !== '') {
+                $channelSlugById[$channelId] = $channelSlug;
+            }
+        }
+
+        $rootPageSlug = null;
+        $channelPage = null;
+        $channelLandingSlug = null;
+        foreach ($pagesForRouting as $row) {
+            $isPublished = (int) ($row['is_published'] ?? 0) === 1;
+            if (!$isPublished) {
+                continue;
+            }
+
+            $slug = trim((string) ($row['slug'] ?? ''));
+            if ($slug === '') {
+                continue;
+            }
+
+            $channelId = (int) ($row['channel_id'] ?? 0);
+            if ($channelId < 1) {
+                if ($rootPageSlug === null && !in_array($slug, ['home', 'index'], true)) {
+                    $rootPageSlug = $slug;
+                }
+                continue;
+            }
+
+            $channelSlug = trim((string) ($channelSlugById[$channelId] ?? ''));
+            if ($channelSlug === '') {
+                continue;
+            }
+
+            if ($channelLandingSlug === null && in_array($slug, ['home', 'index'], true)) {
+                $channelLandingSlug = $channelSlug;
+            }
+
+            if ($channelPage === null && !in_array($slug, ['home', 'index'], true)) {
+                $channelPage = [
+                    'channel_slug' => $channelSlug,
+                    'page_slug' => $slug,
+                ];
+            }
+        }
+
+        $scenarios = [];
+        $scenarios[] = [
+            'key' => 'home',
+            'uri' => '/',
+            'handler' => static function (PublicController $controller): void {
+                $controller->home();
+            },
+        ];
+
+        if ($channelLandingSlug !== null) {
+            $scenarios[] = [
+                'key' => 'channel_landing',
+                'uri' => '/' . rawurlencode($channelLandingSlug),
+                'handler' => static function (PublicController $controller) use ($channelLandingSlug): void {
+                    $controller->channel($channelLandingSlug);
+                },
+            ];
+        }
+
+        if ($rootPageSlug !== null) {
+            $scenarios[] = [
+                'key' => 'page_root',
+                'uri' => '/' . rawurlencode($rootPageSlug),
+                'handler' => static function (PublicController $controller) use ($rootPageSlug): void {
+                    $controller->page($rootPageSlug, null);
+                },
+            ];
+        }
+
+        if (is_array($channelPage)) {
+            $channelSlug = (string) ($channelPage['channel_slug'] ?? '');
+            $pageSlug = (string) ($channelPage['page_slug'] ?? '');
+            if ($channelSlug !== '' && $pageSlug !== '') {
+                $scenarios[] = [
+                    'key' => 'page_channel',
+                    'uri' => '/' . rawurlencode($channelSlug) . '/' . rawurlencode($pageSlug),
+                    'handler' => static function (PublicController $controller) use ($channelSlug, $pageSlug): void {
+                        $controller->page($pageSlug, $channelSlug);
+                    },
+                ];
+            }
+        }
+
+        if ($categoryPrefix !== '' && $categories !== []) {
+            $categorySlug = trim((string) ($categories[0]['slug'] ?? ''));
+            if ($categorySlug !== '') {
+                $scenarios[] = [
+                    'key' => 'category_index',
+                    'uri' => '/' . rawurlencode($categoryPrefix) . '/' . rawurlencode($categorySlug),
+                    'handler' => static function (PublicController $controller) use ($categorySlug): void {
+                        $controller->category($categorySlug, 1);
+                    },
+                ];
+            }
+        }
+
+        if ($tagPrefix !== '' && $tags !== []) {
+            $tagSlug = trim((string) ($tags[0]['slug'] ?? ''));
+            if ($tagSlug !== '') {
+                $scenarios[] = [
+                    'key' => 'tag_index',
+                    'uri' => '/' . rawurlencode($tagPrefix) . '/' . rawurlencode($tagSlug),
+                    'handler' => static function (PublicController $controller) use ($tagSlug): void {
+                        $controller->tag($tagSlug, 1);
+                    },
+                ];
+            }
+        }
+
+        if ($profileRoutesEnabled) {
+            $usersForRouting = $users->listAllForRouting();
+            if ($usersForRouting !== []) {
+                $username = trim((string) ($usersForRouting[0]['username'] ?? ''));
+                if ($username !== '') {
+                    $scenarios[] = [
+                        'key' => 'profile',
+                        'uri' => '/' . rawurlencode($profilePrefix) . '/' . rawurlencode($username),
+                        'handler' => static function (PublicController $controller) use ($username): void {
+                            $controller->profile($username);
+                        },
+                    ];
+                }
+            }
+        }
+
+        if ($groupRoutesEnabled) {
+            $groupRows = $groups->listAll();
+            foreach ($groupRows as $group) {
+                $routeEnabled = (int) ($group['route_enabled'] ?? 0) === 1;
+                $slug = strtolower(trim((string) ($group['slug'] ?? '')));
+                if (!$routeEnabled || $slug === '' || in_array($slug, ['guest', 'validating', 'banned'], true)) {
+                    continue;
+                }
+
+                $scenarios[] = [
+                    'key' => 'group',
+                    'uri' => '/' . rawurlencode($groupPrefix) . '/' . rawurlencode($slug),
+                    'handler' => static function (PublicController $controller) use ($slug): void {
+                        $controller->group($slug);
+                    },
+                ];
+                break;
+            }
+        }
+
+        $scenarios[] = [
+            'key' => 'not_found',
+            'uri' => '/__codex_profiler_not_found__',
+            'handler' => static function (PublicController $controller): void {
+                $controller->notFound();
+            },
+        ];
+
+        return $scenarios;
+    }
+
+    /**
+     * @param array{
+     *   key: string,
+     *   uri: string,
+     *   handler: callable(PublicController): void
+     * } $scenario
+     * @return array{
+     *   status: int,
+     *   body_bytes: int,
+     *   queries: int,
+     *   total_ms: float,
+     *   sql_ms: float,
+     *   duplicate_count: int,
+     *   duplicate_sql: array<int, array{count: int, sql: string}>,
+     *   sql: array<int, string>
+     * }
+     */
+    private function profileScenario(array $scenario): array
+    {
+        $uri = (string) ($scenario['uri'] ?? '/');
+        $this->seedRequestGlobals($uri);
+        http_response_code(200);
+
+        $app = $this->bootstrapApp($uri);
+        $controller = $this->newPublicController($app);
+
+        ob_start();
+        RequestProfiler::start(microtime(true), 'public-profile');
+        RequestProfiler::enable();
+
+        try {
+            if ($controller->enforceSiteAvailability()) {
+                /** @var callable(PublicController): void $handler */
+                $handler = $scenario['handler'];
+                $handler($controller);
+            }
+        } finally {
+            $snapshot = RequestProfiler::snapshot();
+            RequestProfiler::disable();
+            $body = (string) ob_get_clean();
+        }
+
+        /** @var array<int, array<string, mixed>> $queries */
+        $queries = is_array($snapshot['queries'] ?? null) ? $snapshot['queries'] : [];
+        $normalizedSql = [];
+        foreach ($queries as $query) {
+            $sql = trim((string) ($query['sql'] ?? ''));
+            if ($sql === '') {
+                continue;
+            }
+
+            $normalizedSql[] = (string) preg_replace('/\s+/', ' ', $sql);
+        }
+
+        $duplicateMap = [];
+        foreach ($normalizedSql as $sql) {
+            $duplicateMap[$sql] = (int) ($duplicateMap[$sql] ?? 0) + 1;
+        }
+
+        $duplicateSql = [];
+        foreach ($duplicateMap as $sql => $count) {
+            if ($count > 1) {
+                $duplicateSql[] = [
+                    'count' => $count,
+                    'sql' => $sql,
+                ];
+            }
+        }
+        usort(
+            $duplicateSql,
+            static function (array $a, array $b): int {
+                $countCompare = ((int) ($b['count'] ?? 0)) <=> ((int) ($a['count'] ?? 0));
+                if ($countCompare !== 0) {
+                    return $countCompare;
+                }
+
+                return strcmp((string) ($a['sql'] ?? ''), (string) ($b['sql'] ?? ''));
+            }
+        );
+
+        $status = http_response_code();
+        if (!is_int($status) || $status < 100) {
+            $status = 200;
+        }
+
+        return [
+            'status' => $status,
+            'body_bytes' => strlen($body),
+            'queries' => (int) ($snapshot['query_count'] ?? 0),
+            'total_ms' => (float) ($snapshot['duration_ms'] ?? 0.0),
+            'sql_ms' => (float) ($snapshot['query_time_ms'] ?? 0.0),
+            'duplicate_count' => count($duplicateSql),
+            'duplicate_sql' => $duplicateSql,
+            'sql' => $normalizedSql,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $app
+     */
+    private function newPublicController(array $app): PublicController
+    {
+        return new PublicController(
+            $app['view'],
+            $app['config'],
+            $app['auth'],
+            $app['groups'],
+            $app['page_images'],
+            $app['pages'],
+            $app['redirects'],
+            $app['taxonomy'],
+            $app['users'],
+            $app['input'],
+            $app['csrf'],
+            is_array($app['extension_services'] ?? null) ? (array) $app['extension_services'] : []
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function bootstrapApp(string $uri): array
+    {
+        $this->seedRequestGlobals($uri);
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            // Guest-profile run: clear any prior authenticated state between scenarios.
+            $_SESSION = [];
+        }
+
+        /** @var array<string, mixed> $app */
+        $app = require $this->root . '/private/raven.php';
+
+        return $app;
+    }
+
+    private function seedRequestGlobals(string $uri): void
+    {
+        $path = (string) parse_url($uri, PHP_URL_PATH);
+        if ($path === '') {
+            $path = '/';
+        }
+
+        $query = (string) parse_url($uri, PHP_URL_QUERY);
+        $_GET = [];
+        if ($query !== '') {
+            parse_str($query, $_GET);
+        }
+
+        $_POST = [];
+        $_REQUEST = $_GET;
+
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+        $_SERVER['REQUEST_URI'] = $uri;
+        $_SERVER['QUERY_STRING'] = $query;
+        $_SERVER['HTTP_HOST'] = 'dev.lanterns.io';
+        $_SERVER['SERVER_NAME'] = 'dev.lanterns.io';
+        $_SERVER['SERVER_PORT'] = '80';
+        $_SERVER['HTTPS'] = '';
+        $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+        $_SERVER['HTTP_USER_AGENT'] = 'RavenPublicProfiler/1.0';
+        $_SERVER['SCRIPT_NAME'] = $path;
+        $_SERVER['DOCUMENT_ROOT'] = $this->root . '/public';
+    }
+
+    private function normalizedOptionalPrefix(string $rawValue, string $fallback): string
+    {
+        $rawValue = trim($rawValue);
+        if ($rawValue === '') {
+            return '';
+        }
+
+        $slug = strtolower($rawValue);
+        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
+        $slug = trim($slug, '-');
+        $slug = preg_replace('/-+/', '-', $slug) ?? '';
+        if ($slug === '') {
+            return $fallback;
+        }
+
+        return $slug;
+    }
+}
+
+$runner = null;
+
+try {
+    $runner = new PublicRouteProfilerRunner(dirname(__DIR__, 2));
+    $runner->run();
+    foreach ($runner->events() as $event) {
+        echo $event . PHP_EOL;
+    }
+    exit(0);
+} catch (Throwable $exception) {
+    if ($runner instanceof PublicRouteProfilerRunner) {
+        foreach ($runner->events() as $event) {
+            fwrite(STDERR, $event . PHP_EOL);
+        }
+    }
+    fwrite(STDERR, 'public_profile_result=FAIL' . PHP_EOL);
+    fwrite(STDERR, 'error=' . $exception->getMessage() . PHP_EOL);
+    exit(1);
+}

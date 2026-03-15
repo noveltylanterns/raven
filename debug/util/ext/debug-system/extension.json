@@ -1,0 +1,7 @@
+{
+    "name": "Debug System Extension",
+    "version": "0.8.2",
+    "description": "Local debug fixture extension for subtype contract smoke tests.",
+    "type": "system",
+    "author": "Raven Debug Agent"
+}

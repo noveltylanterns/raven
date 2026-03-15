@@ -1,6 +1,5 @@
 {
     "name": "Database Manager",
-    "version": "0.9",
     "description": "Database management portal powered by Adminer.",
     "type": "system",
     "author": "Novelty Lanterns",

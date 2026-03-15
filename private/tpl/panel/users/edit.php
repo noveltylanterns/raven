@@ -280,15 +280,13 @@ $themeLabels = [
             aria-labelledby="user-account-tab"
             tabindex="0"
         >
+            <?php if ($usernameRequiredForAuth): ?>
             <div class="form-group">
                 <label for="username" class="form-label">Username</label>
-                <input id="username" name="username" class="form-control"<?= $usernameRequiredForAuth ? ' required' : '' ?> value="<?= e((string) ($userRow['username'] ?? '')) ?>">
-                <div class="form-text">
-                    <?= $usernameRequiredForAuth
-                        ? 'Required because panel login is set to Username mode.'
-                        : 'Optional because panel login is set to Email mode.' ?>
-                </div>
+                <input id="username" name="username" class="form-control" required value="<?= e((string) ($userRow['username'] ?? '')) ?>">
+                <div class="form-text">Required because panel login is set to Username mode.</div>
             </div>
+            <?php endif; ?>
 
             <div class="form-group">
                 <label for="display_name" class="form-label">Display Name</label>

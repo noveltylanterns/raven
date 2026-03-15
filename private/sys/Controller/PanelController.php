@@ -2086,6 +2086,7 @@ final class PanelController
         $editPath = '/users/edit' . ($id !== null ? '/' . $id : '');
         $editUrl = $this->panelEditorUrlWithTab('/users/edit', $id, $activeTab, 'account');
         $loginIdentifierMode = $this->panelLoginIdentifierMode();
+        $usernameSubmitted = array_key_exists('username', $post);
         $rawUsername = $this->input->text($post['username'] ?? null, 254);
         $username = $this->normalizeUserIdentifierValue($rawUsername);
         $displayName = $this->input->text($post['display_name'] ?? null, 160);
@@ -2200,6 +2201,10 @@ final class PanelController
         }
 
         $usernameRequired = $loginIdentifierMode === 'username';
+        if (!$usernameRequired && !$usernameSubmitted && is_array($existingUser)) {
+            $username = trim((string) ($existingUser['username'] ?? ''));
+            $rawUsername = $username;
+        }
         $usernameInvalid = $usernameRequired
             ? !is_string($username)
             : ($rawUsername !== '' && !is_string($username));
@@ -2959,6 +2964,7 @@ final class PanelController
         }
 
         $loginIdentifierMode = $this->panelLoginIdentifierMode();
+        $usernameSubmitted = array_key_exists('username', $post);
         $rawUsername = $this->input->text($post['username'] ?? null, 254);
         $username = $this->normalizeUserIdentifierValue($rawUsername);
         $displayName = $this->input->text($post['display_name'] ?? null, 160);
@@ -2976,6 +2982,10 @@ final class PanelController
 
         $errors = [];
         $usernameRequired = $loginIdentifierMode === 'username';
+        if (!$usernameRequired && !$usernameSubmitted) {
+            $username = trim((string) ($current['username'] ?? ''));
+            $rawUsername = $username;
+        }
 
         // Collect all validation errors first so users can fix in one pass.
         if ($usernameRequired && !is_string($username)) {
@@ -3086,6 +3096,9 @@ final class PanelController
         if (is_string($oldAvatar) && $oldAvatar !== '' && $oldAvatar !== $avatarFilename && $avatarSet) {
             $this->deleteAvatarFile($oldAvatar);
         }
+
+        // Keep the current session valid after enabling or rotating interactive 2FA methods.
+        $this->auth->markTwoFactorVerified($userId);
 
         $this->flash('success', 'User preferences updated.');
         redirect($preferencesUrl);
@@ -4372,9 +4385,6 @@ final class PanelController
         }
 
         $version = $this->input->text($post['version'] ?? null, 80);
-        if ($version === '') {
-            $version = '0.1.0';
-        }
 
         $description = $this->input->text($post['description'] ?? null, 1000);
         $author = $this->input->text($post['author'] ?? null, 120);

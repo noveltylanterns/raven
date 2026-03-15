@@ -1,0 +1,7 @@
+{
+    "name": "Debug Plugin Extension",
+    "version": "0.8.2",
+    "description": "Local debug fixture extension for subtype contract smoke tests.",
+    "type": "plugin",
+    "author": "Raven Debug Agent"
+}

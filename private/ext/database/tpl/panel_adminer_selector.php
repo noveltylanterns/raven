@@ -32,7 +32,9 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
     <div class="card-body">
         <h1>
             <?= e($extensionName !== '' ? $extensionName : 'Database Manager') ?>
-            <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
+            <?php if ($extensionVersion !== ''): ?>
+                <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion) ?></small>
+            <?php endif; ?>
         </h1>
         <p class="mb-0">Select one <?= e($modeLabel) ?> target to open in Adminer. The list is sorted alphabetically.</p>
     </div>

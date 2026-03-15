@@ -1,6 +1,5 @@
 {
     "name": "PHP Info",
-    "version": "0.9",
     "description": "Display phpinfo() data within the administration panel.",
     "type": "system",
     "author": "Novelty Lanterns",

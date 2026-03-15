@@ -156,7 +156,7 @@ final class ExtensionScaffoldService
      *
      * @param array{
      *   name: string,
-     *   version: string,
+     *   version?: string,
      *   description: string,
      *   type: string,
      *   author: string,
@@ -168,10 +168,14 @@ final class ExtensionScaffoldService
     {
         $manifest = [
             'name' => $meta['name'],
-            'version' => $meta['version'],
             'description' => $meta['description'],
             'type' => $meta['type'],
         ];
+
+        $version = trim((string) ($meta['version'] ?? ''));
+        if ($version !== '') {
+            $manifest['version'] = $version;
+        }
 
         if ($meta['author'] !== '') {
             $manifest['author'] = $meta['author'];
@@ -787,7 +791,9 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.
             <div>
                 <h1 class="mb-1">
                     <?= e($extensionName !== '' ? $extensionName : 'Extension') ?>
-                    <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion !== '' ? $extensionVersion : 'Unknown') ?></small>
+                    <?php if ($extensionVersion !== ''): ?>
+                        <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion) ?></small>
+                    <?php endif; ?>
                 </h1>
                 <h6 class="mb-2">by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h6>
                 <p class="mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'Generated starter extension page.') ?></p>
