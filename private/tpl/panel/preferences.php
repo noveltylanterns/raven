@@ -1198,7 +1198,6 @@ $themeLabels = [
                     required
                     value="<?= e((string) ($preferences['username'] ?? '')) ?>"
                 >
-                <div class="form-text">Required because panel login is set to Username mode.</div>
             </div>
             <?php endif; ?>
 
