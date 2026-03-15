@@ -81,7 +81,7 @@ Last updated: 2026-03-14
 - `private/bin/rvn-ext`
 - `private/bin/rvn-sys`
 - `private/bin/rvn.sh` (shell completion helper)
-- `private/bin/lib/raven_cli.php` - Shared CLI command framework and command implementations for 'rvn*' tools.
+- `private/lib/Shell/raven_cli.php` - Shared CLI command framework and command implementations for 'rvn*' tools.
 - CLI command requirements when commands are added:
 - Add command usage + arguments to `docs/CLI.md`.
 - Keep commands non-destructive by default (explicit opt-in for destructive operations).

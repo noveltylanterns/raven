@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/bin/lib/raven_cli.php
+ * ~/private/lib/Shell/raven_cli.php
  * Shared CLI runtime and command handlers for Raven CLI tools.
  * Docs: https://raven.lanterns.io
  */
