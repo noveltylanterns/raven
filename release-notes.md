@@ -37,6 +37,8 @@
 - Updated `AGENTS.md` file-tree and responsibility summaries for the new `private/lib` modules and corresponding `private/sys` delegation changes.
 - Added fourteenth-wave `private/lib/` modularization for package-install workflow, login WebAuthn challenge context, panel invite policy, panel POST payload normalization, config file persistence, and public channel page-route canonicalization (`PackageInstallWorkflowService`, `LoginWebAuthnChallengeService`, `PanelInvitePolicyService`, `PanelPostNormalizer`, `ConfigFileStore`, `PublicChannelPageRouteService`).
 - Rewired `PanelController`, `AuthController`, `PublicController`, and `Core/Config` to delegate these concerns through `private/lib/`, and refreshed the `AGENTS.md` `private/lib` + `private/sys` file-tree summaries accordingly.
+- Added fifteenth-wave `private/lib/` modularization for auth access gating, group role policy, user-group catalog assembly, page taxonomy assignment writes, page-image primary selection policy, and recursive directory cleanup (`AuthAccessGateService`, `GroupRolePolicy`, `UserGroupCatalogService`, `PageTaxonomyAssignmentService`, `PageImagePrimarySelectionService`, `DirectoryTreeService`).
+- Rewired `AuthService`, `GroupRepository`, `UserRepository`, `PageRepository`, `PageImageRepository`, and `PanelController` to delegate these concerns through `private/lib/`, and refreshed `AGENTS.md` file-tree/responsibility notes for the new modules.
 
 ### March 13, 2026
 

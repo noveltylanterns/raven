@@ -14,6 +14,7 @@ namespace Raven\Repository;
 use PDO;
 use Raven\Lib\Content\PageBodyBlockCodec;
 use Raven\Lib\Content\PagePanelFilterClauseBuilder;
+use Raven\Lib\Content\PageTaxonomyAssignmentService;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 use Raven\Lib\Media\PageEditorGalleryHydrator;
 use Raven\Lib\Routing\ChannelContextService;
@@ -34,6 +35,7 @@ final class PageRepository
     private PageBodyBlockCodec $bodyBlockCodec;
     private PageEditorGalleryHydrator $pageEditorGalleryHydrator;
     private PagePanelFilterClauseBuilder $panelFilterClauseBuilder;
+    private PageTaxonomyAssignmentService $pageTaxonomyAssignmentService;
 
     public function __construct(
         PDO $db,
@@ -54,6 +56,7 @@ final class PageRepository
         $this->bodyBlockCodec = new PageBodyBlockCodec();
         $this->pageEditorGalleryHydrator = new PageEditorGalleryHydrator();
         $this->panelFilterClauseBuilder = new PagePanelFilterClauseBuilder();
+        $this->pageTaxonomyAssignmentService = new PageTaxonomyAssignmentService();
     }
 
     /**
@@ -1307,42 +1310,13 @@ final class PageRepository
      */
     private function replacePageCategories(int $pageId, array $categoryIds): void
     {
-        $pageCategories = $this->table('page_categories');
-
-        $delete = $this->db->prepare(
-            'DELETE FROM ' . $pageCategories . ' WHERE page_id = :page_id'
+        $this->pageTaxonomyAssignmentService->replacePageCategories(
+            $this->db,
+            $this->driver,
+            $this->table('page_categories'),
+            $pageId,
+            $categoryIds
         );
-        $delete->execute([':page_id' => $pageId]);
-
-        if ($categoryIds === []) {
-            return;
-        }
-
-        foreach ($categoryIds as $categoryId) {
-            if ($this->driver === 'sqlite') {
-                $insert = $this->db->prepare(
-                    'INSERT INTO ' . $pageCategories . ' (page_id, category_id)
-                     VALUES (:page_id, :category_id)
-                     ON CONFLICT(page_id, category_id) DO NOTHING'
-                );
-            } elseif ($this->driver === 'mysql') {
-                $insert = $this->db->prepare(
-                    'INSERT IGNORE INTO ' . $pageCategories . ' (page_id, category_id)
-                     VALUES (:page_id, :category_id)'
-                );
-            } else {
-                $insert = $this->db->prepare(
-                    'INSERT INTO ' . $pageCategories . ' (page_id, category_id)
-                     VALUES (:page_id, :category_id)
-                     ON CONFLICT (page_id, category_id) DO NOTHING'
-                );
-            }
-
-            $insert->execute([
-                ':page_id' => $pageId,
-                ':category_id' => $categoryId,
-            ]);
-        }
     }
 
     /**
@@ -1352,42 +1326,13 @@ final class PageRepository
      */
     private function replacePageTags(int $pageId, array $tagIds): void
     {
-        $pageTags = $this->table('page_tags');
-
-        $delete = $this->db->prepare(
-            'DELETE FROM ' . $pageTags . ' WHERE page_id = :page_id'
+        $this->pageTaxonomyAssignmentService->replacePageTags(
+            $this->db,
+            $this->driver,
+            $this->table('page_tags'),
+            $pageId,
+            $tagIds
         );
-        $delete->execute([':page_id' => $pageId]);
-
-        if ($tagIds === []) {
-            return;
-        }
-
-        foreach ($tagIds as $tagId) {
-            if ($this->driver === 'sqlite') {
-                $insert = $this->db->prepare(
-                    'INSERT INTO ' . $pageTags . ' (page_id, tag_id)
-                     VALUES (:page_id, :tag_id)
-                     ON CONFLICT(page_id, tag_id) DO NOTHING'
-                );
-            } elseif ($this->driver === 'mysql') {
-                $insert = $this->db->prepare(
-                    'INSERT IGNORE INTO ' . $pageTags . ' (page_id, tag_id)
-                     VALUES (:page_id, :tag_id)'
-                );
-            } else {
-                $insert = $this->db->prepare(
-                    'INSERT INTO ' . $pageTags . ' (page_id, tag_id)
-                     VALUES (:page_id, :tag_id)
-                     ON CONFLICT (page_id, tag_id) DO NOTHING'
-                );
-            }
-
-            $insert->execute([
-                ':page_id' => $pageId,
-                ':tag_id' => $tagId,
-            ]);
-        }
     }
 
     /**

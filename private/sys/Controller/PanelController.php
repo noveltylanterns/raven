@@ -38,6 +38,7 @@ use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\ExtensionScaffoldService;
+use Raven\Lib\Filesystem\DirectoryTreeService;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\PanelPostNormalizer;
 use Raven\Lib\Http\SessionFlash;
@@ -138,6 +139,7 @@ final class PanelController
     private ?PanelInvitePolicyService $panelInvitePolicyService = null;
     private ?PanelPostNormalizer $panelPostNormalizer = null;
     private ?PackageInstallWorkflowService $packageInstallWorkflowService = null;
+    private ?DirectoryTreeService $directoryTreeService = null;
 
     public function __construct(
         View $view,
@@ -3739,7 +3741,7 @@ final class PanelController
                 );
             }
         } catch (\RuntimeException $exception) {
-            $this->removeDirectoryRecursively($themePath);
+            $this->directoryTreeService()->removeDirectoryRecursively($themePath);
             $this->flash('error', 'Failed to create theme scaffold: ' . $exception->getMessage());
             redirect($this->panelUrl('/themes'));
         }
@@ -3749,7 +3751,7 @@ final class PanelController
                 $this->config->set('site.default_theme', $themeSlug);
                 $this->config->save();
             } catch (\RuntimeException $exception) {
-                $this->removeDirectoryRecursively($themePath);
+                $this->directoryTreeService()->removeDirectoryRecursively($themePath);
                 $this->flash('error', 'Theme scaffold created, but activation failed: ' . $exception->getMessage());
                 redirect($this->panelUrl('/themes'));
             }
@@ -3852,7 +3854,7 @@ final class PanelController
             $tmpPath,
             $targetDirectory,
             function (string $directory): void {
-                $this->removeDirectoryRecursively($directory);
+                $this->directoryTreeService()->removeDirectoryRecursively($directory);
             },
             'theme'
         );
@@ -3863,14 +3865,14 @@ final class PanelController
 
         $manifestPath = $targetDirectory . '/theme.json';
         if (!is_file($manifestPath)) {
-            $this->removeDirectoryRecursively($targetDirectory);
+            $this->directoryTreeService()->removeDirectoryRecursively($targetDirectory);
             $this->flash('error', 'Theme upload failed: archive must include theme.json at archive root.');
             redirect($this->panelUrl('/themes'));
         }
 
         $manifests = PublicThemeRegistry::manifests($themesRoot);
         if (!isset($manifests[$themeSlug])) {
-            $this->removeDirectoryRecursively($targetDirectory);
+            $this->directoryTreeService()->removeDirectoryRecursively($targetDirectory);
             $this->flash('error', 'Theme upload failed: theme.json is missing required/valid metadata.');
             redirect($this->panelUrl('/themes'));
         }
@@ -3964,7 +3966,7 @@ final class PanelController
             redirect($this->panelUrl('/themes'));
         }
 
-        $this->removeDirectoryRecursively($themePath);
+        $this->directoryTreeService()->removeDirectoryRecursively($themePath);
         if (is_dir($themePath)) {
             $this->flash('error', 'Failed to delete theme directory from disk.');
             redirect($this->panelUrl('/themes'));
@@ -4144,7 +4146,7 @@ final class PanelController
             redirect($this->panelUrl('/extensions'));
         }
 
-        $this->removeDirectoryRecursively($extensionPath);
+        $this->directoryTreeService()->removeDirectoryRecursively($extensionPath);
         if (is_dir($extensionPath)) {
             $this->flash('error', 'Failed to delete extension directory from disk.');
             redirect($this->panelUrl('/extensions'));
@@ -4241,7 +4243,7 @@ final class PanelController
             $tmpPath,
             $targetDirectory,
             function (string $directory): void {
-                $this->removeDirectoryRecursively($directory);
+                $this->directoryTreeService()->removeDirectoryRecursively($directory);
             },
             'extension'
         );
@@ -4252,7 +4254,7 @@ final class PanelController
 
         $manifest = $this->readExtensionManifest($targetDirectory);
         if (!($manifest['valid'] ?? false)) {
-            $this->removeDirectoryRecursively($targetDirectory);
+            $this->directoryTreeService()->removeDirectoryRecursively($targetDirectory);
             $reason = (string) ($manifest['invalid_reason'] ?? 'Missing required extension metadata.');
             $this->flash('error', 'Extension upload failed: ' . $reason);
             redirect($this->panelUrl('/extensions'));
@@ -4273,7 +4275,7 @@ final class PanelController
             }
         } catch (\RuntimeException $exception) {
             // Roll back extracted files when state finalization fails to avoid ambiguous activation state.
-            $this->removeDirectoryRecursively($targetDirectory);
+            $this->directoryTreeService()->removeDirectoryRecursively($targetDirectory);
             $this->flash('error', 'Extension upload failed: ' . $exception->getMessage());
             redirect($this->panelUrl('/extensions'));
         }
@@ -4438,7 +4440,7 @@ final class PanelController
             ], $generateAgentsFile, $generateComposerFile);
         } catch (\Throwable $exception) {
             // Roll back partial writes so failed scaffold attempts do not leave broken extensions.
-            $this->removeDirectoryRecursively($extensionPath);
+            $this->directoryTreeService()->removeDirectoryRecursively($extensionPath);
             $this->flash('error', 'Failed to create extension scaffold: ' . $exception->getMessage());
             redirect($this->panelUrl('/extensions'));
         }
@@ -4457,7 +4459,7 @@ final class PanelController
                 $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
             }
         } catch (\RuntimeException $exception) {
-            $this->removeDirectoryRecursively($extensionPath);
+            $this->directoryTreeService()->removeDirectoryRecursively($extensionPath);
             $this->flash('error', 'Extension scaffold created, but state finalization failed: ' . $exception->getMessage());
             redirect($this->panelUrl('/extensions'));
         }
@@ -5372,31 +5374,6 @@ final class PanelController
     private function extensionNameFromArchiveFilename(string $archiveName): ?string
     {
         return $this->extensionCatalogService()->extensionNameFromArchiveFilename($archiveName);
-    }
-
-    /**
-     * Removes a directory tree recursively; used for failed extension uploads.
-     */
-    private function removeDirectoryRecursively(string $directory): void
-    {
-        if (!is_dir($directory)) {
-            return;
-        }
-
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-
-        foreach ($iterator as $item) {
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-            } else {
-                @unlink($item->getPathname());
-            }
-        }
-
-        @rmdir($directory);
     }
 
     /**
@@ -6425,6 +6402,15 @@ final class PanelController
         }
 
         return $this->packageInstallWorkflowService;
+    }
+
+    private function directoryTreeService(): DirectoryTreeService
+    {
+        if (!$this->directoryTreeService instanceof DirectoryTreeService) {
+            $this->directoryTreeService = new DirectoryTreeService();
+        }
+
+        return $this->directoryTreeService;
     }
 
     private function profileContactService(): ProfileContactService

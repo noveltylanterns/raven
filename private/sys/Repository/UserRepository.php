@@ -17,6 +17,7 @@ use PDO;
 use RuntimeException;
 use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\ContactProfileNormalizer;
+use Raven\Lib\Auth\UserGroupCatalogService;
 use Raven\Lib\Auth\UserPanelHydrator;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 
@@ -31,6 +32,7 @@ final class UserRepository
     private string $prefix;
     private AuthPayloadCodec $authPayloadCodec;
     private UserPanelHydrator $panelHydrator;
+    private UserGroupCatalogService $userGroupCatalogService;
 
     public function __construct(PDO $authDb, PDO $appDb, string $driver, string $prefix)
     {
@@ -42,6 +44,7 @@ final class UserRepository
         $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
         $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
         $this->panelHydrator = new UserPanelHydrator();
+        $this->userGroupCatalogService = new UserGroupCatalogService();
     }
 
     /**
@@ -1112,45 +1115,12 @@ final class UserRepository
      */
     private function groupEntriesByUserId(array $userIds = []): array
     {
-        $groups = $this->groupTable('groups');
-        $userGroups = $this->groupTable('user_groups');
-        $userIds = array_values(array_unique(array_filter($userIds, static fn (int $id): bool => $id > 0)));
-
-        $where = '';
-        $params = [];
-        if ($userIds !== []) {
-            $placeholders = [];
-            foreach ($userIds as $index => $userId) {
-                $placeholder = ':user_id_' . $index;
-                $placeholders[] = $placeholder;
-                $params[$placeholder] = $userId;
-            }
-            $where = ' WHERE ug.user_id IN (' . implode(', ', $placeholders) . ')';
-        }
-
-        // Join once, then fan out rows into a user_id keyed map.
-        $stmt = $this->appDb->prepare(
-            'SELECT ug.user_id, g.name, g.permission_mask
-             FROM ' . $userGroups . ' ug
-             INNER JOIN ' . $groups . ' g ON g.id = ug.group_id
-             ' . $where . '
-             ORDER BY ug.user_id ASC, g.id ASC'
+        return $this->userGroupCatalogService->groupEntriesByUserId(
+            $this->appDb,
+            $this->groupTable('groups'),
+            $this->groupTable('user_groups'),
+            $userIds
         );
-        $stmt->execute($params);
-
-        $rows = $stmt->fetchAll() ?: [];
-
-        $map = [];
-        foreach ($rows as $row) {
-            $userId = (int) $row['user_id'];
-            $map[$userId] ??= [];
-            $map[$userId][] = [
-                'name' => (string) ($row['name'] ?? ''),
-                'permission_mask' => (int) ($row['permission_mask'] ?? 0),
-            ];
-        }
-
-        return $map;
     }
 
     /**
@@ -1164,143 +1134,12 @@ final class UserRepository
      */
     private function groupEntriesAndOptionsForUserIds(array $userIds): array
     {
-        $groups = $this->groupTable('groups');
-        $userGroups = $this->groupTable('user_groups');
-        $normalizedUserIds = array_values(array_unique(array_filter($userIds, static fn (int $id): bool => $id > 0)));
-
-        if ($normalizedUserIds === []) {
-            $stmt = $this->appDb->prepare(
-                'SELECT g.id AS group_id,
-                        g.name AS group_name,
-                        g.slug AS group_slug,
-                        g.permission_mask AS group_permission_mask,
-                        g.is_stock AS group_is_stock
-                 FROM ' . $groups . ' g
-                 ORDER BY g.id ASC'
-            );
-            $stmt->execute();
-
-            $rows = $stmt->fetchAll() ?: [];
-            $groupOptions = [];
-            foreach ($rows as $row) {
-                $groupId = (int) ($row['group_id'] ?? 0);
-                if ($groupId < 1) {
-                    continue;
-                }
-
-                $groupOptions[] = [
-                    'id' => $groupId,
-                    'name' => (string) ($row['group_name'] ?? ''),
-                    'slug' => (string) ($row['group_slug'] ?? ''),
-                    'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
-                    'is_stock' => (int) ($row['group_is_stock'] ?? 0),
-                ];
-            }
-
-            usort(
-                $groupOptions,
-                static function (array $a, array $b): int {
-                    $aIsStock = (int) ($a['is_stock'] ?? 0);
-                    $bIsStock = (int) ($b['is_stock'] ?? 0);
-                    if ($aIsStock !== $bIsStock) {
-                        return $bIsStock <=> $aIsStock;
-                    }
-
-                    $aName = strtolower(trim((string) ($a['name'] ?? '')));
-                    $bName = strtolower(trim((string) ($b['name'] ?? '')));
-                    if ($aName !== $bName) {
-                        return $aName <=> $bName;
-                    }
-
-                    return ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0));
-                }
-            );
-
-            return [
-                'group_map' => [],
-                'group_options' => $groupOptions,
-            ];
-        }
-
-        $join = 'LEFT JOIN ' . $userGroups . ' ug ON ug.group_id = g.id';
-        $params = [];
-        $placeholders = [];
-        foreach ($normalizedUserIds as $index => $userId) {
-            $placeholder = ':user_id_' . $index;
-            $placeholders[] = $placeholder;
-            $params[$placeholder] = $userId;
-        }
-        $join .= ' AND ug.user_id IN (' . implode(', ', $placeholders) . ')';
-
-        $stmt = $this->appDb->prepare(
-            'SELECT g.id AS group_id,
-                    g.name AS group_name,
-                    g.slug AS group_slug,
-                    g.permission_mask AS group_permission_mask,
-                    g.is_stock AS group_is_stock,
-                    ug.user_id
-             FROM ' . $groups . ' g
-             ' . $join . '
-             ORDER BY g.id ASC, ug.user_id ASC'
+        return $this->userGroupCatalogService->groupEntriesAndOptionsForUserIds(
+            $this->appDb,
+            $this->groupTable('groups'),
+            $this->groupTable('user_groups'),
+            $userIds
         );
-        $stmt->execute($params);
-
-        $rows = $stmt->fetchAll() ?: [];
-        $groupMap = [];
-        $groupOptionsById = [];
-
-        foreach ($rows as $row) {
-            $groupId = (int) ($row['group_id'] ?? 0);
-            if ($groupId < 1) {
-                continue;
-            }
-
-            if (!isset($groupOptionsById[$groupId])) {
-                $groupOptionsById[$groupId] = [
-                    'id' => $groupId,
-                    'name' => (string) ($row['group_name'] ?? ''),
-                    'slug' => (string) ($row['group_slug'] ?? ''),
-                    'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
-                    'is_stock' => (int) ($row['group_is_stock'] ?? 0),
-                ];
-            }
-
-            $userId = (int) ($row['user_id'] ?? 0);
-            if ($userId < 1) {
-                continue;
-            }
-
-            $groupMap[$userId] ??= [];
-            $groupMap[$userId][] = [
-                'name' => (string) ($row['group_name'] ?? ''),
-                'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
-            ];
-        }
-
-        $groupOptions = array_values($groupOptionsById);
-        usort(
-            $groupOptions,
-            static function (array $a, array $b): int {
-                $aIsStock = (int) ($a['is_stock'] ?? 0);
-                $bIsStock = (int) ($b['is_stock'] ?? 0);
-                if ($aIsStock !== $bIsStock) {
-                    return $bIsStock <=> $aIsStock;
-                }
-
-                $aName = strtolower(trim((string) ($a['name'] ?? '')));
-                $bName = strtolower(trim((string) ($b['name'] ?? '')));
-                if ($aName !== $bName) {
-                    return $aName <=> $bName;
-                }
-
-                return ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0));
-            }
-        );
-
-        return [
-            'group_map' => $groupMap,
-            'group_options' => $groupOptions,
-        ];
     }
 
     /**

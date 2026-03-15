@@ -13,6 +13,7 @@ namespace Raven\Repository;
 
 use PDO;
 use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Media\PageImagePrimarySelectionService;
 
 /**
  * Data access for page gallery images and their size variants.
@@ -22,6 +23,7 @@ final class PageImageRepository
     private PDO $db;
     private string $driver;
     private string $prefix;
+    private PageImagePrimarySelectionService $pageImagePrimarySelectionService;
 
     public function __construct(PDO $db, string $driver, string $prefix)
     {
@@ -29,6 +31,7 @@ final class PageImageRepository
         $this->driver = $driver;
         // Prefix is only used in shared-db modes; SQLite uses attached DB names instead.
         $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
+        $this->pageImagePrimarySelectionService = new PageImagePrimarySelectionService();
     }
 
     /**
@@ -556,42 +559,7 @@ final class PageImageRepository
      */
     private function canonicalizePrimarySelections(array $imageUpdates): array
     {
-        if ($imageUpdates === []) {
-            return [];
-        }
-
-        $orderedImageIds = array_keys($imageUpdates);
-        usort($orderedImageIds, static function (int $a, int $b) use ($imageUpdates): int {
-            $aSort = (int) ($imageUpdates[$a]['sort_order'] ?? 1);
-            $bSort = (int) ($imageUpdates[$b]['sort_order'] ?? 1);
-            if ($aSort !== $bSort) {
-                return $aSort <=> $bSort;
-            }
-
-            return $a <=> $b;
-        });
-
-        $coverWinner = null;
-        $previewWinner = null;
-        foreach ($orderedImageIds as $imageId) {
-            if (!empty($imageUpdates[$imageId]['is_cover'])) {
-                if ($coverWinner === null) {
-                    $coverWinner = $imageId;
-                } else {
-                    $imageUpdates[$imageId]['is_cover'] = false;
-                }
-            }
-
-            if (!empty($imageUpdates[$imageId]['is_preview'])) {
-                if ($previewWinner === null) {
-                    $previewWinner = $imageId;
-                } else {
-                    $imageUpdates[$imageId]['is_preview'] = false;
-                }
-            }
-        }
-
-        return $imageUpdates;
+        return $this->pageImagePrimarySelectionService->canonicalizePayloadSelections($imageUpdates);
     }
 
     /**
@@ -599,87 +567,12 @@ final class PageImageRepository
      */
     private function enforceSinglePrimarySelectionsForPage(int $pageId, string $updatedAt): void
     {
-        $images = $this->table('page_images');
-        $read = $this->db->prepare(
-            'SELECT id, sort_order, is_cover, is_preview
-             FROM ' . $images . '
-             WHERE page_id = :page_id
-             ORDER BY sort_order ASC, id ASC'
+        $this->pageImagePrimarySelectionService->enforcePersistedSelections(
+            $this->db,
+            $this->table('page_images'),
+            $pageId,
+            $updatedAt
         );
-        $read->execute([':page_id' => $pageId]);
-        $rows = $read->fetchAll() ?: [];
-
-        if ($rows === []) {
-            return;
-        }
-
-        $coverWinner = null;
-        $previewWinner = null;
-        $updatesById = [];
-
-        foreach ($rows as $row) {
-            $imageId = (int) ($row['id'] ?? 0);
-            if ($imageId < 1) {
-                continue;
-            }
-
-            $isCover = (int) ($row['is_cover'] ?? 0) === 1;
-            if ($isCover) {
-                if ($coverWinner === null) {
-                    $coverWinner = $imageId;
-                } else {
-                    $updatesById[$imageId]['is_cover'] = 0;
-                }
-            }
-
-            $isPreview = (int) ($row['is_preview'] ?? 0) === 1;
-            if ($isPreview) {
-                if ($previewWinner === null) {
-                    $previewWinner = $imageId;
-                } else {
-                    $updatesById[$imageId]['is_preview'] = 0;
-                }
-            }
-        }
-
-        if ($updatesById === []) {
-            return;
-        }
-
-        $updateCover = $this->db->prepare(
-            'UPDATE ' . $images . '
-             SET is_cover = :value,
-                 updated_at = :updated_at
-             WHERE id = :id
-               AND page_id = :page_id'
-        );
-        $updatePreview = $this->db->prepare(
-            'UPDATE ' . $images . '
-             SET is_preview = :value,
-                 updated_at = :updated_at
-             WHERE id = :id
-               AND page_id = :page_id'
-        );
-
-        foreach ($updatesById as $imageId => $flags) {
-            if (array_key_exists('is_cover', $flags)) {
-                $updateCover->execute([
-                    ':value' => (int) $flags['is_cover'],
-                    ':updated_at' => $updatedAt,
-                    ':id' => (int) $imageId,
-                    ':page_id' => $pageId,
-                ]);
-            }
-
-            if (array_key_exists('is_preview', $flags)) {
-                $updatePreview->execute([
-                    ':value' => (int) $flags['is_preview'],
-                    ':updated_at' => $updatedAt,
-                    ':id' => (int) $imageId,
-                    ':page_id' => $pageId,
-                ]);
-            }
-        }
     }
 
     /**

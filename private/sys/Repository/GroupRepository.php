@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Repository;
 
-use Raven\Core\Auth\PanelAccess;
 use PDO;
+use Raven\Lib\Auth\GroupRolePolicy;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 use RuntimeException;
 
@@ -21,23 +21,13 @@ use RuntimeException;
  */
 final class GroupRepository
 {
-    /** Reserved stock-role slugs; these identify immutable role behavior. */
-    private const STOCK_SLUGS = [
-        'super',
-        'admin',
-        'editor',
-        'user',
-        'guest',
-        'validating',
-        'banned',
-    ];
-
     /** Custom groups start at id 100; ids 1-99 are reserved for stock/system use. */
     private const CUSTOM_GROUP_ID_START = 100;
 
     private PDO $db;
     private string $driver;
     private string $prefix;
+    private GroupRolePolicy $rolePolicy;
 
     public function __construct(PDO $db, string $driver, string $prefix)
     {
@@ -45,6 +35,7 @@ final class GroupRepository
         $this->driver = $driver;
         // Prefix is ignored for SQLite because attached database aliases are used instead.
         $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
+        $this->rolePolicy = new GroupRolePolicy();
     }
 
     /**
@@ -73,7 +64,7 @@ final class GroupRepository
 
         $rows = $stmt->fetchAll() ?: [];
         foreach ($rows as &$row) {
-            if ($this->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
+            if ($this->rolePolicy->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
                 $row['route_enabled'] = 0;
             }
         }
@@ -122,7 +113,7 @@ final class GroupRepository
 
         $rows = $stmt->fetchAll() ?: [];
         foreach ($rows as &$row) {
-            if ($this->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
+            if ($this->rolePolicy->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
                 $row['route_enabled'] = 0;
             }
         }
@@ -183,7 +174,7 @@ final class GroupRepository
             }
 
             unset($row['total_rows']);
-            if ($this->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
+            if ($this->rolePolicy->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
                 $row['route_enabled'] = 0;
             }
             $resultRows[] = $row;
@@ -250,7 +241,7 @@ final class GroupRepository
         $stmt->execute([':id' => $id]);
 
         $row = $stmt->fetch();
-        if (is_array($row) && $this->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
+        if (is_array($row) && $this->rolePolicy->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
             $row['route_enabled'] = 0;
         }
 
@@ -421,7 +412,7 @@ final class GroupRepository
         $id = $data['id'] ?? null;
         $name = trim($data['name']);
         $slugInput = trim((string) ($data['slug'] ?? ''));
-        $slug = $this->normalizeSlug($slugInput !== '' ? $slugInput : $name);
+        $slug = $this->rolePolicy->normalizeSlug($slugInput !== '' ? $slugInput : $name);
         $mask = (int) $data['permission_mask'];
         $routeEnabled = !empty($data['route_enabled']) ? 1 : 0;
 
@@ -444,52 +435,12 @@ final class GroupRepository
             }
 
             $roleSlug = $isStock ? $existingSlug : strtolower($slug);
-            $editorStockMask = PanelAccess::PANEL_LOGIN
-                | PanelAccess::VIEW_PUBLIC_SITE
-                | PanelAccess::VIEW_PRIVATE_SITE
-                | PanelAccess::maskFromBits(PanelAccess::contentPanelBits());
-            $adminStockMask = PanelAccess::PANEL_LOGIN
-                | PanelAccess::VIEW_PUBLIC_SITE
-                | PanelAccess::VIEW_PRIVATE_SITE
-                | PanelAccess::VIEW_DISABLED_SITE
-                | PanelAccess::maskFromBits(array_merge(
-                    PanelAccess::contentPanelBits(),
-                    PanelAccess::taxonomyPanelBits(),
-                    PanelAccess::usersPanelBits()
-                ));
-            if ($this->isBannedRoleSlug($roleSlug)) {
-                $routeEnabled = 0;
-                $mask = 0;
-            } elseif ($this->isGuestLikeRoleSlug($roleSlug)) {
-                $routeEnabled = 0;
-                $mask &= PanelAccess::VIEW_PUBLIC_SITE;
-            } elseif ($this->isUserRoleSlug($roleSlug)) {
-                $mask &= (PanelAccess::VIEW_PUBLIC_SITE | PanelAccess::VIEW_PRIVATE_SITE);
-            } elseif ($this->isEditorRoleSlug($roleSlug)) {
-                $mask = $editorStockMask;
-            } elseif ($this->isAdminRoleSlug($roleSlug)) {
-                $mask = $adminStockMask;
-            } elseif ($this->isSuperAdminRoleSlug($roleSlug)) {
-                $mask = (
-                    PanelAccess::VIEW_PUBLIC_SITE
-                    | PanelAccess::VIEW_PRIVATE_SITE
-                    | PanelAccess::VIEW_DISABLED_SITE
-                    | PanelAccess::PANEL_LOGIN
-                    | PanelAccess::MANAGE_CONTENT
-                    | PanelAccess::MANAGE_TAXONOMY
-                    | PanelAccess::MANAGE_USERS
-                    | PanelAccess::MANAGE_GROUPS
-                    | PanelAccess::MANAGE_CONFIGURATION
-                    | PanelAccess::allStockPanelBitsMask()
-                );
-            }
-            if (($mask & PanelAccess::PANEL_LOGIN) !== PanelAccess::PANEL_LOGIN) {
-                $mask &= ~PanelAccess::allStockPanelBitsMask();
-                $mask &= ~PanelAccess::VIEW_DISABLED_SITE;
-            }
+            $normalizedStockRole = $this->rolePolicy->normalizeStockRoleSettings($roleSlug, $routeEnabled, $mask);
+            $routeEnabled = (int) ($normalizedStockRole['route_enabled'] ?? $routeEnabled);
+            $mask = (int) ($normalizedStockRole['permission_mask'] ?? $mask);
 
             if ($slug === '') {
-                $slug = $this->normalizeSlug($name);
+                $slug = $this->rolePolicy->normalizeSlug($name);
             }
             if ($slug === '') {
                 throw new RuntimeException('Group slug is required.');
@@ -526,16 +477,13 @@ final class GroupRepository
         if ($slug === '') {
             throw new RuntimeException('Group slug is required.');
         }
-        if ($this->isStockRoleSlug($slug)) {
+        if ($this->rolePolicy->isStockRoleSlug($slug)) {
             throw new RuntimeException('Reserved stock group slugs cannot be reused.');
         }
         if ($this->slugExistsForOtherGroup(0, $slug)) {
             throw new RuntimeException('Group slug already exists.');
         }
-        if (($mask & PanelAccess::PANEL_LOGIN) !== PanelAccess::PANEL_LOGIN) {
-            $mask &= ~PanelAccess::allStockPanelBitsMask();
-            $mask &= ~PanelAccess::VIEW_DISABLED_SITE;
-        }
+        $mask = $this->rolePolicy->normalizeMaskForPanelAccess($mask);
 
         $customGroupId = $this->nextCustomGroupId();
 
@@ -663,89 +611,6 @@ final class GroupRepository
         ]);
 
         return $stmt->fetchColumn() !== false;
-    }
-
-    /**
-     * Normalizes one group slug from arbitrary input.
-     */
-    private function normalizeSlug(string $value): string
-    {
-        $value = strtolower(trim($value));
-        if ($value === '') {
-            return '';
-        }
-
-        $value = preg_replace('/[^a-z0-9]+/', '-', $value) ?? '';
-        $value = trim($value, '-');
-        $value = preg_replace('/-+/', '-', $value) ?? '';
-
-        return substr($value, 0, 160);
-    }
-
-    /**
-     * Returns true when one slug maps to any reserved stock role.
-     */
-    private function isStockRoleSlug(string $slug): bool
-    {
-        return in_array(strtolower(trim($slug)), self::STOCK_SLUGS, true);
-    }
-
-    /**
-     * Returns true when one stock role must always have URI routing disabled.
-     */
-    private function isRouteDisabledRoleSlug(string $slug): bool
-    {
-        $normalized = strtolower(trim($slug));
-        return $this->isGuestLikeRoleSlug($normalized) || $normalized === 'banned';
-    }
-
-    /**
-     * Returns true when one slug uses guest-style lockouts.
-     */
-    private function isGuestLikeRoleSlug(string $slug): bool
-    {
-        $normalized = strtolower(trim($slug));
-        return $normalized === 'guest' || $normalized === 'validating';
-    }
-
-    /**
-     * Returns true when one slug is the reserved Banned role.
-     */
-    private function isBannedRoleSlug(string $slug): bool
-    {
-        return strtolower(trim($slug)) === 'banned';
-    }
-
-    /**
-     * Returns true when one slug is the reserved User role.
-     */
-    private function isUserRoleSlug(string $slug): bool
-    {
-        return strtolower(trim($slug)) === 'user';
-    }
-
-    /**
-     * Returns true when one slug is the reserved Editor role.
-     */
-    private function isEditorRoleSlug(string $slug): bool
-    {
-        return strtolower(trim($slug)) === 'editor';
-    }
-
-    /**
-     * Returns true when one slug is the reserved Admin role.
-     */
-    private function isAdminRoleSlug(string $slug): bool
-    {
-        return strtolower(trim($slug)) === 'admin';
-    }
-
-    /**
-     * Returns true when one slug is the reserved Super Admin role.
-     */
-    private function isSuperAdminRoleSlug(string $slug): bool
-    {
-        return strtolower(trim($slug)) === 'super';
     }
 
     /**

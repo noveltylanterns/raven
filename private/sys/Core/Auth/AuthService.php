@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Auth;
 
 use PDO;
+use Raven\Lib\Auth\AuthAccessGateService;
 use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\AuthGroupMembershipService;
 use Raven\Lib\Auth\AuthIdentityLookupService;
@@ -51,6 +52,7 @@ final class AuthService
     private AuthIdentityLookupService $identityLookup;
     private AuthGroupMembershipService $groupMembership;
     private TwoFactorSessionStateService $twoFactorSessionState;
+    private AuthAccessGateService $authAccessGateService;
 
     /**
      * Request-local cache for user preference rows by user id.
@@ -81,6 +83,7 @@ final class AuthService
         $this->identityLookup = new AuthIdentityLookupService($authDb, $driver, $this->prefix);
         $this->groupMembership = new AuthGroupMembershipService($appDb, $driver, $prefix);
         $this->twoFactorSessionState = new TwoFactorSessionStateService();
+        $this->authAccessGateService = new AuthAccessGateService();
 
         $this->bootstrapDelightAuth();
     }
@@ -622,7 +625,7 @@ final class AuthService
         }
 
         $mask = $this->permissionMaskForUser($userId);
-        return PanelAccess::canLoginPanel($mask);
+        return $this->authAccessGateService->canAccessPanel($mask);
     }
 
     /**
@@ -639,16 +642,8 @@ final class AuthService
             return false;
         }
 
-        if (!$this->canAccessPanel($userId)) {
-            return false;
-        }
-
-        if ($this->isSuperAdmin($userId)) {
-            return true;
-        }
-
         $mask = $this->permissionMaskForUser($userId);
-        return PanelAccess::hasPanelPermissionBit($mask, $bit);
+        return $this->authAccessGateService->hasPanelPermissionBit($mask, $bit, $this->isSuperAdmin($userId));
     }
 
     /**
@@ -663,16 +658,8 @@ final class AuthService
             return false;
         }
 
-        if (!$this->canAccessPanel($userId)) {
-            return false;
-        }
-
-        if ($this->isSuperAdmin($userId)) {
-            return true;
-        }
-
         $mask = $this->permissionMaskForUser($userId);
-        return PanelAccess::hasAnyPanelPermissionBit($mask, $bits);
+        return $this->authAccessGateService->hasAnyPanelPermissionBit($mask, $bits, $this->isSuperAdmin($userId));
     }
 
     /**
@@ -685,8 +672,7 @@ final class AuthService
             return false;
         }
 
-        $mask = $this->permissionMaskForUser($userId);
-        return PanelAccess::canManageUsers($mask);
+        return $this->authAccessGateService->canManageUsers($this->permissionMaskForUser($userId));
     }
 
     /**
@@ -699,8 +685,7 @@ final class AuthService
             return false;
         }
 
-        $mask = $this->permissionMaskForUser($userId);
-        return PanelAccess::canManageGroups($mask);
+        return $this->authAccessGateService->canManageGroups($this->permissionMaskForUser($userId));
     }
 
     /**
@@ -713,8 +698,7 @@ final class AuthService
             return false;
         }
 
-        $mask = $this->permissionMaskForUser($userId);
-        return PanelAccess::canManageContent($mask);
+        return $this->authAccessGateService->canManageContent($this->permissionMaskForUser($userId));
     }
 
     /**
@@ -729,8 +713,7 @@ final class AuthService
             return false;
         }
 
-        $mask = $this->permissionMaskForUser($userId);
-        return PanelAccess::canManageConfiguration($mask);
+        return $this->authAccessGateService->canManageConfiguration($this->permissionMaskForUser($userId));
     }
 
     /**
@@ -743,8 +726,7 @@ final class AuthService
             return false;
         }
 
-        $mask = $this->permissionMaskForUser($userId);
-        return PanelAccess::canManageTaxonomy($mask);
+        return $this->authAccessGateService->canManageTaxonomy($this->permissionMaskForUser($userId));
     }
 
     /**
@@ -753,7 +735,7 @@ final class AuthService
     public function canViewPublicSite(?int $userId = null): bool
     {
         if ($userId !== null) {
-            return PanelAccess::canViewPublicSite($this->permissionMaskForUser($userId));
+            return $this->authAccessGateService->canViewPublicSite($this->permissionMaskForUser($userId));
         }
 
         if ($this->isLoggedIn()) {
@@ -762,10 +744,10 @@ final class AuthService
                 return false;
             }
 
-            return PanelAccess::canViewPublicSite($this->permissionMaskForUser($resolvedUserId));
+            return $this->authAccessGateService->canViewPublicSite($this->permissionMaskForUser($resolvedUserId));
         }
 
-        return PanelAccess::canViewPublicSite($this->permissionMaskForGuest());
+        return $this->authAccessGateService->canViewPublicSite($this->permissionMaskForGuest());
     }
 
     /**
@@ -778,7 +760,7 @@ final class AuthService
             return false;
         }
 
-        return PanelAccess::canViewPrivateSite($this->permissionMaskForUser($userId));
+        return $this->authAccessGateService->canViewPrivateSite($this->permissionMaskForUser($userId));
     }
 
     /**
@@ -791,8 +773,7 @@ final class AuthService
             return false;
         }
 
-        $mask = $this->permissionMaskForUser($userId);
-        return PanelAccess::canLoginPanel($mask) && PanelAccess::canViewDisabledSite($mask);
+        return $this->authAccessGateService->canViewDisabledSite($this->permissionMaskForUser($userId));
     }
 
     /**
