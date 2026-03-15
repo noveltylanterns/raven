@@ -147,7 +147,7 @@ $defaultMethodLabel = static function (string $methodType): string {
                     data-webauthn-autostart="<?= $webauthnFailed ? '0' : '1' ?>"
                 >
                     <p class="mb-2">Press your security key or use your passkey to continue.</p>
-                    <button type="button" class="btn btn-primary" data-rvn-webauthn-start="1">Try Security Key</button>
+                    <div class="text-center"><button type="button" class="btn btn-primary" data-rvn-webauthn-start="1">Try Security Key</button></div>
                     <div class="mt-2 d-none" data-rvn-webauthn-status="1"></div>
                 </div>
 
