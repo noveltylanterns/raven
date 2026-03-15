@@ -13461,6 +13461,26 @@ body#rvnp .form-control-sm {
   padding: 0.2rem 0.4rem;
   font-size: 0.75rem;
 }
+body#rvnp .form-select-sm {
+  min-height: calc(1.5em + 0.5rem + calc(var(--bs-border-width) * 2));
+  padding-top: 0.2rem;
+  padding-bottom: 0.2rem;
+  padding-left: 0.4rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+body#rvnp .input-group-sm > .form-control,
+body#rvnp .input-group-sm > .form-select,
+body#rvnp .input-group-sm > .input-group-text,
+body#rvnp .input-group-sm > .btn {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.75rem;
+}
+body#rvnp .input-group-sm > .form-control,
+body#rvnp .input-group-sm > .form-select,
+body#rvnp .input-group-sm > .btn {
+  min-height: calc(1.5em + 0.5rem + calc(var(--bs-border-width) * 2));
+}
 
 body#rvnp [data-preferences-contact-remove="1"],
 body#rvnp [data-user-contact-remove="1"],
@@ -13473,6 +13493,15 @@ body#rvnp [data-rvn-contact-option-remove="1"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+body#rvnp [data-preferences-contact-remove="1"].btn-sm,
+body#rvnp [data-user-contact-remove="1"].btn-sm,
+body#rvnp [data-preferences-two-factor-remove="1"].btn-sm,
+body#rvnp [data-user-two-factor-remove="1"].btn-sm,
+body#rvnp [data-rvn-contact-option-remove="1"].btn-sm {
+  min-height: calc(1.5em + 0.5rem + calc(var(--bs-border-width) * 2));
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
 }
 
 /*# sourceMappingURL=style.css.map */

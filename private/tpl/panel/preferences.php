@@ -128,7 +128,7 @@ $themeLabels = [
         <div class="row g-2 align-items-end pb-4">
             <div class="col-md-2">
                 <label class="form-label">Type</label>
-                <select class="form-select" data-preferences-two-factor-key="type">
+                <select class="form-select form-select-sm" data-preferences-two-factor-key="type">
                     <?php foreach ($twoFactorTypeOptions as $typeValue => $typeLabel): ?>
                         <?php if ((string) $typeValue === 'none') { continue; } ?>
                         <option value="<?= e((string) $typeValue) ?>"><?= e((string) $typeLabel) ?></option>
@@ -137,35 +137,36 @@ $themeLabels = [
             </div>
             <div class="col-md-3" data-preferences-two-factor-section="label">
                 <label class="form-label">Label</label>
-                <input type="text" class="form-control" data-preferences-two-factor-key="label" placeholder="My Authenticator / Office Key">
+                <input type="text" class="form-control form-control-sm" data-preferences-two-factor-key="label" placeholder="My Authenticator / Office Key">
             </div>
             <div class="col-md position-relative" data-preferences-two-factor-section="totp" style="display:none;">
                 <label class="form-label">TOTP Secret / Confirm Code</label>
-                <div class="input-group">
+                <div class="input-group input-group-sm">
                     <input
                         type="text"
-                        class="form-control"
+                        class="form-control form-control-sm"
                         data-preferences-two-factor-key="secret"
                         data-preferences-two-factor-secret-copy="1"
                         placeholder="Click Setup App to generate secret"
                         title="Click to copy"
                         autocomplete="off"
+                        style="caret-color: transparent; cursor: pointer;"
                         readonly
                     >
-                    <input type="text" class="form-control" data-preferences-two-factor-key="verification_code" placeholder="6-digit code">
-                    <button type="button" class="btn btn-primary" data-preferences-two-factor-totp-setup="1">Setup App</button>
+                    <input type="text" class="form-control form-control-sm" data-preferences-two-factor-key="verification_code" placeholder="6-digit code">
+                    <button type="button" class="btn btn-primary btn-sm" data-preferences-two-factor-totp-setup="1">Setup App</button>
                 </div>
                 <div class="small text-muted d-none position-absolute start-0 end-0" style="top:calc(100% + 0.2rem);" data-preferences-two-factor-totp-feedback="1"></div>
             </div>
             <div class="col-md position-relative" data-preferences-two-factor-section="webauthn" style="display:none;">
                 <label class="form-label">Credential ID</label>
-                <div class="input-group">
+                <div class="input-group input-group-sm">
                     <span class="input-group-text">
                         <input class="form-check-input mt-0 me-2" type="checkbox" data-preferences-two-factor-key="require_uv" value="1" aria-label="Require PIN/Biometric?">
                         <span class="small">PIN/Bio</span>
                     </span>
-                    <input type="text" class="form-control" data-preferences-two-factor-key="credential_id" placeholder="Pair a security key to populate this">
-                    <button type="button" class="btn btn-primary" data-preferences-two-factor-webauthn-register="1">Pair Security Key</button>
+                    <input type="text" class="form-control form-control-sm" data-preferences-two-factor-key="credential_id" placeholder="Pair a security key to populate this">
+                    <button type="button" class="btn btn-primary btn-sm" data-preferences-two-factor-webauthn-register="1">Pair Security Key</button>
                 </div>
                 <div class="small d-none position-absolute start-0 end-0" style="top:calc(100% + 0.2rem);" data-preferences-two-factor-webauthn-feedback="1"></div>
                 <input type="hidden" data-preferences-two-factor-key="credential_public_key" value="">
@@ -173,11 +174,11 @@ $themeLabels = [
             </div>
             <div class="col-md" data-preferences-two-factor-section="email" style="display:none;">
                 <label class="form-label">Target Email</label>
-                <input type="email" class="form-control" data-preferences-two-factor-key="target_email" placeholder="Defaults to account email if blank">
+                <input type="email" class="form-control form-control-sm" data-preferences-two-factor-key="target_email" placeholder="Defaults to account email if blank">
             </div>
             <div class="col-md position-relative" data-preferences-two-factor-section="recovery" style="display:none;">
                 <label class="form-label">Recovery Phrase</label>
-                <div class="input-group">
+                <div class="input-group input-group-sm">
                     <span class="input-group-text">
                         <input
                             class="form-check-input mt-0 me-2"
@@ -190,18 +191,32 @@ $themeLabels = [
                     </span>
                     <input
                         type="password"
-                        class="form-control"
+                        class="form-control form-control-sm"
                         data-preferences-two-factor-key="recovery_code"
+                        data-preferences-two-factor-recovery-copy="1"
                         placeholder="Generate 12-word recovery phrase"
                         title="Click to copy"
                         autocomplete="off"
+                        style="caret-color: transparent; cursor: pointer;"
+                        readonly
                     >
-                    <button type="button" class="btn btn-primary" data-preferences-two-factor-recovery-generate="1">Generate</button>
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        data-preferences-two-factor-recovery-visibility="1"
+                        title="Show recovery phrase"
+                        aria-label="Show recovery phrase"
+                    ><i class="bi bi-eye" aria-hidden="true" data-preferences-two-factor-recovery-visibility-icon="1"></i></button>
+                    <button type="button" class="btn btn-primary btn-sm" data-preferences-two-factor-recovery-generate="1">Generate</button>
                 </div>
-                <div class="small text-muted mt-1" data-preferences-two-factor-recovery-copy-hint="1">Click phrase to copy.</div>
+                <div
+                    class="small text-muted position-absolute start-0 end-0"
+                    style="top:calc(100% + 0.2rem);"
+                    data-preferences-two-factor-recovery-copy-hint="1"
+                >Click phrase to copy.</div>
             </div>
             <div class="col-auto ps-md-0 d-flex align-items-end">
-                <button type="button" class="btn btn-danger" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                <button type="button" class="btn btn-danger btn-sm" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
             </div>
         </div>
     </div>
@@ -333,6 +348,25 @@ $themeLabels = [
       labelSection.style.display = methodType === 'recovery' ? 'none' : '';
     }
 
+    function syncTotpSetupButton(row) {
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      var typeField = row.querySelector('[data-preferences-two-factor-key="type"]');
+      var secretField = row.querySelector('[data-preferences-two-factor-key="secret"]');
+      var setupButton = row.querySelector('[data-preferences-two-factor-totp-setup="1"]');
+      if (!(typeField instanceof HTMLSelectElement) || !(setupButton instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      var methodType = String(typeField.value || '').trim().toLowerCase();
+      var hasSecret = secretField instanceof HTMLInputElement
+        ? String(secretField.value || '').trim() !== ''
+        : false;
+      setupButton.textContent = methodType === 'totp' && hasSecret ? 'Reset' : 'Setup App';
+    }
+
     function syncRowSections(row) {
       if (!(row instanceof HTMLElement)) {
         return;
@@ -350,6 +384,7 @@ $themeLabels = [
       sectionVisible(row, 'recovery', methodType === 'recovery');
       sectionVisible(row, 'webauthn', methodType === 'webauthn');
       sectionVisible(row, 'email', methodType === 'email');
+      syncTotpSetupButton(row);
     }
 
     function reindexRows() {
@@ -474,14 +509,39 @@ $themeLabels = [
       return copied;
     }
 
-    function copyHintElement(key) {
-      if (key === 'secret') {
-        return totpModalSecretCopy instanceof HTMLElement ? totpModalSecretCopy : null;
+    function showCopyTooltip(element, copied) {
+      if (!(element instanceof HTMLElement)) {
+        return;
       }
-      if (key === 'uri') {
-        return totpModalUriCopy instanceof HTMLElement ? totpModalUriCopy : null;
+
+      var originalTitle = String(element.getAttribute('data-copy-title') || element.getAttribute('title') || 'Click to copy');
+      element.setAttribute('data-copy-title', originalTitle);
+      var message = copied ? 'Copied!' : 'Copy failed';
+
+      if (!window.bootstrap || typeof window.bootstrap.Tooltip !== 'function') {
+        return;
       }
-      return null;
+
+      var tooltip = window.bootstrap.Tooltip.getOrCreateInstance(element, {
+        trigger: 'manual',
+        placement: 'top',
+        title: originalTitle
+      });
+      if (typeof tooltip.setContent === 'function') {
+        tooltip.setContent({ '.tooltip-inner': message });
+      } else {
+        element.setAttribute('data-bs-original-title', message);
+      }
+      tooltip.show();
+
+      window.setTimeout(function () {
+        if (typeof tooltip.setContent === 'function') {
+          tooltip.setContent({ '.tooltip-inner': originalTitle });
+        } else {
+          element.setAttribute('data-bs-original-title', originalTitle);
+        }
+        tooltip.hide();
+      }, 900);
     }
 
     async function copyTotpModalField(key) {
@@ -503,10 +563,7 @@ $themeLabels = [
         copied = false;
       }
 
-      var hint = copyHintElement(key);
-      if (hint instanceof HTMLElement) {
-        hint.textContent = copied ? 'Copied.' : 'Copy failed.';
-      }
+      showCopyTooltip(source, copied);
     }
 
     function recursiveBinaryStringToArrayBuffer(obj) {
@@ -566,14 +623,15 @@ $themeLabels = [
       var secret = secretField instanceof HTMLInputElement
         ? String(secretField.value || '').toUpperCase().replace(/[^A-Z2-7]/g, '')
         : '';
+      var isReset = secret !== '';
 
       button.disabled = true;
-      setTotpFeedback(row, 'Generating setup details...', 'muted');
+      setTotpFeedback(row, isReset ? 'Resetting secret...' : 'Generating setup details...', 'muted');
 
       try {
         var setupForm = new URLSearchParams();
         setupForm.append('_csrf', csrf);
-        if (secret !== '') {
+        if (secret !== '' && !isReset) {
           setupForm.append('secret', secret);
         }
 
@@ -595,11 +653,18 @@ $themeLabels = [
         if (secretField instanceof HTMLInputElement && resolvedSecret !== '') {
           secretField.value = resolvedSecret;
         }
+        syncTotpSetupButton(row);
 
         row.setAttribute('data-preferences-totp-provisioning-uri', String(setupPayload.provisioning_uri || ''));
         row.setAttribute('data-preferences-totp-qr-data-uri', String(setupPayload.qr_data_uri || ''));
         showTotpSetupModal(setupPayload);
-        setTotpFeedback(row, 'Setup details ready. Enter a 6-digit code and save preferences.', 'success');
+        setTotpFeedback(
+          row,
+          isReset
+            ? 'Secret reset. Enter a 6-digit code and save preferences.'
+            : 'Setup details ready. Enter a 6-digit code and save preferences.',
+          'success'
+        );
       } catch (error) {
         setTotpFeedback(
           row,
@@ -622,6 +687,42 @@ $themeLabels = [
         return;
       }
       hint.textContent = String(message || '').trim() || 'Click phrase to copy.';
+    }
+
+    function setRecoveryVisibility(row, visible) {
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      var field = row.querySelector('[data-preferences-two-factor-key="recovery_code"]');
+      var button = row.querySelector('[data-preferences-two-factor-recovery-visibility="1"]');
+      if (!(field instanceof HTMLInputElement) || !(button instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      var shouldShow = visible === true;
+      field.type = shouldShow ? 'text' : 'password';
+      button.title = shouldShow ? 'Hide recovery phrase' : 'Show recovery phrase';
+      button.setAttribute('aria-label', shouldShow ? 'Hide recovery phrase' : 'Show recovery phrase');
+
+      var icon = button.querySelector('[data-preferences-two-factor-recovery-visibility-icon="1"]');
+      if (icon instanceof HTMLElement) {
+        icon.classList.remove('bi-eye', 'bi-eye-slash');
+        icon.classList.add(shouldShow ? 'bi-eye-slash' : 'bi-eye');
+      }
+    }
+
+    function toggleRecoveryVisibility(row) {
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      var field = row.querySelector('[data-preferences-two-factor-key="recovery_code"]');
+      if (!(field instanceof HTMLInputElement)) {
+        return;
+      }
+
+      setRecoveryVisibility(row, field.type === 'password');
     }
 
     async function generateRecoveryForRow(row, button) {
@@ -658,6 +759,7 @@ $themeLabels = [
         }
 
         field.value = String(payload.recovery_code || '');
+        setRecoveryVisibility(row, false);
         setRecoveryCopyHint(row, 'Generated. Click phrase to copy.');
       } catch (error) {
         setRecoveryCopyHint(
@@ -930,13 +1032,19 @@ $themeLabels = [
         return;
       }
 
-      var recoveryCodeField = target.closest('[data-preferences-two-factor-key="recovery_code"]');
+      var recoveryVisibilityButton = target.closest('[data-preferences-two-factor-recovery-visibility="1"]');
+      if (recoveryVisibilityButton instanceof HTMLButtonElement) {
+        var recoveryVisibilityRow = recoveryVisibilityButton.closest('[data-preferences-two-factor-row="1"]');
+        if (recoveryVisibilityRow instanceof HTMLElement) {
+          toggleRecoveryVisibility(recoveryVisibilityRow);
+        }
+        return;
+      }
+
+      var recoveryCodeField = target.closest('[data-preferences-two-factor-recovery-copy="1"]');
       if (recoveryCodeField instanceof HTMLInputElement) {
         void copyTextValue(recoveryCodeField.value).then(function (copied) {
-          var recoveryRow = recoveryCodeField.closest('[data-preferences-two-factor-row="1"]');
-          if (recoveryRow instanceof HTMLElement) {
-            setRecoveryCopyHint(recoveryRow, copied ? 'Copied.' : 'Copy failed.');
-          }
+          showCopyTooltip(recoveryCodeField, copied);
         });
         return;
       }
@@ -944,10 +1052,8 @@ $themeLabels = [
       var totpSecretField = target.closest('[data-preferences-two-factor-secret-copy="1"]');
       if (totpSecretField instanceof HTMLInputElement) {
         void copyTextValue(totpSecretField.value).then(function (copied) {
-          var totpRow = totpSecretField.closest('[data-preferences-two-factor-row="1"]');
-          if (totpRow instanceof HTMLElement) {
-            setTotpFeedback(totpRow, copied ? 'Secret copied.' : 'Copy failed.', copied ? 'muted' : 'error');
-          }
+          showCopyTooltip(totpSecretField, copied);
+          totpSecretField.blur();
         });
         return;
       }
@@ -992,11 +1098,33 @@ $themeLabels = [
 
       event.preventDefault();
       void copyTextValue(totpSecretField.value).then(function (copied) {
-        var row = totpSecretField.closest('[data-preferences-two-factor-row="1"]');
-        if (row instanceof HTMLElement) {
-          setTotpFeedback(row, copied ? 'Secret copied.' : 'Copy failed.', copied ? 'muted' : 'error');
-        }
+        showCopyTooltip(totpSecretField, copied);
+        totpSecretField.blur();
       });
+    });
+
+    list.addEventListener('focusin', function (event) {
+      var target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      var recoveryCodeField = target.closest('[data-preferences-two-factor-recovery-copy="1"]');
+      if (recoveryCodeField instanceof HTMLInputElement) {
+        window.setTimeout(function () {
+          recoveryCodeField.blur();
+        }, 0);
+        return;
+      }
+
+      var totpSecretField = target.closest('[data-preferences-two-factor-secret-copy="1"]');
+      if (!(totpSecretField instanceof HTMLInputElement)) {
+        return;
+      }
+
+      window.setTimeout(function () {
+        totpSecretField.blur();
+      }, 0);
     });
 
     reindexRows();
@@ -1092,16 +1220,6 @@ $themeLabels = [
                     required
                     value="<?= e((string) ($preferences['email'] ?? '')) ?>"
                 >
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="new_password">New Password</label>
-                <input class="form-control"
-                    id="new_password"
-                    name="new_password"
-                    type="password"
-                >
-                <div class="form-text">Leave blank to keep current password (minimum 8 chars if changing).</div>
             </div>
 
             <div class="form-group mb-0">
@@ -1212,9 +1330,19 @@ $themeLabels = [
             aria-labelledby="preferences-security-tab"
             tabindex="0"
         >
+            <div class="form-group">
+                <label class="form-label h3 mb-0" for="new_password">New Password</label>
+                <div class="form-text mb-1">Leave blank to keep current password (minimum 8 chars if changing).</div>
+                <input class="form-control"
+                    id="new_password"
+                    name="new_password"
+                    type="password"
+                >
+            </div>
+
             <div class="form-group mb-0">
-                <label class="form-label h3 d-block">Two-Factor Methods</label>
-                <p class="text-muted mb-2">Add multiple methods. Confirmed methods are enforced at panel login.</p>
+                <label class="form-label h3 d-block">Two-Factor Authentication</label>
+                <p class="form-text mb-2">Add multiple 2FA methods to be enforced at login.<br><strong>Set a backup method so that you do not get locked out!</strong></p>
 
                 <div id="preferences-two-factor-methods-list">
                     <?php foreach ($twoFactorMethods as $index => $method): ?>
@@ -1246,10 +1374,10 @@ $themeLabels = [
                             data-preferences-totp-provisioning-uri="<?= e($methodProvisioningUri) ?>"
                             data-preferences-totp-qr-data-uri="<?= e($methodQrDataUri) ?>"
                         >
-                            <div class="row g-2 align-items-end">
+                            <div class="row g-2 align-items-end pb-4">
                                 <div class="col-md-2">
                                     <label class="form-label">Type</label>
-                                    <select class="form-select" data-preferences-two-factor-key="type" name="two_factor_methods[<?= (int) $index ?>][type]">
+                                    <select class="form-select form-select-sm" data-preferences-two-factor-key="type" name="two_factor_methods[<?= (int) $index ?>][type]">
                                         <?php foreach ($twoFactorTypeOptions as $typeValue => $typeLabel): ?>
                                             <?php if ((string) $typeValue === 'none') { continue; } ?>
                                             <option value="<?= e((string) $typeValue) ?>"<?= $methodType === (string) $typeValue ? ' selected' : '' ?>><?= e((string) $typeLabel) ?></option>
@@ -1260,7 +1388,7 @@ $themeLabels = [
                                     <label class="form-label">Label</label>
                                     <input
                                         type="text"
-                                        class="form-control"
+                                        class="form-control form-control-sm"
                                         data-preferences-two-factor-key="label"
                                         name="two_factor_methods[<?= (int) $index ?>][label]"
                                         value="<?= e($methodLabel) ?>"
@@ -1269,30 +1397,35 @@ $themeLabels = [
                                 </div>
                                 <div class="col-md position-relative" data-preferences-two-factor-section="totp"<?= $methodType === 'totp' ? '' : ' style="display:none;"' ?>>
                                     <label class="form-label">TOTP Secret / Confirm Code</label>
-                                    <div class="input-group">
+                                    <div class="input-group input-group-sm">
                                         <input
                                             type="text"
-                                            class="form-control"
+                                            class="form-control form-control-sm"
                                             data-preferences-two-factor-key="secret"
+                                            data-preferences-two-factor-secret-copy="1"
                                             name="two_factor_methods[<?= (int) $index ?>][secret]"
                                             value="<?= e($methodSecret) ?>"
-                                            placeholder="TOTP secret (auto if blank)"
+                                            placeholder="Click Setup App to generate secret"
+                                            title="Click to copy"
+                                            autocomplete="off"
+                                            style="caret-color: transparent; cursor: pointer;"
+                                            readonly
                                         >
                                         <input
                                             type="text"
-                                            class="form-control"
+                                            class="form-control form-control-sm"
                                             data-preferences-two-factor-key="verification_code"
                                             name="two_factor_methods[<?= (int) $index ?>][verification_code]"
                                             value=""
                                             placeholder="6-digit code"
                                         >
-                                        <button type="button" class="btn btn-primary" data-preferences-two-factor-totp-setup="1">Setup App</button>
+                                        <button type="button" class="btn btn-primary btn-sm" data-preferences-two-factor-totp-setup="1"><?= $methodSecret !== '' ? 'Reset' : 'Setup App' ?></button>
                                     </div>
                                     <div class="small text-muted d-none position-absolute start-0 end-0" style="top:calc(100% + 0.2rem);" data-preferences-two-factor-totp-feedback="1"></div>
                                 </div>
                                 <div class="col-md position-relative" data-preferences-two-factor-section="webauthn"<?= $methodType === 'webauthn' ? '' : ' style="display:none;"' ?>>
                                     <label class="form-label">Credential ID</label>
-                                    <div class="input-group">
+                                    <div class="input-group input-group-sm">
                                         <span class="input-group-text">
                                             <input
                                                 class="form-check-input mt-0 me-2"
@@ -1307,13 +1440,13 @@ $themeLabels = [
                                         </span>
                                         <input
                                             type="text"
-                                            class="form-control"
+                                            class="form-control form-control-sm"
                                             data-preferences-two-factor-key="credential_id"
                                             name="two_factor_methods[<?= (int) $index ?>][credential_id]"
                                             value="<?= e($methodCredentialId) ?>"
                                             placeholder="Pair a security key to populate this"
                                         >
-                                        <button type="button" class="btn btn-primary" data-preferences-two-factor-webauthn-register="1">
+                                        <button type="button" class="btn btn-primary btn-sm" data-preferences-two-factor-webauthn-register="1">
                                             <?= $methodStatus === 'confirmed' ? 'Reset' : 'Pair Security Key' ?>
                                         </button>
                                     </div>
@@ -1335,7 +1468,7 @@ $themeLabels = [
                                     <label class="form-label">Target Email</label>
                                     <input
                                         type="email"
-                                        class="form-control"
+                                        class="form-control form-control-sm"
                                         data-preferences-two-factor-key="target_email"
                                         name="two_factor_methods[<?= (int) $index ?>][target_email]"
                                         value="<?= e($methodEmail) ?>"
@@ -1344,7 +1477,7 @@ $themeLabels = [
                                 </div>
                                 <div class="col-md position-relative" data-preferences-two-factor-section="recovery"<?= $methodType === 'recovery' ? '' : ' style="display:none;"' ?>>
                                     <label class="form-label">Recovery Phrase</label>
-                                    <div class="input-group">
+                                    <div class="input-group input-group-sm">
                                         <span class="input-group-text">
                                             <input
                                                 class="form-check-input mt-0 me-2"
@@ -1359,20 +1492,34 @@ $themeLabels = [
                                         </span>
                                         <input
                                             type="password"
-                                            class="form-control"
+                                            class="form-control form-control-sm"
                                             data-preferences-two-factor-key="recovery_code"
+                                            data-preferences-two-factor-recovery-copy="1"
                                             name="two_factor_methods[<?= (int) $index ?>][recovery_code]"
                                             value="<?= e($methodRecoveryCode) ?>"
                                             placeholder="Generate 12-word recovery phrase"
                                             title="Click to copy"
                                             autocomplete="off"
+                                            style="caret-color: transparent; cursor: pointer;"
+                                            readonly
                                         >
-                                        <button type="button" class="btn btn-primary" data-preferences-two-factor-recovery-generate="1">Generate</button>
+                                        <button
+                                            type="button"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            data-preferences-two-factor-recovery-visibility="1"
+                                            title="Show recovery phrase"
+                                            aria-label="Show recovery phrase"
+                                        ><i class="bi bi-eye" aria-hidden="true" data-preferences-two-factor-recovery-visibility-icon="1"></i></button>
+                                        <button type="button" class="btn btn-primary btn-sm" data-preferences-two-factor-recovery-generate="1">Generate</button>
                                     </div>
-                                    <div class="small text-muted mt-1" data-preferences-two-factor-recovery-copy-hint="1">Click phrase to copy.</div>
+                                    <div
+                                        class="small text-muted position-absolute start-0 end-0"
+                                        style="top:calc(100% + 0.2rem);"
+                                        data-preferences-two-factor-recovery-copy-hint="1"
+                                    >Click phrase to copy.</div>
                                 </div>
                                 <div class="col-auto ps-md-0 d-flex align-items-end">
-                                    <button type="button" class="btn btn-danger" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-danger btn-sm" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
                                 </div>
                             </div>
                         </div>

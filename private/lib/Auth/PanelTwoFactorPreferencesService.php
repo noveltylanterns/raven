@@ -29,7 +29,7 @@ final class PanelTwoFactorPreferencesService
         return [
             'none' => '<none>',
             'totp' => 'Authenticator App (TOTP)',
-            'recovery' => 'Recovery Code',
+            'recovery' => 'Recovery Phrase',
             'webauthn' => 'Security Key (WebAuthn)',
             'email' => 'Email Code (Stub)',
         ];
