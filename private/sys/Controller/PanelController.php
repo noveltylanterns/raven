@@ -21,6 +21,7 @@ use Raven\Core\Media\PageImageManager;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Lib\Archive\ArchivePackageService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Auth\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Auth\PanelSessionGuard;
 use Raven\Lib\Config\ConfigEditorSchemaService;
 use Raven\Lib\Config\ConfigSnapshotSanitizer;
@@ -40,6 +41,8 @@ use Raven\Lib\Media\TaxonomyImageService;
 use Raven\Lib\Pagination\Pagination;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\ChannelRoutePolicy;
+use Raven\Lib\Routing\PanelEditorTabService;
+use Raven\Lib\Routing\PanelRoutingPreviewService;
 use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Routing\RedirectTargetValidator;
 use Raven\Lib\Routing\RouteConfigService;
@@ -116,8 +119,11 @@ final class PanelController
     private ?RouteConfigService $routeConfigService = null;
     private ?BodyBlockPolicy $bodyBlockPolicy = null;
     private ?ExtensionCatalogService $extensionCatalogService = null;
+    private ?PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog = null;
     private ?PageBodyBlockCodec $pageBodyBlockCodec = null;
     private ?PanelSessionGuard $panelSessionGuard = null;
+    private ?PanelEditorTabService $panelEditorTabService = null;
+    private ?PanelRoutingPreviewService $panelRoutingPreviewService = null;
     private ?UploadFileSetNormalizer $uploadFileSetNormalizer = null;
     private ?ThemeCatalogService $themeCatalogService = null;
     private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
@@ -6251,59 +6257,9 @@ final class PanelController
      */
     private function permissionDefinitions(): array
     {
-        $definitions = [
-            ['bit' => PanelAccess::VIEW_PUBLIC_SITE, 'label' => 'View Public Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_public'],
-            ['bit' => PanelAccess::VIEW_PRIVATE_SITE, 'label' => 'View Private Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_private'],
-            ['bit' => PanelAccess::VIEW_DISABLED_SITE, 'label' => 'View Disabled Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_disabled'],
-            ['bit' => PanelAccess::PANEL_LOGIN, 'label' => 'Access Dashboard', 'section' => 'panel', 'group' => 'Panel', 'action' => 'login'],
-        ];
-
-        foreach (PanelAccess::stockPanelRoutePermissions() as $routeKey => $routeDefinition) {
-            $groupLabel = (string) ($routeDefinition['label'] ?? ucfirst($routeKey));
-            foreach (['view', 'create', 'edit', 'delete'] as $action) {
-                $bit = (int) ($routeDefinition[$action] ?? 0);
-                if ($bit <= 0) {
-                    continue;
-                }
-
-                $definitions[] = [
-                    'bit' => $bit,
-                    'label' => $groupLabel . ': ' . ucfirst($action),
-                    'section' => 'panel',
-                    'group' => $groupLabel,
-                    'action' => $action,
-                ];
-            }
-        }
-
-        try {
-            $extensionPermissionMap = $this->extensionPanelPermissionMapForDirectories();
-        } catch (\Throwable) {
-            $extensionPermissionMap = [];
-        }
-
-        foreach ($extensionPermissionMap as $directory => $meta) {
-            $extensionLabel = trim((string) ($meta['name'] ?? $directory));
-            $levels = is_array($meta['levels'] ?? null) ? $meta['levels'] : [];
-            foreach ($levels as $level) {
-                $bit = (int) ($level['bit'] ?? 0);
-                if ($bit <= 0) {
-                    continue;
-                }
-
-                $levelLabel = trim((string) ($level['label'] ?? 'Access'));
-                $definitions[] = [
-                    'bit' => $bit,
-                    'label' => $extensionLabel . ': ' . $levelLabel,
-                    'section' => 'extension',
-                    'group' => $extensionLabel,
-                    'action' => (string) ($level['key'] ?? 'access'),
-                    'extension' => (string) $directory,
-                ];
-            }
-        }
-
-        return $definitions;
+        return $this->panelPermissionDefinitionCatalog()->definitions(
+            fn (): array => $this->extensionPanelPermissionMapForDirectories()
+        );
     }
 
     /**
@@ -6311,21 +6267,9 @@ final class PanelController
      */
     private function extensionPermissionBitsMask(): int
     {
-        $mask = 0;
-        try {
-            $extensionPermissionMap = $this->extensionPanelPermissionMapForDirectories();
-        } catch (\Throwable) {
-            return 0;
-        }
-
-        foreach ($extensionPermissionMap as $meta) {
-            $levels = is_array($meta['levels'] ?? null) ? $meta['levels'] : [];
-            foreach ($levels as $level) {
-                $mask |= (int) ($level['bit'] ?? 0);
-            }
-        }
-
-        return $mask;
+        return $this->panelPermissionDefinitionCatalog()->extensionBitsMask(
+            fn (): array => $this->extensionPanelPermissionMapForDirectories()
+        );
     }
 
     /**
@@ -6598,29 +6542,14 @@ final class PanelController
         string $channelPageRouteMode,
         string $channelPageUrlSeparator
     ): string {
-        $normalizedSlug = $this->input->slug($pageSlug);
-        if ($normalizedSlug === null || $normalizedSlug === '') {
-            return '/';
-        }
-
-        $normalizedChannel = $this->input->slug($channelSlug);
-        if ($normalizedChannel === null || $normalizedChannel === '') {
-            return '/' . $normalizedSlug;
-        }
-
-        $routeSegment = ChannelRoutePolicy::buildRouteSegment(
-            $this->input,
-            $normalizedSlug,
+        return $this->panelRoutingPreviewService()->routingPublicPathForPage(
+            $pageSlug,
+            $channelSlug,
             $publishedAt,
             $channelPageRouteMode,
             $channelPageUrlSeparator,
             (string) $this->config->get('content.separator', '-')
         );
-        if ($routeSegment === '') {
-            $routeSegment = $normalizedSlug;
-        }
-
-        return '/' . $normalizedChannel . '/' . $routeSegment;
     }
 
     /**
@@ -6636,64 +6565,7 @@ final class PanelController
      */
     private function channelLandingMapFromPagesForRouting(array $pagesForRouting): array
     {
-        /** @var array<string, array{slug: string, priority: int, published_ts: int}> $best */
-        $best = [];
-
-        foreach ($pagesForRouting as $page) {
-            $channelSlug = trim((string) ($page['channel_slug'] ?? ''));
-            if ($channelSlug === '') {
-                continue;
-            }
-
-            if ((int) ($page['is_published'] ?? 0) !== 1) {
-                continue;
-            }
-
-            $pageSlug = trim((string) ($page['slug'] ?? ''));
-            $priority = match ($pageSlug) {
-                'home' => 0,
-                'index' => 1,
-                default => null,
-            };
-            if ($priority === null) {
-                continue;
-            }
-
-            $publishedAt = trim((string) ($page['published_at'] ?? ''));
-            $publishedTs = $publishedAt !== '' ? (int) strtotime($publishedAt) : 0;
-            if ($publishedTs < 0) {
-                $publishedTs = 0;
-            }
-
-            $candidate = [
-                'slug' => $pageSlug,
-                'priority' => $priority,
-                'published_ts' => $publishedTs,
-            ];
-
-            if (!isset($best[$channelSlug])) {
-                $best[$channelSlug] = $candidate;
-                continue;
-            }
-
-            $current = $best[$channelSlug];
-            if (
-                $candidate['priority'] < $current['priority']
-                || (
-                    $candidate['priority'] === $current['priority']
-                    && $candidate['published_ts'] > $current['published_ts']
-                )
-            ) {
-                $best[$channelSlug] = $candidate;
-            }
-        }
-
-        $result = [];
-        foreach ($best as $channelSlug => $candidate) {
-            $result[$channelSlug] = (string) ($candidate['slug'] ?? '');
-        }
-
-        return $result;
+        return $this->panelRoutingPreviewService()->channelLandingMapFromPages($pagesForRouting);
     }
 
     /**
@@ -6701,31 +6573,7 @@ final class PanelController
      */
     private function channelIndexTemplateExistsForRouting(): bool
     {
-        $themeSlug = strtolower($this->input->text((string) $this->config->get('site.default_theme', 'raven'), 80));
-        $options = $this->publicThemeOptions();
-        if (!isset($options[$themeSlug])) {
-            if (isset($options['raven'])) {
-                $themeSlug = 'raven';
-            } else {
-                $slugs = array_keys($options);
-                $themeSlug = (string) ($slugs[0] ?? 'raven');
-            }
-        }
-
-        $themesRoot = dirname(__DIR__, 3) . '/public/theme';
-        $chain = PublicThemeRegistry::inheritanceChain($themesRoot, $themeSlug);
-        if ($chain === []) {
-            $chain = [$themeSlug];
-        }
-
-        foreach ($chain as $candidateThemeSlug) {
-            $candidate = $themesRoot . '/' . $candidateThemeSlug . '/vis/channels/index.php';
-            if (is_file($candidate)) {
-                return true;
-            }
-        }
-
-        return is_file(dirname(__DIR__, 3) . '/private/vis/channels/index.php');
+        return $this->panelRoutingPreviewService()->channelIndexTemplateExists($this->config);
     }
 
     /**
@@ -6735,28 +6583,15 @@ final class PanelController
      */
     private function reservedPublicPrefixes(): array
     {
-        $panelPath = trim((string) $this->config->get('panel.path', 'panel'), '/');
-        $prefixes = [
-            $panelPath,
-            'panel',
-            'boot',
-            'mce',
-            'theme',
-            $this->categoryRoutePrefix(),
-            $this->tagRoutePrefix(),
-            $this->profileRoutePrefix(),
-            $this->groupRoutePrefix(),
-        ];
-
-        $normalized = [];
-        foreach ($prefixes as $prefix) {
-            $clean = strtolower(trim((string) $prefix));
-            if ($clean !== '') {
-                $normalized[$clean] = $clean;
-            }
-        }
-
-        return array_values($normalized);
+        return $this->panelRoutingPreviewService()->reservedPublicPrefixes(
+            (string) $this->config->get('panel.path', 'panel'),
+            [
+                $this->categoryRoutePrefix(),
+                $this->tagRoutePrefix(),
+                $this->profileRoutePrefix(),
+                $this->groupRoutePrefix(),
+            ]
+        );
     }
 
     /**
@@ -7026,12 +6861,7 @@ final class PanelController
      */
     private function normalizeEditorTab(mixed $value, array $allowed, string $default): string
     {
-        $tab = strtolower($this->input->text(is_string($value) ? $value : null, 40));
-        if ($tab === '' || !in_array($tab, $allowed, true)) {
-            return $default;
-        }
-
-        return $tab;
+        return $this->panelEditorTabService()->normalizeEditorTab($value, $allowed, $default);
     }
 
     /**
@@ -7039,12 +6869,13 @@ final class PanelController
      */
     private function panelEditorUrlWithTab(string $basePath, ?int $id, string $tab, string $defaultTab): string
     {
-        $path = $basePath . ($id !== null ? '/' . $id : '');
-        if ($tab === $defaultTab) {
-            return $this->panelUrl($path);
-        }
-
-        return $this->panelUrl($path . '?tab=' . rawurlencode($tab));
+        return $this->panelEditorTabService()->panelEditorUrlWithTab(
+            fn (string $suffix): string => $this->panelUrl($suffix),
+            $basePath,
+            $id,
+            $tab,
+            $defaultTab
+        );
     }
 
     /**
@@ -7052,13 +6883,7 @@ final class PanelController
      */
     private function normalizeConfigEditorTab(mixed $value): string
     {
-        $tab = strtolower($this->input->text(is_string($value) ? $value : null, 40));
-        $allowed = ['basic', 'content', 'database', 'debug', 'media', 'meta', 'security', 'users'];
-        if (!in_array($tab, $allowed, true)) {
-            return 'basic';
-        }
-
-        return $tab;
+        return $this->panelEditorTabService()->normalizeConfigEditorTab($value);
     }
 
     /**
@@ -7066,9 +6891,10 @@ final class PanelController
      */
     private function configurationUrlForTab(string $tab): string
     {
-        $tab = $this->normalizeConfigEditorTab($tab);
-        $query = $tab === 'basic' ? '' : ('?tab=' . rawurlencode($tab));
-        return $this->panelUrl('/configuration' . $query);
+        return $this->panelEditorTabService()->configurationUrlForTab(
+            fn (string $suffix): string => $this->panelUrl($suffix),
+            $tab
+        );
     }
 
     /**
@@ -7423,6 +7249,15 @@ final class PanelController
         return $this->pageBodyBlockCodec;
     }
 
+    private function panelPermissionDefinitionCatalog(): PanelPermissionDefinitionCatalog
+    {
+        if (!$this->panelPermissionDefinitionCatalog instanceof PanelPermissionDefinitionCatalog) {
+            $this->panelPermissionDefinitionCatalog = new PanelPermissionDefinitionCatalog();
+        }
+
+        return $this->panelPermissionDefinitionCatalog;
+    }
+
     private function panelSessionGuard(): PanelSessionGuard
     {
         if (!$this->panelSessionGuard instanceof PanelSessionGuard) {
@@ -7430,6 +7265,28 @@ final class PanelController
         }
 
         return $this->panelSessionGuard;
+    }
+
+    private function panelEditorTabService(): PanelEditorTabService
+    {
+        if (!$this->panelEditorTabService instanceof PanelEditorTabService) {
+            $this->panelEditorTabService = new PanelEditorTabService($this->input);
+        }
+
+        return $this->panelEditorTabService;
+    }
+
+    private function panelRoutingPreviewService(): PanelRoutingPreviewService
+    {
+        if (!$this->panelRoutingPreviewService instanceof PanelRoutingPreviewService) {
+            $this->panelRoutingPreviewService = new PanelRoutingPreviewService(
+                dirname(__DIR__, 3),
+                $this->input,
+                $this->themeCatalogService()
+            );
+        }
+
+        return $this->panelRoutingPreviewService;
     }
 
     private function uploadFileSetNormalizer(): UploadFileSetNormalizer

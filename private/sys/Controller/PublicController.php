@@ -24,7 +24,6 @@ use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\EmbeddedFormRuntimeService;
 use Raven\Lib\Http\RequestContextResolver;
 use Raven\Lib\Http\SessionFlash;
-use Raven\Lib\Pagination\Pagination;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\PanelUrl;
@@ -36,6 +35,7 @@ use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Theme\ThemeCatalogService;
+use Raven\Lib\View\PublicTemplateDecorator;
 use Raven\Lib\View\PublicTemplateResolver;
 use Raven\Core\View;
 use Raven\Core\View\TemplateTagEngine;
@@ -85,6 +85,7 @@ final class PublicController
     private ?ThemeCatalogService $themeCatalogService = null;
     private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
     private ?PublicMetaService $publicMetaService = null;
+    private ?PublicTemplateDecorator $publicTemplateDecorator = null;
     public function __construct(
         View $view,
         Config $config,
@@ -390,28 +391,7 @@ final class PublicController
      */
     private function decoratePageListForTemplate(array $pages): array
     {
-        foreach ($pages as $index => $page) {
-            if (!is_array($page)) {
-                continue;
-            }
-
-            $path = trim((string) ($page['public_path'] ?? ''));
-            if ($path === '') {
-                $slug = $this->input->slug((string) ($page['slug'] ?? ''));
-                $channelSlug = $this->input->slug((string) ($page['channel_slug'] ?? ''));
-                if ($slug === null || $slug === '') {
-                    $path = '/';
-                } elseif ($channelSlug === null || $channelSlug === '') {
-                    $path = '/' . rawurlencode($slug);
-                } else {
-                    $path = '/' . rawurlencode($channelSlug) . '/' . rawurlencode($slug);
-                }
-            }
-
-            $pages[$index]['public_path'] = $path;
-        }
-
-        return $pages;
+        return $this->publicTemplateDecorator()->decoratePageListForTemplate($pages);
     }
 
     /**
@@ -1715,6 +1695,15 @@ final class PublicController
         return $this->publicMetaService;
     }
 
+    private function publicTemplateDecorator(): PublicTemplateDecorator
+    {
+        if (!$this->publicTemplateDecorator instanceof PublicTemplateDecorator) {
+            $this->publicTemplateDecorator = new PublicTemplateDecorator($this->input);
+        }
+
+        return $this->publicTemplateDecorator;
+    }
+
     /**
      * Normalizes one taxonomy route-prefix value and falls back safely.
      */
@@ -1731,7 +1720,7 @@ final class PublicController
      */
     private function decoratePaginationForTemplate(array $pagination): array
     {
-        return Pagination::decorateTemplateLinks($pagination);
+        return $this->publicTemplateDecorator()->decoratePaginationForTemplate($pagination);
     }
 
     /**
@@ -1742,48 +1731,7 @@ final class PublicController
      */
     private function decoratePageForTemplate(array $page): array
     {
-        $page['display_title_resolved'] = !array_key_exists('display_title', $page)
-            || (int) ($page['display_title'] ?? 1) === 1;
-
-        $rawBlocks = is_array($page['extended_blocks'] ?? null) ? $page['extended_blocks'] : [];
-        $hasBodyContent = trim((string) ($page['content'] ?? '')) !== '';
-        $renderedBlocks = [];
-        $displayIndex = 0;
-
-        foreach ($rawBlocks as $block) {
-            if (!is_array($block)) {
-                continue;
-            }
-
-            $html = trim((string) ($block['html'] ?? ''));
-            if ($html === '') {
-                continue;
-            }
-
-            $displayIndex++;
-            $classNames = [
-                'raven-page-extended-block',
-                'raven-page-extended-block-' . $displayIndex,
-            ];
-
-            if ($hasBodyContent || $displayIndex > 1) {
-                array_unshift($classNames, 'mt-3');
-            }
-
-            $customClass = trim((string) ($block['css_class'] ?? ''));
-            if ($customClass !== '') {
-                $classNames[] = $customClass;
-            }
-
-            $renderedBlocks[] = [
-                'html' => $html,
-                'css_id' => trim((string) ($block['css_id'] ?? '')),
-                'class' => trim(implode(' ', $classNames)),
-            ];
-        }
-
-        $page['extended_blocks'] = $renderedBlocks;
-        return $page;
+        return $this->publicTemplateDecorator()->decoratePageForTemplate($page);
     }
 
     /**
@@ -1794,22 +1742,7 @@ final class PublicController
      */
     private function decorateGalleryImagesForTemplate(array $galleryImages): array
     {
-        foreach ($galleryImages as $index => $image) {
-            if (!is_array($image)) {
-                continue;
-            }
-
-            $variants = is_array($image['variants'] ?? null) ? $image['variants'] : [];
-            $imageUrl = trim((string) (($variants['md']['url'] ?? '') ?: ($image['url'] ?? '')));
-            $fullUrl = trim((string) (($variants['lg']['url'] ?? '') ?: $imageUrl));
-
-            $galleryImages[$index]['image_url'] = $imageUrl;
-            $galleryImages[$index]['full_url'] = $fullUrl;
-            $galleryImages[$index]['alt_text'] = (string) ($image['alt_text'] ?? '');
-            $galleryImages[$index]['caption'] = (string) ($image['caption'] ?? '');
-        }
-
-        return $galleryImages;
+        return $this->publicTemplateDecorator()->decorateGalleryImagesForTemplate($galleryImages);
     }
 
     /**
@@ -1820,28 +1753,7 @@ final class PublicController
      */
     private function decorateProfileForTemplate(array $profile): array
     {
-        $displayName = trim((string) ($profile['display_name'] ?? ''));
-        $username = trim((string) ($profile['username'] ?? ''));
-        $profile['display_name_resolved'] = $displayName !== '' ? $displayName : $username;
-
-        $avatar = $this->avatarTemplateDataFromPath((string) ($profile['avatar_path'] ?? ''));
-        $profile['avatar_filename'] = $avatar['filename'];
-        $profile['avatar_url'] = $avatar['url'];
-        $profile['avatar_thumb_url'] = $avatar['thumb_url'];
-        $profile['has_avatar'] = $avatar['filename'] !== '';
-
-        $contacts = is_array($profile['contact_profiles'] ?? null) ? $profile['contact_profiles'] : [];
-        foreach ($contacts as $index => $contact) {
-            if (!is_array($contact)) {
-                continue;
-            }
-
-            $href = trim((string) ($contact['href'] ?? ''));
-            $contacts[$index]['is_external'] = preg_match('#^https?://#i', $href) === 1;
-        }
-        $profile['contact_profiles'] = $contacts;
-
-        return $profile;
+        return $this->publicTemplateDecorator()->decorateProfileForTemplate($profile);
     }
 
     /**
@@ -1852,23 +1764,7 @@ final class PublicController
      */
     private function decorateGroupMembersForTemplate(array $members): array
     {
-        foreach ($members as $index => $member) {
-            if (!is_array($member)) {
-                continue;
-            }
-
-            $displayName = trim((string) ($member['display_name'] ?? ''));
-            $username = trim((string) ($member['username'] ?? ''));
-            $members[$index]['display_name_resolved'] = $displayName !== '' ? $displayName : $username;
-
-            $avatar = $this->avatarTemplateDataFromPath((string) ($member['avatar_path'] ?? ''));
-            $members[$index]['avatar_filename'] = $avatar['filename'];
-            $members[$index]['avatar_url'] = $avatar['url'];
-            $members[$index]['avatar_thumb_url'] = $avatar['thumb_url'];
-            $members[$index]['has_avatar'] = $avatar['filename'] !== '';
-        }
-
-        return $members;
+        return $this->publicTemplateDecorator()->decorateGroupMembersForTemplate($members);
     }
 
     /**
@@ -1880,30 +1776,7 @@ final class PublicController
      */
     private function decorateGroupForTemplate(array $group, array $members): array
     {
-        $group['member_count_resolved'] = max(count($members), (int) ($group['member_count'] ?? 0));
-        return $group;
-    }
-
-    /**
-     * Builds template-facing avatar URL values from stored avatar path.
-     *
-     * @return array{filename: string, url: string, thumb_url: string}
-     */
-    private function avatarTemplateDataFromPath(string $avatarPath): array
-    {
-        $avatarFilename = basename(trim($avatarPath));
-        if ($avatarFilename === '') {
-            return ['filename' => '', 'url' => '', 'thumb_url' => ''];
-        }
-
-        $avatarBase = (string) pathinfo($avatarFilename, PATHINFO_FILENAME);
-        $avatarThumbFilename = $avatarBase !== '' ? $avatarBase . '_thumb.jpg' : $avatarFilename;
-
-        return [
-            'filename' => $avatarFilename,
-            'url' => '/uploads/avatars/' . rawurlencode($avatarFilename),
-            'thumb_url' => '/uploads/avatars/' . rawurlencode($avatarThumbFilename),
-        ];
+        return $this->publicTemplateDecorator()->decorateGroupForTemplate($group, $members);
     }
 
     /**
@@ -1914,95 +1787,12 @@ final class PublicController
      */
     private function decorateTemplateData(array $data): array
     {
-        $site = is_array($data['site'] ?? null) ? $data['site'] : [];
-
-        $siteName = trim((string) ($site['name'] ?? 'Raven CMS'));
-        if ($siteName === '') {
-            $siteName = 'Raven CMS';
-        }
-        $site['name'] = $siteName;
-
-        $publicThemeCss = trim((string) ($site['public_theme_css'] ?? $site['public_theme'] ?? 'raven'));
-        if ($publicThemeCss === '') {
-            $publicThemeCss = 'raven';
-        }
-        $site['public_theme_css'] = $publicThemeCss;
-
-        if (trim((string) ($site['twitter_site'] ?? '')) === '') {
-            $site['twitter_site'] = $siteName;
-        }
-        if (trim((string) ($site['og_type'] ?? '')) === '') {
-            $site['og_type'] = 'website';
-        }
-        if (trim((string) ($site['og_locale'] ?? '')) === '') {
-            $site['og_locale'] = 'en_US';
+        $statusCode = http_response_code();
+        if (!is_int($statusCode)) {
+            $statusCode = 200;
         }
 
-        $viewTitle = '';
-        $metaDescription = '';
-        $pagination = is_array($data['pagination'] ?? null) ? $data['pagination'] : [];
-        $pageNumber = max(1, (int) ($pagination['current'] ?? 1));
-
-        if (is_array($data['page'] ?? null)) {
-            $viewTitle = trim((string) ($data['page']['title'] ?? ''));
-            $metaDescription = trim((string) ($data['page']['description'] ?? ''));
-        } elseif (is_array($data['category'] ?? null)) {
-            $categoryName = trim((string) ($data['category']['name'] ?? ''));
-            if ($categoryName !== '') {
-                $viewTitle = 'Category: ' . $categoryName;
-                if ($pageNumber > 1) {
-                    $viewTitle .= ' (Page ' . $pageNumber . ')';
-                }
-
-                $metaDescription = trim((string) ($data['category']['description'] ?? ''));
-                if ($metaDescription === '') {
-                    $metaDescription = 'Browse pages in category ' . $categoryName . '.';
-                }
-            }
-        } elseif (is_array($data['tag'] ?? null)) {
-            $tagName = trim((string) ($data['tag']['name'] ?? ''));
-            if ($tagName !== '') {
-                $viewTitle = 'Tag: ' . $tagName;
-                if ($pageNumber > 1) {
-                    $viewTitle .= ' (Page ' . $pageNumber . ')';
-                }
-
-                $metaDescription = 'Browse pages tagged ' . $tagName . '.';
-            }
-        } elseif (is_array($data['profile'] ?? null)) {
-            $profileName = trim((string) ($data['profile']['display_name_resolved'] ?? $data['profile']['display_name'] ?? ''));
-            if ($profileName === '') {
-                $profileName = trim((string) ($data['profile']['username'] ?? ''));
-            }
-            if ($profileName !== '') {
-                $viewTitle = 'Profile: ' . $profileName;
-                $metaDescription = 'Public profile for ' . $profileName . '.';
-            }
-        } elseif (is_array($data['group'] ?? null)) {
-            $groupName = trim((string) ($data['group']['name'] ?? ''));
-            if ($groupName !== '') {
-                $viewTitle = 'Group: ' . $groupName;
-                $metaDescription = 'Members in group ' . $groupName . '.';
-            }
-        }
-
-        if ($viewTitle === '' && http_response_code() === 404) {
-            $viewTitle = 'Not Found';
-            if ($metaDescription === '') {
-                $metaDescription = 'The requested page could not be found.';
-            }
-        }
-
-        $documentTitle = $viewTitle === '' ? $siteName : ($viewTitle . ' [' . $siteName . ']');
-
-        $data['site'] = $site;
-        $data['view_meta'] = [
-            'title' => $viewTitle,
-            'description' => $metaDescription,
-            'document_title' => $documentTitle,
-        ];
-
-        return $data;
+        return $this->publicTemplateDecorator()->decorateTemplateData($data, $statusCode);
     }
 
     /**

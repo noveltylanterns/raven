@@ -15,6 +15,8 @@ namespace Raven\Repository;
 
 use PDO;
 use RuntimeException;
+use Raven\Lib\Auth\AuthPayloadCodec;
+use Raven\Lib\Auth\ContactProfileNormalizer;
 
 /**
  * Data access for User CRUD and user-group membership assignments.
@@ -25,6 +27,7 @@ final class UserRepository
     private PDO $appDb;
     private string $driver;
     private string $prefix;
+    private AuthPayloadCodec $authPayloadCodec;
 
     public function __construct(PDO $authDb, PDO $appDb, string $driver, string $prefix)
     {
@@ -34,6 +37,7 @@ final class UserRepository
         $this->driver = $driver;
         // Prefix is ignored for SQLite because attached database aliases are used instead.
         $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
+        $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
     }
 
     /**
@@ -1395,22 +1399,7 @@ final class UserRepository
      */
     private function decodeContactProfiles(mixed $raw): array
     {
-        if (!is_string($raw) || trim($raw) === '') {
-            return [];
-        }
-
-        try {
-            /** @var mixed $decoded */
-            $decoded = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
-        } catch (\Throwable) {
-            return [];
-        }
-
-        if (!is_array($decoded)) {
-            return [];
-        }
-
-        return $this->normalizeContactProfiles($decoded);
+        return $this->authPayloadCodec->decodeContactProfiles($raw);
     }
 
     /**
@@ -1420,15 +1409,7 @@ final class UserRepository
      */
     private function encodeContactProfiles(array $profiles): ?string
     {
-        if ($profiles === []) {
-            return null;
-        }
-
-        try {
-            return json_encode($profiles, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-        } catch (\Throwable) {
-            return null;
-        }
+        return $this->authPayloadCodec->encodeContactProfiles($profiles);
     }
 
     /**
@@ -1439,67 +1420,7 @@ final class UserRepository
      */
     private function normalizeContactProfiles(array $profiles): array
     {
-        $normalized = [];
-        foreach ($profiles as $profile) {
-            if (!is_array($profile)) {
-                continue;
-            }
-
-            $type = strtolower(trim((string) ($profile['type'] ?? '')));
-            $value = trim((string) ($profile['value'] ?? ''));
-            if ($type === '' || $value === '') {
-                continue;
-            }
-
-            $type = preg_replace('/[^a-z0-9-]+/', '-', $type) ?? '';
-            $type = trim($type, '-');
-            $type = preg_replace('/-+/', '-', $type) ?? '';
-            if ($type === '') {
-                continue;
-            }
-
-            if (mb_strlen($type) > 80) {
-                $type = mb_substr($type, 0, 80);
-            }
-            if (mb_strlen($value) > 255) {
-                $value = mb_substr($value, 0, 255);
-            }
-            if ($value === '') {
-                continue;
-            }
-
-            $dedupeKey = strtolower($type . "\n" . $value);
-            $normalized[$dedupeKey] = [
-                'type' => $type,
-                'value' => $value,
-            ];
-
-            if (count($normalized) >= 20) {
-                break;
-            }
-        }
-
-        $result = array_values($normalized);
-        usort(
-            $result,
-            static function (array $left, array $right): int {
-                $leftType = strtolower(trim((string) ($left['type'] ?? '')));
-                $rightType = strtolower(trim((string) ($right['type'] ?? '')));
-                if ($leftType !== $rightType) {
-                    return $leftType <=> $rightType;
-                }
-
-                $leftValue = strtolower(trim((string) ($left['value'] ?? '')));
-                $rightValue = strtolower(trim((string) ($right['value'] ?? '')));
-                if ($leftValue !== $rightValue) {
-                    return $leftValue <=> $rightValue;
-                }
-
-                return 0;
-            }
-        );
-
-        return $result;
+        return $this->authPayloadCodec->normalizeContactProfiles($profiles);
     }
 
     /**
