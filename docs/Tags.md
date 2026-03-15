@@ -4,7 +4,7 @@
 
 This document explains Raven's Tag system for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever tag structure, tag routes, or Tag panel views change (`private/vis/panel/tags/*`, tag controller/repository behavior, or tag public routing).
+Maintenance note: keep this file updated whenever tag structure, tag routes, or Tag panel views change (`private/tpl/panel/tags/*`, tag controller/repository behavior, or tag public routing).
 
 ## 1) Panel Guide (Create And Edit Tags)
 
@@ -65,8 +65,8 @@ Delete behavior note:
 ### Key Files
 
 - Panel views:
-  - `private/vis/panel/tags/list.php`
-  - `private/vis/panel/tags/edit.php`
+  - `private/tpl/panel/tags/list.php`
+  - `private/tpl/panel/tags/edit.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Persistence:

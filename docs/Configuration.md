@@ -4,7 +4,7 @@
 
 This document explains Raven's System Configuration editor for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever configuration routes, config validation/normalization behavior, or Configuration panel views change (`private/vis/panel/configuration.php`, `PanelController::configuration*`, and config schema/field conventions).
+Maintenance note: keep this file updated whenever configuration routes, config validation/normalization behavior, or Configuration panel views change (`private/tpl/panel/configuration.php`, `PanelController::configuration*`, and config schema/field conventions).
 
 ## 1) Panel Guide (System Configuration)
 
@@ -162,7 +162,7 @@ Depending on field key/type, the editor renders:
 ### Key Files
 
 - Panel view (config UI inside dashboard template):
-  - `private/vis/panel/configuration.php`
+  - `private/tpl/panel/configuration.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Runtime config files:

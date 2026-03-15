@@ -10,13 +10,13 @@ Authoritative runtime contract: [public/theme/AGENTS.md](../public/theme/AGENTS.
 
 Public rendering resolves templates from:
 
-1. `public/theme/{active_theme}/vis/*`
-2. parent themes in inheritance order (`vis/*`)
-3. core fallback `private/vis/*`
+1. `public/theme/{active_theme}/tpl/*`
+2. parent themes in inheritance order (`tpl/*`)
+3. core fallback `private/tpl/*`
 
 Theme wrappers are expected at:
 
-- `public/theme/{slug}/vis/wrapper.php`
+- `public/theme/{slug}/tpl/wrapper.php`
 
 ## 2) Complete Brace-Tag Directive Inventory
 
@@ -147,8 +147,8 @@ Generated files:
 
 - `public/theme/{slug}/theme.json`
 - `public/theme/{slug}/css/style.css`
-- `public/theme/{slug}/vis/wrapper.php`
-- `public/theme/{slug}/vis/home.php`
+- `public/theme/{slug}/tpl/wrapper.php`
+- `public/theme/{slug}/tpl/home.php`
 - optional (panel create-form checkboxes, default off):
   - `public/theme/{slug}/AGENTS.md`
   - `public/theme/{slug}/composer.json`

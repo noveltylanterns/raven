@@ -20,7 +20,7 @@ At minimum, each extension needs:
 - optional `lib/routes_panel.php` (panel route registrar)
 - optional `lib/routes_public.php` (public route registrar)
 - optional `lib/shortcodes.php` (page editor shortcode provider)
-- optional `vis/` (extension-owned panel templates; panel-routable types only)
+- optional `tpl/` (extension-owned panel templates; panel-routable types only)
 - optional extension-local state files when needed by your extension
 
 ## 2) How Extensions Are Loaded
@@ -105,7 +105,7 @@ Also:
 1. Create `private/ext/{slug}/`.
 2. Add `ext.json` first.
 3. Add `ext.php` and `lib/schema.php` for service/storage behavior.
-4. Add `lib/routes_panel.php` + `vis/` only when panel pages are needed.
+4. Add `lib/routes_panel.php` + `tpl/` only when panel pages are needed.
 5. Add `lib/routes_public.php` only for `module` extensions that need public endpoints.
 6. Add `lib/shortcodes.php` only when editor shortcode insertion is needed.
 7. Add extension-local state files only when necessary.
@@ -115,11 +115,11 @@ Also:
 Alternative bootstrap path:
 
 - Use Extension Manager -> **Create New Extension** to generate a starter scaffold.
-- `helper`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/routes_panel.php`, `vis/panel_index.php`
-- `content`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/fields.php`, `lib/routes_panel.php`, `vis/panel_index.php`
-- `plugin`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `vis/panel_index.php`
-- `module`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `lib/routes_public.php`, `vis/panel_index.php`, `vis/public_index.php`
-- `system`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/routes_panel.php`, `vis/panel_index.php`
+- `helper`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
+- `content`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/fields.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
+- `plugin`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
+- `module`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `lib/routes_public.php`, `tpl/panel_index.php`, `tpl/public_index.php`
+- `system`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
 - Optional in that same modal: `Generate AGENTS.md?` to create `private/ext/{slug}/AGENTS.md` with extension-local guidance that points back to [private/ext/AGENTS.md](../private/ext/AGENTS.md) for missing context.
 
 ### Extension Manager Panel Options

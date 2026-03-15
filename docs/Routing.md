@@ -4,7 +4,7 @@
 
 This document explains Raven's Routing Table screen for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever Routing Table routes, row-building/conflict logic, export behavior, or Routing Table panel views change (`private/vis/panel/routing.php`, `PanelController::routing*`, or routing inventory composition helpers).
+Maintenance note: keep this file updated whenever Routing Table routes, row-building/conflict logic, export behavior, or Routing Table panel views change (`private/tpl/panel/routing.php`, `PanelController::routing*`, or routing inventory composition helpers).
 
 ## 1) Panel Guide (Routing Table)
 
@@ -73,7 +73,7 @@ Export fields include:
 ### Key Files
 
 - Panel view:
-  - `private/vis/panel/routing.php`
+  - `private/tpl/panel/routing.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 

@@ -147,7 +147,7 @@ Extension management:
 - `import --archive <zip_path> [--slug <slug>]`
 - `delete --slug <slug> [--force]`
 
-`create` writes extension scaffolds under `private/ext/{slug}/` using current route/view conventions (`ext.php`, `ext.json`, `lib/*.php`, `vis/*.php`).
+`create` writes extension scaffolds under `private/ext/{slug}/` using current route/view conventions (`ext.php`, `ext.json`, `lib/*.php`, `tpl/*.php`).
 
 ### `rvn-theme`
 
@@ -168,8 +168,8 @@ Delete rules:
 
 - `theme.json`
 - `css/style.css`
-- `vis/wrapper.php`
-- `vis/home.php`
+- `tpl/wrapper.php`
+- `tpl/home.php`
 
 When `--clone` is provided, all files from `public/theme/{source_slug}/` are copied into the new theme directory and `theme.json` is rewritten with the new theme metadata.
 

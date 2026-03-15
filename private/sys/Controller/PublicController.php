@@ -1637,8 +1637,8 @@ final class PublicController
      * Renders one public template with theme-aware lookup and private fallback.
      *
      * Theme lookup order:
-     * 1) `public/theme/{active_theme}/vis/{template}.php`
-     * 2) `private/vis/{template}.php`
+     * 1) `public/theme/{active_theme}/tpl/{template}.php`
+     * 2) `private/tpl/{template}.php`
      *
      * @param array<string, mixed> $data
      */
@@ -1660,8 +1660,8 @@ final class PublicController
      * Resolves channel landing template name with slug-specific override support.
      *
      * Priority:
-     * 1) `vis/channels/{channel_slug}.php`
-     * 2) `vis/channels/index.php`
+     * 1) `tpl/channels/{channel_slug}.php`
+     * 2) `tpl/channels/index.php`
      */
     private function resolveChannelTemplateName(string $channelSlug): string
     {
@@ -1675,8 +1675,8 @@ final class PublicController
      * Resolves public page template with optional channel-specific override.
      *
      * Priority:
-     * 1) `vis/pages/{channel_slug}.php` when route has a channel
-     * 2) `vis/pages/index.php`
+     * 1) `tpl/pages/{channel_slug}.php` when route has a channel
+     * 2) `tpl/pages/index.php`
      */
     private function resolvePageTemplateName(?string $channelSlug): string
     {
@@ -1690,8 +1690,8 @@ final class PublicController
      * Resolves category-list template name with category-slug override support.
      *
      * Priority:
-     * 1) `vis/categories/{category_slug}.php`
-     * 2) `vis/categories/index.php`
+     * 1) `tpl/categories/{category_slug}.php`
+     * 2) `tpl/categories/index.php`
      */
     private function resolveCategoryTemplateName(string $categorySlug): string
     {
@@ -1705,8 +1705,8 @@ final class PublicController
      * Resolves tag-list template name with tag-slug override support.
      *
      * Priority:
-     * 1) `vis/tags/{tag_slug}.php`
-     * 2) `vis/tags/index.php`
+     * 1) `tpl/tags/{tag_slug}.php`
+     * 2) `tpl/tags/index.php`
      */
     private function resolveTagTemplateName(string $tagSlug): string
     {
@@ -1724,7 +1724,7 @@ final class PublicController
         return $this->publicTemplatePipeline()->lookupRoots(
             $this->publicThemesRoot(),
             $this->currentPublicThemeSlug(),
-            dirname(__DIR__, 3) . '/private/vis'
+            dirname(__DIR__, 3) . '/private/tpl'
         );
     }
 

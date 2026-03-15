@@ -4,7 +4,7 @@
 
 This document explains Raven's user Preferences screen for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever Preferences routes, validation/avatar behavior, or Preferences panel views change (`private/vis/panel/preferences.php`, `PanelController::preferences*`, or `AuthService` preference persistence contracts).
+Maintenance note: keep this file updated whenever Preferences routes, validation/avatar behavior, or Preferences panel views change (`private/tpl/panel/preferences.php`, `PanelController::preferences*`, or `AuthService` preference persistence contracts).
 
 ## 1) Panel Guide (Preferences)
 
@@ -58,7 +58,7 @@ Behavior notes:
 ### Key Files
 
 - Panel view:
-  - `private/vis/panel/preferences.php`
+  - `private/tpl/panel/preferences.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Auth service persistence:

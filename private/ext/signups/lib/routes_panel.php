@@ -63,9 +63,9 @@ return static function (Router $router, array $context): void {
 
     $extensionRoot = rtrim((string) $app['root'], '/') . '/private/ext/signups';
     $extensionManifestFile = $extensionRoot . '/ext.json';
-    $listViewFile = $extensionRoot . '/vis/panel_index.php';
-    $editViewFile = $extensionRoot . '/vis/panel_edit.php';
-    $submissionsViewFile = $extensionRoot . '/vis/panel_signups.php';
+    $listViewFile = $extensionRoot . '/tpl/panel_index.php';
+    $editViewFile = $extensionRoot . '/tpl/panel_edit.php';
+    $submissionsViewFile = $extensionRoot . '/tpl/panel_signups.php';
 
     $indexPath = $panelUrl('/signups');
     $editBasePath = $panelUrl('/signups/edit');

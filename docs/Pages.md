@@ -4,7 +4,7 @@
 
 This document explains Raven's Page system for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever page structure, page-related routes, or Page panel views change (`private/vis/panel/pages/*`, page controller/repository/media flows, or page public-render behavior).
+Maintenance note: keep this file updated whenever page structure, page-related routes, or Page panel views change (`private/tpl/panel/pages/*`, page controller/repository/media flows, or page public-render behavior).
 
 ## 1) Panel Guide (Create And Edit Pages)
 
@@ -137,8 +137,8 @@ Behavior notes:
 ### Key Files
 
 - Panel views:
-  - `private/vis/panel/pages/list.php`
-  - `private/vis/panel/pages/edit.php`
+  - `private/tpl/panel/pages/list.php`
+  - `private/tpl/panel/pages/edit.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Public controller:
@@ -228,7 +228,7 @@ Main page rendering path in `PublicController`:
 - homepage: `findHomepage()` with slug priority `home` -> `index`
 - channel landing: `findChannelHomepage()` with same `home` -> `index` priority
 - normal page: `findPublicPage(pageSlug, channelSlug?)`
-- rendered templates support EE-style brace tags (`{site:name}`, `{if ...}`, `{each ...}`) in both `public/theme/*/vis/*` and fallback `private/vis/*`
+- rendered templates support EE-style brace tags (`{site:name}`, `{if ...}`, `{each ...}`) in both `public/theme/*/tpl/*` and fallback `private/tpl/*`
 
 Page media on public output:
 

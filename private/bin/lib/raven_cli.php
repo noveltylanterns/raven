@@ -2095,7 +2095,7 @@ function raven_cli_extension_scaffold_files(string $extensionPath, array $meta, 
         "    });\n" .
         "};\n";
 
-    $files['vis/panel_index.php'] = "<?php\n\n" .
+    $files['tpl/panel_index.php'] = "<?php\n\n" .
         "declare(strict_types=1);\n\n" .
         "if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {\n" .
         "    http_response_code(404);\n" .
@@ -2130,7 +2130,7 @@ function raven_cli_extension_scaffold_files(string $extensionPath, array $meta, 
             "    });\n" .
             "};\n";
 
-        $files['vis/public_index.php'] = "<?php\n\n" .
+        $files['tpl/public_index.php'] = "<?php\n\n" .
             "declare(strict_types=1);\n\n" .
             "if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {\n" .
             "    http_response_code(404);\n" .
@@ -2574,7 +2574,7 @@ function raven_cli_theme_scaffold_files(array $meta): array
     $wrapper = "<?php\n\n"
         . "/**\n"
         . " * RAVEN CMS\n"
-        . " * ~/public/theme/" . $slug . "/vis/wrapper.php\n"
+        . " * ~/public/theme/" . $slug . "/tpl/wrapper.php\n"
         . " * " . $nameForDoc . " theme wrapper template.\n"
         . " * Docs: https://raven.lanterns.io\n"
         . " */\n\n"
@@ -2601,7 +2601,7 @@ function raven_cli_theme_scaffold_files(array $meta): array
     $home = "<?php\n\n"
         . "/**\n"
         . " * RAVEN CMS\n"
-        . " * ~/public/theme/" . $slug . "/vis/home.php\n"
+        . " * ~/public/theme/" . $slug . "/tpl/home.php\n"
         . " * " . $nameForDoc . " homepage template scaffold.\n"
         . " * Docs: https://raven.lanterns.io\n"
         . " */\n\n"
@@ -2637,8 +2637,8 @@ function raven_cli_theme_scaffold_files(array $meta): array
     return [
         'theme.json' => $manifestJson . "\n",
         'css/style.css' => $css,
-        'vis/wrapper.php' => $wrapper,
-        'vis/home.php' => $home,
+        'tpl/wrapper.php' => $wrapper,
+        'tpl/home.php' => $home,
     ];
 }
 
@@ -2691,7 +2691,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                     'parent_theme' => (string) ($manifest['parent_theme'] ?? ''),
                     'active' => $activeTheme !== '' && $slug === $activeTheme,
                     'has_css' => is_file($themesRoot . '/' . $slug . '/css/style.css'),
-                    'has_wrapper' => is_file($themesRoot . '/' . $slug . '/vis/wrapper.php'),
+                    'has_wrapper' => is_file($themesRoot . '/' . $slug . '/tpl/wrapper.php'),
                 ];
             }
 

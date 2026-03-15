@@ -4,7 +4,7 @@
 
 This document explains Raven's Category system for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever category structure, category routes, or Category panel views change (`private/vis/panel/categories/*`, category controller/repository behavior, or category public routing).
+Maintenance note: keep this file updated whenever category structure, category routes, or Category panel views change (`private/tpl/panel/categories/*`, category controller/repository behavior, or category public routing).
 
 ## 1) Panel Guide (Create And Edit Categories)
 
@@ -65,8 +65,8 @@ Delete behavior note:
 ### Key Files
 
 - Panel views:
-  - `private/vis/panel/categories/list.php`
-  - `private/vis/panel/categories/edit.php`
+  - `private/tpl/panel/categories/list.php`
+  - `private/tpl/panel/categories/edit.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Persistence:

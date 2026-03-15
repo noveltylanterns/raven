@@ -57,7 +57,7 @@ final class ThemeFallbackRenderer
         }
 
         foreach ($chain as $candidateThemeSlug) {
-            $themeViewsRoot = $this->themesRoot . '/' . $candidateThemeSlug . '/vis';
+            $themeViewsRoot = $this->themesRoot . '/' . $candidateThemeSlug . '/tpl';
             if (is_dir($themeViewsRoot)) {
                 $roots[] = $themeViewsRoot;
             }

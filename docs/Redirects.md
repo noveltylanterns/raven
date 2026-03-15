@@ -4,7 +4,7 @@
 
 This document explains Raven's Redirect system for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever redirect structure, redirect routes, or Redirect panel views change (`private/vis/panel/redirects/*`, redirect controller/repository behavior, or public redirect resolution).
+Maintenance note: keep this file updated whenever redirect structure, redirect routes, or Redirect panel views change (`private/tpl/panel/redirects/*`, redirect controller/repository behavior, or public redirect resolution).
 
 ## 1) Panel Guide (Create And Edit Redirects)
 
@@ -63,8 +63,8 @@ Fields/options:
 ### Key Files
 
 - Panel views:
-  - `private/vis/panel/redirects/list.php`
-  - `private/vis/panel/redirects/edit.php`
+  - `private/tpl/panel/redirects/list.php`
+  - `private/tpl/panel/redirects/edit.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Persistence:

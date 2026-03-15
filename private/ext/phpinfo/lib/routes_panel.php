@@ -38,7 +38,7 @@ return static function (Router $router, array $context): void {
     }
 
     $extensionRoot = dirname(__DIR__);
-    $viewFile = $extensionRoot . '/vis/panel_index.php';
+    $viewFile = $extensionRoot . '/tpl/panel_index.php';
     $routePath = '/phpinfo';
     $section = 'phpinfo';
     $extensionManifestFile = $extensionRoot . '/ext.json';

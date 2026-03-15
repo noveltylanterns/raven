@@ -25,8 +25,8 @@ Last updated: 2026-03-14
 1. Create folder: `private/ext/{slug}/` using a safe slug.
 2. Create `ext.json` first and validate JSON syntax.
 3. Add `ext.php` and `lib/schema.php` as no-op valid callables.
-4. Add `lib/routes_panel.php` and `vis/panel_index.php` for panel-facing extension pages.
-5. Add `lib/routes_public.php` and `vis/public_index.php` only for `module` extensions.
+4. Add `lib/routes_panel.php` and `tpl/panel_index.php` for panel-facing extension pages.
+5. Add `lib/routes_public.php` and `tpl/public_index.php` only for `module` extensions.
 6. Add `lib/shortcodes.php` for `helper`, `plugin`, or `module` types.
 7. Add `lib/fields.php` for `content`, `plugin`, or `module` types.
 8. If `lib/shortcodes.php` and/or `lib/fields.php` exist, ensure they match the universal contracts below.
@@ -169,12 +169,12 @@ return static function (): array {
     return [];
 };
 ```
-- `vis/panel_index.php` (all extension types):
+- `tpl/panel_index.php` (all extension types):
 ```php
 <?php
 /**
  * RAVEN CMS
- * ~/private/ext/{slug}/vis/panel_index.php
+ * ~/private/ext/{slug}/tpl/panel_index.php
  * Extension panel landing view.
  * docs: /private/ext/AGENTS.md
  */
@@ -208,11 +208,11 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - These type/file boundaries are runtime-enforced by core manifest validation; violating extensions are treated as invalid and are not enabled.
 
 ## Critical Rule: Do Not Modify Core
-- Do not modify `panel/index.php`, `public/index.php`, `private/sys/*`, `private/vis/*`, or installer code to ship an extension.
+- Do not modify `panel/index.php`, `public/index.php`, `private/sys/*`, `private/tpl/*`, or installer code to ship an extension.
 - Do not patch core controllers to force extension behavior.
 - Keep extension code isolated under `private/ext/{extension_slug}/`.
 - Repeated warning: core edits for extension behavior can break long-term compatibility and future upgrades.
-- Repeated warning: if behavior can be implemented inside extension routes/vis/state, do not touch core.
+- Repeated warning: if behavior can be implemented inside extension routes/tpl/state, do not touch core.
 
 ## Core `private/lib` Boundary
 - `private/lib/` is core-owned shared runtime code and is not an extension storage location.
@@ -231,7 +231,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - Optional public routes registrar: `private/ext/{directory_name}/lib/routes_public.php`
 - Optional page-editor shortcode provider: `private/ext/{directory_name}/lib/shortcodes.php`
 - Optional extension-local state file(s) when needed by your extension
-- Optional extension-owned panel templates: `private/ext/{directory_name}/vis/*.php`
+- Optional extension-owned panel templates: `private/ext/{directory_name}/tpl/*.php`
 
 ## Extension Enablement State
 - Runtime enablement state file: `private/ext/.state.php`
@@ -365,7 +365,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - submit handler (`submit(...)`)
 
 ## Panel UI Integration Pattern
-- Extensions generally render via shared panel layout: `private/vis/panel/wrapper.php`.
+- Extensions generally render via shared panel layout: `private/tpl/panel/wrapper.php`.
 - Typical render flow:
 - render extension body template to buffer
 - pass buffered HTML as `content` into panel layout render
@@ -428,11 +428,11 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 
 ## Extension Upload/Packaging Rules
 - Extension Manager can generate a new extension scaffold directly in `private/ext/{name}/`:
-- helper scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/routes_panel.php`, `vis/panel_index.php`
-- content scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/fields.php`, `lib/routes_panel.php`, `vis/panel_index.php`
-- plugin scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `vis/panel_index.php`
-- module scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `lib/routes_public.php`, `vis/panel_index.php`, `vis/public_index.php`
-- system scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/routes_panel.php`, `vis/panel_index.php`
+- helper scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
+- content scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/fields.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
+- plugin scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
+- module scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `lib/routes_public.php`, `tpl/panel_index.php`, `tpl/public_index.php`
+- system scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
 - generated header card pulls version/author/description/docs URL from `ext.json`.
 - The same modal can optionally generate `private/ext/{name}/AGENTS.md` with extension-local guidance and a backlink to this file for missing/global context.
 - Uploads are ZIP-only through Extension Manager.
@@ -471,8 +471,8 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 ## Update-Safe Workflow
 - Create `private/ext/{new_extension}/`.
 - Add `ext.json` first.
-- Add `lib/routes_panel.php` and `vis/` for panel pages.
-- Add `lib/routes_public.php` and `vis/public_index.php` only for `module` extensions.
+- Add `lib/routes_panel.php` and `tpl/` for panel pages.
+- Add `lib/routes_public.php` and `tpl/public_index.php` only for `module` extensions.
 - Persist extension-specific state in extension-owned files.
 - Enable through Extension Manager only after manifest/routes validate.
 - Repeated warning: do not modify core to ship extension features.

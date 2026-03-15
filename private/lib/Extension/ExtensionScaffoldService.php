@@ -47,9 +47,9 @@ final class ExtensionScaffoldService
             throw new \RuntimeException('Failed to create extension lib directory.');
         }
 
-        $visPath = $extensionPath . '/vis';
+        $visPath = $extensionPath . '/tpl';
         if ($generatesPanelRoutes && !mkdir($visPath, 0700, true) && !is_dir($visPath)) {
-            throw new \RuntimeException('Failed to create extension vis directory.');
+            throw new \RuntimeException('Failed to create extension tpl directory.');
         }
 
         $manifestPath = $extensionPath . '/ext.json';
@@ -106,7 +106,7 @@ final class ExtensionScaffoldService
             }
 
             if (file_put_contents($panelIndexViewPath, $viewContent, LOCK_EX) === false) {
-                throw new \RuntimeException('Failed to write vis/panel_index.php.');
+                throw new \RuntimeException('Failed to write tpl/panel_index.php.');
             }
         }
         if ($generatesPublicRoutes) {
@@ -115,7 +115,7 @@ final class ExtensionScaffoldService
                 throw new \RuntimeException('Failed to write lib/routes_public.php.');
             }
             if (file_put_contents($publicIndexViewPath, $publicViewContent, LOCK_EX) === false) {
-                throw new \RuntimeException('Failed to write vis/public_index.php.');
+                throw new \RuntimeException('Failed to write tpl/public_index.php.');
             }
         }
         if ($generateAgentsFile && file_put_contents($agentsFilePath, $agentsContent, LOCK_EX) === false) {
@@ -362,7 +362,7 @@ return static function (Router $router, array $context): void {
     }
 
     $extensionRoot = dirname(__DIR__);
-    $viewFile = $extensionRoot . '/vis/panel_index.php';
+    $viewFile = $extensionRoot . '/tpl/panel_index.php';
     $routePath = __ROUTE_PATH_LITERAL__;
     $section = __SECTION_LITERAL__;
     $extensionManifestFile = $extensionRoot . '/ext.json';
@@ -509,7 +509,7 @@ use Raven\Lib\Routing\Router;
  */
 return static function (Router $router, array $context): void {
     // Add public extension routes here. Keep routes extension-owned and avoid core edits.
-    // Generated public view stub is available at: /vis/public_index.php
+    // Generated public view stub is available at: /tpl/public_index.php
     // Example:
     // $router->add('GET', '/my-extension', static function () use ($context): void { ... });
 };
@@ -674,7 +674,7 @@ PHP;
     }
 
     /**
-     * Returns generated `vis/public_index.php` scaffold content for module extensions.
+     * Returns generated `tpl/public_index.php` scaffold content for module extensions.
      *
      * @param array{
      *   name: string,
@@ -689,7 +689,7 @@ PHP;
 
 /**
  * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/vis/public_index.php
+ * ~/private/ext/__DIRECTORY__/tpl/public_index.php
  * __NAME_DOC__ extension public view scaffold.
  * Docs: https://raven.lanterns.io
  */
@@ -717,7 +717,7 @@ PHP;
     }
 
     /**
-     * Returns generated `vis/panel_index.php` scaffold content.
+     * Returns generated `tpl/panel_index.php` scaffold content.
      *
      * @param array{
      *   name: string,
@@ -742,7 +742,7 @@ PHP;
         ];
         if ($generatesPublicRoutes) {
             $starterFiles[] = 'private/ext/__DIRECTORY__/lib/routes_public.php';
-            $starterFiles[] = 'private/ext/__DIRECTORY__/vis/public_index.php';
+            $starterFiles[] = 'private/ext/__DIRECTORY__/tpl/public_index.php';
         }
         if ($generatesShortcodes) {
             $starterFiles[] = 'private/ext/__DIRECTORY__/lib/shortcodes.php';
@@ -750,7 +750,7 @@ PHP;
         if ($generatesContentBlocks) {
             $starterFiles[] = 'private/ext/__DIRECTORY__/lib/fields.php';
         }
-        $starterFiles[] = 'private/ext/__DIRECTORY__/vis/panel_index.php';
+        $starterFiles[] = 'private/ext/__DIRECTORY__/tpl/panel_index.php';
         $starterFilesListHtml = '';
         foreach ($starterFiles as $starterFile) {
             $starterFilesListHtml .= "\n            <li><code>" . $starterFile . "</code></li>";
@@ -760,7 +760,7 @@ PHP;
 
 /**
  * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/vis/panel_index.php
+ * ~/private/ext/__DIRECTORY__/tpl/panel_index.php
  * __NAME_DOC__ extension panel index view.
  * Docs: https://raven.lanterns.io
  */
@@ -851,11 +851,11 @@ PHP;
             '- `ext.php`',
             '- `lib/schema.php`',
             '- `lib/routes_panel.php`',
-            '- `vis/panel_index.php`',
+            '- `tpl/panel_index.php`',
         ];
         if ($generatesPublicRoutes) {
             $starterFiles[] = '- `lib/routes_public.php`';
-            $starterFiles[] = '- `vis/public_index.php`';
+            $starterFiles[] = '- `tpl/public_index.php`';
         }
         if ($generatesShortcodes) {
             $starterFiles[] = '- `lib/shortcodes.php`';

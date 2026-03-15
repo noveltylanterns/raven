@@ -60,7 +60,7 @@ server {
     fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
     include /etc/nginx/fastcgi_params;
   }
-  location ~ ^/theme/[^/]+/vis/.*\.php$ {
+  location ~ ^/theme/[^/]+/tpl/.*\.php$ {
     return 404;
   }
   location / {

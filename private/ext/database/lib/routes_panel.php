@@ -51,8 +51,8 @@ return static function (Router $router, array $context): void {
     $extensionRoot = rtrim((string) $app['root'], '/') . '/private/ext/database';
     $extensionManifestFile = $extensionRoot . '/ext.json';
     $extensionEntrypoint = $extensionRoot . '/adminer.php';
-    $extensionViewFile = $extensionRoot . '/vis/panel_index.php';
-    $adminerSelectorViewFile = $extensionRoot . '/vis/panel_adminer_selector.php';
+    $extensionViewFile = $extensionRoot . '/tpl/panel_index.php';
+    $adminerSelectorViewFile = $extensionRoot . '/tpl/panel_adminer_selector.php';
     $extensionPublicRoot = rtrim((string) $app['root'], '/') . '/panel/ext/database';
     $extensionMeta = [
         'name' => 'Database Manager',

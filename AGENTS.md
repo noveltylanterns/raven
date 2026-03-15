@@ -50,7 +50,7 @@ Last updated: 2026-03-14
 ## Theme Rules
 - Public themes must live in `public/theme/{slug}/`.
 - Theme manifest required: `public/theme/{slug}/theme.json`.
-- Theme templates live in `public/theme/{slug}/vis/` and wrapper must be `vis/wrapper.php`.
+- Theme templates live in `public/theme/{slug}/tpl/` and wrapper must be `tpl/wrapper.php`.
 - Panel styling and panel-theme contracts are governed by `panel/theme/AGENTS.md`.
 - Public-theme rendering and inheritance contracts are governed by `public/theme/AGENTS.md`.
 
@@ -146,8 +146,8 @@ Where extensions are stored. Not all extensions will have all these files, but t
 - `/private/ext/*/lib/schema.php` - Extension-specific schema ensure provider.
 - `/private/ext/*/lib/shortcodes.php` - Internal API bind location for extension-provided shortcodes.
 - `/private/ext/*/src/` - Extension source files. These can look like whatever as long as the above lib/ files adhere to spec.
-- `/private/ext/*/vis/panel_*.php` - Extension-specific panel/ view templates.
-- `/private/ext/*/vis/public_*.php` - Extension-specific public/ view templates.
+- `/private/ext/*/tpl/panel_*.php` - Extension-specific panel/ view templates.
+- `/private/ext/*/tpl/public_*.php` - Extension-specific public/ view templates.
 
 #### /private/lib/
 Reusable library modules decoupled from Raven core runtime assumptions:
@@ -329,47 +329,47 @@ Core system files:
 #### /.tmp/
 Sometimes temporary files get stashed here.
 
-#### /private/vis/
+#### /private/tpl/
 Core fallback templates:
-- `/private/vis/categories/index.php` - Core fallback category listing template.
-- `/private/vis/channels/index.php` - Core fallback channel landing template.
-- `/private/vis/groups/index.php` - Core fallback group-route wrapper/entry template.
-- `/private/vis/groups/limited.php` - Core fallback limited-visibility group listing template.
-- `/private/vis/groups/list.php` - Core fallback group listing template.
-- `/private/vis/home.php` - Core fallback homepage template.
-- `/private/vis/messages/404.php` - Core fallback not-found message template.
-- `/private/vis/messages/denied.php` - Core fallback permission-denied message template.
-- `/private/vis/messages/disabled.php` - Core fallback site-disabled message template.
-- `/private/vis/pages/index.php` - Core fallback page template.
-- `/private/vis/profiles/full.php` - Core fallback full profile template.
-- `/private/vis/profiles/index.php` - Core fallback profile-route wrapper/entry template.
-- `/private/vis/profiles/limited.php` - Core fallback limited-visibility profile template.
-- `/private/vis/tags/index.php` - Core fallback tag listing template.
-- `/private/vis/wrapper.php` - Core fallback public layout wrapper template.
+- `/private/tpl/categories/index.php` - Core fallback category listing template.
+- `/private/tpl/channels/index.php` - Core fallback channel landing template.
+- `/private/tpl/groups/index.php` - Core fallback group-route wrapper/entry template.
+- `/private/tpl/groups/limited.php` - Core fallback limited-visibility group listing template.
+- `/private/tpl/groups/list.php` - Core fallback group listing template.
+- `/private/tpl/home.php` - Core fallback homepage template.
+- `/private/tpl/messages/404.php` - Core fallback not-found message template.
+- `/private/tpl/messages/denied.php` - Core fallback permission-denied message template.
+- `/private/tpl/messages/disabled.php` - Core fallback site-disabled message template.
+- `/private/tpl/pages/index.php` - Core fallback page template.
+- `/private/tpl/profiles/full.php` - Core fallback full profile template.
+- `/private/tpl/profiles/index.php` - Core fallback profile-route wrapper/entry template.
+- `/private/tpl/profiles/limited.php` - Core fallback limited-visibility profile template.
+- `/private/tpl/tags/index.php` - Core fallback tag listing template.
+- `/private/tpl/wrapper.php` - Core fallback public layout wrapper template.
 
 ###### Core panel-specific templates:
-- `/private/vis/panel/categories/edit.php` - Panel category create/edit template.
-- `/private/vis/panel/categories/list.php` - Panel category list template.
-- `/private/vis/panel/channels/edit.php` - Panel channel create/edit template.
-- `/private/vis/panel/channels/list.php` - Panel channel list template.
-- `/private/vis/panel/configuration.php` - Panel system configuration editor template.
-- `/private/vis/panel/dashboard.php` - Panel dashboard landing template.
-- `/private/vis/panel/extensions.php` - Panel extension manager template.
-- `/private/vis/panel/themes.php` - Panel public theme manager template.
-- `/private/vis/panel/groups/edit.php` - Panel group create/edit template.
-- `/private/vis/panel/groups/list.php` - Panel group list template.
-- `/private/vis/panel/login.php` - Panel login screen template.
-- `/private/vis/panel/pages/edit.php` - Panel page create/edit template.
-- `/private/vis/panel/pages/list.php` - Panel page list template.
-- `/private/vis/panel/preferences.php` - Panel user preferences editor template.
-- `/private/vis/panel/redirects/edit.php` - Panel redirect create/edit template.
-- `/private/vis/panel/redirects/list.php` - Panel redirect list template.
-- `/private/vis/panel/routing.php` - Panel routing inventory/list template.
-- `/private/vis/panel/tags/edit.php` - Panel tag create/edit template.
-- `/private/vis/panel/tags/list.php` - Panel tag list template.
-- `/private/vis/panel/users/edit.php` - Panel user create/edit template.
-- `/private/vis/panel/users/list.php` - Panel user list template.
-- `/private/vis/panel/wrapper.php` - Panel layout wrapper template used by panel pages.
+- `/private/tpl/panel/categories/edit.php` - Panel category create/edit template.
+- `/private/tpl/panel/categories/list.php` - Panel category list template.
+- `/private/tpl/panel/channels/edit.php` - Panel channel create/edit template.
+- `/private/tpl/panel/channels/list.php` - Panel channel list template.
+- `/private/tpl/panel/configuration.php` - Panel system configuration editor template.
+- `/private/tpl/panel/dashboard.php` - Panel dashboard landing template.
+- `/private/tpl/panel/extensions.php` - Panel extension manager template.
+- `/private/tpl/panel/themes.php` - Panel public theme manager template.
+- `/private/tpl/panel/groups/edit.php` - Panel group create/edit template.
+- `/private/tpl/panel/groups/list.php` - Panel group list template.
+- `/private/tpl/panel/login.php` - Panel login screen template.
+- `/private/tpl/panel/pages/edit.php` - Panel page create/edit template.
+- `/private/tpl/panel/pages/list.php` - Panel page list template.
+- `/private/tpl/panel/preferences.php` - Panel user preferences editor template.
+- `/private/tpl/panel/redirects/edit.php` - Panel redirect create/edit template.
+- `/private/tpl/panel/redirects/list.php` - Panel redirect list template.
+- `/private/tpl/panel/routing.php` - Panel routing inventory/list template.
+- `/private/tpl/panel/tags/edit.php` - Panel tag create/edit template.
+- `/private/tpl/panel/tags/list.php` - Panel tag list template.
+- `/private/tpl/panel/users/edit.php` - Panel user create/edit template.
+- `/private/tpl/panel/users/list.php` - Panel user list template.
+- `/private/tpl/panel/wrapper.php` - Panel layout wrapper template used by panel pages.
 
 ### /public/
 The web entrypoint to the general public. Must be readable by web server process:
@@ -382,6 +382,6 @@ The web entrypoint to the general public. Must be readable by web server process
 - `/public/theme/*/fonts/` - Theme-specific font files.
 - `/public/theme/*/img/` - Theme-specific image assets.
 - `/public/theme/*/scss/` - Theme-specific scss files & Bootstrap imports.
-- `/public/theme/*/vis/` - Theme-specific view files.
+- `/public/theme/*/tpl/` - Theme-specific view files.
 - `/public/theme/raven/` - Stock theme example.
 - `/public/uploads/` - Where site content (avatars, image attachments, etc) is uploaded. Much of it is sorted by type/uniqueid/subid.

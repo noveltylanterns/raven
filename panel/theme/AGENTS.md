@@ -20,7 +20,7 @@ Last updated: 2026-03-14
 
 ## Critical Rule: Keep Panel Theming Update-Safe
 - Do not modify core PHP/controller/routing code for style-only panel changes.
-- Do not modify `private/vis/*` for visual-only adjustments unless layout asset wiring itself must change.
+- Do not modify `private/tpl/*` for visual-only adjustments unless layout asset wiring itself must change.
 - Prefer panel theme assets (`panel/theme/css/*`, `panel/theme/scss/*`, `panel/theme/fonts/*`, `panel/theme/img/*`) so updates remain merge-safe.
 
 ## Panel Theme Asset Contract
@@ -33,7 +33,7 @@ Last updated: 2026-03-14
 - Do not add telemetry/tracking scripts to panel theme output.
 
 ## Runtime CSS Load Order
-- Panel layout (`private/vis/panel/wrapper.php`) loads CSS in this order:
+- Panel layout (`private/tpl/panel/wrapper.php`) loads CSS in this order:
 - `theme/css/style.css`
 - `theme/css/bootstrap-icons.min.css`
 - `theme/css/custom.css` (only when file exists)
@@ -89,7 +89,7 @@ body#rvnp .card {
 - Panel `<body>` includes classes like:
 - `rvn-panel`
 - `theme-default` or `theme-light` or `theme-dark`
-- These are generated in `private/vis/panel/wrapper.php` from controller-provided `userTheme`.
+- These are generated in `private/tpl/panel/wrapper.php` from controller-provided `userTheme`.
 - User preference theme values:
 - `default`
 - `corp`
@@ -108,7 +108,7 @@ body#rvnp .card {
 
 ## Panel View/Theming Boundary
 - Unlike public themes, panel theming does not provide customizable PHP view directories under `panel/theme/`.
-- Panel HTML templates are under `private/vis/` and are part of core application behavior.
+- Panel HTML templates are under `private/tpl/` and are part of core application behavior.
 - Panel visual customization should be done via CSS/SCSS assets in `panel/theme/`.
 
 ## Current Panel Table UI Hooks

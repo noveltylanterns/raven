@@ -151,7 +151,7 @@ return (static function (): array {
         'db' => $appDb,
         'auth_db' => $authDb,
         'auth' => $auth,
-        'view' => new View($root . '/private/vis'),
+        'view' => new View($root . '/private/tpl'),
         'input' => $input,
         'csrf' => new Csrf(),
         'categories' => new CategoryRepository($appDb, $driver, $prefix),

@@ -4473,10 +4473,10 @@ final class PanelController
         if (in_array($type, ['content', 'plugin', 'module'], true)) {
             $createdFiles[] = 'lib/fields.php';
         }
-        $createdFiles = array_merge($createdFiles, ['lib/routes_panel.php', 'vis/panel_index.php']);
+        $createdFiles = array_merge($createdFiles, ['lib/routes_panel.php', 'tpl/panel_index.php']);
         if ($type === 'module') {
             $createdFiles[] = 'lib/routes_public.php';
-            $createdFiles[] = 'vis/public_index.php';
+            $createdFiles[] = 'tpl/public_index.php';
         }
         if ($generateComposerFile) {
             $createdFiles[] = 'composer.json';
@@ -6588,7 +6588,7 @@ final class PanelController
             $projectRoot = dirname(__DIR__, 3);
             $this->publicFallbackRenderer = new ThemeFallbackRenderer(
                 $this->publicThemesRoot(),
-                $projectRoot . '/private/vis',
+                $projectRoot . '/private/tpl',
                 $projectRoot . '/.tmp/template_tag_cache'
             );
         }

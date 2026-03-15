@@ -4,7 +4,7 @@
 
 This document explains Raven's User system for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever user structure, user routes, or User panel views change (`private/vis/panel/users/*`, user controller/repository behavior, or user-group assignment rules).
+Maintenance note: keep this file updated whenever user structure, user routes, or User panel views change (`private/tpl/panel/users/*`, user controller/repository behavior, or user-group assignment rules).
 
 ## 1) Panel Guide (Create And Edit Users)
 
@@ -91,11 +91,11 @@ Group assignment notes:
 ### Key Files
 
 - Panel views:
-  - `private/vis/panel/users/list.php`
-  - `private/vis/panel/users/edit.php`
-  - `private/vis/panel/users/invites.php`
-  - `private/vis/login.php`
-  - `private/vis/register.php`
+  - `private/tpl/panel/users/list.php`
+  - `private/tpl/panel/users/edit.php`
+  - `private/tpl/panel/users/invites.php`
+  - `private/tpl/login.php`
+  - `private/tpl/register.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
   - `private/sys/Controller/PublicController.php`

@@ -26,7 +26,7 @@ final class PublicTemplateResolver
     {
         $roots = [];
         foreach ($this->currentThemeInheritanceChain($themesRoot, $activeThemeSlug) as $candidateThemeSlug) {
-            $themeViewsRoot = rtrim($themesRoot, '/\\') . '/' . $candidateThemeSlug . '/vis';
+            $themeViewsRoot = rtrim($themesRoot, '/\\') . '/' . $candidateThemeSlug . '/tpl';
             if (is_dir($themeViewsRoot)) {
                 $roots[] = $themeViewsRoot;
             }

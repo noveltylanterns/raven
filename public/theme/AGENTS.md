@@ -18,7 +18,7 @@ Last updated: 2026-03-14
 
 ## Agent Safe Mode (Mandatory)
 - If your model is uncertain, do not invent behavior. Use only this contract.
-- Never edit core files for theme work (`public/index.php`, `private/sys/*`, `private/vis/*`).
+- Never edit core files for theme work (`public/index.php`, `private/sys/*`, `private/tpl/*`).
 - Never introduce CDN assets, remote fonts, telemetry scripts, or tracking beacons.
 - Build minimal valid theme structure first, then layer optional templates.
 - Validate each file as you create it; do not batch large uncertain changes.
@@ -27,15 +27,15 @@ Last updated: 2026-03-14
 1. Create `public/theme/{slug}/` with a safe slug.
 2. Create valid `theme.json` first.
 3. Add `css/style.css` (even if minimal).
-4. Add `vis/wrapper.php` with render guard and `$content` output.
-5. Add only the view overrides you need (`vis/pages/index.php`, `vis/home.php`, etc.).
+4. Add `tpl/wrapper.php` with render guard and `$content` output.
+5. Add only the view overrides you need (`tpl/pages/index.php`, `tpl/home.php`, etc.).
 6. Enable the theme in Theme Manager or via `private/bin/rvn-theme enable --slug <theme_slug>`, then verify route/template rendering.
 
 ## Canonical Minimal Theme Scaffold
 - Required minimum for a standalone functional theme:
 - `public/theme/{slug}/theme.json`
 - `public/theme/{slug}/css/style.css`
-- `public/theme/{slug}/vis/wrapper.php`
+- `public/theme/{slug}/tpl/wrapper.php`
 - Minimal `theme.json`:
 ```json
 {
@@ -44,12 +44,12 @@ Last updated: 2026-03-14
   "parent_theme": ""
 }
 ```
-- Minimal `vis/wrapper.php`:
+- Minimal `tpl/wrapper.php`:
 ```php
 <?php
 /**
  * RAVEN CMS
- * ~/public/theme/{slug}/vis/wrapper.php
+ * ~/public/theme/{slug}/tpl/wrapper.php
  * Public theme wrapper template.
  * docs: /public/theme/AGENTS.md
  */
@@ -88,15 +88,15 @@ body { background: #fff; color: #212529; }
 - Theme renders 404/denied/disabled states cleanly (either overridden or inherited fallback).
 
 ## Common Failure Patterns To Avoid
-- Putting templates in `private/vis/` instead of `public/theme/{slug}/vis/`.
+- Putting templates in `private/tpl/` instead of `public/theme/{slug}/tpl/`.
 - Forgetting wrapper guard, which allows direct template execution.
 - Hardcoding a theme slug in asset paths instead of using `$site['public_theme_css']` resolution.
 - Overriding too many templates unnecessarily instead of inheriting fallback behavior.
 
 ## Critical Rule: Do Not Modify Core
-- Do not modify `public/index.php`, `private/sys/*`, `private/vis/*`, or installer code to build a theme.
+- Do not modify `public/index.php`, `private/sys/*`, `private/tpl/*`, or installer code to build a theme.
 - Do not patch core routing or controllers for theme-only visual/layout changes.
-- Do not place custom theme templates in `private/vis/`; keep them inside your theme folder.
+- Do not place custom theme templates in `private/tpl/`; keep them inside your theme folder.
 - Theme customizations must live in `public/theme/{your_theme_slug}/` so updates can replace core safely without destroying custom work.
 - Repeated warning: changing core for theming will create maintenance conflicts and can break future upgrades.
 - Repeated warning: if a requirement can be solved in a theme override, do not edit core.
@@ -104,8 +104,8 @@ body { background: #fff; color: #212529; }
 ## Theme Folder Contract
 - Theme root: `public/theme/{slug}/`
 - Required discovery file: `public/theme/{slug}/theme.json`
-- Template root: `public/theme/{slug}/vis/`
-- Preferred layout wrapper override: `public/theme/{slug}/vis/wrapper.php` (falls back through parent chain, then `private/vis/wrapper.php`)
+- Template root: `public/theme/{slug}/tpl/`
+- Preferred layout wrapper override: `public/theme/{slug}/tpl/wrapper.php` (falls back through parent chain, then `private/tpl/wrapper.php`)
 - Stylesheet path expected by wrapper: `public/theme/{slug}/css/style.css` (resolved from first theme in inheritance chain that contains it)
 - Optional theme assets: `public/theme/{slug}/img/*`, `public/theme/{slug}/fonts/*`, `public/theme/{slug}/js/*`
 
@@ -157,11 +157,11 @@ body { background: #fff; color: #212529; }
 - Inheritance chain is resolved child-first: `[active_child, parent, grandparent, ...]`.
 - Cycle protection exists; repeated theme slugs stop traversal.
 - Maximum traversal depth is 12.
-- Template lookup searches each chain member in order, then `private/vis/` fallback.
+- Template lookup searches each chain member in order, then `private/tpl/` fallback.
 - CSS lookup uses the first theme in chain containing `css/style.css`.
 - Wrapper uses that same resolved CSS slug for favicon path (`/theme/{resolved_css_slug}/img/favicon.png`).
 - There is no general automatic fallback resolver for arbitrary image/js files; fallback behavior is explicit in template code.
-- If a child theme wants its own favicon while inheriting parent CSS, override `vis/wrapper.php`.
+- If a child theme wants its own favicon while inheriting parent CSS, override `tpl/wrapper.php`.
 
 ## Public Route Matching Order
 - `GET /` -> homepage
@@ -179,8 +179,8 @@ body { background: #fff; color: #212529; }
 - Global frontend mode comes from config key `site.enabled`:
 - `public`: frontend available to guests and logged-in users that have `View Public Site`
 - `private`: guests are denied; logged-in users require `View Private Site`
-- `disabled`: frontend uses `vis/messages/disabled.php` for both guests and logged-in users
-- Theme authors should ensure `vis/messages/denied.php`, `vis/messages/404.php`, and `vis/messages/disabled.php` are present/styled consistently.
+- `disabled`: frontend uses `tpl/messages/disabled.php` for both guests and logged-in users
+- Theme authors should ensure `tpl/messages/denied.php`, `tpl/messages/404.php`, and `tpl/messages/disabled.php` are present/styled consistently.
 - Reserved first segments are blocked from public content routes:
 - configured panel path
 - `panel`
@@ -207,66 +207,66 @@ body { background: #fff; color: #212529; }
 
 ## Template Lookup Roots
 - For every public template resolve:
-- active theme vis roots in inheritance order (child to parent)
-- then `private/vis/` as final fallback
+- active theme tpl roots in inheritance order (child to parent)
+- then `private/tpl/` as final fallback
 - Effective ordered roots:
-- `public/theme/{child}/vis`
-- `public/theme/{parent}/vis`
+- `public/theme/{child}/tpl`
+- `public/theme/{parent}/tpl`
 - `...`
-- `private/vis`
+- `private/tpl`
 
 ## Template Override Matrix
 - Not Found page:
 - template key: `messages/404`
-- file: `vis/messages/404.php`
+- file: `tpl/messages/404.php`
 - Permission denied page:
 - template key: `messages/denied`
-- file: `vis/messages/denied.php`
+- file: `tpl/messages/denied.php`
 - Site disabled page:
 - template key: `messages/disabled`
-- file: `vis/messages/disabled.php`
+- file: `tpl/messages/disabled.php`
 - Home page (`/`):
 - template key: `home`
-- file: `vis/home.php`
+- file: `tpl/home.php`
 - Wrapper layout:
 - layout key: `wrapper`
-- file: `vis/wrapper.php`
+- file: `tpl/wrapper.php`
 - Standard page render:
 - priority:
-- `vis/pages/{channel_slug}.php` (only when URL had channel segment)
-- `vis/pages/index.php`
+- `tpl/pages/{channel_slug}.php` (only when URL had channel segment)
+- `tpl/pages/index.php`
 - Channel landing render:
 - priority:
-- `vis/channels/{channel_slug}.php`
-- `vis/channels/index.php`
+- `tpl/channels/{channel_slug}.php`
+- `tpl/channels/index.php`
 - Category listing render:
 - priority:
-- `vis/categories/{category_slug}.php`
-- `vis/categories/index.php`
+- `tpl/categories/{category_slug}.php`
+- `tpl/categories/index.php`
 - Tag listing render:
 - priority:
-- `vis/tags/{tag_slug}.php`
-- `vis/tags/index.php`
+- `tpl/tags/{tag_slug}.php`
+- `tpl/tags/index.php`
 - Profile render:
 - template key: dynamic by `session.profile_mode`
 - files:
-- `vis/profiles/full.php` for `public_full`
-- `vis/profiles/full.php` for logged-in users and `vis/profiles/limited.php` for logged-out users in `public_limited`
-- `vis/profiles/full.php` for logged-in users in `private`
-- `vis/profiles/index.php` for disabled mode (delegates to `vis/messages/404.php`) and private-mode logged-out placeholder (`403`, delegates to `vis/messages/denied.php`)
+- `tpl/profiles/full.php` for `public_full`
+- `tpl/profiles/full.php` for logged-in users and `tpl/profiles/limited.php` for logged-out users in `public_limited`
+- `tpl/profiles/full.php` for logged-in users in `private`
+- `tpl/profiles/index.php` for disabled mode (delegates to `tpl/messages/404.php`) and private-mode logged-out placeholder (`403`, delegates to `tpl/messages/denied.php`)
 - Group render:
 - template key: dynamic by `session.show_groups`
 - files:
-- `vis/groups/list.php` for `public`
-- `vis/groups/list.php` for logged-in users in `private`
-- `vis/groups/index.php` for disabled mode (delegates to `vis/messages/404.php`) and private-mode logged-out placeholder (`403`, delegates to `vis/messages/denied.php`)
+- `tpl/groups/list.php` for `public`
+- `tpl/groups/list.php` for logged-in users in `private`
+- `tpl/groups/index.php` for disabled mode (delegates to `tpl/messages/404.php`) and private-mode logged-out placeholder (`403`, delegates to `tpl/messages/denied.php`)
 - Stock-group display names are editable in panel; do not rely on hardcoded stock names in templates for authorization assumptions.
 - Group-role behavior is keyed by reserved stock slugs (`super`, `admin`, `editor`, `user`, `guest`, `validating`, `banned`).
 
 ## Brace Tag Runtime (0.9+)
 - Public templates support lightweight EE-style brace tags in both:
-- `public/theme/*/vis/*.php`
-- `private/vis/*.php` (core fallback templates)
+- `public/theme/*/tpl/*.php`
+- `private/tpl/*.php` (core fallback templates)
 - Tags compile to cached PHP files under `.tmp/template_tag_cache/` and are recompiled only when source template mtime changes.
 - Templates still support normal PHP as before; brace tags are additive.
 
@@ -295,20 +295,20 @@ body { background: #fff; color: #212529; }
 - Brace tags do not execute arbitrary PHP and do not evaluate expressions; they only read route/template data.
 
 ## Current Stock Raven View Files
-- `vis/wrapper.php`
-- `vis/home.php`
-- `vis/messages/404.php`
-- `vis/messages/denied.php`
-- `vis/messages/disabled.php`
-- `vis/pages/index.php`
-- `vis/channels/index.php`
-- `vis/categories/index.php`
-- `vis/tags/index.php`
-- `vis/profiles/full.php`
-- `vis/profiles/limited.php`
-- `vis/profiles/index.php`
-- `vis/groups/list.php`
-- `vis/groups/index.php`
+- `tpl/wrapper.php`
+- `tpl/home.php`
+- `tpl/messages/404.php`
+- `tpl/messages/denied.php`
+- `tpl/messages/disabled.php`
+- `tpl/pages/index.php`
+- `tpl/channels/index.php`
+- `tpl/categories/index.php`
+- `tpl/tags/index.php`
+- `tpl/profiles/full.php`
+- `tpl/profiles/limited.php`
+- `tpl/profiles/index.php`
+- `tpl/groups/list.php`
+- `tpl/groups/index.php`
 
 ## Template Data Contract
 - Wrapper receives:
@@ -381,7 +381,7 @@ body { background: #fff; color: #212529; }
 ## Update-Safe Theme Workflow
 - Create a new folder under `public/theme/{your_slug}/`.
 - Add `theme.json` with `name` and optional child-theme metadata.
-- Override only required templates in `vis/`; omit others to inherit parent/core behavior.
+- Override only required templates in `tpl/`; omit others to inherit parent/core behavior.
 - Keep all custom assets in your theme folder.
 - Select the theme in Theme Manager or with `private/bin/rvn-theme enable --slug <theme_slug>`.
 - Never change core files for theme presentation.

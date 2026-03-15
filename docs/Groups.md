@@ -4,7 +4,7 @@
 
 This document explains Raven's Group system for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever group structure, group routes, or Group panel views change (`private/vis/panel/groups/*`, group controller/repository behavior, or permission/routing contracts).
+Maintenance note: keep this file updated whenever group structure, group routes, or Group panel views change (`private/tpl/panel/groups/*`, group controller/repository behavior, or permission/routing contracts).
 
 ## 1) Panel Guide (Create And Edit Groups)
 
@@ -78,8 +78,8 @@ Stock-group constraints visible in UI:
 ### Key Files
 
 - Panel views:
-  - `private/vis/panel/groups/list.php`
-  - `private/vis/panel/groups/edit.php`
+  - `private/tpl/panel/groups/list.php`
+  - `private/tpl/panel/groups/edit.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Persistence:

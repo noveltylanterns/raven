@@ -44,6 +44,7 @@
 - Added seventeenth-wave `private/lib/` modularization for channel metadata file persistence, page taxonomy public query helpers, page write/delete transaction orchestration, user routing-data payload assembly, user persistence workflows, and public group-route payload queries (`ChannelFileStoreService`, `PageTaxonomyQueryService`, `PagePersistenceService`, `UserRoutingDataService`, `UserPersistenceService`, `GroupPublicRouteService`).
 - Rewired `ChannelRepository`, `PageRepository`, `UserRepository`, and `GroupRepository` to delegate these concerns through `private/lib/`, and refreshed `AGENTS.md` private file-tree delegation summaries.
 - Moved runtime temp/cache/session/export paths from `private/tmp` to root `.tmp` while keeping installer lock state at `private/dat/install.lock`, and updated runtime/docs/config references accordingly.
+- Migrated template directory conventions from `vis/` to `tpl/` across core fallback templates, stock public theme templates, extension templates, runtime resolver/scaffold paths, CLI generators, and documentation references.
 
 ### March 13, 2026
 

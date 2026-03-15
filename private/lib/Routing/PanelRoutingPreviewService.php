@@ -127,13 +127,13 @@ final class PanelRoutingPreviewService
     {
         $themeSlug = $this->themeCatalog->activeSlugFromConfig($config);
         foreach ($this->themeCatalog->inheritanceChain($themeSlug) as $candidateThemeSlug) {
-            $candidate = $this->themeCatalog->root() . '/' . $candidateThemeSlug . '/vis/channels/index.php';
+            $candidate = $this->themeCatalog->root() . '/' . $candidateThemeSlug . '/tpl/channels/index.php';
             if (is_file($candidate)) {
                 return true;
             }
         }
 
-        return is_file($this->projectRoot . '/private/vis/channels/index.php');
+        return is_file($this->projectRoot . '/private/tpl/channels/index.php');
     }
 
     /**

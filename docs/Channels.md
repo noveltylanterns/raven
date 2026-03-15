@@ -4,7 +4,7 @@
 
 This document explains Raven's Channel system for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever channel structure, channel routes, or Channel panel views change (`private/vis/panel/channels/*`, channel controller/repository behavior, or channel public routing).
+Maintenance note: keep this file updated whenever channel structure, channel routes, or Channel panel views change (`private/tpl/panel/channels/*`, channel controller/repository behavior, or channel public routing).
 
 ## 1) Panel Guide (Create And Edit Channels)
 
@@ -65,8 +65,8 @@ Delete behavior note:
 ### Key Files
 
 - Panel views:
-  - `private/vis/panel/channels/list.php`
-  - `private/vis/panel/channels/edit.php`
+  - `private/tpl/panel/channels/list.php`
+  - `private/tpl/panel/channels/edit.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Persistence:

@@ -117,7 +117,7 @@ final class ThemeCatalogService
                 'is_child_theme' => (bool) ($manifest['is_child_theme'] ?? false),
                 'parent_theme' => (string) ($manifest['parent_theme'] ?? ''),
                 'has_css' => is_file($this->themesRoot . '/' . $slug . '/css/style.css'),
-                'has_wrapper' => is_file($this->themesRoot . '/' . $slug . '/vis/wrapper.php'),
+                'has_wrapper' => is_file($this->themesRoot . '/' . $slug . '/tpl/wrapper.php'),
                 'inheritance_chain' => implode(' -> ', $chain),
             ];
         }

@@ -32,7 +32,7 @@ final class ThemeScaffoldService
         $wrapper = "<?php\n\n"
             . "/**\n"
             . " * RAVEN CMS\n"
-            . " * ~/public/theme/" . $meta['slug'] . "/vis/wrapper.php\n"
+            . " * ~/public/theme/" . $meta['slug'] . "/tpl/wrapper.php\n"
             . " * " . $safeNameForDoc . " theme wrapper template.\n"
             . " * Docs: https://raven.lanterns.io\n"
             . " */\n\n"
@@ -59,7 +59,7 @@ final class ThemeScaffoldService
         $home = "<?php\n\n"
             . "/**\n"
             . " * RAVEN CMS\n"
-            . " * ~/public/theme/" . $meta['slug'] . "/vis/home.php\n"
+            . " * ~/public/theme/" . $meta['slug'] . "/tpl/home.php\n"
             . " * " . $safeNameForDoc . " homepage template scaffold.\n"
             . " * Docs: https://raven.lanterns.io\n"
             . " */\n\n"
@@ -101,8 +101,8 @@ final class ThemeScaffoldService
             ]
         );
         $this->writeScaffoldFile($themePath . '/css/style.css', $css);
-        $this->writeScaffoldFile($themePath . '/vis/wrapper.php', $wrapper);
-        $this->writeScaffoldFile($themePath . '/vis/home.php', $home);
+        $this->writeScaffoldFile($themePath . '/tpl/wrapper.php', $wrapper);
+        $this->writeScaffoldFile($themePath . '/tpl/home.php', $home);
         if ($generateAgentsFile) {
             $this->writeScaffoldFile($themePath . '/AGENTS.md', $this->agentsFileContent($meta));
         }
@@ -139,11 +139,11 @@ final class ThemeScaffoldService
         }
         $content .= "\n## Required Files\n";
         $content .= "- `theme.json`\n";
-        $content .= "- `vis/wrapper.php`\n";
+        $content .= "- `tpl/wrapper.php`\n";
         $content .= "- `css/style.css`\n";
         $content .= "\n## Safety Rules\n";
         $content .= "- Keep customizations inside this theme directory.\n";
-        $content .= "- Do not edit core templates under `private/vis/` for theme-only changes.\n";
+        $content .= "- Do not edit core templates under `private/tpl/` for theme-only changes.\n";
         $content .= "- Use escaped brace tags by default; reserve `{raw:...}` for trusted HTML only.\n";
 
         return $content;

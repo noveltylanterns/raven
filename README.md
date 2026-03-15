@@ -51,7 +51,7 @@ The default themes are all built using [Bootstrap](https://getbootstrap.com), bu
 
 #### Theme Fallback Chain
 
-When loading the frontend, Raven first checks `public/theme/{slug}` for whatever theme you have set in your config. Whatever views are missing from your theme, it should pull default basic styles from `private/vis/`. If your theme is set as a "child theme," it will pull the missing views from the parent first before checking `private/vis/` for the rest.
+When loading the frontend, Raven first checks `public/theme/{slug}` for whatever theme you have set in your config. Whatever views are missing from your theme, it should pull default basic styles from `private/tpl/`. If your theme is set as a "child theme," it will pull the missing views from the parent first before checking `private/tpl/` for the rest.
 
 In theory.
 
