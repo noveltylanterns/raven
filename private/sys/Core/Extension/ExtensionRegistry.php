@@ -13,9 +13,11 @@ namespace Raven\Core\Extension;
 
 require_once dirname(__DIR__, 3) . '/lib/Extension/ManifestContractValidator.php';
 require_once dirname(__DIR__, 3) . '/lib/Extension/ExtensionProviderValidator.php';
+require_once dirname(__DIR__, 3) . '/lib/Extension/ExtensionStateLoader.php';
 
 use Raven\Lib\Extension\ExtensionProviderValidator;
 use Raven\Lib\Extension\ManifestContractValidator;
+use Raven\Lib\Extension\ExtensionStateLoader;
 
 /**
  * Centralizes extension registry parsing so bootstrap/panel/public stay in sync.
@@ -24,6 +26,7 @@ final class ExtensionRegistry
 {
     private static ?ManifestContractValidator $manifestContractValidator = null;
     private static ?ExtensionProviderValidator $providerValidator = null;
+    private static ?ExtensionStateLoader $stateLoader = null;
     /**
      * Returns enabled extension directory map from `private/ext/.state.php`.
      *
@@ -31,7 +34,7 @@ final class ExtensionRegistry
      */
     public static function enabledMap(string $root): array
     {
-        $state = self::loadState($root);
+        $state = self::stateLoader()->loadState($root);
         /** @var mixed $rawEnabled */
         $rawEnabled = $state['enabled'] ?? [];
         if (!is_array($rawEnabled)) {
@@ -63,7 +66,7 @@ final class ExtensionRegistry
      */
     public static function permissionMap(string $root, array $allowedBits = []): array
     {
-        $state = self::loadState($root);
+        $state = self::stateLoader()->loadState($root);
         /** @var mixed $rawPermissions */
         $rawPermissions = $state['permissions'] ?? [];
         if (!is_array($rawPermissions)) {
@@ -218,44 +221,6 @@ final class ExtensionRegistry
     }
 
     /**
-     * Loads extension state from disk and normalizes legacy layout.
-     *
-     * @return array{enabled: array<string, mixed>, permissions: array<string, mixed>}
-     */
-    private static function loadState(string $root): array
-    {
-        $statePath = rtrim($root, '/') . '/private/ext/.state.php';
-        if (!is_file($statePath)) {
-            return ['enabled' => [], 'permissions' => []];
-        }
-
-        clearstatcache(true, $statePath);
-        if (function_exists('opcache_invalidate')) {
-            @opcache_invalidate($statePath, true);
-        }
-
-        /** @var mixed $rawState */
-        $rawState = require $statePath;
-        if (!is_array($rawState)) {
-            return ['enabled' => [], 'permissions' => []];
-        }
-
-        /** @var mixed $enabled */
-        $enabled = array_key_exists('enabled', $rawState) ? $rawState['enabled'] : $rawState;
-        if (!array_key_exists('enabled', $rawState) && array_key_exists('permissions', $rawState)) {
-            $enabled = [];
-        }
-
-        /** @var mixed $permissions */
-        $permissions = $rawState['permissions'] ?? [];
-
-        return [
-            'enabled' => is_array($enabled) ? $enabled : [],
-            'permissions' => is_array($permissions) ? $permissions : [],
-        ];
-    }
-
-    /**
      * Loads + validates one extension shortcode provider file.
      *
      * @param array{
@@ -309,5 +274,14 @@ final class ExtensionRegistry
         }
 
         return self::$providerValidator;
+    }
+
+    private static function stateLoader(): ExtensionStateLoader
+    {
+        if (!self::$stateLoader instanceof ExtensionStateLoader) {
+            self::$stateLoader = new ExtensionStateLoader();
+        }
+
+        return self::$stateLoader;
     }
 }

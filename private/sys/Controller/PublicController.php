@@ -19,6 +19,7 @@ use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Content\BodyBlockPolicy;
 use Raven\Lib\Content\MarkdownRenderer;
+use Raven\Lib\Content\PublicPageBodyRenderer;
 use Raven\Lib\Content\PageBodyBlockCodec;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\EmbeddedFormRuntimeService;
@@ -34,7 +35,7 @@ use Raven\Lib\Site\PublicMetaService;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Theme\ThemeCatalogService;
+use Raven\Lib\View\ThemeCatalogService;
 use Raven\Lib\View\PublicTemplateDecorator;
 use Raven\Lib\View\PublicTemplateResolver;
 use Raven\Core\View;
@@ -86,6 +87,7 @@ final class PublicController
     private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
     private ?PublicMetaService $publicMetaService = null;
     private ?PublicTemplateDecorator $publicTemplateDecorator = null;
+    private ?PublicPageBodyRenderer $pageBodyRenderer = null;
     public function __construct(
         View $view,
         Config $config,
@@ -1235,21 +1237,12 @@ final class PublicController
      */
     private function renderPageBodyBlockByType(string $type, string $content): string
     {
-        $type = $this->normalizePageBodyBlockType($type);
-        $content = str_replace("\0", '', $content);
-
-        return match ($this->pageBodyBlockEditorMode($type)) {
-            'plaintext' => '<div class="raven-page-body-plaintext" style="white-space: pre-wrap;">'
-                . $this->escapeHtml($content)
-                . '</div>',
-            'autobr' => '<div class="raven-page-body-autobr">'
-                . $this->escapeNewlinesAsBreaks($content)
-                . '</div>',
-            'markdown' => $this->renderMarkdownBlockContent($content),
-            'markdown_file' => $this->renderMarkdownFileBlock($content),
-            'gallery' => '',
-            default => $this->renderEmbeddedForms($content),
-        };
+        $editorMode = $this->pageBodyBlockEditorMode($this->normalizePageBodyBlockType($type));
+        return $this->pageBodyRenderer()->renderByEditorMode(
+            $editorMode,
+            $content,
+            fn (string $html): string => $this->renderEmbeddedForms($html)
+        );
     }
 
     /**
@@ -1306,126 +1299,6 @@ final class PublicController
 
         $this->pageBodyBlockTypeDefinitionsCache = $definitions;
         return $definitions;
-    }
-
-    /**
-     * Renders markdown text block content into HTML.
-     */
-    private function renderMarkdownBlockContent(string $markdown): string
-    {
-        $html = $this->simpleMarkdownToHtml($markdown);
-        if (trim($html) === '') {
-            return '';
-        }
-
-        return $this->renderEmbeddedForms($html);
-    }
-
-    /**
-     * Renders markdown from one local project path.
-     */
-    private function renderMarkdownFileBlock(string $pathInput): string
-    {
-        $markdown = $this->loadLocalMarkdownFileForBlock($pathInput);
-        if ($markdown === null) {
-            return '';
-        }
-
-        return $this->renderMarkdownBlockContent($markdown);
-    }
-
-    /**
-     * Loads markdown content from one local path under project root.
-     */
-    private function loadLocalMarkdownFileForBlock(string $pathInput): ?string
-    {
-        $path = trim($pathInput);
-        if ($path === '') {
-            return null;
-        }
-
-        $path = (string) preg_replace('/[?#].*$/', '', $path);
-        if ($path === '') {
-            return null;
-        }
-
-        $path = str_replace('\\', '/', $path);
-        if (preg_match('/\.(?:md|markdown)$/i', $path) !== 1) {
-            return null;
-        }
-
-        $projectRoot = realpath(dirname(__DIR__, 3));
-        if (!is_string($projectRoot) || $projectRoot === '') {
-            return null;
-        }
-
-        $projectRootPrefix = rtrim($projectRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
-        $trimmedPath = trim($path);
-        if ($trimmedPath === '') {
-            return null;
-        }
-
-        $candidatePath = $projectRoot . '/' . ltrim($trimmedPath, '/');
-        if ($candidatePath === '') {
-            return null;
-        }
-
-        $resolved = realpath($candidatePath);
-        if (!is_string($resolved) || $resolved === '') {
-            return null;
-        }
-
-        if (!str_starts_with($resolved, $projectRootPrefix) || !is_file($resolved) || !is_readable($resolved)) {
-            return null;
-        }
-
-        $content = @file_get_contents($resolved, false, null, 0, 1048576);
-        if (!is_string($content) || $content === '') {
-            return null;
-        }
-
-        return str_replace("\0", '', $content);
-    }
-
-    /**
-     * Converts markdown into basic safe HTML.
-     */
-    private function simpleMarkdownToHtml(string $markdown): string
-    {
-        return $this->markdownRenderer()->toHtml($markdown);
-    }
-
-    /**
-     * Renders markdown inline tokens within one text fragment.
-     */
-    private function renderMarkdownInline(string $text): string
-    {
-        return $this->markdownRenderer()->renderInline($text);
-    }
-
-    /**
-     * Normalizes one markdown link URL.
-     */
-    private function normalizeMarkdownLinkUrl(string $url): ?string
-    {
-        return $this->markdownRenderer()->normalizeLinkUrl($url);
-    }
-
-    /**
-     * Escapes HTML while preserving UTF-8 text.
-     */
-    private function escapeHtml(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    }
-
-    /**
-     * Escapes text and converts newlines into `<br>` tag.
-     */
-    private function escapeNewlinesAsBreaks(string $value): string
-    {
-        $normalized = str_replace(["\r\n", "\r"], "\n", $value);
-        return nl2br($this->escapeHtml($normalized), false);
     }
 
     /**
@@ -1581,6 +1454,18 @@ final class PublicController
         }
 
         return $this->markdownRenderer;
+    }
+
+    private function pageBodyRenderer(): PublicPageBodyRenderer
+    {
+        if (!$this->pageBodyRenderer instanceof PublicPageBodyRenderer) {
+            $this->pageBodyRenderer = new PublicPageBodyRenderer(
+                dirname(__DIR__, 3),
+                $this->markdownRenderer()
+            );
+        }
+
+        return $this->pageBodyRenderer;
     }
 
     private function requestContextResolver(): RequestContextResolver

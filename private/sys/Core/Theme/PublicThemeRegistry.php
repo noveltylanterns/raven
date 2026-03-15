@@ -11,12 +11,12 @@ declare(strict_types=1);
 
 namespace Raven\Core\Theme;
 
-require_once dirname(__DIR__, 3) . '/lib/Theme/ThemeManifestValidator.php';
-require_once dirname(__DIR__, 3) . '/lib/Theme/ThemeDiscoveryService.php';
-require_once dirname(__DIR__, 3) . '/lib/Theme/ThemeInheritanceResolver.php';
+require_once dirname(__DIR__, 3) . '/lib/View/ThemeManifestValidator.php';
+require_once dirname(__DIR__, 3) . '/lib/View/ThemeDiscoveryService.php';
+require_once dirname(__DIR__, 3) . '/lib/View/ThemeInheritanceResolver.php';
 
-use Raven\Lib\Theme\ThemeDiscoveryService;
-use Raven\Lib\Theme\ThemeInheritanceResolver;
+use Raven\Lib\View\ThemeDiscoveryService;
+use Raven\Lib\View\ThemeInheritanceResolver;
 
 /**
  * Enumerates public themes from `public/theme/{slug}/theme.json`.

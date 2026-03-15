@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Theme;
+namespace Raven\Lib\View;
 
 /**
  * Shared public-theme scaffold generator for panel create workflows.

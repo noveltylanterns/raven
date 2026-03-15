@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Theme;
+namespace Raven\Lib\View;
 
 /**
  * Validates and normalizes one public theme manifest payload.

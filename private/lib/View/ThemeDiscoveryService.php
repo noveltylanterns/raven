@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Theme;
+namespace Raven\Lib\View;
 
 /**
  * Discovers and validates public theme manifests from one themes root.

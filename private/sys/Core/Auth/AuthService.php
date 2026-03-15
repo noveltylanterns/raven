@@ -13,6 +13,8 @@ namespace Raven\Core\Auth;
 
 use PDO;
 use Raven\Lib\Auth\AuthPayloadCodec;
+use Raven\Lib\Auth\AuthGroupMembershipService;
+use Raven\Lib\Auth\AuthIdentityLookupService;
 use Raven\Lib\Auth\ContactProfileNormalizer;
 use Raven\Lib\Auth\LoginThrottleService;
 use Raven\Lib\Auth\PermissionMaskService;
@@ -44,13 +46,8 @@ final class AuthService
     private AuthPayloadCodec $authPayloadCodec;
     private PermissionMaskService $permissionMaskService;
     private UserSecurityProfileService $securityProfiles;
-
-    /**
-     * Request-local cache for user group lookups.
-     *
-     * @var array<int, array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>>
-     */
-    private array $groupsForUserCache = [];
+    private AuthIdentityLookupService $identityLookup;
+    private AuthGroupMembershipService $groupMembership;
 
     /**
      * Request-local cache for user preference rows by user id.
@@ -82,6 +79,8 @@ final class AuthService
         $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
         $this->permissionMaskService = new PermissionMaskService($appDb, $driver, $prefix);
         $this->securityProfiles = new UserSecurityProfileService();
+        $this->identityLookup = new AuthIdentityLookupService($authDb, $this->prefix);
+        $this->groupMembership = new AuthGroupMembershipService($appDb, $driver, $prefix);
 
         $this->bootstrapDelightAuth();
     }
@@ -180,21 +179,7 @@ final class AuthService
      */
     private function emailByUsername(string $username): ?string
     {
-        $stmt = $this->authDb->prepare(
-            'SELECT email
-             FROM ' . $this->authTable('users') . '
-             WHERE username = :username
-             LIMIT 1'
-        );
-        $stmt->execute([':username' => $username]);
-
-        $email = $stmt->fetchColumn();
-
-        if ($email === false || !is_string($email) || $email === '') {
-            return null;
-        }
-
-        return $email;
+        return $this->identityLookup->emailByUsername($username);
     }
 
     /**
@@ -849,40 +834,7 @@ final class AuthService
      */
     public function groupsForUser(int $userId): array
     {
-        if ($userId > 0 && array_key_exists($userId, $this->groupsForUserCache)) {
-            return $this->groupsForUserCache[$userId];
-        }
-
-        $groupsTable = $this->groupTable('groups');
-        $userGroupsTable = $this->groupTable('user_groups');
-
-        $stmt = $this->appDb->prepare(
-            'SELECT g.id, g.name, g.slug, g.permission_mask, g.is_stock
-             FROM ' . $groupsTable . ' g
-             INNER JOIN ' . $userGroupsTable . ' ug ON ug.group_id = g.id
-             WHERE ug.user_id = :user_id
-             ORDER BY g.id ASC'
-        );
-
-        $stmt->execute([':user_id' => $userId]);
-        $rows = $stmt->fetchAll();
-
-        $result = [];
-        foreach ($rows as $row) {
-            $result[] = [
-                'id' => (int) $row['id'],
-                'name' => (string) $row['name'],
-                'slug' => (string) ($row['slug'] ?? ''),
-                'permission_mask' => (int) $row['permission_mask'],
-                'is_stock' => (int) $row['is_stock'],
-            ];
-        }
-
-        if ($userId > 0) {
-            $this->groupsForUserCache[$userId] = $result;
-        }
-
-        return $result;
+        return $this->groupMembership->groupsForUser($userId);
     }
 
     /**
@@ -890,43 +842,7 @@ final class AuthService
      */
     public function assignUserToGroupByName(int $userId, string $groupName): void
     {
-        $groupsTable = $this->groupTable('groups');
-        $userGroupsTable = $this->groupTable('user_groups');
-
-        $groupStmt = $this->appDb->prepare(
-            'SELECT id FROM ' . $groupsTable . ' WHERE name = :name LIMIT 1'
-        );
-        $groupStmt->execute([':name' => $groupName]);
-
-        $groupId = $groupStmt->fetchColumn();
-        if ($groupId === false) {
-            return;
-        }
-
-        if ($this->driver === 'sqlite') {
-            $stmt = $this->appDb->prepare(
-                'INSERT INTO ' . $userGroupsTable . ' (user_id, group_id)
-                 VALUES (:user_id, :group_id)
-                 ON CONFLICT(user_id, group_id) DO NOTHING'
-            );
-        } elseif ($this->driver === 'mysql') {
-            $stmt = $this->appDb->prepare(
-                'INSERT IGNORE INTO ' . $userGroupsTable . ' (user_id, group_id)
-                 VALUES (:user_id, :group_id)'
-            );
-        } else {
-            $stmt = $this->appDb->prepare(
-                'INSERT INTO ' . $userGroupsTable . ' (user_id, group_id)
-                 VALUES (:user_id, :group_id)
-                 ON CONFLICT (user_id, group_id) DO NOTHING'
-            );
-        }
-
-        $stmt->execute([
-            ':user_id' => $userId,
-            ':group_id' => (int) $groupId,
-        ]);
-
+        $this->groupMembership->assignUserToGroupByName($userId, $groupName);
         $this->invalidateUserPermissionCaches($userId);
     }
 
@@ -951,7 +867,7 @@ final class AuthService
      */
     private function clearPermissionCaches(): void
     {
-        $this->groupsForUserCache = [];
+        $this->groupMembership->clearCaches();
         $this->permissionMaskService->clearCaches();
         $this->userPreferencesCache = [];
     }
@@ -979,7 +895,7 @@ final class AuthService
             return;
         }
 
-        unset($this->groupsForUserCache[$userId]);
+        $this->groupMembership->invalidateUser($userId);
         $this->permissionMaskService->invalidateUser($userId);
     }
 
@@ -988,23 +904,7 @@ final class AuthService
      */
     private function usernameExistsForOtherUser(int $userId, string $username): bool
     {
-        if (trim($username) === '') {
-            return false;
-        }
-
-        $stmt = $this->authDb->prepare(
-            'SELECT 1
-             FROM ' . $this->authTable('users') . '
-             WHERE username = :username
-               AND id <> :id
-             LIMIT 1'
-        );
-        $stmt->execute([
-            ':username' => $username,
-            ':id' => $userId,
-        ]);
-
-        return $stmt->fetchColumn() !== false;
+        return $this->identityLookup->usernameExistsForOtherUser($userId, $username);
     }
 
     /**
@@ -1012,19 +912,7 @@ final class AuthService
      */
     private function emailExistsForOtherUser(int $userId, string $email): bool
     {
-        $stmt = $this->authDb->prepare(
-            'SELECT 1
-             FROM ' . $this->authTable('users') . '
-             WHERE email = :email
-               AND id <> :id
-             LIMIT 1'
-        );
-        $stmt->execute([
-            ':email' => $email,
-            ':id' => $userId,
-        ]);
-
-        return $stmt->fetchColumn() !== false;
+        return $this->identityLookup->emailExistsForOtherUser($userId, $email);
     }
 
     /**
@@ -1032,22 +920,6 @@ final class AuthService
      */
     private function authTable(string $base): string
     {
-        return $this->prefix . $base;
-    }
-
-    /**
-     * Maps group tables based on backend mode.
-     */
-    private function groupTable(string $base): string
-    {
-        if ($this->driver === 'sqlite') {
-            return match ($base) {
-                'groups' => 'auth.groups',
-                'user_groups' => 'auth.user_groups',
-                default => 'auth.' . $base,
-            };
-        }
-
         return $this->prefix . $base;
     }
 

@@ -13,6 +13,7 @@ namespace Raven\Repository;
 
 use PDO;
 use Raven\Lib\Content\PageBodyBlockCodec;
+use Raven\Lib\Media\PageEditorGalleryHydrator;
 use RuntimeException;
 
 /**
@@ -27,6 +28,7 @@ final class PageRepository
     private bool $categoryEnabled;
     private bool $tagEnabled;
     private PageBodyBlockCodec $bodyBlockCodec;
+    private PageEditorGalleryHydrator $pageEditorGalleryHydrator;
 
     public function __construct(
         PDO $db,
@@ -45,6 +47,7 @@ final class PageRepository
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
         $this->bodyBlockCodec = new PageBodyBlockCodec();
+        $this->pageEditorGalleryHydrator = new PageEditorGalleryHydrator();
     }
 
     /**
@@ -1240,14 +1243,7 @@ final class PageRepository
      */
     private function stripEditorMediaColumns(array $row): array
     {
-        foreach (array_keys($row) as $column) {
-            $name = (string) $column;
-            if (str_starts_with($name, 'image_') || str_starts_with($name, 'variant_')) {
-                unset($row[$name]);
-            }
-        }
-
-        return $row;
+        return $this->pageEditorGalleryHydrator->stripEditorMediaColumns($row);
     }
 
     /**
@@ -1258,78 +1254,10 @@ final class PageRepository
      */
     private function hydrateEditorGalleryRows(array $rows): array
     {
-        if ($rows === []) {
-            return [];
-        }
-
-        $imagesById = [];
-        $orderedImageIds = [];
-        foreach ($rows as $row) {
-            $imageId = (int) ($row['image_id'] ?? 0);
-            if ($imageId < 1) {
-                continue;
-            }
-
-            if (!isset($imagesById[$imageId])) {
-                $storedPath = (string) ($row['image_stored_path'] ?? '');
-                $imagesById[$imageId] = [
-                    'id' => $imageId,
-                    'page_id' => (int) ($row['image_page_id'] ?? 0),
-                    'storage_target' => (string) ($row['image_storage_target'] ?? ''),
-                    'original_filename' => (string) ($row['image_original_filename'] ?? ''),
-                    'stored_filename' => (string) ($row['image_stored_filename'] ?? ''),
-                    'stored_path' => $storedPath,
-                    'url' => $this->publicUrlFromStoredPath($storedPath),
-                    'mime_type' => (string) ($row['image_mime_type'] ?? ''),
-                    'extension' => (string) ($row['image_extension'] ?? ''),
-                    'byte_size' => (int) ($row['image_byte_size'] ?? 0),
-                    'width' => (int) ($row['image_width'] ?? 0),
-                    'height' => (int) ($row['image_height'] ?? 0),
-                    'hash_sha256' => (string) ($row['image_hash_sha256'] ?? ''),
-                    'status' => (string) ($row['image_status'] ?? ''),
-                    'sort_order' => (int) ($row['image_sort_order'] ?? 0),
-                    'is_cover' => (int) ($row['image_is_cover'] ?? 0) === 1,
-                    'is_preview' => (int) ($row['image_is_preview'] ?? 0) === 1,
-                    'include_in_gallery' => (int) ($row['image_include_in_gallery'] ?? 1) === 1,
-                    'alt_text' => (string) ($row['image_alt_text'] ?? ''),
-                    'title_text' => (string) ($row['image_title_text'] ?? ''),
-                    'caption' => (string) ($row['image_caption'] ?? ''),
-                    'credit' => (string) ($row['image_credit'] ?? ''),
-                    'license' => (string) ($row['image_license'] ?? ''),
-                    'focal_x' => $row['image_focal_x'] === null ? null : (float) $row['image_focal_x'],
-                    'focal_y' => $row['image_focal_y'] === null ? null : (float) $row['image_focal_y'],
-                    'created_at' => (string) ($row['image_created_at'] ?? ''),
-                    'updated_at' => (string) ($row['image_updated_at'] ?? ''),
-                    'variants' => [],
-                ];
-                $orderedImageIds[] = $imageId;
-            }
-
-            $variantKey = trim((string) ($row['variant_key'] ?? ''));
-            if ($variantKey === '') {
-                continue;
-            }
-
-            $variantStoredPath = (string) ($row['variant_stored_path'] ?? '');
-            $imagesById[$imageId]['variants'][$variantKey] = [
-                'variant_key' => $variantKey,
-                'stored_filename' => (string) ($row['variant_stored_filename'] ?? ''),
-                'stored_path' => $variantStoredPath,
-                'url' => $this->publicUrlFromStoredPath($variantStoredPath),
-                'mime_type' => (string) ($row['variant_mime_type'] ?? ''),
-                'extension' => (string) ($row['variant_extension'] ?? ''),
-                'byte_size' => (int) ($row['variant_byte_size'] ?? 0),
-                'width' => (int) ($row['variant_width'] ?? 0),
-                'height' => (int) ($row['variant_height'] ?? 0),
-            ];
-        }
-
-        $result = [];
-        foreach ($orderedImageIds as $imageId) {
-            $result[] = $imagesById[$imageId];
-        }
-
-        return $result;
+        return $this->pageEditorGalleryHydrator->hydrate(
+            $rows,
+            fn (string $storedPath): string => $this->publicUrlFromStoredPath($storedPath)
+        );
     }
 
     /**

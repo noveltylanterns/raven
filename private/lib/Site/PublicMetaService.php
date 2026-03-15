@@ -7,7 +7,7 @@ namespace Raven\Lib\Site;
 use Raven\Core\Config;
 use Raven\Lib\Http\RequestContextResolver;
 use Raven\Lib\Profile\ProfileContactService;
-use Raven\Lib\Theme\ThemeCatalogService;
+use Raven\Lib\View\ThemeCatalogService;
 
 /**
  * Shared site/public meta payload builder and social-image URL resolver.

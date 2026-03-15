@@ -29,6 +29,10 @@
 - Reduced `SchemaManager`, `ConnectionFactory`, `PanelAccess`, `PublicThemeRegistry`, `TemplateTagEngine`, and `AvatarValidator` to thin orchestration/adaptor layers over `private/lib/`.
 - Added direct-load fallback includes in `PublicThemeRegistry`, `TemplateTagEngine`, and `PanelAccess` so CLI/direct-require execution paths still resolve the newly extracted lib classes.
 - Re-ran full smoke suite (`debug/smoke/*.php`) after these extractions: PASS.
+- Added eleventh-wave `private/lib/` modularization for auth identity/group lookups, extension state loading, panel author-option assembly, public page-body rendering, page-editor gallery hydration, and panel-user row hydration (`AuthIdentityLookupService`, `AuthGroupMembershipService`, `ExtensionStateLoader`, `PanelPageAuthorOptionBuilder`, `PublicPageBodyRenderer`, `PageEditorGalleryHydrator`, `UserPanelHydrator`).
+- Rewired `AuthService`, `ExtensionRegistry`, `PanelController`, `PublicController`, `PageRepository`, and `UserRepository` to delegate these concerns to `private/lib/`.
+- Consolidated theme helper modules into `private/lib/View/` (from `private/lib/Theme/`) and rewired imports/direct-load includes (`ThemeCatalogService`, `ThemeCloneService`, `ThemeDiscoveryService`, `ThemeInheritanceResolver`, `ThemeManifestValidator`, `ThemeScaffoldService`).
+- Re-ran full smoke suite (`debug/smoke/*.php`) after this wave: PASS. (Local run required clearing accumulated auth-throttle state between repeated smoke cycles.)
 
 ### March 13, 2026
 

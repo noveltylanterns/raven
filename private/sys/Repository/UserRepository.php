@@ -17,6 +17,7 @@ use PDO;
 use RuntimeException;
 use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\ContactProfileNormalizer;
+use Raven\Lib\Auth\UserPanelHydrator;
 
 /**
  * Data access for User CRUD and user-group membership assignments.
@@ -28,6 +29,7 @@ final class UserRepository
     private string $driver;
     private string $prefix;
     private AuthPayloadCodec $authPayloadCodec;
+    private UserPanelHydrator $panelHydrator;
 
     public function __construct(PDO $authDb, PDO $appDb, string $driver, string $prefix)
     {
@@ -38,6 +40,7 @@ final class UserRepository
         // Prefix is ignored for SQLite because attached database aliases are used instead.
         $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
         $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
+        $this->panelHydrator = new UserPanelHydrator();
     }
 
     /**
@@ -1308,32 +1311,7 @@ final class UserRepository
      */
     private function hydratePanelUsers(array $users, array $groupMap): array
     {
-        $result = [];
-        foreach ($users as $row) {
-            $userId = (int) ($row['id'] ?? 0);
-            /** @var array<int, array{name: string, permission_mask: int}> $groupEntries */
-            $groupEntries = $groupMap[$userId] ?? [];
-            $groupNames = array_map(
-                static fn (array $entry): string => (string) ($entry['name'] ?? ''),
-                $groupEntries
-            );
-
-            $result[] = [
-                'id' => $userId,
-                'username' => (string) ($row['username'] ?? ''),
-                'display_name' => (string) ($row['display_name'] ?? ''),
-                'email' => (string) ($row['email'] ?? ''),
-                'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
-                'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                    ? (string) $row['avatar_path']
-                    : null,
-                'groups' => $groupNames,
-                'group_entries' => $groupEntries,
-                'groups_text' => implode(', ', $groupNames),
-            ];
-        }
-
-        return $result;
+        return $this->panelHydrator->hydrate($users, $groupMap);
     }
 
     /**

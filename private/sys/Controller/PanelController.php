@@ -39,6 +39,7 @@ use Raven\Lib\Http\UploadFileSetNormalizer;
 use Raven\Lib\Media\AvatarUploadService;
 use Raven\Lib\Media\TaxonomyImageService;
 use Raven\Lib\Pagination\Pagination;
+use Raven\Lib\Panel\PanelPageAuthorOptionBuilder;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\PanelEditorTabService;
@@ -47,9 +48,9 @@ use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Routing\RedirectTargetValidator;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Routing\RoutingInventoryBuilder;
-use Raven\Lib\Theme\ThemeCatalogService;
-use Raven\Lib\Theme\ThemeCloneService;
-use Raven\Lib\Theme\ThemeScaffoldService;
+use Raven\Lib\View\ThemeCatalogService;
+use Raven\Lib\View\ThemeCloneService;
+use Raven\Lib\View\ThemeScaffoldService;
 use Raven\Repository\CategoryRepository;
 use Raven\Core\Security\AvatarValidator;
 use Raven\Lib\Security\Csrf;
@@ -127,6 +128,7 @@ final class PanelController
     private ?UploadFileSetNormalizer $uploadFileSetNormalizer = null;
     private ?ThemeCatalogService $themeCatalogService = null;
     private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
+    private ?PanelPageAuthorOptionBuilder $pageAuthorOptionBuilder = null;
 
     public function __construct(
         View $view,
@@ -513,41 +515,11 @@ final class PanelController
      */
     private function pageAuthorOptions(): array
     {
-        $options = [];
-        foreach ($this->users->listAll() as $entry) {
-            if (!is_array($entry)) {
-                continue;
-            }
-
-            $userId = (int) ($entry['id'] ?? 0);
-            if ($userId < 1) {
-                continue;
-            }
-
-            $username = $this->normalizeUserIdentifierValue((string) ($entry['username'] ?? ''));
-            if ($username === null || $username === '') {
-                continue;
-            }
-
-            $options[$userId] = [
-                'id' => $userId,
-                'username' => $username,
-                'display_name' => $this->input->text((string) ($entry['display_name'] ?? ''), 120),
-            ];
-        }
-
-        $result = array_values($options);
-        usort($result, static function (array $left, array $right): int {
-            $leftLabel = strtolower(trim((string) (($left['display_name'] ?? '') !== '' ? $left['display_name'] : $left['username'])));
-            $rightLabel = strtolower(trim((string) (($right['display_name'] ?? '') !== '' ? $right['display_name'] : $right['username'])));
-            if ($leftLabel !== $rightLabel) {
-                return $leftLabel <=> $rightLabel;
-            }
-
-            return ((int) ($left['id'] ?? 0)) <=> ((int) ($right['id'] ?? 0));
-        });
-
-        return $result;
+        return $this->pageAuthorOptionBuilder()->build(
+            $this->users->listAll(),
+            $this->input,
+            fn (string $value): ?string => $this->normalizeUserIdentifierValue($value)
+        );
     }
 
     /**
@@ -7365,6 +7337,15 @@ final class PanelController
         }
 
         return $this->extensionEditorCatalogService;
+    }
+
+    private function pageAuthorOptionBuilder(): PanelPageAuthorOptionBuilder
+    {
+        if (!$this->pageAuthorOptionBuilder instanceof PanelPageAuthorOptionBuilder) {
+            $this->pageAuthorOptionBuilder = new PanelPageAuthorOptionBuilder();
+        }
+
+        return $this->pageAuthorOptionBuilder;
     }
 
     private function themeCatalogService(): ThemeCatalogService

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Theme;
+namespace Raven\Lib\View;
 
 use Raven\Core\Config;
 use Raven\Core\Theme\PublicThemeRegistry;

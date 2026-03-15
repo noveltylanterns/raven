@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Theme;
+namespace Raven\Lib\View;
 
 /**
  * Handles recursive theme-directory cloning for local scaffold workflows.
