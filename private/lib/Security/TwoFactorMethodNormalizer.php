@@ -101,9 +101,12 @@ final class TwoFactorMethodNormalizer
                 if ($email === null) {
                     $email = self::sanitizeEmail($fallbackEmail);
                 }
-                if ($email !== null) {
-                    $row['email'] = $email;
+                if ($email === null) {
+                    continue;
                 }
+
+                $row['email'] = $email;
+                $row['status'] = 'confirmed';
             }
 
             $dedupeValue = (string) ($row['secret'] ?? $row['recovery_code'] ?? $row['credential_id'] ?? $row['email'] ?? '');
@@ -189,13 +192,13 @@ final class TwoFactorMethodNormalizer
                     : 'stub';
                 $row['require_uv'] = (bool) ($method['require_uv'] ?? false);
             } else {
-                $email = trim((string) ($method['email'] ?? ''));
-                if ($email !== '') {
-                    if (mb_strlen($email) > 254) {
-                        $email = mb_substr($email, 0, 254);
-                    }
-                    $row['email'] = $email;
+                $email = self::sanitizeEmail((string) ($method['email'] ?? ''));
+                if ($email === null) {
+                    continue;
                 }
+
+                $row['email'] = $email;
+                $row['status'] = 'confirmed';
             }
 
             $dedupeValue = (string) ($row['secret'] ?? $row['recovery_code'] ?? $row['credential_id'] ?? $row['email'] ?? '');
@@ -287,9 +290,12 @@ final class TwoFactorMethodNormalizer
                 if ($email === null) {
                     $email = self::sanitizeEmail($fallbackEmail);
                 }
-                if ($email !== null) {
-                    $row['email'] = $email;
+                if ($email === null) {
+                    continue;
                 }
+
+                $row['email'] = $email;
+                $row['status'] = 'confirmed';
             }
 
             $row['status_label'] = TwoFactorMethodRules::statusLabel((string) $row['status']);
@@ -337,4 +343,3 @@ final class TwoFactorMethodNormalizer
         return $value;
     }
 }
-

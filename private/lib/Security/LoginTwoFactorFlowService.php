@@ -74,7 +74,7 @@ final class LoginTwoFactorFlowService
             $showMethodPicker = true;
         } else {
             $showMethodPicker = !$hasWebauthn && count($codeMethods) > 1 && $selectedMethod === null;
-            $showTotpForm = in_array($selectedMethodType, ['totp', 'recovery'], true);
+            $showTotpForm = in_array($selectedMethodType, ['totp', 'recovery', 'email'], true);
             $showWebauthn = $hasWebauthn && (
                 $selectedMethod === null
                 || $selectedMethodType === 'webauthn'

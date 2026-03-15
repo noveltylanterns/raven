@@ -63,6 +63,9 @@ final class TwoFactorMethodRules
         if ($normalizedType === 'recovery') {
             return 'confirmed';
         }
+        if ($normalizedType === 'email') {
+            return 'confirmed';
+        }
 
         return 'stub';
     }
@@ -83,4 +86,3 @@ final class TwoFactorMethodRules
         );
     }
 }
-

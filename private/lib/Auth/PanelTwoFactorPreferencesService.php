@@ -31,7 +31,7 @@ final class PanelTwoFactorPreferencesService
             'totp' => 'Authenticator App (TOTP)',
             'recovery' => 'Recovery Phrase',
             'webauthn' => 'Security Key (WebAuthn)',
-            'email' => 'Email Code (Stub)',
+            'email' => 'Email Code',
         ];
     }
 

@@ -31,7 +31,7 @@ Fields/options:
   - `Setup App`
   - `Setup TOTP` (legacy label)
   - `Manual Key`
-  - `Type` (`Authenticator App (TOTP)`, `Recovery Code`, `Security Key (WebAuthn)`, `Email Code (Stub)`)
+  - `Type` (`Authenticator App (TOTP)`, `Recovery Phrase`, `Security Key (WebAuthn)`, `Email Code`)
   - `Label`
   - `TOTP Secret / Confirm Code`
   - `Recovery Phrase`

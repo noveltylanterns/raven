@@ -19,6 +19,8 @@
 /** @var array<string, mixed>|null $selectedMethod */
 /** @var string $selectedMethodType */
 /** @var bool $canSwitchMethod */
+/** @var bool $emailCodeSent */
+/** @var string $emailCodeTargetMasked */
 /** @var string $panelBaseUrl */
 
 use function Raven\Core\Support\e;
@@ -33,6 +35,8 @@ $fallbackMethods = is_array($fallbackMethods ?? null) ? $fallbackMethods : [];
 $selectedMethod = is_array($selectedMethod ?? null) ? $selectedMethod : null;
 $selectedMethodType = strtolower(trim((string) ($selectedMethodType ?? '')));
 $canSwitchMethod = (bool) ($canSwitchMethod ?? false);
+$emailCodeSent = (bool) ($emailCodeSent ?? false);
+$emailCodeTargetMasked = trim((string) ($emailCodeTargetMasked ?? ''));
 $csrfToken = trim((string) ($csrfToken ?? ''));
 
 $defaultMethodLabel = static function (string $methodType): string {
@@ -40,6 +44,7 @@ $defaultMethodLabel = static function (string $methodType): string {
     return match ($normalized) {
         'webauthn' => 'Security Key',
         'recovery' => 'Recovery Phrase',
+        'email' => 'Email Code',
         default => 'Authenticator App',
     };
 };
@@ -87,12 +92,23 @@ $defaultMethodLabel = static function (string $methodType): string {
                         : $defaultMethodLabel($selectedMethodType);
                 }
                 $isRecovery = $selectedMethodType === 'recovery';
+                $isEmail = $selectedMethodType === 'email';
+                $inputLabel = $isRecovery
+                    ? 'Recovery Phrase'
+                    : ($isEmail ? 'Email Code' : 'Verification Code');
+                $inputPattern = $isEmail ? '[0-9]{6}' : '[0-9]{6,8}';
                 ?>
                 <form method="post" action="<?= e($panelBase) ?>/login/2fa" novalidate>
                     <?= $csrfField ?>
                     <p class="text-muted mb-2">Method: <?= e($selectedLabel) ?></p>
+                    <?php if ($isEmail && $emailCodeTargetMasked !== ''): ?>
+                        <p class="small text-muted mb-2">
+                            <?= $emailCodeSent ? 'A verification code was sent to' : 'Enter the verification code sent to' ?>
+                            <code><?= e($emailCodeTargetMasked) ?></code>.
+                        </p>
+                    <?php endif; ?>
                     <div class="mb-3">
-                        <label for="verification_code" class="form-label"><?= e($isRecovery ? 'Recovery Phrase' : 'Verification Code') ?></label>
+                        <label for="verification_code" class="form-label"><?= e($inputLabel) ?></label>
                         <input
                             id="verification_code"
                             name="verification_code"
@@ -101,7 +117,7 @@ $defaultMethodLabel = static function (string $methodType): string {
                             required
                             autocomplete="<?= e($isRecovery ? 'off' : 'one-time-code') ?>"
                             inputmode="<?= e($isRecovery ? 'text' : 'numeric') ?>"
-                            <?= $isRecovery ? '' : 'pattern="[0-9]{6,8}"' ?>
+                            <?= $isRecovery ? '' : ('pattern="' . e($inputPattern) . '"') ?>
                             placeholder="<?= e($isRecovery ? 'twelve-word recovery phrase' : '123456') ?>"
                         >
                     </div>

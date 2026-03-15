@@ -4,6 +4,8 @@
 
 ### March 14, 2026
 
+- Finished `Email Code` 2FA method implementation (removed stub status): email methods now normalize as confirmed, participate in interactive login challenge selection, and can be verified during `/login/2fa` flows.
+- Added login-time email 2FA challenge services in `private/lib/Auth/` for one-time 6-digit code issuance/expiry/session-state verification plus configurable `php_mail` delivery with masked-recipient UI hints on the challenge screen.
 - Updated panel login 2FA challenge flow with an inline `Try Other Method` action beside `Verify` for code-based methods when alternatives exist, returning users to the full method picker without restarting login.
 - Updated login 2FA method-picker labeling to use `Recovery Phrase` terminology and clearer fallback/default method names.
 - Updated Preferences -> Security so `New Password` now appears at the top of the Security tab.

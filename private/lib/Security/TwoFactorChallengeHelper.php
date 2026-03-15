@@ -67,7 +67,8 @@ final class TwoFactorChallengeHelper
     {
         return array_values(array_merge(
             self::filterByType($methods, 'totp'),
-            self::filterByType($methods, 'recovery')
+            self::filterByType($methods, 'recovery'),
+            self::filterByType($methods, 'email')
         ));
     }
 
@@ -100,4 +101,3 @@ final class TwoFactorChallengeHelper
         return $fallbackMethods;
     }
 }
-

@@ -93,9 +93,14 @@ final class UserSecurityProfileService
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function interactiveTwoFactorMethods(array $methods): array
+    public function interactiveTwoFactorMethods(array $methods, string $fallbackEmail = ''): array
     {
         $interactive = [];
+        $fallbackEmail = strtolower(trim($fallbackEmail));
+        if ($fallbackEmail === '' || filter_var($fallbackEmail, FILTER_VALIDATE_EMAIL) === false) {
+            $fallbackEmail = '';
+        }
+
         foreach ($methods as $method) {
             if (!is_array($method)) {
                 continue;
@@ -160,6 +165,25 @@ final class UserSecurityProfileService
                     'label' => TwoFactorMethodRules::normalizeLabel((string) ($method['label'] ?? ''), 'webauthn'),
                     'credential_id' => $credentialId,
                     'require_uv' => $requireUv,
+                ];
+                continue;
+            }
+
+            if ($type === 'email') {
+                $email = strtolower(trim((string) ($method['email'] ?? '')));
+                if ($email === '' && $fallbackEmail !== '') {
+                    $email = $fallbackEmail;
+                }
+
+                if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+                    continue;
+                }
+
+                $interactive[] = [
+                    'type' => 'email',
+                    'key' => TwoFactorMethodKey::forEmailAddress($email),
+                    'label' => TwoFactorMethodRules::normalizeLabel((string) ($method['label'] ?? ''), 'email'),
+                    'email' => $email,
                 ];
             }
         }

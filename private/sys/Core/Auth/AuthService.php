@@ -19,6 +19,7 @@ use Raven\Lib\Auth\AuthIdentityLookupService;
 use Raven\Lib\Auth\ContactProfileNormalizer;
 use Raven\Lib\Auth\LoginThrottleService;
 use Raven\Lib\Auth\PermissionMaskService;
+use Raven\Lib\Auth\TwoFactorEmailChallengeService;
 use Raven\Lib\Auth\TwoFactorChallengeVerificationService;
 use Raven\Lib\Auth\TwoFactorSessionStateService;
 use Raven\Lib\Auth\UserSecurityProfileService;
@@ -55,6 +56,7 @@ final class AuthService
     private TwoFactorSessionStateService $twoFactorSessionState;
     private AuthAccessGateService $authAccessGateService;
     private TwoFactorChallengeVerificationService $twoFactorChallengeVerificationService;
+    private TwoFactorEmailChallengeService $twoFactorEmailChallengeService;
 
     /**
      * Request-local cache for user preference rows by user id.
@@ -87,6 +89,7 @@ final class AuthService
         $this->twoFactorSessionState = new TwoFactorSessionStateService();
         $this->authAccessGateService = new AuthAccessGateService();
         $this->twoFactorChallengeVerificationService = new TwoFactorChallengeVerificationService();
+        $this->twoFactorEmailChallengeService = new TwoFactorEmailChallengeService();
 
         $this->bootstrapDelightAuth();
     }
@@ -292,7 +295,33 @@ final class AuthService
         $methods = is_array($preferences['two_factor_methods'] ?? null)
             ? $preferences['two_factor_methods']
             : [];
-        return $this->securityProfiles->interactiveTwoFactorMethods($methods);
+        return $this->securityProfiles->interactiveTwoFactorMethods($methods, (string) ($preferences['email'] ?? ''));
+    }
+
+    /**
+     * @return array{
+     *   ok: bool,
+     *   message?: string,
+     *   sent?: bool,
+     *   email?: string,
+     *   code?: string,
+     *   expires_at?: int,
+     *   method_key?: string
+     * }
+     */
+    public function issuePendingEmailCodeChallenge(string $selectedMethodKey): array
+    {
+        return $this->twoFactorEmailChallengeService->issueChallenge(
+            $this->pendingTwoFactorUserId(),
+            $this->pendingTwoFactorMethods(),
+            $selectedMethodKey,
+            $this->twoFactorSessionState
+        );
+    }
+
+    public function clearPendingEmailCodeChallenge(string $selectedMethodKey = ''): void
+    {
+        $this->twoFactorSessionState->clearEmailCodeChallenge($selectedMethodKey);
     }
 
     /**
@@ -334,6 +363,19 @@ final class AuthService
                 $updated = $this->updateUserTwoFactorMethods($pendingUserId, $methods);
                 return (bool) ($updated['ok'] ?? false);
             }
+        );
+    }
+
+    /**
+     * Verifies one submitted email code for pending 2FA session.
+     */
+    public function verifyPendingEmailCode(string $submittedCode, string $selectedMethodKey = ''): bool
+    {
+        return $this->twoFactorEmailChallengeService->verifySubmittedCode(
+            $this->pendingTwoFactorUserId(),
+            $selectedMethodKey,
+            $submittedCode,
+            $this->twoFactorSessionState
         );
     }
 
