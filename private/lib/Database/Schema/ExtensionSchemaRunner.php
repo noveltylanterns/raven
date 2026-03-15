@@ -21,7 +21,7 @@ final class ExtensionSchemaRunner
 
     public function ensureEnabledExtensionSchemas(PDO $db, string $driver, string $prefix): void
     {
-        $root = dirname(__DIR__, 5);
+        $root = dirname(__DIR__, 4);
         foreach (ExtensionRegistry::enabledDirectories($root, true) as $directory) {
             $schemaPath = $root . '/private/ext/' . $directory . '/lib/schema.php';
             if (!is_file($schemaPath)) {
