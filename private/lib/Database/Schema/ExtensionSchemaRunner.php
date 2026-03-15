@@ -12,6 +12,13 @@ use Raven\Core\Extension\ExtensionRegistry;
  */
 final class ExtensionSchemaRunner
 {
+    private TableNameResolver $tables;
+
+    public function __construct(?TableNameResolver $tables = null)
+    {
+        $this->tables = $tables ?? new TableNameResolver();
+    }
+
     public function ensureEnabledExtensionSchemas(PDO $db, string $driver, string $prefix): void
     {
         $root = dirname(__DIR__, 5);
@@ -35,7 +42,7 @@ final class ExtensionSchemaRunner
                     'prefix' => $prefix,
                     'extension' => $directory,
                     'table' => function (string $table) use ($driver, $prefix): string {
-                        return $this->table($driver, $prefix, $table);
+                        return $this->tables->resolve($driver, $prefix, $table);
                     },
                 ]);
             } catch (\Throwable $exception) {
@@ -44,30 +51,4 @@ final class ExtensionSchemaRunner
         }
     }
 
-    private function table(string $driver, string $prefix, string $table): string
-    {
-        if ($driver !== 'sqlite') {
-            return $prefix . $table;
-        }
-
-        if (str_starts_with($table, 'ext_')) {
-            return 'extensions.' . $table;
-        }
-
-        return match ($table) {
-            'pages' => 'main.pages',
-            'categories' => 'taxonomy.categories',
-            'tags' => 'taxonomy.tags',
-            'redirects' => 'taxonomy.redirects',
-            'page_categories' => 'main.page_categories',
-            'page_tags' => 'main.page_tags',
-            'page_images' => 'main.page_images',
-            'page_image_variants' => 'main.page_image_variants',
-            'groups' => 'auth.groups',
-            'user_groups' => 'auth.user_groups',
-            'login_failures' => 'auth.login_failures',
-            default => 'main.' . $table,
-        };
-    }
 }
-

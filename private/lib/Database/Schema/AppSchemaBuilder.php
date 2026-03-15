@@ -12,10 +12,12 @@ use PDO;
 final class AppSchemaBuilder
 {
     private SchemaIntrospector $introspector;
+    private TableNameResolver $tables;
 
-    public function __construct(SchemaIntrospector $introspector)
+    public function __construct(SchemaIntrospector $introspector, ?TableNameResolver $tables = null)
     {
         $this->introspector = $introspector;
+        $this->tables = $tables ?? new TableNameResolver();
     }
 
     public function ensurePageExtendedColumn(PDO $db, string $driver, string $prefix): void
@@ -161,7 +163,7 @@ final class AppSchemaBuilder
 
     public function ensureGroupRoutingColumns(PDO $db, string $driver, string $prefix): void
     {
-        $groupsTable = $this->table($driver, $prefix, 'groups');
+        $groupsTable = $this->tables->resolve($driver, $prefix, 'groups');
 
         if ($driver === 'sqlite') {
             if (!$this->introspector->appColumnExistsSqlite($db, 'auth.groups', 'slug')) {
@@ -310,7 +312,7 @@ final class AppSchemaBuilder
 
         if ($driver === 'sqlite') {
             foreach ($taxonomyTables as $table) {
-                $qualifiedTable = $this->table($driver, $prefix, $table);
+                $qualifiedTable = $this->tables->resolve($driver, $prefix, $table);
                 foreach ($columns as $column) {
                     if (!$this->introspector->appColumnExistsSqlite($db, $qualifiedTable, $column)) {
                         $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN ' . $column . ' TEXT NULL');
@@ -433,7 +435,7 @@ final class AppSchemaBuilder
     public function ensureRedirectDescriptionColumn(PDO $db, string $driver, string $prefix): void
     {
         if ($driver === 'sqlite') {
-            $redirectsTable = $this->table($driver, $prefix, 'redirects');
+            $redirectsTable = $this->tables->resolve($driver, $prefix, 'redirects');
             if (!$this->introspector->appColumnExistsSqlite($db, $redirectsTable, 'description')) {
                 $db->exec('ALTER TABLE ' . $redirectsTable . ' ADD COLUMN description TEXT NULL');
             }
@@ -464,32 +466,6 @@ final class AppSchemaBuilder
         $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_pages_channel_slug_unique ON pages (channel_id, slug) WHERE channel_id IS NOT NULL');
     }
 
-    private function table(string $driver, string $prefix, string $table): string
-    {
-        if ($driver !== 'sqlite') {
-            return $prefix . $table;
-        }
-
-        if (str_starts_with($table, 'ext_')) {
-            return 'extensions.' . $table;
-        }
-
-        return match ($table) {
-            'pages' => 'main.pages',
-            'categories' => 'taxonomy.categories',
-            'tags' => 'taxonomy.tags',
-            'redirects' => 'taxonomy.redirects',
-            'page_categories' => 'main.page_categories',
-            'page_tags' => 'main.page_tags',
-            'page_images' => 'main.page_images',
-            'page_image_variants' => 'main.page_image_variants',
-            'groups' => 'auth.groups',
-            'user_groups' => 'auth.user_groups',
-            'login_failures' => 'auth.login_failures',
-            default => 'main.' . $table,
-        };
-    }
-
     private function slugifyGroupName(string $value): string
     {
         $value = strtolower(trim($value));
@@ -511,4 +487,3 @@ final class AppSchemaBuilder
         return substr($value, 0, 160);
     }
 }
-

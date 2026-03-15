@@ -25,6 +25,10 @@
 - Rewired `AuthController`, `AuthService`, `DebugToolbarRenderer`, `ExtensionRegistry`, `PageImageManager`, and `SchemaManager` to delegate these concerns to `private/lib/`.
 - Added an `ExtensionRegistry` fallback include path for lib validators so CLI extension commands remain functional in direct-load contexts (outside full app bootstrap autoload setup).
 - Re-ran full smoke suite (`debug/smoke/*.php`): PASS.
+- Added tenth-wave `private/lib/` modularization for schema bootstrap composition, theme manifest/inheritance discovery, template-tag compilation/path resolution, DB connection config/DSN/sqlite bootstrap, panel ACL catalogs, and avatar validation policy (`AppSchemaBootstrap`, `TableNameResolver`, `ThemeDiscoveryService`, `ThemeInheritanceResolver`, `ThemeManifestValidator`, `TemplateTagCompiler`, `TemplateTagPathResolver`, `DriverConfigNormalizer`, `DsnBuilder`, `SqlitePathResolver`, `SqliteConnectionBootstrap`, `PanelAccessCatalog`, `AvatarValidationPolicy`).
+- Reduced `SchemaManager`, `ConnectionFactory`, `PanelAccess`, `PublicThemeRegistry`, `TemplateTagEngine`, and `AvatarValidator` to thin orchestration/adaptor layers over `private/lib/`.
+- Added direct-load fallback includes in `PublicThemeRegistry`, `TemplateTagEngine`, and `PanelAccess` so CLI/direct-require execution paths still resolve the newly extracted lib classes.
+- Re-ran full smoke suite (`debug/smoke/*.php`) after these extractions: PASS.
 
 ### March 13, 2026
 

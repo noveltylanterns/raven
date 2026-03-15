@@ -7,17 +7,18 @@
  * Docs: https://raven.lanterns.io
  */
 
-// Inline note: Isolate backend-specific database behavior behind one consistent API.
-
 declare(strict_types=1);
 
 namespace Raven\Core\Database;
 
 use PDO;
+use Raven\Lib\Database\Connection\DriverConfigNormalizer;
+use Raven\Lib\Database\Connection\DsnBuilder;
+use Raven\Lib\Database\Connection\SqliteConnectionBootstrap;
+use Raven\Lib\Database\Connection\SqlitePathResolver;
 use Raven\Lib\Database\Profiling\ProfiledPDO;
 use Raven\Lib\Database\Profiling\QueryProfilerInterface;
 use Raven\Lib\Profiling\RequestQueryProfilerAdapter;
-use RuntimeException;
 
 /**
  * Builds PDO connections for Raven backends.
@@ -27,6 +28,10 @@ final class ConnectionFactory
     /** @var array<string, mixed> */
     private array $config;
     private QueryProfilerInterface $queryProfiler;
+    private DriverConfigNormalizer $configNormalizer;
+    private DsnBuilder $dsnBuilder;
+    private SqliteConnectionBootstrap $sqliteBootstrap;
+    private ?SqlitePathResolver $sqlitePaths = null;
 
     /**
      * @param array<string, mixed> $databaseConfig
@@ -35,6 +40,9 @@ final class ConnectionFactory
     {
         $this->config = $databaseConfig;
         $this->queryProfiler = $queryProfiler ?? new RequestQueryProfilerAdapter();
+        $this->configNormalizer = new DriverConfigNormalizer();
+        $this->dsnBuilder = new DsnBuilder();
+        $this->sqliteBootstrap = new SqliteConnectionBootstrap();
     }
 
     /**
@@ -42,13 +50,7 @@ final class ConnectionFactory
      */
     public function getDriver(): string
     {
-        $driver = strtolower((string) ($this->config['driver'] ?? 'sqlite'));
-
-        if (!in_array($driver, ['sqlite', 'mysql', 'pgsql'], true)) {
-            throw new RuntimeException('Unsupported database driver: ' . $driver);
-        }
-
-        return $driver;
+        return $this->configNormalizer->driver($this->config);
     }
 
     /**
@@ -56,10 +58,7 @@ final class ConnectionFactory
      */
     public function getPrefix(): string
     {
-        $prefix = (string) ($this->config['table_prefix'] ?? '');
-
-        // Keep SQL identifier prefix strictly alphanumeric+underscore.
-        return preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
+        return $this->configNormalizer->prefix($this->config);
     }
 
     /**
@@ -103,17 +102,10 @@ final class ConnectionFactory
      */
     private function newSqliteConnection(string $path, string $connectionLabel = 'app'): PDO
     {
-        $directory = dirname($path);
-        if (!is_dir($directory)) {
-            mkdir($directory, 0775, true);
-        }
+        $this->sqliteBootstrap->ensureDirectory($path);
 
-        $pdo = new ProfiledPDO('sqlite:' . $path, null, null, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ], $connectionLabel, $this->queryProfiler);
-
-        $pdo->exec('PRAGMA foreign_keys = ON');
+        $pdo = new ProfiledPDO('sqlite:' . $path, null, null, $this->defaultPdoOptions(), $connectionLabel, $this->queryProfiler);
+        $this->sqliteBootstrap->bootstrap($pdo);
 
         return $pdo;
     }
@@ -124,48 +116,25 @@ final class ConnectionFactory
     private function newServerConnection(string $driver, string $connectionLabel = 'app'): PDO
     {
         if ($driver === 'mysql') {
-            /** @var array<string, mixed> $mysql */
-            $mysql = (array) ($this->config['mysql'] ?? []);
-
-            $dsn = sprintf(
-                'mysql:host=%s;port=%d;dbname=%s;charset=%s',
-                (string) ($mysql['host'] ?? '127.0.0.1'),
-                (int) ($mysql['port'] ?? 3306),
-                (string) ($mysql['dbname'] ?? 'raven'),
-                (string) ($mysql['charset'] ?? 'utf8mb4')
-            );
+            $mysql = $this->configNormalizer->mysql($this->config);
 
             return new ProfiledPDO(
-                $dsn,
+                $this->dsnBuilder->mysql($mysql),
                 (string) ($mysql['user'] ?? ''),
                 (string) ($mysql['password'] ?? ''),
-                [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                ],
+                $this->defaultPdoOptions(),
                 $connectionLabel,
                 $this->queryProfiler
             );
         }
 
-        /** @var array<string, mixed> $pgsql */
-        $pgsql = (array) ($this->config['pgsql'] ?? []);
-
-        $dsn = sprintf(
-            'pgsql:host=%s;port=%d;dbname=%s',
-            (string) ($pgsql['host'] ?? '127.0.0.1'),
-            (int) ($pgsql['port'] ?? 5432),
-            (string) ($pgsql['dbname'] ?? 'raven')
-        );
+        $pgsql = $this->configNormalizer->pgsql($this->config);
 
         return new ProfiledPDO(
-            $dsn,
+            $this->dsnBuilder->pgsql($pgsql),
             (string) ($pgsql['user'] ?? ''),
             (string) ($pgsql['password'] ?? ''),
-            [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            ],
+            $this->defaultPdoOptions(),
             $connectionLabel,
             $this->queryProfiler
         );
@@ -176,36 +145,7 @@ final class ConnectionFactory
      */
     private function sqlitePath(string $key): string
     {
-        /** @var array<string, mixed> $sqlite */
-        $sqlite = (array) ($this->config['sqlite'] ?? []);
-
-        $basePath = rtrim((string) ($sqlite['base_path'] ?? ''), '/');
-        $canonicalFiles = $this->sqliteCanonicalFiles();
-
-        if ($basePath === '') {
-            throw new RuntimeException("Missing SQLite path configuration for '{$key}'.");
-        }
-
-        if (isset($canonicalFiles[$key])) {
-            return $basePath . '/' . $canonicalFiles[$key];
-        }
-
-        throw new RuntimeException("Missing SQLite path configuration for '{$key}'.");
-    }
-
-    /**
-     * Returns canonical SQLite filenames used by Raven.
-     *
-     * @return array<string, string>
-     */
-    private function sqliteCanonicalFiles(): array
-    {
-        return [
-            'pages' => 'pages.db',
-            'auth' => 'auth.db',
-            'taxonomy' => 'taxonomy.db',
-            'extensions' => 'extensions.db',
-        ];
+        return $this->sqlitePaths()->path($key);
     }
 
     /**
@@ -225,5 +165,26 @@ final class ConnectionFactory
 
             $pdo->exec("ATTACH DATABASE '{$safePath}' AS {$alias}");
         }
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function defaultPdoOptions(): array
+    {
+        return [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ];
+    }
+
+    private function sqlitePaths(): SqlitePathResolver
+    {
+        if ($this->sqlitePaths === null) {
+            $basePath = $this->configNormalizer->sqliteBasePath($this->config);
+            $this->sqlitePaths = new SqlitePathResolver($basePath);
+        }
+
+        return $this->sqlitePaths;
     }
 }

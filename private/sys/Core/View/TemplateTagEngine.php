@@ -11,6 +11,11 @@ declare(strict_types=1);
 
 namespace Raven\Core\View;
 
+require_once dirname(__DIR__, 3) . '/lib/View/TemplateTagPathResolver.php';
+require_once dirname(__DIR__, 3) . '/lib/View/TemplateTagCompiler.php';
+
+use Raven\Lib\View\TemplateTagCompiler;
+use Raven\Lib\View\TemplateTagPathResolver;
 use RuntimeException;
 
 use function Raven\Core\Support\e;
@@ -21,10 +26,17 @@ use function Raven\Core\Support\e;
 final class TemplateTagEngine
 {
     private string $cacheDirectory;
+    private TemplateTagPathResolver $paths;
+    private TemplateTagCompiler $compiler;
 
-    public function __construct(string $cacheDirectory)
-    {
+    public function __construct(
+        string $cacheDirectory,
+        ?TemplateTagPathResolver $paths = null,
+        ?TemplateTagCompiler $compiler = null
+    ) {
         $this->cacheDirectory = rtrim($cacheDirectory, '/');
+        $this->paths = $paths ?? new TemplateTagPathResolver();
+        $this->compiler = $compiler ?? new TemplateTagCompiler();
     }
 
     /**
@@ -58,7 +70,7 @@ final class TemplateTagEngine
      */
     public function value(string $path, array $scope, bool $raw = false): string
     {
-        $value = $this->resolvePath($path, $scope);
+        $value = $this->paths->resolve($path, $scope);
         if ($value === null) {
             return '';
         }
@@ -83,29 +95,7 @@ final class TemplateTagEngine
      */
     public function truthy(string $path, array $scope): bool
     {
-        $value = $this->resolvePath($path, $scope);
-        if ($value === null) {
-            return false;
-        }
-
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        if (is_int($value) || is_float($value)) {
-            return $value != 0;
-        }
-
-        if (is_string($value)) {
-            $normalized = trim($value);
-            return $normalized !== '' && $normalized !== '0';
-        }
-
-        if (is_array($value)) {
-            return $value !== [];
-        }
-
-        return true;
+        return $this->paths->truthy($path, $scope);
     }
 
     /**
@@ -116,104 +106,7 @@ final class TemplateTagEngine
      */
     public function iter(string $path, array $scope): array
     {
-        $value = $this->resolvePath($path, $scope);
-        return is_array($value) ? $value : [];
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $scope
-     */
-    private function resolvePath(string $path, array $scope): mixed
-    {
-        $segments = array_values(array_filter(explode(':', trim($path)), static fn (string $value): bool => $value !== ''));
-        if ($segments === []) {
-            return null;
-        }
-
-        $first = array_shift($segments);
-        if (!is_string($first) || $first === '') {
-            return null;
-        }
-
-        $found = false;
-        $value = $this->lookupFirstSegment($first, $scope, $found);
-        if (!$found) {
-            return null;
-        }
-
-        foreach ($segments as $segment) {
-            if ($segment === '') {
-                return null;
-            }
-
-            $value = $this->lookupNestedSegment($value, $segment, $found);
-            if (!$found) {
-                return null;
-            }
-        }
-
-        return $value;
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $scope
-     */
-    private function lookupFirstSegment(string $segment, array $scope, bool &$found): mixed
-    {
-        for ($index = count($scope) - 1; $index >= 0; $index--) {
-            $layer = $scope[$index] ?? null;
-            if (!is_array($layer)) {
-                continue;
-            }
-
-            if (array_key_exists($segment, $layer)) {
-                $found = true;
-                return $layer[$segment];
-            }
-
-            if (ctype_digit($segment)) {
-                $intKey = (int) $segment;
-                if (array_key_exists($intKey, $layer)) {
-                    $found = true;
-                    return $layer[$intKey];
-                }
-            }
-        }
-
-        $found = false;
-        return null;
-    }
-
-    private function lookupNestedSegment(mixed $value, string $segment, bool &$found): mixed
-    {
-        if (is_array($value)) {
-            if (array_key_exists($segment, $value)) {
-                $found = true;
-                return $value[$segment];
-            }
-
-            if (ctype_digit($segment)) {
-                $intKey = (int) $segment;
-                if (array_key_exists($intKey, $value)) {
-                    $found = true;
-                    return $value[$intKey];
-                }
-            }
-
-            $found = false;
-            return null;
-        }
-
-        if (is_object($value)) {
-            $properties = get_object_vars($value);
-            if (array_key_exists($segment, $properties)) {
-                $found = true;
-                return $properties[$segment];
-            }
-        }
-
-        $found = false;
-        return null;
+        return $this->paths->iter($path, $scope);
     }
 
     private function compiledTemplateFile(string $sourceFile): string
@@ -236,7 +129,7 @@ final class TemplateTagEngine
             throw new RuntimeException('Failed to read template source file: ' . $sourceFile);
         }
 
-        $compiledSource = $this->compileTemplate($source);
+        $compiledSource = $this->compiler->compileTemplate($source);
         $tmpFile = $compiledFile . '.tmp.' . uniqid('', true);
         if (file_put_contents($tmpFile, $compiledSource, LOCK_EX) === false) {
             throw new RuntimeException('Failed to write compiled template file: ' . $compiledFile);
@@ -260,93 +153,5 @@ final class TemplateTagEngine
         if (!@mkdir($this->cacheDirectory, 0700, true) && !is_dir($this->cacheDirectory)) {
             throw new RuntimeException('Failed to create template-tag cache directory: ' . $this->cacheDirectory);
         }
-    }
-
-    private function compileTemplate(string $source): string
-    {
-        $tokens = token_get_all($source);
-        $compiled = '';
-
-        foreach ($tokens as $token) {
-            if (is_array($token)) {
-                if ($token[0] === T_INLINE_HTML) {
-                    $compiled .= $this->compileInlineHtml($token[1]);
-                    continue;
-                }
-
-                $compiled .= $token[1];
-                continue;
-            }
-
-            $compiled .= $token;
-        }
-
-        return $compiled;
-    }
-
-    private function compileInlineHtml(string $html): string
-    {
-        if ($html === '' || !str_contains($html, '{')) {
-            return $html;
-        }
-
-        $pathPattern = '([A-Za-z_][A-Za-z0-9_]*(?::[A-Za-z0-9_]+)*)';
-        $valuePathPattern = '([A-Za-z_][A-Za-z0-9_]*(?::[A-Za-z0-9_]+)+)';
-        $compiled = $html;
-        $rawTagPlaceholders = [];
-
-        $compiled = preg_replace_callback(
-            '/\{if\s+not\s+' . $pathPattern . '\}/',
-            static fn (array $matches): string => '<?php if (!$__rvn_tags->truthy('
-                . var_export((string) ($matches[1] ?? ''), true)
-                . ', $__rvn_scope)): ?>',
-            $compiled
-        ) ?? $compiled;
-
-        $compiled = preg_replace_callback(
-            '/\{if\s+' . $pathPattern . '\}/',
-            static fn (array $matches): string => '<?php if ($__rvn_tags->truthy('
-                . var_export((string) ($matches[1] ?? ''), true)
-                . ', $__rvn_scope)): ?>',
-            $compiled
-        ) ?? $compiled;
-
-        $compiled = preg_replace('/\{\/if\}/', '<?php endif; ?>', $compiled) ?? $compiled;
-
-        $compiled = preg_replace_callback(
-            '/\{each\s+' . $pathPattern . '\}/',
-            static fn (array $matches): string => '<?php foreach ($__rvn_tags->iter('
-                . var_export((string) ($matches[1] ?? ''), true)
-                . ', $__rvn_scope) as $__rvn_item): $__rvn_scope[] = [\'item\' => $__rvn_item]; ?>',
-            $compiled
-        ) ?? $compiled;
-
-        $compiled = preg_replace('/\{\/each\}/', '<?php array_pop($__rvn_scope); endforeach; ?>', $compiled) ?? $compiled;
-
-        $compiled = preg_replace_callback(
-            '/\{raw:' . $pathPattern . '\}/',
-            static function (array $matches) use (&$rawTagPlaceholders): string {
-                $token = '__RVN_RAW_TAG_' . count($rawTagPlaceholders) . '__';
-                $rawTagPlaceholders[$token] = '<?php echo $__rvn_tags->value('
-                    . var_export((string) ($matches[1] ?? ''), true)
-                    . ', $__rvn_scope, true); ?>';
-                return $token;
-            },
-            $compiled
-        ) ?? $compiled;
-
-        $compiled = preg_replace_callback(
-            '/\{' . $valuePathPattern . '\}/',
-            static fn (array $matches): string => '<?php echo $__rvn_tags->value('
-                . var_export((string) ($matches[1] ?? ''), true)
-                . ', $__rvn_scope, false); ?>',
-            $compiled
-        ) ?? $compiled;
-
-        if ($rawTagPlaceholders !== []) {
-            $compiled = strtr($compiled, $rawTagPlaceholders);
-        }
-
-        return $compiled;
     }
 }

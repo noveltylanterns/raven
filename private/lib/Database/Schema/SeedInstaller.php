@@ -12,9 +12,16 @@ use Raven\Core\Auth\PanelAccess;
  */
 final class SeedInstaller
 {
+    private TableNameResolver $tables;
+
+    public function __construct(?TableNameResolver $tables = null)
+    {
+        $this->tables = $tables ?? new TableNameResolver();
+    }
+
     public function ensureStockGroups(PDO $db, string $driver, string $prefix): void
     {
-        $groupsTable = $this->table($driver, $prefix, 'groups');
+        $groupsTable = $this->tables->resolve($driver, $prefix, 'groups');
         $now = gmdate('Y-m-d H:i:s');
         $stockGroups = PanelAccess::stockGroups();
         $findBySlug = $db->prepare(
@@ -96,7 +103,7 @@ final class SeedInstaller
 
     public function ensureSeedPages(PDO $db, string $driver, string $prefix): void
     {
-        $pagesTable = $this->table($driver, $prefix, 'pages');
+        $pagesTable = $this->tables->resolve($driver, $prefix, 'pages');
         $usersTable = $driver === 'sqlite' ? 'auth.users' : ($prefix . 'users');
 
         try {
@@ -151,8 +158,8 @@ final class SeedInstaller
             return;
         }
 
-        $groupsTable = $this->table($driver, $prefix, 'groups');
-        $userGroupsTable = $this->table($driver, $prefix, 'user_groups');
+        $groupsTable = $this->tables->resolve($driver, $prefix, 'groups');
+        $userGroupsTable = $this->tables->resolve($driver, $prefix, 'user_groups');
 
         $findStock = $db->prepare(
             'SELECT id
@@ -229,32 +236,6 @@ final class SeedInstaller
         }
     }
 
-    private function table(string $driver, string $prefix, string $table): string
-    {
-        if ($driver !== 'sqlite') {
-            return $prefix . $table;
-        }
-
-        if (str_starts_with($table, 'ext_')) {
-            return 'extensions.' . $table;
-        }
-
-        return match ($table) {
-            'pages' => 'main.pages',
-            'categories' => 'taxonomy.categories',
-            'tags' => 'taxonomy.tags',
-            'redirects' => 'taxonomy.redirects',
-            'page_categories' => 'main.page_categories',
-            'page_tags' => 'main.page_tags',
-            'page_images' => 'main.page_images',
-            'page_image_variants' => 'main.page_image_variants',
-            'groups' => 'auth.groups',
-            'user_groups' => 'auth.user_groups',
-            'login_failures' => 'auth.login_failures',
-            default => 'main.' . $table,
-        };
-    }
-
     private function slugifyGroupName(string $value): string
     {
         $value = strtolower(trim($value));
@@ -276,4 +257,3 @@ final class SeedInstaller
         return substr($value, 0, 160);
     }
 }
-

@@ -1,0 +1,285 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Raven\Lib\Auth;
+
+use Raven\Core\Auth\PanelAccess;
+
+/**
+ * Holds stock panel permission-route/group catalog definitions.
+ */
+final class PanelAccessCatalog
+{
+    /**
+     * @return array<string, array{label: string, view: int, create: int, edit: int, delete: int}>
+     */
+    public static function stockPanelRoutePermissions(): array
+    {
+        return [
+            'pages' => [
+                'label' => 'Pages',
+                'view' => PanelAccess::PAGES_VIEW,
+                'create' => PanelAccess::PAGES_CREATE,
+                'edit' => PanelAccess::PAGES_EDIT,
+                'delete' => PanelAccess::PAGES_DELETE,
+            ],
+            'channels' => [
+                'label' => 'Channels',
+                'view' => PanelAccess::CHANNELS_VIEW,
+                'create' => PanelAccess::CHANNELS_CREATE,
+                'edit' => PanelAccess::CHANNELS_EDIT,
+                'delete' => PanelAccess::CHANNELS_DELETE,
+            ],
+            'categories' => [
+                'label' => 'Categories',
+                'view' => PanelAccess::CATEGORIES_VIEW,
+                'create' => PanelAccess::CATEGORIES_CREATE,
+                'edit' => PanelAccess::CATEGORIES_EDIT,
+                'delete' => PanelAccess::CATEGORIES_DELETE,
+            ],
+            'tags' => [
+                'label' => 'Tags',
+                'view' => PanelAccess::TAGS_VIEW,
+                'create' => PanelAccess::TAGS_CREATE,
+                'edit' => PanelAccess::TAGS_EDIT,
+                'delete' => PanelAccess::TAGS_DELETE,
+            ],
+            'redirects' => [
+                'label' => 'Redirects',
+                'view' => PanelAccess::REDIRECTS_VIEW,
+                'create' => PanelAccess::REDIRECTS_CREATE,
+                'edit' => PanelAccess::REDIRECTS_EDIT,
+                'delete' => PanelAccess::REDIRECTS_DELETE,
+            ],
+            'users' => [
+                'label' => 'Users',
+                'view' => PanelAccess::USERS_VIEW,
+                'create' => PanelAccess::USERS_CREATE,
+                'edit' => PanelAccess::USERS_EDIT,
+                'delete' => PanelAccess::USERS_DELETE,
+            ],
+            'groups' => [
+                'label' => 'Groups',
+                'view' => PanelAccess::GROUPS_VIEW,
+                'create' => PanelAccess::GROUPS_CREATE,
+                'edit' => PanelAccess::GROUPS_EDIT,
+                'delete' => PanelAccess::GROUPS_DELETE,
+            ],
+            'routing' => [
+                'label' => 'Routing',
+                'view' => PanelAccess::ROUTING_VIEW,
+                'create' => PanelAccess::ROUTING_CREATE,
+                'edit' => PanelAccess::ROUTING_EDIT,
+                'delete' => PanelAccess::ROUTING_DELETE,
+            ],
+            'themes' => [
+                'label' => 'Themes',
+                'view' => PanelAccess::THEMES_VIEW,
+                'create' => PanelAccess::THEMES_CREATE,
+                'edit' => PanelAccess::THEMES_EDIT,
+                'delete' => PanelAccess::THEMES_DELETE,
+            ],
+            'extensions' => [
+                'label' => 'Extensions',
+                'view' => PanelAccess::EXTENSIONS_VIEW,
+                'create' => PanelAccess::EXTENSIONS_CREATE,
+                'edit' => PanelAccess::EXTENSIONS_EDIT,
+                'delete' => PanelAccess::EXTENSIONS_DELETE,
+            ],
+            'configuration' => [
+                'label' => 'Configuration',
+                'view' => PanelAccess::CONFIGURATION_VIEW,
+                'create' => PanelAccess::CONFIGURATION_CREATE,
+                'edit' => PanelAccess::CONFIGURATION_EDIT,
+                'delete' => PanelAccess::CONFIGURATION_DELETE,
+            ],
+        ];
+    }
+
+    /**
+     * @return array{label: string, view: int, create: int, edit: int, delete: int}|null
+     */
+    public static function stockPanelRoutePermission(string $routeKey): ?array
+    {
+        $definitions = self::stockPanelRoutePermissions();
+        $normalized = strtolower(trim($routeKey));
+        return $definitions[$normalized] ?? null;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public static function allStockPanelBits(): array
+    {
+        $bits = [];
+        foreach (self::stockPanelRoutePermissions() as $permissionRow) {
+            $bits[] = (int) $permissionRow['view'];
+            $bits[] = (int) $permissionRow['create'];
+            $bits[] = (int) $permissionRow['edit'];
+            $bits[] = (int) $permissionRow['delete'];
+        }
+
+        return $bits;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public static function contentPanelBits(): array
+    {
+        return self::routeBits('pages');
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public static function taxonomyPanelBits(): array
+    {
+        return self::routesBits(['channels', 'categories', 'tags', 'redirects', 'routing']);
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public static function usersPanelBits(): array
+    {
+        return self::routeBits('users');
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public static function groupsPanelBits(): array
+    {
+        return self::routeBits('groups');
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public static function systemPanelBits(): array
+    {
+        return self::routesBits(['configuration', 'themes', 'extensions']);
+    }
+
+    /**
+     * @return array<int, array{name: string, slug: string, permission_mask: int, is_stock: int}>
+     */
+    public static function stockGroups(): array
+    {
+        $allStockPanelBitsMask = self::maskFromBits(self::allStockPanelBits());
+        $editorPanelBitsMask = self::maskFromBits(self::contentPanelBits());
+        $adminPanelBitsMask = self::maskFromBits(array_merge(
+            self::contentPanelBits(),
+            self::taxonomyPanelBits(),
+            self::usersPanelBits()
+        ));
+
+        return [
+            [
+                'name' => 'Super Admin',
+                'slug' => 'super',
+                'permission_mask' => PanelAccess::PANEL_LOGIN
+                    | PanelAccess::VIEW_PUBLIC_SITE
+                    | PanelAccess::VIEW_PRIVATE_SITE
+                    | PanelAccess::VIEW_DISABLED_SITE
+                    | PanelAccess::MANAGE_CONTENT
+                    | PanelAccess::MANAGE_TAXONOMY
+                    | PanelAccess::MANAGE_USERS
+                    | PanelAccess::MANAGE_GROUPS
+                    | PanelAccess::MANAGE_CONFIGURATION
+                    | $allStockPanelBitsMask,
+                'is_stock' => 1,
+            ],
+            [
+                'name' => 'Admin',
+                'slug' => 'admin',
+                'permission_mask' => PanelAccess::PANEL_LOGIN
+                    | PanelAccess::VIEW_PUBLIC_SITE
+                    | PanelAccess::VIEW_PRIVATE_SITE
+                    | PanelAccess::VIEW_DISABLED_SITE
+                    | PanelAccess::MANAGE_CONTENT
+                    | PanelAccess::MANAGE_TAXONOMY
+                    | PanelAccess::MANAGE_USERS
+                    | $adminPanelBitsMask,
+                'is_stock' => 1,
+            ],
+            [
+                'name' => 'Editor',
+                'slug' => 'editor',
+                'permission_mask' => PanelAccess::PANEL_LOGIN
+                    | PanelAccess::VIEW_PUBLIC_SITE
+                    | PanelAccess::VIEW_PRIVATE_SITE
+                    | PanelAccess::MANAGE_CONTENT
+                    | $editorPanelBitsMask,
+                'is_stock' => 1,
+            ],
+            [
+                'name' => 'User',
+                'slug' => 'user',
+                'permission_mask' => PanelAccess::VIEW_PUBLIC_SITE | PanelAccess::VIEW_PRIVATE_SITE,
+                'is_stock' => 1,
+            ],
+            [
+                'name' => 'Guest',
+                'slug' => 'guest',
+                'permission_mask' => PanelAccess::VIEW_PUBLIC_SITE,
+                'is_stock' => 1,
+            ],
+            [
+                'name' => 'Validating',
+                'slug' => 'validating',
+                'permission_mask' => PanelAccess::VIEW_PUBLIC_SITE,
+                'is_stock' => 1,
+            ],
+            [
+                'name' => 'Banned',
+                'slug' => 'banned',
+                'permission_mask' => 0,
+                'is_stock' => 1,
+            ],
+        ];
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private static function routeBits(string $route): array
+    {
+        $row = self::stockPanelRoutePermission($route);
+        if ($row === null) {
+            return [];
+        }
+
+        return [(int) $row['view'], (int) $row['create'], (int) $row['edit'], (int) $row['delete']];
+    }
+
+    /**
+     * @param array<int, string> $routes
+     * @return array<int, int>
+     */
+    private static function routesBits(array $routes): array
+    {
+        $bits = [];
+        foreach ($routes as $route) {
+            $bits = array_merge($bits, self::routeBits($route));
+        }
+
+        return $bits;
+    }
+
+    /**
+     * @param array<int, int> $bits
+     */
+    private static function maskFromBits(array $bits): int
+    {
+        $mask = 0;
+        foreach ($bits as $bit) {
+            $mask |= (int) $bit;
+        }
+
+        return $mask;
+    }
+}
+
