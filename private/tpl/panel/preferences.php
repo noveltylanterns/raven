@@ -177,9 +177,9 @@ $themeLabels = [
                 <label class="form-label">Email Address</label>
                 <input type="email" class="form-control form-control-sm" data-preferences-two-factor-key="target_email" placeholder="Defaults to account email if blank">
             </div>
-            <div class="col-md position-relative" data-preferences-two-factor-section="recovery" style="display:none;">
-                <label class="form-label">Recovery Phrase</label>
-                <div class="input-group input-group-sm">
+                <div class="col-md position-relative" data-preferences-two-factor-section="recovery" style="display:none;">
+                    <label class="form-label">Recovery Phrase</label>
+                    <div class="input-group input-group-sm">
                     <span class="input-group-text">
                         <input
                             class="form-check-input mt-0 me-2"
@@ -188,12 +188,17 @@ $themeLabels = [
                             value="1"
                             aria-label="Reusable"
                         >
-                        <span class="small">Reusable</span>
-                    </span>
+                            <span class="small">Reusable</span>
+                        </span>
                     <input
-                        type="password"
-                        class="form-control form-control-sm"
+                        type="hidden"
                         data-preferences-two-factor-key="recovery_code"
+                        value=""
+                    >
+                    <input
+                        type="text"
+                        class="form-control form-control-sm"
+                        data-preferences-two-factor-recovery-display="1"
                         data-preferences-two-factor-recovery-copy="1"
                         placeholder="Generate 12-word recovery phrase"
                         title="Click to copy"
@@ -414,6 +419,7 @@ $themeLabels = [
         });
 
         syncRowSections(row);
+        setRecoveryVisibility(row, false);
       });
     }
 
@@ -679,8 +685,8 @@ $themeLabels = [
         setTotpFeedback(
           row,
           isReset
-            ? 'Secret reset. Enter a 6-digit code and save preferences.'
-            : 'Setup details ready. Enter a 6-digit code and save preferences to confirm.',
+            ? 'Secret reset. To finish setup, enter code from app.'
+            : 'Secret generated. To finish setup, enter code from app.',
           'success'
         );
       } catch (error) {
@@ -707,19 +713,45 @@ $themeLabels = [
       hint.textContent = String(message || '').trim() || 'Click phrase to copy.';
     }
 
+    function recoveryMaskedValue(actualValue) {
+      var actual = String(actualValue || '');
+      if (actual === '') {
+        return '';
+      }
+
+      return actual.replace(/\S/g, '*');
+    }
+
+    function recoveryHiddenField(row) {
+      var field = row.querySelector('[data-preferences-two-factor-key="recovery_code"]');
+      return field instanceof HTMLInputElement ? field : null;
+    }
+
+    function recoveryDisplayField(row) {
+      var field = row.querySelector('[data-preferences-two-factor-recovery-display="1"]');
+      return field instanceof HTMLInputElement ? field : null;
+    }
+
     function setRecoveryVisibility(row, visible) {
       if (!(row instanceof HTMLElement)) {
         return;
       }
 
-      var field = row.querySelector('[data-preferences-two-factor-key="recovery_code"]');
+      var hiddenField = recoveryHiddenField(row);
+      var displayField = recoveryDisplayField(row);
       var button = row.querySelector('[data-preferences-two-factor-recovery-visibility="1"]');
-      if (!(field instanceof HTMLInputElement) || !(button instanceof HTMLButtonElement)) {
+      if (
+        !(hiddenField instanceof HTMLInputElement)
+        || !(displayField instanceof HTMLInputElement)
+        || !(button instanceof HTMLButtonElement)
+      ) {
         return;
       }
 
       var shouldShow = visible === true;
-      field.type = shouldShow ? 'text' : 'password';
+      var actualValue = String(hiddenField.value || '');
+      displayField.value = shouldShow ? actualValue : recoveryMaskedValue(actualValue);
+      row.setAttribute('data-preferences-two-factor-recovery-visible', shouldShow ? '1' : '0');
       button.title = shouldShow ? 'Hide recovery phrase' : 'Show recovery phrase';
       button.setAttribute('aria-label', shouldShow ? 'Hide recovery phrase' : 'Show recovery phrase');
 
@@ -735,12 +767,12 @@ $themeLabels = [
         return;
       }
 
-      var field = row.querySelector('[data-preferences-two-factor-key="recovery_code"]');
-      if (!(field instanceof HTMLInputElement)) {
+      var currentlyVisible = String(row.getAttribute('data-preferences-two-factor-recovery-visible') || '') === '1';
+      if (!(recoveryHiddenField(row) instanceof HTMLInputElement)) {
         return;
       }
 
-      setRecoveryVisibility(row, field.type === 'password');
+      setRecoveryVisibility(row, !currentlyVisible);
     }
 
     async function generateRecoveryForRow(row, button) {
@@ -754,8 +786,8 @@ $themeLabels = [
         return;
       }
 
-      var field = row.querySelector('[data-preferences-two-factor-key="recovery_code"]');
-      if (!(field instanceof HTMLInputElement)) {
+      var hiddenField = recoveryHiddenField(row);
+      if (!(hiddenField instanceof HTMLInputElement)) {
         return;
       }
 
@@ -776,7 +808,7 @@ $themeLabels = [
           throw new Error(payload && payload.message ? payload.message : 'Unable to generate recovery phrase.');
         }
 
-        field.value = String(payload.recovery_code || '');
+        hiddenField.value = String(payload.recovery_code || '');
         setRecoveryVisibility(row, false);
         setRecoveryCopyHint(row, 'Generated. Click phrase to copy.');
       } catch (error) {
@@ -1012,7 +1044,7 @@ $themeLabels = [
         syncRowSections(row);
         var selectedType = String(target.value || '').trim().toLowerCase();
         if (selectedType === 'recovery') {
-          var recoveryField = row.querySelector('[data-preferences-two-factor-key="recovery_code"]');
+          var recoveryField = recoveryHiddenField(row);
           var generateButton = row.querySelector('[data-preferences-two-factor-recovery-generate="1"]');
           if (
             recoveryField instanceof HTMLInputElement
@@ -1061,7 +1093,16 @@ $themeLabels = [
 
       var recoveryCodeField = target.closest('[data-preferences-two-factor-recovery-copy="1"]');
       if (recoveryCodeField instanceof HTMLInputElement) {
-        void copyTextValue(recoveryCodeField.value).then(function (copied) {
+        var recoveryRowForCopy = recoveryCodeField.closest('[data-preferences-two-factor-row="1"]');
+        var recoveryValue = '';
+        if (recoveryRowForCopy instanceof HTMLElement) {
+          var recoveryHiddenForCopy = recoveryHiddenField(recoveryRowForCopy);
+          if (recoveryHiddenForCopy instanceof HTMLInputElement) {
+            recoveryValue = String(recoveryHiddenForCopy.value || '');
+          }
+        }
+
+        void copyTextValue(recoveryValue).then(function (copied) {
           showCopyTooltip(recoveryCodeField, copied);
         });
         return;
@@ -1153,7 +1194,7 @@ $themeLabels = [
 <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
-<form method="post" action="<?= e($panelBase) ?>/preferences/save" enctype="multipart/form-data">
+<form method="post" action="<?= e($panelBase) ?>/preferences/save" enctype="multipart/form-data" autocomplete="off">
     <?= $csrfField ?>
     <nav class="rvnp-editor-actions">
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Preferences</button>
@@ -1349,18 +1390,9 @@ $themeLabels = [
         >
             <div class="form-group">
                 <label class="form-label h3 mb-0" for="new_password">New Password</label>
-                <div class="form-text mb-1">Leave blank to keep current password (minimum 8 chars if changing):</div>
-                <input class="form-control"
-                    id="new_password"
-                    name="new_password"
-                    type="password"
-                >
-                <label class="form-text mt-2 mb-0" for="confirm_new_password">Enter new password again to confirm:</label>
-                <input class="form-control"
-                    id="confirm_new_password"
-                    name="confirm_new_password"
-                    type="password"
-                >
+                <div class="form-text mb-2">Use this only when you want to rotate your panel password.</div>
+                <button type="button" class="btn btn-danger btn-sm" id="preferences-password-toggle">Change Password</button>
+                <div class="mt-2 d-none" id="preferences-password-fields"></div>
             </div>
 
             <div class="form-group mb-0">
@@ -1375,6 +1407,7 @@ $themeLabels = [
                         $methodStatus = strtolower((string) ($method['status'] ?? ''));
                         $methodSecret = (string) ($method['secret'] ?? '');
                         $methodRecoveryCode = (string) ($method['recovery_code'] ?? '');
+                        $methodRecoveryDisplay = preg_replace('/\S/u', '*', $methodRecoveryCode) ?? '';
                         $methodReusable = (bool) ($method['reusable'] ?? false);
                         $methodCredentialId = (string) ($method['credential_id'] ?? '');
                         $methodCredentialPublicKey = (string) ($method['credential_public_key'] ?? '');
@@ -1516,15 +1549,20 @@ $themeLabels = [
                                                 <?= $methodReusable ? ' checked' : '' ?>
                                                 aria-label="Reusable"
                                             >
-                                            <span class="small">Reusable</span>
-                                        </span>
+                                                <span class="small">Reusable</span>
+                                            </span>
                                         <input
-                                            type="password"
-                                            class="form-control form-control-sm"
+                                            type="hidden"
                                             data-preferences-two-factor-key="recovery_code"
-                                            data-preferences-two-factor-recovery-copy="1"
                                             name="two_factor_methods[<?= (int) $index ?>][recovery_code]"
                                             value="<?= e($methodRecoveryCode) ?>"
+                                        >
+                                        <input
+                                            type="text"
+                                            class="form-control form-control-sm"
+                                            data-preferences-two-factor-recovery-display="1"
+                                            data-preferences-two-factor-recovery-copy="1"
+                                            value="<?= e($methodRecoveryDisplay) ?>"
                                             placeholder="Generate 12-word recovery phrase"
                                             title="Click to copy"
                                             autocomplete="off"
@@ -1554,7 +1592,7 @@ $themeLabels = [
                     <?php endforeach; ?>
                 </div>
 
-                <button type="button" class="btn btn-primary" id="preferences-two-factor-add">Add 2FA Method</button>
+                <button type="button" class="btn btn-primary btn-sm" id="preferences-two-factor-add">Add 2FA Method</button>
             </div>
         </div>
     </div>
@@ -1564,6 +1602,74 @@ $themeLabels = [
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Preferences</button>
     </nav>
 </form>
+
+<template id="preferences-password-fields-template">
+    <div class="form-text mb-1">Leave blank to keep current password (minimum 8 chars if changing):</div>
+    <input class="form-control"
+        id="new_password"
+        name="new_password"
+        type="text"
+        autocomplete="new-password"
+        data-preferences-password-kind="new"
+        data-preferences-password-field="1"
+    >
+    <label class="form-text mt-2 mb-0" for="confirm_new_password">Enter new password again to confirm:</label>
+    <input class="form-control"
+        id="confirm_new_password"
+        name="confirm_new_password"
+        type="text"
+        autocomplete="new-password"
+        data-preferences-password-kind="confirm"
+        data-preferences-password-field="1"
+    >
+</template>
+
+<script>
+  (function () {
+    var toggleButton = document.getElementById('preferences-password-toggle');
+    var fieldsContainer = document.getElementById('preferences-password-fields');
+    var fieldsTemplate = document.getElementById('preferences-password-fields-template');
+    if (
+      !(toggleButton instanceof HTMLButtonElement)
+      || !(fieldsContainer instanceof HTMLElement)
+      || !(fieldsTemplate instanceof HTMLTemplateElement)
+    ) {
+      return;
+    }
+
+    var enabled = false;
+
+    function setEnabled(nextEnabled) {
+      enabled = !!nextEnabled;
+      if (enabled && !fieldsContainer.hasChildNodes()) {
+        fieldsContainer.appendChild(fieldsTemplate.content.cloneNode(true));
+        var passwordFields = fieldsContainer.querySelectorAll('[data-preferences-password-field="1"]');
+        passwordFields.forEach(function (field) {
+          if (field instanceof HTMLInputElement) {
+            field.type = 'password';
+          }
+        });
+      } else if (!enabled) {
+        fieldsContainer.innerHTML = '';
+      }
+
+      fieldsContainer.classList.toggle('d-none', !enabled);
+      toggleButton.textContent = enabled ? 'Cancel Password Change' : 'Change Password';
+    }
+
+    toggleButton.addEventListener('click', function () {
+      setEnabled(!enabled);
+      if (!enabled) {
+        return;
+      }
+
+      var firstField = fieldsContainer.querySelector('#new_password');
+      if (firstField instanceof HTMLInputElement) {
+        firstField.focus();
+      }
+    });
+  })();
+</script>
 
 <?php if ($profileContactOptions !== []): ?>
 <template id="preferences-contact-profile-template">

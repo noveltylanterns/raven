@@ -20,6 +20,7 @@ final class TwoFactorMethodNormalizer
     public static function normalizeSubmitted(array $methods, string $fallbackEmail, string $totpIssuer): array
     {
         $normalized = [];
+        $numberedLabelState = self::initializeNumberedLabelState($methods);
         foreach ($methods as $method) {
             if (!is_array($method)) {
                 continue;
@@ -30,10 +31,10 @@ final class TwoFactorMethodNormalizer
                 continue;
             }
 
-            $label = TwoFactorMethodRules::normalizeLabel(
-                self::sanitizeText((string) ($method['label'] ?? ''), 80),
-                $type
-            );
+            $rawLabel = self::sanitizeText((string) ($method['label'] ?? ''), 80);
+            $label = in_array($type, ['webauthn', 'email'], true)
+                ? self::resolveSubmittedNumberedLabel($rawLabel, $type, $numberedLabelState)
+                : TwoFactorMethodRules::normalizeLabel($rawLabel, $type);
 
             $row = [
                 'type' => $type,
@@ -119,6 +120,109 @@ final class TwoFactorMethodNormalizer
         }
 
         return array_values($normalized);
+    }
+
+    /**
+     * @param array<int, mixed> $methods
+     * @return array{webauthn: array<int, bool>, email: array<int, bool>}
+     */
+    private static function initializeNumberedLabelState(array $methods): array
+    {
+        $state = [
+            'webauthn' => [],
+            'email' => [],
+        ];
+
+        foreach ($methods as $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            $type = TwoFactorMethodRules::normalizeType((string) ($method['type'] ?? ''));
+            if (!array_key_exists($type, $state)) {
+                continue;
+            }
+
+            $label = self::sanitizeText((string) ($method['label'] ?? ''), 80);
+            if ($label === '') {
+                continue;
+            }
+
+            $base = self::numberedLabelBase($type);
+            if (preg_match('/^' . preg_quote($base, '/') . '\s+([1-9][0-9]*)$/i', $label, $matches) !== 1) {
+                continue;
+            }
+
+            $state[$type][(int) ($matches[1] ?? 0)] = true;
+        }
+
+        return $state;
+    }
+
+    /**
+     * @param array{webauthn: array<int, bool>, email: array<int, bool>} $state
+     */
+    private static function resolveSubmittedNumberedLabel(string $rawLabel, string $type, array &$state): string
+    {
+        $type = TwoFactorMethodRules::normalizeType($type);
+        if (!array_key_exists($type, $state)) {
+            return TwoFactorMethodRules::normalizeLabel($rawLabel, $type);
+        }
+
+        $label = self::sanitizeText($rawLabel, 80);
+        $base = self::numberedLabelBase($type);
+        if (preg_match('/^' . preg_quote($base, '/') . '\s+([1-9][0-9]*)$/i', $label, $matches) === 1) {
+            $number = (int) ($matches[1] ?? 0);
+            if ($number > 0) {
+                $state[$type][$number] = true;
+                return $base . ' ' . $number;
+            }
+        }
+
+        $normalizedLabel = strtolower(trim($label));
+        $autoLabelCandidates = self::numberedLabelLegacyDefaults($type);
+        $shouldAuto = $normalizedLabel === '';
+        if (!$shouldAuto) {
+            foreach ($autoLabelCandidates as $candidate) {
+                if ($normalizedLabel === strtolower(trim($candidate))) {
+                    $shouldAuto = true;
+                    break;
+                }
+            }
+        }
+
+        if (!$shouldAuto) {
+            return TwoFactorMethodRules::normalizeLabel($label, $type);
+        }
+
+        $nextNumber = 1;
+        while (isset($state[$type][$nextNumber])) {
+            $nextNumber += 1;
+        }
+
+        $state[$type][$nextNumber] = true;
+        return $base . ' ' . $nextNumber;
+    }
+
+    private static function numberedLabelBase(string $type): string
+    {
+        return match (TwoFactorMethodRules::normalizeType($type)) {
+            'webauthn' => 'My Key',
+            'email' => 'My Email',
+            default => TwoFactorMethodRules::defaultLabelForType($type),
+        };
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function numberedLabelLegacyDefaults(string $type): array
+    {
+        $base = self::numberedLabelBase($type);
+        return [
+            $base,
+            TwoFactorMethodRules::defaultLabelForType($type),
+        ];
     }
 
     /**
