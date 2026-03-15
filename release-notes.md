@@ -4,6 +4,12 @@
 
 ### March 14, 2026
 
+- Updated panel login 2FA challenge flow with an inline `Try Other Method` action beside `Verify` for code-based methods when alternatives exist, returning users to the full method picker without restarting login.
+- Updated login 2FA method-picker labeling to use `Recovery Phrase` terminology and clearer fallback/default method names.
+- Updated Preferences -> Security so `New Password` now appears at the top of the Security tab.
+- Updated Preferences 2FA recovery-phrase inputs with immutable read-only behavior plus an eye-toggle show/hide control, while preserving click-to-copy behavior.
+- Tuned panel 2FA compact control sizing so small selects, grouped inputs, and row-end remove buttons align to a consistent height/font baseline.
+- Renamed 2FA type-option label from `Recovery Code` to `Recovery Phrase` in panel preferences dropdowns.
 - Updated extension-type documentation to match the current manifest schema (`helper`, `content`, `plugin`, `module`, `system`) in `README.md` and `docs/Extensions.md`.
 - Clarified extension capability notes in docs so `lib/routes_public.php` is documented as `module`-only and extension permission masks are described as applying to non-system extensions.
 - Synced `docs/Preferences.md` and `docs/Users.md` UI-label coverage for panel 2FA controls (`Setup TOTP`, `Manual Key`, `Two-Factor Methods`, `Details`) and re-validated docs coverage.

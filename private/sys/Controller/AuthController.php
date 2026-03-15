@@ -38,6 +38,7 @@ final class AuthController
     private const SESSION_2FA_SELECTED_METHOD_KEY = '_raven_2fa_selected_method_key';
     private const SESSION_2FA_WEBAUTHN_FAILED = '_raven_2fa_webauthn_failed';
     private const SESSION_2FA_WEBAUTHN_CHALLENGE = '_raven_2fa_webauthn_challenge';
+    private const SESSION_2FA_FORCE_METHOD_PICKER = '_raven_2fa_force_method_picker';
 
     private View $view;
     private Config $config;
@@ -183,7 +184,11 @@ final class AuthController
         $interactiveMethods = $this->auth->interactiveTwoFactorMethodsForUser($userId);
         if ($interactiveMethods !== []) {
             $this->auth->beginTwoFactorChallenge($userId, $interactiveMethods);
-            unset($_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED], $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE]);
+            unset(
+                $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED],
+                $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE],
+                $_SESSION[self::SESSION_2FA_FORCE_METHOD_PICKER]
+            );
 
             $preferredMethodKey = $this->twoFactorFlowService()->preferredMethodKeyForChallenge($interactiveMethods);
             if ($preferredMethodKey !== null) {
@@ -219,17 +224,24 @@ final class AuthController
         $pendingMethods = $this->auth->pendingTwoFactorMethods();
         $selectedMethodKey = trim((string) ($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] ?? ''));
         $webauthnFailed = !empty($_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED]);
+        $forceMethodPicker = !empty($_SESSION[self::SESSION_2FA_FORCE_METHOD_PICKER]);
         $flowState = $this->twoFactorFlowService()->challengeViewState(
             $pendingMethods,
             $selectedMethodKey,
-            $webauthnFailed
+            $webauthnFailed,
+            $forceMethodPicker
         );
         $selectedMethod = $flowState['selected_method'];
         $selectedMethodType = (string) ($flowState['selected_method_type'] ?? '');
         $showMethodPicker = (bool) ($flowState['show_method_picker'] ?? false);
         $showTotpForm = (bool) ($flowState['show_totp_form'] ?? false);
         $showWebauthn = (bool) ($flowState['show_webauthn_prompt'] ?? false);
+        $canSwitchMethod = (bool) ($flowState['can_switch_method'] ?? false);
         $fallbackMethods = is_array($flowState['fallback_methods'] ?? null) ? $flowState['fallback_methods'] : [];
+
+        if (!$showMethodPicker) {
+            unset($_SESSION[self::SESSION_2FA_FORCE_METHOD_PICKER]);
+        }
 
         $this->view->render('panel/login_2fa', [
             'site' => $this->siteData(),
@@ -244,6 +256,7 @@ final class AuthController
             'fallbackMethods' => $fallbackMethods,
             'selectedMethod' => $selectedMethod,
             'selectedMethodType' => $selectedMethodType,
+            'canSwitchMethod' => $canSwitchMethod,
             'panelBaseUrl' => $this->panelUrl(''),
             // 2FA screen remains outside authenticated panel navigation.
             'showSidebar' => false,
@@ -317,7 +330,8 @@ final class AuthController
         unset(
             $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY],
             $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED],
-            $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE]
+            $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE],
+            $_SESSION[self::SESSION_2FA_FORCE_METHOD_PICKER]
         );
         $this->auth->markTwoFactorVerified($pendingUserId);
         redirect($this->panelUrl('/'));
@@ -342,6 +356,19 @@ final class AuthController
         }
 
         $pendingMethods = $this->auth->pendingTwoFactorMethods();
+        $showMethodPicker = (string) ($post['show_method_picker'] ?? '') === '1';
+        if ($showMethodPicker) {
+            if (count($pendingMethods) > 1) {
+                $_SESSION[self::SESSION_2FA_FORCE_METHOD_PICKER] = true;
+            }
+            unset(
+                $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY],
+                $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED],
+                $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE]
+            );
+            redirect($this->panelUrl('/login/2fa'));
+        }
+
         $methodKey = $this->input->text((string) ($post['method_key'] ?? ''), 200);
         $selectedMethod = $this->twoFactorFlowService()->resolveSelectedMethod($pendingMethods, $methodKey);
         if ($selectedMethod === null) {
@@ -349,6 +376,7 @@ final class AuthController
             redirect($this->panelUrl('/login/2fa'));
         }
 
+        unset($_SESSION[self::SESSION_2FA_FORCE_METHOD_PICKER]);
         $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = (string) ($selectedMethod['key'] ?? '');
         if (strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'webauthn') {
             unset($_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED]);
@@ -495,7 +523,8 @@ final class AuthController
             unset(
                 $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY],
                 $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED],
-                $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE]
+                $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE],
+                $_SESSION[self::SESSION_2FA_FORCE_METHOD_PICKER]
             );
             $this->auth->markTwoFactorVerified($pendingUserId);
             $this->jsonResponse(['ok' => true, 'redirect' => $this->panelUrl('/')], 200);

@@ -47,24 +47,40 @@ final class LoginTwoFactorFlowService
      *   show_method_picker: bool,
      *   show_totp_form: bool,
      *   show_webauthn_prompt: bool,
+     *   can_switch_method: bool,
      *   fallback_methods: array<int, array<string, mixed>>,
      *   has_webauthn: bool,
      *   webauthn_failed: bool
      * }
      */
-    public function challengeViewState(array $pendingMethods, string $selectedMethodKey, bool $webauthnFailed): array
+    public function challengeViewState(
+        array $pendingMethods,
+        string $selectedMethodKey,
+        bool $webauthnFailed,
+        bool $forceMethodPicker = false
+    ): array
     {
         $selectedMethod = TwoFactorChallengeHelper::findByKey($pendingMethods, trim($selectedMethodKey));
         $codeMethods = TwoFactorChallengeHelper::codeMethods($pendingMethods);
         $webauthnMethods = TwoFactorChallengeHelper::filterByType($pendingMethods, 'webauthn');
         $hasWebauthn = $webauthnMethods !== [];
         $selectedMethodType = strtolower(trim((string) ($selectedMethod['type'] ?? '')));
-        $showMethodPicker = !$hasWebauthn && count($codeMethods) > 1 && $selectedMethod === null;
-        $showTotpForm = in_array($selectedMethodType, ['totp', 'recovery'], true);
-        $showWebauthn = $hasWebauthn && (
-            $selectedMethod === null
-            || $selectedMethodType === 'webauthn'
-        );
+        $canSwitchMethod = count(TwoFactorChallengeHelper::fallbackMethods($pendingMethods, $selectedMethod)) > 0;
+
+        $showMethodPicker = false;
+        $showTotpForm = false;
+        $showWebauthn = false;
+        if ($forceMethodPicker && count($pendingMethods) > 1) {
+            $showMethodPicker = true;
+        } else {
+            $showMethodPicker = !$hasWebauthn && count($codeMethods) > 1 && $selectedMethod === null;
+            $showTotpForm = in_array($selectedMethodType, ['totp', 'recovery'], true);
+            $showWebauthn = $hasWebauthn && (
+                $selectedMethod === null
+                || $selectedMethodType === 'webauthn'
+            );
+        }
+
         $fallbackMethods = $showWebauthn
             ? TwoFactorChallengeHelper::fallbackMethods($pendingMethods, $selectedMethod)
             : [];
@@ -75,6 +91,7 @@ final class LoginTwoFactorFlowService
             'show_method_picker' => $showMethodPicker,
             'show_totp_form' => $showTotpForm,
             'show_webauthn_prompt' => $showWebauthn,
+            'can_switch_method' => $canSwitchMethod,
             'fallback_methods' => $fallbackMethods,
             'has_webauthn' => $hasWebauthn,
             'webauthn_failed' => $webauthnFailed,
@@ -183,4 +200,3 @@ final class LoginTwoFactorFlowService
         return TwoFactorMethodKey::extractWebauthnCredentialId(trim((string) ($method['key'] ?? '')));
     }
 }
-

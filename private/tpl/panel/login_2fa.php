@@ -18,6 +18,7 @@
 /** @var array<int, array<string, mixed>> $fallbackMethods */
 /** @var array<string, mixed>|null $selectedMethod */
 /** @var string $selectedMethodType */
+/** @var bool $canSwitchMethod */
 /** @var string $panelBaseUrl */
 
 use function Raven\Core\Support\e;
@@ -31,7 +32,17 @@ $twoFactorMethods = is_array($twoFactorMethods ?? null) ? $twoFactorMethods : []
 $fallbackMethods = is_array($fallbackMethods ?? null) ? $fallbackMethods : [];
 $selectedMethod = is_array($selectedMethod ?? null) ? $selectedMethod : null;
 $selectedMethodType = strtolower(trim((string) ($selectedMethodType ?? '')));
+$canSwitchMethod = (bool) ($canSwitchMethod ?? false);
 $csrfToken = trim((string) ($csrfToken ?? ''));
+
+$defaultMethodLabel = static function (string $methodType): string {
+    $normalized = strtolower(trim($methodType));
+    return match ($normalized) {
+        'webauthn' => 'Security Key',
+        'recovery' => 'Recovery Phrase',
+        default => 'Authenticator App',
+    };
+};
 ?>
 <div class="rvnp-login-shell">
     <div class="card rvnp-login-card">
@@ -48,10 +59,6 @@ $csrfToken = trim((string) ($csrfToken ?? ''));
                     <?php foreach ($twoFactorMethods as $method): ?>
                         <?php
                         $methodType = strtolower(trim((string) ($method['type'] ?? '')));
-                        if ($methodType === 'webauthn') {
-                            continue;
-                        }
-
                         $methodKey = trim((string) ($method['key'] ?? ''));
                         if ($methodKey === '') {
                             continue;
@@ -59,7 +66,7 @@ $csrfToken = trim((string) ($csrfToken ?? ''));
 
                         $methodLabel = trim((string) ($method['label'] ?? ''));
                         if ($methodLabel === '') {
-                            $methodLabel = 'Authenticator App';
+                            $methodLabel = $defaultMethodLabel($methodType);
                         }
                         ?>
                         <form method="post" action="<?= e($panelBase) ?>/login/2fa/select" class="mb-2">
@@ -76,8 +83,8 @@ $csrfToken = trim((string) ($csrfToken ?? ''));
                 $selectedLabel = trim((string) ($selectedMethod['label'] ?? ''));
                 if ($selectedLabel === '') {
                     $selectedLabel = $selectedMethodType === 'recovery'
-                        ? 'Recovery Code'
-                        : 'Authenticator App';
+                        ? 'Recovery Phrase'
+                        : $defaultMethodLabel($selectedMethodType);
                 }
                 $isRecovery = $selectedMethodType === 'recovery';
                 ?>
@@ -98,8 +105,18 @@ $csrfToken = trim((string) ($csrfToken ?? ''));
                             placeholder="<?= e($isRecovery ? 'twelve-word recovery phrase' : '123456') ?>"
                         >
                     </div>
-                    <div class="text-center">
+                    <div class="d-flex flex-wrap justify-content-center gap-2">
                         <button type="submit" class="btn btn-primary">Verify</button>
+                        <?php if ($canSwitchMethod): ?>
+                            <button
+                                type="submit"
+                                class="btn btn-outline-secondary"
+                                formaction="<?= e($panelBase) ?>/login/2fa/select"
+                                formmethod="post"
+                                name="show_method_picker"
+                                value="1"
+                            >Try Other Method</button>
+                        <?php endif; ?>
                     </div>
                 </form>
             <?php endif; ?>
@@ -134,7 +151,7 @@ $csrfToken = trim((string) ($csrfToken ?? ''));
 
                         $methodLabel = trim((string) ($method['label'] ?? ''));
                         if ($methodLabel === '') {
-                            $methodLabel = 'Authenticator App';
+                            $methodLabel = $defaultMethodLabel((string) ($method['type'] ?? ''));
                         }
                         ?>
                         <form method="post" action="<?= e($panelBase) ?>/login/2fa/select" class="mb-2">
