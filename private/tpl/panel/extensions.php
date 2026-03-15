@@ -80,7 +80,8 @@ $panelBase = '/' . trim($site['panel_path'], '/');
         <h5>Notes:</h5>
         <p class="text-muted mb-0">
           - Enabled extensions must be disabled before deletion.<br>
-          - Stock extensions cannot be deleted, only disabled.
+          - Stock extensions cannot be deleted, only disabled.<br>
+          - Disable unused extensions for performance!
         </p>
     </div>
 </header>
@@ -309,7 +310,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                             <div class="form-text">Lowercase letters, numbers, underscores, and dashes only.</div>
                         </div>
                         <div class="col-md-2">
-                            <label for="extension_version" class="form-label">Version (Optional)</label>
+                            <label for="extension_version" class="form-label">Version</label>
                             <input
                                 id="extension_version"
                                 type="text"
