@@ -166,6 +166,7 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Auth/LoginIdentifierResolver.php` - Shared login identifier mode + username/email normalization helper.
 - `/private/lib/Auth/LoginWebAuthnChallengeService.php` - Shared WebAuthn login challenge context helper for option/verify payload preparation with method-state guards.
 - `/private/lib/Auth/LoginThrottleService.php` - Shared persistent login-throttle bucket service for lockout checks and failure upserts.
+- `/private/lib/Auth/PasswordChangePolicy.php` - Shared password-change validation policy for account flows (new/confirm matching and minimum-length enforcement).
 - `/private/lib/Auth/PanelAccessCatalog.php` - Shared stock panel route-permission and stock-group catalog definitions consumed by core permission helpers.
 - `/private/lib/Auth/PanelInvitePolicyService.php` - Shared panel invite policy helper for reusable-type parsing, batch count normalization, and expiration timestamp parsing.
 - `/private/lib/Auth/PanelPermissionDefinitionCatalog.php` - Shared panel permission-definition catalog builder for stock panel ACL bits plus extension-level ACL labels.

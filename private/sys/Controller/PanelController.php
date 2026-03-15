@@ -22,6 +22,7 @@ use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Lib\Archive\ArchivePackageService;
 use Raven\Lib\Archive\PackageInstallWorkflowService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Auth\PasswordChangePolicy;
 use Raven\Lib\Auth\PanelInvitePolicyService;
 use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PanelPermissionDefinitionCatalog;
@@ -136,6 +137,7 @@ final class PanelController
     private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
     private ?PanelPageAuthorOptionBuilder $pageAuthorOptionBuilder = null;
     private ?PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService = null;
+    private ?PasswordChangePolicy $passwordChangePolicy = null;
     private ?PanelConfigFieldPolicyService $panelConfigFieldPolicyService = null;
     private ?PanelInvitePolicyService $panelInvitePolicyService = null;
     private ?PanelPostNormalizer $panelPostNormalizer = null;
@@ -3005,17 +3007,10 @@ final class PanelController
             $errors[] = 'Theme selection is invalid.';
         }
 
-        if ($newPassword !== '' || $confirmNewPassword !== '') {
-            if ($newPassword === '' || $confirmNewPassword === '') {
-                $errors[] = 'Both new password fields are required to change password.';
-            } elseif (!hash_equals($newPassword, $confirmNewPassword)) {
-                $errors[] = 'New password and confirm new password must match.';
-            }
-        }
-
-        if ($newPassword !== '' && strlen($newPassword) < 8) {
-            $errors[] = 'New password must be at least 8 characters.';
-        }
+        $errors = array_merge(
+            $errors,
+            $this->passwordChangePolicy()->validateNewPasswordChange($newPassword, $confirmNewPassword, 8)
+        );
 
         $avatarSet = false;
         $avatarFilename = null;
@@ -6357,6 +6352,15 @@ final class PanelController
         }
 
         return $this->panelTwoFactorPreferencesService;
+    }
+
+    private function passwordChangePolicy(): PasswordChangePolicy
+    {
+        if (!$this->passwordChangePolicy instanceof PasswordChangePolicy) {
+            $this->passwordChangePolicy = new PasswordChangePolicy();
+        }
+
+        return $this->passwordChangePolicy;
     }
 
     private function panelInvitePolicyService(): PanelInvitePolicyService
