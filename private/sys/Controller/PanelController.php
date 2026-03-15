@@ -2972,6 +2972,7 @@ final class PanelController
         $themeRaw = $this->input->text($post['theme'] ?? null, 50);
         $theme = $this->normalizePanelThemeChoice((string) $themeRaw, true);
         $newPassword = $this->input->text($post['new_password'] ?? null, 255);
+        $confirmNewPassword = $this->input->text($post['confirm_new_password'] ?? null, 255);
         $profileContactOptions = $this->profileContactOptions();
         $contactProfiles = $this->normalizeSubmittedContactProfiles($post['contact_profiles'] ?? null, $profileContactOptions);
         $twoFactorMethods = $this->normalizeSubmittedTwoFactorMethods(
@@ -3002,6 +3003,14 @@ final class PanelController
 
         if (!is_string($theme)) {
             $errors[] = 'Theme selection is invalid.';
+        }
+
+        if ($newPassword !== '' || $confirmNewPassword !== '') {
+            if ($newPassword === '' || $confirmNewPassword === '') {
+                $errors[] = 'Both new password fields are required to change password.';
+            } elseif (!hash_equals($newPassword, $confirmNewPassword)) {
+                $errors[] = 'New password and confirm new password must match.';
+            }
         }
 
         if ($newPassword !== '' && strlen($newPassword) < 8) {

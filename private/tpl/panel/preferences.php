@@ -122,6 +122,7 @@ $themeLabels = [
     <div
         class="border rounded p-2 mb-2"
         data-preferences-two-factor-row="1"
+        data-preferences-two-factor-status=""
         data-preferences-totp-provisioning-uri=""
         data-preferences-totp-qr-data-uri=""
     >
@@ -147,7 +148,7 @@ $themeLabels = [
                         class="form-control form-control-sm"
                         data-preferences-two-factor-key="secret"
                         data-preferences-two-factor-secret-copy="1"
-                        placeholder="Click Setup App to generate secret"
+                        placeholder="Click 'Setup App'"
                         title="Click to copy"
                         autocomplete="off"
                         style="caret-color: transparent; cursor: pointer;"
@@ -364,7 +365,13 @@ $themeLabels = [
       var hasSecret = secretField instanceof HTMLInputElement
         ? String(secretField.value || '').trim() !== ''
         : false;
-      setupButton.textContent = methodType === 'totp' && hasSecret ? 'Reset' : 'Setup App';
+      var methodStatus = String(row.getAttribute('data-preferences-two-factor-status') || '').trim().toLowerCase();
+      if (methodType !== 'totp' || !hasSecret) {
+        setupButton.textContent = 'Setup App';
+        return;
+      }
+
+      setupButton.textContent = methodStatus === 'confirmed' ? 'Reset' : 'Confirm';
     }
 
     function syncRowSections(row) {
@@ -623,10 +630,18 @@ $themeLabels = [
       var secret = secretField instanceof HTMLInputElement
         ? String(secretField.value || '').toUpperCase().replace(/[^A-Z2-7]/g, '')
         : '';
-      var isReset = secret !== '';
+      var methodStatus = String(row.getAttribute('data-preferences-two-factor-status') || '').trim().toLowerCase();
+      var hasSecret = secret !== '';
+      var isReset = hasSecret && methodStatus === 'confirmed';
 
       button.disabled = true;
-      setTotpFeedback(row, isReset ? 'Resetting secret...' : 'Generating setup details...', 'muted');
+      setTotpFeedback(
+        row,
+        isReset
+          ? 'Resetting secret...'
+          : (hasSecret ? 'Loading setup details...' : 'Generating setup details...'),
+        'muted'
+      );
 
       try {
         var setupForm = new URLSearchParams();
@@ -653,6 +668,9 @@ $themeLabels = [
         if (secretField instanceof HTMLInputElement && resolvedSecret !== '') {
           secretField.value = resolvedSecret;
         }
+        if (resolvedSecret !== '') {
+          row.setAttribute('data-preferences-two-factor-status', 'pending');
+        }
         syncTotpSetupButton(row);
 
         row.setAttribute('data-preferences-totp-provisioning-uri', String(setupPayload.provisioning_uri || ''));
@@ -662,7 +680,7 @@ $themeLabels = [
           row,
           isReset
             ? 'Secret reset. Enter a 6-digit code and save preferences.'
-            : 'Setup details ready. Enter a 6-digit code and save preferences.',
+            : 'Setup details ready. Enter a 6-digit code and save preferences to confirm.',
           'success'
         );
       } catch (error) {
@@ -1331,10 +1349,16 @@ $themeLabels = [
         >
             <div class="form-group">
                 <label class="form-label h3 mb-0" for="new_password">New Password</label>
-                <div class="form-text mb-1">Leave blank to keep current password (minimum 8 chars if changing).</div>
+                <div class="form-text mb-1">Leave blank to keep current password (minimum 8 chars if changing):</div>
                 <input class="form-control"
                     id="new_password"
                     name="new_password"
+                    type="password"
+                >
+                <label class="form-text mt-2 mb-0" for="confirm_new_password">Enter new password again to confirm:</label>
+                <input class="form-control"
+                    id="confirm_new_password"
+                    name="confirm_new_password"
                     type="password"
                 >
             </div>
@@ -1370,6 +1394,7 @@ $themeLabels = [
                         <div
                             class="border rounded p-2 mb-2"
                             data-preferences-two-factor-row="1"
+                            data-preferences-two-factor-status="<?= e($methodStatus) ?>"
                             data-preferences-totp-provisioning-uri="<?= e($methodProvisioningUri) ?>"
                             data-preferences-totp-qr-data-uri="<?= e($methodQrDataUri) ?>"
                         >
@@ -1404,7 +1429,7 @@ $themeLabels = [
                                             data-preferences-two-factor-secret-copy="1"
                                             name="two_factor_methods[<?= (int) $index ?>][secret]"
                                             value="<?= e($methodSecret) ?>"
-                                            placeholder="Click Setup App to generate secret"
+                                            placeholder="Click 'Setup App'"
                                             title="Click to copy"
                                             autocomplete="off"
                                             style="caret-color: transparent; cursor: pointer;"
@@ -1418,7 +1443,11 @@ $themeLabels = [
                                             value=""
                                             placeholder="6-digit code"
                                         >
-                                        <button type="button" class="btn btn-primary btn-sm" data-preferences-two-factor-totp-setup="1"><?= $methodSecret !== '' ? 'Reset' : 'Setup App' ?></button>
+                                        <button type="button" class="btn btn-primary btn-sm" data-preferences-two-factor-totp-setup="1"><?=
+                                            $methodSecret === ''
+                                                ? 'Setup App'
+                                                : ($methodStatus === 'confirmed' ? 'Reset' : 'Confirm')
+                                        ?></button>
                                     </div>
                                     <div class="small text-muted d-none position-absolute start-0 end-0" style="top:calc(100% + 0.2rem);" data-preferences-two-factor-totp-feedback="1"></div>
                                 </div>
