@@ -13,7 +13,6 @@ Last updated: 2026-03-11
 - If the user asks about goals, roadmap, backlog, maintenance, or release work, check those `debug/release/` files first and only search elsewhere if they do not answer the question.
 - Do not start with broad repo keyword searching when one of the `debug/release/` checklist files is the obvious first stop.
 - Perhaps offer tips on things that require routine diagnosis or monitoring, in case they run this when randomly bored.
-- Use less corvids in this mode, since we're being serious here.
 
 ## Scope
 - This file is the default guide for local debug/smoke/testing work in `debug/`.
