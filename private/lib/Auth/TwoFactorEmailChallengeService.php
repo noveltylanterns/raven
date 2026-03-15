@@ -12,7 +12,7 @@ use Raven\Lib\Security\TwoFactorMethodKey;
  */
 final class TwoFactorEmailChallengeService
 {
-    private const DEFAULT_TTL_SECONDS = 300;
+    private const DEFAULT_TTL_SECONDS = 600;
     private const MIN_TTL_SECONDS = 60;
     private const MAX_TTL_SECONDS = 1800;
 

@@ -20,7 +20,7 @@ final class TwoFactorEmailDeliveryService
         string $senderAddress = '',
         string $senderName = 'Postmaster',
         string $mailAgent = 'php_mail',
-        int $ttlSeconds = 300
+        int $ttlSeconds = 600
     ): array {
         $recipientEmail = $this->normalizeEmail($recipientEmail);
         if ($recipientEmail === null) {
