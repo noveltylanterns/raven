@@ -1604,7 +1604,7 @@ $themeLabels = [
 </form>
 
 <template id="preferences-password-fields-template">
-    <div class="form-text mb-1">Leave blank to keep current password (minimum 8 chars if changing):</div>
+    <div class="form-text mb-1">Enter new password (minimum 8 chars):</div>
     <input class="form-control"
         id="new_password"
         name="new_password"
