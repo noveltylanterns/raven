@@ -35,6 +35,8 @@
 - Added thirteenth-wave `private/lib/` modularization for panel config field-policy validation, panel preferences 2FA orchestration helpers, page-list SQL filter clause composition, public route render-decision payloads, invite-token crypto/format policy, and auth 2FA session-state handling (`PanelConfigFieldPolicyService`, `PanelTwoFactorPreferencesService`, `PagePanelFilterClauseBuilder`, `PublicRouteRenderService`, `InviteTokenPolicy`, `TwoFactorSessionStateService`).
 - Rewired `PanelController`, `PublicController`, `AuthService`, `PageRepository`, and `InviteTokenRepository` to delegate these concerns through `private/lib/`.
 - Updated `AGENTS.md` file-tree and responsibility summaries for the new `private/lib` modules and corresponding `private/sys` delegation changes.
+- Added fourteenth-wave `private/lib/` modularization for package-install workflow, login WebAuthn challenge context, panel invite policy, panel POST payload normalization, config file persistence, and public channel page-route canonicalization (`PackageInstallWorkflowService`, `LoginWebAuthnChallengeService`, `PanelInvitePolicyService`, `PanelPostNormalizer`, `ConfigFileStore`, `PublicChannelPageRouteService`).
+- Rewired `PanelController`, `AuthController`, `PublicController`, and `Core/Config` to delegate these concerns through `private/lib/`, and refreshed the `AGENTS.md` `private/lib` + `private/sys` file-tree summaries accordingly.
 
 ### March 13, 2026
 

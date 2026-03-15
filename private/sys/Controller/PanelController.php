@@ -20,7 +20,9 @@ use Raven\Core\Config;
 use Raven\Core\Media\PageImageManager;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Lib\Archive\ArchivePackageService;
+use Raven\Lib\Archive\PackageInstallWorkflowService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Auth\PanelInvitePolicyService;
 use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Auth\PanelSessionGuard;
@@ -37,6 +39,7 @@ use Raven\Lib\Extension\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\ExtensionScaffoldService;
 use Raven\Lib\Http\HttpResponse;
+use Raven\Lib\Http\PanelPostNormalizer;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Http\UploadFileSetNormalizer;
 use Raven\Lib\Media\AvatarUploadService;
@@ -132,6 +135,9 @@ final class PanelController
     private ?PanelPageAuthorOptionBuilder $pageAuthorOptionBuilder = null;
     private ?PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService = null;
     private ?PanelConfigFieldPolicyService $panelConfigFieldPolicyService = null;
+    private ?PanelInvitePolicyService $panelInvitePolicyService = null;
+    private ?PanelPostNormalizer $panelPostNormalizer = null;
+    private ?PackageInstallWorkflowService $packageInstallWorkflowService = null;
 
     public function __construct(
         View $view,
@@ -2516,8 +2522,7 @@ final class PanelController
             redirect($this->panelUrl('/users/invites'));
         }
 
-        $inviteType = strtolower(trim((string) $this->input->text($post['invite_type'] ?? 'single', 20)));
-        $isReusable = $inviteType === 'reusable';
+        $isReusable = $this->panelInvitePolicyService()->isReusableInviteType($post['invite_type'] ?? 'single');
 
         try {
             $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
@@ -2555,7 +2560,7 @@ final class PanelController
             redirect($this->panelUrl('/users/invites'));
         }
 
-        $count = $this->input->int($post['count'] ?? null, 1, 100) ?? 10;
+        $count = $this->panelInvitePolicyService()->normalizeBatchCount($post['count'] ?? null, 10, 1, 100);
 
         try {
             $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
@@ -3800,59 +3805,35 @@ final class PanelController
             redirect($this->panelUrl('/themes'));
         }
 
-        /** @var mixed $rawUpload */
-        $rawUpload = $files['theme_archive'] ?? null;
-        if (!is_array($rawUpload)) {
-            $this->flash('error', 'No theme archive payload was received.');
+        $upload = $this->packageInstallWorkflowService()->validateZipUploadPayload(
+            $files['theme_archive'] ?? null,
+            'Theme archive',
+            'Themes'
+        );
+        if (!(bool) ($upload['ok'] ?? false)) {
+            $this->flash('error', (string) ($upload['error'] ?? 'Theme upload failed.'));
             redirect($this->panelUrl('/themes'));
         }
 
-        $uploadError = (int) ($rawUpload['error'] ?? UPLOAD_ERR_NO_FILE);
-        if ($uploadError !== UPLOAD_ERR_OK) {
-            $this->flash('error', $this->archivePackages()->uploadErrorMessage($uploadError, 'Theme archive'));
+        $tmpPath = (string) ($upload['tmp_path'] ?? '');
+        $archiveName = (string) ($upload['archive_name'] ?? 'theme.zip');
+
+        $slugResult = $this->packageInstallWorkflowService()->resolveInstallName(
+            (string) ($post['upload_slug'] ?? ($post['theme'] ?? '')),
+            $archiveName,
+            fn (string $name): ?string => $this->themeSlugFromArchiveFilename($name),
+            fn (string $slug): bool => $this->isSafePublicThemeSlug($slug),
+            fn (string $slug): bool => $this->isStockPublicThemeSlug($slug),
+            fn (string $slug): ?string => $this->nextAvailablePublicThemeSlug($slug),
+            fn (string $slug): bool => file_exists($this->publicThemesRoot() . '/' . $slug),
+            'Theme',
+            'Theme slug must use lowercase letters, numbers, underscores, or dashes.'
+        );
+        if (!(bool) ($slugResult['ok'] ?? false)) {
+            $this->flash('error', (string) ($slugResult['error'] ?? 'Failed to resolve theme slug.'));
             redirect($this->panelUrl('/themes'));
         }
-
-        $tmpPath = (string) ($rawUpload['tmp_name'] ?? '');
-        if ($tmpPath === '' || !is_uploaded_file($tmpPath) || !is_file($tmpPath)) {
-            $this->flash('error', 'Uploaded archive could not be validated as an HTTP upload.');
-            redirect($this->panelUrl('/themes'));
-        }
-
-        $archiveName = $this->input->text((string) ($rawUpload['name'] ?? 'theme.zip'), 255);
-        if (strtolower((string) pathinfo($archiveName, PATHINFO_EXTENSION)) !== 'zip') {
-            $this->flash('error', 'Themes must be uploaded as .zip archives.');
-            redirect($this->panelUrl('/themes'));
-        }
-
-        // Keep archive uploads bounded to avoid accidental oversized package uploads.
-        $maxArchiveBytes = 50 * 1024 * 1024;
-        $archiveSize = (int) ($rawUpload['size'] ?? 0);
-        if ($archiveSize < 1 || $archiveSize > $maxArchiveBytes) {
-            $this->flash('error', 'Theme archive exceeds the 50MB upload limit.');
-            redirect($this->panelUrl('/themes'));
-        }
-
-        $themeSlug = strtolower(trim($this->input->text($post['upload_slug'] ?? ($post['theme'] ?? null), 80)));
-        $manualSlugProvided = $themeSlug !== '';
-        if ($themeSlug === '') {
-            $derivedSlug = $this->themeSlugFromArchiveFilename($archiveName);
-            if (!is_string($derivedSlug)) {
-                $this->flash('error', 'Could not derive a valid theme directory slug from archive filename.');
-                redirect($this->panelUrl('/themes'));
-            }
-            $themeSlug = $derivedSlug;
-        }
-
-        if (!$this->isSafePublicThemeSlug($themeSlug)) {
-            $this->flash('error', 'Theme slug must use lowercase letters, numbers, underscores, or dashes.');
-            redirect($this->panelUrl('/themes'));
-        }
-
-        if ($manualSlugProvided && $this->isStockPublicThemeSlug($themeSlug)) {
-            $this->flash('error', 'That theme slug is reserved by a stock theme.');
-            redirect($this->panelUrl('/themes'));
-        }
+        $themeSlug = (string) ($slugResult['name'] ?? '');
 
         $themesRoot = $this->publicThemesRoot();
         if (!is_dir($themesRoot) && !mkdir($themesRoot, 0775, true) && !is_dir($themesRoot)) {
@@ -3860,40 +3841,23 @@ final class PanelController
             redirect($this->panelUrl('/themes'));
         }
 
-        $initialThemeSlug = $themeSlug;
         $targetDirectory = $themesRoot . '/' . $themeSlug;
-        if (file_exists($targetDirectory)) {
-            if ($manualSlugProvided) {
-                $this->flash('error', 'A theme directory with this slug already exists.');
-                redirect($this->panelUrl('/themes'));
-            }
-
-            $resolvedThemeSlug = $this->nextAvailablePublicThemeSlug($themeSlug);
-            if ($resolvedThemeSlug === null) {
-                $this->flash('error', 'Failed to resolve an available theme slug for this upload.');
-                redirect($this->panelUrl('/themes'));
-            }
-
-            $themeSlug = $resolvedThemeSlug;
-            $targetDirectory = $themesRoot . '/' . $themeSlug;
-        }
 
         if (!mkdir($targetDirectory, 0775, true) && !is_dir($targetDirectory)) {
             $this->flash('error', 'Failed to create theme directory.');
             redirect($this->panelUrl('/themes'));
         }
 
-        try {
-            $this->archivePackages()->extractUploadedZip($tmpPath, $targetDirectory);
-        } catch (\Throwable $exception) {
-            $this->removeDirectoryRecursively($targetDirectory);
-            $this->flash('error', $exception->getMessage() !== '' ? $exception->getMessage() : 'Theme upload failed.');
-            redirect($this->panelUrl('/themes'));
-        }
-
-        if (!$this->archivePackages()->directoryHasFiles($targetDirectory)) {
-            $this->removeDirectoryRecursively($targetDirectory);
-            $this->flash('error', 'Extracted theme directory is empty.');
+        $extractError = $this->packageInstallWorkflowService()->extractIntoTarget(
+            $tmpPath,
+            $targetDirectory,
+            function (string $directory): void {
+                $this->removeDirectoryRecursively($directory);
+            },
+            'theme'
+        );
+        if (is_string($extractError)) {
+            $this->flash('error', $extractError);
             redirect($this->panelUrl('/themes'));
         }
 
@@ -3912,7 +3876,7 @@ final class PanelController
         }
 
         $message = 'Theme uploaded to public/theme/' . $themeSlug . '/. Enable it from the Installed Themes list when ready.';
-        if (!$manualSlugProvided && $themeSlug !== $initialThemeSlug) {
+        if ((bool) ($slugResult['renamed'] ?? false)) {
             $message .= ' Existing slug detected; upload was renamed automatically.';
         }
         $this->flash('success', $message);
@@ -4229,59 +4193,35 @@ final class PanelController
             redirect($this->panelUrl('/extensions'));
         }
 
-        /** @var mixed $rawUpload */
-        $rawUpload = $files['extension_archive'] ?? null;
-        if (!is_array($rawUpload)) {
-            $this->flash('error', 'No extension archive payload was received.');
+        $upload = $this->packageInstallWorkflowService()->validateZipUploadPayload(
+            $files['extension_archive'] ?? null,
+            'Extension archive',
+            'Extensions'
+        );
+        if (!(bool) ($upload['ok'] ?? false)) {
+            $this->flash('error', (string) ($upload['error'] ?? 'Extension upload failed.'));
             redirect($this->panelUrl('/extensions'));
         }
 
-        $uploadError = (int) ($rawUpload['error'] ?? UPLOAD_ERR_NO_FILE);
-        if ($uploadError !== UPLOAD_ERR_OK) {
-            $this->flash('error', $this->archivePackages()->uploadErrorMessage($uploadError, 'Extension archive'));
+        $tmpPath = (string) ($upload['tmp_path'] ?? '');
+        $archiveName = (string) ($upload['archive_name'] ?? 'extension.zip');
+
+        $nameResult = $this->packageInstallWorkflowService()->resolveInstallName(
+            (string) ($post['upload_slug'] ?? ''),
+            $archiveName,
+            fn (string $name): ?string => $this->extensionNameFromArchiveFilename($name),
+            fn (string $name): bool => $this->isSafeExtensionDirectoryName($name),
+            fn (string $name): bool => $this->isStockExtensionDirectory($name),
+            fn (string $name): ?string => $this->nextAvailableExtensionDirectoryName($name),
+            fn (string $name): bool => file_exists($this->extensionsBasePath() . '/' . $name),
+            'Extension',
+            'Extension directory must use lowercase letters, numbers, underscores, or dashes.'
+        );
+        if (!(bool) ($nameResult['ok'] ?? false)) {
+            $this->flash('error', (string) ($nameResult['error'] ?? 'Failed to resolve extension directory name.'));
             redirect($this->panelUrl('/extensions'));
         }
-
-        $tmpPath = (string) ($rawUpload['tmp_name'] ?? '');
-        if ($tmpPath === '' || !is_uploaded_file($tmpPath) || !is_file($tmpPath)) {
-            $this->flash('error', 'Uploaded archive could not be validated as an HTTP upload.');
-            redirect($this->panelUrl('/extensions'));
-        }
-
-        $archiveName = $this->input->text((string) ($rawUpload['name'] ?? 'extension.zip'), 255);
-        if (strtolower((string) pathinfo($archiveName, PATHINFO_EXTENSION)) !== 'zip') {
-            $this->flash('error', 'Extensions must be uploaded as .zip archives.');
-            redirect($this->panelUrl('/extensions'));
-        }
-
-        // Keep archive uploads bounded to avoid accidental oversized package uploads.
-        $maxArchiveBytes = 50 * 1024 * 1024;
-        $archiveSize = (int) ($rawUpload['size'] ?? 0);
-        if ($archiveSize < 1 || $archiveSize > $maxArchiveBytes) {
-            $this->flash('error', 'Extension archive exceeds the 50MB upload limit.');
-            redirect($this->panelUrl('/extensions'));
-        }
-
-        $extensionName = strtolower(trim($this->input->text($post['upload_slug'] ?? null, 120)));
-        $manualSlugProvided = $extensionName !== '';
-        if ($extensionName === '') {
-            $derivedExtensionName = $this->extensionNameFromArchiveFilename($archiveName);
-            if ($derivedExtensionName === null) {
-                $this->flash('error', 'Could not derive a valid extension directory name from archive filename.');
-                redirect($this->panelUrl('/extensions'));
-            }
-            $extensionName = $derivedExtensionName;
-        }
-
-        if (!$this->isSafeExtensionDirectoryName($extensionName)) {
-            $this->flash('error', 'Extension directory must use lowercase letters, numbers, underscores, or dashes.');
-            redirect($this->panelUrl('/extensions'));
-        }
-
-        if ($manualSlugProvided && $this->isStockExtensionDirectory($extensionName)) {
-            $this->flash('error', 'That extension directory name is reserved by a stock extension.');
-            redirect($this->panelUrl('/extensions'));
-        }
+        $extensionName = (string) ($nameResult['name'] ?? '');
 
         try {
             $this->ensureExtensionsDirectory();
@@ -4290,40 +4230,23 @@ final class PanelController
             redirect($this->panelUrl('/extensions'));
         }
 
-        $initialExtensionName = $extensionName;
         $targetDirectory = $this->extensionsBasePath() . '/' . $extensionName;
-        if (file_exists($targetDirectory)) {
-            if ($manualSlugProvided) {
-                $this->flash('error', 'An extension directory with this name already exists.');
-                redirect($this->panelUrl('/extensions'));
-            }
-
-            $resolvedExtensionName = $this->nextAvailableExtensionDirectoryName($extensionName);
-            if ($resolvedExtensionName === null) {
-                $this->flash('error', 'Failed to resolve an available extension directory name for this upload.');
-                redirect($this->panelUrl('/extensions'));
-            }
-
-            $extensionName = $resolvedExtensionName;
-            $targetDirectory = $this->extensionsBasePath() . '/' . $extensionName;
-        }
 
         if (!mkdir($targetDirectory, 0775, true) && !is_dir($targetDirectory)) {
             $this->flash('error', 'Failed to create extension directory.');
             redirect($this->panelUrl('/extensions'));
         }
 
-        try {
-            $this->archivePackages()->extractUploadedZip($tmpPath, $targetDirectory);
-        } catch (\Throwable $exception) {
-            $this->removeDirectoryRecursively($targetDirectory);
-            $this->flash('error', $exception->getMessage() !== '' ? $exception->getMessage() : 'Extension upload failed.');
-            redirect($this->panelUrl('/extensions'));
-        }
-
-        if (!$this->archivePackages()->directoryHasFiles($targetDirectory)) {
-            $this->removeDirectoryRecursively($targetDirectory);
-            $this->flash('error', 'Extracted extension directory is empty.');
+        $extractError = $this->packageInstallWorkflowService()->extractIntoTarget(
+            $tmpPath,
+            $targetDirectory,
+            function (string $directory): void {
+                $this->removeDirectoryRecursively($directory);
+            },
+            'extension'
+        );
+        if (is_string($extractError)) {
+            $this->flash('error', $extractError);
             redirect($this->panelUrl('/extensions'));
         }
 
@@ -4356,7 +4279,7 @@ final class PanelController
         }
 
         $message = 'Extension uploaded to private/ext/' . $extensionName . '/. It is disabled by default.';
-        if (!$manualSlugProvided && $extensionName !== $initialExtensionName) {
+        if ((bool) ($nameResult['renamed'] ?? false)) {
             $message .= ' Existing slug detected; upload was renamed automatically.';
         }
         $this->flash('success', $message);
@@ -5158,26 +5081,7 @@ final class PanelController
      */
     private function selectedIdsFromPost(array $post, string $key = 'selected_ids'): array
     {
-        /** @var mixed $rawIds */
-        $rawIds = $post[$key] ?? [];
-        if (!is_array($rawIds)) {
-            return [];
-        }
-
-        $ids = [];
-        foreach ($rawIds as $rawId) {
-            // Ignore invalid ids rather than failing the whole bulk action.
-            $parsed = $this->input->int($rawId, 1);
-            if ($parsed !== null) {
-                $ids[] = $parsed;
-            }
-        }
-
-        // De-duplicate and sort for deterministic processing/order-independent tests.
-        $ids = array_values(array_unique($ids));
-        sort($ids);
-
-        return $ids;
+        return $this->panelPostNormalizer()->selectedIdsFromPost($post, $key);
     }
 
     /**
@@ -5200,76 +5104,7 @@ final class PanelController
      */
     private function normalizeGalleryImageUpdates(mixed $raw): array
     {
-        if (!is_array($raw)) {
-            return [];
-        }
-
-        $updates = [];
-
-        foreach ($raw as $rawImageId => $rawData) {
-            $imageId = $this->input->int($rawImageId, 1);
-            if ($imageId === null || !is_array($rawData)) {
-                continue;
-            }
-
-            $sortOrder = $this->input->int($rawData['sort_order'] ?? null, 1) ?? 1;
-            // Media editor uses one shared field for both alt/title values.
-            $sharedAltTitle = $this->input->text($rawData['alt_text'] ?? ($rawData['title_text'] ?? null), 255);
-
-            $updates[$imageId] = [
-                'alt_text' => $sharedAltTitle,
-                'title_text' => $sharedAltTitle,
-                'caption' => $this->input->text($rawData['caption'] ?? null, 2000),
-                'credit' => $this->input->text($rawData['credit'] ?? null, 255),
-                'license' => $this->input->text($rawData['license'] ?? null, 255),
-                'focal_x' => $this->normalizeNullableFloat($rawData['focal_x'] ?? null, 0.0, 100.0),
-                'focal_y' => $this->normalizeNullableFloat($rawData['focal_y'] ?? null, 0.0, 100.0),
-                'sort_order' => $sortOrder,
-                'is_cover' => isset($rawData['is_cover']) && (string) $rawData['is_cover'] === '1',
-                'is_preview' => isset($rawData['is_preview']) && (string) $rawData['is_preview'] === '1',
-                'include_in_gallery' => isset($rawData['include_in_gallery']) && (string) $rawData['include_in_gallery'] === '1',
-            ];
-        }
-
-        ksort($updates);
-
-        if ($updates === []) {
-            return [];
-        }
-
-        // Canonicalize single-select flags so malicious/manual posts cannot store multiple cover/preview rows.
-        $orderedImageIds = array_keys($updates);
-        usort($orderedImageIds, static function (int $a, int $b) use ($updates): int {
-            $aSort = (int) ($updates[$a]['sort_order'] ?? 1);
-            $bSort = (int) ($updates[$b]['sort_order'] ?? 1);
-            if ($aSort !== $bSort) {
-                return $aSort <=> $bSort;
-            }
-
-            return $a <=> $b;
-        });
-
-        $coverWinner = null;
-        $previewWinner = null;
-        foreach ($orderedImageIds as $imageId) {
-            if (!empty($updates[$imageId]['is_cover'])) {
-                if ($coverWinner === null) {
-                    $coverWinner = $imageId;
-                } else {
-                    $updates[$imageId]['is_cover'] = false;
-                }
-            }
-
-            if (!empty($updates[$imageId]['is_preview'])) {
-                if ($previewWinner === null) {
-                    $previewWinner = $imageId;
-                } else {
-                    $updates[$imageId]['is_preview'] = false;
-                }
-            }
-        }
-
-        return $updates;
+        return $this->panelPostNormalizer()->normalizeGalleryImageUpdates($raw);
     }
 
     /**
@@ -5594,28 +5429,6 @@ final class PanelController
     }
 
     /**
-     * Converts user input to bounded float or null.
-     */
-    private function normalizeNullableFloat(mixed $value, float $min, float $max): ?float
-    {
-        if (is_string($value) && trim($value) === '') {
-            return null;
-        }
-
-        if ($value === null || !is_numeric($value)) {
-            return null;
-        }
-
-        $floatValue = (float) $value;
-
-        if ($floatValue < $min || $floatValue > $max) {
-            return null;
-        }
-
-        return $floatValue;
-    }
-
-    /**
      * Returns editable permission-bit definitions for usergroups UI.
      *
      * @return array<int, array{
@@ -5789,21 +5602,7 @@ final class PanelController
      */
     private function parseInviteExpirationTimestamp(mixed $rawValue): ?int
     {
-        $value = trim((string) $this->input->text(is_string($rawValue) ? $rawValue : null, 40));
-        if ($value === '') {
-            return null;
-        }
-
-        $timestamp = strtotime($value);
-        if ($timestamp === false) {
-            throw new \RuntimeException('Invite expiration must be a valid date/time or left blank.');
-        }
-
-        if ($timestamp <= time()) {
-            throw new \RuntimeException('Invite expiration must be in the future.');
-        }
-
-        return $timestamp;
+        return $this->panelInvitePolicyService()->parseExpirationTimestamp($rawValue);
     }
 
     /**
@@ -6596,6 +6395,36 @@ final class PanelController
         }
 
         return $this->panelTwoFactorPreferencesService;
+    }
+
+    private function panelInvitePolicyService(): PanelInvitePolicyService
+    {
+        if (!$this->panelInvitePolicyService instanceof PanelInvitePolicyService) {
+            $this->panelInvitePolicyService = new PanelInvitePolicyService($this->input);
+        }
+
+        return $this->panelInvitePolicyService;
+    }
+
+    private function panelPostNormalizer(): PanelPostNormalizer
+    {
+        if (!$this->panelPostNormalizer instanceof PanelPostNormalizer) {
+            $this->panelPostNormalizer = new PanelPostNormalizer($this->input);
+        }
+
+        return $this->panelPostNormalizer;
+    }
+
+    private function packageInstallWorkflowService(): PackageInstallWorkflowService
+    {
+        if (!$this->packageInstallWorkflowService instanceof PackageInstallWorkflowService) {
+            $this->packageInstallWorkflowService = new PackageInstallWorkflowService(
+                $this->input,
+                $this->archivePackages()
+            );
+        }
+
+        return $this->packageInstallWorkflowService;
     }
 
     private function profileContactService(): ProfileContactService

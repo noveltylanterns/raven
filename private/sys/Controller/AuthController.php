@@ -14,6 +14,7 @@ namespace Raven\Controller;
 use Raven\Core\Config;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\LoginAttemptPolicy;
+use Raven\Lib\Auth\LoginWebAuthnChallengeService;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\RequestContextResolver;
 use Raven\Lib\Http\SessionFlash;
@@ -47,6 +48,7 @@ final class AuthController
     private LoginIdentifierResolver $identifierResolver;
     private ?LoginTwoFactorFlowService $twoFactorFlowService = null;
     private ?LoginAttemptPolicy $loginAttemptPolicy = null;
+    private ?LoginWebAuthnChallengeService $loginWebAuthnChallengeService = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
     private ?RequestContextResolver $requestContextResolver = null;
 
@@ -372,53 +374,29 @@ final class AuthController
         }
 
         $pendingMethods = $this->auth->pendingTwoFactorMethods();
-        $selectedMethod = $this->twoFactorFlowService()->resolveWebauthnMethodForOptions(
+        $context = $this->loginWebAuthnChallengeService()->prepareOptionsContext(
+            $this->auth,
+            $this->twoFactorFlowService(),
+            $userId,
             $pendingMethods,
             trim((string) ($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] ?? ''))
         );
-        if (is_array($selectedMethod)) {
-            $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = trim((string) ($selectedMethod['key'] ?? ''));
-        }
-
-        if ($selectedMethod === null || strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'webauthn') {
-            $this->jsonResponse(['ok' => false, 'message' => 'Choose a security key method first.'], 400);
+        if (!(bool) ($context['ok'] ?? false)) {
+            $this->jsonResponse(
+                ['ok' => false, 'message' => (string) ($context['message'] ?? 'Failed to initialize WebAuthn challenge.')],
+                (int) ($context['status'] ?? 400)
+            );
             return;
         }
 
-        $selectedCredentialIdB64 = $this->twoFactorFlowService()->selectedWebauthnCredentialId($selectedMethod);
-
-        if ($selectedCredentialIdB64 === '') {
-            $this->jsonResponse(['ok' => false, 'message' => 'Selected security key is invalid.'], 400);
-            return;
-        }
-
-        $preferences = $this->auth->userPreferences($userId);
-        if (!is_array($preferences)) {
-            $this->jsonResponse(['ok' => false, 'message' => 'Unable to load user preferences.'], 500);
-            return;
-        }
-
-        $resolvedMethod = $this->twoFactorFlowService()->resolveRegisteredWebauthnMethod(
-            (array) ($preferences['two_factor_methods'] ?? []),
-            $selectedCredentialIdB64
-        );
-
-        if (!is_array($resolvedMethod)) {
-            $this->jsonResponse(['ok' => false, 'message' => 'No WebAuthn methods are configured.'], 400);
-            return;
-        }
-
+        $selectedCredentialIdB64 = (string) ($context['credential_id_b64'] ?? '');
         $credentialIdBinary = base64_decode($selectedCredentialIdB64, true);
         if (!is_string($credentialIdBinary) || $credentialIdBinary === '') {
             $this->jsonResponse(['ok' => false, 'message' => 'Selected security key is invalid.'], 400);
             return;
         }
 
-        // Honor per-key PIN/Bio toggle strictly: unchecked maps to "discouraged"
-        // instead of library default "preferred", which can still prompt UV.
-        $requireUserVerification = (bool) ($resolvedMethod['require_uv'] ?? false)
-            ? 'required'
-            : 'discouraged';
+        $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = (string) ($context['selected_method_key'] ?? '');
 
         $webAuthn = WebAuthnService::createServer(
             (string) $this->config->get('site.name', 'Raven CMS'),
@@ -439,7 +417,7 @@ final class AuthController
                 true,
                 true,
                 true,
-                $requireUserVerification
+                (string) ($context['require_user_verification'] ?? 'discouraged')
             );
             $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE] = $webAuthn->getChallenge()->getBinaryString();
             $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = TwoFactorMethodKey::forWebauthnCredentialId($selectedCredentialIdB64);
@@ -472,65 +450,15 @@ final class AuthController
             return;
         }
 
-        $credentialIdBinary = base64_decode((string) ($post['id'] ?? ''), true);
-        $clientDataJSON = base64_decode((string) ($post['clientDataJSON'] ?? ''), true);
-        $authenticatorData = base64_decode((string) ($post['authenticatorData'] ?? ''), true);
-        $signature = base64_decode((string) ($post['signature'] ?? ''), true);
-        $credentialIdB64 = is_string($credentialIdBinary) ? base64_encode($credentialIdBinary) : '';
-        if (
-            !is_string($credentialIdBinary) || $credentialIdBinary === ''
-            || !is_string($clientDataJSON) || $clientDataJSON === ''
-            || !is_string($authenticatorData) || $authenticatorData === ''
-            || !is_string($signature) || $signature === ''
-        ) {
-            $this->jsonResponse(['ok' => false, 'message' => 'Invalid WebAuthn payload.'], 400);
-            return;
-        }
-
-        $preferences = $this->auth->userPreferences($userId);
-        if (!is_array($preferences)) {
-            $this->jsonResponse(['ok' => false, 'message' => 'Unable to load user preferences.'], 500);
-            return;
-        }
-
-        $credentialPublicKey = '';
-        $requiresUserVerification = false;
-        $previousSignatureCounter = null;
-        foreach ((array) ($preferences['two_factor_methods'] ?? []) as $method) {
-            if (!is_array($method)) {
-                continue;
+        $context = $this->loginWebAuthnChallengeService()->prepareVerifyContext($this->auth, $userId, $post);
+        if (!(bool) ($context['ok'] ?? false)) {
+            if (!empty($context['mark_webauthn_failed'])) {
+                $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED] = true;
             }
-
-            if (
-                strtolower(trim((string) ($method['type'] ?? ''))) !== 'webauthn'
-                || strtolower(trim((string) ($method['status'] ?? ''))) !== 'confirmed'
-            ) {
-                continue;
-            }
-
-            if (trim((string) ($method['credential_id'] ?? '')) !== $credentialIdB64) {
-                continue;
-            }
-
-            $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
-            $counter = (int) ($method['signature_counter'] ?? 0);
-            $previousSignatureCounter = $counter >= 0 ? $counter : 0;
-            $requiresUserVerification = (bool) ($method['require_uv'] ?? false);
-            break;
-        }
-
-        if ($credentialPublicKey === '') {
-            $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED] = true;
-            $this->jsonResponse(['ok' => false, 'message' => 'Security key is not registered for this account.'], 400);
-            return;
-        }
-
-        if ($requiresUserVerification && !WebAuthnService::authenticatorDataHasUserVerification($authenticatorData)) {
-            $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED] = true;
-            $this->jsonResponse([
-                'ok' => false,
-                'message' => 'This security key requires PIN/biometric verification.',
-            ], 400);
+            $this->jsonResponse(
+                ['ok' => false, 'message' => (string) ($context['message'] ?? 'Invalid WebAuthn payload.')],
+                (int) ($context['status'] ?? 400)
+            );
             return;
         }
 
@@ -546,18 +474,22 @@ final class AuthController
 
         try {
             $webAuthn->processGet(
-                $clientDataJSON,
-                $authenticatorData,
-                $signature,
-                $credentialPublicKey,
+                (string) ($context['client_data_json'] ?? ''),
+                (string) ($context['authenticator_data'] ?? ''),
+                (string) ($context['signature'] ?? ''),
+                (string) ($context['credential_public_key'] ?? ''),
                 $challenge,
-                $previousSignatureCounter,
+                (int) ($context['previous_signature_counter'] ?? 0),
                 false
             );
 
             $signatureCounter = $webAuthn->getSignatureCounter();
             if (is_int($signatureCounter) && $signatureCounter >= 0) {
-                $this->auth->updateWebauthnSignatureCounter($userId, $credentialIdB64, $signatureCounter);
+                $this->auth->updateWebauthnSignatureCounter(
+                    $userId,
+                    (string) ($context['credential_id_b64'] ?? ''),
+                    $signatureCounter
+                );
             }
 
             unset(
@@ -734,6 +666,15 @@ final class AuthController
         }
 
         return $this->twoFactorFlowService;
+    }
+
+    private function loginWebAuthnChallengeService(): LoginWebAuthnChallengeService
+    {
+        if (!$this->loginWebAuthnChallengeService instanceof LoginWebAuthnChallengeService) {
+            $this->loginWebAuthnChallengeService = new LoginWebAuthnChallengeService();
+        }
+
+        return $this->loginWebAuthnChallengeService;
     }
 
     /**

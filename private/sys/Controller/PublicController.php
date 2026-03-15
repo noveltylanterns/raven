@@ -26,7 +26,7 @@ use Raven\Lib\Extension\EmbeddedFormRuntimeService;
 use Raven\Lib\Http\RequestContextResolver;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Profile\ProfileContactService;
-use Raven\Lib\Routing\ChannelRoutePolicy;
+use Raven\Lib\Routing\PublicChannelPageRouteService;
 use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Routing\RedirectTargetValidator;
 use Raven\Lib\Routing\RouteConfigService;
@@ -92,6 +92,7 @@ final class PublicController
     private ?PublicTemplateDecorator $publicTemplateDecorator = null;
     private ?PublicPageBodyRenderer $pageBodyRenderer = null;
     private ?PublicRouteRenderService $publicRouteRenderService = null;
+    private ?PublicChannelPageRouteService $publicChannelPageRouteService = null;
     public function __construct(
         View $view,
         Config $config,
@@ -267,38 +268,29 @@ final class PublicController
                 return;
             }
 
-            $channelRouteMode = $this->normalizeChannelPageRouteMode(
+            $channelRouteMode = $this->publicChannelPageRouteService()->normalizeRouteMode(
                 (string) ($channel['page_route_mode'] ?? 'slug')
             );
-            $channelWordSeparator = $this->resolveChannelPageUrlSeparator(
-                (string) ($channel['page_url_separator'] ?? 'inherit')
+            $channelWordSeparator = $this->publicChannelPageRouteService()->resolveWordSeparator(
+                (string) ($channel['page_url_separator'] ?? 'inherit'),
+                (string) $this->config->get('content.separator', '-')
             );
 
-            if ($channelRouteMode === 'date_slug') {
-                $parsed = $this->parseChannelDateSlugSegment($requestedSlug, $channelWordSeparator);
-                if ($parsed === null) {
-                    if ($this->tryRedirect($requestedSlug, $channelSlug)) {
-                        return;
-                    }
-
-                    $this->notFound();
+            $resolvedLookupSlug = $this->publicChannelPageRouteService()->resolveLookupSlug(
+                $requestedSlug,
+                $channelRouteMode,
+                $channelWordSeparator
+            );
+            if (!is_string($resolvedLookupSlug) || $resolvedLookupSlug === '') {
+                if ($this->tryRedirect($requestedSlug, $channelSlug)) {
                     return;
                 }
 
-                $lookupSlug = (string) ($parsed['slug'] ?? $requestedSlug);
-            } else {
-                $normalizedLookupSlug = $this->normalizeChannelPageSlugForLookup($requestedSlug, $channelWordSeparator);
-                if ($normalizedLookupSlug === null) {
-                    if ($this->tryRedirect($requestedSlug, $channelSlug)) {
-                        return;
-                    }
-
-                    $this->notFound();
-                    return;
-                }
-
-                $lookupSlug = $normalizedLookupSlug;
+                $this->notFound();
+                return;
             }
+
+            $lookupSlug = $resolvedLookupSlug;
         }
 
         $page = $this->pages->findPublicPage($lookupSlug, $channelSlug);
@@ -314,11 +306,12 @@ final class PublicController
         }
 
         if ($channelSlug !== null) {
-            $canonicalSegment = $this->channelPageRouteSegment(
+            $canonicalSegment = $this->publicChannelPageRouteService()->canonicalSegment(
                 (string) ($page['slug'] ?? ''),
                 (string) ($page['published_at'] ?? ''),
                 $channelRouteMode,
-                $channelWordSeparator
+                $channelWordSeparator,
+                (string) $this->config->get('content.separator', '-')
             );
             if ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedSlug) !== 0) {
                 \Raven\Core\Support\redirect(
@@ -377,11 +370,12 @@ final class PublicController
                 . rawurlencode($channelSlug)
                 . '/'
                 . rawurlencode(
-                    $this->channelPageRouteSegment(
+                    $this->publicChannelPageRouteService()->canonicalSegment(
                         $slug,
                         (string) ($page['published_at'] ?? ''),
                         (string) ($page['channel_page_route_mode'] ?? 'slug'),
-                        (string) ($page['channel_page_url_separator'] ?? 'inherit')
+                        (string) ($page['channel_page_url_separator'] ?? 'inherit'),
+                        (string) $this->config->get('content.separator', '-')
                     )
                 );
         }
@@ -398,60 +392,6 @@ final class PublicController
     private function decoratePageListForTemplate(array $pages): array
     {
         return $this->publicTemplateDecorator()->decoratePageListForTemplate($pages);
-    }
-
-    /**
-     * Normalizes one stored channel page-route mode value.
-     */
-    private function normalizeChannelPageRouteMode(string $value): string
-    {
-        return ChannelRoutePolicy::normalizeRouteMode($value);
-    }
-
-    /**
-     * Resolves effective channel page-url separator from channel + global config.
-     */
-    private function resolveChannelPageUrlSeparator(string $channelValue): string
-    {
-        return $this->routeConfigService()->resolveChannelPageUrlSeparator($channelValue);
-    }
-
-    /**
-     * Normalizes one channel route segment into canonical stored slug format.
-     */
-    private function normalizeChannelPageSlugForLookup(string $segment, string $wordSeparator): ?string
-    {
-        return ChannelRoutePolicy::normalizeSlugForLookup($this->input, $segment, $wordSeparator);
-    }
-
-    /**
-     * Parses one `YYYY-MM-DD-{slug}` channel route segment.
-     *
-     * @return array{date: string, slug: string}|null
-     */
-    private function parseChannelDateSlugSegment(string $segment, string $wordSeparator): ?array
-    {
-        return ChannelRoutePolicy::parseDateSlugSegment($this->input, $segment, $wordSeparator);
-    }
-
-    /**
-     * Returns one channel page route segment from slug + mode.
-     */
-    private function channelPageRouteSegment(
-        string $slug,
-        string $publishedAt,
-        string $routeMode,
-        string $wordSeparator
-    ): string
-    {
-        return ChannelRoutePolicy::buildRouteSegment(
-            $this->input,
-            $slug,
-            $publishedAt,
-            $routeMode,
-            $wordSeparator,
-            (string) $this->config->get('content.separator', '-')
-        );
     }
 
     /**
@@ -1461,6 +1401,15 @@ final class PublicController
         }
 
         return $this->requestContextResolver;
+    }
+
+    private function publicChannelPageRouteService(): PublicChannelPageRouteService
+    {
+        if (!$this->publicChannelPageRouteService instanceof PublicChannelPageRouteService) {
+            $this->publicChannelPageRouteService = new PublicChannelPageRouteService($this->input);
+        }
+
+        return $this->publicChannelPageRouteService;
     }
 
     private function publicTemplateResolver(): PublicTemplateResolver
