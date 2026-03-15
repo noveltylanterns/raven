@@ -174,7 +174,7 @@ $themeLabels = [
                 <input type="hidden" data-preferences-two-factor-key="signature_counter" value="0">
             </div>
             <div class="col-md" data-preferences-two-factor-section="email" style="display:none;">
-                <label class="form-label">Target Email</label>
+                <label class="form-label">Email Address</label>
                 <input type="email" class="form-control form-control-sm" data-preferences-two-factor-key="target_email" placeholder="Defaults to account email if blank">
             </div>
             <div class="col-md position-relative" data-preferences-two-factor-section="recovery" style="display:none;">
@@ -1493,7 +1493,7 @@ $themeLabels = [
                                     >
                                 </div>
                                 <div class="col-md" data-preferences-two-factor-section="email"<?= $methodType === 'email' ? '' : ' style="display:none;"' ?>>
-                                    <label class="form-label">Target Email</label>
+                                    <label class="form-label">Email Address</label>
                                     <input
                                         type="email"
                                         class="form-control form-control-sm"
