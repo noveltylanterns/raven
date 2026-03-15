@@ -46,7 +46,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
 <header class="card">
     <div class="card-body">
         <h1>Channels</h1>
-        <p class="text-muted mb-0">Manage channel sections used for URL structure and channel landing pages.</p>
+        <p class="text-muted mb-0">Manage channel taxonomy for URL structure &amp; landing pages.</p>
     </div>
 </header>
 

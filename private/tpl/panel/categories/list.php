@@ -46,7 +46,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
 <header class="card">
     <div class="card-body">
         <h1>Categories</h1>
-        <p class="text-muted mb-0">Manage category taxonomy used to organize pages and category landing views.</p>
+        <p class="text-muted mb-0">Manage category taxonomy to organize pages and category landing views.</p>
     </div>
 </header>
 
