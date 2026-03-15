@@ -1374,7 +1374,7 @@ $themeLabels = [
                     <?php endforeach; ?>
                 </div>
                 <?php if ($profileContactOptions !== []): ?>
-                    <button type="button" class="btn btn-primary" id="preferences-contact-profiles-add">Add More Contact Information</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="preferences-contact-profiles-add">Add More Contact Information</button>
                 <?php else: ?>
                     <div class="form-text text-muted">No contact types are configured in <code>user.contact</code>.</div>
                 <?php endif; ?>
