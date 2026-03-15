@@ -5,6 +5,7 @@
 /private/dat/install.lock
 !/private/dat/
 !/private/dat/channel/
+/private/dat/channel/**
 !/private/dat/channel/.channel.php.dist
 /private/ext/.state.php
 !/private/ext/.state.php.dist
