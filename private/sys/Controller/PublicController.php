@@ -124,7 +124,7 @@ final class PublicController
         $this->publicFlash = new SessionFlash('_raven_public_flash');
         $this->identifierResolver = new LoginIdentifierResolver();
         $this->embeddedFormRuntimes = $this->discoverEmbeddedFormRuntimes($extensionServices);
-        $this->templateTags = new TemplateTagEngine(dirname(__DIR__, 3) . '/private/tmp/template_tag_cache');
+        $this->templateTags = new TemplateTagEngine(dirname(__DIR__, 3) . '/.tmp/template_tag_cache');
     }
 
     /**

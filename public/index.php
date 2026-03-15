@@ -33,7 +33,7 @@ $requestPath = $requestPath === '' ? '/' : $requestPath;
  * - If request explicitly targets installer, run installer script directly.
  */
 $configPath = dirname(__DIR__) . '/private/config.php';
-$installLockPath = dirname(__DIR__) . '/private/tmp/install.lock';
+$installLockPath = dirname(__DIR__) . '/private/dat/install.lock';
 
 if (!is_file($configPath)) {
     if (!is_file($installLockPath)) {

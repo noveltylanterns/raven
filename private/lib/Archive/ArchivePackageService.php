@@ -215,8 +215,8 @@ final class ArchivePackageService
     {
         $candidateDirectories = [
             (string) sys_get_temp_dir(),
-            $this->projectRoot . '/private/tmp',
-            $this->projectRoot . '/private/tmp/exports',
+            $this->projectRoot . '/.tmp',
+            $this->projectRoot . '/.tmp/exports',
         ];
 
         foreach ($candidateDirectories as $candidateDirectory) {

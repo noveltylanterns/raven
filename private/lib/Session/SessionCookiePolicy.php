@@ -20,7 +20,7 @@ final class SessionCookiePolicy
         $sessionName = $this->resolveSessionName($config);
         $cookieDomain = $this->resolveCookieDomain($config, $server);
 
-        $sessionPath = $root . '/private/tmp/sessions';
+        $sessionPath = $root . '/.tmp/sessions';
         if (!is_dir($sessionPath)) {
             mkdir($sessionPath, 0775, true);
         }

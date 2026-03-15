@@ -58,7 +58,7 @@ $configPath = $root . '/private/config.php';
 $configTemplatePath = $root . '/private/config.php.dist';
 $extensionStatePath = $root . '/private/ext/.state.php';
 $extensionStateTemplatePath = $root . '/private/ext/.state.php.dist';
-$lockPath = $root . '/private/tmp/install.lock';
+$lockPath = $root . '/private/dat/install.lock';
 $sqliteDefaultBasePath = rtrim($root, '/') . '/private/dat/db';
 
 $detectedDomain = strtolower(trim((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '')));
@@ -491,7 +491,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         <p class="note">
             This installer writes <code>private/config.php</code>, initializes database schema, creates the first Super Admin account,
             seeds <code>private/ext/.state.php</code> from <code>private/ext/.state.php.dist</code>,
-            and then writes a lock file at <code>private/tmp/install.lock</code>.
+            and then writes a lock file at <code>private/dat/install.lock</code>.
             Delete <code>public/install.php</code> after setup.
         </p>
     </div>

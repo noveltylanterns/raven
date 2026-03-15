@@ -41,6 +41,9 @@
 - Rewired `AuthService`, `GroupRepository`, `UserRepository`, `PageRepository`, `PageImageRepository`, and `PanelController` to delegate these concerns through `private/lib/`, and refreshed `AGENTS.md` file-tree/responsibility notes for the new modules.
 - Added sixteenth-wave `private/lib/` modularization for backend-agnostic idempotent upsert SQL policy, group membership writes/custom-id allocation, pending 2FA challenge verification, panel-user list/page query orchestration, page-image deletion workflows, and panel media config policy helpers (`SqlUpsertPolicy`, `GroupMembershipWriteService`, `TwoFactorChallengeVerificationService`, `UserPanelQueryService`, `PageImageDeletionService`, `PanelMediaConfigService`).
 - Rewired `AuthService`, `UserRepository`, `GroupRepository`, `PageImageRepository`, `PanelController`, and `PageTaxonomyAssignmentService` to delegate these concerns through `private/lib/`, and refreshed `AGENTS.md` private file-tree delegation summaries.
+- Added seventeenth-wave `private/lib/` modularization for channel metadata file persistence, page taxonomy public query helpers, page write/delete transaction orchestration, user routing-data payload assembly, user persistence workflows, and public group-route payload queries (`ChannelFileStoreService`, `PageTaxonomyQueryService`, `PagePersistenceService`, `UserRoutingDataService`, `UserPersistenceService`, `GroupPublicRouteService`).
+- Rewired `ChannelRepository`, `PageRepository`, `UserRepository`, and `GroupRepository` to delegate these concerns through `private/lib/`, and refreshed `AGENTS.md` private file-tree delegation summaries.
+- Moved runtime temp/cache/session/export paths from `private/tmp` to root `.tmp` while keeping installer lock state at `private/dat/install.lock`, and updated runtime/docs/config references accordingly.
 
 ### March 13, 2026
 

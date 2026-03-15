@@ -162,7 +162,7 @@ Clone mode:
 
 Brace tags are compiled to cached PHP files under:
 
-- `private/tmp/template_tag_cache/`
+- `.tmp/template_tag_cache/`
 
 Compilation model:
 

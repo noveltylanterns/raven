@@ -267,7 +267,7 @@ body { background: #fff; color: #212529; }
 - Public templates support lightweight EE-style brace tags in both:
 - `public/theme/*/vis/*.php`
 - `private/vis/*.php` (core fallback templates)
-- Tags compile to cached PHP files under `private/tmp/template_tag_cache/` and are recompiled only when source template mtime changes.
+- Tags compile to cached PHP files under `.tmp/template_tag_cache/` and are recompiled only when source template mtime changes.
 - Templates still support normal PHP as before; brace tags are additive.
 
 ### Supported Tags

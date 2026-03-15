@@ -6589,7 +6589,7 @@ final class PanelController
             $this->publicFallbackRenderer = new ThemeFallbackRenderer(
                 $this->publicThemesRoot(),
                 $projectRoot . '/private/vis',
-                $projectRoot . '/private/tmp/template_tag_cache'
+                $projectRoot . '/.tmp/template_tag_cache'
             );
         }
 

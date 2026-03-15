@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Repository;
 
 use PDO;
+use Raven\Lib\Channel\ChannelFileStoreService;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 use Raven\Lib\Routing\ChannelRecordPolicy;
 use RuntimeException;
@@ -25,6 +26,7 @@ final class ChannelRepository
     private string $driver;
     private string $prefix;
     private string $channelDirectory;
+    private ChannelFileStoreService $channelFileStoreService;
     /** @var array<int, array<string, mixed>>|null */
     private ?array $channelsCache = null;
 
@@ -34,6 +36,7 @@ final class ChannelRepository
         $this->driver = $driver;
         $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
         $this->channelDirectory = $channelDirectory ?? (dirname(__DIR__, 3) . '/dat/channel');
+        $this->channelFileStoreService = new ChannelFileStoreService($this->channelDirectory);
     }
 
     /**
@@ -73,9 +76,7 @@ final class ChannelRepository
             return $this->channelsCache;
         }
 
-        $this->ensureChannelDirectory();
-        $paths = glob($this->channelDirectory . '/*.php') ?: [];
-        sort($paths, SORT_STRING);
+        $paths = $this->channelFileStoreService->listChannelFilePaths();
         $records = [];
         $usedIds = [];
         $maxId = 0;
@@ -92,7 +93,7 @@ final class ChannelRepository
                 continue;
             }
 
-            $record = $this->loadChannelFile($path, $slug);
+            $record = $this->channelFileStoreService->loadRecordFromPath($path, $slug);
             if ($record === null) {
                 continue;
             }
@@ -317,7 +318,7 @@ final class ChannelRepository
             ? (int) ($existingRecord['id'] ?? 0)
             : $this->nextChannelId();
 
-        $currentRaw = $oldSlug !== '' ? $this->loadChannelRaw($oldSlug) : [];
+        $currentRaw = $oldSlug !== '' ? $this->channelFileStoreService->loadRawBySlug($oldSlug) : [];
         $customFields = is_array($currentRaw['custom_fields'] ?? null) ? $currentRaw['custom_fields'] : [];
         $overrides = is_array($currentRaw['overrides'] ?? null) ? $currentRaw['overrides'] : [];
         $createdAt = trim((string) ($currentRaw['created_at'] ?? ''));
@@ -346,11 +347,11 @@ final class ChannelRepository
             'created_at' => $createdAt,
         ];
 
-        $newPath = $this->channelPathForSlug($slug);
-        $oldPath = $oldSlug !== '' ? $this->channelPathForSlug($oldSlug) : '';
+        $newPath = $this->channelFileStoreService->pathForSlug($slug);
+        $oldPath = $oldSlug !== '' ? $this->channelFileStoreService->pathForSlug($oldSlug) : '';
 
         // For slug changes, write new file first, then remove old slug file.
-        $this->writeChannelFile($newPath, $record);
+        $this->channelFileStoreService->writeRecordAtPath($newPath, $record);
 
         if ($oldPath !== '' && $oldPath !== $newPath && is_file($oldPath)) {
             @unlink($oldPath);
@@ -386,7 +387,7 @@ final class ChannelRepository
             throw new RuntimeException('Channel slug is invalid.');
         }
 
-        $raw = $this->loadChannelRaw($slug);
+        $raw = $this->channelFileStoreService->loadRawBySlug($slug);
         $raw['id'] = (int) ($record['id'] ?? $id);
         $raw['name'] = (string) ($record['name'] ?? '');
         $raw['slug'] = $slug;
@@ -408,7 +409,7 @@ final class ChannelRepository
             ? (string) $raw['created_at']
             : gmdate('Y-m-d H:i:s');
 
-        $this->writeChannelFile($this->channelPathForSlug($slug), $raw);
+        $this->channelFileStoreService->writeRecordBySlug($slug, $raw);
         $this->channelsCache = null;
     }
 
@@ -423,7 +424,7 @@ final class ChannelRepository
         }
 
         $slug = (string) ($record['slug'] ?? '');
-        $path = $slug !== '' ? $this->channelPathForSlug($slug) : '';
+        $path = $slug !== '' ? $this->channelFileStoreService->pathForSlug($slug) : '';
 
         $pages = $this->table('pages');
         $redirects = $this->table('redirects');
@@ -489,109 +490,6 @@ final class ChannelRepository
         return $counts;
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
-    private function loadChannelFile(string $path, string $slug): ?array
-    {
-        try {
-            /** @var mixed $raw */
-            $raw = require $path;
-        } catch (\Throwable) {
-            return null;
-        }
-
-        if (!is_array($raw)) {
-            return null;
-        }
-
-        $name = trim((string) ($raw['name'] ?? ''));
-        if ($name === '') {
-            $name = ucwords(str_replace('-', ' ', $slug));
-        }
-
-        return [
-            'id' => $this->normalizeChannelId($raw['id'] ?? null) ?? 0,
-            'name' => $name,
-            'slug' => $slug,
-            'description' => trim((string) ($raw['description'] ?? '')),
-            'text_editor_override' => $this->normalizeTextEditorOverride((string) ($raw['text_editor_override'] ?? 'inherit')),
-            'page_route_mode' => $this->normalizePageRouteMode((string) ($raw['page_route_mode'] ?? 'slug')),
-            'page_url_separator' => $this->normalizePageUrlSeparator((string) ($raw['page_url_separator'] ?? 'inherit')),
-            'cover_image_path' => $this->normalizeNullablePath($raw['cover_image_path'] ?? null),
-            'cover_image_sm_path' => $this->normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
-            'cover_image_md_path' => $this->normalizeNullablePath($raw['cover_image_md_path'] ?? null),
-            'cover_image_lg_path' => $this->normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
-            'preview_image_path' => $this->normalizeNullablePath($raw['preview_image_path'] ?? null),
-            'preview_image_sm_path' => $this->normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
-            'preview_image_md_path' => $this->normalizeNullablePath($raw['preview_image_md_path'] ?? null),
-            'preview_image_lg_path' => $this->normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
-            'custom_fields' => is_array($raw['custom_fields'] ?? null) ? $raw['custom_fields'] : [],
-            'overrides' => is_array($raw['overrides'] ?? null) ? $raw['overrides'] : [],
-            'created_at' => trim((string) ($raw['created_at'] ?? '')) !== ''
-                ? trim((string) $raw['created_at'])
-                : gmdate('Y-m-d H:i:s'),
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function loadChannelRaw(string $slug): array
-    {
-        $path = $this->channelPathForSlug($slug);
-        if (!is_file($path)) {
-            return [];
-        }
-
-        try {
-            /** @var mixed $raw */
-            $raw = require $path;
-        } catch (\Throwable) {
-            return [];
-        }
-
-        return is_array($raw) ? $raw : [];
-    }
-
-    /**
-     * @param array<string, mixed> $record
-     */
-    private function writeChannelFile(string $path, array $record): void
-    {
-        $this->ensureChannelDirectory();
-
-        $content = "<?php\n\n";
-        $content .= "declare(strict_types=1);\n\n";
-        $content .= 'return ' . var_export($record, true) . ";\n";
-
-        $tmpPath = $path . '.tmp';
-        if (file_put_contents($tmpPath, $content, LOCK_EX) === false) {
-            throw new RuntimeException('Failed to write channel file.');
-        }
-
-        if (!@rename($tmpPath, $path)) {
-            @unlink($tmpPath);
-            throw new RuntimeException('Failed to finalize channel file.');
-        }
-    }
-
-    private function channelPathForSlug(string $slug): string
-    {
-        return rtrim($this->channelDirectory, '/') . '/' . strtolower(trim($slug)) . '.php';
-    }
-
-    private function ensureChannelDirectory(): void
-    {
-        if (is_dir($this->channelDirectory)) {
-            return;
-        }
-
-        if (!@mkdir($this->channelDirectory, 0775, true) && !is_dir($this->channelDirectory)) {
-            throw new RuntimeException('Failed to initialize channel directory.');
-        }
-    }
-
     private function isValidSlug(string $slug): bool
     {
         return ChannelRecordPolicy::isValidSlug($slug);
@@ -652,23 +550,8 @@ final class ChannelRepository
 
     private function persistChannelId(string $slug, int $id): void
     {
-        if ($id < 1 || $slug === '') {
-            return;
-        }
-
-        $raw = $this->loadChannelRaw($slug);
-        if ($raw === []) {
-            return;
-        }
-
-        $currentId = $this->normalizeChannelId($raw['id'] ?? null);
-        if ($currentId === $id) {
-            return;
-        }
-
-        $raw['id'] = $id;
         try {
-            $this->writeChannelFile($this->channelPathForSlug($slug), $raw);
+            $this->channelFileStoreService->persistChannelId($slug, $id);
         } catch (\Throwable) {
             // Keep repository reads resilient even when id backfill cannot be persisted.
         }

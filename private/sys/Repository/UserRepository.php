@@ -14,11 +14,12 @@ declare(strict_types=1);
 namespace Raven\Repository;
 
 use PDO;
-use RuntimeException;
 use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\ContactProfileNormalizer;
 use Raven\Lib\Auth\GroupMembershipWriteService;
+use Raven\Lib\Auth\UserPersistenceService;
 use Raven\Lib\Auth\UserGroupCatalogService;
+use Raven\Lib\Auth\UserRoutingDataService;
 use Raven\Lib\Auth\UserPanelQueryService;
 use Raven\Lib\Auth\UserPanelHydrator;
 use Raven\Lib\Database\Runtime\TableNameResolver;
@@ -37,6 +38,8 @@ final class UserRepository
     private UserGroupCatalogService $userGroupCatalogService;
     private UserPanelQueryService $userPanelQueryService;
     private GroupMembershipWriteService $groupMembershipWriteService;
+    private UserPersistenceService $userPersistenceService;
+    private UserRoutingDataService $userRoutingDataService;
 
     public function __construct(PDO $authDb, PDO $appDb, string $driver, string $prefix)
     {
@@ -51,6 +54,8 @@ final class UserRepository
         $this->userGroupCatalogService = new UserGroupCatalogService();
         $this->userPanelQueryService = new UserPanelQueryService();
         $this->groupMembershipWriteService = new GroupMembershipWriteService();
+        $this->userPersistenceService = new UserPersistenceService();
+        $this->userRoutingDataService = new UserRoutingDataService();
     }
 
     /**
@@ -158,160 +163,15 @@ final class UserRepository
      */
     public function listRoutingData(bool $includeGroups, bool $includeUsers): array
     {
-        if (!$includeGroups && !$includeUsers) {
-            return [
-                'groups' => [],
-                'users' => [],
-            ];
-        }
-
-        $users = $this->appAuthTable('users');
-        $groups = $this->groupTable('groups');
-        $userGroups = $this->groupTable('user_groups');
-        $unionParts = [];
-
-        if ($includeGroups) {
-            $unionParts[] = 'SELECT
-                    \'group\' AS row_type,
-                    g.id AS group_id,
-                    g.name AS group_name,
-                    g.slug AS group_slug,
-                    g.route_enabled AS group_route_enabled,
-                    g.permission_mask AS group_permission_mask,
-                    g.is_stock AS group_is_stock,
-                    COALESCE(mc.member_count, 0) AS group_member_count,
-                    NULL AS user_id,
-                    NULL AS username,
-                    NULL AS display_name,
-                    NULL AS email,
-                    NULL AS theme,
-                    NULL AS avatar_path,
-                    NULL AS user_group_name,
-                    NULL AS user_group_permission_mask
-                 FROM ' . $groups . ' g
-                 LEFT JOIN (
-                    SELECT group_id, COUNT(*) AS member_count
-                    FROM ' . $userGroups . '
-                    GROUP BY group_id
-                 ) mc ON mc.group_id = g.id';
-        }
-
-        if ($includeUsers) {
-            $unionParts[] = 'SELECT
-                    \'user\' AS row_type,
-                    NULL AS group_id,
-                    NULL AS group_name,
-                    NULL AS group_slug,
-                    NULL AS group_route_enabled,
-                    NULL AS group_permission_mask,
-                    NULL AS group_is_stock,
-                    NULL AS group_member_count,
-                    u.id AS user_id,
-                    u.username AS username,
-                    u.display_name AS display_name,
-                    u.email AS email,
-                    u.theme AS theme,
-                    u.avatar_path AS avatar_path,
-                    g.name AS user_group_name,
-                    g.permission_mask AS user_group_permission_mask
-                 FROM ' . $users . ' u
-                 LEFT JOIN ' . $userGroups . ' ug ON ug.user_id = u.id
-                 LEFT JOIN ' . $groups . ' g ON g.id = ug.group_id';
-        }
-
-        $stmt = $this->appDb->prepare(
-            'SELECT
-                row_type,
-                group_id,
-                group_name,
-                group_slug,
-                group_route_enabled,
-                group_permission_mask,
-                group_is_stock,
-                group_member_count,
-                user_id,
-                username,
-                display_name,
-                email,
-                theme,
-                avatar_path,
-                user_group_name,
-                user_group_permission_mask
-             FROM (
-                 ' . implode(' UNION ALL ', $unionParts) . '
-             ) routing_auth_rows
-             ORDER BY
-                CASE row_type WHEN \'group\' THEN 0 ELSE 1 END ASC,
-                COALESCE(group_id, 0) ASC,
-                COALESCE(user_id, 0) ASC,
-                user_group_name ASC'
+        return $this->userRoutingDataService->listRoutingData(
+            $this->appDb,
+            $this->appAuthTable('users'),
+            $this->groupTable('groups'),
+            $this->groupTable('user_groups'),
+            $includeGroups,
+            $includeUsers,
+            fn (array $users, array $groupMap): array => $this->hydratePanelUsers($users, $groupMap)
         );
-        $stmt->execute();
-        $rows = $stmt->fetchAll() ?: [];
-
-        $groupRows = [];
-        $usersById = [];
-        /** @var array<int, array<int, array{name: string, permission_mask: int}>> $groupMap */
-        $groupMap = [];
-
-        foreach ($rows as $row) {
-            $rowType = strtolower(trim((string) ($row['row_type'] ?? '')));
-            if ($rowType === 'group') {
-                $groupId = (int) ($row['group_id'] ?? 0);
-                if ($groupId < 1) {
-                    continue;
-                }
-
-                $groupRows[] = [
-                    'id' => $groupId,
-                    'name' => (string) ($row['group_name'] ?? ''),
-                    'slug' => (string) ($row['group_slug'] ?? ''),
-                    'route_enabled' => (int) ($row['group_route_enabled'] ?? 0),
-                    'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
-                    'is_stock' => (int) ($row['group_is_stock'] ?? 0),
-                    'member_count' => (int) ($row['group_member_count'] ?? 0),
-                ];
-                continue;
-            }
-
-            if ($rowType !== 'user') {
-                continue;
-            }
-
-            $userId = (int) ($row['user_id'] ?? 0);
-            if ($userId < 1) {
-                continue;
-            }
-
-            if (!isset($usersById[$userId])) {
-                $usersById[$userId] = [
-                    'id' => $userId,
-                    'username' => (string) ($row['username'] ?? ''),
-                    'display_name' => (string) ($row['display_name'] ?? ''),
-                    'email' => (string) ($row['email'] ?? ''),
-                    'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
-                    'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                        ? (string) $row['avatar_path']
-                        : null,
-                ];
-            }
-
-            $groupName = trim((string) ($row['user_group_name'] ?? ''));
-            if ($groupName === '') {
-                continue;
-            }
-
-            $groupMap[$userId] ??= [];
-            $groupMap[$userId][] = [
-                'name' => $groupName,
-                'permission_mask' => (int) ($row['user_group_permission_mask'] ?? 0),
-            ];
-        }
-
-        return [
-            'groups' => $groupRows,
-            'users' => $this->hydratePanelUsers(array_values($usersById), $groupMap),
-        ];
     }
 
     /**
@@ -646,122 +506,39 @@ final class UserRepository
      */
     public function save(array $data): int
     {
-        $usersTable = $this->authTable('users');
-
-        $id = $data['id'] ?? null;
-        $username = trim($data['username']);
-        $displayName = trim($data['display_name']);
-        $email = trim($data['email']);
-        $theme = trim($data['theme']);
-        $password = $data['password'];
-        $groupIds = $this->normalizeGroupIds($data['group_ids']);
+        $id = isset($data['id']) ? (int) $data['id'] : null;
+        $username = trim((string) ($data['username'] ?? ''));
+        $displayName = trim((string) ($data['display_name'] ?? ''));
+        $email = trim((string) ($data['email'] ?? ''));
+        $theme = trim((string) ($data['theme'] ?? ''));
+        $password = isset($data['password']) && is_string($data['password']) ? $data['password'] : null;
+        $groupIds = $this->normalizeGroupIds(is_array($data['group_ids'] ?? null) ? $data['group_ids'] : []);
         $contactProfiles = $this->normalizeContactProfiles((array) ($data['contact_profiles'] ?? []));
         $contactProfilesEncoded = $this->encodeContactProfiles($contactProfiles);
         $setAvatar = (bool) ($data['set_avatar'] ?? false);
-        $avatarPath = $data['avatar_path'] ?? null;
+        $avatarPath = isset($data['avatar_path']) && is_string($data['avatar_path']) ? $data['avatar_path'] : null;
 
-        if ($email === '') {
-            throw new RuntimeException('Email is required.');
-        }
-
-        // Keep new rows switch-ready for username-login mode by backfilling
-        // undefined usernames from the account email.
-        if (($id === null || $id <= 0) && $username === '') {
-            $username = $email;
-        }
-
-        if ($id !== null && $id > 0) {
-            // Update mode: enforce uniqueness against all other user rows.
-            if ($username !== '' && $this->usernameExistsForOtherUser($id, $username)) {
-                throw new RuntimeException('Username is already in use.');
+        return $this->userPersistenceService->saveUser(
+            $this->authDb,
+            $this->appDb,
+            $this->authTable('users'),
+            $this->groupTable('user_groups'),
+            [
+                'id' => $id,
+                'username' => $username,
+                'display_name' => $displayName,
+                'email' => $email,
+                'theme' => $theme,
+                'password' => $password,
+                'group_ids' => $groupIds,
+                'contact_profiles' => $contactProfilesEncoded,
+                'set_avatar' => $setAvatar,
+                'avatar_path' => $avatarPath,
+            ],
+            function (int $userId, int $groupId): void {
+                $this->attachUserToGroup($userId, $groupId);
             }
-
-            if ($this->emailExistsForOtherUser($id, $email)) {
-                throw new RuntimeException('Email is already in use.');
-            }
-
-            $fields = [
-                'username = :username',
-                'display_name = :display_name',
-                'email = :email',
-                'theme = :theme',
-                'contact_profiles = :contact_profiles',
-            ];
-
-            $params = [
-                ':id' => $id,
-                ':username' => $username,
-                ':display_name' => $displayName,
-                ':email' => $email,
-                ':theme' => $theme,
-                ':contact_profiles' => $contactProfilesEncoded,
-            ];
-
-            if ($password !== null && $password !== '') {
-                // Only rotate hash when a replacement password is provided.
-                $fields[] = 'password = :password';
-                $params[':password'] = password_hash($password, PASSWORD_DEFAULT);
-            }
-
-            if ($setAvatar) {
-                $fields[] = 'avatar_path = :avatar_path';
-                $params[':avatar_path'] = $avatarPath;
-            }
-
-            $stmt = $this->authDb->prepare(
-                'UPDATE ' . $usersTable . '
-                 SET ' . implode(', ', $fields) . '
-                 WHERE id = :id'
-            );
-            $stmt->execute($params);
-
-            // Memberships are replaced atomically in app database.
-            $this->setUserGroups($id, $groupIds);
-
-            return $id;
-        }
-
-        if ($username !== '' && $this->usernameExistsForOtherUser(0, $username)) {
-            throw new RuntimeException('Username is already in use.');
-        }
-
-        if ($this->emailExistsForOtherUser(0, $email)) {
-            throw new RuntimeException('Email is already in use.');
-        }
-
-        if ($password === null || $password === '') {
-            throw new RuntimeException('Password is required when creating a user.');
-        }
-
-        // Create mode: seed Delight Auth required columns with safe defaults.
-        $stmt = $this->authDb->prepare(
-            'INSERT INTO ' . $usersTable . '
-            (email, password, username, display_name, theme, avatar_path, contact_profiles, status, verified, resettable, roles_mask, registered, last_login, force_logout)
-            VALUES (:email, :password, :username, :display_name, :theme, :avatar_path, :contact_profiles, :status, :verified, :resettable, :roles_mask, :registered, :last_login, :force_logout)'
         );
-        $stmt->execute([
-            ':email' => $email,
-            ':password' => password_hash($password, PASSWORD_DEFAULT),
-            ':username' => $username,
-            ':display_name' => $displayName,
-            ':theme' => $theme,
-            ':avatar_path' => $setAvatar ? $avatarPath : null,
-            ':contact_profiles' => $contactProfilesEncoded,
-            ':status' => 0,
-            ':verified' => 1,
-            ':resettable' => 1,
-            ':roles_mask' => 0,
-            ':registered' => time(),
-            ':last_login' => null,
-            ':force_logout' => 0,
-        ]);
-
-        $newId = (int) $this->authDb->lastInsertId();
-
-        // Apply initial memberships immediately after account creation.
-        $this->setUserGroups($newId, $groupIds);
-
-        return $newId;
     }
 
     /**
@@ -769,19 +546,13 @@ final class UserRepository
      */
     public function deleteById(int $id): void
     {
-        $userGroups = $this->groupTable('user_groups');
-        $usersTable = $this->authTable('users');
-
-        // Memberships live in app database and are cleaned first.
-        $deleteMemberships = $this->appDb->prepare(
-            'DELETE FROM ' . $userGroups . ' WHERE user_id = :user_id'
+        $this->userPersistenceService->deleteUserById(
+            $this->authDb,
+            $this->appDb,
+            $this->authTable('users'),
+            $this->groupTable('user_groups'),
+            $id
         );
-        $deleteMemberships->execute([':user_id' => $id]);
-
-        $deleteUser = $this->authDb->prepare(
-            'DELETE FROM ' . $usersTable . ' WHERE id = :id'
-        );
-        $deleteUser->execute([':id' => $id]);
     }
 
     /**
@@ -789,30 +560,12 @@ final class UserRepository
      */
     public function usernameExistsForOtherUser(int $id, string $username): bool
     {
-        if (trim($username) === '') {
-            return false;
-        }
-
-        $usersTable = $this->authTable('users');
-
-        if ($id > 0) {
-            $stmt = $this->authDb->prepare(
-                'SELECT 1 FROM ' . $usersTable . ' WHERE username = :username AND id <> :id LIMIT 1'
-            );
-            $stmt->execute([
-                ':username' => $username,
-                ':id' => $id,
-            ]);
-
-            return $stmt->fetchColumn() !== false;
-        }
-
-        $stmt = $this->authDb->prepare(
-            'SELECT 1 FROM ' . $usersTable . ' WHERE username = :username LIMIT 1'
+        return $this->userPersistenceService->usernameExistsForOtherUser(
+            $this->authDb,
+            $this->authTable('users'),
+            $id,
+            $username
         );
-        $stmt->execute([':username' => $username]);
-
-        return $stmt->fetchColumn() !== false;
     }
 
     /**
@@ -820,26 +573,12 @@ final class UserRepository
      */
     public function emailExistsForOtherUser(int $id, string $email): bool
     {
-        $usersTable = $this->authTable('users');
-
-        if ($id > 0) {
-            $stmt = $this->authDb->prepare(
-                'SELECT 1 FROM ' . $usersTable . ' WHERE email = :email AND id <> :id LIMIT 1'
-            );
-            $stmt->execute([
-                ':email' => $email,
-                ':id' => $id,
-            ]);
-
-            return $stmt->fetchColumn() !== false;
-        }
-
-        $stmt = $this->authDb->prepare(
-            'SELECT 1 FROM ' . $usersTable . ' WHERE email = :email LIMIT 1'
+        return $this->userPersistenceService->emailExistsForOtherUser(
+            $this->authDb,
+            $this->authTable('users'),
+            $id,
+            $email
         );
-        $stmt->execute([':email' => $email]);
-
-        return $stmt->fetchColumn() !== false;
     }
 
     /**
@@ -849,19 +588,11 @@ final class UserRepository
      */
     public function groupIdsForUser(int $userId): array
     {
-        $userGroups = $this->groupTable('user_groups');
-
-        $stmt = $this->appDb->prepare(
-            'SELECT group_id
-             FROM ' . $userGroups . '
-             WHERE user_id = :user_id
-             ORDER BY group_id ASC'
+        return $this->userPersistenceService->groupIdsForUser(
+            $this->appDb,
+            $this->groupTable('user_groups'),
+            $userId
         );
-        $stmt->execute([':user_id' => $userId]);
-
-        $rows = $stmt->fetchAll() ?: [];
-
-        return array_map(static fn (array $row): int => (int) $row['group_id'], $rows);
     }
 
     /**
@@ -871,31 +602,15 @@ final class UserRepository
      */
     public function setUserGroups(int $userId, array $groupIds): void
     {
-        $groupIds = $this->normalizeGroupIds($groupIds);
-        $userGroups = $this->groupTable('user_groups');
-
-        // Replace-all strategy keeps membership state deterministic from panel payload.
-        $this->appDb->beginTransaction();
-
-        try {
-            $delete = $this->appDb->prepare(
-                'DELETE FROM ' . $userGroups . ' WHERE user_id = :user_id'
-            );
-            $delete->execute([':user_id' => $userId]);
-
-            foreach ($groupIds as $groupId) {
-                $this->attachUserToGroup($userId, $groupId);
+        $this->userPersistenceService->setUserGroups(
+            $this->appDb,
+            $this->groupTable('user_groups'),
+            $userId,
+            $this->normalizeGroupIds($groupIds),
+            function (int $memberUserId, int $groupId): void {
+                $this->attachUserToGroup($memberUserId, $groupId);
             }
-
-            // Commit only after delete+reinsert completes for every selected group id.
-            $this->appDb->commit();
-        } catch (\Throwable $exception) {
-            if ($this->appDb->inTransaction()) {
-                $this->appDb->rollBack();
-            }
-
-            throw $exception;
-        }
+        );
     }
 
     /**

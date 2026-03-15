@@ -2,6 +2,7 @@
 /private/config.php
 !/private/config.php.dist
 /private/dat/*
+/private/dat/install.lock
 !/private/dat/
 !/private/dat/channel/
 !/private/dat/channel/.channel.php.dist
@@ -21,8 +22,7 @@
 
 # Local temporary files
 /tmp/
-/private/tmp/
-/private/tmp/install.lock
+/.tmp/
 
 # Local dev tools
 /debug/

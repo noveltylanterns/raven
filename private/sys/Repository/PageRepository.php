@@ -13,8 +13,10 @@ namespace Raven\Repository;
 
 use PDO;
 use Raven\Lib\Content\PageBodyBlockCodec;
+use Raven\Lib\Content\PagePersistenceService;
 use Raven\Lib\Content\PagePanelFilterClauseBuilder;
 use Raven\Lib\Content\PageTaxonomyAssignmentService;
+use Raven\Lib\Content\PageTaxonomyQueryService;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 use Raven\Lib\Media\PageEditorGalleryHydrator;
 use Raven\Lib\Routing\ChannelContextService;
@@ -36,6 +38,8 @@ final class PageRepository
     private PageEditorGalleryHydrator $pageEditorGalleryHydrator;
     private PagePanelFilterClauseBuilder $panelFilterClauseBuilder;
     private PageTaxonomyAssignmentService $pageTaxonomyAssignmentService;
+    private PageTaxonomyQueryService $pageTaxonomyQueryService;
+    private PagePersistenceService $pagePersistenceService;
 
     public function __construct(
         PDO $db,
@@ -57,6 +61,8 @@ final class PageRepository
         $this->pageEditorGalleryHydrator = new PageEditorGalleryHydrator();
         $this->panelFilterClauseBuilder = new PagePanelFilterClauseBuilder();
         $this->pageTaxonomyAssignmentService = new PageTaxonomyAssignmentService();
+        $this->pageTaxonomyQueryService = new PageTaxonomyQueryService();
+        $this->pagePersistenceService = new PagePersistenceService();
     }
 
     /**
@@ -611,90 +617,35 @@ final class PageRepository
             throw new \RuntimeException('A page already exists for that slug/channel path.');
         }
 
-        // Persist page row + taxonomy assignments as one atomic unit.
-        $this->db->beginTransaction();
-
-        try {
-            if ($id > 0) {
-                // Update existing page row in place and keep immutable created_at untouched.
-                $stmt = $this->db->prepare(
-                    'UPDATE ' . $pages . '
-                     SET title = :title,
-                         slug = :slug,
-                         content = :content,
-                         extended = :extended,
-                         description = :description,
-                         display_title = :display_title,
-                         gallery_enabled = :gallery_enabled,
-                         author_user_id = :author_user_id,
-                         channel_id = :channel_id,
-                         is_published = :is_published,
-                         published_at = :published_at,
-                         updated_at = :updated_at
-                     WHERE id = :id'
-                );
-
-                $stmt->execute([
-                    ':title' => $title,
-                    ':slug' => $slug,
-                    ':content' => $content,
-                    ':extended' => $extended,
-                    ':description' => $description,
-                    ':display_title' => $displayTitle,
-                    ':gallery_enabled' => $galleryEnabled,
-                    ':author_user_id' => $authorUserId,
-                    ':channel_id' => $channelId,
-                    ':is_published' => $isPublished,
-                    ':published_at' => $publishedAt,
-                    ':updated_at' => $now,
-                    ':id' => $id,
-                ]);
-
-                $pageId = $id;
-            } else {
-                // Create path always stores created_at and updated_at together.
-                $stmt = $this->db->prepare(
-                    'INSERT INTO ' . $pages . '
-                    (title, slug, content, extended, description, display_title, gallery_enabled, channel_id, is_published, published_at, author_user_id, created_at, updated_at)
-                    VALUES (:title, :slug, :content, :extended, :description, :display_title, :gallery_enabled, :channel_id, :is_published, :published_at, :author_user_id, :created_at, :updated_at)'
-                );
-
-                $stmt->execute([
-                    ':title' => $title,
-                    ':slug' => $slug,
-                    ':content' => $content,
-                    ':extended' => $extended,
-                    ':description' => $description,
-                    ':display_title' => $displayTitle,
-                    ':gallery_enabled' => $galleryEnabled,
-                    ':channel_id' => $channelId,
-                    ':is_published' => $isPublished,
-                    ':published_at' => $publishedAt,
-                    ':author_user_id' => $authorUserId,
-                    ':created_at' => $now,
-                    ':updated_at' => $now,
-                ]);
-
-                $pageId = (int) $this->db->lastInsertId();
+        return $this->pagePersistenceService->savePage(
+            $this->db,
+            $pages,
+            [
+                'id' => $id,
+                'title' => $title,
+                'slug' => $slug,
+                'content' => $content,
+                'extended' => $extended,
+                'description' => $description,
+                'display_title' => $displayTitle,
+                'gallery_enabled' => $galleryEnabled,
+                'is_published' => $isPublished,
+                'author_user_id' => $authorUserId,
+                'channel_id' => $channelId,
+                'published_at' => is_scalar($publishedAt) ? (string) $publishedAt : null,
+                'now' => $now,
+                'category_ids' => $categoryIds,
+                'tag_ids' => $tagIds,
+            ],
+            $this->categoryEnabled,
+            $this->tagEnabled,
+            function (int $pageId, array $ids): void {
+                $this->replacePageCategories($pageId, $ids);
+            },
+            function (int $pageId, array $ids): void {
+                $this->replacePageTags($pageId, $ids);
             }
-
-            // Replace-all strategy keeps assignments deterministic from form payload.
-            if ($this->categoryEnabled) {
-                $this->replacePageCategories($pageId, $categoryIds);
-            }
-            if ($this->tagEnabled) {
-                $this->replacePageTags($pageId, $tagIds);
-            }
-
-            $this->db->commit();
-            return $pageId;
-        } catch (\Throwable $exception) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-
-            throw $exception;
-        }
+        );
     }
 
     /**
@@ -872,57 +823,17 @@ final class PageRepository
      */
     public function deleteById(int $id): void
     {
-        $pages = $this->table('pages');
-        $pageCategories = $this->table('page_categories');
-        $pageTags = $this->table('page_tags');
-        $pageImages = $this->table('page_images');
-        $pageImageVariants = $this->table('page_image_variants');
-
-        $this->db->beginTransaction();
-
-        try {
-            // Remove category links so no orphaned relations remain.
-            if ($this->categoryEnabled) {
-                $detachCategories = $this->db->prepare(
-                    'DELETE FROM ' . $pageCategories . ' WHERE page_id = :page_id'
-                );
-                $detachCategories->execute([':page_id' => $id]);
-            }
-
-            // Remove tag links before deleting the page row.
-            if ($this->tagEnabled) {
-                $detachTags = $this->db->prepare(
-                    'DELETE FROM ' . $pageTags . ' WHERE page_id = :page_id'
-                );
-                $detachTags->execute([':page_id' => $id]);
-            }
-
-            // Delete image variants first, then image rows, to keep rows consistent.
-            $detachImageVariants = $this->db->prepare(
-                'DELETE FROM ' . $pageImageVariants . '
-                 WHERE image_id IN (
-                    SELECT id FROM ' . $pageImages . ' WHERE page_id = :page_id
-                 )'
-            );
-            $detachImageVariants->execute([':page_id' => $id]);
-
-            $detachImages = $this->db->prepare(
-                'DELETE FROM ' . $pageImages . ' WHERE page_id = :page_id'
-            );
-            $detachImages->execute([':page_id' => $id]);
-
-            $delete = $this->db->prepare('DELETE FROM ' . $pages . ' WHERE id = :id');
-            $delete->execute([':id' => $id]);
-
-            // Commit only after relation cleanup and page delete both succeed.
-            $this->db->commit();
-        } catch (\Throwable $exception) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-
-            throw $exception;
-        }
+        $this->pagePersistenceService->deletePageById(
+            $this->db,
+            $this->table('pages'),
+            $this->table('page_categories'),
+            $this->table('page_tags'),
+            $this->table('page_images'),
+            $this->table('page_image_variants'),
+            $id,
+            $this->categoryEnabled,
+            $this->tagEnabled
+        );
     }
 
     /**
@@ -936,37 +847,18 @@ final class PageRepository
             return [];
         }
 
-        $pages = $this->table('pages');
-        $categories = $this->table('categories');
-        $pageCategories = $this->table('page_categories');
-
-        $sql = 'SELECT p.*
-                FROM ' . $pages . ' p
-                INNER JOIN ' . $pageCategories . ' pc ON pc.page_id = p.id
-                INNER JOIN ' . $categories . ' c ON c.id = pc.category_id
-                WHERE c.slug = :slug AND p.is_published = :is_published
-                ORDER BY p.published_at DESC, p.id DESC
-                LIMIT :limit OFFSET :offset';
-
-        // Join table enforces category membership while keeping page rows canonical.
-        $stmt = $this->db->prepare($sql);
-        $stmt->bindValue(':slug', $slug);
-        $stmt->bindValue(':is_published', 1, PDO::PARAM_INT);
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-        $stmt->execute();
-
-        $rows = $stmt->fetchAll() ?: [];
         $channelsById = $this->channelsByIdMap();
-        foreach ($rows as $index => $row) {
-            if (!is_array($row)) {
-                continue;
-            }
 
-            $rows[$index] = $this->withChannelContext($this->hydratePageRow($row), null, $channelsById);
-        }
-
-        return $rows;
+        return $this->pageTaxonomyQueryService->listByCategorySlug(
+            $this->db,
+            $this->table('pages'),
+            $this->table('categories'),
+            $this->table('page_categories'),
+            $slug,
+            $limit,
+            $offset,
+            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById)
+        );
     }
 
     /**
@@ -978,24 +870,13 @@ final class PageRepository
             return 0;
         }
 
-        $pages = $this->table('pages');
-        $categories = $this->table('categories');
-        $pageCategories = $this->table('page_categories');
-
-        $stmt = $this->db->prepare(
-            'SELECT COUNT(*)
-             FROM ' . $pages . ' p
-             INNER JOIN ' . $pageCategories . ' pc ON pc.page_id = p.id
-             INNER JOIN ' . $categories . ' c ON c.id = pc.category_id
-             WHERE c.slug = :slug AND p.is_published = :is_published'
+        return $this->pageTaxonomyQueryService->countByCategorySlug(
+            $this->db,
+            $this->table('pages'),
+            $this->table('categories'),
+            $this->table('page_categories'),
+            $slug
         );
-
-        $stmt->execute([
-            ':slug' => $slug,
-            ':is_published' => 1,
-        ]);
-
-        return (int) $stmt->fetchColumn();
     }
 
     /**
@@ -1009,37 +890,18 @@ final class PageRepository
             return [];
         }
 
-        $pages = $this->table('pages');
-        $tags = $this->table('tags');
-        $pageTags = $this->table('page_tags');
-
-        $sql = 'SELECT p.*
-                FROM ' . $pages . ' p
-                INNER JOIN ' . $pageTags . ' pt ON pt.page_id = p.id
-                INNER JOIN ' . $tags . ' t ON t.id = pt.tag_id
-                WHERE t.slug = :slug AND p.is_published = :is_published
-                ORDER BY p.published_at DESC, p.id DESC
-                LIMIT :limit OFFSET :offset';
-
-        // Join table enforces tag membership while keeping page rows canonical.
-        $stmt = $this->db->prepare($sql);
-        $stmt->bindValue(':slug', $slug);
-        $stmt->bindValue(':is_published', 1, PDO::PARAM_INT);
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-        $stmt->execute();
-
-        $rows = $stmt->fetchAll() ?: [];
         $channelsById = $this->channelsByIdMap();
-        foreach ($rows as $index => $row) {
-            if (!is_array($row)) {
-                continue;
-            }
 
-            $rows[$index] = $this->withChannelContext($this->hydratePageRow($row), null, $channelsById);
-        }
-
-        return $rows;
+        return $this->pageTaxonomyQueryService->listByTagSlug(
+            $this->db,
+            $this->table('pages'),
+            $this->table('tags'),
+            $this->table('page_tags'),
+            $slug,
+            $limit,
+            $offset,
+            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById)
+        );
     }
 
     /**
@@ -1051,24 +913,13 @@ final class PageRepository
             return 0;
         }
 
-        $pages = $this->table('pages');
-        $tags = $this->table('tags');
-        $pageTags = $this->table('page_tags');
-
-        $stmt = $this->db->prepare(
-            'SELECT COUNT(*)
-             FROM ' . $pages . ' p
-             INNER JOIN ' . $pageTags . ' pt ON pt.page_id = p.id
-             INNER JOIN ' . $tags . ' t ON t.id = pt.tag_id
-             WHERE t.slug = :slug AND p.is_published = :is_published'
+        return $this->pageTaxonomyQueryService->countByTagSlug(
+            $this->db,
+            $this->table('pages'),
+            $this->table('tags'),
+            $this->table('page_tags'),
+            $slug
         );
-
-        $stmt->execute([
-            ':slug' => $slug,
-            ':is_published' => 1,
-        ]);
-
-        return (int) $stmt->fetchColumn();
     }
 
     /**
@@ -1082,49 +933,19 @@ final class PageRepository
             return ['rows' => [], 'total' => 0];
         }
 
-        $pages = $this->table('pages');
-        $categories = $this->table('categories');
-        $pageCategories = $this->table('page_categories');
-        $safeLimit = max(1, $limit);
-        $safeOffset = max(0, $offset);
-
-        $stmt = $this->db->prepare(
-            'SELECT p.*, COUNT(*) OVER() AS total_rows
-             FROM ' . $pages . ' p
-             INNER JOIN ' . $pageCategories . ' pc ON pc.page_id = p.id
-             INNER JOIN ' . $categories . ' c ON c.id = pc.category_id
-             WHERE c.slug = :slug
-               AND p.is_published = :is_published
-             ORDER BY p.published_at DESC, p.id DESC
-             LIMIT :limit OFFSET :offset'
-        );
-        $stmt->bindValue(':slug', $slug);
-        $stmt->bindValue(':is_published', 1, PDO::PARAM_INT);
-        $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
-        $stmt->execute();
-
-        $rows = $stmt->fetchAll() ?: [];
-        $total = 0;
-        $resultRows = [];
         $channelsById = $this->channelsByIdMap();
-        foreach ($rows as $row) {
-            if ($total === 0) {
-                $total = (int) ($row['total_rows'] ?? 0);
-            }
 
-            unset($row['total_rows']);
-            $resultRows[] = $this->withChannelContext($this->hydratePageRow($row), null, $channelsById);
-        }
-
-        if ($resultRows === [] && $safeOffset > 0) {
-            $total = $this->countByCategorySlug($slug);
-        }
-
-        return [
-            'rows' => $resultRows,
-            'total' => $total,
-        ];
+        return $this->pageTaxonomyQueryService->listPageByCategorySlug(
+            $this->db,
+            $this->table('pages'),
+            $this->table('categories'),
+            $this->table('page_categories'),
+            $slug,
+            $limit,
+            $offset,
+            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById),
+            fn (string $taxonomySlug): int => $this->countByCategorySlug($taxonomySlug)
+        );
     }
 
     /**
@@ -1138,49 +959,19 @@ final class PageRepository
             return ['rows' => [], 'total' => 0];
         }
 
-        $pages = $this->table('pages');
-        $tags = $this->table('tags');
-        $pageTags = $this->table('page_tags');
-        $safeLimit = max(1, $limit);
-        $safeOffset = max(0, $offset);
-
-        $stmt = $this->db->prepare(
-            'SELECT p.*, COUNT(*) OVER() AS total_rows
-             FROM ' . $pages . ' p
-             INNER JOIN ' . $pageTags . ' pt ON pt.page_id = p.id
-             INNER JOIN ' . $tags . ' t ON t.id = pt.tag_id
-             WHERE t.slug = :slug
-               AND p.is_published = :is_published
-             ORDER BY p.published_at DESC, p.id DESC
-             LIMIT :limit OFFSET :offset'
-        );
-        $stmt->bindValue(':slug', $slug);
-        $stmt->bindValue(':is_published', 1, PDO::PARAM_INT);
-        $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
-        $stmt->execute();
-
-        $rows = $stmt->fetchAll() ?: [];
-        $total = 0;
-        $resultRows = [];
         $channelsById = $this->channelsByIdMap();
-        foreach ($rows as $row) {
-            if ($total === 0) {
-                $total = (int) ($row['total_rows'] ?? 0);
-            }
 
-            unset($row['total_rows']);
-            $resultRows[] = $this->withChannelContext($this->hydratePageRow($row), null, $channelsById);
-        }
-
-        if ($resultRows === [] && $safeOffset > 0) {
-            $total = $this->countByTagSlug($slug);
-        }
-
-        return [
-            'rows' => $resultRows,
-            'total' => $total,
-        ];
+        return $this->pageTaxonomyQueryService->listPageByTagSlug(
+            $this->db,
+            $this->table('pages'),
+            $this->table('tags'),
+            $this->table('page_tags'),
+            $slug,
+            $limit,
+            $offset,
+            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById),
+            fn (string $taxonomySlug): int => $this->countByTagSlug($taxonomySlug)
+        );
     }
 
     /**

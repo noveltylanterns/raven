@@ -63,7 +63,7 @@ Last updated: 2026-03-14
 
 ## Update Survivability
 - Keep end-user custom code in theme/extension directories only.
-- Keep runtime state/data in local/private paths (`private/config.php`, `private/dat/`, `private/tmp/`, uploads).
+- Keep runtime state/data in local/private paths (`private/config.php`, `private/dat/`, `.tmp/`, uploads).
 - Never require operators to patch core files to preserve customization across updates.
 - Document new extension/theme capabilities in subsystem AGENTS + `docs/` in the same task.
 
@@ -153,12 +153,14 @@ Where extensions are stored. Not all extensions will have all these files, but t
 Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Archive/ArchivePackageService.php` - Shared ZIP archive upload/extract/export helper service with path-safety validation and download streaming.
 - `/private/lib/Archive/PackageInstallWorkflowService.php` - Shared theme/extension package install workflow helper for ZIP payload validation, install-name resolution, and safe extraction into target directories.
+- `/private/lib/Channel/ChannelFileStoreService.php` - Shared channel metadata file-store helper for channel directory reads/writes, slug-path resolution, and id backfill persistence.
 - `/private/lib/Auth/AuthAccessGateService.php` - Shared permission-mask capability gate helper for panel/public access checks and panel permission-bit evaluation.
 - `/private/lib/Auth/AuthPayloadCodec.php` - Shared auth JSON payload codec for contact-profile and 2FA method decode/encode normalization.
 - `/private/lib/Auth/AuthGroupMembershipService.php` - Shared auth-side user-group membership query/mutation service with backend-aware idempotent assignment and request-local caching.
 - `/private/lib/Auth/AuthIdentityLookupService.php` - Shared auth identity lookup helpers for username-to-email resolution and uniqueness checks used by login/preferences.
 - `/private/lib/Auth/ContactProfileNormalizer.php` - Shared contact profile normalizer for deterministic `{type,value}` dedupe/sort limits.
 - `/private/lib/Auth/GroupMembershipWriteService.php` - Shared user-group membership write/count/custom-id helpers for duplicate-safe assignments and custom-group id allocation.
+- `/private/lib/Auth/GroupPublicRouteService.php` - Shared public group-route query helper for route-enabled group payloads and member row hydration.
 - `/private/lib/Auth/GroupRolePolicy.php` - Shared usergroup slug normalization and stock-role route/permission policy helper.
 - `/private/lib/Auth/LoginAttemptPolicy.php` - Shared login-attempt throttle policy helper for max/window/lock config normalization and request IP bucketing.
 - `/private/lib/Auth/LoginIdentifierResolver.php` - Shared login identifier mode + username/email normalization helper.
@@ -176,6 +178,8 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Auth/UserSecurityProfileService.php` - Shared user security-profile and 2FA-method helper for preference payload normalization/validation and method-state mutations.
 - `/private/lib/Auth/UserPanelHydrator.php` - Shared panel-facing user row hydrator for stable group-display metadata (`groups`, `group_entries`, `groups_text`).
 - `/private/lib/Auth/UserPanelQueryService.php` - Shared panel-user list/page query orchestration helpers for group filters, pagination payload shaping, and hydrated row handoff.
+- `/private/lib/Auth/UserPersistenceService.php` - Shared user create/update/delete persistence flow for uniqueness checks, password/avatar write policy, and membership replacement transactions.
+- `/private/lib/Auth/UserRoutingDataService.php` - Shared routing-table auth payload assembler for group/user inventory rows with panel user-group hydration handoff.
 - `/private/lib/Config/ConfigEditorNormalizer.php` - Shared configuration-editor normalization helpers for scalar/meta/media field parsing and validation.
 - `/private/lib/Config/ConfigEditorSchemaService.php` - Shared config-editor schema/default normalizer and field-map helper for flatten/read/write + legacy key migration.
 - `/private/lib/Config/ConfigFileStore.php` - Shared config array file load/save helper for PHP config stores with opcache-safe persistence behavior.
@@ -188,7 +192,9 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Content/MarkdownRenderer.php` - Shared lightweight markdown-to-HTML renderer for public body-block markdown output.
 - `/private/lib/Content/PageBodyBlockCodec.php` - Shared page body-block codec for editor payload normalization and persisted encode/decode behavior.
 - `/private/lib/Content/PagePanelFilterClauseBuilder.php` - Shared SQL filter-clause builder for panel page list/count queries (channel/category/tag prefilters with deterministic placeholders).
+- `/private/lib/Content/PagePersistenceService.php` - Shared transactional page write/delete orchestration for core page rows, taxonomy assignment replacement, and relation cleanup ordering.
 - `/private/lib/Content/PageTaxonomyAssignmentService.php` - Shared page category/tag assignment writer with backend-aware idempotent upserts.
+- `/private/lib/Content/PageTaxonomyQueryService.php` - Shared public category/tag page list/count pagination query helpers with callback-based row hydration hooks.
 - `/private/lib/Content/PublicPageBodyRenderer.php` - Shared public page body-block renderer for plaintext/autobr/markdown/markdown-file modes with safe local markdown file loading.
 - `/private/lib/Database/Connection/DriverConfigNormalizer.php` - Shared database driver/prefix and per-driver config normalization helper for connection bootstrapping.
 - `/private/lib/Database/Connection/DsnBuilder.php` - Shared MySQL/PostgreSQL DSN builder for profiled PDO connection wiring.
@@ -310,17 +316,17 @@ Core system files:
 - `/private/sys/Core/View.php` - Template rendering service for panel/public/extension views.
 - `/private/sys/Core/View/TemplateTagEngine.php` - Template tag render/cache engine delegating path resolution and brace-tag compilation to `/private/lib/View/`.
 - `/private/sys/Repository/CategoryRepository.php` - Category repository CRUD/query layer backed by shared runtime table-name resolution helpers from `/private/lib/Database/Runtime/`.
-- `/private/sys/Repository/ChannelRepository.php` - Channel repository (flat-file metadata + linked ids) access layer, now delegating slug/editor/route/nullable-field normalization to `/private/lib/Routing/ChannelRecordPolicy.php`.
-- `/private/sys/Repository/GroupRepository.php` - Group repository CRUD/query layer and permission mask persistence, now delegating slug normalization/stock-role route policy and shared membership writes/custom-id allocation helpers through `/private/lib/Auth/`.
+- `/private/sys/Repository/ChannelRepository.php` - Channel repository (flat-file metadata + linked ids) access layer, now delegating channel file read/write/id-backfill persistence to `/private/lib/Channel/ChannelFileStoreService.php` and slug/editor/route/nullable-field normalization to `/private/lib/Routing/ChannelRecordPolicy.php`.
+- `/private/sys/Repository/GroupRepository.php` - Group repository CRUD/query layer and permission mask persistence, now delegating slug normalization/stock-role route policy, public route payload queries, and shared membership writes/custom-id allocation helpers through `/private/lib/Auth/`.
 - `/private/sys/Repository/InviteTokenRepository.php` - Invite token repository CRUD/query layer for registration workflows, now using shared auth-table resolution helpers from `/private/lib/Database/Runtime/` and invite token crypto/format policy from `/private/lib/Security/InviteTokenPolicy.php`.
 - `/private/sys/Repository/PageImageRepository.php` - Page gallery image metadata repository backed by shared runtime table-name resolution helpers from `/private/lib/Database/Runtime/`, shared cover/preview selection policy, and shared transactional page-image delete workflows from `/private/lib/Media/`.
-- `/private/sys/Repository/PageRepository.php` - Page repository CRUD, routing, taxonomy, and body-block persistence (now using shared page body-block codec + panel filter-clause + taxonomy-assignment helpers from `/private/lib/Content/`, page-editor gallery hydration helpers from `/private/lib/Media/`, and shared channel context/path-scope helpers from `/private/lib/Routing/`).
+- `/private/sys/Repository/PageRepository.php` - Page repository CRUD, routing, taxonomy, and body-block persistence (now using shared page body-block codec + panel filter-clause + taxonomy assignment/public taxonomy query/persistence services from `/private/lib/Content/`, page-editor gallery hydration helpers from `/private/lib/Media/`, and shared channel context/path-scope helpers from `/private/lib/Routing/`).
 - `/private/sys/Repository/RedirectRepository.php` - Redirect repository CRUD/query layer, now delegating path-scope uniqueness and channel-context hydration helpers to `/private/lib/Routing/`.
 - `/private/sys/Repository/TagRepository.php` - Tag repository CRUD/query layer.
 - `/private/sys/Repository/TaxonomyRepository.php` - Shared taxonomy repository helpers and cross-taxonomy queries, now reusing shared channel-context and runtime table-name helpers from `/private/lib/`.
-- `/private/sys/Repository/UserRepository.php` - User repository CRUD/profile/contact/group membership persistence, now reusing shared auth payload codec helpers for contact profile normalization, shared user-group catalog mapping, panel-user list/page query orchestration + row hydration, shared membership write helpers from `/private/lib/Auth/`, and shared runtime table-name resolution helpers from `/private/lib/Database/Runtime/`.
+- `/private/sys/Repository/UserRepository.php` - User repository CRUD/profile/contact/group membership persistence, now reusing shared auth payload codec helpers for contact profile normalization, shared user-group catalog mapping, panel-user list/page query orchestration + row hydration, shared routing-data assembly/user persistence/membership write helpers from `/private/lib/Auth/`, and shared runtime table-name resolution helpers from `/private/lib/Database/Runtime/`.
 
-#### /private/tmp/
+#### /.tmp/
 Sometimes temporary files get stashed here.
 
 #### /private/vis/
