@@ -13,6 +13,7 @@ namespace Raven\Repository;
 
 use PDO;
 use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Media\PageImageDeletionService;
 use Raven\Lib\Media\PageImagePrimarySelectionService;
 
 /**
@@ -24,6 +25,7 @@ final class PageImageRepository
     private string $driver;
     private string $prefix;
     private PageImagePrimarySelectionService $pageImagePrimarySelectionService;
+    private PageImageDeletionService $pageImageDeletionService;
 
     public function __construct(PDO $db, string $driver, string $prefix)
     {
@@ -32,6 +34,7 @@ final class PageImageRepository
         // Prefix is only used in shared-db modes; SQLite uses attached DB names instead.
         $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
         $this->pageImagePrimarySelectionService = new PageImagePrimarySelectionService();
+        $this->pageImageDeletionService = new PageImageDeletionService();
     }
 
     /**
@@ -582,63 +585,13 @@ final class PageImageRepository
      */
     public function deleteImageForPage(int $pageId, int $imageId): ?array
     {
-        $images = $this->table('page_images');
-        $variants = $this->table('page_image_variants');
-
-        $this->db->beginTransaction();
-
-        try {
-            $readImage = $this->db->prepare(
-                'SELECT stored_path
-                 FROM ' . $images . '
-                 WHERE id = :id AND page_id = :page_id
-                 LIMIT 1'
-            );
-            $readImage->execute([
-                ':id' => $imageId,
-                ':page_id' => $pageId,
-            ]);
-            $imagePath = $readImage->fetchColumn();
-
-            if ($imagePath === false) {
-                $this->db->rollBack();
-                return null;
-            }
-
-            $readVariants = $this->db->prepare(
-                'SELECT stored_path FROM ' . $variants . ' WHERE image_id = :image_id'
-            );
-            $readVariants->execute([':image_id' => $imageId]);
-            $variantRows = $readVariants->fetchAll() ?: [];
-
-            $deleteVariants = $this->db->prepare(
-                'DELETE FROM ' . $variants . ' WHERE image_id = :image_id'
-            );
-            $deleteVariants->execute([':image_id' => $imageId]);
-
-            $deleteImage = $this->db->prepare(
-                'DELETE FROM ' . $images . ' WHERE id = :id AND page_id = :page_id'
-            );
-            $deleteImage->execute([
-                ':id' => $imageId,
-                ':page_id' => $pageId,
-            ]);
-
-            $this->db->commit();
-
-            $storedPaths = [(string) $imagePath];
-            foreach ($variantRows as $variantRow) {
-                $storedPaths[] = (string) ($variantRow['stored_path'] ?? '');
-            }
-
-            return ['stored_paths' => array_values(array_filter($storedPaths, static fn (string $path): bool => $path !== ''))];
-        } catch (\Throwable $exception) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-
-            throw $exception;
-        }
+        return $this->pageImageDeletionService->deleteImageForPage(
+            $this->db,
+            $this->table('page_images'),
+            $this->table('page_image_variants'),
+            $pageId,
+            $imageId
+        );
     }
 
     /**
@@ -648,64 +601,12 @@ final class PageImageRepository
      */
     public function deleteAllForPage(int $pageId): array
     {
-        $images = $this->table('page_images');
-        $variants = $this->table('page_image_variants');
-
-        $this->db->beginTransaction();
-
-        try {
-            $readPaths = $this->db->prepare(
-                'SELECT i.stored_path AS image_path, v.stored_path AS variant_path
-                 FROM ' . $images . ' i
-                 LEFT JOIN ' . $variants . ' v ON v.image_id = i.id
-                 WHERE i.page_id = :page_id'
-            );
-            $readPaths->execute([':page_id' => $pageId]);
-            $rows = $readPaths->fetchAll() ?: [];
-
-            $imageIdsStmt = $this->db->prepare(
-                'SELECT id FROM ' . $images . ' WHERE page_id = :page_id'
-            );
-            $imageIdsStmt->execute([':page_id' => $pageId]);
-            $imageIds = array_map(static fn (mixed $value): int => (int) $value, $imageIdsStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
-
-            if ($imageIds !== []) {
-                $placeholders = implode(', ', array_fill(0, count($imageIds), '?'));
-                $deleteVariants = $this->db->prepare(
-                    'DELETE FROM ' . $variants . ' WHERE image_id IN (' . $placeholders . ')'
-                );
-                $deleteVariants->execute($imageIds);
-            }
-
-            $deleteImages = $this->db->prepare(
-                'DELETE FROM ' . $images . ' WHERE page_id = :page_id'
-            );
-            $deleteImages->execute([':page_id' => $pageId]);
-
-            $this->db->commit();
-
-            $paths = [];
-            foreach ($rows as $row) {
-                $imagePath = (string) ($row['image_path'] ?? '');
-                $variantPath = (string) ($row['variant_path'] ?? '');
-
-                if ($imagePath !== '') {
-                    $paths[$imagePath] = $imagePath;
-                }
-
-                if ($variantPath !== '') {
-                    $paths[$variantPath] = $variantPath;
-                }
-            }
-
-            return array_values($paths);
-        } catch (\Throwable $exception) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-
-            throw $exception;
-        }
+        return $this->pageImageDeletionService->deleteAllForPage(
+            $this->db,
+            $this->table('page_images'),
+            $this->table('page_image_variants'),
+            $pageId
+        );
     }
 
     /**

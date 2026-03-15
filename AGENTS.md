@@ -158,6 +158,7 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Auth/AuthGroupMembershipService.php` - Shared auth-side user-group membership query/mutation service with backend-aware idempotent assignment and request-local caching.
 - `/private/lib/Auth/AuthIdentityLookupService.php` - Shared auth identity lookup helpers for username-to-email resolution and uniqueness checks used by login/preferences.
 - `/private/lib/Auth/ContactProfileNormalizer.php` - Shared contact profile normalizer for deterministic `{type,value}` dedupe/sort limits.
+- `/private/lib/Auth/GroupMembershipWriteService.php` - Shared user-group membership write/count/custom-id helpers for duplicate-safe assignments and custom-group id allocation.
 - `/private/lib/Auth/GroupRolePolicy.php` - Shared usergroup slug normalization and stock-role route/permission policy helper.
 - `/private/lib/Auth/LoginAttemptPolicy.php` - Shared login-attempt throttle policy helper for max/window/lock config normalization and request IP bucketing.
 - `/private/lib/Auth/LoginIdentifierResolver.php` - Shared login identifier mode + username/email normalization helper.
@@ -169,15 +170,18 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Auth/PanelSessionGuard.php` - Shared panel login-guard flow and panel-identity session synchronization helper.
 - `/private/lib/Auth/PanelTwoFactorPreferencesService.php` - Shared panel preferences 2FA helper for type options/method normalization/TOTP+recovery payload prep and WebAuthn registration identity/exclusion orchestration.
 - `/private/lib/Auth/PermissionMaskService.php` - Shared user/guest permission-mask composition + cache helper for group-based panel/public access checks.
+- `/private/lib/Auth/TwoFactorChallengeVerificationService.php` - Shared verification helpers for pending 2FA challenge methods (TOTP and recovery code selection + one-time invalidation flow).
 - `/private/lib/Auth/TwoFactorSessionStateService.php` - Shared session-state helper for interactive 2FA challenge lifecycle (`pending`, `verified`, and challenge-clear transitions).
 - `/private/lib/Auth/UserGroupCatalogService.php` - Shared panel user-group map/group-option query and sorting helper for user list/editor payloads.
 - `/private/lib/Auth/UserSecurityProfileService.php` - Shared user security-profile and 2FA-method helper for preference payload normalization/validation and method-state mutations.
 - `/private/lib/Auth/UserPanelHydrator.php` - Shared panel-facing user row hydrator for stable group-display metadata (`groups`, `group_entries`, `groups_text`).
+- `/private/lib/Auth/UserPanelQueryService.php` - Shared panel-user list/page query orchestration helpers for group filters, pagination payload shaping, and hydrated row handoff.
 - `/private/lib/Config/ConfigEditorNormalizer.php` - Shared configuration-editor normalization helpers for scalar/meta/media field parsing and validation.
 - `/private/lib/Config/ConfigEditorSchemaService.php` - Shared config-editor schema/default normalizer and field-map helper for flatten/read/write + legacy key migration.
 - `/private/lib/Config/ConfigFileStore.php` - Shared config array file load/save helper for PHP config stores with opcache-safe persistence behavior.
 - `/private/lib/Config/PanelConfigDefaultsService.php` - Shared panel configuration-editor defaults bundle that applies section ensure rules and scalar/media coercion helpers.
 - `/private/lib/Config/PanelConfigFieldPolicyService.php` - Shared panel configuration-editor per-path validation/casting policy for route prefixes, session cookie fields, auth modes, meta URL fields, and media/debug coercion.
+- `/private/lib/Config/PanelMediaConfigService.php` - Shared panel media config helper for avatar upload limits, extension allowlists, and media filesize policy normalization.
 - `/private/lib/Config/ConfigSnapshotSanitizer.php` - Shared config snapshot sanitizer for stripping core-managed keys before panel editor save/render flows.
 - `/private/lib/Config/ConfigValueParser.php` - Shared scalar configuration parsing helpers for booleans and numeric values with fallback/clamp behavior.
 - `/private/lib/Content/BodyBlockPolicy.php` - Shared page body-block definition defaults and CSS/type/editor normalization helpers for panel/public flows.
@@ -191,6 +195,7 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Database/Connection/SqliteConnectionBootstrap.php` - Shared SQLite filesystem/bootstrap helper for directory creation and pragma initialization.
 - `/private/lib/Database/Connection/SqlitePathResolver.php` - Shared canonical SQLite database-path resolver (`pages/auth/taxonomy/extensions`).
 - `/private/lib/Database/Runtime/TableNameResolver.php` - Shared runtime table resolver for app-db/auth-db logical names across sqlite attached schemas and prefixed server DBs.
+- `/private/lib/Database/SqlUpsertPolicy.php` - Shared backend-aware SQL builder for duplicate-safe idempotent insert/upsert statements.
 - `/private/lib/Database/Profiling/ProfiledPDO.php` - PDO subclass that records query timings through an injected profiler contract.
 - `/private/lib/Database/Profiling/ProfiledPDOStatement.php` - PDOStatement subclass that records execute payloads/timings through a profiler contract.
 - `/private/lib/Database/Profiling/QueryProfilerInterface.php` - Interface contract for query profiling collectors used by profiled PDO classes.
@@ -222,6 +227,7 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Media/AvatarUploadService.php` - Shared avatar upload sanitizer/thumbnail generator and deterministic avatar filename+storage lifecycle helper.
 - `/private/lib/Media/AvatarValidationPolicy.php` - Shared avatar upload validation policy for file-size, MIME, extension, and dimension guardrails.
 - `/private/lib/Media/ImageVariantProcessor.php` - Shared image variant-generation helper for GD resize/orient/encode pipelines.
+- `/private/lib/Media/PageImageDeletionService.php` - Shared transactional page-image/variant delete workflows with deleted-path collection payloads.
 - `/private/lib/Media/PageImagePathLayout.php` - Shared page-image path/filename layout helper for deterministic storage and cleanup.
 - `/private/lib/Media/PageImagePrimarySelectionService.php` - Shared page-image cover/preview canonicalization and persisted single-selection enforcement helper.
 - `/private/lib/Media/PageImageUploadPolicy.php` - Shared page-image upload constraints and upload-error mapping helper.
@@ -286,9 +292,9 @@ Bootstrap/service container wiring and startup helpers.
 #### /private/sys/
 Core system files:
 - `/private/sys/Controller/AuthController.php` - Authentication controller for login/logout and auth flow handling, now delegating flash/json/panel-url/identifier normalization, login-attempt throttle policy, 2FA challenge-state selection, WebAuthn login challenge context preparation, and panel site-context helpers through `/private/lib/`.
-- `/private/sys/Controller/PanelController.php` - Primary panel controller for admin routes/forms/page rendering, now delegating shared flash/json/pagination/panel-url/editor-tab/routing-preview/route-config+schema parsing/config snapshot sanitization/config-default enforcement/config-field policy validation/routing inventory building/archive packaging/package-install workflow/invite policy/post payload normalization/directory-tree cleanup/extension-state+catalog+permission+editor-catalog services/avatar/taxonomy image processing/upload normalization/page-body codec/panel-session guard/panel 2FA-preferences orchestration/theme catalog+clone+scaffold generators/profile-contact normalization/page-author option building and fallback/site-context helpers through `/private/lib/`.
+- `/private/sys/Controller/PanelController.php` - Primary panel controller for admin routes/forms/page rendering, now delegating shared flash/json/pagination/panel-url/editor-tab/routing-preview/route-config+schema parsing/config snapshot sanitization/config-default enforcement/config-field policy validation/panel media config policy/routing inventory building/archive packaging/package-install workflow/invite policy/post payload normalization/directory-tree cleanup/extension-state+catalog+permission+editor-catalog services/avatar/taxonomy image processing/upload normalization/page-body codec/panel-session guard/panel 2FA-preferences orchestration/theme catalog+clone+scaffold generators/profile-contact normalization/page-author option building and fallback/site-context helpers through `/private/lib/`.
 - `/private/sys/Controller/PublicController.php` - Primary public controller for frontend rendering/form endpoints, now delegating shared flash/panel-url/route-config/captcha/redirect validation/channel route policy/public channel page-route segment parsing+canonicalization/request-context resolution/site-context/public-meta/theme-catalog/embedded-form runtime/template resolution+pipeline+decoration/public route render-decision policy/page-body codec+policy/public page-body rendering/extension editor-catalog/profile-contact helpers and markdown rendering through `/private/lib/`.
-- `/private/sys/Core/Auth/AuthService.php` - Auth service wrapper around session/auth provider operations, now delegating login-throttle persistence, auth payload codec normalization, identity lookup/group membership, interactive 2FA session-state handling + security profile mutations, permission capability gate checks, and permission-mask composition/caching through `/private/lib/Auth/`.
+- `/private/sys/Core/Auth/AuthService.php` - Auth service wrapper around session/auth provider operations, now delegating login-throttle persistence, auth payload codec normalization, identity lookup/group membership, interactive 2FA session-state + challenge verification handling, security profile mutations, permission capability gate checks, and permission-mask composition/caching through `/private/lib/Auth/`.
 - `/private/sys/Core/Auth/PanelAccess.php` - Panel permission bit constants and guard helpers, delegating stock route/group catalog definitions through `/private/lib/Auth/PanelAccessCatalog.php`.
 - `/private/sys/Core/Config.php` - Config loader/getter/setter service for Raven config keys, delegating underlying file load/save persistence to `/private/lib/Config/ConfigFileStore.php`.
 - `/private/sys/Core/Database/ConnectionFactory.php` - Database connection factory for SQLite/MySQL/PostgreSQL backends, delegating DSN/config/sqlite path/bootstrap concerns through `/private/lib/Database/Connection/`.
@@ -305,14 +311,14 @@ Core system files:
 - `/private/sys/Core/View/TemplateTagEngine.php` - Template tag render/cache engine delegating path resolution and brace-tag compilation to `/private/lib/View/`.
 - `/private/sys/Repository/CategoryRepository.php` - Category repository CRUD/query layer backed by shared runtime table-name resolution helpers from `/private/lib/Database/Runtime/`.
 - `/private/sys/Repository/ChannelRepository.php` - Channel repository (flat-file metadata + linked ids) access layer, now delegating slug/editor/route/nullable-field normalization to `/private/lib/Routing/ChannelRecordPolicy.php`.
-- `/private/sys/Repository/GroupRepository.php` - Group repository CRUD/query layer and permission mask persistence, now delegating slug normalization and stock-role route/permission policy to `/private/lib/Auth/GroupRolePolicy.php`.
+- `/private/sys/Repository/GroupRepository.php` - Group repository CRUD/query layer and permission mask persistence, now delegating slug normalization/stock-role route policy and shared membership writes/custom-id allocation helpers through `/private/lib/Auth/`.
 - `/private/sys/Repository/InviteTokenRepository.php` - Invite token repository CRUD/query layer for registration workflows, now using shared auth-table resolution helpers from `/private/lib/Database/Runtime/` and invite token crypto/format policy from `/private/lib/Security/InviteTokenPolicy.php`.
-- `/private/sys/Repository/PageImageRepository.php` - Page gallery image metadata repository backed by shared runtime table-name resolution helpers from `/private/lib/Database/Runtime/` and shared cover/preview selection policy from `/private/lib/Media/PageImagePrimarySelectionService.php`.
+- `/private/sys/Repository/PageImageRepository.php` - Page gallery image metadata repository backed by shared runtime table-name resolution helpers from `/private/lib/Database/Runtime/`, shared cover/preview selection policy, and shared transactional page-image delete workflows from `/private/lib/Media/`.
 - `/private/sys/Repository/PageRepository.php` - Page repository CRUD, routing, taxonomy, and body-block persistence (now using shared page body-block codec + panel filter-clause + taxonomy-assignment helpers from `/private/lib/Content/`, page-editor gallery hydration helpers from `/private/lib/Media/`, and shared channel context/path-scope helpers from `/private/lib/Routing/`).
 - `/private/sys/Repository/RedirectRepository.php` - Redirect repository CRUD/query layer, now delegating path-scope uniqueness and channel-context hydration helpers to `/private/lib/Routing/`.
 - `/private/sys/Repository/TagRepository.php` - Tag repository CRUD/query layer.
 - `/private/sys/Repository/TaxonomyRepository.php` - Shared taxonomy repository helpers and cross-taxonomy queries, now reusing shared channel-context and runtime table-name helpers from `/private/lib/`.
-- `/private/sys/Repository/UserRepository.php` - User repository CRUD/profile/contact/group membership persistence, now reusing shared auth payload codec helpers for contact profile normalization, shared user-group catalog mapping from `/private/lib/Auth/UserGroupCatalogService.php`, shared panel-user row hydration from `/private/lib/Auth/`, and shared runtime table-name resolution helpers from `/private/lib/Database/Runtime/`.
+- `/private/sys/Repository/UserRepository.php` - User repository CRUD/profile/contact/group membership persistence, now reusing shared auth payload codec helpers for contact profile normalization, shared user-group catalog mapping, panel-user list/page query orchestration + row hydration, shared membership write helpers from `/private/lib/Auth/`, and shared runtime table-name resolution helpers from `/private/lib/Database/Runtime/`.
 
 #### /private/tmp/
 Sometimes temporary files get stashed here.

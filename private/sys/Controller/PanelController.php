@@ -31,6 +31,7 @@ use Raven\Lib\Config\PanelConfigFieldPolicyService;
 use Raven\Lib\Config\ConfigEditorSchemaService;
 use Raven\Lib\Config\ConfigSnapshotSanitizer;
 use Raven\Lib\Config\ConfigEditorNormalizer;
+use Raven\Lib\Config\PanelMediaConfigService;
 use Raven\Lib\Content\BodyBlockPolicy;
 use Raven\Lib\Content\PageBodyBlockCodec;
 use Raven\Lib\Extension\ExtensionCatalogService;
@@ -140,6 +141,7 @@ final class PanelController
     private ?PanelPostNormalizer $panelPostNormalizer = null;
     private ?PackageInstallWorkflowService $packageInstallWorkflowService = null;
     private ?DirectoryTreeService $directoryTreeService = null;
+    private ?PanelMediaConfigService $panelMediaConfigService = null;
 
     public function __construct(
         View $view,
@@ -4644,21 +4646,7 @@ final class PanelController
      */
     private function resolveMediaMaxFilesizeBytes(string $target, int $defaultBytes): int
     {
-        $config = $this->config->all();
-        $section = $config['media'][$target] ?? null;
-        if (is_array($section) && array_key_exists('max_filesize_kb', $section)) {
-            $kilobytes = (int) $section['max_filesize_kb'];
-            if ($kilobytes > 0) {
-                return max(1, $kilobytes * 1024);
-            }
-
-            if ($kilobytes === 0) {
-                // `0` means unlimited file size in the config editor.
-                return 0;
-            }
-        }
-
-        return max(1, $defaultBytes);
+        return $this->panelMediaConfigService()->resolveMediaMaxFilesizeBytes($target, $defaultBytes);
     }
 
     /**
@@ -4666,12 +4654,7 @@ final class PanelController
      */
     private function resolveAvatarAllowedExtensionsCsv(): string
     {
-        $avatarAllowList = trim((string) $this->config->get('media.avatars.allowed_extensions', ''));
-        if ($avatarAllowList !== '') {
-            return $avatarAllowList;
-        }
-
-        return trim((string) $this->config->get('media.images.allowed_extensions', ''));
+        return $this->panelMediaConfigService()->resolveAvatarAllowedExtensionsCsv();
     }
 
     /**
@@ -4679,27 +4662,7 @@ final class PanelController
      */
     private function avatarAllowedExtensionsLabel(): string
     {
-        $raw = strtolower(trim($this->resolveAvatarAllowedExtensionsCsv()));
-        if ($raw === '') {
-            return 'none';
-        }
-
-        $parts = preg_split('/[\s,]+/', $raw) ?: [];
-        $allowed = [];
-        foreach ($parts as $part) {
-            $token = trim($part);
-            if (!in_array($token, ['gif', 'jpg', 'jpeg', 'png'], true)) {
-                continue;
-            }
-
-            $allowed[$token] = $token;
-        }
-
-        if ($allowed === []) {
-            return 'none';
-        }
-
-        return implode('/', array_values($allowed));
+        return $this->panelMediaConfigService()->avatarAllowedExtensionsLabel();
     }
 
     /**
@@ -4707,13 +4670,7 @@ final class PanelController
      */
     private function avatarUploadLimitsNote(): string
     {
-        $maxBytes = $this->resolveMediaMaxFilesizeBytes('avatars', 1048576);
-        $maxKilobytes = $maxBytes <= 0 ? 0 : (int) max(1, ceil($maxBytes / 1024));
-        $maxWidth = max(1, (int) $this->config->get('media.avatars.max_width', 500));
-        $maxHeight = max(1, (int) $this->config->get('media.avatars.max_height', 500));
-        $extensions = $this->avatarAllowedExtensionsLabel();
-
-        return 'Max: ' . $maxKilobytes . 'KB, ' . $maxWidth . 'x' . $maxHeight . 'px, ' . $extensions;
+        return $this->panelMediaConfigService()->avatarUploadLimitsNote();
     }
 
     /**
@@ -6363,6 +6320,15 @@ final class PanelController
         }
 
         return $this->panelConfigFieldPolicyService;
+    }
+
+    private function panelMediaConfigService(): PanelMediaConfigService
+    {
+        if (!$this->panelMediaConfigService instanceof PanelMediaConfigService) {
+            $this->panelMediaConfigService = new PanelMediaConfigService($this->config);
+        }
+
+        return $this->panelMediaConfigService;
     }
 
     private function panelTwoFactorPreferencesService(): PanelTwoFactorPreferencesService

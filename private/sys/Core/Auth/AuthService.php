@@ -19,6 +19,7 @@ use Raven\Lib\Auth\AuthIdentityLookupService;
 use Raven\Lib\Auth\ContactProfileNormalizer;
 use Raven\Lib\Auth\LoginThrottleService;
 use Raven\Lib\Auth\PermissionMaskService;
+use Raven\Lib\Auth\TwoFactorChallengeVerificationService;
 use Raven\Lib\Auth\TwoFactorSessionStateService;
 use Raven\Lib\Auth\UserSecurityProfileService;
 use Raven\Lib\Database\Runtime\TableNameResolver;
@@ -53,6 +54,7 @@ final class AuthService
     private AuthGroupMembershipService $groupMembership;
     private TwoFactorSessionStateService $twoFactorSessionState;
     private AuthAccessGateService $authAccessGateService;
+    private TwoFactorChallengeVerificationService $twoFactorChallengeVerificationService;
 
     /**
      * Request-local cache for user preference rows by user id.
@@ -84,6 +86,7 @@ final class AuthService
         $this->groupMembership = new AuthGroupMembershipService($appDb, $driver, $prefix);
         $this->twoFactorSessionState = new TwoFactorSessionStateService();
         $this->authAccessGateService = new AuthAccessGateService();
+        $this->twoFactorChallengeVerificationService = new TwoFactorChallengeVerificationService();
 
         $this->bootstrapDelightAuth();
     }
@@ -302,15 +305,12 @@ final class AuthService
             return false;
         }
 
-        $preferences = $this->userPreferences($pendingUserId);
-        if (!is_array($preferences)) {
-            return false;
-        }
-
-        $methods = is_array($preferences['two_factor_methods'] ?? null)
-            ? $preferences['two_factor_methods']
-            : [];
-        return $this->securityProfiles->verifyTotpCode($methods, $submittedCode, 'Raven CMS');
+        return $this->twoFactorChallengeVerificationService->verifyPendingTotpCode(
+            $this->userPreferences($pendingUserId),
+            $submittedCode,
+            $this->securityProfiles,
+            'Raven CMS'
+        );
     }
 
     /**
@@ -325,33 +325,16 @@ final class AuthService
             return false;
         }
 
-        $preferences = $this->userPreferences($pendingUserId);
-        if (!is_array($preferences)) {
-            return false;
-        }
-
-        $methods = is_array($preferences['two_factor_methods'] ?? null)
-            ? array_values($preferences['two_factor_methods'])
-            : [];
-        $matched = $this->securityProfiles->matchRecoveryMethod($methods, $submittedPhrase, $selectedMethodKey);
-        if (!is_array($matched)) {
-            return false;
-        }
-
-        if (!(bool) ($matched['reusable'] ?? false)) {
-            $matchedIndex = (int) ($matched['index'] ?? -1);
-            if ($matchedIndex < 0 || !array_key_exists($matchedIndex, $methods)) {
-                return false;
+        return $this->twoFactorChallengeVerificationService->verifyPendingRecoveryCode(
+            $this->userPreferences($pendingUserId),
+            $submittedPhrase,
+            $selectedMethodKey,
+            $this->securityProfiles,
+            function (array $methods) use ($pendingUserId): bool {
+                $updated = $this->updateUserTwoFactorMethods($pendingUserId, $methods);
+                return (bool) ($updated['ok'] ?? false);
             }
-
-            unset($methods[$matchedIndex]);
-            $updated = $this->updateUserTwoFactorMethods($pendingUserId, array_values($methods));
-            if (!(bool) ($updated['ok'] ?? false)) {
-                return false;
-            }
-        }
-
-        return true;
+        );
     }
 
     /**

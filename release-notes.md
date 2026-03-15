@@ -39,6 +39,8 @@
 - Rewired `PanelController`, `AuthController`, `PublicController`, and `Core/Config` to delegate these concerns through `private/lib/`, and refreshed the `AGENTS.md` `private/lib` + `private/sys` file-tree summaries accordingly.
 - Added fifteenth-wave `private/lib/` modularization for auth access gating, group role policy, user-group catalog assembly, page taxonomy assignment writes, page-image primary selection policy, and recursive directory cleanup (`AuthAccessGateService`, `GroupRolePolicy`, `UserGroupCatalogService`, `PageTaxonomyAssignmentService`, `PageImagePrimarySelectionService`, `DirectoryTreeService`).
 - Rewired `AuthService`, `GroupRepository`, `UserRepository`, `PageRepository`, `PageImageRepository`, and `PanelController` to delegate these concerns through `private/lib/`, and refreshed `AGENTS.md` file-tree/responsibility notes for the new modules.
+- Added sixteenth-wave `private/lib/` modularization for backend-agnostic idempotent upsert SQL policy, group membership writes/custom-id allocation, pending 2FA challenge verification, panel-user list/page query orchestration, page-image deletion workflows, and panel media config policy helpers (`SqlUpsertPolicy`, `GroupMembershipWriteService`, `TwoFactorChallengeVerificationService`, `UserPanelQueryService`, `PageImageDeletionService`, `PanelMediaConfigService`).
+- Rewired `AuthService`, `UserRepository`, `GroupRepository`, `PageImageRepository`, `PanelController`, and `PageTaxonomyAssignmentService` to delegate these concerns through `private/lib/`, and refreshed `AGENTS.md` private file-tree delegation summaries.
 
 ### March 13, 2026
 

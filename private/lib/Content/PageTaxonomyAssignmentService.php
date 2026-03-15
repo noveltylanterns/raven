@@ -5,12 +5,20 @@ declare(strict_types=1);
 namespace Raven\Lib\Content;
 
 use PDO;
+use Raven\Lib\Database\SqlUpsertPolicy;
 
 /**
  * Shared page taxonomy assignment writer for categories and tags.
  */
 final class PageTaxonomyAssignmentService
 {
+    private SqlUpsertPolicy $upsertPolicy;
+
+    public function __construct(?SqlUpsertPolicy $upsertPolicy = null)
+    {
+        $this->upsertPolicy = $upsertPolicy ?? new SqlUpsertPolicy();
+    }
+
     /**
      * @param array<int> $categoryIds
      */
@@ -47,29 +55,19 @@ final class PageTaxonomyAssignmentService
             return;
         }
 
-        if ($driver === 'sqlite') {
-            $insert = $db->prepare(
-                'INSERT INTO ' . $table . ' (page_id, ' . $column . ')
-                 VALUES (:page_id, :taxonomy_id)
-                 ON CONFLICT(page_id, ' . $column . ') DO NOTHING'
-            );
-        } elseif ($driver === 'mysql') {
-            $insert = $db->prepare(
-                'INSERT IGNORE INTO ' . $table . ' (page_id, ' . $column . ')
-                 VALUES (:page_id, :taxonomy_id)'
-            );
-        } else {
-            $insert = $db->prepare(
-                'INSERT INTO ' . $table . ' (page_id, ' . $column . ')
-                 VALUES (:page_id, :taxonomy_id)
-                 ON CONFLICT (page_id, ' . $column . ') DO NOTHING'
-            );
-        }
+        $insert = $db->prepare(
+            $this->upsertPolicy->idempotentInsertSql(
+                $driver,
+                $table,
+                ['page_id', $column],
+                ['page_id', $column]
+            )
+        );
 
         foreach ($ids as $id) {
             $insert->execute([
                 ':page_id' => $pageId,
-                ':taxonomy_id' => $id,
+                ':' . $column => $id,
             ]);
         }
     }

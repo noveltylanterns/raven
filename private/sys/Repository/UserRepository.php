@@ -17,7 +17,9 @@ use PDO;
 use RuntimeException;
 use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\ContactProfileNormalizer;
+use Raven\Lib\Auth\GroupMembershipWriteService;
 use Raven\Lib\Auth\UserGroupCatalogService;
+use Raven\Lib\Auth\UserPanelQueryService;
 use Raven\Lib\Auth\UserPanelHydrator;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 
@@ -33,6 +35,8 @@ final class UserRepository
     private AuthPayloadCodec $authPayloadCodec;
     private UserPanelHydrator $panelHydrator;
     private UserGroupCatalogService $userGroupCatalogService;
+    private UserPanelQueryService $userPanelQueryService;
+    private GroupMembershipWriteService $groupMembershipWriteService;
 
     public function __construct(PDO $authDb, PDO $appDb, string $driver, string $prefix)
     {
@@ -45,6 +49,8 @@ final class UserRepository
         $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
         $this->panelHydrator = new UserPanelHydrator();
         $this->userGroupCatalogService = new UserGroupCatalogService();
+        $this->userPanelQueryService = new UserPanelQueryService();
+        $this->groupMembershipWriteService = new GroupMembershipWriteService();
     }
 
     /**
@@ -342,74 +348,18 @@ final class UserRepository
      */
     public function listForPanel(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
     {
-        $normalizedGroupFilter = strtolower(trim((string) ($groupNameFilter ?? '')));
-        $userIds = [];
-
-        if ($normalizedGroupFilter === '') {
-            $usersTable = $this->authTable('users');
-            $stmt = $this->authDb->prepare(
-                'SELECT id
-                 FROM ' . $usersTable . '
-                 ORDER BY id ASC
-                 LIMIT :limit OFFSET :offset'
-            );
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-            $stmt->execute();
-            foreach ($stmt->fetchAll() ?: [] as $row) {
-                $userId = (int) ($row['id'] ?? 0);
-                if ($userId > 0) {
-                    $userIds[] = $userId;
-                }
-            }
-        } else {
-            $groups = $this->groupTable('groups');
-            $userGroups = $this->groupTable('user_groups');
-            $stmt = $this->appDb->prepare(
-                'SELECT DISTINCT ug.user_id
-                 FROM ' . $userGroups . ' ug
-                 INNER JOIN ' . $groups . ' g ON g.id = ug.group_id
-                 WHERE LOWER(g.name) = :group_name
-                 ORDER BY ug.user_id ASC
-                 LIMIT :limit OFFSET :offset'
-            );
-            $stmt->bindValue(':group_name', $normalizedGroupFilter, PDO::PARAM_STR);
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-            $stmt->execute();
-            foreach ($stmt->fetchAll() ?: [] as $row) {
-                $userId = (int) ($row['user_id'] ?? 0);
-                if ($userId > 0) {
-                    $userIds[] = $userId;
-                }
-            }
-        }
-
-        $userIds = array_values(array_unique(array_filter($userIds, static fn (int $id): bool => $id > 0)));
-        if ($userIds === []) {
-            return [];
-        }
-
-        $usersTable = $this->authTable('users');
-        $placeholders = [];
-        $params = [];
-        foreach ($userIds as $index => $userId) {
-            $placeholder = ':user_id_' . $index;
-            $placeholders[] = $placeholder;
-            $params[$placeholder] = $userId;
-        }
-
-        $stmt = $this->authDb->prepare(
-            'SELECT id, username, display_name, email, theme, avatar_path
-             FROM ' . $usersTable . '
-             WHERE id IN (' . implode(', ', $placeholders) . ')
-             ORDER BY id ASC'
+        return $this->userPanelQueryService->listForPanel(
+            $this->authDb,
+            $this->appDb,
+            $this->authTable('users'),
+            $this->groupTable('groups'),
+            $this->groupTable('user_groups'),
+            $limit,
+            $offset,
+            $groupNameFilter,
+            fn (array $userIds): array => $this->groupEntriesByUserId($userIds),
+            fn (array $users, array $groupMap): array => $this->hydratePanelUsers($users, $groupMap)
         );
-        $stmt->execute($params);
-        $users = $stmt->fetchAll() ?: [];
-        $groupMap = $this->groupEntriesByUserId($userIds);
-
-        return $this->hydratePanelUsers($users, $groupMap);
     }
 
     /**
@@ -423,176 +373,17 @@ final class UserRepository
      */
     public function listPageForPanel(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
     {
-        $normalizedGroupFilter = strtolower(trim((string) ($groupNameFilter ?? '')));
-        $safeLimit = max(1, $limit);
-        $safeOffset = max(0, $offset);
-        $usersTable = $this->authTable('users');
-        $groups = $this->groupTable('groups');
-        $userGroups = $this->groupTable('user_groups');
-        $total = 0;
-
-        if ($normalizedGroupFilter === '') {
-            $stmt = $this->appDb->prepare(
-                'WITH page_users AS (
-                     SELECT u.id,
-                            u.username,
-                            u.display_name,
-                            u.email,
-                            u.theme,
-                            u.avatar_path,
-                            COUNT(*) OVER() AS total_rows
-                     FROM ' . $usersTable . ' u
-                     ORDER BY u.id ASC
-                     LIMIT :limit OFFSET :offset
-                 )
-                 SELECT pu.id AS user_id,
-                        pu.username,
-                        pu.display_name,
-                        pu.email,
-                        pu.theme,
-                        pu.avatar_path,
-                        pu.total_rows,
-                        g.id AS group_id,
-                        g.name AS group_name,
-                        g.slug AS group_slug,
-                        g.permission_mask AS group_permission_mask,
-                        g.is_stock AS group_is_stock,
-                        CASE WHEN ug.user_id IS NULL THEN 0 ELSE 1 END AS group_selected
-                 FROM ' . $groups . ' g
-                 LEFT JOIN page_users pu ON 1 = 1
-                 LEFT JOIN ' . $userGroups . ' ug
-                   ON ug.group_id = g.id
-                  AND ug.user_id = pu.id
-                 ORDER BY COALESCE(pu.id, 0) ASC, g.id ASC'
-            );
-            $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
-        } else {
-            $stmt = $this->appDb->prepare(
-                'WITH filtered_user_ids AS (
-                     SELECT DISTINCT ug.user_id
-                     FROM ' . $userGroups . ' ug
-                     INNER JOIN ' . $groups . ' gf ON gf.id = ug.group_id
-                     WHERE LOWER(gf.name) = :group_name
-                 ),
-                 page_users AS (
-                     SELECT u.id,
-                            u.username,
-                            u.display_name,
-                            u.email,
-                            u.theme,
-                            u.avatar_path,
-                            COUNT(*) OVER() AS total_rows
-                     FROM ' . $usersTable . ' u
-                     INNER JOIN filtered_user_ids f ON f.user_id = u.id
-                     ORDER BY u.id ASC
-                     LIMIT :limit OFFSET :offset
-                 )
-                 SELECT pu.id AS user_id,
-                        pu.username,
-                        pu.display_name,
-                        pu.email,
-                        pu.theme,
-                        pu.avatar_path,
-                        pu.total_rows,
-                        g.id AS group_id,
-                        g.name AS group_name,
-                        g.slug AS group_slug,
-                        g.permission_mask AS group_permission_mask,
-                        g.is_stock AS group_is_stock,
-                        CASE WHEN ug.user_id IS NULL THEN 0 ELSE 1 END AS group_selected
-                 FROM ' . $groups . ' g
-                 LEFT JOIN page_users pu ON 1 = 1
-                 LEFT JOIN ' . $userGroups . ' ug
-                   ON ug.group_id = g.id
-                  AND ug.user_id = pu.id
-                 ORDER BY COALESCE(pu.id, 0) ASC, g.id ASC'
-            );
-            $stmt->bindValue(':group_name', $normalizedGroupFilter, PDO::PARAM_STR);
-            $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
-        }
-
-        $stmt->execute();
-        $rows = $stmt->fetchAll() ?: [];
-
-        $usersById = [];
-        /** @var array<int, array<int, array{name: string, permission_mask: int}>> $groupMap */
-        $groupMap = [];
-        $groupOptionsById = [];
-        foreach ($rows as $row) {
-            $groupId = (int) ($row['group_id'] ?? 0);
-            if ($groupId > 0 && !isset($groupOptionsById[$groupId])) {
-                $groupOptionsById[$groupId] = [
-                    'id' => $groupId,
-                    'name' => (string) ($row['group_name'] ?? ''),
-                    'slug' => (string) ($row['group_slug'] ?? ''),
-                    'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
-                    'is_stock' => (int) ($row['group_is_stock'] ?? 0),
-                ];
-            }
-
-            $userId = (int) ($row['user_id'] ?? 0);
-            if ($userId < 1) {
-                continue;
-            }
-
-            if (!isset($usersById[$userId])) {
-                if ($total === 0) {
-                    $total = (int) ($row['total_rows'] ?? 0);
-                }
-
-                $usersById[$userId] = [
-                    'id' => $userId,
-                    'username' => (string) ($row['username'] ?? ''),
-                    'display_name' => (string) ($row['display_name'] ?? ''),
-                    'email' => (string) ($row['email'] ?? ''),
-                    'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
-                    'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                        ? (string) $row['avatar_path']
-                        : null,
-                ];
-            }
-
-            if ($groupId > 0 && (int) ($row['group_selected'] ?? 0) === 1) {
-                $groupMap[$userId] ??= [];
-                $groupMap[$userId][] = [
-                    'name' => (string) ($row['group_name'] ?? ''),
-                    'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
-                ];
-            }
-        }
-
-        // Offset can target an empty page while rows still exist; recover accurate total.
-        if ($usersById === [] && $safeOffset > 0) {
-            $total = $this->countForPanel($normalizedGroupFilter !== '' ? $normalizedGroupFilter : null);
-        }
-
-        $groupOptions = array_values($groupOptionsById);
-        usort(
-            $groupOptions,
-            static function (array $a, array $b): int {
-                $aIsStock = (int) ($a['is_stock'] ?? 0);
-                $bIsStock = (int) ($b['is_stock'] ?? 0);
-                if ($aIsStock !== $bIsStock) {
-                    return $bIsStock <=> $aIsStock;
-                }
-
-                $aName = strtolower(trim((string) ($a['name'] ?? '')));
-                $bName = strtolower(trim((string) ($b['name'] ?? '')));
-                if ($aName !== $bName) {
-                    return $aName <=> $bName;
-                }
-
-                return ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0));
-            }
+        return $this->userPanelQueryService->listPageForPanel(
+            $this->appDb,
+            $this->authTable('users'),
+            $this->groupTable('groups'),
+            $this->groupTable('user_groups'),
+            $limit,
+            $offset,
+            $groupNameFilter,
+            fn (?string $filter): int => $this->countForPanel($filter),
+            fn (array $users, array $groupMap): array => $this->hydratePanelUsers($users, $groupMap)
         );
-
-        return [
-            'rows' => $this->hydratePanelUsers(array_values($usersById), $groupMap),
-            'total' => $total,
-            'group_options' => $groupOptions,
-        ];
     }
 
     /**
@@ -1159,32 +950,13 @@ final class UserRepository
      */
     private function attachUserToGroup(int $userId, int $groupId): void
     {
-        $userGroups = $this->groupTable('user_groups');
-
-        // Use backend-specific idempotent insert strategy for duplicate-safe writes.
-        if ($this->driver === 'sqlite') {
-            $stmt = $this->appDb->prepare(
-                'INSERT INTO ' . $userGroups . ' (user_id, group_id)
-                 VALUES (:user_id, :group_id)
-                 ON CONFLICT(user_id, group_id) DO NOTHING'
-            );
-        } elseif ($this->driver === 'mysql') {
-            $stmt = $this->appDb->prepare(
-                'INSERT IGNORE INTO ' . $userGroups . ' (user_id, group_id)
-                 VALUES (:user_id, :group_id)'
-            );
-        } else {
-            $stmt = $this->appDb->prepare(
-                'INSERT INTO ' . $userGroups . ' (user_id, group_id)
-                 VALUES (:user_id, :group_id)
-                 ON CONFLICT (user_id, group_id) DO NOTHING'
-            );
-        }
-
-        $stmt->execute([
-            ':user_id' => $userId,
-            ':group_id' => $groupId,
-        ]);
+        $this->groupMembershipWriteService->attachUserToGroup(
+            $this->appDb,
+            $this->driver,
+            $this->groupTable('user_groups'),
+            $userId,
+            $groupId
+        );
     }
 
     /**

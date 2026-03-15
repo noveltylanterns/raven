@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Repository;
 
 use PDO;
+use Raven\Lib\Auth\GroupMembershipWriteService;
 use Raven\Lib\Auth\GroupRolePolicy;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 use RuntimeException;
@@ -28,6 +29,7 @@ final class GroupRepository
     private string $driver;
     private string $prefix;
     private GroupRolePolicy $rolePolicy;
+    private GroupMembershipWriteService $groupMembershipWriteService;
 
     public function __construct(PDO $db, string $driver, string $prefix)
     {
@@ -36,6 +38,7 @@ final class GroupRepository
         // Prefix is ignored for SQLite because attached database aliases are used instead.
         $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
         $this->rolePolicy = new GroupRolePolicy();
+        $this->groupMembershipWriteService = new GroupMembershipWriteService();
     }
 
     /**
@@ -618,16 +621,11 @@ final class GroupRepository
      */
     private function membershipCountForUser(int $userId): int
     {
-        $userGroups = $this->table('user_groups');
-
-        $stmt = $this->db->prepare(
-            'SELECT COUNT(*)
-             FROM ' . $userGroups . '
-             WHERE user_id = :user_id'
+        return $this->groupMembershipWriteService->membershipCountForUser(
+            $this->db,
+            $this->table('user_groups'),
+            $userId
         );
-        $stmt->execute([':user_id' => $userId]);
-
-        return (int) $stmt->fetchColumn();
     }
 
     /**
@@ -635,32 +633,13 @@ final class GroupRepository
      */
     private function attachUserToGroup(int $userId, int $groupId): void
     {
-        $userGroups = $this->table('user_groups');
-
-        // Use backend-specific idempotent insert strategy for duplicate-safe writes.
-        if ($this->driver === 'sqlite') {
-            $stmt = $this->db->prepare(
-                'INSERT INTO ' . $userGroups . ' (user_id, group_id)
-                 VALUES (:user_id, :group_id)
-                 ON CONFLICT(user_id, group_id) DO NOTHING'
-            );
-        } elseif ($this->driver === 'mysql') {
-            $stmt = $this->db->prepare(
-                'INSERT IGNORE INTO ' . $userGroups . ' (user_id, group_id)
-                 VALUES (:user_id, :group_id)'
-            );
-        } else {
-            $stmt = $this->db->prepare(
-                'INSERT INTO ' . $userGroups . ' (user_id, group_id)
-                 VALUES (:user_id, :group_id)
-                 ON CONFLICT (user_id, group_id) DO NOTHING'
-            );
-        }
-
-        $stmt->execute([
-            ':user_id' => $userId,
-            ':group_id' => $groupId,
-        ]);
+        $this->groupMembershipWriteService->attachUserToGroup(
+            $this->db,
+            $this->driver,
+            $this->table('user_groups'),
+            $userId,
+            $groupId
+        );
     }
 
     /**
@@ -668,21 +647,11 @@ final class GroupRepository
      */
     private function nextCustomGroupId(): int
     {
-        $groups = $this->table('groups');
-
-        $stmt = $this->db->prepare(
-            'SELECT MAX(id)
-             FROM ' . $groups . '
-             WHERE id >= :min_id'
+        return $this->groupMembershipWriteService->nextCustomGroupId(
+            $this->db,
+            $this->table('groups'),
+            self::CUSTOM_GROUP_ID_START
         );
-        $stmt->execute([':min_id' => self::CUSTOM_GROUP_ID_START]);
-
-        $maxId = $stmt->fetchColumn();
-        if ($maxId === false || $maxId === null) {
-            return self::CUSTOM_GROUP_ID_START;
-        }
-
-        return max((int) $maxId + 1, self::CUSTOM_GROUP_ID_START);
     }
 
     /**
