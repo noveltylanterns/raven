@@ -16,11 +16,8 @@ use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\ContactProfileNormalizer;
 use Raven\Lib\Auth\LoginThrottleService;
 use Raven\Lib\Auth\PermissionMaskService;
-use Raven\Lib\Security\RecoveryPhrase;
-use Raven\Lib\Security\TotpService;
-use Raven\Lib\Security\TwoFactorMethodKey;
+use Raven\Lib\Auth\UserSecurityProfileService;
 use Raven\Lib\Security\TwoFactorMethodNormalizer;
-use Raven\Lib\Security\TwoFactorMethodRules;
 use RuntimeException;
 
 /**
@@ -46,6 +43,7 @@ final class AuthService
     private LoginThrottleService $loginThrottle;
     private AuthPayloadCodec $authPayloadCodec;
     private PermissionMaskService $permissionMaskService;
+    private UserSecurityProfileService $securityProfiles;
 
     /**
      * Request-local cache for user group lookups.
@@ -83,6 +81,7 @@ final class AuthService
         $this->loginThrottle = new LoginThrottleService($appDb, $driver, $prefix);
         $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
         $this->permissionMaskService = new PermissionMaskService($appDb, $driver, $prefix);
+        $this->securityProfiles = new UserSecurityProfileService();
 
         $this->bootstrapDelightAuth();
     }
@@ -315,76 +314,7 @@ final class AuthService
         $methods = is_array($preferences['two_factor_methods'] ?? null)
             ? $preferences['two_factor_methods']
             : [];
-        $interactive = [];
-        foreach ($methods as $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            $type = TwoFactorMethodRules::normalizeType((string) ($method['type'] ?? ''));
-            $status = TwoFactorMethodRules::normalizeStatus((string) ($method['status'] ?? ''), $type);
-            if ($type === 'totp') {
-                if ($status !== 'confirmed') {
-                    continue;
-                }
-
-                $secret = TotpService::normalizeSecret((string) ($method['secret'] ?? ''));
-                if (!TotpService::isValidSecret($secret)) {
-                    continue;
-                }
-
-                $interactive[] = [
-                    'type' => 'totp',
-                    'key' => TwoFactorMethodKey::forTotpSecret($secret),
-                    'label' => TwoFactorMethodRules::normalizeLabel((string) ($method['label'] ?? ''), 'totp'),
-                ];
-                continue;
-            }
-
-            if ($type === 'recovery') {
-                if ($status !== 'confirmed') {
-                    continue;
-                }
-
-                $recoveryCode = RecoveryPhrase::normalize((string) ($method['recovery_code'] ?? ''));
-                if (!RecoveryPhrase::isValid($recoveryCode, 12)) {
-                    continue;
-                }
-
-                $interactive[] = [
-                    'type' => 'recovery',
-                    'key' => TwoFactorMethodKey::forRecoveryPhrase($recoveryCode),
-                    'label' => (bool) ($method['reusable'] ?? false)
-                        ? 'Recovery Code (Reusable)'
-                        : 'Recovery Code',
-                ];
-                continue;
-            }
-
-            if ($type === 'webauthn') {
-                if ($status !== 'confirmed') {
-                    continue;
-                }
-
-                $credentialId = trim((string) ($method['credential_id'] ?? ''));
-                $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
-                if ($credentialId === '' || $credentialPublicKey === '') {
-                    continue;
-                }
-
-                $requireUv = (bool) ($method['require_uv'] ?? false);
-
-                $interactive[] = [
-                    'type' => 'webauthn',
-                    'key' => TwoFactorMethodKey::forWebauthnCredentialId($credentialId),
-                    'label' => TwoFactorMethodRules::normalizeLabel((string) ($method['label'] ?? ''), 'webauthn'),
-                    'credential_id' => $credentialId,
-                    'require_uv' => $requireUv,
-                ];
-            }
-        }
-
-        return $interactive;
+        return $this->securityProfiles->interactiveTwoFactorMethods($methods);
     }
 
     /**
@@ -397,11 +327,6 @@ final class AuthService
             return false;
         }
 
-        $submittedCode = TotpService::normalizeCode($submittedCode);
-        if (!TotpService::isValidCode($submittedCode)) {
-            return false;
-        }
-
         $preferences = $this->userPreferences($pendingUserId);
         if (!is_array($preferences)) {
             return false;
@@ -410,24 +335,7 @@ final class AuthService
         $methods = is_array($preferences['two_factor_methods'] ?? null)
             ? $preferences['two_factor_methods']
             : [];
-        foreach ($methods as $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            $type = TwoFactorMethodRules::normalizeType((string) ($method['type'] ?? ''));
-            $status = TwoFactorMethodRules::normalizeStatus((string) ($method['status'] ?? ''), $type);
-            $secret = TotpService::normalizeSecret((string) ($method['secret'] ?? ''));
-            if ($type !== 'totp' || $status !== 'confirmed' || !TotpService::isValidSecret($secret)) {
-                continue;
-            }
-
-            if (TotpService::verifyCode($secret, $submittedCode, 1, 'Raven CMS')) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->securityProfiles->verifyTotpCode($methods, $submittedCode, 'Raven CMS');
     }
 
     /**
@@ -442,17 +350,6 @@ final class AuthService
             return false;
         }
 
-        $normalizedSubmittedPhrase = RecoveryPhrase::normalize($submittedPhrase);
-        if (!RecoveryPhrase::isValid($normalizedSubmittedPhrase, 12)) {
-            return false;
-        }
-
-        $selectedMethodKey = trim($selectedMethodKey);
-        $expectedMethodKey = TwoFactorMethodKey::forRecoveryPhrase($normalizedSubmittedPhrase);
-        if ($selectedMethodKey !== '' && $selectedMethodKey !== $expectedMethodKey) {
-            return false;
-        }
-
         $preferences = $this->userPreferences($pendingUserId);
         if (!is_array($preferences)) {
             return false;
@@ -461,35 +358,25 @@ final class AuthService
         $methods = is_array($preferences['two_factor_methods'] ?? null)
             ? array_values($preferences['two_factor_methods'])
             : [];
-        foreach ($methods as $index => $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            $type = TwoFactorMethodRules::normalizeType((string) ($method['type'] ?? ''));
-            $status = TwoFactorMethodRules::normalizeStatus((string) ($method['status'] ?? ''), $type);
-            if ($type !== 'recovery' || $status !== 'confirmed') {
-                continue;
-            }
-
-            $recoveryCode = RecoveryPhrase::normalize((string) ($method['recovery_code'] ?? ''));
-            if (!RecoveryPhrase::isValid($recoveryCode, 12) || $recoveryCode !== $normalizedSubmittedPhrase) {
-                continue;
-            }
-
-            $isReusable = (bool) ($method['reusable'] ?? false);
-            if (!$isReusable) {
-                unset($methods[$index]);
-                $updated = $this->updateUserTwoFactorMethods($pendingUserId, array_values($methods));
-                if (!(bool) ($updated['ok'] ?? false)) {
-                    return false;
-                }
-            }
-
-            return true;
+        $matched = $this->securityProfiles->matchRecoveryMethod($methods, $submittedPhrase, $selectedMethodKey);
+        if (!is_array($matched)) {
+            return false;
         }
 
-        return false;
+        if (!(bool) ($matched['reusable'] ?? false)) {
+            $matchedIndex = (int) ($matched['index'] ?? -1);
+            if ($matchedIndex < 0 || !array_key_exists($matchedIndex, $methods)) {
+                return false;
+            }
+
+            unset($methods[$matchedIndex]);
+            $updated = $this->updateUserTwoFactorMethods($pendingUserId, array_values($methods));
+            if (!(bool) ($updated['ok'] ?? false)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -532,27 +419,16 @@ final class AuthService
         $methods = is_array($preferences['two_factor_methods'] ?? null)
             ? $preferences['two_factor_methods']
             : [];
-        $updated = false;
-        foreach ($methods as $index => $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            if (
-                strtolower(trim((string) ($method['type'] ?? ''))) === 'webauthn'
-                && trim((string) ($method['credential_id'] ?? '')) === $credentialId
-            ) {
-                $methods[$index]['signature_counter'] = $signatureCounter;
-                $updated = true;
-                break;
-            }
-        }
-
-        if (!$updated) {
+        $mutation = $this->securityProfiles->withUpdatedWebauthnSignatureCounter(
+            $methods,
+            $credentialId,
+            $signatureCounter
+        );
+        if (!(bool) ($mutation['updated'] ?? false)) {
             return;
         }
 
-        $this->updateUserTwoFactorMethods($userId, $methods);
+        $this->updateUserTwoFactorMethods($userId, (array) ($mutation['methods'] ?? []));
     }
 
     /**
@@ -621,18 +497,10 @@ final class AuthService
             return null;
         }
 
-        $result = [
-            'id' => (int) $row['id'],
-            'username' => (string) ($row['username'] ?? ''),
-            'display_name' => (string) ($row['display_name'] ?? ''),
-            'email' => (string) ($row['email'] ?? ''),
-            'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
-            'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                ? (string) $row['avatar_path']
-                : null,
-            'contact_profiles' => $this->decodeContactProfiles($row['contact_profiles'] ?? null),
-            'two_factor_methods' => $this->decodeTwoFactorMethods($row['two_factor_methods'] ?? null),
-        ];
+        $result = $this->securityProfiles->decodeUserPreferencesRow(
+            is_array($row) ? $row : [],
+            $this->authPayloadCodec
+        );
 
         if ($userId > 0) {
             $this->userPreferencesCache[$userId] = $result;
@@ -660,35 +528,23 @@ final class AuthService
      */
     public function updateUserPreferences(int $userId, array $payload): array
     {
-        $username = trim((string) ($payload['username'] ?? ''));
-        $displayName = trim((string) ($payload['display_name'] ?? ''));
-        $email = trim((string) ($payload['email'] ?? ''));
-        $theme = trim((string) ($payload['theme'] ?? 'default'));
-        $password = $payload['password'] ?? null;
-        $contactProfiles = $this->normalizeContactProfiles((array) ($payload['contact_profiles'] ?? []));
-        $contactProfilesEncoded = $this->encodeContactProfiles($contactProfiles);
-        $twoFactorMethods = TwoFactorMethodNormalizer::normalizeStored((array) ($payload['two_factor_methods'] ?? []));
-        $twoFactorMethodsEncoded = $this->encodeTwoFactorMethods($twoFactorMethods);
-        $setAvatar = (bool) ($payload['set_avatar'] ?? false);
-        $avatarPath = $payload['avatar_path'] ?? null;
+        $normalized = $this->securityProfiles->normalizePreferenceUpdatePayload($payload, $this->authPayloadCodec);
+        $username = (string) ($normalized['username'] ?? '');
+        $displayName = (string) ($normalized['display_name'] ?? '');
+        $email = (string) ($normalized['email'] ?? '');
+        $theme = (string) ($normalized['theme'] ?? 'default');
+        $password = $normalized['password'] ?? null;
+        $contactProfilesEncoded = $normalized['contact_profiles_encoded'] ?? null;
+        $twoFactorMethodsEncoded = $normalized['two_factor_methods_encoded'] ?? null;
+        $setAvatar = (bool) ($normalized['set_avatar'] ?? false);
+        $avatarPath = $normalized['avatar_path'] ?? null;
 
-        $errors = [];
-
-        if ($email === '') {
-            $errors[] = 'Email is required.';
-        }
-
-        if ($password !== null && $password !== '' && strlen($password) < 8) {
-            $errors[] = 'Password must be at least 8 characters.';
-        }
-
-        if ($username !== '' && $this->usernameExistsForOtherUser($userId, $username)) {
-            $errors[] = 'Username is already in use.';
-        }
-
-        if ($this->emailExistsForOtherUser($userId, $email)) {
-            $errors[] = 'Email is already in use.';
-        }
+        $errors = $this->securityProfiles->validatePreferenceUpdate(
+            $email,
+            is_string($password) ? $password : null,
+            $username !== '' && $this->usernameExistsForOtherUser($userId, $username),
+            $this->emailExistsForOtherUser($userId, $email)
+        );
 
         if ($errors !== []) {
             return ['ok' => false, 'errors' => $errors];

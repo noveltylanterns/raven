@@ -11,11 +11,19 @@ declare(strict_types=1);
 
 namespace Raven\Core\Extension;
 
+require_once dirname(__DIR__, 3) . '/lib/Extension/ManifestContractValidator.php';
+require_once dirname(__DIR__, 3) . '/lib/Extension/ExtensionProviderValidator.php';
+
+use Raven\Lib\Extension\ExtensionProviderValidator;
+use Raven\Lib\Extension\ManifestContractValidator;
+
 /**
  * Centralizes extension registry parsing so bootstrap/panel/public stay in sync.
  */
 final class ExtensionRegistry
 {
+    private static ?ManifestContractValidator $manifestContractValidator = null;
+    private static ?ExtensionProviderValidator $providerValidator = null;
     /**
      * Returns enabled extension directory map from `private/ext/.state.php`.
      *
@@ -119,44 +127,10 @@ final class ExtensionRegistry
      */
     public static function readManifest(string $root, string $directoryName): ?array
     {
-        if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $directoryName) !== 1) {
+        $manifest = self::manifestContractValidator()->readManifest($root, $directoryName);
+        if ($manifest === null) {
             return null;
         }
-
-        $manifestPath = rtrim($root, '/') . '/private/ext/' . $directoryName . '/ext.json';
-        if (!is_file($manifestPath)) {
-            return null;
-        }
-
-        $raw = file_get_contents($manifestPath);
-        if ($raw === false || trim($raw) === '') {
-            return null;
-        }
-
-        /** @var mixed $decoded */
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            return null;
-        }
-
-        $name = trim((string) ($decoded['name'] ?? ''));
-        if ($name === '') {
-            return null;
-        }
-
-        $type = strtolower(trim((string) ($decoded['type'] ?? 'plugin')));
-        if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
-            $type = 'plugin';
-        }
-
-        $typeContractError = self::typeContractError($root, $directoryName, $type);
-        if ($typeContractError !== null) {
-            return null;
-        }
-
-        // Extension routing identity is standardized on directory slug.
-        $panelPath = $directoryName;
-        $panelSection = $directoryName;
 
         // `lib/shortcodes.php` is optional, but when present it must return the canonical
         // shortcode item format so extension behavior stays deterministic.
@@ -170,38 +144,7 @@ final class ExtensionRegistry
             return null;
         }
 
-        return [
-            'name' => $name,
-            'type' => $type,
-            'panel_path' => $panelPath,
-            'panel_section' => $panelSection,
-            'system_extension' => (bool) ($decoded['system_extension'] ?? false),
-        ];
-    }
-
-    /**
-     * Returns one type-capability contract violation for extension files.
-     */
-    private static function typeContractError(string $root, string $directoryName, string $type): ?string
-    {
-        $extensionRoot = rtrim($root, '/') . '/private/ext/' . $directoryName;
-        $hasPublicRoutes = is_file($extensionRoot . '/lib/routes_public.php');
-        $hasShortcodes = is_file($extensionRoot . '/lib/shortcodes.php');
-        $hasFields = is_file($extensionRoot . '/lib/fields.php');
-
-        if ($hasPublicRoutes && $type !== 'module') {
-            return 'Only module extensions may define lib/routes_public.php.';
-        }
-
-        if ($hasShortcodes && !in_array($type, ['helper', 'plugin', 'module'], true)) {
-            return 'Only helper/plugin/module extensions may define lib/shortcodes.php.';
-        }
-
-        if ($hasFields && !in_array($type, ['content', 'plugin', 'module'], true)) {
-            return 'Only content/plugin/module extensions may define lib/fields.php.';
-        }
-
-        return null;
+        return $manifest;
     }
 
     /**
@@ -327,109 +270,7 @@ final class ExtensionRegistry
      */
     private static function validateShortcodesProvider(string $root, string $directoryName, array $context): array
     {
-        if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $directoryName) !== 1) {
-            return [
-                'valid' => false,
-                'error' => 'Invalid extension directory name.',
-                'items' => [],
-            ];
-        }
-
-        $providerPath = rtrim($root, '/') . '/private/ext/' . $directoryName . '/lib/shortcodes.php';
-        if (!is_file($providerPath)) {
-            return [
-                'valid' => true,
-                'error' => '',
-                'items' => [],
-            ];
-        }
-
-        /** @var mixed $provider */
-        try {
-            $provider = require $providerPath;
-        } catch (\Throwable) {
-            return [
-                'valid' => false,
-                'error' => 'lib/shortcodes.php threw an error while loading.',
-                'items' => [],
-            ];
-        }
-
-        if (is_callable($provider)) {
-            $context['extension'] = $directoryName;
-            if (!isset($context['forms']) || !is_callable($context['forms'])) {
-                $context['forms'] = static fn (string $tableName): array => [];
-            }
-
-            try {
-                $provider = $provider($context);
-            } catch (\ArgumentCountError) {
-                try {
-                    $provider = $provider();
-                } catch (\Throwable) {
-                    return [
-                        'valid' => false,
-                        'error' => 'lib/shortcodes.php callable threw an error while executing.',
-                        'items' => [],
-                    ];
-                }
-            } catch (\Throwable) {
-                return [
-                    'valid' => false,
-                    'error' => 'lib/shortcodes.php callable threw an error while executing.',
-                    'items' => [],
-                ];
-            }
-        }
-
-        if (!is_array($provider)) {
-            return [
-                'valid' => false,
-                'error' => 'lib/shortcodes.php must return an array (or callable returning an array).',
-                'items' => [],
-            ];
-        }
-
-        $items = [];
-        foreach ($provider as $entry) {
-            if (!is_array($entry)) {
-                return [
-                    'valid' => false,
-                    'error' => 'Each shortcode row must be an object-like array.',
-                    'items' => [],
-                ];
-            }
-
-            $label = trim((string) ($entry['label'] ?? ''));
-            $shortcode = trim((string) ($entry['shortcode'] ?? ''));
-            $shortcode = str_replace(["\r", "\n", "\0"], '', $shortcode);
-            if ($label === '' || $shortcode === '') {
-                return [
-                    'valid' => false,
-                    'error' => 'Each shortcode row must include non-empty "label" and "shortcode" values.',
-                    'items' => [],
-                ];
-            }
-
-            if (!str_starts_with($shortcode, '[') || !str_ends_with($shortcode, ']')) {
-                return [
-                    'valid' => false,
-                    'error' => 'Each shortcode value must use bracket shortcode syntax (for example `[example]`).',
-                    'items' => [],
-                ];
-            }
-
-            $items[] = [
-                'label' => $label,
-                'shortcode' => $shortcode,
-            ];
-        }
-
-        return [
-            'valid' => true,
-            'error' => '',
-            'items' => $items,
-        ];
+        return self::providerValidator()->validateShortcodesProvider($root, $directoryName, $context);
     }
 
     /**
@@ -449,123 +290,24 @@ final class ExtensionRegistry
      */
     private static function validateFieldsProvider(string $root, string $directoryName, array $context): array
     {
-        if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $directoryName) !== 1) {
-            return [
-                'valid' => false,
-                'error' => 'Invalid extension directory name.',
-                'items' => [],
-            ];
+        return self::providerValidator()->validateFieldsProvider($root, $directoryName, $context);
+    }
+
+    private static function manifestContractValidator(): ManifestContractValidator
+    {
+        if (!self::$manifestContractValidator instanceof ManifestContractValidator) {
+            self::$manifestContractValidator = new ManifestContractValidator();
         }
 
-        $providerPath = rtrim($root, '/') . '/private/ext/' . $directoryName . '/lib/fields.php';
-        if (!is_file($providerPath)) {
-            return [
-                'valid' => true,
-                'error' => '',
-                'items' => [],
-            ];
+        return self::$manifestContractValidator;
+    }
+
+    private static function providerValidator(): ExtensionProviderValidator
+    {
+        if (!self::$providerValidator instanceof ExtensionProviderValidator) {
+            self::$providerValidator = new ExtensionProviderValidator(self::manifestContractValidator());
         }
 
-        /** @var mixed $provider */
-        try {
-            $provider = require $providerPath;
-        } catch (\Throwable) {
-            return [
-                'valid' => false,
-                'error' => 'lib/fields.php threw an error while loading.',
-                'items' => [],
-            ];
-        }
-
-        if (is_callable($provider)) {
-            $context['extension'] = $directoryName;
-
-            try {
-                $provider = $provider($context);
-            } catch (\ArgumentCountError) {
-                try {
-                    $provider = $provider();
-                } catch (\Throwable) {
-                    return [
-                        'valid' => false,
-                        'error' => 'lib/fields.php callable threw an error while executing.',
-                        'items' => [],
-                    ];
-                }
-            } catch (\Throwable) {
-                return [
-                    'valid' => false,
-                    'error' => 'lib/fields.php callable threw an error while executing.',
-                    'items' => [],
-                ];
-            }
-        }
-
-        if (!is_array($provider)) {
-            return [
-                'valid' => false,
-                'error' => 'lib/fields.php must return an array (or callable returning an array).',
-                'items' => [],
-            ];
-        }
-
-        $allowedEditors = ['tinymce', 'plaintext', 'autobr', 'markdown', 'markdown_file'];
-        $items = [];
-        $seenSlugs = [];
-        foreach ($provider as $entry) {
-            if (!is_array($entry)) {
-                return [
-                    'valid' => false,
-                    'error' => 'Each fields row must be an object-like array.',
-                    'items' => [],
-                ];
-            }
-
-            $slug = strtolower(trim((string) ($entry['slug'] ?? '')));
-            $label = trim((string) ($entry['label'] ?? ''));
-            $editor = strtolower(trim((string) ($entry['editor'] ?? '')));
-
-            if ($slug === '' || $label === '' || $editor === '') {
-                return [
-                    'valid' => false,
-                    'error' => 'Each fields row must include non-empty "slug", "label", and "editor" values.',
-                    'items' => [],
-                ];
-            }
-            if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
-                return [
-                    'valid' => false,
-                    'error' => 'Field slug values must match `[a-z0-9][a-z0-9_-]*`.',
-                    'items' => [],
-                ];
-            }
-            if (!in_array($editor, $allowedEditors, true)) {
-                return [
-                    'valid' => false,
-                    'error' => 'Field editor values must be one of: tinymce, plaintext, autobr, markdown, markdown_file.',
-                    'items' => [],
-                ];
-            }
-            if (isset($seenSlugs[$slug])) {
-                return [
-                    'valid' => false,
-                    'error' => 'Field slugs must be unique within lib/fields.php.',
-                    'items' => [],
-                ];
-            }
-            $seenSlugs[$slug] = true;
-
-            $items[] = [
-                'slug' => $slug,
-                'label' => $label,
-                'editor' => $editor,
-            ];
-        }
-
-        return [
-            'valid' => true,
-            'error' => '',
-            'items' => $items,
-        ];
+        return self::$providerValidator;
     }
 }

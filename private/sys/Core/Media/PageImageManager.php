@@ -13,6 +13,9 @@ namespace Raven\Core\Media;
 
 use Imagick;
 use Raven\Core\Config;
+use Raven\Lib\Media\ImageVariantProcessor;
+use Raven\Lib\Media\PageImagePathLayout;
+use Raven\Lib\Media\PageImageUploadPolicy;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Repository\PageImageRepository;
 
@@ -25,6 +28,9 @@ final class PageImageManager
     private InputSanitizer $input;
     private PageImageRepository $images;
     private string $projectRoot;
+    private ?PageImageUploadPolicy $uploadPolicy = null;
+    private ?ImageVariantProcessor $variantProcessor = null;
+    private ?PageImagePathLayout $pathLayout = null;
 
     public function __construct(
         Config $config,
@@ -157,8 +163,7 @@ final class PageImageManager
             ];
         }
 
-        $pageDir = $this->projectRoot . '/public/uploads/pages/' . $pageId;
-        if (!is_dir($pageDir) && !mkdir($pageDir, 0775, true) && !is_dir($pageDir)) {
+        if (!$this->pathLayout()->ensurePageDirectory($pageId)) {
             return [
                 'ok' => false,
                 'error' => 'Failed to create page image directory.',
@@ -168,8 +173,8 @@ final class PageImageManager
         $token = bin2hex(random_bytes(16));
         $baseFilename = 'img_' . $token;
         $originalFilename = $baseFilename . '.' . $canonicalExtension;
-        $originalStoredPath = 'uploads/pages/' . $pageId . '/' . $originalFilename;
-        $originalAbsolutePath = $this->projectRoot . '/public/' . $originalStoredPath;
+        $originalStoredPath = $this->pathLayout()->storedPathForFilename($pageId, $originalFilename);
+        $originalAbsolutePath = $this->pathLayout()->absolutePublicPath($originalStoredPath);
 
         $writtenPaths = [];
 
@@ -229,8 +234,8 @@ final class PageImageManager
                 }
 
                 $variantFilename = $baseFilename . '_' . $variantKey . '.' . $canonicalExtension;
-                $variantStoredPath = 'uploads/pages/' . $pageId . '/' . $variantFilename;
-                $variantAbsolutePath = $this->projectRoot . '/public/' . $variantStoredPath;
+                $variantStoredPath = $this->pathLayout()->storedPathForFilename($pageId, $variantFilename);
+                $variantAbsolutePath = $this->pathLayout()->absolutePublicPath($variantStoredPath);
 
                 if (!$variant->writeImage($variantAbsolutePath)) {
                     throw new \RuntimeException('Failed to store generated ' . $variantKey . ' variant.');
@@ -339,27 +344,7 @@ final class PageImageManager
      */
     private function allowedExtensions(): array
     {
-        $raw = strtolower((string) $this->config->get('media.images.allowed_extensions', 'gif,jpg,jpeg,png'));
-        $parts = array_map('trim', explode(',', $raw));
-
-        $allowed = [];
-        foreach ($parts as $part) {
-            if ($part === 'jpeg') {
-                $part = 'jpg';
-            }
-
-            if ($part === '') {
-                continue;
-            }
-
-            if (!preg_match('/^[a-z0-9]+$/', $part)) {
-                continue;
-            }
-
-            $allowed[$part] = $part;
-        }
-
-        return array_values($allowed);
+        return $this->uploadPolicy()->allowedExtensions();
     }
 
     /**
@@ -367,21 +352,7 @@ final class PageImageManager
      */
     private function maxUploadFilesizeBytes(): int
     {
-        $config = $this->config->all();
-        $images = $config['media']['images'] ?? null;
-        if (is_array($images) && array_key_exists('max_filesize_kb', $images)) {
-            $kilobytes = (int) $images['max_filesize_kb'];
-            if ($kilobytes > 0) {
-                return $kilobytes * 1024;
-            }
-
-            if ($kilobytes === 0) {
-                // `0` means unlimited file size in the config editor.
-                return 0;
-            }
-        }
-
-        return 10485760;
+        return $this->uploadPolicy()->maxUploadFilesizeBytes();
     }
 
     /**
@@ -391,22 +362,7 @@ final class PageImageManager
      */
     private function variantSpecs(): array
     {
-        return [
-            // Keep config keys stable while shortening stored variant keys/filenames.
-            'sm' => [
-                // `0` means "auto" for this axis (aspect-ratio-preserving contain).
-                'width' => max(0, (int) $this->config->get('media.images.small.width', 200)),
-                'height' => max(0, (int) $this->config->get('media.images.small.height', 200)),
-            ],
-            'md' => [
-                'width' => max(0, (int) $this->config->get('media.images.med.width', 600)),
-                'height' => max(0, (int) $this->config->get('media.images.med.height', 600)),
-            ],
-            'lg' => [
-                'width' => max(0, (int) $this->config->get('media.images.large.width', 1000)),
-                'height' => max(0, (int) $this->config->get('media.images.large.height', 1000)),
-            ],
-        ];
+        return $this->variantProcessor()->variantSpecs();
     }
 
     /**
@@ -425,37 +381,7 @@ final class PageImageManager
         int $maxWidth,
         int $maxHeight
     ): array {
-        if ($sourceWidth < 1 || $sourceHeight < 1) {
-            return ['width' => 1, 'height' => 1];
-        }
-
-        if ($maxWidth <= 0 && $maxHeight <= 0) {
-            return ['width' => $sourceWidth, 'height' => $sourceHeight];
-        }
-
-        if ($maxWidth <= 0) {
-            $scale = min(1.0, $maxHeight / $sourceHeight);
-        } elseif ($maxHeight <= 0) {
-            $scale = min(1.0, $maxWidth / $sourceWidth);
-        } else {
-            $scale = min(1.0, $maxWidth / $sourceWidth, $maxHeight / $sourceHeight);
-        }
-
-        $targetWidth = max(1, (int) round($sourceWidth * $scale));
-        $targetHeight = max(1, (int) round($sourceHeight * $scale));
-
-        // Clamp to positive configured max bounds when set.
-        if ($maxWidth > 0) {
-            $targetWidth = min($targetWidth, $maxWidth);
-        }
-        if ($maxHeight > 0) {
-            $targetHeight = min($targetHeight, $maxHeight);
-        }
-
-        return [
-            'width' => $targetWidth,
-            'height' => $targetHeight,
-        ];
+        return $this->variantProcessor()->resolveVariantSize($sourceWidth, $sourceHeight, $maxWidth, $maxHeight);
     }
 
     /**
@@ -463,38 +389,7 @@ final class PageImageManager
      */
     private function autoOrient(Imagick $image): void
     {
-        $orientation = $image->getImageOrientation();
-
-        switch ($orientation) {
-            case Imagick::ORIENTATION_TOPRIGHT:
-                $image->flopImage();
-                break;
-            case Imagick::ORIENTATION_BOTTOMRIGHT:
-                $image->rotateImage('#000', 180);
-                break;
-            case Imagick::ORIENTATION_BOTTOMLEFT:
-                $image->flipImage();
-                break;
-            case Imagick::ORIENTATION_LEFTTOP:
-                $image->flopImage();
-                $image->rotateImage('#000', 90);
-                break;
-            case Imagick::ORIENTATION_RIGHTTOP:
-                $image->rotateImage('#000', 90);
-                break;
-            case Imagick::ORIENTATION_RIGHTBOTTOM:
-                $image->flopImage();
-                $image->rotateImage('#000', -90);
-                break;
-            case Imagick::ORIENTATION_LEFTBOTTOM:
-                $image->rotateImage('#000', -90);
-                break;
-            default:
-                break;
-        }
-
-        // Reset orientation tag to canonical top-left after transform.
-        $image->setImageOrientation(Imagick::ORIENTATION_TOPLEFT);
+        $this->variantProcessor()->autoOrient($image);
     }
 
     /**
@@ -502,20 +397,7 @@ final class PageImageManager
      */
     private function deleteStoredPath(string $storedPath): void
     {
-        $normalized = ltrim($storedPath, '/');
-
-        if ($normalized === '' || str_contains($normalized, '..')) {
-            return;
-        }
-
-        if (!str_starts_with($normalized, 'uploads/pages/')) {
-            return;
-        }
-
-        $absolutePath = $this->projectRoot . '/public/' . $normalized;
-        if (is_file($absolutePath)) {
-            @unlink($absolutePath);
-        }
+        $this->pathLayout()->deleteStoredPath($storedPath);
     }
 
     /**
@@ -523,26 +405,7 @@ final class PageImageManager
      */
     private function removePageDirectoryIfEmpty(int $pageId): void
     {
-        $directory = $this->projectRoot . '/public/uploads/pages/' . $pageId;
-        if (!is_dir($directory)) {
-            return;
-        }
-
-        $files = scandir($directory);
-        if ($files === false) {
-            return;
-        }
-
-        foreach ($files as $file) {
-            if ($file === '.' || $file === '..') {
-                continue;
-            }
-
-            // Directory still has files/subdirs, keep it.
-            return;
-        }
-
-        @rmdir($directory);
+        $this->pathLayout()->removePageDirectoryIfEmpty($pageId);
     }
 
     /**
@@ -550,14 +413,33 @@ final class PageImageManager
      */
     private function uploadErrorMessage(int $code): string
     {
-        return match ($code) {
-            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'Uploaded image exceeds upload size limits.',
-            UPLOAD_ERR_PARTIAL => 'Uploaded image was only partially received.',
-            UPLOAD_ERR_NO_FILE => 'Please choose an image file to upload.',
-            UPLOAD_ERR_NO_TMP_DIR => 'Server temporary upload directory is missing.',
-            UPLOAD_ERR_CANT_WRITE => 'Server failed to write uploaded image.',
-            UPLOAD_ERR_EXTENSION => 'A server extension blocked the upload.',
-            default => 'Image upload failed with an unknown error.',
-        };
+        return $this->uploadPolicy()->uploadErrorMessage($code);
+    }
+
+    private function uploadPolicy(): PageImageUploadPolicy
+    {
+        if (!$this->uploadPolicy instanceof PageImageUploadPolicy) {
+            $this->uploadPolicy = new PageImageUploadPolicy($this->config);
+        }
+
+        return $this->uploadPolicy;
+    }
+
+    private function variantProcessor(): ImageVariantProcessor
+    {
+        if (!$this->variantProcessor instanceof ImageVariantProcessor) {
+            $this->variantProcessor = new ImageVariantProcessor($this->config);
+        }
+
+        return $this->variantProcessor;
+    }
+
+    private function pathLayout(): PageImagePathLayout
+    {
+        if (!$this->pathLayout instanceof PageImagePathLayout) {
+            $this->pathLayout = new PageImagePathLayout($this->projectRoot);
+        }
+
+        return $this->pathLayout;
     }
 }

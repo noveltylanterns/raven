@@ -12,15 +12,23 @@ declare(strict_types=1);
 namespace Raven\Core\Database;
 
 use PDO;
-use Raven\Core\Auth\PanelAccess;
-use Raven\Core\Extension\ExtensionRegistry;
-use RuntimeException;
+use Raven\Lib\Database\Schema\AppSchemaBuilder;
+use Raven\Lib\Database\Schema\AuthSchemaBuilder;
+use Raven\Lib\Database\Schema\ExtensionSchemaRunner;
+use Raven\Lib\Database\Schema\SchemaIntrospector;
+use Raven\Lib\Database\Schema\SeedInstaller;
 
 /**
  * Creates or updates minimal schema required by Raven.
  */
 final class SchemaManager
 {
+    private ?SchemaIntrospector $schemaIntrospector = null;
+    private ?AuthSchemaBuilder $authSchemaBuilder = null;
+    private ?AppSchemaBuilder $appSchemaBuilder = null;
+    private ?SeedInstaller $seedInstaller = null;
+    private ?ExtensionSchemaRunner $extensionSchemaRunner = null;
+
     /**
      * Ensures both app and auth schemas exist for the selected backend.
      */
@@ -551,24 +559,7 @@ final class SchemaManager
      */
     private function ensureAuthSchema(PDO $authDb, string $driver, string $prefix): void
     {
-        if (!$this->authUsersTableExists($authDb, $driver, $prefix)) {
-            $schema = $this->loadDelightSchema($driver);
-
-            if ($schema === null) {
-                throw new RuntimeException('Delight Auth SQL schema files are missing. Install composer dependencies before bootstrap.');
-            }
-
-            // Prefix auth tables in shared-DB modes for namespace isolation.
-            if ($driver !== 'sqlite' && $prefix !== '') {
-                $schema = $this->applyAuthPrefix($schema, $prefix);
-            }
-
-            $this->executeSqlBatch($authDb, $schema);
-        }
-
-        // Profile columns are required by User Preferences and may be missing
-        // in previously created Delight tables, so always ensure them.
-        $this->ensureAuthUserPreferenceColumns($authDb, $driver, $driver === 'sqlite' ? '' : $prefix);
+        $this->authSchemaBuilder()->ensureAuthSchema($authDb, $driver, $prefix);
     }
 
     /**
@@ -576,54 +567,7 @@ final class SchemaManager
      */
     private function ensureInviteTokenSchema(PDO $authDb, string $driver, string $prefix): void
     {
-        $table = $driver === 'sqlite' ? 'invite_tokens' : ($prefix . 'invite_tokens');
-
-        if ($driver === 'sqlite') {
-            $authDb->exec('CREATE TABLE IF NOT EXISTS invite_tokens (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                token_hash TEXT NOT NULL UNIQUE,
-                token_hint TEXT NOT NULL,
-                is_reusable INTEGER NOT NULL DEFAULT 0,
-                use_count INTEGER NOT NULL DEFAULT 0,
-                expires_at INTEGER NULL,
-                last_used_at INTEGER NULL,
-                created_at TEXT NOT NULL,
-                created_by_user_id INTEGER NULL
-            )');
-            $authDb->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_invite_tokens_token_hash ON invite_tokens (token_hash)');
-            $authDb->exec('CREATE INDEX IF NOT EXISTS idx_invite_tokens_expires_at ON invite_tokens (expires_at)');
-            return;
-        }
-
-        if ($driver === 'mysql') {
-            $authDb->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
-                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                token_hash CHAR(64) NOT NULL,
-                token_hint VARCHAR(16) NOT NULL,
-                is_reusable TINYINT(1) NOT NULL DEFAULT 0,
-                use_count INT UNSIGNED NOT NULL DEFAULT 0,
-                expires_at BIGINT UNSIGNED NULL,
-                last_used_at BIGINT UNSIGNED NULL,
-                created_at DATETIME NOT NULL,
-                created_by_user_id BIGINT UNSIGNED NULL,
-                UNIQUE KEY (token_hash),
-                INDEX (expires_at)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-            return;
-        }
-
-        $authDb->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
-            id BIGSERIAL PRIMARY KEY,
-            token_hash CHAR(64) NOT NULL UNIQUE,
-            token_hint VARCHAR(16) NOT NULL,
-            is_reusable SMALLINT NOT NULL DEFAULT 0,
-            use_count INTEGER NOT NULL DEFAULT 0,
-            expires_at BIGINT NULL,
-            last_used_at BIGINT NULL,
-            created_at TIMESTAMP NOT NULL,
-            created_by_user_id BIGINT NULL
-        )');
-        $authDb->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_expires_at ON ' . $table . ' (expires_at)');
+        $this->authSchemaBuilder()->ensureInviteTokenSchema($authDb, $driver, $prefix);
     }
 
     /**
@@ -631,88 +575,7 @@ final class SchemaManager
      */
     private function ensureStockGroups(PDO $db, string $driver, string $prefix): void
     {
-        $groupsTable = $this->table($driver, $prefix, 'groups');
-        $now = gmdate('Y-m-d H:i:s');
-        $stockGroups = PanelAccess::stockGroups();
-        $findBySlug = $db->prepare(
-            'SELECT id
-             FROM ' . $groupsTable . '
-             WHERE LOWER(slug) = :slug
-             LIMIT 1'
-        );
-        $markAsStock = $db->prepare(
-            'UPDATE ' . $groupsTable . '
-             SET is_stock = 1
-             WHERE id = :id
-               AND is_stock <> 1'
-        );
-        $insertStock = $db->prepare(
-            'INSERT INTO ' . $groupsTable . ' (name, slug, route_enabled, permission_mask, is_stock, created_at)
-             VALUES (:name, :slug, :route_enabled, :permission_mask, :is_stock, :created_at)'
-        );
-
-        foreach ($stockGroups as $group) {
-            $stockSlug = strtolower(trim((string) ($group['slug'] ?? '')));
-            if ($stockSlug === '') {
-                $stockSlug = $this->slugifyGroupNameForSchema((string) ($group['name'] ?? ''));
-            }
-            if ($stockSlug === '') {
-                continue;
-            }
-
-            $findBySlug->execute([':slug' => $stockSlug]);
-            $existingId = $findBySlug->fetchColumn();
-            if ($existingId === false) {
-                $insertStock->execute([
-                    ':name' => (string) ($group['name'] ?? ''),
-                    ':slug' => $stockSlug,
-                    ':route_enabled' => 0,
-                    ':permission_mask' => (int) ($group['permission_mask'] ?? 0),
-                    ':is_stock' => 1,
-                    ':created_at' => $now,
-                ]);
-                continue;
-            }
-
-            $markAsStock->execute([
-                ':id' => (int) $existingId,
-            ]);
-        }
-
-        // Preserve canonical stock group ids so downstream policy checks
-        // can rely on stable numeric identifiers in fresh and upgraded installs.
-        $this->ensureStockGroupId($db, $driver, $prefix, 'banned', 6);
-        $this->ensureStockGroupId($db, $driver, $prefix, 'validating', 7);
-
-        $stockMaskBySlug = [];
-        foreach ($stockGroups as $stockGroup) {
-            $slug = strtolower(trim((string) ($stockGroup['slug'] ?? '')));
-            if ($slug === '') {
-                $slug = $this->slugifyGroupNameForSchema((string) ($stockGroup['name'] ?? ''));
-            }
-            if ($slug === '') {
-                continue;
-            }
-
-            $stockMaskBySlug[$slug] = (int) ($stockGroup['permission_mask'] ?? 0);
-        }
-
-        // Keep all stock role masks deterministic across installs/upgrades.
-        $syncStockMask = $db->prepare(
-            'UPDATE ' . $groupsTable . '
-             SET permission_mask = :permission_mask,
-                 route_enabled = 0
-             WHERE LOWER(slug) = :slug
-               AND is_stock = 1
-               AND (permission_mask <> :permission_mask OR route_enabled <> 0)'
-        );
-        foreach ($stockMaskBySlug as $slug => $mask) {
-            $syncStockMask->execute([
-                ':slug' => $slug,
-                ':permission_mask' => (int) $mask,
-            ]);
-        }
-
+        $this->seedInstaller()->ensureStockGroups($db, $driver, $prefix);
     }
 
     /**
@@ -809,55 +672,7 @@ final class SchemaManager
      */
     private function ensureSeedPages(PDO $db, string $driver, string $prefix): void
     {
-        $pagesTable = $this->table($driver, $prefix, 'pages');
-        $usersTable = $driver === 'sqlite' ? 'auth.users' : ($prefix . 'users');
-
-        // Seed starter pages only during pre-user install bootstrap.
-        // Once at least one auth user exists, never auto-recreate `home/index`.
-        try {
-            $userCountStmt = $db->query('SELECT COUNT(*) FROM ' . $usersTable);
-            $userCount = (int) (($userCountStmt?->fetchColumn()) ?: 0);
-            if ($userCount > 0) {
-                return;
-            }
-        } catch (\Throwable) {
-            // If user table is unavailable, fall back to legacy seeding behavior.
-        }
-
-        $check = $db->prepare(
-            'SELECT COUNT(*) FROM ' . $pagesTable . ' WHERE channel_id IS NULL AND slug IN (:home, :index)'
-        );
-        $check->execute([
-            ':home' => 'home',
-            ':index' => 'index',
-        ]);
-
-        if ((int) $check->fetchColumn() > 0) {
-            return;
-        }
-
-        $now = gmdate('Y-m-d H:i:s');
-
-        $insert = $db->prepare(
-            'INSERT INTO ' . $pagesTable . '
-            (title, slug, content, extended, description, display_title, channel_id, is_published, published_at, author_user_id, created_at, updated_at)
-            VALUES (:title, :slug, :content, :extended, :description, :display_title, :channel_id, :is_published, :published_at, :author_user_id, :created_at, :updated_at)'
-        );
-
-        $insert->execute([
-            ':title' => 'Raven Home',
-            ':slug' => 'home',
-            ':content' => '<p>Welcome to Raven CMS.</p>',
-            ':extended' => '',
-            ':description' => 'Welcome to Raven CMS.',
-            ':display_title' => 1,
-            ':channel_id' => null,
-            ':is_published' => 1,
-            ':published_at' => $now,
-            ':author_user_id' => null,
-            ':created_at' => $now,
-            ':updated_at' => $now,
-        ]);
+        $this->seedInstaller()->ensureSeedPages($db, $driver, $prefix);
     }
 
     /**
@@ -865,27 +680,7 @@ final class SchemaManager
      */
     private function ensurePageDescriptionColumn(PDO $db, string $driver, string $prefix): void
     {
-        if ($driver === 'sqlite') {
-            if (!$this->appColumnExistsSqlite($db, 'pages', 'description')) {
-                $db->exec('ALTER TABLE pages ADD COLUMN description TEXT NULL');
-            }
-
-            return;
-        }
-
-        $pagesTable = $prefix . 'pages';
-
-        if ($driver === 'mysql') {
-            if (!$this->appColumnExistsMySql($db, $pagesTable, 'description')) {
-                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN description TEXT NULL');
-            }
-
-            return;
-        }
-
-        if (!$this->appColumnExistsPgSql($db, $pagesTable, 'description')) {
-            $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN description TEXT NULL');
-        }
+        $this->appSchemaBuilder()->ensurePageDescriptionColumn($db, $driver, $prefix);
     }
 
     /**
@@ -893,27 +688,7 @@ final class SchemaManager
      */
     private function ensurePageDisplayTitleColumn(PDO $db, string $driver, string $prefix): void
     {
-        if ($driver === 'sqlite') {
-            if (!$this->appColumnExistsSqlite($db, 'pages', 'display_title')) {
-                $db->exec('ALTER TABLE pages ADD COLUMN display_title INTEGER NOT NULL DEFAULT 1');
-            }
-
-            return;
-        }
-
-        $pagesTable = $prefix . 'pages';
-
-        if ($driver === 'mysql') {
-            if (!$this->appColumnExistsMySql($db, $pagesTable, 'display_title')) {
-                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN display_title TINYINT(1) NOT NULL DEFAULT 1');
-            }
-
-            return;
-        }
-
-        if (!$this->appColumnExistsPgSql($db, $pagesTable, 'display_title')) {
-            $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN display_title SMALLINT NOT NULL DEFAULT 1');
-        }
+        $this->appSchemaBuilder()->ensurePageDisplayTitleColumn($db, $driver, $prefix);
     }
 
     /**
@@ -921,32 +696,7 @@ final class SchemaManager
      */
     private function ensurePageGalleryEnabledColumn(PDO $db, string $driver, string $prefix): void
     {
-        if ($driver === 'sqlite') {
-            // Backfill nulls defensively in case of partially-migrated local DBs.
-            if (!$this->appColumnExistsSqlite($db, 'pages', 'gallery_enabled')) {
-                $db->exec('ALTER TABLE pages ADD COLUMN gallery_enabled INTEGER NOT NULL DEFAULT 0');
-            }
-
-            $db->exec('UPDATE pages SET gallery_enabled = 0 WHERE gallery_enabled IS NULL');
-            return;
-        }
-
-        $pagesTable = $prefix . 'pages';
-
-        if ($driver === 'mysql') {
-            if (!$this->appColumnExistsMySql($db, $pagesTable, 'gallery_enabled')) {
-                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN gallery_enabled TINYINT(1) NOT NULL DEFAULT 0');
-            }
-
-            $db->exec('UPDATE ' . $pagesTable . ' SET gallery_enabled = 0 WHERE gallery_enabled IS NULL');
-            return;
-        }
-
-        if (!$this->appColumnExistsPgSql($db, $pagesTable, 'gallery_enabled')) {
-            $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN gallery_enabled SMALLINT NOT NULL DEFAULT 0');
-        }
-
-        $db->exec('UPDATE ' . $pagesTable . ' SET gallery_enabled = 0 WHERE gallery_enabled IS NULL');
+        $this->appSchemaBuilder()->ensurePageGalleryEnabledColumn($db, $driver, $prefix);
     }
 
     /**
@@ -954,39 +704,7 @@ final class SchemaManager
      */
     private function ensurePageSlugScopeUniqueness(PDO $db, string $driver, string $prefix): void
     {
-        if ($driver === 'sqlite') {
-            $this->ensurePageSlugScopeUniquenessSqlite($db);
-            return;
-        }
-
-        $pagesTable = $prefix . 'pages';
-
-        if ($driver === 'mysql') {
-            if (!$this->mySqlIndexExists($db, $pagesTable, 'uniq_' . $prefix . 'pages_channel_slug')) {
-                $db->exec(
-                    'ALTER TABLE ' . $pagesTable . '
-                     ADD UNIQUE INDEX uniq_' . $prefix . 'pages_channel_slug (channel_id, slug)'
-                );
-            }
-
-            return;
-        }
-
-        if (!$this->pgSqlIndexExists($db, $pagesTable, 'uniq_' . $prefix . 'pages_root_slug')) {
-            $db->exec(
-                'CREATE UNIQUE INDEX uniq_' . $prefix . 'pages_root_slug
-                 ON ' . $this->quotePgIdentifier($pagesTable) . ' (slug)
-                 WHERE channel_id IS NULL'
-            );
-        }
-
-        if (!$this->pgSqlIndexExists($db, $pagesTable, 'uniq_' . $prefix . 'pages_channel_slug')) {
-            $db->exec(
-                'CREATE UNIQUE INDEX uniq_' . $prefix . 'pages_channel_slug
-                 ON ' . $this->quotePgIdentifier($pagesTable) . ' (channel_id, slug)
-                 WHERE channel_id IS NOT NULL'
-            );
-        }
+        $this->appSchemaBuilder()->ensurePageSlugScopeUniqueness($db, $driver, $prefix);
     }
 
     /**
@@ -1005,96 +723,7 @@ final class SchemaManager
      */
     private function ensureGroupRoutingColumns(PDO $db, string $driver, string $prefix): void
     {
-        $groupsTable = $this->table($driver, $prefix, 'groups');
-
-        if ($driver === 'sqlite') {
-            if (!$this->appColumnExistsSqlite($db, 'auth.groups', 'slug')) {
-                $db->exec('ALTER TABLE auth.groups ADD COLUMN slug TEXT NULL');
-            }
-            if (!$this->appColumnExistsSqlite($db, 'auth.groups', 'route_enabled')) {
-                $db->exec('ALTER TABLE auth.groups ADD COLUMN route_enabled INTEGER NOT NULL DEFAULT 0');
-            }
-            $db->exec('CREATE INDEX IF NOT EXISTS auth.idx_groups_slug ON groups (slug)');
-        } elseif ($driver === 'mysql') {
-            if (!$this->appColumnExistsMySql($db, $groupsTable, 'slug')) {
-                $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN slug VARCHAR(160) NULL AFTER name');
-            }
-            if (!$this->appColumnExistsMySql($db, $groupsTable, 'route_enabled')) {
-                $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN route_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER slug');
-            }
-            if (!$this->mySqlIndexExists($db, $groupsTable, 'idx_' . $prefix . 'groups_slug')) {
-                $db->exec('ALTER TABLE ' . $groupsTable . ' ADD INDEX idx_' . $prefix . 'groups_slug (slug)');
-            }
-        } else {
-            if (!$this->appColumnExistsPgSql($db, $groupsTable, 'slug')) {
-                $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN slug VARCHAR(160) NULL');
-            }
-            if (!$this->appColumnExistsPgSql($db, $groupsTable, 'route_enabled')) {
-                $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN route_enabled SMALLINT NOT NULL DEFAULT 0');
-            }
-            if (!$this->pgSqlIndexExists($db, $groupsTable, 'idx_' . $prefix . 'groups_slug')) {
-                $db->exec('CREATE INDEX idx_' . $prefix . 'groups_slug ON ' . $this->quotePgIdentifier($groupsTable) . ' (slug)');
-            }
-        }
-
-        $rows = $db->query(
-            'SELECT id, name, slug, route_enabled
-             FROM ' . $groupsTable . '
-             ORDER BY id ASC'
-        );
-        if ($rows === false) {
-            return;
-        }
-
-        $update = $db->prepare(
-            'UPDATE ' . $groupsTable . '
-             SET slug = :slug,
-                 route_enabled = :route_enabled
-             WHERE id = :id'
-        );
-
-        /** @var array<string, bool> $usedSlugs */
-        $usedSlugs = [];
-        foreach ($rows->fetchAll() ?: [] as $row) {
-            $groupId = (int) ($row['id'] ?? 0);
-            if ($groupId <= 0) {
-                continue;
-            }
-
-            $rawSlug = trim((string) ($row['slug'] ?? ''));
-            $rawName = trim((string) ($row['name'] ?? ''));
-            $slug = $this->slugifyGroupNameForSchema($rawSlug !== '' ? $rawSlug : $rawName);
-            if ($slug === '') {
-                $slug = 'group-' . $groupId;
-            }
-
-            $baseSlug = $slug;
-            $suffix = 2;
-            while (isset($usedSlugs[$slug])) {
-                $slug = $baseSlug . '-' . $suffix;
-                $suffix++;
-            }
-            $usedSlugs[$slug] = true;
-
-            $hasRouteEnabled = array_key_exists('route_enabled', $row) && $row['route_enabled'] !== null;
-            $routeEnabledRaw = $hasRouteEnabled ? (int) $row['route_enabled'] : 0;
-            $normalizedRoleSlug = strtolower(trim($slug));
-            $isGuestLikeGroup = $normalizedRoleSlug === 'guest' || $normalizedRoleSlug === 'validating';
-            $isBannedGroup = $normalizedRoleSlug === 'banned';
-            $routeEnabled = ($isGuestLikeGroup || $isBannedGroup) ? 0 : ($routeEnabledRaw === 1 ? 1 : 0);
-            $needsSlugUpdate = $rawSlug !== $slug;
-            $needsRouteUpdate = !$hasRouteEnabled || $routeEnabledRaw !== $routeEnabled;
-
-            if (!$needsSlugUpdate && !$needsRouteUpdate) {
-                continue;
-            }
-
-            $update->execute([
-                ':slug' => $slug,
-                ':route_enabled' => $routeEnabled,
-                ':id' => $groupId,
-            ]);
-        }
+        $this->appSchemaBuilder()->ensureGroupRoutingColumns($db, $driver, $prefix);
     }
 
     /**
@@ -1106,43 +735,7 @@ final class SchemaManager
      */
     private function ensurePageImageDisplayColumns(PDO $db, string $driver, string $prefix): void
     {
-        if ($driver === 'sqlite') {
-            if (!$this->appColumnExistsSqlite($db, 'main.page_images', 'is_preview')) {
-                $db->exec('ALTER TABLE main.page_images ADD COLUMN is_preview INTEGER NOT NULL DEFAULT 0');
-            }
-            if (!$this->appColumnExistsSqlite($db, 'main.page_images', 'include_in_gallery')) {
-                $db->exec('ALTER TABLE main.page_images ADD COLUMN include_in_gallery INTEGER NOT NULL DEFAULT 1');
-            }
-
-            $db->exec('UPDATE main.page_images SET is_preview = 0 WHERE is_preview IS NULL');
-            $db->exec('UPDATE main.page_images SET include_in_gallery = 1 WHERE include_in_gallery IS NULL');
-            return;
-        }
-
-        $imagesTable = $prefix . 'page_images';
-
-        if ($driver === 'mysql') {
-            if (!$this->appColumnExistsMySql($db, $imagesTable, 'is_preview')) {
-                $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN is_preview TINYINT(1) NOT NULL DEFAULT 0');
-            }
-            if (!$this->appColumnExistsMySql($db, $imagesTable, 'include_in_gallery')) {
-                $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN include_in_gallery TINYINT(1) NOT NULL DEFAULT 1');
-            }
-
-            $db->exec('UPDATE ' . $imagesTable . ' SET is_preview = 0 WHERE is_preview IS NULL');
-            $db->exec('UPDATE ' . $imagesTable . ' SET include_in_gallery = 1 WHERE include_in_gallery IS NULL');
-            return;
-        }
-
-        if (!$this->appColumnExistsPgSql($db, $imagesTable, 'is_preview')) {
-            $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN is_preview SMALLINT NOT NULL DEFAULT 0');
-        }
-        if (!$this->appColumnExistsPgSql($db, $imagesTable, 'include_in_gallery')) {
-            $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN include_in_gallery SMALLINT NOT NULL DEFAULT 1');
-        }
-
-        $db->exec('UPDATE ' . $imagesTable . ' SET is_preview = 0 WHERE is_preview IS NULL');
-        $db->exec('UPDATE ' . $imagesTable . ' SET include_in_gallery = 1 WHERE include_in_gallery IS NULL');
+        $this->appSchemaBuilder()->ensurePageImageDisplayColumns($db, $driver, $prefix);
     }
 
     /**
@@ -1150,58 +743,7 @@ final class SchemaManager
      */
     private function ensureTaxonomyImageColumns(PDO $db, string $driver, string $prefix): void
     {
-        $columns = [
-            'cover_image_path',
-            'cover_image_sm_path',
-            'cover_image_md_path',
-            'cover_image_lg_path',
-            'preview_image_path',
-            'preview_image_sm_path',
-            'preview_image_md_path',
-            'preview_image_lg_path',
-        ];
-        $taxonomyTables = ['categories', 'tags'];
-
-        if ($driver === 'sqlite') {
-            foreach ($taxonomyTables as $table) {
-                $qualifiedTable = $this->table($driver, $prefix, $table);
-                foreach ($columns as $column) {
-                    if (!$this->appColumnExistsSqlite($db, $qualifiedTable, $column)) {
-                        $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN ' . $column . ' TEXT NULL');
-                    }
-
-                    $db->exec('UPDATE ' . $qualifiedTable . ' SET ' . $column . ' = NULL WHERE ' . $column . ' = \'\'');
-                }
-            }
-
-            return;
-        }
-
-        if ($driver === 'mysql') {
-            foreach ($taxonomyTables as $table) {
-                $physicalTable = $prefix . $table;
-                foreach ($columns as $column) {
-                    if (!$this->appColumnExistsMySql($db, $physicalTable, $column)) {
-                        $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN ' . $column . ' VARCHAR(500) NULL');
-                    }
-
-                    $db->exec('UPDATE ' . $physicalTable . ' SET ' . $column . ' = NULL WHERE ' . $column . ' = \'\'');
-                }
-            }
-
-            return;
-        }
-
-        foreach ($taxonomyTables as $table) {
-            $physicalTable = $prefix . $table;
-            foreach ($columns as $column) {
-                if (!$this->appColumnExistsPgSql($db, $physicalTable, $column)) {
-                    $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN ' . $column . ' VARCHAR(500) NULL');
-                }
-
-                $db->exec('UPDATE ' . $physicalTable . ' SET ' . $column . ' = NULL WHERE ' . $column . ' = \'\'');
-            }
-        }
+        $this->appSchemaBuilder()->ensureTaxonomyImageColumns($db, $driver, $prefix);
     }
 
     /**
@@ -1209,12 +751,7 @@ final class SchemaManager
      */
     private function dropLegacyChannelTable(PDO $db, string $driver, string $prefix): void
     {
-        if ($driver === 'sqlite') {
-            $db->exec('DROP TABLE IF EXISTS taxonomy.channels');
-            return;
-        }
-
-        $db->exec('DROP TABLE IF EXISTS ' . $prefix . 'channels');
+        $this->appSchemaBuilder()->dropLegacyChannelTable($db, $driver, $prefix);
     }
 
     /**
@@ -1222,72 +759,7 @@ final class SchemaManager
      */
     private function ensurePanelPerformanceIndexes(PDO $db, string $driver, string $prefix): void
     {
-        if ($driver === 'sqlite') {
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_page_categories_category_id ON page_categories (category_id, page_id)');
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_page_tags_tag_id ON page_tags (tag_id, page_id)');
-            $db->exec('CREATE INDEX IF NOT EXISTS auth.idx_user_groups_group_id ON user_groups (group_id, user_id)');
-            $db->exec('CREATE INDEX IF NOT EXISTS taxonomy.idx_redirects_lookup ON redirects (slug, channel_id, is_active)');
-            return;
-        }
-
-        $pageCategoriesTable = $prefix . 'page_categories';
-        $pageTagsTable = $prefix . 'page_tags';
-        $userGroupsTable = $prefix . 'user_groups';
-        $redirectsTable = $prefix . 'redirects';
-
-        if ($driver === 'mysql') {
-            if (!$this->mySqlIndexExists($db, $pageCategoriesTable, 'idx_' . $prefix . 'page_categories_category_id')) {
-                $db->exec(
-                    'ALTER TABLE ' . $pageCategoriesTable . '
-                     ADD INDEX idx_' . $prefix . 'page_categories_category_id (category_id, page_id)'
-                );
-            }
-            if (!$this->mySqlIndexExists($db, $pageTagsTable, 'idx_' . $prefix . 'page_tags_tag_id')) {
-                $db->exec(
-                    'ALTER TABLE ' . $pageTagsTable . '
-                     ADD INDEX idx_' . $prefix . 'page_tags_tag_id (tag_id, page_id)'
-                );
-            }
-            if (!$this->mySqlIndexExists($db, $userGroupsTable, 'idx_' . $prefix . 'user_groups_group_id')) {
-                $db->exec(
-                    'ALTER TABLE ' . $userGroupsTable . '
-                     ADD INDEX idx_' . $prefix . 'user_groups_group_id (group_id, user_id)'
-                );
-            }
-            if (!$this->mySqlIndexExists($db, $redirectsTable, 'idx_' . $prefix . 'redirects_lookup')) {
-                $db->exec(
-                    'ALTER TABLE ' . $redirectsTable . '
-                     ADD INDEX idx_' . $prefix . 'redirects_lookup (slug, channel_id, is_active)'
-                );
-            }
-
-            return;
-        }
-
-        if (!$this->pgSqlIndexExists($db, $pageCategoriesTable, 'idx_' . $prefix . 'page_categories_category_id')) {
-            $db->exec(
-                'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'page_categories_category_id
-                 ON ' . $this->quotePgIdentifier($pageCategoriesTable) . ' (category_id, page_id)'
-            );
-        }
-        if (!$this->pgSqlIndexExists($db, $pageTagsTable, 'idx_' . $prefix . 'page_tags_tag_id')) {
-            $db->exec(
-                'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'page_tags_tag_id
-                 ON ' . $this->quotePgIdentifier($pageTagsTable) . ' (tag_id, page_id)'
-            );
-        }
-        if (!$this->pgSqlIndexExists($db, $userGroupsTable, 'idx_' . $prefix . 'user_groups_group_id')) {
-            $db->exec(
-                'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'user_groups_group_id
-                 ON ' . $this->quotePgIdentifier($userGroupsTable) . ' (group_id, user_id)'
-            );
-        }
-        if (!$this->pgSqlIndexExists($db, $redirectsTable, 'idx_' . $prefix . 'redirects_lookup')) {
-            $db->exec(
-                'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'redirects_lookup
-                 ON ' . $this->quotePgIdentifier($redirectsTable) . ' (slug, channel_id, is_active)'
-            );
-        }
+        $this->appSchemaBuilder()->ensurePanelPerformanceIndexes($db, $driver, $prefix);
     }
 
     /**
@@ -1295,28 +767,7 @@ final class SchemaManager
      */
     private function ensureRedirectDescriptionColumn(PDO $db, string $driver, string $prefix): void
     {
-        if ($driver === 'sqlite') {
-            $redirectsTable = $this->table($driver, $prefix, 'redirects');
-            if (!$this->appColumnExistsSqlite($db, $redirectsTable, 'description')) {
-                $db->exec('ALTER TABLE ' . $redirectsTable . ' ADD COLUMN description TEXT NULL');
-            }
-
-            return;
-        }
-
-        $redirectsTable = $prefix . 'redirects';
-
-        if ($driver === 'mysql') {
-            if (!$this->appColumnExistsMySql($db, $redirectsTable, 'description')) {
-                $db->exec('ALTER TABLE ' . $redirectsTable . ' ADD COLUMN description TEXT NULL');
-            }
-
-            return;
-        }
-
-        if (!$this->appColumnExistsPgSql($db, $redirectsTable, 'description')) {
-            $db->exec('ALTER TABLE ' . $redirectsTable . ' ADD COLUMN description TEXT NULL');
-        }
+        $this->appSchemaBuilder()->ensureRedirectDescriptionColumn($db, $driver, $prefix);
     }
 
     /**
@@ -1324,35 +775,7 @@ final class SchemaManager
      */
     private function ensureEnabledExtensionSchemas(PDO $db, string $driver, string $prefix): void
     {
-        $root = dirname(__DIR__, 4);
-        foreach (ExtensionRegistry::enabledDirectories($root, true) as $directory) {
-            // Extension schema providers live at `lib/schema.php`, not the directory itself.
-            $schemaPath = $root . '/private/ext/' . $directory . '/lib/schema.php';
-            if (!is_file($schemaPath)) {
-                continue;
-            }
-
-            /** @var mixed $provider */
-            $provider = require $schemaPath;
-            if (!is_callable($provider)) {
-                error_log('Raven extension schema provider is invalid for extension "' . $directory . '".');
-                continue;
-            }
-
-            try {
-                $provider([
-                    'db' => $db,
-                    'driver' => $driver,
-                    'prefix' => $prefix,
-                    'extension' => $directory,
-                    'table' => function (string $table) use ($driver, $prefix): string {
-                        return $this->table($driver, $prefix, $table);
-                    },
-                ]);
-            } catch (\Throwable $exception) {
-                error_log('Raven extension schema provider failed for extension "' . $directory . '": ' . $exception->getMessage());
-            }
-        }
+        $this->extensionSchemaRunner()->ensureEnabledExtensionSchemas($db, $driver, $prefix);
     }
 
     /**
@@ -1477,27 +900,7 @@ final class SchemaManager
      */
     private function ensurePageExtendedColumn(PDO $db, string $driver, string $prefix): void
     {
-        if ($driver === 'sqlite') {
-            if (!$this->appColumnExistsSqlite($db, 'pages', 'extended')) {
-                $db->exec('ALTER TABLE pages ADD COLUMN extended TEXT NULL');
-            }
-
-            return;
-        }
-
-        $pagesTable = $prefix . 'pages';
-
-        if ($driver === 'mysql') {
-            if (!$this->appColumnExistsMySql($db, $pagesTable, 'extended')) {
-                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN extended MEDIUMTEXT NULL');
-            }
-
-            return;
-        }
-
-        if (!$this->appColumnExistsPgSql($db, $pagesTable, 'extended')) {
-            $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN extended TEXT NULL');
-        }
+        $this->appSchemaBuilder()->ensurePageExtendedColumn($db, $driver, $prefix);
     }
 
     /**
@@ -1877,6 +1280,51 @@ final class SchemaManager
             || str_contains($message, 'duplicate key name')
             || str_contains($message, 'duplicate object')
             || str_contains($message, 'relation') && str_contains($message, 'exists');
+    }
+
+    private function schemaIntrospector(): SchemaIntrospector
+    {
+        if ($this->schemaIntrospector === null) {
+            $this->schemaIntrospector = new SchemaIntrospector();
+        }
+
+        return $this->schemaIntrospector;
+    }
+
+    private function authSchemaBuilder(): AuthSchemaBuilder
+    {
+        if ($this->authSchemaBuilder === null) {
+            $this->authSchemaBuilder = new AuthSchemaBuilder($this->schemaIntrospector());
+        }
+
+        return $this->authSchemaBuilder;
+    }
+
+    private function appSchemaBuilder(): AppSchemaBuilder
+    {
+        if ($this->appSchemaBuilder === null) {
+            $this->appSchemaBuilder = new AppSchemaBuilder($this->schemaIntrospector());
+        }
+
+        return $this->appSchemaBuilder;
+    }
+
+    private function seedInstaller(): SeedInstaller
+    {
+        if ($this->seedInstaller === null) {
+            $this->seedInstaller = new SeedInstaller();
+        }
+
+        return $this->seedInstaller;
+    }
+
+    private function extensionSchemaRunner(): ExtensionSchemaRunner
+    {
+        if ($this->extensionSchemaRunner === null) {
+            $this->extensionSchemaRunner = new ExtensionSchemaRunner();
+        }
+
+        return $this->extensionSchemaRunner;
     }
 
 }

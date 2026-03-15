@@ -21,6 +21,10 @@
 - Added eighth-wave `private/lib/` modularization for panel permission-definition cataloging, panel editor-tab URL policy, panel routing-preview helpers, and public template payload decoration (`PanelPermissionDefinitionCatalog`, `PanelEditorTabService`, `PanelRoutingPreviewService`, `PublicTemplateDecorator`), and rewired `UserRepository` contact profile persistence to reuse `AuthPayloadCodec` from `private/lib/Auth/`.
 - Updated `AGENTS.md` private file-tree appendix for `private/lib/` and `private/sys/` to reflect current module responsibilities after declutter work.
 - Added a short-term backlog item in `debug/release/todo.md` to break down/rebuild `private/sys/Core/Database/SchemaManager.php` into smaller `private/lib/`-backed modules.
+- Added ninth-wave `private/lib/` modularization for auth 2FA/login preference orchestration, debug toolbar rendering, extension contract validation, page-image pipeline helpers, and schema bootstrap services (`LoginTwoFactorFlowService`, `UserSecurityProfileService`, `DebugToolbarDataSanitizer`, `DebugToolbarMarkupBuilder`, `ManifestContractValidator`, `ExtensionProviderValidator`, `PageImageUploadPolicy`, `PageImagePathLayout`, `ImageVariantProcessor`, `SchemaIntrospector`, `AuthSchemaBuilder`, `AppSchemaBuilder`, `SeedInstaller`, `ExtensionSchemaRunner`).
+- Rewired `AuthController`, `AuthService`, `DebugToolbarRenderer`, `ExtensionRegistry`, `PageImageManager`, and `SchemaManager` to delegate these concerns to `private/lib/`.
+- Added an `ExtensionRegistry` fallback include path for lib validators so CLI extension commands remain functional in direct-load contexts (outside full app bootstrap autoload setup).
+- Re-ran full smoke suite (`debug/smoke/*.php`): PASS.
 
 ### March 13, 2026
 

@@ -159,6 +159,7 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Auth/PanelPermissionDefinitionCatalog.php` - Shared panel permission-definition catalog builder for stock panel ACL bits plus extension-level ACL labels.
 - `/private/lib/Auth/PanelSessionGuard.php` - Shared panel login-guard flow and panel-identity session synchronization helper.
 - `/private/lib/Auth/PermissionMaskService.php` - Shared user/guest permission-mask composition + cache helper for group-based panel/public access checks.
+- `/private/lib/Auth/UserSecurityProfileService.php` - Shared user security-profile and 2FA-method helper for preference payload normalization/validation and method-state mutations.
 - `/private/lib/Config/ConfigEditorNormalizer.php` - Shared configuration-editor normalization helpers for scalar/meta/media field parsing and validation.
 - `/private/lib/Config/ConfigEditorSchemaService.php` - Shared config-editor schema/default normalizer and field-map helper for flatten/read/write + legacy key migration.
 - `/private/lib/Config/ConfigSnapshotSanitizer.php` - Shared config snapshot sanitizer for stripping core-managed keys before panel editor save/render flows.
@@ -169,18 +170,30 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Database/Profiling/ProfiledPDO.php` - PDO subclass that records query timings through an injected profiler contract.
 - `/private/lib/Database/Profiling/ProfiledPDOStatement.php` - PDOStatement subclass that records execute payloads/timings through a profiler contract.
 - `/private/lib/Database/Profiling/QueryProfilerInterface.php` - Interface contract for query profiling collectors used by profiled PDO classes.
+- `/private/lib/Database/Schema/AppSchemaBuilder.php` - Shared app-schema table/index/column builder for core content/taxonomy/group storage.
+- `/private/lib/Database/Schema/AuthSchemaBuilder.php` - Shared auth-schema/install builder for Delight schema bootstrap and Raven auth-column backfills.
+- `/private/lib/Database/Schema/ExtensionSchemaRunner.php` - Shared enabled-extension schema provider runner for `private/ext/*/lib/schema.php`.
+- `/private/lib/Database/Schema/SchemaIntrospector.php` - Shared cross-driver schema/table/index introspection and DDL error helpers.
+- `/private/lib/Database/Schema/SeedInstaller.php` - Shared stock-group and starter-page seed installer/normalizer.
 - `/private/lib/Debug/DebugToolbarConfigResolver.php` - Shared resolver that maps debug config keys into normalized debug-toolbar visibility flags.
+- `/private/lib/Debug/DebugToolbarDataSanitizer.php` - Shared debug-toolbar query/profile payload sanitizer and truncation helper.
+- `/private/lib/Debug/DebugToolbarMarkupBuilder.php` - Shared debug-toolbar HTML builder for profiler cards, toggles, and section rendering.
 - `/private/lib/Extension/ExtensionCatalogService.php` - Shared extension catalog + ext.json validation service for panel listing/install/delete safety flows.
 - `/private/lib/Extension/ExtensionEditorCatalogService.php` - Shared extension-provided editor catalog helper for body-block field and shortcode menu discovery.
 - `/private/lib/Extension/ExtensionPermissionCatalogService.php` - Shared extension permission-level catalog discovery and stable permission-bit allocation service for panel ACL mapping.
 - `/private/lib/Extension/EmbeddedFormRuntimeService.php` - Shared embedded-form shortcode parser/runtime resolver with enabled-extension filtering and per-type form-definition caches.
+- `/private/lib/Extension/ExtensionProviderValidator.php` - Shared validator for extension provider contracts (shortcodes/fields/schema bind checks).
 - `/private/lib/Extension/ExtensionScaffoldService.php` - Shared extension scaffold generator for panel extension-create workflows.
 - `/private/lib/Extension/ExtensionStateStore.php` - Shared persistence service for extension enablement and permission state maps.
+- `/private/lib/Extension/ManifestContractValidator.php` - Shared ext-manifest contract validator for required keys/types and extension-type policy checks.
 - `/private/lib/Http/HttpResponse.php` - Shared HTTP response helper for redirects and JSON/no-store response payloads.
 - `/private/lib/Http/RequestContextResolver.php` - Shared request-context resolver for scheme/host/current URL and normalized client IP/hostname extraction.
 - `/private/lib/Http/SessionFlash.php` - Shared session flash message helper with single-value and list pull/write support.
 - `/private/lib/Http/UploadFileSetNormalizer.php` - Shared `$_FILES` tree flatten/normalization helper for nested single/multiple upload payloads.
 - `/private/lib/Media/AvatarUploadService.php` - Shared avatar upload sanitizer/thumbnail generator and deterministic avatar filename+storage lifecycle helper.
+- `/private/lib/Media/ImageVariantProcessor.php` - Shared image variant-generation helper for GD resize/orient/encode pipelines.
+- `/private/lib/Media/PageImagePathLayout.php` - Shared page-image path/filename layout helper for deterministic storage and cleanup.
+- `/private/lib/Media/PageImageUploadPolicy.php` - Shared page-image upload constraints and upload-error mapping helper.
 - `/private/lib/Media/TaxonomyImageService.php` - Shared taxonomy image upload pipeline for cover/preview storage, variant generation, and cleanup.
 - `/private/lib/Pagination/Pagination.php` - Shared pagination utility for state normalization and template link payload generation.
 - `/private/lib/Profiling/ProfilerOutputInterface.php` - Interface contract for pluggable request-profiler output renderers.
@@ -201,6 +214,7 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Security/CsrfTokenStoreInterface.php` - Contract for CSRF token persistence backends.
 - `/private/lib/Security/CaptchaService.php` - Shared captcha provider config/verification/markup helper for public embedded forms.
 - `/private/lib/Security/InputSanitizer.php` - Reusable scalar input sanitization and validation utility.
+- `/private/lib/Security/LoginTwoFactorFlowService.php` - Shared login-time 2FA challenge selection/state helper for TOTP/WebAuthn method fallback flows.
 - `/private/lib/Security/PhpSessionTokenStore.php` - Default CSRF token-store implementation backed by PHP sessions.
 - `/private/lib/Security/QrCodeService.php` - Shared QR-code rendering helper for SVG data-URI generation.
 - `/private/lib/Security/RecoveryPhrase.php` - Shared recovery-phrase generator, normalization, and validation helper for 2FA.
@@ -226,18 +240,18 @@ Bootstrap/service container wiring and startup helpers.
 
 #### /private/sys/
 Core system files:
-- `/private/sys/Controller/AuthController.php` - Authentication controller for login/logout and auth flow handling, now delegating flash/json/panel-url/identifier normalization, request-context IP resolution, and panel site-context helpers through `/private/lib/`.
+- `/private/sys/Controller/AuthController.php` - Authentication controller for login/logout and auth flow handling, now delegating flash/json/panel-url/identifier normalization, request-context IP resolution, 2FA challenge-state selection, and panel site-context helpers through `/private/lib/`.
 - `/private/sys/Controller/PanelController.php` - Primary panel controller for admin routes/forms/page rendering, now delegating shared flash/json/pagination/panel-url/editor-tab/routing-preview/route-config+schema parsing/config snapshot sanitization/routing inventory building/archive packaging/extension-state+catalog+permission+editor-catalog services/avatar/taxonomy image processing/upload normalization/page-body codec/panel-session guard/theme catalog+clone+scaffold generators/profile-contact normalization and fallback/site-context helpers through `/private/lib/`.
 - `/private/sys/Controller/PublicController.php` - Primary public controller for frontend rendering/form endpoints, now delegating shared flash/panel-url/route-config/captcha/redirect validation/channel route policy/request-context resolution/site-context/public-meta/theme-catalog/embedded-form runtime/template resolution+decoration/page-body codec+policy/extension editor-catalog/profile-contact helpers and markdown rendering through `/private/lib/`.
-- `/private/sys/Core/Auth/AuthService.php` - Auth service wrapper around session/auth provider operations, now delegating login-throttle persistence, auth payload codec normalization, and permission-mask composition/caching through `/private/lib/Auth/`.
+- `/private/sys/Core/Auth/AuthService.php` - Auth service wrapper around session/auth provider operations, now delegating login-throttle persistence, auth payload codec normalization, 2FA/security profile mutations, and permission-mask composition/caching through `/private/lib/Auth/`.
 - `/private/sys/Core/Auth/PanelAccess.php` - Panel permission bit constants and access helper utilities.
 - `/private/sys/Core/Config.php` - Config loader/getter/setter persistence service for Raven config keys.
 - `/private/sys/Core/Database/ConnectionFactory.php` - Database connection factory for SQLite/MySQL/PostgreSQL backends.
-- `/private/sys/Core/Database/SchemaManager.php` - Idempotent schema ensure/migration coordinator for core and extensions.
-- `/private/sys/Core/Debug/DebugToolbarRenderer.php` - Renderer for the Output Profiler toolbar UI and sections.
+- `/private/sys/Core/Database/SchemaManager.php` - Idempotent schema ensure/migration coordinator, now orchestrating shared app/auth/schema-introspection/seed/extension schema services from `/private/lib/Database/Schema/`.
+- `/private/sys/Core/Debug/DebugToolbarRenderer.php` - Thin debug-toolbar adapter that delegates profiler payload sanitization/markup rendering to `/private/lib/Debug/`.
 - `/private/sys/Core/Extension/EmbeddedFormRuntimeInterface.php` - Contract interface for extension-provided embedded form runtimes.
-- `/private/sys/Core/Extension/ExtensionRegistry.php` - Extension discovery, validation, manifest, and provider registry logic.
-- `/private/sys/Core/Media/PageImageManager.php` - Page image upload/variant processing and storage lifecycle manager.
+- `/private/sys/Core/Extension/ExtensionRegistry.php` - Extension discovery/registry logic, now delegating manifest/provider contract validation to `/private/lib/Extension/`.
+- `/private/sys/Core/Media/PageImageManager.php` - Page image lifecycle manager, now delegating upload policy, storage layout, and variant processing to `/private/lib/Media/`.
 - `/private/sys/Core/Security/AvatarValidator.php` - Avatar image validation and normalization rules helper.
 - `/private/sys/Core/Support/CountryOptions.php` - Country option dataset/provider used by UI and form builders.
 - `/private/sys/Core/Support/Helpers.php` - Shared support helper functions for common runtime tasks (`redirect()` delegates through `/private/lib/Http/HttpResponse.php`).

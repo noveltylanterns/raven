@@ -20,7 +20,7 @@ use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Security\TwoFactorChallengeHelper;
+use Raven\Lib\Security\LoginTwoFactorFlowService;
 use Raven\Lib\Security\TwoFactorMethodKey;
 use Raven\Lib\Security\WebAuthnService;
 use Raven\Core\View;
@@ -53,6 +53,7 @@ final class AuthController
     private Csrf $csrf;
     private SessionFlash $flash;
     private LoginIdentifierResolver $identifierResolver;
+    private ?LoginTwoFactorFlowService $twoFactorFlowService = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
     private ?RequestContextResolver $requestContextResolver = null;
 
@@ -189,32 +190,9 @@ final class AuthController
             $this->auth->beginTwoFactorChallenge($userId, $interactiveMethods);
             unset($_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED], $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE]);
 
-            $preferredWebauthn = null;
-            foreach ($interactiveMethods as $method) {
-                if (!is_array($method)) {
-                    continue;
-                }
-
-                if (strtolower(trim((string) ($method['type'] ?? ''))) !== 'webauthn') {
-                    continue;
-                }
-
-                $methodKey = trim((string) ($method['key'] ?? ''));
-                if ($methodKey !== '') {
-                    $preferredWebauthn = $methodKey;
-                    break;
-                }
-            }
-
-            if ($preferredWebauthn !== null) {
-                $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = $preferredWebauthn;
-            } elseif (count($interactiveMethods) === 1) {
-                $singleKey = trim((string) ($interactiveMethods[0]['key'] ?? ''));
-                if ($singleKey !== '') {
-                    $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = $singleKey;
-                } else {
-                    unset($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY]);
-                }
+            $preferredMethodKey = $this->twoFactorFlowService()->preferredMethodKeyForChallenge($interactiveMethods);
+            if ($preferredMethodKey !== null) {
+                $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = $preferredMethodKey;
             } else {
                 unset($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY]);
             }
@@ -245,21 +223,18 @@ final class AuthController
 
         $pendingMethods = $this->auth->pendingTwoFactorMethods();
         $selectedMethodKey = trim((string) ($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] ?? ''));
-        $selectedMethod = TwoFactorChallengeHelper::findByKey($pendingMethods, $selectedMethodKey);
         $webauthnFailed = !empty($_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED]);
-        $codeMethods = TwoFactorChallengeHelper::codeMethods($pendingMethods);
-        $webauthnMethods = TwoFactorChallengeHelper::filterByType($pendingMethods, 'webauthn');
-        $hasWebauthn = $webauthnMethods !== [];
-        $selectedMethodType = strtolower(trim((string) ($selectedMethod['type'] ?? '')));
-        $showMethodPicker = !$hasWebauthn && count($codeMethods) > 1 && $selectedMethod === null;
-        $showTotpForm = in_array($selectedMethodType, ['totp', 'recovery'], true);
-        $showWebauthn = $hasWebauthn && (
-            $selectedMethod === null
-            || $selectedMethodType === 'webauthn'
+        $flowState = $this->twoFactorFlowService()->challengeViewState(
+            $pendingMethods,
+            $selectedMethodKey,
+            $webauthnFailed
         );
-        $fallbackMethods = $showWebauthn
-            ? TwoFactorChallengeHelper::fallbackMethods($pendingMethods, $selectedMethod)
-            : [];
+        $selectedMethod = $flowState['selected_method'];
+        $selectedMethodType = (string) ($flowState['selected_method_type'] ?? '');
+        $showMethodPicker = (bool) ($flowState['show_method_picker'] ?? false);
+        $showTotpForm = (bool) ($flowState['show_totp_form'] ?? false);
+        $showWebauthn = (bool) ($flowState['show_webauthn_prompt'] ?? false);
+        $fallbackMethods = is_array($flowState['fallback_methods'] ?? null) ? $flowState['fallback_methods'] : [];
 
         $this->view->render('panel/login_2fa', [
             'site' => $this->siteData(),
@@ -270,7 +245,7 @@ final class AuthController
             'showMethodPicker' => $showMethodPicker,
             'showTotpForm' => $showTotpForm,
             'showWebauthnPrompt' => $showWebauthn,
-            'webauthnFailed' => $webauthnFailed,
+            'webauthnFailed' => (bool) ($flowState['webauthn_failed'] ?? $webauthnFailed),
             'fallbackMethods' => $fallbackMethods,
             'selectedMethod' => $selectedMethod,
             'selectedMethodType' => $selectedMethodType,
@@ -301,14 +276,14 @@ final class AuthController
         }
 
         $pendingMethods = $this->auth->pendingTwoFactorMethods();
-        $selectedMethodKey = trim((string) ($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] ?? ''));
-        $selectedMethod = TwoFactorChallengeHelper::findByKey($pendingMethods, $selectedMethodKey);
-        if ($selectedMethod === null) {
-            $codeMethods = TwoFactorChallengeHelper::codeMethods($pendingMethods);
-            if (count($codeMethods) === 1) {
-                $selectedMethod = $codeMethods[0];
-                $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = (string) ($selectedMethod['key'] ?? '');
-            }
+        $selection = $this->twoFactorFlowService()->resolveCodeMethodForVerification(
+            $pendingMethods,
+            trim((string) ($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] ?? ''))
+        );
+        $selectedMethod = $selection['method'];
+        $selectedMethodKey = (string) ($selection['selected_method_key'] ?? '');
+        if ($selectedMethod !== null) {
+            $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = $selectedMethodKey;
         }
 
         $selectedMethodType = strtolower(trim((string) ($selectedMethod['type'] ?? '')));
@@ -373,7 +348,7 @@ final class AuthController
 
         $pendingMethods = $this->auth->pendingTwoFactorMethods();
         $methodKey = $this->input->text((string) ($post['method_key'] ?? ''), 200);
-        $selectedMethod = TwoFactorChallengeHelper::findByKey($pendingMethods, $methodKey);
+        $selectedMethod = $this->twoFactorFlowService()->resolveSelectedMethod($pendingMethods, $methodKey);
         if ($selectedMethod === null) {
             $this->flash('error', 'Selected verification method is invalid.');
             redirect($this->panelUrl('/login/2fa'));
@@ -404,14 +379,12 @@ final class AuthController
         }
 
         $pendingMethods = $this->auth->pendingTwoFactorMethods();
-        $selectedMethodKey = trim((string) ($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] ?? ''));
-        $selectedMethod = TwoFactorChallengeHelper::findByKey($pendingMethods, $selectedMethodKey);
-        if ($selectedMethod === null || strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'webauthn') {
-            $pendingWebauthn = TwoFactorChallengeHelper::filterByType($pendingMethods, 'webauthn');
-            if ($pendingWebauthn !== []) {
-                $selectedMethod = $pendingWebauthn[0];
-                $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = trim((string) ($selectedMethod['key'] ?? ''));
-            }
+        $selectedMethod = $this->twoFactorFlowService()->resolveWebauthnMethodForOptions(
+            $pendingMethods,
+            trim((string) ($_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] ?? ''))
+        );
+        if (is_array($selectedMethod)) {
+            $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = trim((string) ($selectedMethod['key'] ?? ''));
         }
 
         if ($selectedMethod === null || strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'webauthn') {
@@ -419,11 +392,7 @@ final class AuthController
             return;
         }
 
-        $selectedCredentialIdB64 = trim((string) ($selectedMethod['credential_id'] ?? ''));
-        if ($selectedCredentialIdB64 === '') {
-            $selectedKey = trim((string) ($selectedMethod['key'] ?? ''));
-            $selectedCredentialIdB64 = TwoFactorMethodKey::extractWebauthnCredentialId($selectedKey);
-        }
+        $selectedCredentialIdB64 = $this->twoFactorFlowService()->selectedWebauthnCredentialId($selectedMethod);
 
         if ($selectedCredentialIdB64 === '') {
             $this->jsonResponse(['ok' => false, 'message' => 'Selected security key is invalid.'], 400);
@@ -436,32 +405,10 @@ final class AuthController
             return;
         }
 
-        $resolvedMethod = null;
-        foreach ((array) ($preferences['two_factor_methods'] ?? []) as $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            if (
-                strtolower(trim((string) ($method['type'] ?? ''))) !== 'webauthn'
-                || strtolower(trim((string) ($method['status'] ?? ''))) !== 'confirmed'
-            ) {
-                continue;
-            }
-
-            $credentialIdB64 = trim((string) ($method['credential_id'] ?? ''));
-            $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
-            if ($credentialIdB64 === '' || $credentialPublicKey === '') {
-                continue;
-            }
-
-            if ($credentialIdB64 !== $selectedCredentialIdB64) {
-                continue;
-            }
-
-            $resolvedMethod = $method;
-            break;
-        }
+        $resolvedMethod = $this->twoFactorFlowService()->resolveRegisteredWebauthnMethod(
+            (array) ($preferences['two_factor_methods'] ?? []),
+            $selectedCredentialIdB64
+        );
 
         if (!is_array($resolvedMethod)) {
             $this->jsonResponse(['ok' => false, 'message' => 'No WebAuthn methods are configured.'], 400);
@@ -818,6 +765,15 @@ final class AuthController
         }
 
         return $this->requestContextResolver;
+    }
+
+    private function twoFactorFlowService(): LoginTwoFactorFlowService
+    {
+        if (!$this->twoFactorFlowService instanceof LoginTwoFactorFlowService) {
+            $this->twoFactorFlowService = new LoginTwoFactorFlowService();
+        }
+
+        return $this->twoFactorFlowService;
     }
 
     /**

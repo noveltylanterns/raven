@@ -1,0 +1,126 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Raven\Lib\Media;
+
+use Imagick;
+use Raven\Core\Config;
+
+/**
+ * Shared page-image variant sizing and EXIF-orientation helpers.
+ */
+final class ImageVariantProcessor
+{
+    private Config $config;
+
+    public function __construct(Config $config)
+    {
+        $this->config = $config;
+    }
+
+    /**
+     * @return array<string, array{width: int, height: int}>
+     */
+    public function variantSpecs(): array
+    {
+        return [
+            // Keep config keys stable while shortening stored variant keys/filenames.
+            'sm' => [
+                // `0` means "auto" for this axis (aspect-ratio-preserving contain).
+                'width' => max(0, (int) $this->config->get('media.images.small.width', 200)),
+                'height' => max(0, (int) $this->config->get('media.images.small.height', 200)),
+            ],
+            'md' => [
+                'width' => max(0, (int) $this->config->get('media.images.med.width', 600)),
+                'height' => max(0, (int) $this->config->get('media.images.med.height', 600)),
+            ],
+            'lg' => [
+                'width' => max(0, (int) $this->config->get('media.images.large.width', 1000)),
+                'height' => max(0, (int) $this->config->get('media.images.large.height', 1000)),
+            ],
+        ];
+    }
+
+    /**
+     * @return array{width: int, height: int}
+     */
+    public function resolveVariantSize(
+        int $sourceWidth,
+        int $sourceHeight,
+        int $maxWidth,
+        int $maxHeight
+    ): array {
+        if ($sourceWidth < 1 || $sourceHeight < 1) {
+            return ['width' => 1, 'height' => 1];
+        }
+
+        if ($maxWidth <= 0 && $maxHeight <= 0) {
+            return ['width' => $sourceWidth, 'height' => $sourceHeight];
+        }
+
+        if ($maxWidth <= 0) {
+            $scale = min(1.0, $maxHeight / $sourceHeight);
+        } elseif ($maxHeight <= 0) {
+            $scale = min(1.0, $maxWidth / $sourceWidth);
+        } else {
+            $scale = min(1.0, $maxWidth / $sourceWidth, $maxHeight / $sourceHeight);
+        }
+
+        $targetWidth = max(1, (int) round($sourceWidth * $scale));
+        $targetHeight = max(1, (int) round($sourceHeight * $scale));
+
+        // Clamp to positive configured max bounds when set.
+        if ($maxWidth > 0) {
+            $targetWidth = min($targetWidth, $maxWidth);
+        }
+        if ($maxHeight > 0) {
+            $targetHeight = min($targetHeight, $maxHeight);
+        }
+
+        return [
+            'width' => $targetWidth,
+            'height' => $targetHeight,
+        ];
+    }
+
+    /**
+     * Converts EXIF orientation into pixel-space rotation/flip changes.
+     */
+    public function autoOrient(Imagick $image): void
+    {
+        $orientation = $image->getImageOrientation();
+
+        switch ($orientation) {
+            case Imagick::ORIENTATION_TOPRIGHT:
+                $image->flopImage();
+                break;
+            case Imagick::ORIENTATION_BOTTOMRIGHT:
+                $image->rotateImage('#000', 180);
+                break;
+            case Imagick::ORIENTATION_BOTTOMLEFT:
+                $image->flipImage();
+                break;
+            case Imagick::ORIENTATION_LEFTTOP:
+                $image->flopImage();
+                $image->rotateImage('#000', 90);
+                break;
+            case Imagick::ORIENTATION_RIGHTTOP:
+                $image->rotateImage('#000', 90);
+                break;
+            case Imagick::ORIENTATION_RIGHTBOTTOM:
+                $image->flopImage();
+                $image->rotateImage('#000', -90);
+                break;
+            case Imagick::ORIENTATION_LEFTBOTTOM:
+                $image->rotateImage('#000', -90);
+                break;
+            default:
+                break;
+        }
+
+        // Reset orientation tag to canonical top-left after transform.
+        $image->setImageOrientation(Imagick::ORIENTATION_TOPLEFT);
+    }
+}
+
