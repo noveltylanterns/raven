@@ -21,8 +21,11 @@ use Raven\Core\Media\PageImageManager;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Lib\Archive\ArchivePackageService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Auth\PanelSessionGuard;
+use Raven\Lib\Config\PanelConfigDefaultsService;
+use Raven\Lib\Config\PanelConfigFieldPolicyService;
 use Raven\Lib\Config\ConfigEditorSchemaService;
 use Raven\Lib\Config\ConfigSnapshotSanitizer;
 use Raven\Lib\Config\ConfigEditorNormalizer;
@@ -56,9 +59,6 @@ use Raven\Core\Security\AvatarValidator;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\QrCodeService;
-use Raven\Lib\Security\RecoveryPhrase;
-use Raven\Lib\Security\TotpService;
-use Raven\Lib\Security\TwoFactorMethodNormalizer;
 use Raven\Lib\Security\WebAuthnService;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\View\ThemeFallbackRenderer;
@@ -109,6 +109,7 @@ final class PanelController
     private ?ThemeScaffoldService $themeScaffoldService = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
     private ?ConfigEditorNormalizer $configEditorNormalizer = null;
+    private ?PanelConfigDefaultsService $panelConfigDefaultsService = null;
     private ?RoutingInventoryBuilder $routingInventoryBuilder = null;
     private ?ExtensionPermissionCatalogService $extensionPermissionCatalogService = null;
     private ?AvatarUploadService $avatarUploadService = null;
@@ -129,6 +130,8 @@ final class PanelController
     private ?ThemeCatalogService $themeCatalogService = null;
     private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
     private ?PanelPageAuthorOptionBuilder $pageAuthorOptionBuilder = null;
+    private ?PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService = null;
+    private ?PanelConfigFieldPolicyService $panelConfigFieldPolicyService = null;
 
     public function __construct(
         View $view,
@@ -3105,36 +3108,26 @@ final class PanelController
             return;
         }
 
-        $secret = TotpService::normalizeSecret((string) ($post['secret'] ?? ''));
-        if (!TotpService::isValidSecret($secret)) {
-            $generatedSecret = TotpService::generateSecret($this->totpIssuer());
-            $secret = is_string($generatedSecret) ? $generatedSecret : '';
-        }
-
-        if (!TotpService::isValidSecret($secret)) {
-            $this->jsonResponse(['ok' => false, 'message' => 'Unable to generate a TOTP secret.'], 500);
+        $payload = $this->panelTwoFactorPreferencesService()->buildTotpSetupPayload(
+            $post['secret'] ?? '',
+            (string) ($preferences['email'] ?? ''),
+            $this->totpIssuer()
+        );
+        if (!(bool) ($payload['ok'] ?? false)) {
+            $this->jsonResponse(
+                ['ok' => false, 'message' => (string) ($payload['message'] ?? 'Unable to generate a TOTP secret.')],
+                500
+            );
             return;
-        }
-
-        $accountEmail = (string) ($preferences['email'] ?? '');
-        $provisioningUri = TotpService::provisioningUri($this->totpIssuer(), $accountEmail, $secret);
-        if ($provisioningUri === '') {
-            $this->jsonResponse(['ok' => false, 'message' => 'Unable to build TOTP provisioning data.'], 500);
-            return;
-        }
-
-        $accountAddress = $this->input->email($accountEmail);
-        if ($accountAddress === null) {
-            $accountAddress = 'account@local';
         }
 
         $this->jsonResponse([
             'ok' => true,
-            'secret' => $secret,
-            'issuer' => $this->totpIssuer(),
-            'account' => $accountAddress,
-            'provisioning_uri' => $provisioningUri,
-            'qr_data_uri' => QrCodeService::dataUriSvgBase64($provisioningUri, 220),
+            'secret' => (string) ($payload['secret'] ?? ''),
+            'issuer' => (string) ($payload['issuer'] ?? $this->totpIssuer()),
+            'account' => (string) ($payload['account'] ?? 'account@local'),
+            'provisioning_uri' => (string) ($payload['provisioning_uri'] ?? ''),
+            'qr_data_uri' => QrCodeService::dataUriSvgBase64((string) ($payload['provisioning_uri'] ?? ''), 220),
         ], 200);
     }
 
@@ -3158,8 +3151,8 @@ final class PanelController
             return;
         }
 
-        $recoveryCode = RecoveryPhrase::generate(12);
-        if (!is_string($recoveryCode) || !RecoveryPhrase::isValid($recoveryCode, 12)) {
+        $recoveryCode = $this->panelTwoFactorPreferencesService()->generateRecoveryPhrase(12);
+        if (!is_string($recoveryCode)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Unable to generate a recovery phrase.'], 500);
             return;
         }
@@ -3196,53 +3189,11 @@ final class PanelController
             return;
         }
 
-        $excludeCredentialIds = [];
-        $seenCredentialIds = [];
-
-        $appendCredentialId = static function (string $credentialIdB64) use (&$excludeCredentialIds, &$seenCredentialIds): void {
-            $credentialIdB64 = trim($credentialIdB64);
-            if ($credentialIdB64 === '') {
-                return;
-            }
-
-            if (isset($seenCredentialIds[$credentialIdB64])) {
-                return;
-            }
-
-            $credentialBinary = base64_decode($credentialIdB64, true);
-            if (!is_string($credentialBinary) || $credentialBinary === '') {
-                return;
-            }
-
-            $seenCredentialIds[$credentialIdB64] = true;
-            $excludeCredentialIds[] = $credentialBinary;
-        };
-
-        foreach ((array) ($preferences['two_factor_methods'] ?? []) as $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            if (strtolower(trim((string) ($method['type'] ?? ''))) !== 'webauthn') {
-                continue;
-            }
-
-            $appendCredentialId((string) ($method['credential_id'] ?? ''));
-        }
-
-        $submittedExcludeIds = $post['exclude_credential_ids'] ?? null;
-        if (is_array($submittedExcludeIds)) {
-            foreach ($submittedExcludeIds as $credentialIdCandidate) {
-                if (!is_scalar($credentialIdCandidate)) {
-                    continue;
-                }
-
-                $appendCredentialId((string) $credentialIdCandidate);
-                if (count($excludeCredentialIds) >= 20) {
-                    break;
-                }
-            }
-        }
+        $excludeCredentialIds = $this->panelTwoFactorPreferencesService()->collectWebauthnExcludeCredentialIds(
+            (array) ($preferences['two_factor_methods'] ?? []),
+            $post['exclude_credential_ids'] ?? null,
+            20
+        );
 
         $requireUserVerification = isset($post['require_user_verification'])
             && (string) ($post['require_user_verification'] ?? '') === '1';
@@ -3253,18 +3204,9 @@ final class PanelController
             return;
         }
 
-        $username = trim((string) ($preferences['username'] ?? ''));
-        if ($username === '') {
-            $username = trim((string) ($preferences['email'] ?? ''));
-        }
-        if ($username === '') {
-            $username = 'user-' . $userId;
-        }
-
-        $displayName = trim((string) ($preferences['display_name'] ?? ''));
-        if ($displayName === '') {
-            $displayName = $username;
-        }
+        $userIdentity = $this->panelTwoFactorPreferencesService()->resolveWebauthnUserIdentity($preferences, $userId);
+        $username = (string) ($userIdentity['username'] ?? ('user-' . $userId));
+        $displayName = (string) ($userIdentity['display_name'] ?? $username);
 
         try {
             $options = $webAuthn->getCreateArgs(
@@ -3405,15 +3347,7 @@ final class PanelController
 
         $configSnapshot = $this->config->all();
         $configSnapshot = $this->removeSqliteDatabaseFilesConfig($configSnapshot);
-        $configSnapshot = $this->ensureContentEditorConfig($configSnapshot);
-        $configSnapshot = $this->ensureTaxonomyRoutePrefixConfig($configSnapshot);
-        $configSnapshot = $this->ensurePublicProfileConfig($configSnapshot);
-        $configSnapshot = $this->ensureUserAuthConfig($configSnapshot);
-        $configSnapshot = $this->ensureSiteEnabledConfig($configSnapshot);
-        $configSnapshot = $this->ensurePanelBrandingConfig($configSnapshot);
-        $configSnapshot = $this->ensureCaptchaConfig($configSnapshot);
-        $configSnapshot = $this->ensureMailConfig($configSnapshot);
-        $configSnapshot = $this->ensureDebugToolbarConfig($configSnapshot);
+        $configSnapshot = $this->applyConfigEditorDefaults($configSnapshot);
         $activeConfigTab = $this->normalizeConfigEditorTab($_GET['tab'] ?? 'basic');
 
         $this->view->render('panel/configuration', [
@@ -3457,15 +3391,7 @@ final class PanelController
 
         $currentConfig = $this->config->all();
         $currentConfig = $this->removeSqliteDatabaseFilesConfig($currentConfig);
-        $currentConfig = $this->ensureContentEditorConfig($currentConfig);
-        $currentConfig = $this->ensureTaxonomyRoutePrefixConfig($currentConfig);
-        $currentConfig = $this->ensurePublicProfileConfig($currentConfig);
-        $currentConfig = $this->ensureUserAuthConfig($currentConfig);
-        $currentConfig = $this->ensureSiteEnabledConfig($currentConfig);
-        $currentConfig = $this->ensurePanelBrandingConfig($currentConfig);
-        $currentConfig = $this->ensureCaptchaConfig($currentConfig);
-        $currentConfig = $this->ensureMailConfig($currentConfig);
-        $currentConfig = $this->ensureDebugToolbarConfig($currentConfig);
+        $currentConfig = $this->applyConfigEditorDefaults($currentConfig);
         $fields = $this->flattenConfigFields($currentConfig);
         $nextConfig = $currentConfig;
 
@@ -3504,15 +3430,7 @@ final class PanelController
         );
 
         // Keep taxonomy listing prefixes explicit/configured for public category/tag routes.
-        $nextConfig = $this->ensureContentEditorConfig($nextConfig);
-        $nextConfig = $this->ensureTaxonomyRoutePrefixConfig($nextConfig);
-        $nextConfig = $this->ensurePublicProfileConfig($nextConfig);
-        $nextConfig = $this->ensureUserAuthConfig($nextConfig);
-        $nextConfig = $this->ensureSiteEnabledConfig($nextConfig);
-        $nextConfig = $this->ensurePanelBrandingConfig($nextConfig);
-        $nextConfig = $this->ensureCaptchaConfig($nextConfig);
-        $nextConfig = $this->ensureMailConfig($nextConfig);
-        $nextConfig = $this->ensureDebugToolbarConfig($nextConfig);
+        $nextConfig = $this->applyConfigEditorDefaults($nextConfig);
         $nextConfig = $this->removeSqliteDatabaseFilesConfig($nextConfig);
 
         // Replace-and-save keeps on-disk config as the single source of truth.
@@ -4723,447 +4641,16 @@ final class PanelController
      */
     private function normalizeConfigFieldValue(string $path, string $type, string $rawValue, array $workingConfig = []): mixed
     {
-        $value = $this->input->text($rawValue, 1000);
-
-        if ($path === 'panel.path') {
-            $slug = $this->input->slug($value);
-            if ($slug === null) {
-                throw new \RuntimeException('panel.path must be a valid slug.');
-            }
-
-            return $slug;
-        }
-
-        if ($path === 'site.domain') {
-            if ($value === '') {
-                throw new \RuntimeException('site.domain is required.');
-            }
-
-            return $value;
-        }
-
-        if ($path === 'site.enabled') {
-            $mode = strtolower(trim($value));
-            if (!in_array($mode, ['public', 'private', 'disabled'], true)) {
-                throw new \RuntimeException('site.enabled must be public, private, or disabled.');
-            }
-
-            return $mode;
-        }
-
-        if ($path === 'database.driver') {
-            $driver = strtolower($value);
-            if (!in_array($driver, ['sqlite', 'mysql', 'pgsql'], true)) {
-                throw new \RuntimeException('database.driver must be sqlite, mysql, or pgsql.');
-            }
-
-            return $driver;
-        }
-
-        if ($path === 'category.enabled' || $path === 'tag.enabled') {
-            return $this->normalizeConfigBool($path, $value);
-        }
-
-        if ($path === 'category.prefix' || $path === 'tag.prefix') {
-            $trimmedValue = trim($value);
-            if ($trimmedValue === '') {
-                return '';
-            }
-
-            $prefix = $this->input->slug($trimmedValue);
-            if ($prefix === null) {
-                throw new \RuntimeException($path . ' must be a valid slug.');
-            }
-
-            $isCategoryPath = $path === 'category.prefix';
-            $thisEnabled = $isCategoryPath
-                ? $this->configBool(
-                    $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', true),
-                    true
-                )
-                : $this->configBool(
-                    $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', true),
-                    true
-                );
-            if (!$thisEnabled) {
-                return $prefix;
-            }
-
-            $panelPathValue = (string) ($workingConfig['panel']['path'] ?? $this->config->get('panel.path', 'panel'));
-            $panelPrefix = $this->input->slug($panelPathValue);
-            if ($panelPrefix !== null && $prefix === $panelPrefix) {
-                throw new \RuntimeException($path . ' cannot match panel.path.');
-            }
-
-            if (in_array($prefix, ['panel', 'boot', 'mce', 'theme'], true)) {
-                throw new \RuntimeException($path . ' uses a reserved public prefix.');
-            }
-
-            $otherPath = $path === 'category.prefix' ? 'tag.prefix' : 'category.prefix';
-            $otherDefault = $path === 'category.prefix' ? 'tag' : 'cat';
-            $otherEnabled = $isCategoryPath
-                ? $this->configBool(
-                    $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', true),
-                    true
-                )
-                : $this->configBool(
-                    $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', true),
-                    true
-                );
-            $otherRaw = $otherPath === 'category.prefix'
-                ? (string) ($workingConfig['category']['prefix'] ?? $this->config->get('category.prefix', $otherDefault))
-                : (string) ($workingConfig['tag']['prefix'] ?? $this->config->get('tag.prefix', $otherDefault));
-            $otherPrefix = $this->input->slug($otherRaw);
-            if ($otherEnabled && $otherPrefix !== null && $otherPrefix !== '' && $otherPrefix === $prefix) {
-                throw new \RuntimeException('category.prefix and tag.prefix must be different values.');
-            }
-
-            return $prefix;
-        }
-
-        if ($path === 'user.privacy') {
-            $mode = strtolower(trim($value));
-            if (!in_array($mode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
-                throw new \RuntimeException('user.privacy must be public_full, public_limited, private, or disabled.');
-            }
-
-            return $mode;
-        }
-
-        if ($path === 'user.auth.login') {
-            $mode = strtolower(trim($value));
-            if (!in_array($mode, ['email', 'username'], true)) {
-                throw new \RuntimeException('user.auth.login must be email or username.');
-            }
-
-            return $mode;
-        }
-
-        if ($path === 'user.auth.registration') {
-            $mode = strtolower(trim($value));
-            if (!in_array($mode, ['open', 'invite', 'closed'], true)) {
-                throw new \RuntimeException('user.auth.registration must be open, invite, or closed.');
-            }
-
-            return $mode;
-        }
-
-        if ($path === 'user.prefix') {
-            $trimmedValue = trim($value);
-            if ($trimmedValue === '') {
-                return '';
-            }
-
-            $prefix = $this->input->slug($trimmedValue);
-            if ($prefix === null) {
-                throw new \RuntimeException('user.prefix must be a valid slug.');
-            }
-
-            $panelPathValue = (string) ($workingConfig['panel']['path'] ?? $this->config->get('panel.path', 'panel'));
-            $panelPrefix = $this->input->slug($panelPathValue);
-            if ($panelPrefix !== null && $prefix === $panelPrefix) {
-                throw new \RuntimeException('user.prefix cannot match panel.path.');
-            }
-
-            $categoryPrefix = $this->input->slug(
-                (string) ($workingConfig['category']['prefix'] ?? $this->config->get('category.prefix', 'cat'))
-            );
-            $categoryEnabled = $this->configBool(
-                $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', true),
-                true
-            );
-            if ($categoryEnabled && $categoryPrefix !== null && $prefix === $categoryPrefix) {
-                throw new \RuntimeException('user.prefix cannot match category.prefix.');
-            }
-
-            $tagPrefix = $this->input->slug(
-                (string) ($workingConfig['tag']['prefix'] ?? $this->config->get('tag.prefix', 'tag'))
-            );
-            $tagEnabled = $this->configBool(
-                $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', true),
-                true
-            );
-            if ($tagEnabled && $tagPrefix !== null && $prefix === $tagPrefix) {
-                throw new \RuntimeException('user.prefix cannot match tag.prefix.');
-            }
-
-            $groupPrefix = $this->input->slug(
-                (string) ($workingConfig['group']['prefix'] ?? $this->config->get('group.prefix', 'group'))
-            );
-            if ($groupPrefix !== null && $groupPrefix !== '' && $prefix === $groupPrefix) {
-                throw new \RuntimeException('user.prefix cannot match group.prefix.');
-            }
-
-            if (in_array($prefix, ['panel', 'boot', 'mce', 'theme'], true)) {
-                throw new \RuntimeException('user.prefix uses a reserved public prefix.');
-            }
-
-            return $prefix;
-        }
-
-        if ($path === 'group.privacy') {
-            $mode = strtolower(trim($value));
-            if ($mode === 'public') {
-                $mode = 'public_full';
-            }
-            if (!in_array($mode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
-                throw new \RuntimeException(
-                    'group.privacy must be public_full, public_limited, private, or disabled.'
-                );
-            }
-
-            return $mode;
-        }
-
-        if ($path === 'group.prefix') {
-            $trimmedValue = trim($value);
-            if ($trimmedValue === '') {
-                return '';
-            }
-
-            $prefix = $this->input->slug($trimmedValue);
-            if ($prefix === null) {
-                throw new \RuntimeException('group.prefix must be a valid slug.');
-            }
-
-            $panelPathValue = (string) ($workingConfig['panel']['path'] ?? $this->config->get('panel.path', 'panel'));
-            $panelPrefix = $this->input->slug($panelPathValue);
-            if ($panelPrefix !== null && $prefix === $panelPrefix) {
-                throw new \RuntimeException('group.prefix cannot match panel.path.');
-            }
-
-            $categoryPrefix = $this->input->slug(
-                (string) ($workingConfig['category']['prefix'] ?? $this->config->get('category.prefix', 'cat'))
-            );
-            $categoryEnabled = $this->configBool(
-                $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', true),
-                true
-            );
-            if ($categoryEnabled && $categoryPrefix !== null && $prefix === $categoryPrefix) {
-                throw new \RuntimeException('group.prefix cannot match category.prefix.');
-            }
-
-            $tagPrefix = $this->input->slug(
-                (string) ($workingConfig['tag']['prefix'] ?? $this->config->get('tag.prefix', 'tag'))
-            );
-            $tagEnabled = $this->configBool(
-                $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', true),
-                true
-            );
-            if ($tagEnabled && $tagPrefix !== null && $prefix === $tagPrefix) {
-                throw new \RuntimeException('group.prefix cannot match tag.prefix.');
-            }
-
-            $profilePrefix = $this->input->slug(
-                (string) ($workingConfig['user']['prefix'] ?? $this->config->get('user.prefix', 'user'))
-            );
-            if ($profilePrefix !== null && $profilePrefix !== '' && $prefix === $profilePrefix) {
-                throw new \RuntimeException('group.prefix cannot match user.prefix.');
-            }
-
-            if (in_array($prefix, ['panel', 'boot', 'mce', 'theme'], true)) {
-                throw new \RuntimeException('group.prefix uses a reserved public prefix.');
-            }
-
-            return $prefix;
-        }
-
-        if ($path === 'captcha.provider') {
-            $provider = strtolower($value);
-            if (!in_array($provider, ['none', 'hcaptcha', 'recaptcha2', 'recaptcha3'], true)) {
-                throw new \RuntimeException('captcha.provider must be none, hcaptcha, recaptcha2, or recaptcha3.');
-            }
-
-            return $provider;
-        }
-
-        if ($path === 'mail.agent') {
-            $agent = strtolower($value);
-            if (!in_array($agent, ['php_mail'], true)) {
-                throw new \RuntimeException('mail.agent must be php_mail.');
-            }
-
-            return $agent;
-        }
-
-        if ($path === 'content.default_editor') {
-            $editor = $this->normalizeBodyTextEditorOption($value);
-            if ($editor === 'tinymce' && strtolower(trim($value)) !== 'tinymce') {
-                throw new \RuntimeException(
-                    'content.default_editor must be tinymce, plaintext, autobr, or markdown.'
-                );
-            }
-
-            return $editor;
-        }
-
-        if ($path === 'content.separator') {
-            $separator = $this->normalizeGlobalPageUrlSeparator($value);
-            if ($separator === '-' && trim($value) !== '-') {
-                throw new \RuntimeException(
-                    'content.separator must be - or _.'
-                );
-            }
-
-            return $separator;
-        }
-
-        if ($path === 'mail.sender_address') {
-            $address = trim($value);
-            if ($address === '') {
-                return '';
-            }
-
-            $normalized = $this->input->email($address);
-            if ($normalized === null) {
-                throw new \RuntimeException('mail.sender_address must be a valid email address or blank.');
-            }
-
-            return $normalized;
-        }
-
-        if ($path === 'mail.sender_name') {
-            return $this->input->text($value, 120);
-        }
-
-        if (in_array($path, ['meta.twitter.image', 'meta.apple_touch_icon', 'panel.brand_logo'], true)) {
-            $siteDomain = (string) ($workingConfig['site']['domain'] ?? $this->config->get('site.domain', ''));
-            return $this->normalizeMetaAbsoluteUrlPathValue($siteDomain, $value);
-        }
-
-        if ($path === 'meta.opengraph.image') {
-            $siteDomain = (string) ($workingConfig['site']['domain'] ?? $this->config->get('site.domain', ''));
-            return $this->normalizeMetaAbsoluteUrlPathValue($siteDomain, $value, false);
-        }
-
-        if ($path === 'panel.default_theme') {
-            $theme = $this->normalizePanelThemeChoice($value, false);
-            if (!is_string($theme)) {
-                throw new \RuntimeException('panel.default_theme must be corp, ice, or midnight.');
-            }
-
-            return $theme;
-        }
-
-        if ($path === 'site.default_theme') {
-            $theme = strtolower($value);
-            $options = $this->publicThemeOptions();
-            if (!isset($options[$theme])) {
-                throw new \RuntimeException('site.default_theme must match one installed theme manifest.');
-            }
-
-            return $theme;
-        }
-
-        if ($path === 'session.cookie.name') {
-            $sessionName = trim($value);
-            if ($sessionName === '') {
-                throw new \RuntimeException('session.cookie.name is required.');
-            }
-
-            if (!preg_match('/^[a-zA-Z0-9_-]{1,64}$/', $sessionName)) {
-                throw new \RuntimeException('session.cookie.name may contain only letters, numbers, underscores, and hyphens (max 64 chars).');
-            }
-
-            return $sessionName;
-        }
-
-        if ($path === 'session.cookie.domain') {
-            $cookieDomain = strtolower(trim($value));
-            if ($cookieDomain === '') {
-                return '';
-            }
-
-            if (preg_match('/[:\/\s]/', $cookieDomain) === 1) {
-                throw new \RuntimeException('session.cookie.domain must be a bare domain (no protocol, path, port, or spaces).');
-            }
-
-            if (!preg_match('/^\.?[a-z0-9-]+(?:\.[a-z0-9-]+)*$/', $cookieDomain)) {
-                throw new \RuntimeException('session.cookie.domain must be a valid domain value.');
-            }
-
-            return $cookieDomain;
-        }
-
-        if ($path === 'session.cookie.prefix') {
-            $cookiePrefix = trim($value);
-            if ($cookiePrefix === '') {
-                return '';
-            }
-
-            if (!preg_match('/^[a-zA-Z0-9_-]{1,40}$/', $cookiePrefix)) {
-                throw new \RuntimeException('session.cookie.prefix may contain only letters, numbers, underscores, and hyphens (max 40 chars).');
-            }
-
-            return $cookiePrefix;
-        }
-
-        if ($path === 'session.brute.max') {
-            $maxAttempts = $this->normalizeConfigInt($path, $value);
-            if ($maxAttempts < 1) {
-                throw new \RuntimeException($path . ' must be greater than 0.');
-            }
-
-            return $maxAttempts;
-        }
-
-        if ($path === 'session.brute.window' || $path === 'session.brute.lock') {
-            $seconds = $this->normalizeConfigInt($path, $value);
-            if ($seconds < 1) {
-                throw new \RuntimeException($path . ' must be greater than 0.');
-            }
-
-            return $seconds;
-        }
-
-        if (str_starts_with($path, 'debug.')) {
-            return $this->normalizeConfigBool($path, $value);
-        }
-
-        if ($path === 'media.avatars.max_filesize_kb') {
-            $size = $this->normalizeConfigInt($path, $value);
-            if ($size < 0) {
-                throw new \RuntimeException($path . ' must be 0 or greater.');
-            }
-
-            return $size;
-        }
-
-        if (str_starts_with($path, 'media.images.')) {
-            // Keep image-config fields strongly typed to avoid invalid values
-            // breaking later media-processing features.
-            return $this->normalizeImageConfigValue($path, $value);
-        }
-
-        return match ($type) {
-            'int' => $this->normalizeConfigInt($path, $value),
-            'float' => $this->normalizeConfigFloat($path, $value),
-            'bool' => $this->normalizeConfigBool($path, $value),
-            'null' => $value === '' ? null : $value,
-            default => $value,
-        };
-    }
-
-    /**
-     * Normalizes one domain + path-style input into an absolute https URL.
-     *
-     * Config editor displays these fields with an inline `https://{domain}/` prefix.
-     */
-    private function normalizeMetaAbsoluteUrlPathValue(string $siteDomain, string $rawPathOrUrl, bool $allowAbsoluteUrlPaste = true): string
-    {
-        return $this->configEditorNormalizer()->normalizeMetaAbsoluteUrlPathValue(
-            $siteDomain,
-            $rawPathOrUrl,
-            $allowAbsoluteUrlPaste
+        return $this->panelConfigFieldPolicyService()->normalizeFieldValue(
+            $path,
+            $type,
+            $rawValue,
+            $workingConfig,
+            fn (string $value): string => $this->normalizeBodyTextEditorOption($value),
+            fn (string $value): string => $this->normalizeGlobalPageUrlSeparator($value),
+            fn (string $theme, bool $allowDefault): ?string => $this->normalizePanelThemeChoice($theme, $allowDefault),
+            $this->publicThemeOptions()
         );
-    }
-
-    /**
-     * Normalizes `site.domain` into host[:port] for URL prefix composition.
-     */
-    private function normalizeDomainHostForUrlPrefix(string $rawDomain): string
-    {
-        return $this->configEditorNormalizer()->normalizeDomainHostForUrlPrefix($rawDomain);
     }
 
     /**
@@ -5171,7 +4658,7 @@ final class PanelController
      */
     private function normalizeConfigInt(string $path, string $value): int
     {
-        return $this->configEditorNormalizer()->normalizeInt($path, $value);
+        return $this->panelConfigDefaultsService()->normalizeInt($path, $value);
     }
 
     /**
@@ -5179,7 +4666,7 @@ final class PanelController
      */
     private function normalizeConfigFloat(string $path, string $value): float
     {
-        return $this->configEditorNormalizer()->normalizeFloat($path, $value);
+        return $this->panelConfigDefaultsService()->normalizeFloat($path, $value);
     }
 
     /**
@@ -5187,7 +4674,7 @@ final class PanelController
      */
     private function normalizeConfigBool(string $path, string $value): bool
     {
-        return $this->configEditorNormalizer()->normalizeBool($path, $value);
+        return $this->panelConfigDefaultsService()->normalizeBool($path, $value);
     }
 
     /**
@@ -5195,7 +4682,7 @@ final class PanelController
      */
     private function normalizeImageConfigValue(string $path, string $value): int|string|bool
     {
-        return $this->configEditorNormalizer()->normalizeImageConfigValue($path, $value);
+        return $this->panelConfigDefaultsService()->normalizeImageConfigValue($path, $value);
     }
 
     /**
@@ -5213,105 +4700,18 @@ final class PanelController
     }
 
     /**
-     * Ensures content-editor config keys exist with safe defaults.
+     * Applies shared config-editor default-key enforcement across core sections.
      *
      * @param array<string, mixed> $config
      * @return array<string, mixed>
      */
-    private function ensureContentEditorConfig(array $config): array
+    private function applyConfigEditorDefaults(array $config): array
     {
-        return $this->configEditorSchemaService()->ensureContentEditorConfig($config);
-    }
-
-    /**
-     * Ensures taxonomy route-prefix config keys exist and are valid slugs.
-     *
-     * @param array<string, mixed> $config
-     * @return array<string, mixed>
-     */
-    private function ensureTaxonomyRoutePrefixConfig(array $config): array
-    {
-        return $this->configEditorSchemaService()->ensureTaxonomyRoutePrefixConfig($config);
-    }
-
-    /**
-     * Ensures public-profile config keys exist with safe defaults.
-     *
-     * @param array<string, mixed> $config
-     * @return array<string, mixed>
-     */
-    private function ensurePublicProfileConfig(array $config): array
-    {
-        return $this->configEditorSchemaService()->ensurePublicProfileConfig($config);
-    }
-
-    /**
-     * Ensures user-auth login identifier config exists with safe defaults.
-     *
-     * @param array<string, mixed> $config
-     * @return array<string, mixed>
-     */
-    private function ensureUserAuthConfig(array $config): array
-    {
-        return $this->configEditorSchemaService()->ensureUserAuthConfig($config);
-    }
-
-    /**
-     * Ensures site-level config keys exist with safe defaults.
-     *
-     * @param array<string, mixed> $config
-     * @return array<string, mixed>
-     */
-    private function ensureSiteEnabledConfig(array $config): array
-    {
-        return $this->configEditorSchemaService()->ensureSiteEnabledConfig($config, $this->publicThemeOptions());
-    }
-
-    /**
-     * Ensures panel config keys exist with safe defaults.
-     *
-     * @param array<string, mixed> $config
-     * @return array<string, mixed>
-     */
-    private function ensurePanelBrandingConfig(array $config): array
-    {
-        return $this->configEditorSchemaService()->ensurePanelBrandingConfig(
+        return $this->panelConfigDefaultsService()->apply(
             $config,
+            $this->publicThemeOptions(),
             fn (string $theme, bool $allowDefault): ?string => $this->normalizePanelThemeChoice($theme, $allowDefault)
         );
-    }
-
-    /**
-     * Ensures captcha provider/keys are normalized with explicit reCAPTCHA v2/v3 drivers.
-     *
-     * @param array<string, mixed> $config
-     * @return array<string, mixed>
-     */
-    private function ensureCaptchaConfig(array $config): array
-    {
-        return $this->configEditorSchemaService()->ensureCaptchaConfig($config);
-    }
-
-    /**
-     * Ensures mail config keys exist with safe defaults.
-     *
-     * @param array<string, mixed> $config
-     * @return array<string, mixed>
-     */
-    private function ensureMailConfig(array $config): array
-    {
-        return $this->configEditorSchemaService()->ensureMailConfig($config);
-    }
-
-    /**
-     * Ensures debug-toolbar config keys exist with safe defaults.
-     *
-     * @param array<string, mixed> $config
-     * @return array<string, mixed>
-     */
-    private function ensureDebugToolbarConfig(array $config): array
-    {
-        return $this->configEditorSchemaService()->ensureDebugToolbarConfig($config);
     }
 
     /**
@@ -6644,13 +6044,7 @@ final class PanelController
      */
     private function twoFactorTypeOptions(): array
     {
-        return [
-            'none' => '<none>',
-            'totp' => 'Authenticator App (TOTP)',
-            'recovery' => 'Recovery Code',
-            'webauthn' => 'Security Key (WebAuthn)',
-            'email' => 'Email Code (Stub)',
-        ];
+        return $this->panelTwoFactorPreferencesService()->typeOptions();
     }
 
     /**
@@ -6659,28 +6053,7 @@ final class PanelController
      */
     private function normalizeSubmittedTwoFactorExistingIndices(mixed $rawMethods): array
     {
-        if (!is_array($rawMethods)) {
-            return [];
-        }
-
-        $normalized = [];
-        foreach ($rawMethods as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-
-            $existingIndex = $this->input->int($row['existing_index'] ?? null, 0, 1000);
-            if ($existingIndex === null) {
-                continue;
-            }
-
-            $normalized[$existingIndex] = $existingIndex;
-            if (count($normalized) >= 100) {
-                break;
-            }
-        }
-
-        return array_values($normalized);
+        return $this->panelTwoFactorPreferencesService()->normalizeSubmittedExistingIndices($rawMethods);
     }
 
     /**
@@ -6689,11 +6062,11 @@ final class PanelController
      */
     private function normalizeSubmittedTwoFactorMethods(mixed $rawMethods, string $fallbackEmail): array
     {
-        if (!is_array($rawMethods)) {
-            return [];
-        }
-
-        return TwoFactorMethodNormalizer::normalizeSubmitted($rawMethods, $fallbackEmail, $this->totpIssuer());
+        return $this->panelTwoFactorPreferencesService()->normalizeSubmittedMethods(
+            $rawMethods,
+            $fallbackEmail,
+            $this->totpIssuer()
+        );
     }
 
     /**
@@ -6702,13 +6075,18 @@ final class PanelController
      */
     private function prepareTwoFactorMethodsForView(array $methods, string $fallbackEmail): array
     {
-        return TwoFactorMethodNormalizer::prepareForView($methods, $fallbackEmail, $this->totpIssuer());
+        return $this->panelTwoFactorPreferencesService()->prepareMethodsForView(
+            $methods,
+            $fallbackEmail,
+            $this->totpIssuer()
+        );
     }
 
     private function totpIssuer(): string
     {
-        $issuer = trim((string) $this->config->get('site.name', 'Raven CMS'));
-        return $issuer !== '' ? $issuer : 'Raven CMS';
+        return $this->panelTwoFactorPreferencesService()->resolveTotpIssuer(
+            (string) $this->config->get('site.name', 'Raven CMS')
+        );
     }
 
     private function createWebAuthnServer(): ?WebAuthn
@@ -7183,6 +6561,41 @@ final class PanelController
         }
 
         return $this->configEditorNormalizer;
+    }
+
+    private function panelConfigDefaultsService(): PanelConfigDefaultsService
+    {
+        if (!$this->panelConfigDefaultsService instanceof PanelConfigDefaultsService) {
+            $this->panelConfigDefaultsService = new PanelConfigDefaultsService(
+                $this->configEditorSchemaService(),
+                $this->configEditorNormalizer()
+            );
+        }
+
+        return $this->panelConfigDefaultsService;
+    }
+
+    private function panelConfigFieldPolicyService(): PanelConfigFieldPolicyService
+    {
+        if (!$this->panelConfigFieldPolicyService instanceof PanelConfigFieldPolicyService) {
+            $this->panelConfigFieldPolicyService = new PanelConfigFieldPolicyService(
+                $this->config,
+                $this->input,
+                $this->panelConfigDefaultsService(),
+                $this->configEditorNormalizer()
+            );
+        }
+
+        return $this->panelConfigFieldPolicyService;
+    }
+
+    private function panelTwoFactorPreferencesService(): PanelTwoFactorPreferencesService
+    {
+        if (!$this->panelTwoFactorPreferencesService instanceof PanelTwoFactorPreferencesService) {
+            $this->panelTwoFactorPreferencesService = new PanelTwoFactorPreferencesService($this->input);
+        }
+
+        return $this->panelTwoFactorPreferencesService;
     }
 
     private function profileContactService(): ProfileContactService

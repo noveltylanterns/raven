@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use PDO;
+use Raven\Lib\Database\Runtime\TableNameResolver;
 
 /**
  * Shared user-group membership queries/mutations for auth permission flows.
@@ -126,15 +127,6 @@ final class AuthGroupMembershipService
 
     private function table(string $base): string
     {
-        if ($this->driver === 'sqlite') {
-            return match ($base) {
-                'groups' => 'auth.groups',
-                'user_groups' => 'auth.user_groups',
-                default => 'auth.' . $base,
-            };
-        }
-
-        return $this->prefix . $base;
+        return TableNameResolver::appTable($this->driver, $this->prefix, $base);
     }
 }
-

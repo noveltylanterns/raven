@@ -15,6 +15,8 @@ namespace Raven\Repository;
 
 use PDO;
 use PDOException;
+use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Routing\ChannelContextService;
 use RuntimeException;
 
 /**
@@ -264,18 +266,16 @@ final class TaxonomyRepository
 
                 $channelId = $row['channel_id'] !== null ? (int) $row['channel_id'] : null;
                 $channel = $channelId !== null ? ($channelsById[$channelId] ?? null) : null;
-
-                $result['redirects'][] = [
+                $redirectRow = [
                     'id' => $redirectId,
                     'title' => (string) ($row['title'] ?? ''),
                     'description' => (string) ($row['description'] ?? ''),
                     'slug' => $redirectSlug,
                     'channel_id' => $channelId,
-                    'channel_slug' => $channel !== null ? (string) ($channel['slug'] ?? '') : '',
-                    'channel_name' => $channel !== null ? (string) ($channel['name'] ?? '') : '',
                     'is_active' => (int) ($row['is_active'] ?? 0),
                     'target_url' => (string) ($row['target_url'] ?? ''),
                 ];
+                $result['redirects'][] = ChannelContextService::applyBasicChannelContext($redirectRow, $channel);
             }
         }
 
@@ -452,17 +452,7 @@ final class TaxonomyRepository
      */
     private function channelsByIdMap(): array
     {
-        $map = [];
-        foreach ($this->channels->listRecords() as $channel) {
-            $id = (int) ($channel['id'] ?? 0);
-            if ($id < 1) {
-                continue;
-            }
-
-            $map[$id] = $channel;
-        }
-
-        return $map;
+        return ChannelContextService::channelsByIdMap($this->channels->listRecords());
     }
 
     /**
@@ -470,21 +460,6 @@ final class TaxonomyRepository
      */
     private function table(string $table): string
     {
-        if ($this->driver !== 'sqlite') {
-            // Shared-db mode: physical name is prefix + logical table.
-            return $this->prefix . $table;
-        }
-
-        // SQLite mode: resolve to attached database aliases.
-        if (str_starts_with($table, 'ext_')) {
-            return 'extensions.' . $table;
-        }
-
-        return match ($table) {
-            'categories' => 'taxonomy.categories',
-            'tags' => 'taxonomy.tags',
-            'redirects' => 'taxonomy.redirects',
-            default => 'main.' . $table,
-        };
+        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
     }
 }

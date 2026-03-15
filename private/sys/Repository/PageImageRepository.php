@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Repository;
 
 use PDO;
+use Raven\Lib\Database\Runtime\TableNameResolver;
 
 /**
  * Data access for page gallery images and their size variants.
@@ -851,17 +852,6 @@ final class PageImageRepository
      */
     private function table(string $table): string
     {
-        if ($this->driver !== 'sqlite') {
-            // Shared-db mode relies on configurable table prefixes only.
-            return $this->prefix . $table;
-        }
-
-        // SQLite mode maps logical names onto attached database file aliases.
-        return match ($table) {
-            'pages' => 'main.pages',
-            'page_images' => 'main.page_images',
-            'page_image_variants' => 'main.page_image_variants',
-            default => 'main.' . $table,
-        };
+        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
     }
 }

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Raven\Repository;
 
 use PDO;
+use Raven\Lib\Database\Runtime\TableNameResolver;
 
 /**
  * Data access for Category CRUD operations in panel.
@@ -399,16 +400,6 @@ final class CategoryRepository
      */
     private function table(string $table): string
     {
-        if ($this->driver !== 'sqlite') {
-            // Shared-db mode: physical name is prefix + logical table.
-            return $this->prefix . $table;
-        }
-
-        // SQLite mode: resolve to attached database aliases.
-        return match ($table) {
-            'categories' => 'taxonomy.categories',
-            'page_categories' => 'main.page_categories',
-            default => 'main.' . $table,
-        };
+        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
     }
 }

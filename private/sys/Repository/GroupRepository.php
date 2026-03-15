@@ -13,6 +13,7 @@ namespace Raven\Repository;
 
 use Raven\Core\Auth\PanelAccess;
 use PDO;
+use Raven\Lib\Database\Runtime\TableNameResolver;
 use RuntimeException;
 
 /**
@@ -824,16 +825,6 @@ final class GroupRepository
      */
     private function table(string $table): string
     {
-        if ($this->driver !== 'sqlite') {
-            // Shared-db mode: physical name is prefix + logical table.
-            return $this->prefix . $table;
-        }
-
-        // SQLite mode: resolve to attached database aliases.
-        return match ($table) {
-            'groups' => 'auth.groups',
-            'user_groups' => 'auth.user_groups',
-            default => 'auth.' . $table,
-        };
+        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
     }
 }

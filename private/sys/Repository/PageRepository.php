@@ -13,7 +13,11 @@ namespace Raven\Repository;
 
 use PDO;
 use Raven\Lib\Content\PageBodyBlockCodec;
+use Raven\Lib\Content\PagePanelFilterClauseBuilder;
+use Raven\Lib\Database\Runtime\TableNameResolver;
 use Raven\Lib\Media\PageEditorGalleryHydrator;
+use Raven\Lib\Routing\ChannelContextService;
+use Raven\Lib\Routing\PathScopeLookupService;
 use RuntimeException;
 
 /**
@@ -29,6 +33,7 @@ final class PageRepository
     private bool $tagEnabled;
     private PageBodyBlockCodec $bodyBlockCodec;
     private PageEditorGalleryHydrator $pageEditorGalleryHydrator;
+    private PagePanelFilterClauseBuilder $panelFilterClauseBuilder;
 
     public function __construct(
         PDO $db,
@@ -48,6 +53,7 @@ final class PageRepository
         $this->tagEnabled = $tagEnabled;
         $this->bodyBlockCodec = new PageBodyBlockCodec();
         $this->pageEditorGalleryHydrator = new PageEditorGalleryHydrator();
+        $this->panelFilterClauseBuilder = new PagePanelFilterClauseBuilder();
     }
 
     /**
@@ -693,30 +699,14 @@ final class PageRepository
      */
     private function pathExists(string $slug, ?int $channelId, ?int $excludeId = null): bool
     {
-        $pages = $this->table('pages');
-        $sql = 'SELECT id
-                FROM ' . $pages . '
-                WHERE slug = :slug';
-        $params = [':slug' => $slug];
-
-        if ($channelId === null) {
-            $sql .= ' AND channel_id IS NULL';
-        } else {
-            $sql .= ' AND channel_id = :channel_id';
-            $params[':channel_id'] = $channelId;
-        }
-
-        if ($excludeId !== null && $excludeId > 0) {
-            $sql .= ' AND id <> :exclude_id';
-            $params[':exclude_id'] = $excludeId;
-        }
-
-        $sql .= ' LIMIT 1';
-
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-
-        return $stmt->fetchColumn() !== false;
+        return PathScopeLookupService::exists(
+            $this->db,
+            $this->table('pages'),
+            $slug,
+            $channelId,
+            $excludeId,
+            'exclude_id'
+        );
     }
 
     /**
@@ -1273,17 +1263,7 @@ final class PageRepository
      */
     private function channelsByIdMap(): array
     {
-        $map = [];
-        foreach ($this->channels->listRecords() as $channel) {
-            $id = (int) ($channel['id'] ?? 0);
-            if ($id < 1) {
-                continue;
-            }
-
-            $map[$id] = $channel;
-        }
-
-        return $map;
+        return ChannelContextService::channelsByIdMap($this->channels->listRecords());
     }
 
     /**
@@ -1305,19 +1285,7 @@ final class PageRepository
             }
         }
 
-        if ($resolvedChannel === null) {
-            $row['channel_slug'] = '';
-            $row['channel_name'] = '';
-            $row['channel_page_route_mode'] = 'slug';
-            $row['channel_page_url_separator'] = 'inherit';
-            return $row;
-        }
-
-        $row['channel_slug'] = (string) ($resolvedChannel['slug'] ?? '');
-        $row['channel_name'] = (string) ($resolvedChannel['name'] ?? '');
-        $row['channel_page_route_mode'] = (string) ($resolvedChannel['page_route_mode'] ?? 'slug');
-        $row['channel_page_url_separator'] = (string) ($resolvedChannel['page_url_separator'] ?? 'inherit');
-        return $row;
+        return ChannelContextService::applyPageChannelContext($row, $resolvedChannel);
     }
 
     /**
@@ -1325,17 +1293,11 @@ final class PageRepository
      */
     private function channelIdBySlug(string $slug): ?int
     {
-        $normalized = strtolower(trim($slug));
-        if ($normalized === '') {
-            return null;
-        }
-
-        $id = $this->channels->idBySlug($normalized);
-        if ($id === null) {
-            throw new RuntimeException('Selected channel does not exist.');
-        }
-
-        return $id;
+        return ChannelContextService::resolveChannelIdBySlug(
+            $slug,
+            fn (string $normalized): ?int => $this->channels->idBySlug($normalized),
+            'Selected channel does not exist.'
+        );
     }
 
     /**
@@ -1456,22 +1418,7 @@ final class PageRepository
      */
     private function table(string $table): string
     {
-        if ($this->driver !== 'sqlite') {
-            // Shared-db mode relies on configurable table prefixes only.
-            return $this->prefix . $table;
-        }
-
-        // SQLite mode maps logical names onto attached database file aliases.
-        return match ($table) {
-            'pages' => 'main.pages',
-            'categories' => 'taxonomy.categories',
-            'tags' => 'taxonomy.tags',
-            'page_categories' => 'main.page_categories',
-            'page_tags' => 'main.page_tags',
-            'page_images' => 'main.page_images',
-            'page_image_variants' => 'main.page_image_variants',
-            default => 'main.' . $table,
-        };
+        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
     }
 
     /**
@@ -1492,47 +1439,18 @@ final class PageRepository
         bool $includeCategoryFilters = true,
         bool $includeTagFilters = true
     ): void {
-        $placeholderPrefix = trim($placeholderPrefix);
-        if ($placeholderPrefix === '') {
-            $placeholderPrefix = 'filter';
-        }
-
-        $channelIdPlaceholder = ':' . $placeholderPrefix . '_channel_id';
-        $categoryIdPlaceholder = ':' . $placeholderPrefix . '_category_id';
-        $tagIdPlaceholder = ':' . $placeholderPrefix . '_tag_id';
-
-        $channelSlug = trim((string) ($channelSlug ?? ''));
-        if ($channelSlug !== '') {
-            $resolvedChannelId = $this->channels->idBySlug($channelSlug);
-            if ($resolvedChannelId === null) {
-                // No channel can match this slug, so force an empty result.
-                $where[] = '1 = 0';
-            } else {
-                $where[] = 'p.channel_id = ' . $channelIdPlaceholder;
-                $params[$channelIdPlaceholder] = $resolvedChannelId;
-            }
-        }
-
-        $categoryId = $categoryId !== null && $categoryId > 0 ? $categoryId : null;
-        if ($includeCategoryFilters && $categoryId !== null) {
-            $where[] = 'EXISTS (
-                SELECT 1
-                FROM ' . $pageCategoriesTable . ' pc
-                WHERE pc.page_id = p.id
-                  AND pc.category_id = ' . $categoryIdPlaceholder . '
-            )';
-            $params[$categoryIdPlaceholder] = $categoryId;
-        }
-
-        $tagId = $tagId !== null && $tagId > 0 ? $tagId : null;
-        if ($includeTagFilters && $tagId !== null) {
-            $where[] = 'EXISTS (
-                SELECT 1
-                FROM ' . $pageTagsTable . ' pt
-                WHERE pt.page_id = p.id
-                  AND pt.tag_id = ' . $tagIdPlaceholder . '
-            )';
-            $params[$tagIdPlaceholder] = $tagId;
-        }
+        $this->panelFilterClauseBuilder->append(
+            $where,
+            $params,
+            $channelSlug,
+            $categoryId,
+            $tagId,
+            $pageCategoriesTable,
+            $pageTagsTable,
+            fn (string $slug): ?int => $this->channels->idBySlug($slug),
+            $placeholderPrefix,
+            $includeCategoryFilters,
+            $includeTagFilters
+        );
     }
 }

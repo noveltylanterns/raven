@@ -13,6 +13,7 @@ namespace Raven\Controller;
 
 use Raven\Core\Config;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Auth\LoginAttemptPolicy;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\RequestContextResolver;
 use Raven\Lib\Http\SessionFlash;
@@ -33,15 +34,6 @@ use function Raven\Core\Support\redirect;
  */
 final class AuthController
 {
-    /** Default max failed attempts allowed before temporary lockout. */
-    private const DEFAULT_LOGIN_ATTEMPT_MAX = 5;
-
-    /** Default sliding window for counting failed attempts. */
-    private const DEFAULT_LOGIN_ATTEMPT_WINDOW_SECONDS = 600;
-
-    /** Default temporary lockout duration after too many failures. */
-    private const DEFAULT_LOGIN_ATTEMPT_LOCK_SECONDS = 900;
-
     private const SESSION_2FA_SELECTED_METHOD_KEY = '_raven_2fa_selected_method_key';
     private const SESSION_2FA_WEBAUTHN_FAILED = '_raven_2fa_webauthn_failed';
     private const SESSION_2FA_WEBAUTHN_CHALLENGE = '_raven_2fa_webauthn_challenge';
@@ -54,6 +46,7 @@ final class AuthController
     private SessionFlash $flash;
     private LoginIdentifierResolver $identifierResolver;
     private ?LoginTwoFactorFlowService $twoFactorFlowService = null;
+    private ?LoginAttemptPolicy $loginAttemptPolicy = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
     private ?RequestContextResolver $requestContextResolver = null;
 
@@ -665,10 +658,12 @@ final class AuthController
      */
     private function isLoginTemporarilyLocked(string $identifier): bool
     {
+        $policy = $this->loginAttemptPolicy();
+
         return $this->auth->isLoginTemporarilyLocked(
             $identifier,
-            $this->clientIpAddress(),
-            $this->loginAttemptWindowSeconds()
+            $policy->clientIpAddress($_SERVER),
+            $policy->windowSeconds()
         );
     }
 
@@ -677,12 +672,14 @@ final class AuthController
      */
     private function recordFailedLoginAttempt(string $identifier): void
     {
+        $policy = $this->loginAttemptPolicy();
+
         $this->auth->recordFailedLoginAttempt(
             $identifier,
-            $this->clientIpAddress(),
-            $this->loginAttemptMax(),
-            $this->loginAttemptWindowSeconds(),
-            $this->loginAttemptLockSeconds()
+            $policy->clientIpAddress($_SERVER),
+            $policy->maxAttempts(),
+            $policy->windowSeconds(),
+            $policy->lockSeconds()
         );
     }
 
@@ -691,7 +688,7 @@ final class AuthController
      */
     private function clearFailedLoginAttempts(string $identifier): void
     {
-        $this->auth->clearFailedLoginAttempts($identifier, $this->clientIpAddress());
+        $this->auth->clearFailedLoginAttempts($identifier, $this->loginAttemptPolicy()->clientIpAddress($_SERVER));
     }
 
     /**
@@ -712,50 +709,13 @@ final class AuthController
         return $this->identifierResolver->normalizeUsernameOrEmail($this->input, $rawIdentifier);
     }
 
-    /**
-     * Returns normalized remote IP used for login-throttle bucketing.
-     */
-    private function clientIpAddress(): string
+    private function loginAttemptPolicy(): LoginAttemptPolicy
     {
-        $normalized = $this->requestContextResolver()->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+        if (!$this->loginAttemptPolicy instanceof LoginAttemptPolicy) {
+            $this->loginAttemptPolicy = new LoginAttemptPolicy($this->config, $this->requestContextResolver());
+        }
 
-        return $normalized ?? 'unknown';
-    }
-
-    /**
-     * Returns configured max failed login attempts before lockout.
-     */
-    private function loginAttemptMax(): int
-    {
-        $configured = (int) $this->config->get('session.brute.max', self::DEFAULT_LOGIN_ATTEMPT_MAX);
-
-        return max(1, $configured);
-    }
-
-    /**
-     * Returns configured rolling login-attempt window in seconds.
-     */
-    private function loginAttemptWindowSeconds(): int
-    {
-        $configured = (int) $this->config->get(
-            'session.brute.window',
-            self::DEFAULT_LOGIN_ATTEMPT_WINDOW_SECONDS
-        );
-
-        return max(1, $configured);
-    }
-
-    /**
-     * Returns configured login lockout duration in seconds.
-     */
-    private function loginAttemptLockSeconds(): int
-    {
-        $configured = (int) $this->config->get(
-            'session.brute.lock',
-            self::DEFAULT_LOGIN_ATTEMPT_LOCK_SECONDS
-        );
-
-        return max(1, $configured);
+        return $this->loginAttemptPolicy;
     }
 
     private function requestContextResolver(): RequestContextResolver

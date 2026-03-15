@@ -18,6 +18,7 @@ use RuntimeException;
 use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\ContactProfileNormalizer;
 use Raven\Lib\Auth\UserPanelHydrator;
+use Raven\Lib\Database\Runtime\TableNameResolver;
 
 /**
  * Data access for User CRUD and user-group membership assignments.
@@ -1406,8 +1407,7 @@ final class UserRepository
      */
     private function authTable(string $table): string
     {
-        // Auth tables use same prefix rules as other shared-db tables.
-        return $this->prefix . $table;
+        return TableNameResolver::authTable($this->driver, $this->prefix, $table);
     }
 
     /**
@@ -1415,11 +1415,7 @@ final class UserRepository
      */
     private function appAuthTable(string $table): string
     {
-        if ($this->driver !== 'sqlite') {
-            return $this->prefix . $table;
-        }
-
-        return 'auth.' . $table;
+        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
     }
 
     /**
@@ -1427,16 +1423,6 @@ final class UserRepository
      */
     private function groupTable(string $table): string
     {
-        if ($this->driver !== 'sqlite') {
-            // Shared-db mode: physical name is prefix + logical table.
-            return $this->prefix . $table;
-        }
-
-        // SQLite mode: resolve to attached database aliases.
-        return match ($table) {
-            'groups' => 'auth.groups',
-            'user_groups' => 'auth.user_groups',
-            default => 'auth.' . $table,
-        };
+        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
     }
 }

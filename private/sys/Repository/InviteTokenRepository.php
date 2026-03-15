@@ -12,6 +12,8 @@ declare(strict_types=1);
 namespace Raven\Repository;
 
 use PDO;
+use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Security\InviteTokenPolicy;
 
 /**
  * Data access for registration invite tokens.
@@ -21,12 +23,14 @@ final class InviteTokenRepository
     private PDO $authDb;
     private string $driver;
     private string $prefix;
+    private InviteTokenPolicy $tokenPolicy;
 
     public function __construct(PDO $authDb, string $driver, string $prefix)
     {
         $this->authDb = $authDb;
         $this->driver = $driver;
         $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
+        $this->tokenPolicy = new InviteTokenPolicy();
     }
 
     /**
@@ -103,15 +107,15 @@ final class InviteTokenRepository
      */
     public function createToken(bool $reusable, ?int $expiresAt = null, ?int $createdByUserId = null): string
     {
-        $expiresAt = $this->normalizeExpiresAt($expiresAt);
-        $createdByUserId = $this->normalizeCreatedByUserId($createdByUserId);
+        $expiresAt = $this->tokenPolicy->normalizeExpiresAt($expiresAt);
+        $createdByUserId = $this->tokenPolicy->normalizeCreatedByUserId($createdByUserId);
         $createdAt = gmdate('Y-m-d H:i:s');
 
         // Retry token generation on rare hash collisions.
         for ($attempt = 0; $attempt < 8; $attempt++) {
-            $normalizedToken = $this->generateNormalizedToken();
-            $displayToken = $this->formatDisplayToken($normalizedToken);
-            $tokenHash = $this->tokenHash($normalizedToken);
+            $normalizedToken = $this->tokenPolicy->generateNormalizedToken();
+            $displayToken = $this->tokenPolicy->formatDisplayToken($normalizedToken);
+            $tokenHash = $this->tokenPolicy->tokenHash($normalizedToken);
 
             $stmt = $this->authDb->prepare(
                 'INSERT INTO ' . $this->authTable('invite_tokens') . '
@@ -166,7 +170,7 @@ final class InviteTokenRepository
      */
     public function findUsableByToken(string $submittedToken, int $now): ?array
     {
-        $normalizedToken = $this->normalizeSubmittedToken($submittedToken);
+        $normalizedToken = $this->tokenPolicy->normalizeSubmittedToken($submittedToken);
         if ($normalizedToken === null) {
             return null;
         }
@@ -178,7 +182,7 @@ final class InviteTokenRepository
              LIMIT 1'
         );
         $stmt->execute([
-            ':token_hash' => $this->tokenHash($normalizedToken),
+            ':token_hash' => $this->tokenPolicy->tokenHash($normalizedToken),
         ]);
 
         $row = $stmt->fetch();
@@ -277,79 +281,6 @@ final class InviteTokenRepository
      */
     private function authTable(string $table): string
     {
-        return $this->prefix . $table;
-    }
-
-    /**
-     * Builds one deterministic token hash.
-     */
-    private function tokenHash(string $normalizedToken): string
-    {
-        return hash('sha256', $normalizedToken);
-    }
-
-    /**
-     * Returns one normalized generated token value.
-     */
-    private function generateNormalizedToken(): string
-    {
-        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        $alphabetLength = strlen($alphabet);
-        $length = 20;
-        $token = '';
-
-        for ($i = 0; $i < $length; $i++) {
-            $token .= $alphabet[random_int(0, $alphabetLength - 1)];
-        }
-
-        return $token;
-    }
-
-    /**
-     * Formats one normalized token for operator display/copy.
-     */
-    private function formatDisplayToken(string $normalizedToken): string
-    {
-        return implode('-', str_split($normalizedToken, 5));
-    }
-
-    /**
-     * Normalizes one submitted token string.
-     */
-    private function normalizeSubmittedToken(string $rawToken): ?string
-    {
-        $normalized = strtoupper(trim($rawToken));
-        if ($normalized === '') {
-            return null;
-        }
-
-        $normalized = preg_replace('/[^A-Z0-9]+/', '', $normalized) ?? '';
-        if ($normalized === '' || strlen($normalized) < 8 || strlen($normalized) > 64) {
-            return null;
-        }
-
-        if (preg_match('/^[A-Z0-9]+$/', $normalized) !== 1) {
-            return null;
-        }
-
-        return $normalized;
-    }
-
-    private function normalizeExpiresAt(?int $expiresAt): ?int
-    {
-        if ($expiresAt === null || $expiresAt <= 0) {
-            return null;
-        }
-
-        return $expiresAt;
-    }
-
-    private function normalizeCreatedByUserId(?int $createdByUserId): ?int
-    {
-        if ($createdByUserId === null || $createdByUserId <= 0) {
-            return null;
-        }
-
-        return $createdByUserId;
+        return TableNameResolver::authTable($this->driver, $this->prefix, $table);
     }
 }

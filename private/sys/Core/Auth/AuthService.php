@@ -18,7 +18,9 @@ use Raven\Lib\Auth\AuthIdentityLookupService;
 use Raven\Lib\Auth\ContactProfileNormalizer;
 use Raven\Lib\Auth\LoginThrottleService;
 use Raven\Lib\Auth\PermissionMaskService;
+use Raven\Lib\Auth\TwoFactorSessionStateService;
 use Raven\Lib\Auth\UserSecurityProfileService;
+use Raven\Lib\Database\Runtime\TableNameResolver;
 use Raven\Lib\Security\TwoFactorMethodNormalizer;
 use RuntimeException;
 
@@ -48,6 +50,7 @@ final class AuthService
     private UserSecurityProfileService $securityProfiles;
     private AuthIdentityLookupService $identityLookup;
     private AuthGroupMembershipService $groupMembership;
+    private TwoFactorSessionStateService $twoFactorSessionState;
 
     /**
      * Request-local cache for user preference rows by user id.
@@ -65,10 +68,6 @@ final class AuthService
      */
     private array $userPreferencesCache = [];
 
-    private const SESSION_2FA_PENDING_USER_ID = '_raven_2fa_pending_user_id';
-    private const SESSION_2FA_PENDING_METHODS = '_raven_2fa_pending_methods';
-    private const SESSION_2FA_VERIFIED_USER_ID = '_raven_2fa_verified_user_id';
-
     public function __construct(PDO $authDb, PDO $appDb, string $driver, string $prefix)
     {
         $this->authDb = $authDb;
@@ -79,8 +78,9 @@ final class AuthService
         $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
         $this->permissionMaskService = new PermissionMaskService($appDb, $driver, $prefix);
         $this->securityProfiles = new UserSecurityProfileService();
-        $this->identityLookup = new AuthIdentityLookupService($authDb, $this->prefix);
+        $this->identityLookup = new AuthIdentityLookupService($authDb, $driver, $this->prefix);
         $this->groupMembership = new AuthGroupMembershipService($appDb, $driver, $prefix);
+        $this->twoFactorSessionState = new TwoFactorSessionStateService();
 
         $this->bootstrapDelightAuth();
     }
@@ -190,7 +190,7 @@ final class AuthService
         $this->auth->logOut();
         // Clear panel identity cache used by shared layout headings.
         unset($_SESSION['rvn-panel-identity']);
-        $this->clearTwoFactorSessionState();
+        $this->twoFactorSessionState->clearAll();
         $this->clearPermissionCaches();
     }
 
@@ -229,7 +229,7 @@ final class AuthService
             return true;
         }
 
-        return (int) ($_SESSION[self::SESSION_2FA_VERIFIED_USER_ID] ?? 0) === $userId;
+        return $this->twoFactorSessionState->isVerifiedForUser($userId);
     }
 
     /**
@@ -239,13 +239,7 @@ final class AuthService
      */
     public function beginTwoFactorChallenge(int $userId, array $methods): void
     {
-        if ($userId <= 0) {
-            return;
-        }
-
-        $_SESSION[self::SESSION_2FA_PENDING_USER_ID] = $userId;
-        $_SESSION[self::SESSION_2FA_PENDING_METHODS] = $methods;
-        unset($_SESSION[self::SESSION_2FA_VERIFIED_USER_ID]);
+        $this->twoFactorSessionState->beginChallenge($userId, $methods);
     }
 
     /**
@@ -253,12 +247,7 @@ final class AuthService
      */
     public function markTwoFactorVerified(int $userId): void
     {
-        if ($userId <= 0) {
-            return;
-        }
-
-        unset($_SESSION[self::SESSION_2FA_PENDING_USER_ID], $_SESSION[self::SESSION_2FA_PENDING_METHODS]);
-        $_SESSION[self::SESSION_2FA_VERIFIED_USER_ID] = $userId;
+        $this->twoFactorSessionState->markVerified($userId);
     }
 
     /**
@@ -266,8 +255,7 @@ final class AuthService
      */
     public function pendingTwoFactorUserId(): ?int
     {
-        $pendingUserId = (int) ($_SESSION[self::SESSION_2FA_PENDING_USER_ID] ?? 0);
-        return $pendingUserId > 0 ? $pendingUserId : null;
+        return $this->twoFactorSessionState->pendingUserId();
     }
 
     /**
@@ -275,13 +263,12 @@ final class AuthService
      */
     public function pendingTwoFactorMethods(): array
     {
-        $raw = $_SESSION[self::SESSION_2FA_PENDING_METHODS] ?? null;
-        return is_array($raw) ? array_values($raw) : [];
+        return $this->twoFactorSessionState->pendingMethods();
     }
 
     public function clearTwoFactorChallenge(): void
     {
-        unset($_SESSION[self::SESSION_2FA_PENDING_USER_ID], $_SESSION[self::SESSION_2FA_PENDING_METHODS]);
+        $this->twoFactorSessionState->clearChallenge();
     }
 
     /**
@@ -872,15 +859,6 @@ final class AuthService
         $this->userPreferencesCache = [];
     }
 
-    private function clearTwoFactorSessionState(): void
-    {
-        unset(
-            $_SESSION[self::SESSION_2FA_PENDING_USER_ID],
-            $_SESSION[self::SESSION_2FA_PENDING_METHODS],
-            $_SESSION[self::SESSION_2FA_VERIFIED_USER_ID]
-        );
-    }
-
     private function hasInteractiveTwoFactorMethod(int $userId): bool
     {
         return $this->interactiveTwoFactorMethodsForUser($userId) !== [];
@@ -920,7 +898,7 @@ final class AuthService
      */
     private function authTable(string $base): string
     {
-        return $this->prefix . $base;
+        return TableNameResolver::authTable($this->driver, $this->prefix, $base);
     }
 
     /**

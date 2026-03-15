@@ -36,7 +36,9 @@ use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\ThemeCatalogService;
+use Raven\Lib\View\PublicRouteRenderService;
 use Raven\Lib\View\PublicTemplateDecorator;
+use Raven\Lib\View\PublicTemplatePipeline;
 use Raven\Lib\View\PublicTemplateResolver;
 use Raven\Core\View;
 use Raven\Core\View\TemplateTagEngine;
@@ -77,6 +79,7 @@ final class PublicController
     private ?MarkdownRenderer $markdownRenderer = null;
     private ?RequestContextResolver $requestContextResolver = null;
     private ?PublicTemplateResolver $publicTemplateResolver = null;
+    private ?PublicTemplatePipeline $publicTemplatePipeline = null;
     private ?EmbeddedFormRuntimeService $embeddedFormRuntimeService = null;
     private ?ProfileContactService $profileContactService = null;
     private ?RouteConfigService $routeConfigService = null;
@@ -88,6 +91,7 @@ final class PublicController
     private ?PublicMetaService $publicMetaService = null;
     private ?PublicTemplateDecorator $publicTemplateDecorator = null;
     private ?PublicPageBodyRenderer $pageBodyRenderer = null;
+    private ?PublicRouteRenderService $publicRouteRenderService = null;
     public function __construct(
         View $view,
         Config $config,
@@ -861,16 +865,13 @@ final class PublicController
      */
     private function renderProfileUnavailable(string $error, string $mode): void
     {
-        if ($error === 'permission_denied') {
-            http_response_code(403);
-        } else {
-            http_response_code(404);
-        }
-
-        $this->renderPublic('profiles/index', [
-            'site' => $this->siteData(),
-            'profile_show_denied' => $error === 'permission_denied' && $mode === 'private',
-        ], 'wrapper');
+        $payload = $this->publicRouteRenderService()->profileUnavailablePayload($error, $mode, $this->siteData());
+        http_response_code((int) ($payload['status'] ?? 404));
+        $this->renderPublic(
+            (string) ($payload['template'] ?? 'profiles/index'),
+            is_array($payload['data'] ?? null) ? $payload['data'] : [],
+            (string) ($payload['layout'] ?? 'wrapper')
+        );
     }
 
     /**
@@ -878,16 +879,13 @@ final class PublicController
      */
     private function renderGroupUnavailable(string $error, string $mode): void
     {
-        if ($error === 'permission_denied') {
-            http_response_code(403);
-        } else {
-            http_response_code(404);
-        }
-
-        $this->renderPublic('groups/index', [
-            'site' => $this->siteData(),
-            'group_show_denied' => $error === 'permission_denied' && $mode === 'private',
-        ], 'wrapper');
+        $payload = $this->publicRouteRenderService()->groupUnavailablePayload($error, $mode, $this->siteData());
+        http_response_code((int) ($payload['status'] ?? 404));
+        $this->renderPublic(
+            (string) ($payload['template'] ?? 'groups/index'),
+            is_array($payload['data'] ?? null) ? $payload['data'] : [],
+            (string) ($payload['layout'] ?? 'wrapper')
+        );
     }
 
     /**
@@ -994,40 +992,26 @@ final class PublicController
     public function enforceSiteAvailability(): bool
     {
         $mode = $this->siteEnabledMode();
-
-        if ($mode === 'disabled') {
-            if ($this->auth->isLoggedIn() && $this->auth->canViewDisabledSite()) {
-                return true;
-            }
-
-            http_response_code(503);
-            $this->renderPublic('messages/disabled', [
-                'site' => $this->siteData(),
-            ], 'wrapper');
-            return false;
-        }
-
-        if ($mode === 'private') {
-            if (!$this->auth->isLoggedIn() || !$this->auth->canViewPrivateSite()) {
-                http_response_code(403);
-                $this->renderPublic('messages/denied', [
-                    'site' => $this->siteData(),
-                ], 'wrapper');
-                return false;
-            }
-
+        $isLoggedIn = $this->auth->isLoggedIn();
+        $payload = $this->publicRouteRenderService()->availabilityGatePayload(
+            $mode,
+            $isLoggedIn,
+            $isLoggedIn && $this->auth->canViewDisabledSite(),
+            $isLoggedIn && $this->auth->canViewPrivateSite(),
+            $this->auth->canViewPublicSite(),
+            $this->siteData()
+        );
+        if ((bool) ($payload['allowed'] ?? false)) {
             return true;
         }
 
-        if (!$this->auth->canViewPublicSite()) {
-            http_response_code(403);
-            $this->renderPublic('messages/denied', [
-                'site' => $this->siteData(),
-            ], 'wrapper');
-            return false;
-        }
-
-        return true;
+        http_response_code((int) ($payload['status'] ?? 403));
+        $this->renderPublic(
+            (string) ($payload['template'] ?? 'messages/denied'),
+            is_array($payload['data'] ?? null) ? $payload['data'] : [],
+            (string) ($payload['layout'] ?? 'wrapper')
+        );
+        return false;
     }
 
     /**
@@ -1035,11 +1019,13 @@ final class PublicController
      */
     public function notFound(): void
     {
-        http_response_code(404);
-
-        $this->renderPublic('messages/404', [
-            'site' => $this->siteData(),
-        ], 'wrapper');
+        $payload = $this->publicRouteRenderService()->notFoundPayload($this->siteData());
+        http_response_code((int) ($payload['status'] ?? 404));
+        $this->renderPublic(
+            (string) ($payload['template'] ?? 'messages/404'),
+            is_array($payload['data'] ?? null) ? $payload['data'] : [],
+            (string) ($payload['layout'] ?? 'wrapper')
+        );
     }
 
     /**
@@ -1486,6 +1472,15 @@ final class PublicController
         return $this->publicTemplateResolver;
     }
 
+    private function publicTemplatePipeline(): PublicTemplatePipeline
+    {
+        if (!$this->publicTemplatePipeline instanceof PublicTemplatePipeline) {
+            $this->publicTemplatePipeline = new PublicTemplatePipeline($this->publicTemplateResolver());
+        }
+
+        return $this->publicTemplatePipeline;
+    }
+
     private function embeddedFormRuntimeService(): EmbeddedFormRuntimeService
     {
         if (!$this->embeddedFormRuntimeService instanceof EmbeddedFormRuntimeService) {
@@ -1587,6 +1582,15 @@ final class PublicController
         }
 
         return $this->publicTemplateDecorator;
+    }
+
+    private function publicRouteRenderService(): PublicRouteRenderService
+    {
+        if (!$this->publicRouteRenderService instanceof PublicRouteRenderService) {
+            $this->publicRouteRenderService = new PublicRouteRenderService();
+        }
+
+        return $this->publicRouteRenderService;
     }
 
     /**
@@ -1692,51 +1696,15 @@ final class PublicController
     private function renderPublic(string $template, array $data = [], ?string $layout = null): void
     {
         $data = $this->decorateTemplateData($data);
-
-        $themeViewsRoots = $this->currentPublicThemeViewsRoots();
-        $coreViewsRoot = dirname(__DIR__, 3) . '/private/vis';
-        $lookupRoots = [...$themeViewsRoots, $coreViewsRoot];
-
-        $templateFile = $this->resolvePublicTemplateFile($template, ...$lookupRoots);
-        if ($templateFile === null) {
-            throw new \RuntimeException('Public template not found: ' . $template);
-        }
-
-        $content = $this->renderPublicTemplateFile($templateFile, $data);
-        if ($layout === null) {
-            echo $content;
-            return;
-        }
-
-        $layoutFile = $this->resolvePublicTemplateFile($layout, ...$lookupRoots);
-        if ($layoutFile === null) {
-            throw new \RuntimeException('Public layout not found: ' . $layout);
-        }
-
-        $layoutData = $data;
-        $layoutData['content'] = $content;
-        echo $this->renderPublicTemplateFile($layoutFile, $layoutData);
-    }
-
-    /**
-     * Returns active public theme views roots, child first.
-     *
-     * @return array<int, string>
-     */
-    private function currentPublicThemeViewsRoots(): array
-    {
-        return $this->publicTemplateResolver()->currentThemeViewsRoots(
-            $this->publicThemesRoot(),
-            $this->currentPublicThemeSlug()
+        $output = $this->publicTemplatePipeline()->render(
+            $template,
+            $data,
+            $layout,
+            fn (string $file, array $payload): string => $this->templateTags->renderFile($file, $payload),
+            ...$this->publicTemplateLookupRoots()
         );
-    }
 
-    /**
-     * Resolves one public template path from ordered roots.
-     */
-    private function resolvePublicTemplateFile(string $template, string ...$roots): ?string
-    {
-        return $this->publicTemplateResolver()->resolveTemplateFile($template, ...$roots);
+        echo $output;
     }
 
     /**
@@ -1748,10 +1716,10 @@ final class PublicController
      */
     private function resolveChannelTemplateName(string $channelSlug): string
     {
-        $themeViewsRoots = $this->currentPublicThemeViewsRoots();
-        $coreViewsRoot = dirname(__DIR__, 3) . '/private/vis';
-        $lookupRoots = [...$themeViewsRoots, $coreViewsRoot];
-        return $this->publicTemplateResolver()->resolveChannelTemplateName($channelSlug, ...$lookupRoots);
+        return $this->publicTemplatePipeline()->resolveChannelTemplateName(
+            $channelSlug,
+            ...$this->publicTemplateLookupRoots()
+        );
     }
 
     /**
@@ -1763,10 +1731,10 @@ final class PublicController
      */
     private function resolvePageTemplateName(?string $channelSlug): string
     {
-        $themeViewsRoots = $this->currentPublicThemeViewsRoots();
-        $coreViewsRoot = dirname(__DIR__, 3) . '/private/vis';
-        $lookupRoots = [...$themeViewsRoots, $coreViewsRoot];
-        return $this->publicTemplateResolver()->resolvePageTemplateName($channelSlug, ...$lookupRoots);
+        return $this->publicTemplatePipeline()->resolvePageTemplateName(
+            $channelSlug,
+            ...$this->publicTemplateLookupRoots()
+        );
     }
 
     /**
@@ -1778,10 +1746,10 @@ final class PublicController
      */
     private function resolveCategoryTemplateName(string $categorySlug): string
     {
-        $themeViewsRoots = $this->currentPublicThemeViewsRoots();
-        $coreViewsRoot = dirname(__DIR__, 3) . '/private/vis';
-        $lookupRoots = [...$themeViewsRoots, $coreViewsRoot];
-        return $this->publicTemplateResolver()->resolveCategoryTemplateName($categorySlug, ...$lookupRoots);
+        return $this->publicTemplatePipeline()->resolveCategoryTemplateName(
+            $categorySlug,
+            ...$this->publicTemplateLookupRoots()
+        );
     }
 
     /**
@@ -1793,20 +1761,22 @@ final class PublicController
      */
     private function resolveTagTemplateName(string $tagSlug): string
     {
-        $themeViewsRoots = $this->currentPublicThemeViewsRoots();
-        $coreViewsRoot = dirname(__DIR__, 3) . '/private/vis';
-        $lookupRoots = [...$themeViewsRoots, $coreViewsRoot];
-        return $this->publicTemplateResolver()->resolveTagTemplateName($tagSlug, ...$lookupRoots);
+        return $this->publicTemplatePipeline()->resolveTagTemplateName(
+            $tagSlug,
+            ...$this->publicTemplateLookupRoots()
+        );
     }
 
     /**
-     * Executes one resolved public template file in isolated scope.
-     *
-     * @param array<string, mixed> $data
+     * @return array<int, string>
      */
-    private function renderPublicTemplateFile(string $file, array $data): string
+    private function publicTemplateLookupRoots(): array
     {
-        return $this->templateTags->renderFile($file, $data);
+        return $this->publicTemplatePipeline()->lookupRoots(
+            $this->publicThemesRoot(),
+            $this->currentPublicThemeSlug(),
+            dirname(__DIR__, 3) . '/private/vis'
+        );
     }
 
     /**

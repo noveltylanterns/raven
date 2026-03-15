@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Raven\Repository;
 
 use PDO;
+use Raven\Lib\Database\Runtime\TableNameResolver;
 
 /**
  * Data access for Tag CRUD operations in panel.
@@ -399,16 +400,6 @@ final class TagRepository
      */
     private function table(string $table): string
     {
-        if ($this->driver !== 'sqlite') {
-            // Shared-db mode: physical name is prefix + logical table.
-            return $this->prefix . $table;
-        }
-
-        // SQLite mode: resolve to attached database aliases.
-        return match ($table) {
-            'tags' => 'taxonomy.tags',
-            'page_tags' => 'main.page_tags',
-            default => 'main.' . $table,
-        };
+        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
     }
 }

@@ -12,6 +12,8 @@ declare(strict_types=1);
 namespace Raven\Repository;
 
 use PDO;
+use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Routing\ChannelRecordPolicy;
 use RuntimeException;
 
 /**
@@ -592,37 +594,27 @@ final class ChannelRepository
 
     private function isValidSlug(string $slug): bool
     {
-        return preg_match('/^[a-z0-9][a-z0-9-]*$/', strtolower(trim($slug))) === 1;
+        return ChannelRecordPolicy::isValidSlug($slug);
     }
 
     private function normalizeTextEditorOverride(string $value): string
     {
-        $normalized = strtolower(trim($value));
-        return in_array($normalized, ['inherit', 'tinymce', 'plaintext', 'autobr', 'markdown'], true)
-            ? $normalized
-            : 'inherit';
+        return ChannelRecordPolicy::normalizeTextEditorOverride($value);
     }
 
     private function normalizePageRouteMode(string $value): string
     {
-        $normalized = strtolower(trim($value));
-        return in_array($normalized, ['slug', 'date_slug'], true) ? $normalized : 'slug';
+        return ChannelRecordPolicy::normalizePageRouteMode($value);
     }
 
     private function normalizePageUrlSeparator(string $value): string
     {
-        $normalized = trim($value);
-        return in_array($normalized, ['inherit', '-', '_'], true) ? $normalized : 'inherit';
+        return ChannelRecordPolicy::normalizePageUrlSeparator($value);
     }
 
     private function normalizeNullablePath(mixed $value): ?string
     {
-        if (!is_scalar($value) && $value !== null) {
-            return null;
-        }
-
-        $path = trim((string) ($value ?? ''));
-        return $path === '' ? null : $path;
+        return ChannelRecordPolicy::normalizeNullablePath($value);
     }
 
     /**
@@ -655,12 +647,7 @@ final class ChannelRepository
 
     private function normalizeChannelId(mixed $value): ?int
     {
-        if (!is_scalar($value) && $value !== null) {
-            return null;
-        }
-
-        $id = (int) trim((string) ($value ?? ''));
-        return $id > 0 ? $id : null;
+        return ChannelRecordPolicy::normalizeChannelId($value);
     }
 
     private function persistChannelId(string $slug, int $id): void
@@ -692,14 +679,6 @@ final class ChannelRepository
      */
     private function table(string $table): string
     {
-        if ($this->driver !== 'sqlite') {
-            return $this->prefix . $table;
-        }
-
-        return match ($table) {
-            'pages' => 'main.pages',
-            'redirects' => 'taxonomy.redirects',
-            default => 'main.' . $table,
-        };
+        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
     }
 }

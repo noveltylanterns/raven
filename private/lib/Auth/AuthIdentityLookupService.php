@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use PDO;
+use Raven\Lib\Database\Runtime\TableNameResolver;
 
 /**
  * Shared auth-identity lookup helpers for username/email uniqueness checks.
@@ -12,12 +13,14 @@ use PDO;
 final class AuthIdentityLookupService
 {
     private PDO $authDb;
+    private string $driver;
     private string $prefix;
 
-    public function __construct(PDO $authDb, string $prefix = '')
+    public function __construct(PDO $authDb, string $driver, string $prefix = '')
     {
         $this->authDb = $authDb;
-        $this->prefix = $prefix;
+        $this->driver = $driver;
+        $this->prefix = $driver === 'sqlite' ? '' : $prefix;
     }
 
     public function emailByUsername(string $username): ?string
@@ -78,7 +81,6 @@ final class AuthIdentityLookupService
 
     private function table(string $base): string
     {
-        return $this->prefix . $base;
+        return TableNameResolver::authTable($this->driver, $this->prefix, $base);
     }
 }
-

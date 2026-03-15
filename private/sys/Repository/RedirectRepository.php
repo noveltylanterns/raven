@@ -14,6 +14,9 @@ declare(strict_types=1);
 namespace Raven\Repository;
 
 use PDO;
+use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Routing\ChannelContextService;
+use Raven\Lib\Routing\PathScopeLookupService;
 use RuntimeException;
 
 /**
@@ -368,33 +371,14 @@ final class RedirectRepository
      */
     private function pathExists(string $slug, ?int $channelId, ?int $ignoreId = null): bool
     {
-        $redirects = $this->table('redirects');
-
-        $sql = 'SELECT 1
-                FROM ' . $redirects . '
-                WHERE slug = :slug';
-        $params = [
-            ':slug' => $slug,
-        ];
-
-        if ($channelId === null) {
-            $sql .= ' AND channel_id IS NULL';
-        } else {
-            $sql .= ' AND channel_id = :channel_id';
-            $params[':channel_id'] = $channelId;
-        }
-
-        if ($ignoreId !== null && $ignoreId > 0) {
-            $sql .= ' AND id <> :ignore_id';
-            $params[':ignore_id'] = $ignoreId;
-        }
-
-        $sql .= ' LIMIT 1';
-
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-
-        return $stmt->fetchColumn() !== false;
+        return PathScopeLookupService::exists(
+            $this->db,
+            $this->table('redirects'),
+            $slug,
+            $channelId,
+            $ignoreId,
+            'ignore_id'
+        );
     }
 
     /**
@@ -402,17 +386,7 @@ final class RedirectRepository
      */
     private function channelsByIdMap(): array
     {
-        $map = [];
-        foreach ($this->channels->listRecords() as $channel) {
-            $id = (int) ($channel['id'] ?? 0);
-            if ($id < 1) {
-                continue;
-            }
-
-            $map[$id] = $channel;
-        }
-
-        return $map;
+        return ChannelContextService::channelsByIdMap($this->channels->listRecords());
     }
 
     /**
@@ -424,10 +398,7 @@ final class RedirectRepository
     {
         $channelId = (int) ($row['channel_id'] ?? 0);
         $channel = $channelId > 0 ? ($channelsById[$channelId] ?? null) : null;
-
-        $row['channel_slug'] = $channel !== null ? (string) ($channel['slug'] ?? '') : '';
-        $row['channel_name'] = $channel !== null ? (string) ($channel['name'] ?? '') : '';
-        return $row;
+        return ChannelContextService::applyBasicChannelContext($row, $channel);
     }
 
     /**
@@ -435,17 +406,11 @@ final class RedirectRepository
      */
     private function channelIdBySlug(?string $slug): ?int
     {
-        $slug = trim((string) ($slug ?? ''));
-        if ($slug === '') {
-            return null;
-        }
-
-        $channelId = $this->channels->idBySlug($slug);
-        if ($channelId === null) {
-            throw new RuntimeException('Selected channel does not exist.');
-        }
-
-        return $channelId;
+        return ChannelContextService::resolveChannelIdBySlug(
+            $slug,
+            fn (string $normalized): ?int => $this->channels->idBySlug($normalized),
+            'Selected channel does not exist.'
+        );
     }
 
     /**
@@ -453,15 +418,6 @@ final class RedirectRepository
      */
     private function table(string $table): string
     {
-        if ($this->driver !== 'sqlite') {
-            // Shared-db mode: physical name is prefix + logical table.
-            return $this->prefix . $table;
-        }
-
-        // SQLite mode: resolve to attached database aliases.
-        return match ($table) {
-            'redirects' => 'taxonomy.redirects',
-            default => 'main.' . $table,
-        };
+        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
     }
 }
