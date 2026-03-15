@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Repository;
 
 use PDO;
+use Raven\Lib\Content\PageBodyBlockCodec;
 use RuntimeException;
 
 /**
@@ -25,6 +26,7 @@ final class PageRepository
     private ChannelRepository $channels;
     private bool $categoryEnabled;
     private bool $tagEnabled;
+    private PageBodyBlockCodec $bodyBlockCodec;
 
     public function __construct(
         PDO $db,
@@ -42,6 +44,7 @@ final class PageRepository
         $this->channels = $channels;
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
+        $this->bodyBlockCodec = new PageBodyBlockCodec();
     }
 
     /**
@@ -1206,62 +1209,7 @@ final class PageRepository
      */
     private function normalizeExtendedBlocks(mixed $raw): array
     {
-        if (!is_array($raw)) {
-            return [];
-        }
-
-        $blocks = [];
-        foreach ($raw as $entry) {
-            $type = 'tinymce';
-            $content = '';
-            $cssId = '';
-            $cssClass = '';
-
-            if (is_array($entry)) {
-                $type = $this->normalizeBodyBlockType((string) ($entry['type'] ?? 'tinymce'));
-                $value = $entry['content'] ?? '';
-                $cssId = $this->normalizeBodyBlockCssId($entry['css_id'] ?? null);
-                $cssClass = $this->normalizeBodyBlockCssClassList($entry['css_class'] ?? null);
-                if (!is_scalar($value) && $value !== null) {
-                    continue;
-                }
-
-                $content = str_replace("\0", '', (string) ($value ?? ''));
-            } else {
-                if (!is_scalar($entry) && $entry !== null) {
-                    continue;
-                }
-
-                $content = str_replace("\0", '', (string) ($entry ?? ''));
-            }
-
-            if ($type === 'markdown_file') {
-                $content = trim($content);
-            }
-
-            if ($type === 'image_gallery') {
-                $blocks[] = [
-                    'type' => 'image_gallery',
-                    'content' => '',
-                    'css_id' => $cssId,
-                    'css_class' => $cssClass,
-                ];
-                continue;
-            }
-
-            if (trim($content) === '') {
-                continue;
-            }
-
-            $blocks[] = [
-                'type' => $type,
-                'content' => $content,
-                'css_id' => $cssId,
-                'css_class' => $cssClass,
-            ];
-        }
-
-        return $blocks;
+        return $this->bodyBlockCodec->normalizeStoredBlocks($raw);
     }
 
     /**
@@ -1271,12 +1219,7 @@ final class PageRepository
      */
     private function encodeExtendedBlocks(array $blocks): string
     {
-        if ($blocks === []) {
-            return '';
-        }
-
-        $encoded = json_encode($blocks, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        return is_string($encoded) ? $encoded : '';
+        return $this->bodyBlockCodec->encodeStoredBlocks($blocks);
     }
 
     /**
@@ -1286,155 +1229,7 @@ final class PageRepository
      */
     private function decodeExtendedBlocks(string $raw): array
     {
-        $trimmed = trim($raw);
-        if ($trimmed === '') {
-            return [];
-        }
-
-        $decoded = json_decode($trimmed, true);
-        if (!is_array($decoded)) {
-            // Non-JSON legacy content is treated as one TinyMCE body block.
-            return [[
-                'type' => 'tinymce',
-                'content' => $raw,
-                'css_id' => '',
-                'css_class' => '',
-            ]];
-        }
-
-        $blocks = [];
-        foreach ($decoded as $entry) {
-            if (is_array($entry)) {
-                $type = $this->normalizeBodyBlockType((string) ($entry['type'] ?? 'tinymce'));
-                $value = $entry['content'] ?? '';
-                $cssId = $this->normalizeBodyBlockCssId($entry['css_id'] ?? null);
-                $cssClass = $this->normalizeBodyBlockCssClassList($entry['css_class'] ?? null);
-                if (!is_scalar($value) && $value !== null) {
-                    continue;
-                }
-
-                $content = str_replace("\0", '', (string) ($value ?? ''));
-                if ($type === 'markdown_file') {
-                    $content = trim($content);
-                }
-
-                if ($type === 'image_gallery') {
-                    $blocks[] = [
-                        'type' => 'image_gallery',
-                        'content' => '',
-                        'css_id' => $cssId,
-                        'css_class' => $cssClass,
-                    ];
-                    continue;
-                }
-
-                if (trim($content) === '') {
-                    continue;
-                }
-
-                $blocks[] = [
-                    'type' => $type,
-                    'content' => $content,
-                    'css_id' => $cssId,
-                    'css_class' => $cssClass,
-                ];
-                continue;
-            }
-
-            if (!is_scalar($entry) && $entry !== null) {
-                continue;
-            }
-
-            $content = str_replace("\0", '', (string) ($entry ?? ''));
-            if (trim($content) === '') {
-                continue;
-            }
-
-            $blocks[] = [
-                'type' => 'tinymce',
-                'content' => $content,
-                'css_id' => '',
-                'css_class' => '',
-            ];
-        }
-
-        return $blocks;
-    }
-
-    /**
-     * Normalizes one stored body-block type value.
-     */
-    private function normalizeBodyBlockType(string $value): string
-    {
-        $type = strtolower(trim($value));
-        if (in_array($type, ['tinymce', 'plaintext', 'autobr', 'markdown', 'markdown_file', 'image_gallery'], true)) {
-            return $type;
-        }
-
-        return preg_match('/^content_[a-z0-9_]{1,120}$/', $type) === 1
-            ? $type
-            : 'tinymce';
-    }
-
-    /**
-     * Normalizes one optional body-block CSS id token.
-     */
-    private function normalizeBodyBlockCssId(mixed $value): string
-    {
-        if (!is_scalar($value) && $value !== null) {
-            return '';
-        }
-
-        $id = str_replace("\0", '', trim((string) ($value ?? '')));
-        $id = ltrim($id, '#');
-        if ($id === '') {
-            return '';
-        }
-
-        if (mb_strlen($id) > 120) {
-            $id = mb_substr($id, 0, 120);
-        }
-
-        return preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/', $id) === 1
-            ? $id
-            : '';
-    }
-
-    /**
-     * Normalizes optional body-block CSS class list into one space-delimited value.
-     */
-    private function normalizeBodyBlockCssClassList(mixed $value): string
-    {
-        if (!is_scalar($value) && $value !== null) {
-            return '';
-        }
-
-        $raw = str_replace("\0", '', trim((string) ($value ?? '')));
-        if ($raw === '') {
-            return '';
-        }
-
-        $classMap = [];
-        $classes = [];
-        foreach (preg_split('/[\s,]+/', $raw) ?: [] as $token) {
-            $token = ltrim(trim((string) $token), '.');
-            if ($token === '' || preg_match('/^[a-zA-Z0-9_-]{1,80}$/', $token) !== 1) {
-                continue;
-            }
-
-            $key = strtolower($token);
-            if (isset($classMap[$key])) {
-                continue;
-            }
-
-            $classMap[$key] = true;
-            $classes[] = $token;
-            if (count($classes) >= 12) {
-                break;
-            }
-        }
-
-        return implode(' ', $classes);
+        return $this->bodyBlockCodec->decodeStoredBlocks($raw);
     }
 
     /**

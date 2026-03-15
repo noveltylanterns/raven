@@ -156,6 +156,7 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Auth/ContactProfileNormalizer.php` - Shared contact profile normalizer for deterministic `{type,value}` dedupe/sort limits.
 - `/private/lib/Auth/LoginIdentifierResolver.php` - Shared login identifier mode + username/email normalization helper.
 - `/private/lib/Auth/LoginThrottleService.php` - Shared persistent login-throttle bucket service for lockout checks and failure upserts.
+- `/private/lib/Auth/PanelSessionGuard.php` - Shared panel login-guard flow and panel-identity session synchronization helper.
 - `/private/lib/Auth/PermissionMaskService.php` - Shared user/guest permission-mask composition + cache helper for group-based panel/public access checks.
 - `/private/lib/Config/ConfigEditorNormalizer.php` - Shared configuration-editor normalization helpers for scalar/meta/media field parsing and validation.
 - `/private/lib/Config/ConfigEditorSchemaService.php` - Shared config-editor schema/default normalizer and field-map helper for flatten/read/write + legacy key migration.
@@ -163,11 +164,13 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Config/ConfigValueParser.php` - Shared scalar configuration parsing helpers for booleans and numeric values with fallback/clamp behavior.
 - `/private/lib/Content/BodyBlockPolicy.php` - Shared page body-block definition defaults and CSS/type/editor normalization helpers for panel/public flows.
 - `/private/lib/Content/MarkdownRenderer.php` - Shared lightweight markdown-to-HTML renderer for public body-block markdown output.
+- `/private/lib/Content/PageBodyBlockCodec.php` - Shared page body-block codec for editor payload normalization and persisted encode/decode behavior.
 - `/private/lib/Database/Profiling/ProfiledPDO.php` - PDO subclass that records query timings through an injected profiler contract.
 - `/private/lib/Database/Profiling/ProfiledPDOStatement.php` - PDOStatement subclass that records execute payloads/timings through a profiler contract.
 - `/private/lib/Database/Profiling/QueryProfilerInterface.php` - Interface contract for query profiling collectors used by profiled PDO classes.
 - `/private/lib/Debug/DebugToolbarConfigResolver.php` - Shared resolver that maps debug config keys into normalized debug-toolbar visibility flags.
 - `/private/lib/Extension/ExtensionCatalogService.php` - Shared extension catalog + ext.json validation service for panel listing/install/delete safety flows.
+- `/private/lib/Extension/ExtensionEditorCatalogService.php` - Shared extension-provided editor catalog helper for body-block field and shortcode menu discovery.
 - `/private/lib/Extension/ExtensionPermissionCatalogService.php` - Shared extension permission-level catalog discovery and stable permission-bit allocation service for panel ACL mapping.
 - `/private/lib/Extension/EmbeddedFormRuntimeService.php` - Shared embedded-form shortcode parser/runtime resolver with enabled-extension filtering and per-type form-definition caches.
 - `/private/lib/Extension/ExtensionScaffoldService.php` - Shared extension scaffold generator for panel extension-create workflows.
@@ -175,6 +178,7 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Http/HttpResponse.php` - Shared HTTP response helper for redirects and JSON/no-store response payloads.
 - `/private/lib/Http/RequestContextResolver.php` - Shared request-context resolver for scheme/host/current URL and normalized client IP/hostname extraction.
 - `/private/lib/Http/SessionFlash.php` - Shared session flash message helper with single-value and list pull/write support.
+- `/private/lib/Http/UploadFileSetNormalizer.php` - Shared `$_FILES` tree flatten/normalization helper for nested single/multiple upload payloads.
 - `/private/lib/Media/AvatarUploadService.php` - Shared avatar upload sanitizer/thumbnail generator and deterministic avatar filename+storage lifecycle helper.
 - `/private/lib/Media/TaxonomyImageService.php` - Shared taxonomy image upload pipeline for cover/preview storage, variant generation, and cleanup.
 - `/private/lib/Pagination/Pagination.php` - Shared pagination utility for state normalization and template link payload generation.
@@ -205,7 +209,9 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Security/WebAuthnService.php` - Shared WebAuthn server bootstrap, RP-id resolution, and authenticator UV-flag helper.
 - `/private/lib/Security/tests/InputSanitizerSmoke.php` - Standalone smoke test for library-level InputSanitizer behavior.
 - `/private/lib/Session/SessionCookiePolicy.php` - Shared session cookie policy resolver/bootstrap helper for name/domain/prefix/host-matching.
+- `/private/lib/Site/PublicMetaService.php` - Shared public `site` meta payload builder for canonical URL, social image, and taxonomy/page meta overrides.
 - `/private/lib/Site/SiteContextBuilder.php` - Shared site-context payload builder for panel/public template data maps.
+- `/private/lib/Theme/ThemeCatalogService.php` - Shared public-theme catalog, inheritance, active-slug, and slug-policy helper for panel/public theme flows.
 - `/private/lib/Theme/ThemeCloneService.php` - Shared recursive directory clone service for local public-theme duplication workflows.
 - `/private/lib/Theme/ThemeScaffoldService.php` - Shared public-theme scaffold generator for panel theme-create workflows.
 - `/private/lib/View/ThemeFallbackRenderer.php` - Shared public-theme fallback template resolver/renderer with inheritance-aware lookup and core fallback support.
@@ -217,8 +223,8 @@ Bootstrap/service container wiring and startup helpers.
 #### /private/sys/
 Core system files:
 - `/private/sys/Controller/AuthController.php` - Authentication controller for login/logout and auth flow handling, now delegating flash/json/panel-url/identifier normalization, request-context IP resolution, and panel site-context helpers through `/private/lib/`.
-- `/private/sys/Controller/PanelController.php` - Primary panel controller for admin routes/forms/page rendering, now delegating shared flash/json/pagination/panel-url/route-config+schema parsing/config snapshot sanitization/routing policy+routing inventory building/archive packaging/extension-state+catalog+permission services/avatar/taxonomy image processing/body-block policy/theme clone+scaffold generators/profile-contact normalization and fallback/site-context helpers through `/private/lib/`.
-- `/private/sys/Controller/PublicController.php` - Primary public controller for frontend rendering/form endpoints, now delegating shared flash/pagination/panel-url/route-config/captcha/redirect validation/channel route policy/request-context resolution/site-context/embedded-form runtime/template resolution/body-block policy/profile-contact helpers and markdown rendering through `/private/lib/`.
+- `/private/sys/Controller/PanelController.php` - Primary panel controller for admin routes/forms/page rendering, now delegating shared flash/json/pagination/panel-url/route-config+schema parsing/config snapshot sanitization/routing policy+routing inventory building/archive packaging/extension-state+catalog+permission/editor-catalog services/avatar/taxonomy image processing/upload normalization/page-body codec/panel-session guard/theme catalog+clone+scaffold generators/profile-contact normalization and fallback/site-context helpers through `/private/lib/`.
+- `/private/sys/Controller/PublicController.php` - Primary public controller for frontend rendering/form endpoints, now delegating shared flash/pagination/panel-url/route-config/captcha/redirect validation/channel route policy/request-context resolution/site-context/public-meta/theme-catalog/embedded-form runtime/template resolution/page-body codec+policy/extension editor-catalog/profile-contact helpers and markdown rendering through `/private/lib/`.
 - `/private/sys/Core/Auth/AuthService.php` - Auth service wrapper around session/auth provider operations, now delegating login-throttle persistence, auth payload codec normalization, and permission-mask composition/caching through `/private/lib/Auth/`.
 - `/private/sys/Core/Auth/PanelAccess.php` - Panel permission bit constants and access helper utilities.
 - `/private/sys/Core/Config.php` - Config loader/getter/setter persistence service for Raven config keys.
@@ -239,7 +245,7 @@ Core system files:
 - `/private/sys/Repository/GroupRepository.php` - Group repository CRUD/query layer and permission mask persistence.
 - `/private/sys/Repository/InviteTokenRepository.php` - Invite token repository CRUD/query layer for registration workflows.
 - `/private/sys/Repository/PageImageRepository.php` - Page gallery image metadata repository.
-- `/private/sys/Repository/PageRepository.php` - Page repository CRUD, routing, taxonomy, and body-block persistence.
+- `/private/sys/Repository/PageRepository.php` - Page repository CRUD, routing, taxonomy, and body-block persistence (now using shared page body-block codec helpers from `/private/lib/Content/`).
 - `/private/sys/Repository/RedirectRepository.php` - Redirect repository CRUD/query layer.
 - `/private/sys/Repository/TagRepository.php` - Tag repository CRUD/query layer.
 - `/private/sys/Repository/TaxonomyRepository.php` - Shared taxonomy repository helpers and cross-taxonomy queries.

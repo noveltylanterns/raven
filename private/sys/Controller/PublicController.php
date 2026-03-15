@@ -16,10 +16,11 @@ namespace Raven\Controller;
 use Raven\Core\Auth\AuthService;
 use Raven\Core\Config;
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
-use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Content\BodyBlockPolicy;
 use Raven\Lib\Content\MarkdownRenderer;
+use Raven\Lib\Content\PageBodyBlockCodec;
+use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\EmbeddedFormRuntimeService;
 use Raven\Lib\Http\RequestContextResolver;
 use Raven\Lib\Http\SessionFlash;
@@ -30,11 +31,12 @@ use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Routing\RedirectTargetValidator;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\CaptchaService;
+use Raven\Lib\Site\PublicMetaService;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Theme\ThemeCatalogService;
 use Raven\Lib\View\PublicTemplateResolver;
-use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Core\View;
 use Raven\Core\View\TemplateTagEngine;
 use Raven\Repository\GroupRepository;
@@ -79,6 +81,10 @@ final class PublicController
     private ?RouteConfigService $routeConfigService = null;
     private ?BodyBlockPolicy $bodyBlockPolicy = null;
     private ?CaptchaService $captchaService = null;
+    private ?PageBodyBlockCodec $pageBodyBlockCodec = null;
+    private ?ThemeCatalogService $themeCatalogService = null;
+    private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
+    private ?PublicMetaService $publicMetaService = null;
     public function __construct(
         View $view,
         Config $config,
@@ -1074,24 +1080,7 @@ final class PublicController
      */
     private function siteData(): array
     {
-        $publicTheme = $this->currentPublicThemeSlug();
-        $configuredDomain = (string) $this->config->get('site.domain', 'localhost');
-        $publicThemeCss = $this->currentPublicThemeCssSlug($publicTheme);
-
-        return $this->siteContextBuilder()->publicBase(
-            $this->config,
-            $this->currentRequestUrl($configuredDomain),
-            $publicTheme,
-            $publicThemeCss,
-            $this->absoluteMetaImageUrl(
-                trim((string) $this->config->get('meta.twitter.image', '')),
-                $configuredDomain
-            ),
-            $this->absoluteMetaImageUrl(
-                trim((string) $this->config->get('meta.opengraph.image', '')),
-                $configuredDomain
-            )
-        );
+        return $this->publicMetaService()->siteData($this->config);
     }
 
     /**
@@ -1102,63 +1091,11 @@ final class PublicController
      */
     private function siteDataWithPageMeta(array $page): array
     {
-        $site = $this->siteData();
-        $site['twitter_creator'] = $this->resolvedTwitterCreatorForPage(
+        return $this->publicMetaService()->siteDataWithPageMeta(
             $page,
-            (string) ($site['twitter_creator'] ?? '')
-        );
-
-        $pageId = (int) ($page['id'] ?? 0);
-        if ($pageId < 1) {
-            return $site;
-        }
-
-        $previewImageUrl = $this->absoluteMetaImageUrl(
-            trim((string) ($this->pageImages->previewImageUrlForPage($pageId) ?? '')),
-            (string) ($site['domain'] ?? 'localhost')
-        );
-        if ($previewImageUrl === '') {
-            return $site;
-        }
-
-        $site['og_image'] = $previewImageUrl;
-        $site['twitter_image'] = $previewImageUrl;
-
-        return $site;
-    }
-
-    /**
-     * Resolves effective `twitter:creator` for a page author with config fallback.
-     *
-     * @param array<string, mixed> $page
-     */
-    private function resolvedTwitterCreatorForPage(array $page, string $fallback): string
-    {
-        $fallback = trim($fallback);
-        $authorUserId = (int) ($page['author_user_id'] ?? 0);
-        if ($authorUserId < 1) {
-            return $fallback;
-        }
-
-        $author = $this->users->findById($authorUserId);
-        if (!is_array($author)) {
-            return $fallback;
-        }
-
-        $profiles = is_array($author['contact_profiles'] ?? null) ? $author['contact_profiles'] : [];
-        $creator = $this->twitterCreatorFromContactProfiles($profiles);
-        return $creator !== '' ? $creator : $fallback;
-    }
-
-    /**
-     * Extracts first valid Twitter/X creator handle from normalized contact-profile rows.
-     *
-     * @param array<int, array<string, mixed>> $profiles
-     */
-    private function twitterCreatorFromContactProfiles(array $profiles): string
-    {
-        return $this->profileContactService()->twitterCreatorFromProfiles(
-            $profiles,
+            $this->siteData(),
+            fn (int $pageId): ?string => $this->pageImages->previewImageUrlForPage($pageId),
+            fn (int $authorUserId): ?array => $this->users->findById($authorUserId),
             $this->profileContactOptions()
         );
     }
@@ -1172,36 +1109,10 @@ final class PublicController
      */
     private function siteDataWithTaxonomyMetaImage(array $taxonomy, ?array $baseSiteData = null): array
     {
-        $site = $baseSiteData ?? $this->siteData();
-        $configuredDomain = (string) ($site['domain'] ?? 'localhost');
-
-        $candidates = [
-            trim((string) ($taxonomy['preview_image_lg_path'] ?? '')),
-            trim((string) ($taxonomy['preview_image_path'] ?? '')),
-            trim((string) ($taxonomy['preview_image_md_path'] ?? '')),
-            trim((string) ($taxonomy['preview_image_sm_path'] ?? '')),
-            trim((string) ($taxonomy['cover_image_lg_path'] ?? '')),
-            trim((string) ($taxonomy['cover_image_path'] ?? '')),
-            trim((string) ($taxonomy['cover_image_md_path'] ?? '')),
-            trim((string) ($taxonomy['cover_image_sm_path'] ?? '')),
-        ];
-
-        foreach ($candidates as $candidate) {
-            if ($candidate === '') {
-                continue;
-            }
-
-            $resolved = $this->absoluteMetaImageUrl($candidate, $configuredDomain);
-            if ($resolved === '') {
-                continue;
-            }
-
-            $site['og_image'] = $resolved;
-            $site['twitter_image'] = $resolved;
-            return $site;
-        }
-
-        return $site;
+        return $this->publicMetaService()->siteDataWithTaxonomyMetaImage(
+            $taxonomy,
+            $baseSiteData ?? $this->siteData()
+        );
     }
 
     /**
@@ -1211,25 +1122,7 @@ final class PublicController
      */
     private function absoluteMetaImageUrl(string $value, string $configuredDomain): string
     {
-        $value = trim(str_replace(["\r", "\n", "\0"], '', $value));
-        if ($value === '') {
-            return '';
-        }
-
-        if (str_starts_with($value, '//')) {
-            return '';
-        }
-
-        if (filter_var($value, FILTER_VALIDATE_URL) !== false) {
-            $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
-            return in_array($scheme, ['http', 'https'], true) ? $value : '';
-        }
-
-        $path = str_starts_with($value, '/') ? $value : ('/' . ltrim($value, '/'));
-        $scheme = $this->resolveRequestScheme();
-        $host = $this->resolveRequestHost($configuredDomain);
-
-        return $scheme . '://' . $host . $path;
+        return $this->publicMetaService()->absoluteMetaImageUrl($value, $configuredDomain);
     }
 
     /**
@@ -1237,43 +1130,7 @@ final class PublicController
      */
     private function currentPublicThemeSlug(): string
     {
-        $configured = strtolower($this->input->text((string) $this->config->get('site.default_theme', 'raven'), 80));
-        $options = $this->publicThemeOptions();
-
-        if (isset($options[$configured])) {
-            return $configured;
-        }
-
-        if (isset($options['raven'])) {
-            return 'raven';
-        }
-
-        $slugs = array_keys($options);
-        return (string) ($slugs[0] ?? 'raven');
-    }
-
-    /**
-     * Returns one canonical absolute URL for the current public request.
-     */
-    private function currentRequestUrl(string $configuredDomain): string
-    {
-        return $this->requestContextResolver()->currentRequestUrl($configuredDomain);
-    }
-
-    /**
-     * Resolves request scheme from forwarded/proxy/server context.
-     */
-    private function resolveRequestScheme(): string
-    {
-        return $this->requestContextResolver()->resolveRequestScheme();
-    }
-
-    /**
-     * Resolves one safe host[:port] for absolute URL generation.
-     */
-    private function resolveRequestHost(string $configuredDomain): string
-    {
-        return $this->requestContextResolver()->resolveRequestHost($configuredDomain);
+        return $this->themeCatalogService()->activeSlugFromConfig($this->config);
     }
 
     /**
@@ -1283,13 +1140,7 @@ final class PublicController
      */
     private function publicThemeOptions(): array
     {
-        $themesRoot = $this->publicThemesRoot();
-        $options = PublicThemeRegistry::options($themesRoot);
-        if ($options === []) {
-            return ['raven' => 'Raven Basic'];
-        }
-
-        return $options;
+        return $this->themeCatalogService()->options();
     }
 
     /**
@@ -1297,7 +1148,7 @@ final class PublicController
      */
     private function publicThemesRoot(): string
     {
-        return dirname(__DIR__, 3) . '/public/theme';
+        return $this->themeCatalogService()->root();
     }
 
     /**
@@ -1307,12 +1158,7 @@ final class PublicController
      */
     private function currentPublicThemeInheritanceChain(string $themeSlug): array
     {
-        $chain = PublicThemeRegistry::inheritanceChain($this->publicThemesRoot(), $themeSlug);
-        if ($chain === []) {
-            return [$themeSlug];
-        }
-
-        return $chain;
+        return $this->themeCatalogService()->inheritanceChain($themeSlug);
     }
 
     /**
@@ -1320,14 +1166,7 @@ final class PublicController
      */
     private function currentPublicThemeCssSlug(string $themeSlug): string
     {
-        foreach ($this->currentPublicThemeInheritanceChain($themeSlug) as $candidateThemeSlug) {
-            $cssPath = $this->publicThemesRoot() . '/' . $candidateThemeSlug . '/css/style.css';
-            if (is_file($cssPath)) {
-                return $candidateThemeSlug;
-            }
-        }
-
-        return $themeSlug;
+        return $this->themeCatalogService()->cssSlug($themeSlug);
     }
 
     /**
@@ -1405,17 +1244,10 @@ final class PublicController
             return false;
         }
 
-        foreach ($rawBlocks as $block) {
-            if (!is_array($block)) {
-                continue;
-            }
-
-            if ($this->pageBodyBlockEditorMode((string) ($block['type'] ?? '')) === 'gallery') {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->pageBodyBlockCodec()->hasGalleryBlock(
+            $rawBlocks,
+            fn (string $type): string => $this->pageBodyBlockEditorMode($type)
+        );
     }
 
     /**
@@ -1484,33 +1316,12 @@ final class PublicController
         }
 
         $definitions = $this->bodyBlockPolicy()->defaultDefinitions();
-
-        $root = dirname(__DIR__, 3);
-        foreach (ExtensionRegistry::enabledDirectories($root, true) as $extensionName) {
-            $manifest = ExtensionRegistry::readManifest($root, $extensionName);
-            if (
-                !is_array($manifest)
-                || !in_array((string) ($manifest['type'] ?? ''), ['content', 'plugin', 'module'], true)
-            ) {
+        foreach ($this->extensionEditorCatalogService()->publicBodyBlockDefinitions() as $type => $definition) {
+            if (isset($definitions[$type])) {
                 continue;
             }
 
-            $fields = ExtensionRegistry::fields(
-                $root,
-                (string) $extensionName,
-                [
-                    'extension' => (string) $extensionName,
-                ]
-            );
-            if ($fields === null) {
-                continue;
-            }
-
-            $definitions = $this->bodyBlockPolicy()->normalizeExtensionDefinitions(
-                (string) $extensionName,
-                $fields,
-                $definitions
-            );
+            $definitions[$type] = $definition;
         }
 
         $this->pageBodyBlockTypeDefinitionsCache = $definitions;
@@ -1846,6 +1657,15 @@ final class PublicController
         return $this->bodyBlockPolicy;
     }
 
+    private function pageBodyBlockCodec(): PageBodyBlockCodec
+    {
+        if (!$this->pageBodyBlockCodec instanceof PageBodyBlockCodec) {
+            $this->pageBodyBlockCodec = new PageBodyBlockCodec($this->input, $this->bodyBlockPolicy());
+        }
+
+        return $this->pageBodyBlockCodec;
+    }
+
     private function captchaService(): CaptchaService
     {
         if (!$this->captchaService instanceof CaptchaService) {
@@ -1853,6 +1673,46 @@ final class PublicController
         }
 
         return $this->captchaService;
+    }
+
+    private function themeCatalogService(): ThemeCatalogService
+    {
+        if (!$this->themeCatalogService instanceof ThemeCatalogService) {
+            $this->themeCatalogService = new ThemeCatalogService(
+                dirname(__DIR__, 3) . '/public/theme',
+                $this->input,
+                ['raven']
+            );
+        }
+
+        return $this->themeCatalogService;
+    }
+
+    private function extensionEditorCatalogService(): ExtensionEditorCatalogService
+    {
+        if (!$this->extensionEditorCatalogService instanceof ExtensionEditorCatalogService) {
+            $this->extensionEditorCatalogService = new ExtensionEditorCatalogService(
+                dirname(__DIR__, 3),
+                $this->input,
+                $this->bodyBlockPolicy()
+            );
+        }
+
+        return $this->extensionEditorCatalogService;
+    }
+
+    private function publicMetaService(): PublicMetaService
+    {
+        if (!$this->publicMetaService instanceof PublicMetaService) {
+            $this->publicMetaService = new PublicMetaService(
+                $this->requestContextResolver(),
+                $this->siteContextBuilder(),
+                $this->themeCatalogService(),
+                $this->profileContactService()
+            );
+        }
+
+        return $this->publicMetaService;
     }
 
     /**

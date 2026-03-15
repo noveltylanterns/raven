@@ -17,21 +17,24 @@ use lbuchs\WebAuthn\WebAuthnException;
 use Raven\Core\Auth\AuthService;
 use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Config;
-use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Media\PageImageManager;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Lib\Archive\ArchivePackageService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Auth\PanelSessionGuard;
 use Raven\Lib\Config\ConfigEditorSchemaService;
 use Raven\Lib\Config\ConfigSnapshotSanitizer;
 use Raven\Lib\Config\ConfigEditorNormalizer;
 use Raven\Lib\Content\BodyBlockPolicy;
+use Raven\Lib\Content\PageBodyBlockCodec;
 use Raven\Lib\Extension\ExtensionCatalogService;
+use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\ExtensionScaffoldService;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\SessionFlash;
+use Raven\Lib\Http\UploadFileSetNormalizer;
 use Raven\Lib\Media\AvatarUploadService;
 use Raven\Lib\Media\TaxonomyImageService;
 use Raven\Lib\Pagination\Pagination;
@@ -41,6 +44,7 @@ use Raven\Lib\Routing\PanelUrl;
 use Raven\Lib\Routing\RedirectTargetValidator;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Routing\RoutingInventoryBuilder;
+use Raven\Lib\Theme\ThemeCatalogService;
 use Raven\Lib\Theme\ThemeCloneService;
 use Raven\Lib\Theme\ThemeScaffoldService;
 use Raven\Repository\CategoryRepository;
@@ -112,6 +116,11 @@ final class PanelController
     private ?RouteConfigService $routeConfigService = null;
     private ?BodyBlockPolicy $bodyBlockPolicy = null;
     private ?ExtensionCatalogService $extensionCatalogService = null;
+    private ?PageBodyBlockCodec $pageBodyBlockCodec = null;
+    private ?PanelSessionGuard $panelSessionGuard = null;
+    private ?UploadFileSetNormalizer $uploadFileSetNormalizer = null;
+    private ?ThemeCatalogService $themeCatalogService = null;
+    private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
 
     public function __construct(
         View $view,
@@ -542,61 +551,12 @@ final class PanelController
      */
     private function normalizeExtendedBlocksInput(mixed $raw): array
     {
-        if (!is_array($raw)) {
-            return [];
-        }
-
-        $blocks = [];
-        foreach ($raw as $entry) {
-            // Keep payload bounded while still allowing substantial long-form pages.
-            if (count($blocks) >= 50) {
-                break;
-            }
-
-            $type = 'tinymce';
-            $value = $entry;
-            $cssId = '';
-            $cssClass = '';
-            if (is_array($entry)) {
-                $type = $this->normalizeBodyBlockType((string) ($entry['type'] ?? 'tinymce'));
-                $value = $entry['content'] ?? '';
-                $cssId = $this->normalizeBodyBlockCssId($entry['css_id'] ?? null);
-                $cssClass = $this->normalizeBodyBlockCssClassList($entry['css_class'] ?? null);
-            }
-
-            if (!is_scalar($value) && $value !== null) {
-                continue;
-            }
-
-            $editorMode = $this->bodyBlockEditorMode($type);
-            $normalized = $this->input->html($value !== null ? (string) $value : null, 500000);
-            if ($editorMode === 'markdown_file') {
-                $normalized = trim($normalized);
-            }
-
-            if ($editorMode === 'gallery') {
-                $blocks[] = [
-                    'type' => $type,
-                    'content' => '',
-                    'css_id' => $cssId,
-                    'css_class' => $cssClass,
-                ];
-                continue;
-            }
-
-            if (trim($normalized) === '') {
-                continue;
-            }
-
-            $blocks[] = [
-                'type' => $type,
-                'content' => $normalized,
-                'css_id' => $cssId,
-                'css_class' => $cssClass,
-            ];
-        }
-
-        return $blocks;
+        return $this->pageBodyBlockCodec()->normalizeEditorSubmittedBlocks(
+            $raw,
+            fn (string $value): string => $this->normalizeBodyBlockType($value),
+            fn (string $type): string => $this->bodyBlockEditorMode($type),
+            50
+        );
     }
 
     /**
@@ -622,13 +582,10 @@ final class PanelController
      */
     private function pageBodyBlocksIncludeGallery(array $blocks): bool
     {
-        foreach ($blocks as $block) {
-            if ($this->bodyBlockEditorMode((string) ($block['type'] ?? '')) === 'gallery') {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->pageBodyBlockCodec()->hasGalleryBlock(
+            $blocks,
+            fn (string $type): string => $this->bodyBlockEditorMode($type)
+        );
     }
 
     /**
@@ -739,48 +696,11 @@ final class PanelController
      */
     private function extensionProvidedBodyBlocksForEditor(array $enabledMap): array
     {
-        $definitions = [];
-        foreach ($enabledMap as $extensionName => $enabled) {
-            if (!$enabled) {
-                continue;
-            }
-
-            $extensionPath = $this->extensionsBasePath() . '/' . $extensionName;
-            if (!is_dir($extensionPath)) {
-                continue;
-            }
-
-            $manifest = $this->readExtensionManifest($extensionPath);
-            if (
-                !($manifest['valid'] ?? false)
-                || !in_array((string) ($manifest['type'] ?? ''), ['content', 'plugin', 'module'], true)
-            ) {
-                continue;
-            }
-
-            $fields = ExtensionRegistry::fields(
-                dirname(__DIR__, 3),
-                (string) $extensionName,
-                [
-                    'extension' => (string) $extensionName,
-                ]
-            );
-            if ($fields === null) {
-                continue;
-            }
-
-            $definitions = $this->bodyBlockPolicy()->normalizeExtensionDefinitions(
-                (string) $extensionName,
-                $fields,
-                $definitions
-            );
-        }
-
-        uasort($definitions, static function (array $left, array $right): int {
-            return strcasecmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? ''));
-        });
-
-        return $definitions;
+        return $this->extensionEditorCatalogService()->panelBodyBlockDefinitions(
+            $enabledMap,
+            $this->extensionsBasePath(),
+            fn (string $extensionPath): array => $this->readExtensionManifest($extensionPath)
+        );
     }
 
     /**
@@ -5641,43 +5561,15 @@ final class PanelController
      */
     private function requirePanelLogin(): void
     {
-        if (!$this->auth->isLoggedIn()) {
-            if ($this->isGuestPanelLoginEntryRequest()) {
-                redirect($this->panelUrl('/login'));
+        $this->panelSessionGuard()->requirePanelLogin(
+            $this->auth,
+            $this->isGuestPanelLoginEntryRequest(),
+            $this->panelUrl('/login'),
+            $this->panelUrl('/login/2fa'),
+            function (): void {
+                $this->renderPublicNotFound();
             }
-
-            $this->renderPublicNotFound();
-            exit;
-        }
-
-        if (!$this->auth->canAccessPanel()) {
-            $this->auth->logout();
-            if ($this->isGuestPanelLoginEntryRequest()) {
-                redirect($this->panelUrl('/login'));
-            }
-
-            $this->renderPublicNotFound();
-            exit;
-        }
-
-        $userId = $this->auth->userId();
-        if ($userId !== null && !$this->auth->isTwoFactorVerifiedForUser($userId)) {
-            if ($this->auth->pendingTwoFactorUserId() === $userId) {
-                redirect($this->panelUrl('/login/2fa'));
-            }
-
-            $this->auth->logout();
-            if ($this->isGuestPanelLoginEntryRequest()) {
-                redirect($this->panelUrl('/login'));
-            }
-
-            $this->renderPublicNotFound();
-            exit;
-        }
-
-        // Keep a lightweight identity payload in session for shared layout chrome
-        // (for example personalized Welcome navigation headings).
-        $this->syncPanelIdentityInSession();
+        );
     }
 
     /**
@@ -5685,31 +5577,10 @@ final class PanelController
      */
     private function isGuestPanelLoginEntryRequest(): bool
     {
-        $requestUri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
-        $requestPath = (string) parse_url($requestUri, PHP_URL_PATH);
-        if ($requestPath === '') {
-            $requestPath = '/';
-        }
-
-        $normalize = static function (string $path): string {
-            $path = '/' . trim($path, '/');
-            if ($path === '/' || $path === '//') {
-                return '/';
-            }
-
-            return rtrim($path, '/');
-        };
-
-        $requestPath = $normalize($requestPath);
-        $configuredPanel = $normalize((string) $this->config->get('panel.path', 'panel'));
-
-        $allowedPaths = [
-            $configuredPanel,
-            $configuredPanel . '/login',
-            $configuredPanel . '/login/2fa',
-        ];
-
-        return in_array($requestPath, $allowedPaths, true);
+        return $this->panelSessionGuard()->isGuestLoginEntryRequest(
+            $_SERVER,
+            (string) $this->config->get('panel.path', 'panel')
+        );
     }
 
     /**
@@ -5717,38 +5588,7 @@ final class PanelController
      */
     private function syncPanelIdentityInSession(): void
     {
-        $userId = $this->auth->userId();
-        if ($userId === null) {
-            unset($_SESSION['rvn-panel-identity']);
-            unset($_SESSION['_raven_can_manage_content']);
-            unset($_SESSION['_raven_can_manage_taxonomy']);
-            unset($_SESSION['_raven_can_manage_users']);
-            unset($_SESSION['_raven_can_manage_groups']);
-            unset($_SESSION['_raven_can_manage_configuration']);
-            return;
-        }
-
-        $preferences = $this->auth->userPreferences($userId);
-        if ($preferences === null) {
-            unset($_SESSION['rvn-panel-identity']);
-            unset($_SESSION['_raven_can_manage_content']);
-            unset($_SESSION['_raven_can_manage_taxonomy']);
-            unset($_SESSION['_raven_can_manage_users']);
-            unset($_SESSION['_raven_can_manage_groups']);
-            unset($_SESSION['_raven_can_manage_configuration']);
-            return;
-        }
-
-        $_SESSION['rvn-panel-identity'] = [
-            'display_name' => trim((string) ($preferences['display_name'] ?? '')),
-            'username' => trim((string) ($preferences['username'] ?? '')),
-            'email' => trim((string) ($preferences['email'] ?? '')),
-        ];
-        $_SESSION['_raven_can_manage_content'] = $this->auth->canManageContent();
-        $_SESSION['_raven_can_manage_taxonomy'] = $this->auth->canManageTaxonomy();
-        $_SESSION['_raven_can_manage_users'] = $this->auth->canManageUsers();
-        $_SESSION['_raven_can_manage_groups'] = $this->auth->canManageGroups();
-        $_SESSION['_raven_can_manage_configuration'] = $this->auth->canManageConfiguration();
+        $this->panelSessionGuard()->syncPanelIdentityInSession($this->auth);
     }
 
     /**
@@ -5758,20 +5598,7 @@ final class PanelController
      */
     private function panelIdentityFromSession(): array
     {
-        $raw = $_SESSION['rvn-panel-identity'] ?? null;
-        if (!is_array($raw)) {
-            return [
-                'display_name' => '',
-                'username' => '',
-                'email' => '',
-            ];
-        }
-
-        return [
-            'display_name' => trim((string) ($raw['display_name'] ?? '')),
-            'username' => trim((string) ($raw['username'] ?? '')),
-            'email' => trim((string) ($raw['email'] ?? '')),
-        ];
+        return $this->panelSessionGuard()->panelIdentityFromSession($_SESSION['rvn-panel-identity'] ?? null);
     }
 
     /**
@@ -6077,83 +5904,7 @@ final class PanelController
      */
     private function normalizeUploadedFileSet(mixed $raw): array
     {
-        if (!is_array($raw) || !isset($raw['name'], $raw['type'], $raw['tmp_name'], $raw['error'], $raw['size'])) {
-            return [];
-        }
-
-        $uploads = [];
-
-        // Recursively flatten upload trees because browsers can submit nested arrays
-        // when multiple file inputs share the same `name[]` and `multiple` is enabled.
-        $this->flattenUploadedFileNodes(
-            $raw['name'],
-            $raw['type'],
-            $raw['tmp_name'],
-            $raw['error'],
-            $raw['size'],
-            $uploads
-        );
-
-        return array_values($uploads);
-    }
-
-    /**
-     * Walks nested upload arrays and extracts only real selected file entries.
-     *
-     * @param mixed $nameNode
-     * @param mixed $typeNode
-     * @param mixed $tmpNameNode
-     * @param mixed $errorNode
-     * @param mixed $sizeNode
-     * @param array<int, array<string, mixed>> $uploads
-     */
-    private function flattenUploadedFileNodes(
-        mixed $nameNode,
-        mixed $typeNode,
-        mixed $tmpNameNode,
-        mixed $errorNode,
-        mixed $sizeNode,
-        array &$uploads
-    ): void {
-        if (is_array($nameNode)) {
-            foreach ($nameNode as $index => $childNameNode) {
-                $childTypeNode = is_array($typeNode) && array_key_exists($index, $typeNode) ? $typeNode[$index] : null;
-                $childTmpNameNode = is_array($tmpNameNode) && array_key_exists($index, $tmpNameNode) ? $tmpNameNode[$index] : null;
-                $childErrorNode = is_array($errorNode) && array_key_exists($index, $errorNode) ? $errorNode[$index] : UPLOAD_ERR_NO_FILE;
-                $childSizeNode = is_array($sizeNode) && array_key_exists($index, $sizeNode) ? $sizeNode[$index] : null;
-
-                $this->flattenUploadedFileNodes(
-                    $childNameNode,
-                    $childTypeNode,
-                    $childTmpNameNode,
-                    $childErrorNode,
-                    $childSizeNode,
-                    $uploads
-                );
-            }
-
-            return;
-        }
-
-        // Missing/empty nodes are treated as "no file selected" and skipped.
-        $error = is_array($errorNode) ? UPLOAD_ERR_NO_FILE : (int) $errorNode;
-        if ($error === UPLOAD_ERR_NO_FILE) {
-            return;
-        }
-
-        $name = is_array($nameNode) ? '' : trim((string) $nameNode);
-        $tmpName = is_array($tmpNameNode) ? '' : trim((string) $tmpNameNode);
-        if ($name === '' && $tmpName === '') {
-            return;
-        }
-
-        $uploads[] = [
-            'name' => $name,
-            'type' => is_array($typeNode) ? '' : (string) $typeNode,
-            'tmp_name' => $tmpName,
-            'error' => $error,
-            'size' => is_array($sizeNode) ? 0 : (int) $sizeNode,
-        ];
+        return $this->uploadFileSetNormalizer()->normalize($raw);
     }
     /**
      * Returns enabled extension shortcodes insertable from the page editor.
@@ -6166,24 +5917,7 @@ final class PanelController
      */
     private function pageEditorInsertableShortcodes(): array
     {
-        $enabledMap = $this->loadExtensionStateMap();
-        $items = $this->extensionProvidedShortcodesForEditor($enabledMap);
-
-        usort($items, static function (array $left, array $right): int {
-            return strcasecmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? ''));
-        });
-
-        $deduped = [];
-        foreach ($items as $item) {
-            $key = strtolower(trim((string) ($item['shortcode'] ?? '')));
-            if ($key === '' || isset($deduped[$key])) {
-                continue;
-            }
-
-            $deduped[$key] = $item;
-        }
-
-        return array_values($deduped);
+        return $this->extensionProvidedShortcodesForEditor($this->loadExtensionStateMap());
     }
 
     /**
@@ -6201,53 +5935,12 @@ final class PanelController
      */
     private function extensionProvidedShortcodesForEditor(array $enabledMap): array
     {
-        $items = [];
-        foreach ($enabledMap as $extensionName => $enabled) {
-            if (!$enabled) {
-                continue;
-            }
-
-            $extensionPath = $this->extensionsBasePath() . '/' . $extensionName;
-            $manifest = $this->readExtensionManifest($extensionPath);
-            $type = strtolower(trim((string) ($manifest['type'] ?? 'plugin')));
-            $isSystemType = $type === 'system' || !empty($manifest['system_extension']);
-            if (
-                !($manifest['valid'] ?? false)
-                || $isSystemType
-                || !in_array($type, ['helper', 'plugin', 'module'], true)
-            ) {
-                continue;
-            }
-
-            $shortcodes = ExtensionRegistry::shortcodes(
-                dirname(__DIR__, 3),
-                (string) $extensionName,
-                [
-                    'extension' => (string) $extensionName,
-                    'forms' => function (string $tableName): array {
-                        return $this->taxonomy->listEnabledExtensionForms($tableName);
-                    },
-                ]
-            );
-            if ($shortcodes === null) {
-                continue;
-            }
-
-            foreach ($shortcodes as $entry) {
-                $label = $this->input->text((string) ($entry['label'] ?? ''), 180);
-                $shortcode = trim((string) ($entry['shortcode'] ?? ''));
-                if ($label === '' || $shortcode === '') {
-                    continue;
-                }
-                $items[] = [
-                    'extension' => (string) $extensionName,
-                    'label' => $label,
-                    'shortcode' => $shortcode,
-                ];
-            }
-        }
-
-        return $items;
+        return $this->extensionEditorCatalogService()->panelInsertableShortcodes(
+            $enabledMap,
+            $this->extensionsBasePath(),
+            fn (string $extensionPath): array => $this->readExtensionManifest($extensionPath),
+            fn (string $tableName): array => $this->taxonomy->listEnabledExtensionForms($tableName)
+        );
     }
 
     /**
@@ -7394,25 +7087,7 @@ final class PanelController
      */
     private function listPublicThemesForPanel(): array
     {
-        $themesRoot = $this->publicThemesRoot();
-        $manifests = PublicThemeRegistry::manifests($themesRoot);
-        $rows = [];
-
-        foreach ($manifests as $slug => $manifest) {
-            $chain = PublicThemeRegistry::inheritanceChain($themesRoot, (string) $slug);
-            $rows[] = [
-                'slug' => (string) $slug,
-                'name' => (string) ($manifest['name'] ?? $slug),
-                'is_stock' => $this->isStockPublicThemeSlug((string) $slug),
-                'is_child_theme' => (bool) ($manifest['is_child_theme'] ?? false),
-                'parent_theme' => (string) ($manifest['parent_theme'] ?? ''),
-                'has_css' => is_file($themesRoot . '/' . $slug . '/css/style.css'),
-                'has_wrapper' => is_file($themesRoot . '/' . $slug . '/vis/wrapper.php'),
-                'inheritance_chain' => implode(' -> ', $chain),
-            ];
-        }
-
-        return $rows;
+        return $this->themeCatalogService()->listForPanel();
     }
 
     /**
@@ -7420,7 +7095,7 @@ final class PanelController
      */
     private function isSafePublicThemeSlug(string $slug): bool
     {
-        return preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $slug) === 1;
+        return $this->themeCatalogService()->isSafeSlug($slug);
     }
 
     /**
@@ -7428,15 +7103,7 @@ final class PanelController
      */
     private function themeSlugFromArchiveFilename(string $archiveName): ?string
     {
-        $base = strtolower($this->input->text((string) pathinfo($archiveName, PATHINFO_FILENAME), 80));
-        $base = preg_replace('/[^a-z0-9_-]+/', '-', $base) ?? '';
-        $base = trim($base, '-_');
-
-        if ($base === '' || !$this->isSafePublicThemeSlug($base)) {
-            return null;
-        }
-
-        return $base;
+        return $this->themeCatalogService()->slugFromArchiveFilename($archiveName);
     }
 
     /**
@@ -7444,37 +7111,7 @@ final class PanelController
      */
     private function nextAvailablePublicThemeSlug(string $baseSlug): ?string
     {
-        $normalizedBase = strtolower(trim($baseSlug));
-        if (!$this->isSafePublicThemeSlug($normalizedBase)) {
-            return null;
-        }
-
-        $themesRoot = $this->publicThemesRoot();
-        $candidate = $normalizedBase;
-        if (!file_exists($themesRoot . '/' . $candidate)) {
-            return $candidate;
-        }
-
-        for ($attempt = 1; $attempt <= 250; $attempt++) {
-            $suffix = $attempt === 1 ? '-copy' : '-copy-' . $attempt;
-            $maxBaseLength = max(1, 64 - strlen($suffix));
-            $trimmedBase = substr($normalizedBase, 0, $maxBaseLength);
-            $trimmedBase = rtrim($trimmedBase, '-_');
-            if ($trimmedBase === '') {
-                $trimmedBase = 'theme';
-            }
-
-            $candidate = $trimmedBase . $suffix;
-            if (!$this->isSafePublicThemeSlug($candidate)) {
-                continue;
-            }
-
-            if (!file_exists($themesRoot . '/' . $candidate)) {
-                return $candidate;
-            }
-        }
-
-        return null;
+        return $this->themeCatalogService()->nextAvailableSlug($baseSlug);
     }
 
     /**
@@ -7522,7 +7159,7 @@ final class PanelController
      */
     private function stockPublicThemeSlugs(): array
     {
-        return ['raven'];
+        return $this->themeCatalogService()->stockSlugs();
     }
 
     /**
@@ -7530,8 +7167,7 @@ final class PanelController
      */
     private function isStockPublicThemeSlug(string $slug): bool
     {
-        $normalized = strtolower(trim($slug));
-        return in_array($normalized, $this->stockPublicThemeSlugs(), true);
+        return $this->themeCatalogService()->isStockSlug($slug);
     }
 
     /**
@@ -7660,13 +7296,7 @@ final class PanelController
      */
     private function publicThemeOptions(): array
     {
-        $options = PublicThemeRegistry::options($this->publicThemesRoot());
-        if ($options === []) {
-            // Keep configuration editor usable even when no manifests are present yet.
-            return ['raven' => 'Raven Basic'];
-        }
-
-        return $options;
+        return $this->themeCatalogService()->options();
     }
 
     /**
@@ -7674,7 +7304,7 @@ final class PanelController
      */
     private function publicThemesRoot(): string
     {
-        return dirname(__DIR__, 3) . '/public/theme';
+        return $this->themeCatalogService()->root();
     }
 
     /**
@@ -7682,19 +7312,7 @@ final class PanelController
      */
     private function activePublicThemeSlug(): string
     {
-        $configured = strtolower($this->input->text((string) $this->config->get('site.default_theme', 'raven'), 80));
-        $options = $this->publicThemeOptions();
-
-        if (isset($options[$configured])) {
-            return $configured;
-        }
-
-        if (isset($options['raven'])) {
-            return 'raven';
-        }
-
-        $slugs = array_keys($options);
-        return (string) ($slugs[0] ?? 'raven');
+        return $this->themeCatalogService()->activeSlugFromConfig($this->config);
     }
 
     /**
@@ -7704,12 +7322,7 @@ final class PanelController
      */
     private function activePublicThemeInheritanceChain(string $themeSlug): array
     {
-        $chain = PublicThemeRegistry::inheritanceChain($this->publicThemesRoot(), $themeSlug);
-        if ($chain === []) {
-            return [$themeSlug];
-        }
-
-        return $chain;
+        return $this->themeCatalogService()->inheritanceChain($themeSlug);
     }
 
     /**
@@ -7717,14 +7330,7 @@ final class PanelController
      */
     private function activePublicThemeCssSlug(string $themeSlug): string
     {
-        foreach ($this->activePublicThemeInheritanceChain($themeSlug) as $candidateThemeSlug) {
-            $cssPath = $this->publicThemesRoot() . '/' . $candidateThemeSlug . '/css/style.css';
-            if (is_file($cssPath)) {
-                return $candidateThemeSlug;
-            }
-        }
-
-        return $themeSlug;
+        return $this->themeCatalogService()->cssSlug($themeSlug);
     }
 
     private function archivePackages(): ArchivePackageService
@@ -7808,6 +7414,33 @@ final class PanelController
         return $this->bodyBlockPolicy;
     }
 
+    private function pageBodyBlockCodec(): PageBodyBlockCodec
+    {
+        if (!$this->pageBodyBlockCodec instanceof PageBodyBlockCodec) {
+            $this->pageBodyBlockCodec = new PageBodyBlockCodec($this->input, $this->bodyBlockPolicy());
+        }
+
+        return $this->pageBodyBlockCodec;
+    }
+
+    private function panelSessionGuard(): PanelSessionGuard
+    {
+        if (!$this->panelSessionGuard instanceof PanelSessionGuard) {
+            $this->panelSessionGuard = new PanelSessionGuard();
+        }
+
+        return $this->panelSessionGuard;
+    }
+
+    private function uploadFileSetNormalizer(): UploadFileSetNormalizer
+    {
+        if (!$this->uploadFileSetNormalizer instanceof UploadFileSetNormalizer) {
+            $this->uploadFileSetNormalizer = new UploadFileSetNormalizer();
+        }
+
+        return $this->uploadFileSetNormalizer;
+    }
+
     private function configEditorSchemaService(): ConfigEditorSchemaService
     {
         if (!$this->configEditorSchemaService instanceof ConfigEditorSchemaService) {
@@ -7862,6 +7495,32 @@ final class PanelController
         }
 
         return $this->extensionCatalogService;
+    }
+
+    private function extensionEditorCatalogService(): ExtensionEditorCatalogService
+    {
+        if (!$this->extensionEditorCatalogService instanceof ExtensionEditorCatalogService) {
+            $this->extensionEditorCatalogService = new ExtensionEditorCatalogService(
+                dirname(__DIR__, 3),
+                $this->input,
+                $this->bodyBlockPolicy()
+            );
+        }
+
+        return $this->extensionEditorCatalogService;
+    }
+
+    private function themeCatalogService(): ThemeCatalogService
+    {
+        if (!$this->themeCatalogService instanceof ThemeCatalogService) {
+            $this->themeCatalogService = new ThemeCatalogService(
+                dirname(__DIR__, 3) . '/public/theme',
+                $this->input,
+                ['raven']
+            );
+        }
+
+        return $this->themeCatalogService;
     }
 
     private function avatarUploadService(): AvatarUploadService
