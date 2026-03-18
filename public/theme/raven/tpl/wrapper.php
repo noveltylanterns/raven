@@ -66,16 +66,15 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 {/if}
 </head>
 <body>
-<div class="site-shell">
-    <header class="site-header">
-        <h1 class="h3 mb-1">{site:name}</h1>
-        <p class="site-subtitle">Domain: {site:domain}</p>
-    </header>
 
-    <main>
-        {raw:content}
-    </main>
-</div>
+<header>
+    <h1><a href="{site:domain}" title="{site:name}">{site:name}</a></h1>
+</header>
+
+<main class="container">
+{raw:content}
+</main>
+
 <script src="/bootstrap.bundle.min.js"></script>
 </body>
 </html>

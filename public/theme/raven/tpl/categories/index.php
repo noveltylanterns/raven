@@ -13,7 +13,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 }
 ?>
 <section>
-    <h2 class="h4">Category: {category:name}</h2>
+    <h2>Category: {category:name}</h2>
 
     {if pages}
     <ul class="list-group mb-3">

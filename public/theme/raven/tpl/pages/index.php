@@ -13,14 +13,9 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 }
 ?>
 <article>
-    <header class="mb-3">
-        {if page:display_title_resolved}
-        <h2 class="h4 mb-1">{page:title}</h2>
-        {/if}
-        {if page:channel_slug}
-        <p class="text-muted small mb-0">Channel: {page:channel_slug}</p>
-        {/if}
-    </header>
+    {if page:display_title_resolved}
+    <h2>{page:title}</h2>
+    {/if}
 
     <div>{raw:page:content}</div>
 
@@ -32,7 +27,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 
     {if galleryImages}
     <section class="mt-4">
-        <h3 class="h5 mb-3">Gallery</h3>
+        <h3>Gallery</h3>
         <div class="row g-3">
             {each galleryImages}
             <div class="col-12 col-md-6 col-lg-4">

@@ -14,10 +14,10 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 ?>
 <section>
     {if group:name}
-    <h2 class="h4 mb-2">Group: {group:name}</h2>
+    <h2>Group: {group:name}</h2>
     {/if}
     {if not group:name}
-    <h2 class="h4 mb-2">Group</h2>
+    <h2>Group</h2>
     {/if}
 
     {if group:slug}

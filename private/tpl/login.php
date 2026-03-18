@@ -23,7 +23,7 @@ $flashError = is_string($flashError ?? null) ? $flashError : null;
 ?>
 <section class="card">
     <div class="card-body">
-        <h2 class="h4 mb-3">Login</h2>
+        <h2>Login</h2>
         <p class="text-muted">Use this form to access dashboard-enabled accounts.</p>
 
         <?php if ($flashSuccess !== null && trim($flashSuccess) !== ''): ?>
