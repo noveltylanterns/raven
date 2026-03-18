@@ -44,14 +44,15 @@ Important delete note:
 What you can do:
 
 - create one token as `Single-use` or `Reusable`
+- optionally set a custom `Token Slug` when creating a single-use token (blank = random token)
 - set optional expiration datetime
 - generate a batch of randomized single-use tokens
 - delete existing tokens
 
 Important behavior:
 
-- generated token values are shown once immediately after creation/generation
-- stored rows keep only a token hint/hash, usage counters, and expiry metadata
+- generated token values are shown immediately after creation/generation
+- stored rows now include full token values (plus hash metadata for validation)
 - `Reusable` tokens can be used multiple times until expiry; `Single-use` tokens expire after first successful use
 
 ### User Editor (`/users/edit` and `/users/edit/{id}`)
@@ -206,7 +207,7 @@ When user behavior changes, update this document in the same task. That includes
 - `Add More Contact Information`
 - `Two-Factor Methods`
 - `Details`
-- `Recovery Code`
+- `Recovery Phrase`
 - `Reusable`
 - `Value`
 - `Next`

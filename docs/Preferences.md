@@ -50,7 +50,7 @@ Behavior notes:
 - Password changes require minimum 8 characters.
 - `<Default>` theme follows system configured panel default theme.
 - Avatar upload shows current avatar preview when present.
-- Recovery phrases are generated as 12 random words.
+- Recovery phrases are generated as 12 words from the BIP39 English wordlist.
 - Non-reusable recovery phrases are one-time login methods and are removed after successful use.
 
 ## 2) Developer And Agent Internals

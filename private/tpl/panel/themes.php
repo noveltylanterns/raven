@@ -201,9 +201,9 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                             class="form-control"
                             maxlength="80"
                             pattern="[a-z0-9][a-z0-9_-]*"
-                            placeholder="leave blank to derive from filename"
+                            placeholder="leave blank to use theme.json slug"
                         >
-                        <div class="form-text">If left blank and the derived slug already exists, Raven appends <code>-copy</code> automatically.</div>
+                        <div class="form-text">If left blank, Raven uses <code>theme.json</code> <code>slug</code> (fallback: archive filename). If that slug already exists, Raven appends <code>-copy</code> automatically.</div>
                     </div>
                 </div>
                 <div class="modal-footer">

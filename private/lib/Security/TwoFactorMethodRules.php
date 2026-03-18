@@ -29,7 +29,7 @@ final class TwoFactorMethodRules
     {
         return match (self::normalizeType($type)) {
             'totp' => 'Authenticator App',
-            'recovery' => 'Recovery Code',
+            'recovery' => 'Recovery Phrase',
             'webauthn' => 'Security Key',
             default => 'Email Code',
         };

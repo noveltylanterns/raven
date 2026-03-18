@@ -8,7 +8,7 @@
  */
 
 /** @var array<string, string> $site */
-/** @var array<int, array{id: int, token_hint: string, is_reusable: int, use_count: int, expires_at: int|null, last_used_at: int|null, created_at: string, created_by_user_id: int|null}> $inviteRows */
+/** @var array<int, array{id: int, token: string, token_hint: string, is_reusable: int, use_count: int, expires_at: int|null, last_used_at: int|null, created_at: string, created_by_user_id: int|null}> $inviteRows */
 /** @var array<int, string>|null $inviteGeneratedTokens */
 /** @var string $inviteRegistrationMode */
 /** @var int $inviteNowTs */
@@ -54,8 +54,22 @@ $formatTimestamp = static function (?int $value): string {
 <section class="card">
     <div class="card-body">
         <h2 class="h5 mb-3">Generated Tokens</h2>
-        <p class="text-muted mb-2">Copy these now. Full token values are shown once.</p>
-        <pre class="mb-0 p-3 border rounded bg-light-subtle"><?= e(implode("\n", $inviteGeneratedTokens)) ?></pre>
+        <p class="text-muted mb-2">Click a token to copy.</p>
+        <div class="d-flex flex-column gap-2">
+            <?php foreach ($inviteGeneratedTokens as $generatedToken): ?>
+                <?php $generatedToken = trim((string) $generatedToken); ?>
+                <?php if ($generatedToken === ''): ?>
+                    <?php continue; ?>
+                <?php endif; ?>
+                <button
+                    type="button"
+                    class="btn btn-outline-secondary btn-sm text-start font-monospace"
+                    data-invite-copy="1"
+                    data-invite-copy-value="<?= e($generatedToken) ?>"
+                    title="Click to copy"
+                ><?= e($generatedToken) ?></button>
+            <?php endforeach; ?>
+        </div>
     </div>
 </section>
 <?php endif; ?>
@@ -77,6 +91,11 @@ $formatTimestamp = static function (?int $value): string {
                             <option value="single">Single-use</option>
                             <option value="reusable">Reusable</option>
                         </select>
+                    </div>
+                    <div class="form-group" id="invite_token_slug_wrap">
+                        <label class="form-label" for="invite_token_slug">Token Slug (Optional For Single-use)</label>
+                        <input class="form-control" id="invite_token_slug" name="token_slug" type="text" maxlength="64" placeholder="Leave blank for random token">
+                        <div class="form-text">If left blank, a random token is generated.</div>
                     </div>
                     <div class="form-group mb-0">
                         <label class="form-label" for="invite_expires_at">Expires At (Optional)</label>
@@ -119,8 +138,7 @@ $formatTimestamp = static function (?int $value): string {
                 <table class="table table-sm align-middle">
                     <thead>
                         <tr>
-                            <th>ID</th>
-                            <th>Token Hint</th>
+                            <th>Token</th>
                             <th>Type</th>
                             <th>Uses</th>
                             <th>Expires</th>
@@ -134,7 +152,13 @@ $formatTimestamp = static function (?int $value): string {
                         <?php foreach ($inviteRows as $inviteRow): ?>
                             <?php
                             $inviteId = (int) ($inviteRow['id'] ?? 0);
+                            $tokenValue = trim((string) ($inviteRow['token'] ?? ''));
                             $tokenHint = trim((string) ($inviteRow['token_hint'] ?? ''));
+                            $legacyTokenOnly = false;
+                            if ($tokenValue === '' && $tokenHint !== '') {
+                                $tokenValue = $tokenHint . '...';
+                                $legacyTokenOnly = true;
+                            }
                             $isReusable = (int) ($inviteRow['is_reusable'] ?? 0) === 1;
                             $useCount = max(0, (int) ($inviteRow['use_count'] ?? 0));
                             $expiresAt = isset($inviteRow['expires_at']) ? (int) $inviteRow['expires_at'] : null;
@@ -148,8 +172,22 @@ $formatTimestamp = static function (?int $value): string {
                                 : ($isUsedSingle ? 'text-bg-warning' : 'text-bg-success');
                             ?>
                             <tr>
-                                <td><?= $inviteId ?></td>
-                                <td><code><?= e($tokenHint !== '' ? ($tokenHint . '…') : '(hidden)') ?></code></td>
+                                <td>
+                                    <?php if ($tokenValue !== '' && !$legacyTokenOnly): ?>
+                                        <button
+                                            type="button"
+                                            class="btn btn-outline-secondary btn-sm font-monospace"
+                                            data-invite-copy="1"
+                                            data-invite-copy-value="<?= e($tokenValue) ?>"
+                                            title="Click to copy"
+                                        ><?= e($tokenValue) ?></button>
+                                    <?php else: ?>
+                                        <code><?= e($tokenValue !== '' ? $tokenValue : '(unavailable)') ?></code>
+                                    <?php endif; ?>
+                                    <?php if ($legacyTokenOnly): ?>
+                                        <div class="small text-muted">Legacy row (full token not stored previously).</div>
+                                    <?php endif; ?>
+                                </td>
                                 <td><?= $isReusable ? 'Reusable' : 'Single-use' ?></td>
                                 <td><?= $useCount ?></td>
                                 <td><?= e($formatTimestamp(is_int($expiresAt) && $expiresAt > 0 ? $expiresAt : null)) ?></td>
@@ -173,3 +211,115 @@ $formatTimestamp = static function (?int $value): string {
         <?php endif; ?>
     </div>
 </section>
+
+<script>
+(function () {
+    var typeField = document.getElementById('invite_type');
+    var tokenWrap = document.getElementById('invite_token_slug_wrap');
+    var tokenField = document.getElementById('invite_token_slug');
+    if (typeField instanceof HTMLSelectElement && tokenWrap instanceof HTMLElement && tokenField instanceof HTMLInputElement) {
+        function syncManualField() {
+            var isSingle = typeField.value === 'single';
+            tokenWrap.style.display = isSingle ? '' : 'none';
+            tokenField.disabled = !isSingle;
+            if (!isSingle) {
+                tokenField.value = '';
+            }
+        }
+
+        typeField.addEventListener('change', syncManualField);
+        syncManualField();
+    }
+
+    function showCopyTooltip(element, copied) {
+        if (!(element instanceof HTMLElement)) {
+            return;
+        }
+
+        var originalTitle = String(element.getAttribute('data-copy-title') || element.getAttribute('title') || 'Click to copy');
+        element.setAttribute('data-copy-title', originalTitle);
+        var message = copied ? 'Copied!' : 'Copy failed';
+
+        if (!window.bootstrap || typeof window.bootstrap.Tooltip !== 'function') {
+            element.setAttribute('title', message);
+            window.setTimeout(function () {
+                element.setAttribute('title', originalTitle);
+            }, 900);
+            return;
+        }
+
+        var tooltip = window.bootstrap.Tooltip.getOrCreateInstance(element, {
+            trigger: 'manual',
+            placement: 'top',
+            title: originalTitle
+        });
+        if (typeof tooltip.setContent === 'function') {
+            tooltip.setContent({ '.tooltip-inner': message });
+        } else {
+            element.setAttribute('data-bs-original-title', message);
+        }
+        tooltip.show();
+
+        window.setTimeout(function () {
+            if (typeof tooltip.setContent === 'function') {
+                tooltip.setContent({ '.tooltip-inner': originalTitle });
+            } else {
+                element.setAttribute('data-bs-original-title', originalTitle);
+            }
+            tooltip.hide();
+        }, 900);
+    }
+
+    async function copyTextValue(value) {
+        var text = String(value || '').trim();
+        if (text === '') {
+            return false;
+        }
+
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (error) {
+                // Fall back to legacy copy path.
+            }
+        }
+
+        var fallback = document.createElement('textarea');
+        fallback.value = text;
+        fallback.setAttribute('readonly', 'readonly');
+        fallback.style.position = 'absolute';
+        fallback.style.left = '-9999px';
+        document.body.appendChild(fallback);
+        fallback.select();
+        var copied = false;
+        try {
+            copied = document.execCommand('copy');
+        } finally {
+            document.body.removeChild(fallback);
+        }
+        return copied;
+    }
+
+    document.addEventListener('click', function (event) {
+        var target = event.target;
+        if (!(target instanceof Element)) {
+            return;
+        }
+
+        var copyButton = target.closest('[data-invite-copy="1"]');
+        if (!(copyButton instanceof HTMLButtonElement)) {
+            return;
+        }
+
+        var value = String(copyButton.getAttribute('data-invite-copy-value') || '').trim();
+        if (value === '') {
+            return;
+        }
+
+        void copyTextValue(value).then(function (copied) {
+            showCopyTooltip(copyButton, copied);
+        });
+    });
+})();
+</script>

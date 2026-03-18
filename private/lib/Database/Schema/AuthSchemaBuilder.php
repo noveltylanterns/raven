@@ -49,6 +49,7 @@ final class AuthSchemaBuilder
             $authDb->exec('CREATE TABLE IF NOT EXISTS invite_tokens (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 token_hash TEXT NOT NULL UNIQUE,
+                token_value TEXT NULL,
                 token_hint TEXT NOT NULL,
                 is_reusable INTEGER NOT NULL DEFAULT 0,
                 use_count INTEGER NOT NULL DEFAULT 0,
@@ -57,6 +58,9 @@ final class AuthSchemaBuilder
                 created_at TEXT NOT NULL,
                 created_by_user_id INTEGER NULL
             )');
+            if (!$this->introspector->authColumnExistsSqlite($authDb, 'invite_tokens', 'token_value')) {
+                $authDb->exec('ALTER TABLE invite_tokens ADD COLUMN token_value TEXT NULL');
+            }
             $authDb->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_invite_tokens_token_hash ON invite_tokens (token_hash)');
             $authDb->exec('CREATE INDEX IF NOT EXISTS idx_invite_tokens_expires_at ON invite_tokens (expires_at)');
             return;
@@ -66,6 +70,7 @@ final class AuthSchemaBuilder
             $authDb->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 token_hash CHAR(64) NOT NULL,
+                token_value VARCHAR(191) NULL,
                 token_hint VARCHAR(16) NOT NULL,
                 is_reusable TINYINT(1) NOT NULL DEFAULT 0,
                 use_count INT UNSIGNED NOT NULL DEFAULT 0,
@@ -76,12 +81,16 @@ final class AuthSchemaBuilder
                 UNIQUE KEY (token_hash),
                 INDEX (expires_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+            if (!$this->introspector->authColumnExistsMySql($authDb, $table, 'token_value')) {
+                $authDb->exec('ALTER TABLE ' . $table . ' ADD COLUMN token_value VARCHAR(191) NULL AFTER token_hash');
+            }
             return;
         }
 
         $authDb->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
             id BIGSERIAL PRIMARY KEY,
             token_hash CHAR(64) NOT NULL UNIQUE,
+            token_value VARCHAR(191) NULL,
             token_hint VARCHAR(16) NOT NULL,
             is_reusable SMALLINT NOT NULL DEFAULT 0,
             use_count INTEGER NOT NULL DEFAULT 0,
@@ -90,6 +99,9 @@ final class AuthSchemaBuilder
             created_at TIMESTAMP NOT NULL,
             created_by_user_id BIGINT NULL
         )');
+        if (!$this->introspector->authColumnExistsPgSql($authDb, $table, 'token_value')) {
+            $authDb->exec('ALTER TABLE ' . $table . ' ADD COLUMN token_value VARCHAR(191) NULL');
+        }
         $authDb->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_expires_at ON ' . $table . ' (expires_at)');
     }
 

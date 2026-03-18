@@ -81,6 +81,11 @@ final class ManifestContractValidator
             return null;
         }
 
+        $slug = strtolower(trim((string) ($decoded['slug'] ?? '')));
+        if ($slug === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
+            return null;
+        }
+
         $type = $this->normalizeType((string) ($decoded['type'] ?? 'plugin'));
         $extensionRoot = rtrim($root, '/') . '/private/ext/' . $directoryName;
         if ($this->typeContractError($extensionRoot, $type) !== null) {
@@ -97,4 +102,3 @@ final class ManifestContractValidator
         ];
     }
 }
-

@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Repository;
 
 use PDO;
+use PDOException;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 use Raven\Lib\Security\InviteTokenPolicy;
 
@@ -38,6 +39,7 @@ final class InviteTokenRepository
      *
      * @return array<int, array{
      *   id: int,
+     *   token: string,
      *   token_hint: string,
      *   is_reusable: int,
      *   use_count: int,
@@ -50,7 +52,7 @@ final class InviteTokenRepository
     public function listForPanel(): array
     {
         $stmt = $this->authDb->prepare(
-            'SELECT id, token_hint, is_reusable, use_count, expires_at, last_used_at, created_at, created_by_user_id
+            'SELECT id, token_value, token_hint, is_reusable, use_count, expires_at, last_used_at, created_at, created_by_user_id
              FROM ' . $this->authTable('invite_tokens') . '
              ORDER BY id DESC'
         );
@@ -89,6 +91,7 @@ final class InviteTokenRepository
 
             $result[] = [
                 'id' => (int) ($row['id'] ?? 0),
+                'token' => trim((string) ($row['token_value'] ?? '')),
                 'token_hint' => trim((string) ($row['token_hint'] ?? '')),
                 'is_reusable' => (int) ($row['is_reusable'] ?? 0) === 1 ? 1 : 0,
                 'use_count' => max(0, (int) ($row['use_count'] ?? 0)),
@@ -105,42 +108,33 @@ final class InviteTokenRepository
     /**
      * Creates one invite token and returns its display value.
      */
-    public function createToken(bool $reusable, ?int $expiresAt = null, ?int $createdByUserId = null): string
+    public function createToken(bool $reusable, ?int $expiresAt = null, ?int $createdByUserId = null, ?string $manualToken = null): string
     {
         $expiresAt = $this->tokenPolicy->normalizeExpiresAt($expiresAt);
         $createdByUserId = $this->tokenPolicy->normalizeCreatedByUserId($createdByUserId);
         $createdAt = gmdate('Y-m-d H:i:s');
+        $manualRaw = is_string($manualToken) ? trim($manualToken) : '';
+
+        if ($manualRaw !== '') {
+            $normalizedToken = $this->tokenPolicy->normalizeSubmittedToken($manualRaw);
+            if ($normalizedToken === null) {
+                throw new \RuntimeException('Manual token must be 8-64 letters/numbers (separators allowed).');
+            }
+
+            $displayToken = $normalizedToken;
+            if (!$this->insertTokenRecord($normalizedToken, $displayToken, $reusable, $expiresAt, $createdByUserId, $createdAt)) {
+                throw new \RuntimeException('Invite token already exists. Choose a different token value.');
+            }
+
+            return $displayToken;
+        }
 
         // Retry token generation on rare hash collisions.
         for ($attempt = 0; $attempt < 8; $attempt++) {
             $normalizedToken = $this->tokenPolicy->generateNormalizedToken();
             $displayToken = $this->tokenPolicy->formatDisplayToken($normalizedToken);
-            $tokenHash = $this->tokenPolicy->tokenHash($normalizedToken);
-
-            $stmt = $this->authDb->prepare(
-                'INSERT INTO ' . $this->authTable('invite_tokens') . '
-                 (token_hash, token_hint, is_reusable, use_count, expires_at, last_used_at, created_at, created_by_user_id)
-                 VALUES (:token_hash, :token_hint, :is_reusable, :use_count, :expires_at, :last_used_at, :created_at, :created_by_user_id)'
-            );
-
-            try {
-                $stmt->execute([
-                    ':token_hash' => $tokenHash,
-                    ':token_hint' => substr($normalizedToken, 0, 8),
-                    ':is_reusable' => $reusable ? 1 : 0,
-                    ':use_count' => 0,
-                    ':expires_at' => $expiresAt,
-                    ':last_used_at' => null,
-                    ':created_at' => $createdAt,
-                    ':created_by_user_id' => $createdByUserId,
-                ]);
-
+            if ($this->insertTokenRecord($normalizedToken, $displayToken, $reusable, $expiresAt, $createdByUserId, $createdAt)) {
                 return $displayToken;
-            } catch (\Throwable $exception) {
-                // Unique collisions should be extremely rare; retry generation.
-                if ($attempt >= 7) {
-                    throw $exception;
-                }
             }
         }
 
@@ -282,5 +276,54 @@ final class InviteTokenRepository
     private function authTable(string $table): string
     {
         return TableNameResolver::authTable($this->driver, $this->prefix, $table);
+    }
+
+    private function insertTokenRecord(
+        string $normalizedToken,
+        string $displayToken,
+        bool $reusable,
+        ?int $expiresAt,
+        ?int $createdByUserId,
+        string $createdAt
+    ): bool {
+        $stmt = $this->authDb->prepare(
+            'INSERT INTO ' . $this->authTable('invite_tokens') . '
+             (token_hash, token_value, token_hint, is_reusable, use_count, expires_at, last_used_at, created_at, created_by_user_id)
+             VALUES (:token_hash, :token_value, :token_hint, :is_reusable, :use_count, :expires_at, :last_used_at, :created_at, :created_by_user_id)'
+        );
+
+        try {
+            $stmt->execute([
+                ':token_hash' => $this->tokenPolicy->tokenHash($normalizedToken),
+                ':token_value' => $displayToken,
+                ':token_hint' => substr($normalizedToken, 0, 8),
+                ':is_reusable' => $reusable ? 1 : 0,
+                ':use_count' => 0,
+                ':expires_at' => $expiresAt,
+                ':last_used_at' => null,
+                ':created_at' => $createdAt,
+                ':created_by_user_id' => $createdByUserId,
+            ]);
+            return true;
+        } catch (PDOException $exception) {
+            if ($this->isUniqueConstraintViolation($exception)) {
+                return false;
+            }
+
+            throw $exception;
+        }
+    }
+
+    private function isUniqueConstraintViolation(PDOException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+        if ($sqlState === '23000' || $sqlState === '23505') {
+            return true;
+        }
+
+        $message = strtolower($exception->getMessage());
+        return str_contains($message, 'unique')
+            || str_contains($message, 'duplicate')
+            || str_contains($message, 'constraint');
     }
 }

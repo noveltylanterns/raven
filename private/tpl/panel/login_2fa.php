@@ -91,7 +91,7 @@ $defaultMethodLabel = static function (string $methodType): string {
                         <form method="post" action="<?= e($panelBase) ?>/login/2fa/select" class="mb-2">
                             <?= $csrfField ?>
                             <input type="hidden" name="method_key" value="<?= e($methodKey) ?>">
-                            <button type="submit" class="btn btn-outline-primary w-100 text-start"><?= e($methodLabel) ?></button>
+                            <button type="submit" class="btn btn-primary w-100 text-start"><?= e($methodLabel) ?></button>
                         </form>
                     <?php endforeach; ?>
                 </div>
@@ -112,12 +112,19 @@ $defaultMethodLabel = static function (string $methodType): string {
                     : ($isEmail ? 'Email Code' : 'Verification Code');
                 $inputPattern = $isEmail ? '[0-9]{8}' : '[0-9]{6,8}';
                 ?>
-                <form method="post" action="<?= e($panelBase) ?>/login/2fa" novalidate>
-                    <?= $csrfField ?>
-                    <p class="text-muted mb-2">Method: <?= e($selectedLabel) ?></p>
-                    <?php if ($isEmail): ?>
-                        <div class="mb-3">
-                            <label for="verification_email" class="form-label">Email Address</label>
+                <p class="text-muted mb-2">Method: <?= e($selectedLabel) ?></p>
+                <?php if ($isEmail): ?>
+                    <form
+                        method="post"
+                        action="<?= e($panelBase) ?>/login/2fa"
+                        class="mb-3"
+                        id="rvn-login-2fa-email-send-form"
+                        novalidate
+                    >
+                        <?= $csrfField ?>
+                        <input type="hidden" name="email_action" value="send_code">
+                        <label for="verification_email" class="form-label">Email Address</label>
+                        <div class="input-group">
                             <input
                                 id="verification_email"
                                 name="verification_email"
@@ -126,45 +133,113 @@ $defaultMethodLabel = static function (string $methodType): string {
                                 autocomplete="email"
                                 value="<?= e($selectedEmailInput) ?>"
                                 placeholder="you@example.com"
+                                required
+                            >
+                            <button type="submit" class="btn btn-primary">Send Code</button>
+                        </div>
+                    </form>
+
+                    <p class="small text-muted mb-2">
+                        Enter one of your saved 2FA email addresses to request a code.
+                        <?php if ($emailCodeTargetMasked !== ''): ?>
+                            Latest dispatch target: <code><?= e($emailCodeTargetMasked) ?></code>.
+                        <?php endif; ?>
+                    </p>
+
+                    <form
+                        method="post"
+                        action="<?= e($panelBase) ?>/login/2fa"
+                        class="mb-3"
+                        id="rvn-login-2fa-email-verify-form"
+                        novalidate
+                    >
+                        <?= $csrfField ?>
+                        <input type="hidden" name="email_action" value="verify_code">
+                        <input
+                            type="hidden"
+                            name="verification_email"
+                            value="<?= e($selectedEmailInput) ?>"
+                            data-login-2fa-verify-email="1"
+                        >
+                        <label for="verification_code" class="form-label">Email Code</label>
+                        <div class="input-group">
+                            <input
+                                id="verification_code"
+                                name="verification_code"
+                                type="text"
+                                class="form-control"
+                                autocomplete="one-time-code"
+                                inputmode="numeric"
+                                pattern="[0-9]{8}"
+                                placeholder="12345678"
+                                required
+                            >
+                            <button type="submit" class="btn btn-primary">Verify</button>
+                        </div>
+                    </form>
+
+                    <script>
+                        (function () {
+                            var emailInput = document.getElementById('verification_email');
+                            var verifyEmail = document.querySelector('[data-login-2fa-verify-email="1"]');
+                            var verifyForm = document.getElementById('rvn-login-2fa-email-verify-form');
+                            if (
+                                !(emailInput instanceof HTMLInputElement)
+                                || !(verifyEmail instanceof HTMLInputElement)
+                            ) {
+                                return;
+                            }
+
+                            function syncVerifyEmail() {
+                                verifyEmail.value = String(emailInput.value || '').trim();
+                            }
+
+                            emailInput.addEventListener('input', syncVerifyEmail);
+                            emailInput.addEventListener('change', syncVerifyEmail);
+                            if (verifyForm instanceof HTMLFormElement) {
+                                verifyForm.addEventListener('submit', syncVerifyEmail);
+                            }
+                            syncVerifyEmail();
+                        })();
+                    </script>
+                <?php else: ?>
+                    <form method="post" action="<?= e($panelBase) ?>/login/2fa" novalidate>
+                        <?= $csrfField ?>
+                        <div class="mb-3">
+                            <label for="verification_code" class="form-label"><?= e($inputLabel) ?></label>
+                            <input
+                                id="verification_code"
+                                name="verification_code"
+                                type="<?= e($isRecovery ? 'password' : 'text') ?>"
+                                class="form-control"
+                                required
+                                autocomplete="<?= e($isRecovery ? 'off' : 'one-time-code') ?>"
+                                inputmode="<?= e($isRecovery ? 'text' : 'numeric') ?>"
+                                <?= $isRecovery ? '' : ('pattern="' . e($inputPattern) . '"') ?>
+                                placeholder="<?= e($isRecovery ? 'twelve-word recovery phrase' : '123456') ?>"
                             >
                         </div>
-                    <?php endif; ?>
-                    <?php if ($isEmail): ?>
-                        <p class="small text-muted mb-2">
-                            Enter one of your saved 2FA email addresses to request a code.
-                            <?php if ($emailCodeTargetMasked !== ''): ?>
-                                Latest dispatch target: <code><?= e($emailCodeTargetMasked) ?></code>.
+                        <div class="d-flex flex-wrap justify-content-center gap-2">
+                            <button type="submit" class="btn btn-primary">Verify</button>
+                            <?php if ($canSwitchMethod): ?>
+                                <button
+                                    type="submit"
+                                    class="btn btn-secondary"
+                                    formaction="<?= e($panelBase) ?>/login/2fa/select"
+                                    formmethod="post"
+                                    name="show_method_picker"
+                                    value="1"
+                                >Try Other Method</button>
                             <?php endif; ?>
-                        </p>
-                    <?php endif; ?>
-                    <div class="mb-3">
-                        <label for="verification_code" class="form-label"><?= e($inputLabel) ?></label>
-                        <input
-                            id="verification_code"
-                            name="verification_code"
-                            type="<?= e($isRecovery ? 'password' : 'text') ?>"
-                            class="form-control"
-                            required
-                            autocomplete="<?= e($isRecovery ? 'off' : 'one-time-code') ?>"
-                            inputmode="<?= e($isRecovery ? 'text' : 'numeric') ?>"
-                            <?= $isRecovery ? '' : ('pattern="' . e($inputPattern) . '"') ?>
-                            placeholder="<?= e($isRecovery ? 'twelve-word recovery phrase' : ($isEmail ? '12345678' : '123456')) ?>"
-                        >
-                    </div>
-                    <div class="d-flex flex-wrap justify-content-center gap-2">
-                        <button type="submit" class="btn btn-primary">Verify</button>
-                        <?php if ($canSwitchMethod): ?>
-                            <button
-                                type="submit"
-                                class="btn btn-outline-secondary"
-                                formaction="<?= e($panelBase) ?>/login/2fa/select"
-                                formmethod="post"
-                                name="show_method_picker"
-                                value="1"
-                            >Try Other Method</button>
-                        <?php endif; ?>
-                    </div>
-                </form>
+                        </div>
+                    </form>
+                <?php endif; ?>
+                <?php if ($isEmail && $canSwitchMethod): ?>
+                    <form method="post" action="<?= e($panelBase) ?>/login/2fa/select" class="d-flex justify-content-center">
+                        <?= $csrfField ?>
+                        <button type="submit" class="btn btn-secondary" name="show_method_picker" value="1">Try Other Method</button>
+                    </form>
+                <?php endif; ?>
             <?php endif; ?>
 
             <?php if ($showWebauthnPrompt): ?>
@@ -203,7 +278,7 @@ $defaultMethodLabel = static function (string $methodType): string {
                         <form method="post" action="<?= e($panelBase) ?>/login/2fa/select" class="mb-2">
                             <?= $csrfField ?>
                             <input type="hidden" name="method_key" value="<?= e($methodKey) ?>">
-                            <button type="submit" class="btn btn-outline-secondary w-100 text-start"><?= e($methodLabel) ?></button>
+                            <button type="submit" class="btn btn-secondary w-100 text-start"><?= e($methodLabel) ?></button>
                         </form>
                     <?php endforeach; ?>
                 </div>

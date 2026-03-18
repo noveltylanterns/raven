@@ -360,7 +360,11 @@ final class AuthController
             $emailInput = trim((string) $this->input->text($post['verification_email'] ?? null, 254));
             $_SESSION[self::SESSION_2FA_EMAIL_INPUT] = $emailInput;
             $emailCode = preg_replace('/\D+/', '', $verificationValue) ?? '';
-            if ($emailCode === '') {
+            $emailAction = strtolower(trim((string) ($post['email_action'] ?? '')));
+            $sendRequested = $emailAction === 'send_code' || ($emailAction === '' && $emailCode === '');
+            $verifyRequested = $emailAction === 'verify_code' || ($emailAction === '' && $emailCode !== '');
+
+            if ($sendRequested) {
                 $selectedEmailKey = (string) ($selectedMethod['key'] ?? '');
                 $challenge = $this->auth->issuePendingEmailCodeChallenge($selectedEmailKey, $emailInput);
                 if ((bool) ($challenge['ok'] ?? false) && (bool) ($challenge['sent'] ?? false)) {
@@ -381,6 +385,11 @@ final class AuthController
                 }
 
                 $this->flash('success', 'Check your email. If it matches what we have on file, a code has been dispatched to your inbox.');
+                redirect($this->panelUrl('/login/2fa'));
+            }
+
+            if (!$verifyRequested || $emailCode === '') {
+                $this->flash('error', 'Email code is required.');
                 redirect($this->panelUrl('/login/2fa'));
             }
 

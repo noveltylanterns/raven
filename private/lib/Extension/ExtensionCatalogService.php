@@ -230,6 +230,24 @@ final class ExtensionCatalogService
             ];
         }
 
+        $manifestSlug = strtolower(trim((string) ($decoded['slug'] ?? '')));
+        if ($manifestSlug === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $manifestSlug) !== 1) {
+            return [
+                'valid' => false,
+                'invalid_reason' => 'ext.json must include a valid "slug" value.',
+                'type' => 'plugin',
+                'panel_path' => '',
+                'name' => '',
+                'version' => '',
+                'description' => '',
+                'author' => '',
+                'author_url' => '',
+                'homepage' => '',
+                'permission_levels' => $defaultPermissionLevels,
+                'default_permission_level' => $defaultPermissionLevel,
+            ];
+        }
+
         $type = strtolower(trim((string) ($decoded['type'] ?? 'plugin')));
         if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
             $type = 'plugin';

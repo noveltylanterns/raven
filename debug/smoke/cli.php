@@ -456,7 +456,7 @@ final class CliSmokeRunner
         }
 
         $zip->addFromString('../' . $outsideMarker, 'blocked');
-        $zip->addFromString('ext.json', "{\"name\":\"Unsafe Smoke\",\"version\":\"0.1.0\",\"type\":\"plugin\"}\n");
+        $zip->addFromString('ext.json', "{\"slug\":\"unsafe-smoke\",\"name\":\"Unsafe Smoke\",\"version\":\"0.1.0\",\"type\":\"plugin\"}\n");
         $zip->close();
 
         try {

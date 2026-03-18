@@ -155,6 +155,7 @@ final class ExtensionScaffoldService
      * Returns JSON content for one generated extension manifest.
      *
      * @param array{
+     *   directory: string,
      *   name: string,
      *   version?: string,
      *   description: string,
@@ -166,7 +167,13 @@ final class ExtensionScaffoldService
      */
     private function renderExtensionManifestJson(array $meta): string
     {
+        $directorySlug = strtolower(trim((string) ($meta['directory'] ?? '')));
+        if ($directorySlug === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $directorySlug) !== 1) {
+            throw new \RuntimeException('Failed to resolve extension slug for ext.json.');
+        }
+
         $manifest = [
+            'slug' => $directorySlug,
             'name' => $meta['name'],
             'description' => $meta['description'],
             'type' => $meta['type'],

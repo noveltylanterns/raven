@@ -79,7 +79,7 @@ foreach ($twoFactorMethodsRaw as $methodRow) {
         'label' => trim((string) ($methodRow['label'] ?? '')),
         'status' => strtolower(trim((string) ($methodRow['status'] ?? ''))),
         'secret' => trim((string) ($methodRow['secret'] ?? '')),
-        'recovery_code' => trim((string) ($methodRow['recovery_code'] ?? '')),
+        'recovery_hash' => trim((string) ($methodRow['recovery_hash'] ?? '')),
         'reusable' => (bool) ($methodRow['reusable'] ?? false),
         'credential_id' => trim((string) ($methodRow['credential_id'] ?? '')),
         'credential_public_key' => trim((string) ($methodRow['credential_public_key'] ?? '')),
@@ -213,6 +213,11 @@ $themeLabels = [
                         value=""
                     >
                     <input
+                        type="hidden"
+                        data-preferences-two-factor-key="recovery_hash"
+                        value=""
+                    >
+                    <input
                         type="text"
                         class="form-control form-control-sm"
                         data-preferences-two-factor-recovery-display="1"
@@ -236,7 +241,7 @@ $themeLabels = [
                     class="small text-muted position-absolute start-0 end-0"
                     style="top:calc(100% + 0.2rem);"
                     data-preferences-two-factor-recovery-copy-hint="1"
-                >Click phrase to copy.</div>
+                >Generate a phrase and click it to copy.</div>
             </div>
             <div class="col-auto ps-md-0 d-flex align-items-end">
                 <button type="button" class="btn btn-danger btn-sm" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
@@ -519,8 +524,12 @@ $themeLabels = [
       }
 
       if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-        await navigator.clipboard.writeText(text);
-        return true;
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (error) {
+          // Fall through to legacy copy fallback when clipboard API is unavailable/blocked.
+        }
       }
 
       var fallback = document.createElement('textarea');
@@ -727,7 +736,7 @@ $themeLabels = [
       if (!(hint instanceof HTMLElement)) {
         return;
       }
-      hint.textContent = String(message || '').trim() || 'Click phrase to copy.';
+      hint.textContent = String(message || '').trim() || 'Generate a phrase and click it to copy.';
     }
 
     function recoveryMaskedValue(actualValue) {
@@ -744,6 +753,11 @@ $themeLabels = [
       return field instanceof HTMLInputElement ? field : null;
     }
 
+    function recoveryHashField(row) {
+      var field = row.querySelector('[data-preferences-two-factor-key="recovery_hash"]');
+      return field instanceof HTMLInputElement ? field : null;
+    }
+
     function recoveryDisplayField(row) {
       var field = row.querySelector('[data-preferences-two-factor-recovery-display="1"]');
       return field instanceof HTMLInputElement ? field : null;
@@ -755,10 +769,12 @@ $themeLabels = [
       }
 
       var hiddenField = recoveryHiddenField(row);
+      var hashField = recoveryHashField(row);
       var displayField = recoveryDisplayField(row);
       var button = row.querySelector('[data-preferences-two-factor-recovery-visibility="1"]');
       if (
         !(hiddenField instanceof HTMLInputElement)
+        || !(hashField instanceof HTMLInputElement)
         || !(displayField instanceof HTMLInputElement)
         || !(button instanceof HTMLButtonElement)
       ) {
@@ -767,10 +783,28 @@ $themeLabels = [
 
       var shouldShow = visible === true;
       var actualValue = String(hiddenField.value || '');
+      var storedHash = String(hashField.value || '').trim();
+      var hasStoredHash = storedHash !== '' && actualValue.trim() === '';
+      if (hasStoredHash) {
+        displayField.value = 'Stored securely on server';
+        displayField.title = 'Stored securely';
+        displayField.style.caretColor = 'auto';
+        displayField.style.cursor = 'default';
+        button.style.display = 'none';
+        setRecoveryCopyHint(row, 'Phrase is stored as a one-way hash. Generate a new phrase to replace it.');
+        row.setAttribute('data-preferences-two-factor-recovery-visible', '0');
+        return;
+      }
+
+      button.style.display = '';
+      displayField.style.caretColor = 'transparent';
+      displayField.style.cursor = 'pointer';
+      displayField.title = actualValue !== '' ? 'Click to copy' : 'Generate a recovery phrase first';
       displayField.value = shouldShow ? actualValue : recoveryMaskedValue(actualValue);
       row.setAttribute('data-preferences-two-factor-recovery-visible', shouldShow ? '1' : '0');
       button.title = shouldShow ? 'Hide recovery phrase' : 'Show recovery phrase';
       button.setAttribute('aria-label', shouldShow ? 'Hide recovery phrase' : 'Show recovery phrase');
+      setRecoveryCopyHint(row, actualValue !== '' ? 'Click phrase to copy.' : 'Generate a phrase and click it to copy.');
 
       var icon = button.querySelector('[data-preferences-two-factor-recovery-visibility-icon="1"]');
       if (icon instanceof HTMLElement) {
@@ -785,7 +819,12 @@ $themeLabels = [
       }
 
       var currentlyVisible = String(row.getAttribute('data-preferences-two-factor-recovery-visible') || '') === '1';
-      if (!(recoveryHiddenField(row) instanceof HTMLInputElement)) {
+      var hiddenField = recoveryHiddenField(row);
+      var hashField = recoveryHashField(row);
+      if (!(hiddenField instanceof HTMLInputElement) || !(hashField instanceof HTMLInputElement)) {
+        return;
+      }
+      if (String(hashField.value || '').trim() !== '' && String(hiddenField.value || '').trim() === '') {
         return;
       }
 
@@ -804,7 +843,8 @@ $themeLabels = [
       }
 
       var hiddenField = recoveryHiddenField(row);
-      if (!(hiddenField instanceof HTMLInputElement)) {
+      var hashField = recoveryHashField(row);
+      if (!(hiddenField instanceof HTMLInputElement) || !(hashField instanceof HTMLInputElement)) {
         return;
       }
 
@@ -826,6 +866,7 @@ $themeLabels = [
         }
 
         hiddenField.value = String(payload.recovery_code || '');
+        hashField.value = '';
         setRecoveryVisibility(row, false);
         setRecoveryCopyHint(row, 'Generated. Click phrase to copy.');
       } catch (error) {
@@ -1062,11 +1103,14 @@ $themeLabels = [
         var selectedType = String(target.value || '').trim().toLowerCase();
         if (selectedType === 'recovery') {
           var recoveryField = recoveryHiddenField(row);
+          var recoveryHash = recoveryHashField(row);
           var generateButton = row.querySelector('[data-preferences-two-factor-recovery-generate="1"]');
           if (
             recoveryField instanceof HTMLInputElement
+            && recoveryHash instanceof HTMLInputElement
             && generateButton instanceof HTMLButtonElement
             && String(recoveryField.value || '').trim() === ''
+            && String(recoveryHash.value || '').trim() === ''
           ) {
             void generateRecoveryForRow(row, generateButton);
           }
@@ -1111,12 +1155,23 @@ $themeLabels = [
       var recoveryCodeField = target.closest('[data-preferences-two-factor-recovery-copy="1"]');
       if (recoveryCodeField instanceof HTMLInputElement) {
         var recoveryRowForCopy = recoveryCodeField.closest('[data-preferences-two-factor-row="1"]');
+        if (!(recoveryRowForCopy instanceof HTMLElement)) {
+          return;
+        }
         var recoveryValue = '';
-        if (recoveryRowForCopy instanceof HTMLElement) {
-          var recoveryHiddenForCopy = recoveryHiddenField(recoveryRowForCopy);
-          if (recoveryHiddenForCopy instanceof HTMLInputElement) {
-            recoveryValue = String(recoveryHiddenForCopy.value || '');
-          }
+        var recoveryHash = '';
+        var recoveryHiddenForCopy = recoveryHiddenField(recoveryRowForCopy);
+        var recoveryHashForCopy = recoveryHashField(recoveryRowForCopy);
+        if (recoveryHiddenForCopy instanceof HTMLInputElement) {
+          recoveryValue = String(recoveryHiddenForCopy.value || '');
+        }
+        if (recoveryHashForCopy instanceof HTMLInputElement) {
+          recoveryHash = String(recoveryHashForCopy.value || '').trim();
+        }
+
+        if (recoveryValue.trim() === '' || recoveryHash !== '') {
+          setRecoveryCopyHint(recoveryRowForCopy, recoveryHash !== '' ? 'Stored phrase cannot be copied.' : 'Generate a phrase first.');
+          return;
         }
 
         void copyTextValue(recoveryValue).then(function (copied) {
@@ -1423,8 +1478,16 @@ $themeLabels = [
                         $methodLabel = (string) ($method['label'] ?? '');
                         $methodStatus = strtolower((string) ($method['status'] ?? ''));
                         $methodSecret = (string) ($method['secret'] ?? '');
-                        $methodRecoveryCode = (string) ($method['recovery_code'] ?? '');
-                        $methodRecoveryDisplay = preg_replace('/\S/u', '*', $methodRecoveryCode) ?? '';
+                        $methodRecoveryCode = trim((string) ($method['recovery_code'] ?? ''));
+                        $methodRecoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
+                        $methodRecoveryHasStoredHash = $methodRecoveryHash !== '' && $methodRecoveryCode === '';
+                        $methodRecoveryDisplay = $methodRecoveryHasStoredHash
+                            ? 'Stored securely on server'
+                            : (preg_replace('/\S/u', '*', $methodRecoveryCode) ?? '');
+                        $methodRecoveryHint = $methodRecoveryHasStoredHash
+                            ? 'Phrase is stored as a one-way hash. Generate a new phrase to replace it.'
+                            : 'Click phrase to copy.';
+                        $methodRecoveryCopyEnabled = !$methodRecoveryHasStoredHash && $methodRecoveryCode !== '';
                         $methodReusable = (bool) ($method['reusable'] ?? false);
                         $methodCredentialId = (string) ($method['credential_id'] ?? '');
                         $methodCredentialPublicKey = (string) ($method['credential_public_key'] ?? '');
@@ -1575,15 +1638,21 @@ $themeLabels = [
                                             value="<?= e($methodRecoveryCode) ?>"
                                         >
                                         <input
+                                            type="hidden"
+                                            data-preferences-two-factor-key="recovery_hash"
+                                            name="two_factor_methods[<?= (int) $index ?>][recovery_hash]"
+                                            value="<?= e($methodRecoveryHash) ?>"
+                                        >
+                                        <input
                                             type="text"
                                             class="form-control form-control-sm"
                                             data-preferences-two-factor-recovery-display="1"
                                             data-preferences-two-factor-recovery-copy="1"
                                             value="<?= e($methodRecoveryDisplay) ?>"
                                             placeholder="Generate 12-word recovery phrase"
-                                            title="Click to copy"
+                                            title="<?= e($methodRecoveryCopyEnabled ? 'Click to copy' : 'Stored securely') ?>"
                                             autocomplete="off"
-                                            style="caret-color: transparent; cursor: pointer;"
+                                            style="<?= e($methodRecoveryCopyEnabled ? 'caret-color: transparent; cursor: pointer;' : 'caret-color: auto; cursor: default;') ?>"
                                             readonly
                                         >
                                         <button
@@ -1592,6 +1661,7 @@ $themeLabels = [
                                             data-preferences-two-factor-recovery-visibility="1"
                                             title="Show recovery phrase"
                                             aria-label="Show recovery phrase"
+                                            <?= $methodRecoveryHasStoredHash ? 'style="display:none;"' : '' ?>
                                         ><i class="bi bi-eye" aria-hidden="true" data-preferences-two-factor-recovery-visibility-icon="1"></i></button>
                                         <button type="button" class="btn btn-primary btn-sm" data-preferences-two-factor-recovery-generate="1">Generate</button>
                                     </div>
@@ -1599,7 +1669,7 @@ $themeLabels = [
                                         class="small text-muted position-absolute start-0 end-0"
                                         style="top:calc(100% + 0.2rem);"
                                         data-preferences-two-factor-recovery-copy-hint="1"
-                                    >Click phrase to copy.</div>
+                                    ><?= e($methodRecoveryHint) ?></div>
                                 </div>
                                 <div class="col-auto ps-md-0 d-flex align-items-end">
                                     <button type="button" class="btn btn-danger btn-sm" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>

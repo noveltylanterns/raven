@@ -61,18 +61,19 @@ final class TwoFactorMethodNormalizer
                 }
             } elseif ($type === 'recovery') {
                 $recoveryCode = RecoveryPhrase::normalize((string) ($method['recovery_code'] ?? ''));
-                if (!RecoveryPhrase::isValid($recoveryCode, 12)) {
-                    $generatedRecoveryCode = RecoveryPhrase::generate(12);
-                    $recoveryCode = is_string($generatedRecoveryCode) ? $generatedRecoveryCode : '';
+                $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
+                if (RecoveryPhrase::isValid($recoveryCode, 12)) {
+                    $generatedHash = RecoveryPhrase::hash($recoveryCode, 12);
+                    $recoveryHash = is_string($generatedHash) ? $generatedHash : '';
                 }
 
-                if (!RecoveryPhrase::isValid($recoveryCode, 12)) {
+                if (!RecoveryPhrase::isValidHash($recoveryHash)) {
                     continue;
                 }
 
                 $row['label'] = TwoFactorMethodRules::defaultLabelForType('recovery');
                 $row['status'] = 'confirmed';
-                $row['recovery_code'] = $recoveryCode;
+                $row['recovery_hash'] = $recoveryHash;
                 $row['reusable'] = isset($method['reusable']) && (string) ($method['reusable'] ?? '') === '1';
             } elseif ($type === 'webauthn') {
                 $credentialId = self::sanitizeText((string) ($method['credential_id'] ?? ''), 512);
@@ -110,7 +111,7 @@ final class TwoFactorMethodNormalizer
                 $row['status'] = 'confirmed';
             }
 
-            $dedupeValue = (string) ($row['secret'] ?? $row['recovery_code'] ?? $row['credential_id'] ?? $row['email'] ?? '');
+            $dedupeValue = (string) ($row['secret'] ?? $row['recovery_hash'] ?? $row['credential_id'] ?? $row['email'] ?? '');
             $dedupeLabel = trim((string) ($row['label'] ?? $label));
             $dedupeKey = TwoFactorMethodRules::dedupeKey($type, $dedupeLabel, $dedupeValue);
             $normalized[$dedupeKey] = $row;
@@ -260,14 +261,22 @@ final class TwoFactorMethodNormalizer
                 }
                 $row['secret'] = $secret;
             } elseif ($type === 'recovery') {
-                $recoveryCode = RecoveryPhrase::normalize((string) ($method['recovery_code'] ?? ''));
-                if (!RecoveryPhrase::isValid($recoveryCode, 12)) {
+                $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
+                if (!RecoveryPhrase::isValidHash($recoveryHash)) {
+                    $recoveryCode = RecoveryPhrase::normalize((string) ($method['recovery_code'] ?? ''));
+                    if (RecoveryPhrase::isValid($recoveryCode, 12)) {
+                        $hashedRecoveryCode = RecoveryPhrase::hash($recoveryCode, 12);
+                        $recoveryHash = is_string($hashedRecoveryCode) ? $hashedRecoveryCode : '';
+                    }
+                }
+
+                if (!RecoveryPhrase::isValidHash($recoveryHash)) {
                     continue;
                 }
 
                 $row['label'] = TwoFactorMethodRules::defaultLabelForType('recovery');
                 $row['status'] = 'confirmed';
-                $row['recovery_code'] = $recoveryCode;
+                $row['recovery_hash'] = $recoveryHash;
                 $row['reusable'] = (bool) ($method['reusable'] ?? false);
             } elseif ($type === 'webauthn') {
                 $credentialId = trim((string) ($method['credential_id'] ?? ''));
@@ -305,7 +314,7 @@ final class TwoFactorMethodNormalizer
                 $row['status'] = 'confirmed';
             }
 
-            $dedupeValue = (string) ($row['secret'] ?? $row['recovery_code'] ?? $row['credential_id'] ?? $row['email'] ?? '');
+            $dedupeValue = (string) ($row['secret'] ?? $row['recovery_hash'] ?? $row['credential_id'] ?? $row['email'] ?? '');
             $dedupeLabel = trim((string) ($row['label'] ?? $label));
             $dedupeKey = TwoFactorMethodRules::dedupeKey($type, $dedupeLabel, $dedupeValue);
             $normalized[$dedupeKey] = $row;
@@ -360,14 +369,14 @@ final class TwoFactorMethodNormalizer
                     }
                 }
             } elseif ($type === 'recovery') {
-                $recoveryCode = RecoveryPhrase::normalize((string) ($method['recovery_code'] ?? ''));
-                if (!RecoveryPhrase::isValid($recoveryCode, 12)) {
+                $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
+                if (!RecoveryPhrase::isValidHash($recoveryHash)) {
                     continue;
                 }
 
                 $row['label'] = TwoFactorMethodRules::defaultLabelForType('recovery');
                 $row['status'] = 'confirmed';
-                $row['recovery_code'] = $recoveryCode;
+                $row['recovery_hash'] = $recoveryHash;
                 $row['reusable'] = (bool) ($method['reusable'] ?? false);
             } elseif ($type === 'webauthn') {
                 $credentialId = trim((string) ($method['credential_id'] ?? ''));

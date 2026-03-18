@@ -1,4 +1,5 @@
 {
+    "slug": "database",
     "name": "Database Manager",
     "description": "Database management portal powered by Adminer.",
     "type": "system",

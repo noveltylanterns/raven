@@ -42,6 +42,12 @@ final class TwoFactorEmailChallengeService
 
         $selectedMethod = TwoFactorChallengeHelper::findByKey($pendingMethods, trim($selectedMethodKey));
         if (!is_array($selectedMethod)) {
+            $selectedMethod = TwoFactorChallengeHelper::findByKey(
+                TwoFactorChallengeHelper::pooledCodeMethods($pendingMethods),
+                trim($selectedMethodKey)
+            );
+        }
+        if (!is_array($selectedMethod)) {
             return ['ok' => false, 'message' => 'Selected verification method is invalid.'];
         }
 

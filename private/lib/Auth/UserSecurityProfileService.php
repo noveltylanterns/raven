@@ -131,17 +131,17 @@ final class UserSecurityProfileService
                     continue;
                 }
 
-                $recoveryCode = RecoveryPhrase::normalize((string) ($method['recovery_code'] ?? ''));
-                if (!RecoveryPhrase::isValid($recoveryCode, 12)) {
+                $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
+                if (!RecoveryPhrase::isValidHash($recoveryHash)) {
                     continue;
                 }
 
                 $interactive[] = [
                     'type' => 'recovery',
-                    'key' => TwoFactorMethodKey::forRecoveryPhrase($recoveryCode),
+                    'key' => TwoFactorMethodKey::forRecoveryHash($recoveryHash),
                     'label' => (bool) ($method['reusable'] ?? false)
-                        ? 'Recovery Code (Reusable)'
-                        : 'Recovery Code',
+                        ? 'Recovery Phrase (Reusable)'
+                        : 'Recovery Phrase',
                 ];
                 continue;
             }
@@ -229,10 +229,6 @@ final class UserSecurityProfileService
         }
 
         $selectedMethodKey = trim($selectedMethodKey);
-        $expectedMethodKey = TwoFactorMethodKey::forRecoveryPhrase($normalizedSubmittedPhrase);
-        if ($selectedMethodKey !== '' && $selectedMethodKey !== $expectedMethodKey) {
-            return null;
-        }
 
         foreach ($methods as $index => $method) {
             if (!is_array($method)) {
@@ -245,8 +241,20 @@ final class UserSecurityProfileService
                 continue;
             }
 
-            $recoveryCode = RecoveryPhrase::normalize((string) ($method['recovery_code'] ?? ''));
-            if (!RecoveryPhrase::isValid($recoveryCode, 12) || $recoveryCode !== $normalizedSubmittedPhrase) {
+            $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
+            if (!RecoveryPhrase::isValidHash($recoveryHash)) {
+                continue;
+            }
+
+            if (
+                $selectedMethodKey !== ''
+                && !TwoFactorMethodKey::isRecoveryPool($selectedMethodKey)
+                && $selectedMethodKey !== TwoFactorMethodKey::forRecoveryHash($recoveryHash)
+            ) {
+                continue;
+            }
+
+            if (!RecoveryPhrase::verify($normalizedSubmittedPhrase, $recoveryHash, 12)) {
                 continue;
             }
 

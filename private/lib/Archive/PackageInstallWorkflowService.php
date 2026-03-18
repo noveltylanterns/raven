@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Archive;
 
 use Raven\Lib\Security\InputSanitizer;
+use ZipArchive;
 
 /**
  * Shared package-upload orchestration helpers for panel theme/extension installs.
@@ -198,6 +199,158 @@ final class PackageInstallWorkflowService
 
         if (!@rmdir($innerRoot)) {
             return 'Failed to finalize extracted package structure.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Reads extension directory slug from archive ext.json manifest.
+     *
+     * Supports archives where ext.json is at root or one wrapper-directory deep.
+     */
+    public function extensionSlugFromArchiveManifest(string $tmpPath): ?string
+    {
+        $zip = new ZipArchive();
+        $opened = $zip->open($tmpPath);
+        if ($opened !== true) {
+            return null;
+        }
+
+        try {
+            $candidateIndexes = [];
+            for ($index = 0; $index < $zip->numFiles; $index++) {
+                $entryName = $zip->getNameIndex($index);
+                if (!is_string($entryName) || !$this->archives->isSafeZipEntryPath($entryName)) {
+                    continue;
+                }
+
+                $normalizedEntry = trim(str_replace('\\', '/', $entryName), '/');
+                if ($normalizedEntry === '' || strtolower((string) pathinfo($normalizedEntry, PATHINFO_BASENAME)) !== 'ext.json') {
+                    continue;
+                }
+
+                $directory = trim((string) pathinfo($normalizedEntry, PATHINFO_DIRNAME), '.');
+                $depth = $directory === '' ? 0 : substr_count($directory, '/') + 1;
+                if ($depth > 1) {
+                    continue;
+                }
+
+                $candidateIndexes[] = [
+                    'index' => $index,
+                    'depth' => $depth,
+                ];
+            }
+
+            usort($candidateIndexes, static function (array $left, array $right): int {
+                return ((int) ($left['depth'] ?? 99)) <=> ((int) ($right['depth'] ?? 99));
+            });
+
+            foreach ($candidateIndexes as $candidate) {
+                $index = (int) ($candidate['index'] ?? -1);
+                if ($index < 0) {
+                    continue;
+                }
+
+                $raw = $zip->getFromIndex($index);
+                if (!is_string($raw) || trim($raw) === '') {
+                    continue;
+                }
+
+                /** @var mixed $decoded */
+                $decoded = json_decode($raw, true);
+                if (!is_array($decoded)) {
+                    continue;
+                }
+
+                $slugRaw = trim((string) ($decoded['slug'] ?? ''));
+                if ($slugRaw === '') {
+                    continue;
+                }
+
+                $slug = strtolower($slugRaw);
+                if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) === 1) {
+                    return strtolower($slug);
+                }
+            }
+        } finally {
+            $zip->close();
+        }
+
+        return null;
+    }
+
+    /**
+     * Reads public-theme slug from archive theme.json manifest.
+     *
+     * Supports archives where theme.json is at root or one wrapper-directory deep.
+     */
+    public function themeSlugFromArchiveManifest(string $tmpPath): ?string
+    {
+        $zip = new ZipArchive();
+        $opened = $zip->open($tmpPath);
+        if ($opened !== true) {
+            return null;
+        }
+
+        try {
+            $candidateIndexes = [];
+            for ($index = 0; $index < $zip->numFiles; $index++) {
+                $entryName = $zip->getNameIndex($index);
+                if (!is_string($entryName) || !$this->archives->isSafeZipEntryPath($entryName)) {
+                    continue;
+                }
+
+                $normalizedEntry = trim(str_replace('\\', '/', $entryName), '/');
+                if ($normalizedEntry === '' || strtolower((string) pathinfo($normalizedEntry, PATHINFO_BASENAME)) !== 'theme.json') {
+                    continue;
+                }
+
+                $directory = trim((string) pathinfo($normalizedEntry, PATHINFO_DIRNAME), '.');
+                $depth = $directory === '' ? 0 : substr_count($directory, '/') + 1;
+                if ($depth > 1) {
+                    continue;
+                }
+
+                $candidateIndexes[] = [
+                    'index' => $index,
+                    'depth' => $depth,
+                ];
+            }
+
+            usort($candidateIndexes, static function (array $left, array $right): int {
+                return ((int) ($left['depth'] ?? 99)) <=> ((int) ($right['depth'] ?? 99));
+            });
+
+            foreach ($candidateIndexes as $candidate) {
+                $index = (int) ($candidate['index'] ?? -1);
+                if ($index < 0) {
+                    continue;
+                }
+
+                $raw = $zip->getFromIndex($index);
+                if (!is_string($raw) || trim($raw) === '') {
+                    continue;
+                }
+
+                /** @var mixed $decoded */
+                $decoded = json_decode($raw, true);
+                if (!is_array($decoded)) {
+                    continue;
+                }
+
+                $slugRaw = trim((string) ($decoded['slug'] ?? ''));
+                if ($slugRaw === '') {
+                    continue;
+                }
+
+                $slug = strtolower($slugRaw);
+                if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $slug) === 1) {
+                    return $slug;
+                }
+            }
+        } finally {
+            $zip->close();
         }
 
         return null;

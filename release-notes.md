@@ -5,6 +5,12 @@
 ### March 18, 2026
 
 - Completed a major bugs-and-tweaks batch, including panel/public 2FA flow fixes, upload/install fixes, panel user-editor/list UX fixes, and misc installer/runtime cleanups.
+- Added required `slug` support to extension manifests (`ext.json`) and aligned extension validation/scaffolding/docs/CLI behavior with the new manifest field.
+- Updated extension upload/install flows to derive install directory from archived `ext.json.slug` (with `Slug Override` still taking precedence and `-copy` auto-suffix behavior preserved).
+- Updated theme upload/install flow to derive theme slug from archived `theme.json.slug` (with fallback to archive filename and `-copy` auto-suffix behavior on collisions).
+- Updated Users list table UX so `Display Name` links directly to the user editor, while `Username` is now plain text and positioned next to `Display Name`.
+- Updated panel invite-token management so single-use token creation accepts an optional manual token slug (blank keeps random generation), and Existing Tokens now shows full token values instead of token hints.
+- Hardened recovery-phrase 2FA handling: generation now uses the BIP39 English wordlist, phrases are stored as one-way Argon2id/bcrypt hashes (`recovery_hash`) instead of plaintext, login verification uses hash verification, and saved recovery methods no longer expose reveal/copy controls in panel preferences.
 - Updated login-time 2FA method handling so recovery/email methods are pooled, authenticator apps remain individually selectable, method lists are alphabetically sorted, email dispatch requests are silent/non-enumerating, and email challenge codes use 8 digits.
 - Updated panel login 2FA UI behavior to preserve a direct `Try Security Key` action after a WebAuthn failure even when users switch to alternate methods and return to method selection.
 - Added missing public/fallback auth templates (`login`, `login_2fa`, `register`) for stock theme/fallback flows.

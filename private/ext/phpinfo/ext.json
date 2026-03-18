@@ -1,4 +1,5 @@
 {
+    "slug": "phpinfo",
     "name": "PHP Info",
     "description": "Display phpinfo() data within the administration panel.",
     "type": "system",

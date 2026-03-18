@@ -1,6 +1,6 @@
 # Raven Extension Agent Guide
 
-Last updated: 2026-03-14
+Last updated: 2026-03-18
 
 ## Scope
 - This file defines the extension-authoring contract for `private/ext/`.
@@ -36,6 +36,7 @@ Last updated: 2026-03-14
 - `plugin`:
 ```json
 {
+  "slug": "example-extension",
   "name": "Example Extension",
   "version": "0.8.0",
   "description": "Example plugin extension.",
@@ -47,6 +48,7 @@ Last updated: 2026-03-14
 - `module`:
 ```json
 {
+  "slug": "example-module",
   "name": "Example Module",
   "version": "0.8.0",
   "description": "Example module extension.",
@@ -58,6 +60,7 @@ Last updated: 2026-03-14
 - `system`:
 ```json
 {
+  "slug": "example-system-tool",
   "name": "Example System Tool",
   "version": "0.8.0",
   "description": "Example system extension.",
@@ -69,6 +72,7 @@ Last updated: 2026-03-14
 - `helper`:
 ```json
 {
+  "slug": "example-helper",
   "name": "Example Helper",
   "version": "0.8.0",
   "description": "Panel helper extension.",
@@ -80,6 +84,7 @@ Last updated: 2026-03-14
 - `content`:
 ```json
 {
+  "slug": "example-content-extension",
   "name": "Example Content Extension",
   "version": "0.8.0",
   "description": "Panel content extension.",
@@ -193,7 +198,8 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 ```
 
 ## Hard-Fail Validation Checklist (Before Hand-Off)
-- `ext.json` parses as JSON object and has non-empty `name`.
+- `ext.json` parses as JSON object and includes non-empty `name`.
+- `ext.json` includes valid `slug` (`[a-z0-9][a-z0-9_-]{0,119}`).
 - `type` is exactly one of: `helper`, `content`, `plugin`, `module`, `system`.
 - `lib/routes_public.php` is used only by `module` extensions.
 - `lib/shortcodes.php` is used only by `helper`, `plugin`, or `module` extensions.
@@ -252,6 +258,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - Manifest path: `private/ext/{name}/ext.json`
 - Minimum valid manifest requirement:
 - JSON object with non-empty `name`
+- Valid non-empty `slug` (`[a-z0-9][a-z0-9_-]{0,119}`)
 - Optional fields commonly used:
 - `version` (string)
 - `description` (string)
@@ -437,7 +444,8 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - The same modal can optionally generate `private/ext/{name}/AGENTS.md` with extension-local guidance and a backlink to this file for missing/global context.
 - Uploads are ZIP-only through Extension Manager.
 - ZIP upload size limit is 50MB.
-- Archive filename determines target directory name (sanitized).
+- If `Slug Override` is blank, upload derives target directory name from `ext.json` `slug`.
+- When the derived slug already exists, upload appends `-copy` (or `-copy-N`) automatically.
 - Existing extension directory name collisions are rejected.
 - ZIP entry paths are validated to block zip-slip traversal.
 - Upload succeeds only when extracted package contains valid `ext.json`.

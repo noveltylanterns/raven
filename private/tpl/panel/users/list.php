@@ -133,10 +133,10 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                     <tr>
                         <th></th>
                         <th scope="col" data-sort-key="id" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">ID</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+                        <th scope="col" data-sort-key="display_name" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Display Name</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <?php if ($showUsernameColumn): ?>
                         <th scope="col" data-sort-key="username" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Username</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <?php endif; ?>
-                        <th scope="col" data-sort-key="display_name" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Display Name</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="email" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Email</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="groups" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Groups</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" class="text-center">Actions</th>
@@ -217,16 +217,14 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                                 >
                             </td>
                             <td><?= $userId ?></td>
-                            <?php if ($showUsernameColumn): ?>
-                                <td>
-                                    <a href="<?= e($panelBase) ?>/users/edit/<?= $userId ?>">
-                                        <?= e($username) ?>
-                                    </a>
-                                </td>
-                            <?php endif; ?>
                             <td>
-                                <?= e($displayName) ?>
+                                <a href="<?= e($panelBase) ?>/users/edit/<?= $userId ?>">
+                                    <?= e($displayName) ?>
+                                </a>
                             </td>
+                            <?php if ($showUsernameColumn): ?>
+                                <td><?= e($username) ?></td>
+                            <?php endif; ?>
                             <td><?= e($email) ?></td>
                             <td>
                                 <?php if ($groupEntries === []): ?>

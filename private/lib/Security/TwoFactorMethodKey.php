@@ -22,6 +22,11 @@ final class TwoFactorMethodKey
         return 'recovery:' . sha1(RecoveryPhrase::normalize($phrase));
     }
 
+    public static function forRecoveryHash(string $recoveryHash): string
+    {
+        return 'recovery:' . sha1(trim($recoveryHash));
+    }
+
     public static function forWebauthnCredentialId(string $credentialId): string
     {
         return 'webauthn:' . trim($credentialId);

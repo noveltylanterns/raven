@@ -130,7 +130,8 @@ Upload modal (`Upload Extension`):
 
 - `Extension Archive (zip)` file input
 - `Slug Override (optional)` input
-- If slug override is blank and derived slug exists, upload auto-renames using `-copy`.
+- If slug override is blank, upload slug is read from `ext.json` `slug`.
+- If that derived slug already exists, upload auto-renames using `-copy`.
 
 Create modal (`Create New Extension`):
 
@@ -153,6 +154,7 @@ Installed list actions:
 
 Common manifest fields:
 
+- `slug` (required, URL-safe extension slug)
 - `name` (required)
 - `version`
 - `description`

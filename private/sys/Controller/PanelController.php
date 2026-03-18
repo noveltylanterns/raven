@@ -2546,6 +2546,13 @@ final class PanelController
         }
 
         $isReusable = $this->panelInvitePolicyService()->isReusableInviteType($post['invite_type'] ?? 'single');
+        $manualToken = null;
+        if (!$isReusable) {
+            $manualToken = trim((string) $this->input->text($post['token_slug'] ?? null, 255));
+            if ($manualToken === '') {
+                $manualToken = null;
+            }
+        }
 
         try {
             $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
@@ -2555,7 +2562,7 @@ final class PanelController
         }
 
         try {
-            $token = $this->inviteTokens->createToken($isReusable, $expiresAt, $this->auth->userId());
+            $token = $this->inviteTokens->createToken($isReusable, $expiresAt, $this->auth->userId(), $manualToken);
         } catch (\Throwable $exception) {
             $this->flash('error', 'Failed to create invite token: ' . ($exception->getMessage() ?: 'Unknown error.'));
             redirect($this->panelUrl('/users/invites'));
@@ -3850,11 +3857,12 @@ final class PanelController
 
         $tmpPath = (string) ($upload['tmp_path'] ?? '');
         $archiveName = (string) ($upload['archive_name'] ?? 'theme.zip');
+        $derivedThemeSlug = $this->packageInstallWorkflowService()->themeSlugFromArchiveManifest($tmpPath);
 
         $slugResult = $this->packageInstallWorkflowService()->resolveInstallName(
             (string) ($post['upload_slug'] ?? ($post['theme'] ?? '')),
             $archiveName,
-            fn (string $name): ?string => $this->themeSlugFromArchiveFilename($name),
+            fn (string $name): ?string => $derivedThemeSlug ?? $this->themeSlugFromArchiveFilename($name),
             fn (string $slug): bool => $this->isSafePublicThemeSlug($slug),
             fn (string $slug): bool => $this->isStockPublicThemeSlug($slug),
             fn (string $slug): ?string => $this->nextAvailablePublicThemeSlug($slug),
@@ -3863,7 +3871,16 @@ final class PanelController
             'Theme slug must use lowercase letters, numbers, underscores, or dashes.'
         );
         if (!(bool) ($slugResult['ok'] ?? false)) {
-            $this->flash('error', (string) ($slugResult['error'] ?? 'Failed to resolve theme slug.'));
+            $slugError = (string) ($slugResult['error'] ?? 'Failed to resolve theme slug.');
+            if (
+                trim((string) ($post['upload_slug'] ?? ($post['theme'] ?? ''))) === ''
+                && $derivedThemeSlug === null
+                && $this->themeSlugFromArchiveFilename($archiveName) === null
+            ) {
+                $slugError = 'Theme upload failed: theme.json must include a valid "slug" value or use Slug Override.';
+            }
+
+            $this->flash('error', $slugError);
             redirect($this->panelUrl('/themes'));
         }
         $themeSlug = (string) ($slugResult['name'] ?? '');
@@ -4245,11 +4262,12 @@ final class PanelController
 
         $tmpPath = (string) ($upload['tmp_path'] ?? '');
         $archiveName = (string) ($upload['archive_name'] ?? 'extension.zip');
+        $derivedExtensionSlug = $this->packageInstallWorkflowService()->extensionSlugFromArchiveManifest($tmpPath);
 
         $nameResult = $this->packageInstallWorkflowService()->resolveInstallName(
             (string) ($post['upload_slug'] ?? ''),
             $archiveName,
-            fn (string $name): ?string => $this->extensionNameFromArchiveFilename($name),
+            fn (string $name): ?string => $derivedExtensionSlug,
             fn (string $name): bool => $this->isSafeExtensionDirectoryName($name),
             fn (string $name): bool => $this->isStockExtensionDirectory($name),
             fn (string $name): ?string => $this->nextAvailableExtensionDirectoryName($name),
@@ -4258,7 +4276,15 @@ final class PanelController
             'Extension directory must use lowercase letters, numbers, underscores, or dashes.'
         );
         if (!(bool) ($nameResult['ok'] ?? false)) {
-            $this->flash('error', (string) ($nameResult['error'] ?? 'Failed to resolve extension directory name.'));
+            $nameError = (string) ($nameResult['error'] ?? 'Failed to resolve extension directory name.');
+            if (
+                trim((string) ($post['upload_slug'] ?? '')) === ''
+                && $derivedExtensionSlug === null
+            ) {
+                $nameError = 'Extension upload failed: ext.json must include a valid "slug" value.';
+            }
+
+            $this->flash('error', $nameError);
             redirect($this->panelUrl('/extensions'));
         }
         $extensionName = (string) ($nameResult['name'] ?? '');

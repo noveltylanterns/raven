@@ -105,7 +105,7 @@ foreach ($twoFactorMethodsRaw as $methodIndex => $methodRow) {
     if ($methodLabel === '') {
         $methodLabel = match ($methodType) {
             'totp' => 'Authenticator App',
-            'recovery' => 'Recovery Code',
+            'recovery' => 'Recovery Phrase',
             'webauthn' => 'Security Key',
             default => 'Email Code',
         };
@@ -127,9 +127,9 @@ foreach ($twoFactorMethodsRaw as $methodIndex => $methodRow) {
             $methodDetail .= ($methodDetail !== '' ? ' ' : '') . '(PIN/Bio)';
         }
     } elseif ($methodType === 'recovery') {
-        $recoveryCode = trim((string) ($methodRow['recovery_code'] ?? ''));
-        if ($recoveryCode !== '') {
-            $methodDetail = 'Phrase: ' . $maskMiddle($recoveryCode, 14);
+        $recoveryHash = trim((string) ($methodRow['recovery_hash'] ?? ''));
+        if ($recoveryHash !== '') {
+            $methodDetail = 'Stored securely (one-way hash).';
         }
         $methodDetail .= ($methodDetail !== '' ? ' ' : '') . ((bool) ($methodRow['reusable'] ?? false) ? '(Reusable)' : '(One-time)');
     } elseif ($methodType === 'email') {
@@ -488,26 +488,31 @@ $themeLabels = [
             aria-labelledby="user-security-tab"
             tabindex="0"
         >
-            <div class="form-group">
-                <label for="password" class="form-label">
-                    <?= $userRow === null ? 'Password' : 'New Password (leave blank to keep current)' ?>
-                </label>
-                <input id="password" name="password" type="password" class="form-control"<?= $userRow === null ? ' required' : '' ?>>
-                <div class="form-text">Minimum 8 characters.</div>
-            </div>
+            <?php if ($userRow === null): ?>
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <input id="password" name="password" type="password" class="form-control" required>
+                    <div class="form-text">Minimum 8 characters.</div>
+                </div>
 
-            <div class="form-group">
-                <label for="password_confirm" class="form-label">
-                    <?= $userRow === null ? 'Confirm Password' : 'Confirm New Password' ?>
-                </label>
-                <input
-                    id="password_confirm"
-                    name="password_confirm"
-                    type="password"
-                    class="form-control"
-                    <?= $userRow === null ? ' required' : '' ?>
-                >
-            </div>
+                <div class="form-group">
+                    <label for="password_confirm" class="form-label">Confirm Password</label>
+                    <input
+                        id="password_confirm"
+                        name="password_confirm"
+                        type="password"
+                        class="form-control"
+                        required
+                    >
+                </div>
+            <?php else: ?>
+                <div class="form-group">
+                    <label class="form-label h3 mb-0" for="password">New Password</label>
+                    <div class="form-text mb-2">Use this only when you want to rotate this user's panel password.</div>
+                    <button type="button" class="btn btn-danger btn-sm" id="user-password-toggle">Change Password</button>
+                    <div class="mt-2 d-none" id="user-password-fields"></div>
+                </div>
+            <?php endif; ?>
 
             <div class="form-group mb-0">
                 <label class="form-label h3 d-block">Two-Factor Methods</label>
@@ -575,6 +580,76 @@ $themeLabels = [
         <?php endif; ?>
     </nav>
 </form>
+
+<?php if ($userRow !== null): ?>
+<template id="user-password-fields-template">
+    <div class="form-text mb-1">Enter new password (minimum 8 chars):</div>
+    <input class="form-control"
+        id="password"
+        name="password"
+        type="text"
+        autocomplete="new-password"
+        data-user-password-kind="new"
+        data-user-password-field="1"
+    >
+    <label class="form-text mt-2 mb-0" for="password_confirm">Enter new password again to confirm:</label>
+    <input class="form-control"
+        id="password_confirm"
+        name="password_confirm"
+        type="text"
+        autocomplete="new-password"
+        data-user-password-kind="confirm"
+        data-user-password-field="1"
+    >
+</template>
+
+<script>
+  (function () {
+    var toggleButton = document.getElementById('user-password-toggle');
+    var fieldsContainer = document.getElementById('user-password-fields');
+    var fieldsTemplate = document.getElementById('user-password-fields-template');
+    if (
+      !(toggleButton instanceof HTMLButtonElement)
+      || !(fieldsContainer instanceof HTMLElement)
+      || !(fieldsTemplate instanceof HTMLTemplateElement)
+    ) {
+      return;
+    }
+
+    var enabled = false;
+
+    function setEnabled(nextEnabled) {
+      enabled = !!nextEnabled;
+      if (enabled && !fieldsContainer.hasChildNodes()) {
+        fieldsContainer.appendChild(fieldsTemplate.content.cloneNode(true));
+        var passwordFields = fieldsContainer.querySelectorAll('[data-user-password-field="1"]');
+        passwordFields.forEach(function (field) {
+          if (field instanceof HTMLInputElement) {
+            field.type = 'password';
+          }
+        });
+      } else if (!enabled) {
+        fieldsContainer.innerHTML = '';
+      }
+
+      fieldsContainer.classList.toggle('d-none', !enabled);
+      toggleButton.textContent = enabled ? 'Cancel Password Change' : 'Change Password';
+    }
+
+    toggleButton.addEventListener('click', function () {
+      setEnabled(!enabled);
+      if (!enabled) {
+        return;
+      }
+
+      var firstField = fieldsContainer.querySelector('#password');
+      if (firstField instanceof HTMLInputElement) {
+        firstField.focus();
+      }
+    });
+  })();
+</script>
+<?php endif; ?>
 
 <?php if ($profileContactOptions !== []): ?>
 <template id="user-contact-profile-template">

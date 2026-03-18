@@ -147,7 +147,8 @@ Extension management:
 - `import --archive <zip_path> [--slug <slug>]`
 - `delete --slug <slug> [--force]`
 
-`create` writes extension scaffolds under `private/ext/{slug}/` using current route/view conventions (`ext.php`, `ext.json`, `lib/*.php`, `tpl/*.php`).
+`create` writes extension scaffolds under `private/ext/{slug}/` using current route/view conventions (`ext.php`, `ext.json`, `lib/*.php`, `tpl/*.php`), and sets `ext.json.slug` to the directory slug.
+`import` uses `ext.json.slug` when `--slug` is omitted.
 
 ### `rvn-theme`
 

@@ -658,6 +658,75 @@ function raven_cli_is_safe_zip_path(string $entryName): bool
     return true;
 }
 
+function raven_cli_extension_slug_from_archive_manifest(string $archivePath): ?string
+{
+    if (!class_exists(ZipArchive::class)) {
+        return null;
+    }
+
+    $zip = new ZipArchive();
+    if ($zip->open($archivePath) !== true) {
+        return null;
+    }
+
+    try {
+        $candidates = [];
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $entryName = $zip->getNameIndex($index);
+            if (!is_string($entryName) || !raven_cli_is_safe_zip_path($entryName)) {
+                continue;
+            }
+
+            $normalizedEntry = trim(str_replace('\\', '/', $entryName), '/');
+            if ($normalizedEntry === '' || strtolower((string) pathinfo($normalizedEntry, PATHINFO_BASENAME)) !== 'ext.json') {
+                continue;
+            }
+
+            $directory = trim((string) pathinfo($normalizedEntry, PATHINFO_DIRNAME), '.');
+            $depth = $directory === '' ? 0 : substr_count($directory, '/') + 1;
+            if ($depth > 1) {
+                continue;
+            }
+
+            $candidates[] = [
+                'index' => $index,
+                'depth' => $depth,
+            ];
+        }
+
+        usort($candidates, static function (array $left, array $right): int {
+            return ((int) ($left['depth'] ?? 99)) <=> ((int) ($right['depth'] ?? 99));
+        });
+
+        foreach ($candidates as $candidate) {
+            $index = (int) ($candidate['index'] ?? -1);
+            if ($index < 0) {
+                continue;
+            }
+
+            $raw = $zip->getFromIndex($index);
+            if (!is_string($raw) || trim($raw) === '') {
+                continue;
+            }
+
+            /** @var mixed $decoded */
+            $decoded = json_decode($raw, true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+
+            $slug = strtolower(trim((string) ($decoded['slug'] ?? '')));
+            if ($slug !== '' && preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) === 1) {
+                return $slug;
+            }
+        }
+    } finally {
+        $zip->close();
+    }
+
+    return null;
+}
+
 /**
  * @param array<string, mixed> $config
  * @param array<string, mixed> $defaults
@@ -2046,6 +2115,7 @@ function raven_cli_extension_scaffold_files(string $extensionPath, array $meta, 
     $authorUrl = (string) ($meta['author_url'] ?? '');
 
     $manifest = [
+        'slug' => $slug,
         'name' => $name,
         'description' => $description,
         'type' => $type,
@@ -2199,6 +2269,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         $context->info('Usage: private/bin/rvn-ext <action> [options]');
         $context->info('Actions: list, enable, disable, create, import, delete');
         $context->info('Options: --slug, --archive, --type, --name, --version (optional), --description, --author, --homepage');
+        $context->info('Import uses ext.json "slug" when --slug is omitted.');
         return 0;
     }
 
@@ -2350,9 +2421,10 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
 
             $slug = strtolower(trim((string) raven_cli_option($options, 'slug', '')));
             if ($slug === '') {
-                $slug = strtolower(trim((string) pathinfo($archivePath, PATHINFO_FILENAME)));
-                $slug = preg_replace('/[^a-z0-9_-]+/', '-', $slug) ?? '';
-                $slug = trim($slug, '-_');
+                $slug = (string) (raven_cli_extension_slug_from_archive_manifest($archivePath) ?? '');
+            }
+            if ($slug === '') {
+                throw new RuntimeException('Missing extension slug. Provide --slug or include a valid ext.json slug in the archive.');
             }
             if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
                 throw new RuntimeException('Extension slug is invalid.');

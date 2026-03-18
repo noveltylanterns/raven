@@ -1,4 +1,5 @@
 {
+    "slug": "signups",
     "name": "Signup Sheets",
     "description": "Deploy custom signup sheets for waitlists and various other marketing campaigns.",
     "type": "plugin",

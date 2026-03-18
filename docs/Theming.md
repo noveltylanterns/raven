@@ -139,6 +139,8 @@ Panel counterpart:
 Theme upload notes:
 
 - Upload archive must include `theme.json` at archive root.
+- If slug override is blank, Theme Manager derives slug from `theme.json` `slug` (fallback: archive filename).
+- If that derived slug already exists, Theme Manager auto-renames with `-copy`.
 - Uploaded themes are not auto-enabled; activate them from Theme Manager or `rvn-theme enable`.
 
 ## 6) Theme Scaffold Contract (rvn-theme create)
