@@ -9,6 +9,7 @@
 
 /** @var array<string, string> $site */
 /** @var array<int, array{id: int, token: string, token_hint: string, is_reusable: int, use_count: int, expires_at: int|null, last_used_at: int|null, created_at: string, created_by_user_id: int|null}> $inviteRows */
+/** @var array<int, array{label: string, edit_url: string}> $inviteCreatorMap */
 /** @var array<int, string>|null $inviteGeneratedTokens */
 /** @var string $inviteRegistrationMode */
 /** @var int $inviteNowTs */
@@ -20,6 +21,7 @@ use function Raven\Core\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $inviteRows = is_array($inviteRows ?? null) ? $inviteRows : [];
+$inviteCreatorMap = is_array($inviteCreatorMap ?? null) ? $inviteCreatorMap : [];
 $inviteGeneratedTokens = is_array($inviteGeneratedTokens ?? null) ? $inviteGeneratedTokens : null;
 $inviteRegistrationMode = strtolower(trim((string) ($inviteRegistrationMode ?? 'closed')));
 if (!in_array($inviteRegistrationMode, ['open', 'invite', 'closed'], true)) {
@@ -33,6 +35,13 @@ $formatTimestamp = static function (?int $value): string {
 
     return gmdate('Y-m-d H:i:s', $value) . ' UTC';
 };
+$invitesSearchId = 'invites-filter-search';
+$invitesLifespanFilterId = 'invites-filter-lifespan';
+$invitesTypeFilterId = 'invites-filter-type';
+$invitesTableId = 'invites-table';
+$invitesBodyId = $invitesTableId . '-body';
+$invitesCountId = 'invites-filter-count';
+$invitesEmptyId = 'invites-filter-empty';
 ?>
 
 <header class="card">
@@ -134,24 +143,50 @@ $formatTimestamp = static function (?int $value): string {
         <?php if ($inviteRows === []): ?>
             <p class="text-muted mb-0">No invite tokens found.</p>
         <?php else: ?>
+            <div class="row g-2 mb-3">
+                <div class="col-12 col-md-6">
+                    <label class="form-label mb-0" for="<?= e($invitesSearchId) ?>">Search</label>
+                    <input
+                        id="<?= e($invitesSearchId) ?>"
+                        type="search"
+                        class="form-control form-control-sm"
+                        placeholder="Filter by token code or user id..."
+                    >
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label mb-0" for="<?= e($invitesLifespanFilterId) ?>">Lifespan</label>
+                    <select id="<?= e($invitesLifespanFilterId) ?>" class="form-select form-select-sm">
+                        <option value="">All Lifespans</option>
+                        <option value="expires">Expires</option>
+                        <option value="immortal">Immortal</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label mb-0" for="<?= e($invitesTypeFilterId) ?>">Type</label>
+                    <select id="<?= e($invitesTypeFilterId) ?>" class="form-select form-select-sm">
+                        <option value="">All Types</option>
+                        <option value="single-use">Single-use</option>
+                        <option value="reusable">Reusable</option>
+                    </select>
+                </div>
+            </div>
+            <div class="small text-muted mb-2" id="<?= e($invitesCountId) ?>"></div>
             <div class="table-responsive">
-                <table class="table table-sm align-middle">
+                <table id="<?= e($invitesTableId) ?>" class="table table-sm align-middle mb-0">
                     <thead>
                         <tr>
-                            <th>Token</th>
-                            <th>Type</th>
-                            <th>Uses</th>
-                            <th>Expires</th>
-                            <th>Last Used</th>
-                            <th>Created</th>
-                            <th>Status</th>
-                            <th class="text-center">Actions</th>
+                            <th scope="col" class="text-center" style="width: 1%;"><span class="visually-hidden">State</span></th>
+                            <th scope="col">Token Code</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Created</th>
+                            <th scope="col" class="text-center">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="<?= e($invitesBodyId) ?>">
                         <?php foreach ($inviteRows as $inviteRow): ?>
                             <?php
                             $inviteId = (int) ($inviteRow['id'] ?? 0);
+                            $detailsId = 'invite-token-details-' . $inviteId;
                             $tokenValue = trim((string) ($inviteRow['token'] ?? ''));
                             $tokenHint = trim((string) ($inviteRow['token_hint'] ?? ''));
                             $legacyTokenOnly = false;
@@ -164,14 +199,53 @@ $formatTimestamp = static function (?int $value): string {
                             $expiresAt = isset($inviteRow['expires_at']) ? (int) $inviteRow['expires_at'] : null;
                             $lastUsedAt = isset($inviteRow['last_used_at']) ? (int) $inviteRow['last_used_at'] : null;
                             $createdAt = trim((string) ($inviteRow['created_at'] ?? ''));
+                            $createdByUserId = isset($inviteRow['created_by_user_id']) ? (int) $inviteRow['created_by_user_id'] : null;
+                            $creatorLabel = '-';
+                            $creatorEditUrl = '';
+                            if ($createdByUserId !== null && $createdByUserId > 0) {
+                                $creatorMapRow = $inviteCreatorMap[$createdByUserId] ?? null;
+                                if (is_array($creatorMapRow)) {
+                                    $mappedLabel = trim((string) ($creatorMapRow['label'] ?? ''));
+                                    $mappedEditUrl = trim((string) ($creatorMapRow['edit_url'] ?? ''));
+                                    if ($mappedLabel !== '') {
+                                        $creatorLabel = $mappedLabel;
+                                    }
+                                    if ($mappedEditUrl !== '') {
+                                        $creatorEditUrl = $mappedEditUrl;
+                                    }
+                                } else {
+                                    $creatorLabel = 'User #' . $createdByUserId;
+                                }
+                            }
                             $isExpired = is_int($expiresAt) && $expiresAt > 0 && $expiresAt <= $inviteNowTs;
                             $isUsedSingle = !$isReusable && $useCount > 0;
+                            $lifespanKey = is_int($expiresAt) && $expiresAt > 0 ? 'expires' : 'immortal';
                             $statusLabel = $isExpired ? 'Expired' : ($isUsedSingle ? 'Used' : 'Active');
                             $statusClass = $isExpired
                                 ? 'text-bg-secondary'
                                 : ($isUsedSingle ? 'text-bg-warning' : 'text-bg-success');
+                            $searchableText = implode(' ', [
+                                $tokenValue,
+                                $tokenHint,
+                                $createdByUserId !== null && $createdByUserId > 0 ? (string) $createdByUserId : '',
+                                $createdByUserId !== null && $createdByUserId > 0 ? ('userid ' . $createdByUserId) : '',
+                                $createdByUserId !== null && $createdByUserId > 0 ? ('user id ' . $createdByUserId) : '',
+                            ]);
                             ?>
-                            <tr>
+                            <tr
+                                data-summary-row="1"
+                                data-details-id="<?= e($detailsId) ?>"
+                                data-filter-search="<?= e($searchableText) ?>"
+                                data-lifespan="<?= e($lifespanKey) ?>"
+                                tabindex="0"
+                                role="button"
+                                aria-expanded="false"
+                                aria-controls="<?= e($detailsId) ?>"
+                                style="cursor: pointer;"
+                            >
+                                <td class="text-center">
+                                    <i class="bi bi-chevron-down js-row-state-icon" aria-hidden="true"></i>
+                                </td>
                                 <td>
                                     <?php if ($tokenValue !== '' && !$legacyTokenOnly): ?>
                                         <button
@@ -180,7 +254,7 @@ $formatTimestamp = static function (?int $value): string {
                                             data-invite-copy="1"
                                             data-invite-copy-value="<?= e($tokenValue) ?>"
                                             title="Click to copy"
-                                        ><?= e($tokenValue) ?></button>
+                                        ><code class="mb-0"><?= e($tokenValue) ?></code></button>
                                     <?php else: ?>
                                         <code><?= e($tokenValue !== '' ? $tokenValue : '(unavailable)') ?></code>
                                     <?php endif; ?>
@@ -189,34 +263,75 @@ $formatTimestamp = static function (?int $value): string {
                                     <?php endif; ?>
                                 </td>
                                 <td><?= $isReusable ? 'Reusable' : 'Single-use' ?></td>
-                                <td><?= $useCount ?></td>
-                                <td><?= e($formatTimestamp(is_int($expiresAt) && $expiresAt > 0 ? $expiresAt : null)) ?></td>
-                                <td><?= e($formatTimestamp(is_int($lastUsedAt) && $lastUsedAt > 0 ? $lastUsedAt : null)) ?></td>
                                 <td><?= e($createdAt !== '' ? ($createdAt . ' UTC') : 'Unknown') ?></td>
-                                <td><span class="badge <?= e($statusClass) ?>"><?= e($statusLabel) ?></span></td>
                                 <td class="text-center">
-                                    <form method="post" action="<?= e($panelBase) ?>/users/invites/delete" onsubmit="return confirm('Delete this invite token?');">
+                                    <form method="post" action="<?= e($panelBase) ?>/users/invites/delete" class="d-inline m-0" onsubmit="return confirm('Delete this invite token?');">
                                         <?= $csrfField ?>
                                         <input type="hidden" name="id" value="<?= $inviteId ?>">
                                         <button type="submit" class="btn btn-danger btn-sm" title="Delete Token" aria-label="Delete Token">
                                             <i class="bi bi-trash3" aria-hidden="true"></i>
+                                            <span class="visually-hidden">Delete Token</span>
                                         </button>
                                     </form>
+                                </td>
+                            </tr>
+                            <tr data-details-row-for="<?= e($detailsId) ?>">
+                                <td colspan="5" class="p-0 border-0">
+                                    <div
+                                        id="<?= e($detailsId) ?>"
+                                        class="collapse js-invite-details"
+                                        data-bs-parent="#<?= e($invitesBodyId) ?>"
+                                    >
+                                        <div class="p-3 mb-0 border-bottom">
+                                            <div class="row g-3">
+                                                <div class="col-12">
+                                                    <h5 class="h6 mb-2">Token Details</h5>
+                                                    <div class="small mb-1"><strong>Status:</strong> <span class="badge <?= e($statusClass) ?>"><?= e($statusLabel) ?></span></div>
+                                                    <div class="small mb-1"><strong>Uses:</strong> <?= $useCount ?></div>
+                                                    <div class="small mb-1"><strong>Expires:</strong> <?= e($formatTimestamp(is_int($expiresAt) && $expiresAt > 0 ? $expiresAt : null)) ?></div>
+                                                    <div class="small mb-1"><strong>Last Used:</strong> <?= e($formatTimestamp(is_int($lastUsedAt) && $lastUsedAt > 0 ? $lastUsedAt : null)) ?></div>
+                                                    <div class="small mb-0">
+                                                        <strong>Generated by:</strong>
+                                                        <?php if ($creatorEditUrl !== '' && $creatorLabel !== '-'): ?>
+                                                            <a href="<?= e($creatorEditUrl) ?>"><?= e($creatorLabel) ?></a>
+                                                        <?php else: ?>
+                                                            <?= e($creatorLabel) ?>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
+            <p id="<?= e($invitesEmptyId) ?>" class="text-muted mb-0 mt-2 d-none">No invite tokens match the current filter.</p>
         <?php endif; ?>
     </div>
 </section>
+
+<style>
+  #<?= e($invitesTableId) ?> tbody tr[data-details-row-for]:hover > td {
+    background-color: transparent !important;
+  }
+</style>
 
 <script>
 (function () {
     var typeField = document.getElementById('invite_type');
     var tokenWrap = document.getElementById('invite_token_slug_wrap');
     var tokenField = document.getElementById('invite_token_slug');
+    var table = document.getElementById('<?= e($invitesTableId) ?>');
+    var searchInput = document.getElementById('<?= e($invitesSearchId) ?>');
+    var lifespanFilter = document.getElementById('<?= e($invitesLifespanFilterId) ?>');
+    var typeFilter = document.getElementById('<?= e($invitesTypeFilterId) ?>');
+    var countLabel = document.getElementById('<?= e($invitesCountId) ?>');
+    var emptyMessage = document.getElementById('<?= e($invitesEmptyId) ?>');
+    var summaryRows = [];
+
     if (typeField instanceof HTMLSelectElement && tokenWrap instanceof HTMLElement && tokenField instanceof HTMLInputElement) {
         function syncManualField() {
             var isSingle = typeField.value === 'single';
@@ -229,6 +344,36 @@ $formatTimestamp = static function (?int $value): string {
 
         typeField.addEventListener('change', syncManualField);
         syncManualField();
+    }
+
+    function hasBootstrapCollapse() {
+        return !!(window.bootstrap && typeof window.bootstrap.Collapse === 'function');
+    }
+
+    function normalize(value) {
+        return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    }
+
+    function setRowState(row, isExpanded) {
+        row.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        var stateIcon = row.querySelector('.js-row-state-icon');
+        if (stateIcon instanceof HTMLElement) {
+            stateIcon.classList.toggle('bi-chevron-up', isExpanded);
+            stateIcon.classList.toggle('bi-chevron-down', !isExpanded);
+        }
+    }
+
+    function closeDetailsPanel(panel) {
+        if (!(panel instanceof HTMLElement)) {
+            return;
+        }
+
+        if (hasBootstrapCollapse()) {
+            window.bootstrap.Collapse.getOrCreateInstance(panel, { toggle: false }).hide();
+            return;
+        }
+
+        panel.classList.remove('show');
     }
 
     function showCopyTooltip(element, copied) {
@@ -300,6 +445,147 @@ $formatTimestamp = static function (?int $value): string {
         }
         return copied;
     }
+
+    if (table instanceof HTMLTableElement && searchInput instanceof HTMLInputElement) {
+        var rows = table.tBodies.length > 0 ? Array.prototype.slice.call(table.tBodies[0].rows) : [];
+        summaryRows = rows.filter(function (row) {
+            return row.getAttribute('data-summary-row') === '1';
+        });
+        var totalRows = summaryRows.length;
+
+        var applyFilters = function () {
+            var query = normalize(searchInput.value);
+            var selectedLifespan = '';
+            if (lifespanFilter instanceof HTMLSelectElement) {
+                selectedLifespan = normalize(lifespanFilter.value);
+            }
+            var selectedType = '';
+            if (typeFilter instanceof HTMLSelectElement) {
+                selectedType = normalize(typeFilter.value);
+            }
+            var visibleRows = 0;
+
+            summaryRows.forEach(function (row) {
+                var haystack = normalize(row.getAttribute('data-filter-search') || '');
+                var rowLifespan = normalize(row.getAttribute('data-lifespan'));
+                var rowTypeCell = row.cells.length > 2 ? row.cells[2] : null;
+                var rowType = normalize(rowTypeCell instanceof HTMLTableCellElement ? rowTypeCell.textContent : '');
+                var matchesQuery = query === '' || haystack.indexOf(query) !== -1;
+                var matchesLifespan = selectedLifespan === '' || rowLifespan === selectedLifespan;
+                var matchesType = selectedType === '' || rowType === selectedType;
+                var visible = matchesQuery && matchesLifespan && matchesType;
+                var detailsId = String(row.getAttribute('data-details-id') || '');
+                var detailsRow = detailsId === '' ? null : table.querySelector('tr[data-details-row-for="' + detailsId + '"]');
+
+                row.classList.toggle('d-none', !visible);
+                if (detailsRow) {
+                    detailsRow.classList.toggle('d-none', !visible);
+                }
+
+                if (!visible && detailsRow) {
+                    var detailsPanel = detailsRow.querySelector('.js-invite-details');
+                    closeDetailsPanel(detailsPanel);
+                    setRowState(row, false);
+                }
+
+                if (visible) {
+                    visibleRows += 1;
+                }
+            });
+
+            if (countLabel instanceof HTMLElement) {
+                countLabel.textContent = 'Showing ' + visibleRows + ' of ' + totalRows + ' tokens on this page.';
+            }
+
+            if (emptyMessage instanceof HTMLElement) {
+                emptyMessage.classList.toggle('d-none', visibleRows > 0);
+            }
+        };
+
+        searchInput.addEventListener('input', applyFilters);
+        if (lifespanFilter instanceof HTMLSelectElement) {
+            lifespanFilter.addEventListener('change', applyFilters);
+        }
+        if (typeFilter instanceof HTMLSelectElement) {
+            typeFilter.addEventListener('change', applyFilters);
+        }
+        applyFilters();
+    } else if (countLabel instanceof HTMLElement) {
+        countLabel.textContent = 'Showing <?= (int) count($inviteRows) ?> of <?= (int) count($inviteRows) ?> tokens on this page.';
+    }
+
+    function bindBootstrapCollapseStateSync() {
+        if (!hasBootstrapCollapse()) {
+            return;
+        }
+
+        summaryRows.forEach(function (row) {
+            var detailsId = String(row.getAttribute('data-details-id') || '');
+            if (detailsId === '') {
+                return;
+            }
+
+            var detailsPanel = document.getElementById(detailsId);
+            if (!(detailsPanel instanceof HTMLElement)) {
+                return;
+            }
+
+            if (detailsPanel.getAttribute('data-rvn-collapse-sync') === '1') {
+                return;
+            }
+
+            detailsPanel.setAttribute('data-rvn-collapse-sync', '1');
+            detailsPanel.addEventListener('show.bs.collapse', function () {
+                setRowState(row, true);
+            });
+            detailsPanel.addEventListener('hide.bs.collapse', function () {
+                setRowState(row, false);
+            });
+        });
+    }
+
+    summaryRows.forEach(function (row) {
+        var detailsId = String(row.getAttribute('data-details-id') || '');
+        if (detailsId === '') {
+            return;
+        }
+
+        var detailsPanel = document.getElementById(detailsId);
+        if (!(detailsPanel instanceof HTMLElement)) {
+            return;
+        }
+
+        var togglePanel = function () {
+            if (hasBootstrapCollapse()) {
+                bindBootstrapCollapseStateSync();
+                window.bootstrap.Collapse.getOrCreateInstance(detailsPanel, { toggle: false }).toggle();
+                return;
+            }
+
+            detailsPanel.classList.toggle('show');
+            setRowState(row, detailsPanel.classList.contains('show'));
+        };
+
+        row.addEventListener('click', function (event) {
+            var target = event.target;
+            if (target instanceof Element && target.closest('a, button, input, select, textarea, label, form')) {
+                return;
+            }
+            togglePanel();
+        });
+
+        row.addEventListener('keydown', function (event) {
+            if (!(event instanceof KeyboardEvent)) {
+                return;
+            }
+            if (event.key !== 'Enter' && event.key !== ' ') {
+                return;
+            }
+
+            event.preventDefault();
+            togglePanel();
+        });
+    });
 
     document.addEventListener('click', function (event) {
         var target = event.target;

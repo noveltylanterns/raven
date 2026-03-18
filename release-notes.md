@@ -5,6 +5,9 @@
 ### March 18, 2026
 
 - Completed a major bugs-and-tweaks batch, including panel/public 2FA flow fixes, upload/install fixes, panel user-editor/list UX fixes, and misc installer/runtime cleanups.
+- Restricted panel invite-token management routes so `/panel/users/invites` now loads only when public registration mode is set to `invite` (non-invite modes redirect back to Users with an error flash).
+- Updated Existing Tokens token-code rendering so click-to-copy buttons display token values wrapped in `<code>` styling.
+- Finished SchemaManager modularization by moving schema component wiring and ensure orchestration into new `private/lib/Database/Schema` modules (`SchemaComponentFactory`, `SchemaEnsurePipeline`, lib `SchemaManager`) and reducing core `SchemaManager` to a compatibility shim.
 - Added required `slug` support to extension manifests (`ext.json`) and aligned extension validation/scaffolding/docs/CLI behavior with the new manifest field.
 - Updated extension upload/install flows to derive install directory from archived `ext.json.slug` (with `Slug Override` still taking precedence and `-copy` auto-suffix behavior preserved).
 - Updated theme upload/install flow to derive theme slug from archived `theme.json.slug` (with fallback to archive filename and `-copy` auto-suffix behavior on collisions).

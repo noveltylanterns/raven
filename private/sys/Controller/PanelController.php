@@ -2512,10 +2512,14 @@ final class PanelController
         if (!$this->requireRoutePermissionOrForbidden('users', 'view')) {
             return;
         }
+        if (!$this->ensureInviteRegistrationMode()) {
+            return;
+        }
 
         $this->view->render('panel/users/invites', [
             'site' => $this->siteData(),
             'inviteRows' => $this->inviteTokens->listForPanel(),
+            'inviteCreatorMap' => $this->inviteCreatorMap(),
             'inviteGeneratedTokens' => $this->pullFlashList('generated_invites'),
             'inviteRegistrationMode' => $this->registrationMode(),
             'inviteNowTs' => time(),
@@ -2529,6 +2533,37 @@ final class PanelController
     }
 
     /**
+     * Builds one user-id keyed label/edit-url map for invite-token creator rendering.
+     *
+     * @return array<int, array{label: string, edit_url: string}>
+     */
+    private function inviteCreatorMap(): array
+    {
+        $rows = $this->users->listAll();
+        $map = [];
+        foreach ($rows as $row) {
+            $userId = (int) ($row['id'] ?? 0);
+            if ($userId < 1) {
+                continue;
+            }
+
+            $displayName = trim((string) ($row['display_name'] ?? ''));
+            $username = trim((string) ($row['username'] ?? ''));
+            $email = trim((string) ($row['email'] ?? ''));
+            $label = $displayName !== ''
+                ? $displayName
+                : ($username !== '' ? $username : ($email !== '' ? $email : ('User #' . $userId)));
+
+            $map[$userId] = [
+                'label' => $label,
+                'edit_url' => $this->panelUrl('/users/edit/' . $userId),
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
      * Creates one invite token from panel form input.
      *
      * @param array<string, mixed> $post
@@ -2537,6 +2572,9 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->requireRoutePermissionOrForbidden('users', 'create')) {
+            return;
+        }
+        if (!$this->ensureInviteRegistrationMode()) {
             return;
         }
 
@@ -2584,6 +2622,9 @@ final class PanelController
         if (!$this->requireRoutePermissionOrForbidden('users', 'create')) {
             return;
         }
+        if (!$this->ensureInviteRegistrationMode()) {
+            return;
+        }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
@@ -2620,6 +2661,9 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->requireRoutePermissionOrForbidden('users', 'delete')) {
+            return;
+        }
+        if (!$this->ensureInviteRegistrationMode()) {
             return;
         }
 
@@ -5595,6 +5639,20 @@ final class PanelController
     private function registrationMode(): string
     {
         return $this->routeConfigService()->registrationMode();
+    }
+
+    /**
+     * Restricts invite-token management to invite-only registration mode.
+     */
+    private function ensureInviteRegistrationMode(): bool
+    {
+        if ($this->registrationMode() === 'invite') {
+            return true;
+        }
+
+        $this->flash('error', 'User invite tokens are available only when public registration mode is set to Invite.');
+        redirect($this->panelUrl('/users'));
+        return false;
     }
 
     /**

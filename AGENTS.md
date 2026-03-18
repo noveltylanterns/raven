@@ -212,7 +212,10 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Database/Schema/AppSchemaBuilder.php` - Shared app-schema table/index/column builder for core content/taxonomy/group storage.
 - `/private/lib/Database/Schema/AuthSchemaBuilder.php` - Shared auth-schema/install builder for Delight schema bootstrap and Raven auth-column backfills.
 - `/private/lib/Database/Schema/ExtensionSchemaRunner.php` - Shared enabled-extension schema provider runner for `private/ext/*/lib/schema.php`.
+- `/private/lib/Database/Schema/SchemaComponentFactory.php` - Shared lazy schema-component wiring helper for introspector/table resolver/app+auth builders/seed+extension runners.
+- `/private/lib/Database/Schema/SchemaEnsurePipeline.php` - Shared schema ensure orchestration pipeline that runs app schema updates, auth schema updates, extension schema providers, and seed install in stable order.
 - `/private/lib/Database/Schema/SchemaIntrospector.php` - Shared cross-driver schema/table/index introspection and DDL error helpers.
+- `/private/lib/Database/Schema/SchemaManager.php` - Shared schema ensure entrypoint delegating to `SchemaEnsurePipeline` for bootstrap orchestration.
 - `/private/lib/Database/Schema/SeedInstaller.php` - Shared stock-group and starter-page seed installer/normalizer.
 - `/private/lib/Database/Schema/TableNameResolver.php` - Shared logical-to-physical SQL table-name resolver across sqlite attached schemas and prefixed server DBs.
 - `/private/lib/Debug/DebugToolbarConfigResolver.php` - Shared resolver that maps debug config keys into normalized debug-toolbar visibility flags.
@@ -307,7 +310,7 @@ Core system files:
 - `/private/sys/Core/Auth/PanelAccess.php` - Panel permission bit constants and guard helpers, delegating stock route/group catalog definitions through `/private/lib/Auth/PanelAccessCatalog.php`.
 - `/private/sys/Core/Config.php` - Config loader/getter/setter service for Raven config keys, delegating underlying file load/save persistence to `/private/lib/Config/ConfigFileStore.php`.
 - `/private/sys/Core/Database/ConnectionFactory.php` - Database connection factory for SQLite/MySQL/PostgreSQL backends, delegating DSN/config/sqlite path/bootstrap concerns through `/private/lib/Database/Connection/`.
-- `/private/sys/Core/Database/SchemaManager.php` - Thin schema bootstrap orchestrator delegating base DDL, migrations, seed installation, and extension schema execution through `/private/lib/Database/Schema/`.
+- `/private/sys/Core/Database/SchemaManager.php` - Core compatibility shim delegating schema ensure/bootstrap behavior through `/private/lib/Database/Schema/SchemaManager.php`.
 - `/private/sys/Core/Debug/DebugToolbarRenderer.php` - Thin debug-toolbar adapter that delegates profiler payload sanitization/markup rendering to `/private/lib/Debug/`.
 - `/private/sys/Core/Extension/EmbeddedFormRuntimeInterface.php` - Contract interface for extension-provided embedded form runtimes.
 - `/private/sys/Core/Extension/ExtensionRegistry.php` - Extension discovery/registry logic, now delegating manifest/provider contract validation and state-file loading/normalization to `/private/lib/Extension/`.
