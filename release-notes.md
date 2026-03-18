@@ -5,6 +5,12 @@
 ### March 18, 2026
 
 - Completed a major bugs-and-tweaks batch, including panel/public 2FA flow fixes, upload/install fixes, panel user-editor/list UX fixes, and misc installer/runtime cleanups.
+- Fixed a Preferences 2FA regression where saving after a successful TOTP setup could incorrectly revert the method back to pending verification.
+- Updated confirmed Preferences TOTP rows so they now show `TOTP Secret` with value `Stored securely on server` (without confirm-code input or click-to-copy), and render secret fields with softer background styling instead of solid white.
+- Updated Preferences TOTP setup modal to include inline 8-digit verification input + `Finish Setup` submit action so TOTP confirmation can be completed directly from the popup.
+- Updated Preferences TOTP setup UX so pending app methods show `Finish Setup` (instead of `View Setup`) and that button now submits verification/save flow instead of reopening the QR setup modal.
+- Hardened TOTP setup/verification defaults: provisioning now emits non-legacy metadata (`algorithm=SHA256`, `digits=8`, `period=30`), generated secrets are longer, and panel TOTP UI prompts now use 8-digit code guidance.
+- Added encryption-at-rest for persisted TOTP secrets via a dedicated AES-256-GCM secret cipher (`private/lib/Security/TotpSecretCipher.php`) integrated into auth payload encode/decode flows.
 - Restricted panel invite-token management routes so `/panel/users/invites` now loads only when public registration mode is set to `invite` (non-invite modes redirect back to Users with an error flash).
 - Updated Existing Tokens token-code rendering so click-to-copy buttons display token values wrapped in `<code>` styling.
 - Finished SchemaManager modularization by moving schema component wiring and ensure orchestration into new `private/lib/Database/Schema` modules (`SchemaComponentFactory`, `SchemaEnsurePipeline`, lib `SchemaManager`) and reducing core `SchemaManager` to a compatibility shim.

@@ -152,13 +152,14 @@ $themeLabels = [
                         <option value="<?= e((string) $typeValue) ?>"><?= e((string) $typeLabel) ?></option>
                     <?php endforeach; ?>
                 </select>
+                <input type="hidden" data-preferences-two-factor-key="status" value="pending">
             </div>
             <div class="col-md-3" data-preferences-two-factor-section="label">
                 <label class="form-label">Label</label>
                 <input type="text" class="form-control form-control-sm" data-preferences-two-factor-key="label" placeholder="My Authenticator / Office Key">
             </div>
             <div class="col-md position-relative" data-preferences-two-factor-section="totp" style="display:none;">
-                <label class="form-label">TOTP Secret / Confirm Code</label>
+                <label class="form-label" data-preferences-two-factor-totp-label="1">TOTP Secret / Confirm Code</label>
                 <div class="input-group input-group-sm">
                     <input
                         type="text"
@@ -171,7 +172,7 @@ $themeLabels = [
                         style="caret-color: transparent; cursor: pointer;"
                         readonly
                     >
-                    <input type="text" class="form-control form-control-sm" data-preferences-two-factor-key="verification_code" placeholder="6-digit code">
+                    <input type="text" class="form-control form-control-sm" data-preferences-two-factor-key="verification_code" placeholder="8-digit code">
                     <button type="button" class="btn btn-primary btn-sm" data-preferences-two-factor-totp-setup="1">Setup App</button>
                 </div>
                 <div class="small text-muted d-none position-absolute start-0 end-0" style="top:calc(100% + 0.2rem);" data-preferences-two-factor-totp-feedback="1"></div>
@@ -260,7 +261,7 @@ $themeLabels = [
                 <ol class="mb-3 ps-3">
                     <li>Scan the QR code with your authenticator app.</li>
                     <li>If scan is unavailable, enter the manual key.</li>
-                    <li>Enter the app's 6-digit code in this row, then save preferences.</li>
+                    <li>Enter the app's 8-digit code below, then click Finish Setup.</li>
                 </ol>
 
                 <div class="text-center mb-3">
@@ -301,6 +302,25 @@ $themeLabels = [
                     ></code>
                     <div class="small text-muted mt-1" data-preferences-totp-modal-uri-copy="1">Click to copy.</div>
                 </div>
+
+                <form class="mt-3" data-preferences-totp-modal-verify-form="1" novalidate>
+                    <label class="form-label" for="preferences_totp_modal_code">Authenticator Code</label>
+                    <div class="input-group">
+                        <input
+                            id="preferences_totp_modal_code"
+                            type="text"
+                            class="form-control"
+                            data-preferences-totp-modal-code="1"
+                            inputmode="numeric"
+                            autocomplete="one-time-code"
+                            pattern="[0-9]{8}"
+                            placeholder="12345678"
+                            required
+                        >
+                        <button type="submit" class="btn btn-primary">Finish Setup</button>
+                    </div>
+                    <div class="small d-none mt-2" data-preferences-totp-modal-feedback="1"></div>
+                </form>
             </div>
         </div>
     </div>
@@ -323,6 +343,10 @@ $themeLabels = [
     var totpModalUri = totpModalEl instanceof HTMLElement ? totpModalEl.querySelector('[data-preferences-totp-modal-uri="1"]') : null;
     var totpModalSecretCopy = totpModalEl instanceof HTMLElement ? totpModalEl.querySelector('[data-preferences-totp-modal-secret-copy="1"]') : null;
     var totpModalUriCopy = totpModalEl instanceof HTMLElement ? totpModalEl.querySelector('[data-preferences-totp-modal-uri-copy="1"]') : null;
+    var totpModalVerifyForm = totpModalEl instanceof HTMLElement ? totpModalEl.querySelector('[data-preferences-totp-modal-verify-form="1"]') : null;
+    var totpModalCode = totpModalEl instanceof HTMLElement ? totpModalEl.querySelector('[data-preferences-totp-modal-code="1"]') : null;
+    var totpModalFeedback = totpModalEl instanceof HTMLElement ? totpModalEl.querySelector('[data-preferences-totp-modal-feedback="1"]') : null;
+    var totpModalActiveRow = null;
     var totpModal = null;
 
     if (
@@ -334,12 +358,39 @@ $themeLabels = [
       totpModal = new window.bootstrap.Modal(totpModalEl);
     }
 
+    if (totpModalEl instanceof HTMLElement) {
+      totpModalEl.addEventListener('hidden.bs.modal', function () {
+        totpModalActiveRow = null;
+        if (totpModalCode instanceof HTMLInputElement) {
+          totpModalCode.value = '';
+        }
+        setTotpModalFeedback('', 'muted');
+      });
+    }
+
     function sectionVisible(row, sectionType, visible) {
       var section = row.querySelector('[data-preferences-two-factor-section="' + sectionType + '"]');
       if (!(section instanceof HTMLElement)) {
         return;
       }
       section.style.display = visible ? '' : 'none';
+    }
+
+    function setRowStatus(row, status) {
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      var normalized = String(status || '').trim().toLowerCase();
+      if (normalized === '') {
+        normalized = 'pending';
+      }
+      row.setAttribute('data-preferences-two-factor-status', normalized);
+
+      var statusField = row.querySelector('[data-preferences-two-factor-key="status"]');
+      if (statusField instanceof HTMLInputElement) {
+        statusField.value = normalized;
+      }
     }
 
     function labelPlaceholderForType(methodType) {
@@ -393,12 +444,96 @@ $themeLabels = [
         ? String(secretField.value || '').trim() !== ''
         : false;
       var methodStatus = String(row.getAttribute('data-preferences-two-factor-status') || '').trim().toLowerCase();
-      if (methodType !== 'totp' || !hasSecret) {
+      if (methodType !== 'totp') {
         setupButton.textContent = 'Setup App';
         return;
       }
 
-      setupButton.textContent = methodStatus === 'confirmed' ? 'Reset' : 'View Setup';
+      if (methodStatus === 'confirmed') {
+        setupButton.textContent = 'Reset';
+        return;
+      }
+
+      if (!hasSecret) {
+        setupButton.textContent = 'Setup App';
+        return;
+      }
+
+      setupButton.textContent = 'Finish Setup';
+    }
+
+    function syncTotpFields(row) {
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      var typeField = row.querySelector('[data-preferences-two-factor-key="type"]');
+      var labelField = row.querySelector('[data-preferences-two-factor-totp-label="1"]');
+      var secretField = row.querySelector('[data-preferences-two-factor-key="secret"]');
+      var preservedSecretField = row.querySelector('[data-preferences-two-factor-secret-preserved="1"]');
+      var verificationField = row.querySelector('[data-preferences-two-factor-key="verification_code"]');
+      if (!(typeField instanceof HTMLSelectElement)) {
+        return;
+      }
+
+      var methodType = String(typeField.value || '').trim().toLowerCase();
+      var methodStatus = String(row.getAttribute('data-preferences-two-factor-status') || '').trim().toLowerCase();
+      var hasSecret = secretField instanceof HTMLInputElement
+        ? String(secretField.value || '').trim() !== ''
+        : false;
+      var isTotpConfirmed = methodType === 'totp' && methodStatus === 'confirmed';
+
+      if (labelField instanceof HTMLElement) {
+        labelField.textContent = isTotpConfirmed ? 'TOTP Secret' : 'TOTP Secret / Confirm Code';
+      }
+
+      if (verificationField instanceof HTMLInputElement) {
+        verificationField.style.display = isTotpConfirmed ? 'none' : '';
+        verificationField.disabled = isTotpConfirmed;
+        if (isTotpConfirmed) {
+          verificationField.value = '';
+        }
+      }
+
+      if (secretField instanceof HTMLInputElement) {
+        var secretName = String(secretField.getAttribute('name') || '').trim();
+        if (secretName === '' && preservedSecretField instanceof HTMLInputElement) {
+          secretName = String(preservedSecretField.getAttribute('name') || '').trim();
+        }
+        if (secretName === '') {
+          var typeName = String(typeField.getAttribute('name') || '');
+          if (typeName !== '') {
+            secretName = typeName.replace(/\[type\]$/, '[secret]');
+          }
+        }
+
+        secretField.classList.toggle('bg-body-tertiary', isTotpConfirmed);
+        if (isTotpConfirmed) {
+          secretField.value = 'Stored securely on server';
+          secretField.removeAttribute('name');
+          secretField.removeAttribute('data-preferences-two-factor-secret-copy');
+          secretField.removeAttribute('title');
+          secretField.style.cursor = 'default';
+          secretField.style.caretColor = 'auto';
+          if (preservedSecretField instanceof HTMLInputElement && secretName !== '') {
+            preservedSecretField.setAttribute('name', secretName);
+          }
+        } else {
+          if (secretName !== '') {
+            secretField.setAttribute('name', secretName);
+          }
+          secretField.setAttribute('data-preferences-two-factor-secret-copy', '1');
+          secretField.setAttribute('title', 'Click to copy');
+          secretField.style.cursor = 'pointer';
+          secretField.style.caretColor = 'transparent';
+          if (preservedSecretField instanceof HTMLInputElement) {
+            preservedSecretField.removeAttribute('name');
+          }
+          if (!hasSecret) {
+            secretField.value = '';
+          }
+        }
+      }
     }
 
     function syncRowSections(row) {
@@ -412,6 +547,18 @@ $themeLabels = [
       }
 
       var methodType = String(typeField.value || '').trim().toLowerCase();
+      var methodStatus = String(row.getAttribute('data-preferences-two-factor-status') || '').trim().toLowerCase();
+      if (methodType === 'totp') {
+        methodStatus = methodStatus === 'confirmed' ? 'confirmed' : 'pending';
+      } else if (methodType === 'webauthn') {
+        methodStatus = methodStatus === 'confirmed' ? 'confirmed' : 'stub';
+      } else if (methodType === 'recovery' || methodType === 'email') {
+        methodStatus = 'confirmed';
+      } else {
+        methodStatus = 'pending';
+      }
+      setRowStatus(row, methodStatus);
+
       syncLabelPlaceholder(row, methodType);
       syncLabelVisibility(row, methodType);
       sectionVisible(row, 'totp', methodType === 'totp');
@@ -419,6 +566,7 @@ $themeLabels = [
       sectionVisible(row, 'webauthn', methodType === 'webauthn');
       sectionVisible(row, 'email', methodType === 'email');
       syncTotpSetupButton(row);
+      syncTotpFields(row);
     }
 
     function reindexRows() {
@@ -475,10 +623,39 @@ $themeLabels = [
       feedback.textContent = text;
     }
 
-    function showTotpSetupModal(payload) {
+    function setTotpModalFeedback(message, level) {
+      if (!(totpModalFeedback instanceof HTMLElement)) {
+        return;
+      }
+
+      var text = String(message || '').trim();
+      totpModalFeedback.classList.remove('d-none', 'text-danger', 'text-success', 'text-muted');
+      if (text === '') {
+        totpModalFeedback.textContent = '';
+        totpModalFeedback.classList.add('d-none');
+        return;
+      }
+
+      if (level === 'error') {
+        totpModalFeedback.classList.add('text-danger');
+      } else if (level === 'success') {
+        totpModalFeedback.classList.add('text-success');
+      } else {
+        totpModalFeedback.classList.add('text-muted');
+      }
+      totpModalFeedback.textContent = text;
+    }
+
+    function showTotpSetupModal(payload, row) {
       var secret = String(payload && payload.secret ? payload.secret : '').trim();
       var provisioningUri = String(payload && payload.provisioning_uri ? payload.provisioning_uri : '').trim();
       var qrDataUri = String(payload && payload.qr_data_uri ? payload.qr_data_uri : '').trim();
+      totpModalActiveRow = row instanceof HTMLElement ? row : null;
+
+      if (totpModalCode instanceof HTMLInputElement) {
+        totpModalCode.value = '';
+      }
+      setTotpModalFeedback('', 'muted');
 
       if (totpModalSecret instanceof HTMLElement) {
         totpModalSecret.textContent = secret;
@@ -701,18 +878,19 @@ $themeLabels = [
           secretField.value = resolvedSecret;
         }
         if (resolvedSecret !== '') {
-          row.setAttribute('data-preferences-two-factor-status', 'pending');
+          setRowStatus(row, 'pending');
         }
         syncTotpSetupButton(row);
+        syncTotpFields(row);
 
         row.setAttribute('data-preferences-totp-provisioning-uri', String(setupPayload.provisioning_uri || ''));
         row.setAttribute('data-preferences-totp-qr-data-uri', String(setupPayload.qr_data_uri || ''));
-        showTotpSetupModal(setupPayload);
+        showTotpSetupModal(setupPayload, row);
         setTotpFeedback(
           row,
           isReset
-            ? 'Secret reset. Enter the app code and save preferences to confirm.'
-            : 'Setup ready. Enter the app code and save preferences to confirm.',
+            ? 'Secret reset. Enter the app code and click Finish Setup.'
+            : 'Setup ready. Enter the app code and click Finish Setup.',
           'success'
         );
       } catch (error) {
@@ -724,6 +902,88 @@ $themeLabels = [
       } finally {
         button.disabled = false;
       }
+    }
+
+    function finishTotpSetupForRow(row, button) {
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      var actionButton = button instanceof HTMLButtonElement ? button : null;
+      var typeField = row.querySelector('[data-preferences-two-factor-key="type"]');
+      if (!(typeField instanceof HTMLSelectElement) || String(typeField.value || '').trim().toLowerCase() !== 'totp') {
+        return;
+      }
+
+      var verificationField = row.querySelector('[data-preferences-two-factor-key="verification_code"]');
+      if (!(verificationField instanceof HTMLInputElement)) {
+        setTotpFeedback(row, 'TOTP verification code field is missing.', 'error');
+        return;
+      }
+
+      var verificationCode = String(verificationField.value || '').replace(/\D+/g, '');
+      if (verificationCode.length !== 8) {
+        setTotpFeedback(row, 'Enter the 8-digit app code to finish setup.', 'error');
+        return;
+      }
+
+      verificationField.value = verificationCode;
+      setTotpFeedback(row, 'Finishing setup...', 'muted');
+      if (actionButton instanceof HTMLButtonElement) {
+        actionButton.disabled = true;
+      }
+
+      var form = row.closest('form');
+      if (!(form instanceof HTMLFormElement)) {
+        if (actionButton instanceof HTMLButtonElement) {
+          actionButton.disabled = false;
+        }
+        setTotpFeedback(row, 'Unable to submit preferences form.', 'error');
+        return;
+      }
+
+      if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+        return;
+      }
+
+      form.submit();
+    }
+
+    if (totpModalVerifyForm instanceof HTMLFormElement) {
+      totpModalVerifyForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        if (!(totpModalActiveRow instanceof HTMLElement)) {
+          setTotpModalFeedback('Setup row is unavailable. Close this dialog and try Setup App again.', 'error');
+          return;
+        }
+
+        if (!(totpModalCode instanceof HTMLInputElement)) {
+          setTotpModalFeedback('Authenticator code field is unavailable.', 'error');
+          return;
+        }
+
+        var code = String(totpModalCode.value || '').replace(/\D+/g, '');
+        if (code.length !== 8) {
+          setTotpModalFeedback('Enter the 8-digit app code to finish setup.', 'error');
+          return;
+        }
+
+        var rowVerificationField = totpModalActiveRow.querySelector('[data-preferences-two-factor-key="verification_code"]');
+        if (!(rowVerificationField instanceof HTMLInputElement)) {
+          setTotpModalFeedback('Verification field is unavailable for this method row.', 'error');
+          return;
+        }
+
+        rowVerificationField.value = code;
+        setTotpModalFeedback('Finishing setup...', 'muted');
+        var activeRow = totpModalActiveRow;
+        if (totpModal !== null) {
+          totpModal.hide();
+        }
+        finishTotpSetupForRow(activeRow, null);
+      });
     }
 
     function recoveryCopyHintElement(row) {
@@ -1129,7 +1389,21 @@ $themeLabels = [
       if (totpSetupButton instanceof HTMLButtonElement) {
         var totpRow = totpSetupButton.closest('[data-preferences-two-factor-row="1"]');
         if (totpRow instanceof HTMLElement) {
-          void setupTotpForRow(totpRow, totpSetupButton);
+          var typeField = totpRow.querySelector('[data-preferences-two-factor-key="type"]');
+          var secretField = totpRow.querySelector('[data-preferences-two-factor-key="secret"]');
+          var methodType = typeField instanceof HTMLSelectElement
+            ? String(typeField.value || '').trim().toLowerCase()
+            : '';
+          var hasSecret = secretField instanceof HTMLInputElement
+            ? String(secretField.value || '').trim() !== ''
+            : false;
+          var methodStatus = String(totpRow.getAttribute('data-preferences-two-factor-status') || '').trim().toLowerCase();
+
+          if (methodType === 'totp' && hasSecret && methodStatus !== 'confirmed') {
+            finishTotpSetupForRow(totpRow, totpSetupButton);
+          } else {
+            void setupTotpForRow(totpRow, totpSetupButton);
+          }
         }
         return;
       }
@@ -1496,6 +1770,17 @@ $themeLabels = [
                         $methodEmail = (string) ($method['email'] ?? '');
                         $methodProvisioningUri = (string) ($method['provisioning_uri'] ?? '');
                         $methodQrDataUri = (string) ($method['qr_data_uri'] ?? '');
+                        $methodStatusValue = $methodStatus;
+                        if (!in_array($methodStatusValue, ['pending', 'confirmed', 'stub'], true)) {
+                            $methodStatusValue = match ($methodType) {
+                                'totp' => 'pending',
+                                'webauthn' => 'stub',
+                                default => 'confirmed',
+                            };
+                        }
+                        $isTotpConfirmed = $methodType === 'totp' && $methodStatus === 'confirmed';
+                        $totpSecretValue = $isTotpConfirmed ? 'Stored securely on server' : $methodSecret;
+                        $totpSecretCopyEnabled = !$isTotpConfirmed;
                         $methodLabelPlaceholder = match ($methodType) {
                             'totp' => 'Authenticator App',
                             'recovery' => '',
@@ -1520,6 +1805,12 @@ $themeLabels = [
                                             <option value="<?= e((string) $typeValue) ?>"<?= $methodType === (string) $typeValue ? ' selected' : '' ?>><?= e((string) $typeLabel) ?></option>
                                         <?php endforeach; ?>
                                     </select>
+                                    <input
+                                        type="hidden"
+                                        data-preferences-two-factor-key="status"
+                                        name="two_factor_methods[<?= (int) $index ?>][status]"
+                                        value="<?= e($methodStatusValue) ?>"
+                                    >
                                 </div>
                                 <div class="col-md-3" data-preferences-two-factor-section="label"<?= $methodType === 'recovery' ? ' style="display:none;"' : '' ?>>
                                     <label class="form-label">Label</label>
@@ -1533,33 +1824,43 @@ $themeLabels = [
                                     >
                                 </div>
                                 <div class="col-md position-relative" data-preferences-two-factor-section="totp"<?= $methodType === 'totp' ? '' : ' style="display:none;"' ?>>
-                                    <label class="form-label">TOTP Secret / Confirm Code</label>
+                                    <label class="form-label" data-preferences-two-factor-totp-label="1"><?= $isTotpConfirmed ? 'TOTP Secret' : 'TOTP Secret / Confirm Code' ?></label>
                                     <div class="input-group input-group-sm">
                                         <input
                                             type="text"
-                                            class="form-control form-control-sm"
+                                            class="form-control form-control-sm<?= $isTotpConfirmed ? ' bg-body-tertiary' : '' ?>"
                                             data-preferences-two-factor-key="secret"
-                                            data-preferences-two-factor-secret-copy="1"
-                                            name="two_factor_methods[<?= (int) $index ?>][secret]"
-                                            value="<?= e($methodSecret) ?>"
+                                            <?= $totpSecretCopyEnabled ? 'data-preferences-two-factor-secret-copy="1"' : '' ?>
+                                            <?= !$isTotpConfirmed ? 'name="two_factor_methods[' . (int) $index . '][secret]"' : '' ?>
+                                            value="<?= e($totpSecretValue) ?>"
                                             placeholder="Click 'Setup App'"
-                                            title="Click to copy"
+                                            <?= $totpSecretCopyEnabled ? 'title="Click to copy"' : '' ?>
                                             autocomplete="off"
-                                            style="caret-color: transparent; cursor: pointer;"
+                                            style="caret-color: <?= $totpSecretCopyEnabled ? 'transparent' : 'auto' ?>; cursor: <?= $totpSecretCopyEnabled ? 'pointer' : 'default' ?>;"
                                             readonly
                                         >
+                                        <?php if ($isTotpConfirmed): ?>
+                                            <input
+                                                type="hidden"
+                                                data-preferences-two-factor-key="secret"
+                                                data-preferences-two-factor-secret-preserved="1"
+                                                name="two_factor_methods[<?= (int) $index ?>][secret]"
+                                                value="<?= e($methodSecret) ?>"
+                                            >
+                                        <?php endif; ?>
                                         <input
                                             type="text"
                                             class="form-control form-control-sm"
                                             data-preferences-two-factor-key="verification_code"
                                             name="two_factor_methods[<?= (int) $index ?>][verification_code]"
                                             value=""
-                                            placeholder="6-digit code"
+                                            placeholder="8-digit code"
+                                            <?= $isTotpConfirmed ? ' style="display:none;" disabled' : '' ?>
                                         >
                                         <button type="button" class="btn btn-primary btn-sm" data-preferences-two-factor-totp-setup="1"><?=
-                                            $methodSecret === ''
-                                                ? 'Setup App'
-                                                : ($methodStatus === 'confirmed' ? 'Reset' : 'View Setup')
+                                            $methodStatus === 'confirmed'
+                                                ? 'Reset'
+                                                : ($methodSecret === '' ? 'Setup App' : 'Finish Setup')
                                         ?></button>
                                     </div>
                                     <div class="small text-muted d-none position-absolute start-0 end-0" style="top:calc(100% + 0.2rem);" data-preferences-two-factor-totp-feedback="1"></div>

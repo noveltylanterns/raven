@@ -39,7 +39,7 @@ final class TwoFactorMethodNormalizer
             $row = [
                 'type' => $type,
                 'label' => $label,
-                'status' => TwoFactorMethodRules::normalizeStatus('', $type),
+                'status' => TwoFactorMethodRules::normalizeStatus((string) ($method['status'] ?? ''), $type),
                 'added_at' => self::normalizeAddedAt($method['added_at'] ?? null),
             ];
 
@@ -55,6 +55,9 @@ final class TwoFactorMethodNormalizer
                 }
 
                 $row['secret'] = $secret;
+                if ($row['status'] !== 'confirmed') {
+                    $row['status'] = 'pending';
+                }
                 $verificationCode = TotpService::normalizeCode((string) ($method['verification_code'] ?? ''));
                 if ($verificationCode !== '' && TotpService::verifyCode($secret, $verificationCode, 1, $totpIssuer)) {
                     $row['status'] = 'confirmed';

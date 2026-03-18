@@ -275,6 +275,7 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Security/QrCodeService.php` - Shared QR-code rendering helper for SVG data-URI generation.
 - `/private/lib/Security/RecoveryPhrase.php` - Shared recovery-phrase generator, normalization, and validation helper for 2FA.
 - `/private/lib/Security/TotpService.php` - Shared TOTP secret/code normalization, verification, and provisioning-URI helper.
+- `/private/lib/Security/TotpSecretCipher.php` - Shared TOTP secret encryption/decryption helper for at-rest protection of persisted authenticator secrets.
 - `/private/lib/Security/TwoFactorChallengeHelper.php` - Shared helper for pending 2FA method lookup/filter/fallback selection logic.
 - `/private/lib/Security/TwoFactorMethodKey.php` - Shared helpers for building/parsing interactive 2FA method keys.
 - `/private/lib/Security/TwoFactorMethodNormalizer.php` - Shared full normalization for submitted/stored/rendered 2FA method rows.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
 
+use Raven\Lib\Security\TotpSecretCipher;
 use Raven\Lib\Security\TwoFactorMethodNormalizer;
 
 /**
@@ -12,10 +13,15 @@ use Raven\Lib\Security\TwoFactorMethodNormalizer;
 final class AuthPayloadCodec
 {
     private ContactProfileNormalizer $contactProfileNormalizer;
+    private TotpSecretCipher $totpSecretCipher;
 
-    public function __construct(ContactProfileNormalizer $contactProfileNormalizer)
+    public function __construct(
+        ContactProfileNormalizer $contactProfileNormalizer,
+        ?TotpSecretCipher $totpSecretCipher = null
+    )
     {
         $this->contactProfileNormalizer = $contactProfileNormalizer;
+        $this->totpSecretCipher = $totpSecretCipher ?? new TotpSecretCipher();
     }
 
     /**
@@ -86,7 +92,7 @@ final class AuthPayloadCodec
             return [];
         }
 
-        return TwoFactorMethodNormalizer::normalizeStored($decoded);
+        return TwoFactorMethodNormalizer::normalizeStored($this->decryptTotpSecrets($decoded));
     }
 
     /**
@@ -99,9 +105,75 @@ final class AuthPayloadCodec
         }
 
         try {
-            return json_encode($methods, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+            return json_encode($this->encryptTotpSecrets($methods), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $methods
+     * @return array<int, array<string, mixed>>
+     */
+    private function encryptTotpSecrets(array $methods): array
+    {
+        foreach ($methods as $index => $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            $type = strtolower(trim((string) ($method['type'] ?? '')));
+            if ($type !== 'totp') {
+                continue;
+            }
+
+            $secret = trim((string) ($method['secret'] ?? ''));
+            if ($secret === '') {
+                continue;
+            }
+
+            if ($this->totpSecretCipher->isEncrypted($secret)) {
+                continue;
+            }
+
+            $encrypted = $this->totpSecretCipher->encryptSecret($secret);
+            if (!is_string($encrypted) || $encrypted === '') {
+                continue;
+            }
+
+            $method['secret'] = $encrypted;
+            $methods[$index] = $method;
+        }
+
+        return $methods;
+    }
+
+    /**
+     * @param array<int, mixed> $methods
+     * @return array<int, mixed>
+     */
+    private function decryptTotpSecrets(array $methods): array
+    {
+        foreach ($methods as $index => $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            $type = strtolower(trim((string) ($method['type'] ?? '')));
+            if ($type !== 'totp') {
+                continue;
+            }
+
+            $secret = trim((string) ($method['secret'] ?? ''));
+            if ($secret === '') {
+                continue;
+            }
+
+            $decrypted = $this->totpSecretCipher->decryptSecret($secret);
+            $method['secret'] = is_string($decrypted) ? $decrypted : '';
+            $methods[$index] = $method;
+        }
+
+        return $methods;
     }
 }

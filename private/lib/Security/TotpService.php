@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Security;
 
+use RobThree\Auth\Algorithm;
 use RobThree\Auth\TwoFactorAuth;
 
 /**
@@ -11,6 +12,12 @@ use RobThree\Auth\TwoFactorAuth;
  */
 final class TotpService
 {
+    private const SECRET_MIN_LENGTH = 32;
+    private const SECRET_MAX_LENGTH = 128;
+    private const MODERN_SECRET_BITS = 160;
+    private const MODERN_DIGITS = 8;
+    private const PERIOD_SECONDS = 30;
+
     public static function normalizeSecret(string $secret): string
     {
         $normalized = strtoupper(trim($secret));
@@ -19,7 +26,10 @@ final class TotpService
 
     public static function isValidSecret(string $secret): bool
     {
-        return preg_match('/^[A-Z2-7]{16,128}$/', self::normalizeSecret($secret)) === 1;
+        return preg_match(
+            '/^[A-Z2-7]{' . self::SECRET_MIN_LENGTH . ',' . self::SECRET_MAX_LENGTH . '}$/',
+            self::normalizeSecret($secret)
+        ) === 1;
     }
 
     public static function normalizeCode(string $code): string
@@ -29,7 +39,7 @@ final class TotpService
 
     public static function isValidCode(string $code): bool
     {
-        return preg_match('/^\d{6,8}$/', self::normalizeCode($code)) === 1;
+        return preg_match('/^\d{' . self::MODERN_DIGITS . '}$/', self::normalizeCode($code)) === 1;
     }
 
     public static function generateSecret(string $issuer = 'Raven CMS'): ?string
@@ -39,8 +49,8 @@ final class TotpService
         }
 
         try {
-            $totp = new TwoFactorAuth(self::normalizeIssuer($issuer));
-            $secret = self::normalizeSecret((string) $totp->createSecret());
+            $totp = self::modernTotp(self::normalizeIssuer($issuer));
+            $secret = self::normalizeSecret((string) $totp->createSecret(self::MODERN_SECRET_BITS));
             return self::isValidSecret($secret) ? $secret : null;
         } catch (\Throwable) {
             return null;
@@ -64,8 +74,12 @@ final class TotpService
         }
 
         try {
-            $totp = new TwoFactorAuth(self::normalizeIssuer($issuer));
-            return $totp->verifyCode($normalizedSecret, $normalizedCode, max(0, $window));
+            $normalizedIssuer = self::normalizeIssuer($issuer);
+            return self::modernTotp($normalizedIssuer)->verifyCode(
+                $normalizedSecret,
+                $normalizedCode,
+                max(0, $window)
+            );
         } catch (\Throwable) {
             return false;
         }
@@ -80,19 +94,29 @@ final class TotpService
 
         $normalizedIssuer = self::normalizeIssuer($issuer);
         $account = self::normalizeAccountEmail($accountEmail);
-        $label = rawurlencode($normalizedIssuer . ':' . $account);
-        $encodedIssuer = rawurlencode($normalizedIssuer);
+        $label = $normalizedIssuer . ':' . $account;
 
-        return 'otpauth://totp/' . $label
-            . '?secret=' . rawurlencode($normalizedSecret)
-            . '&issuer=' . $encodedIssuer
-            . '&digits=6&period=30';
+        try {
+            return self::modernTotp($normalizedIssuer)->getQRText($label, $normalizedSecret);
+        } catch (\Throwable) {
+            return '';
+        }
     }
 
     private static function normalizeIssuer(string $issuer): string
     {
         $normalized = trim($issuer);
         return $normalized !== '' ? $normalized : 'Raven CMS';
+    }
+
+    private static function modernTotp(string $issuer): TwoFactorAuth
+    {
+        return new TwoFactorAuth(
+            $issuer,
+            self::MODERN_DIGITS,
+            self::PERIOD_SECONDS,
+            Algorithm::Sha256
+        );
     }
 
     private static function normalizeAccountEmail(string $accountEmail): string
@@ -102,4 +126,3 @@ final class TotpService
         return is_string($validated) && $validated !== '' ? $validated : 'account@local';
     }
 }
-

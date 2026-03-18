@@ -50,6 +50,9 @@ Behavior notes:
 - Password changes require minimum 8 characters.
 - `<Default>` theme follows system configured panel default theme.
 - Avatar upload shows current avatar preview when present.
+- TOTP setup now provisions 8-digit codes with SHA-256 metadata and longer app secrets.
+- Confirmed TOTP rows show `TOTP Secret` with value `Stored securely on server` (no confirm-code input, no copy control).
+- TOTP secrets are encrypted at rest in user preferences (not one-way hashed) so login-time code verification can still run.
 - Recovery phrases are generated as 12 words from the BIP39 English wordlist.
 - Non-reusable recovery phrases are one-time login methods and are removed after successful use.
 
@@ -131,9 +134,11 @@ When Preferences behavior changes, update this document in the same task. That i
 - `Two-Factor Methods`
 - `Setup TOTP`
 - `Setup App`
+- `Finish Setup`
 - `Manual Key`
 - `Add 2FA Method`
 - `TOTP Secret / Confirm Code`
+- `TOTP Secret`
 - `Recovery Phrase`
 - `Reusable`
 - `Generate`

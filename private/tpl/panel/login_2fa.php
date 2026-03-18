@@ -110,7 +110,7 @@ $defaultMethodLabel = static function (string $methodType): string {
                 $inputLabel = $isRecovery
                     ? 'Recovery Phrase'
                     : ($isEmail ? 'Email Code' : 'Verification Code');
-                $inputPattern = $isEmail ? '[0-9]{8}' : '[0-9]{6,8}';
+                $inputPattern = '[0-9]{8}';
                 ?>
                 <p class="text-muted mb-2">Method: <?= e($selectedLabel) ?></p>
                 <?php if ($isEmail): ?>
@@ -216,7 +216,7 @@ $defaultMethodLabel = static function (string $methodType): string {
                                 autocomplete="<?= e($isRecovery ? 'off' : 'one-time-code') ?>"
                                 inputmode="<?= e($isRecovery ? 'text' : 'numeric') ?>"
                                 <?= $isRecovery ? '' : ('pattern="' . e($inputPattern) . '"') ?>
-                                placeholder="<?= e($isRecovery ? 'twelve-word recovery phrase' : '123456') ?>"
+                                placeholder="<?= e($isRecovery ? 'twelve-word recovery phrase' : '12345678') ?>"
                             >
                         </div>
                         <div class="d-flex flex-wrap justify-content-center gap-2">
