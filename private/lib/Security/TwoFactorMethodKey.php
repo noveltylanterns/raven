@@ -9,6 +9,9 @@ namespace Raven\Lib\Security;
  */
 final class TwoFactorMethodKey
 {
+    private const RECOVERY_POOL_KEY = 'recovery:pool';
+    private const EMAIL_POOL_KEY = 'email:pool';
+
     public static function forTotpSecret(string $secret): string
     {
         return 'totp:' . sha1(TotpService::normalizeSecret($secret));
@@ -29,6 +32,26 @@ final class TwoFactorMethodKey
         return 'email:' . sha1(strtolower(trim($email)));
     }
 
+    public static function recoveryPool(): string
+    {
+        return self::RECOVERY_POOL_KEY;
+    }
+
+    public static function emailPool(): string
+    {
+        return self::EMAIL_POOL_KEY;
+    }
+
+    public static function isRecoveryPool(string $methodKey): bool
+    {
+        return trim(strtolower($methodKey)) === self::RECOVERY_POOL_KEY;
+    }
+
+    public static function isEmailPool(string $methodKey): bool
+    {
+        return trim(strtolower($methodKey)) === self::EMAIL_POOL_KEY;
+    }
+
     public static function extractWebauthnCredentialId(string $methodKey): string
     {
         $methodKey = trim($methodKey);
@@ -39,4 +62,3 @@ final class TwoFactorMethodKey
         return trim(substr($methodKey, strlen('webauthn:')));
     }
 }
-

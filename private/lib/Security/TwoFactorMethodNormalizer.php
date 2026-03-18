@@ -409,6 +409,27 @@ final class TwoFactorMethodNormalizer
             }
         }
 
+        usort($prepared, static function (array $left, array $right): int {
+            $leftLabel = strtolower(trim((string) ($left['label'] ?? '')));
+            $rightLabel = strtolower(trim((string) ($right['label'] ?? '')));
+            if ($leftLabel === '' || $rightLabel === '') {
+                $leftFallback = strtolower(TwoFactorMethodRules::defaultLabelForType((string) ($left['type'] ?? '')));
+                $rightFallback = strtolower(TwoFactorMethodRules::defaultLabelForType((string) ($right['type'] ?? '')));
+                if ($leftLabel === '') {
+                    $leftLabel = $leftFallback;
+                }
+                if ($rightLabel === '') {
+                    $rightLabel = $rightFallback;
+                }
+            }
+
+            if ($leftLabel !== $rightLabel) {
+                return $leftLabel <=> $rightLabel;
+            }
+
+            return strtolower((string) ($left['type'] ?? '')) <=> strtolower((string) ($right['type'] ?? ''));
+        });
+
         return $prepared;
     }
 

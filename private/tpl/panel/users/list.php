@@ -12,6 +12,7 @@
 /** @var array<string, string> $site */
 /** @var array<int, array<string, mixed>> $users */
 /** @var array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}> $groupOptions */
+/** @var string|null $loginIdentifierMode */
 /** @var string $prefilterGroup */
 /** @var array<string, mixed> $pagination */
 /** @var string $csrfField */
@@ -28,6 +29,11 @@ $usersSearchId = 'users-filter-search';
 $usersGroupFilterId = 'users-filter-group';
 $usersCountId = 'users-filter-count';
 $usersEmptyId = 'users-filter-empty';
+$loginIdentifierMode = strtolower(trim((string) ($loginIdentifierMode ?? 'email')));
+if (!in_array($loginIdentifierMode, ['email', 'username'], true)) {
+    $loginIdentifierMode = 'email';
+}
+$showUsernameColumn = $loginIdentifierMode === 'username';
 $prefilterGroup = strtolower(trim((string) ($prefilterGroup ?? '')));
 $groupFilterOptions = [];
 foreach ($groupOptions as $groupOption) {
@@ -101,7 +107,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                         id="<?= e($usersSearchId) ?>"
                         type="search"
                         class="form-control form-control-sm"
-                        placeholder="Filter by username, display name, email, or groups..."
+                        placeholder="<?= e($showUsernameColumn ? 'Filter by username, display name, email, or groups...' : 'Filter by display name, email, or groups...') ?>"
                     >
                 </div>
                 <div class="col-12 col-lg-4">
@@ -120,14 +126,16 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                     id="<?= e($usersTableId) ?>"
                     class="table table-sm align-middle"
                     data-rvn-sort-table="1"
-                    data-sort-default-key="username"
+                    data-sort-default-key="<?= e($showUsernameColumn ? 'username' : 'display_name') ?>"
                     data-sort-default-direction="asc"
                 >
                     <thead>
                     <tr>
                         <th></th>
                         <th scope="col" data-sort-key="id" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">ID</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+                        <?php if ($showUsernameColumn): ?>
                         <th scope="col" data-sort-key="username" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Username</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+                        <?php endif; ?>
                         <th scope="col" data-sort-key="display_name" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Display Name</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="email" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Email</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="groups" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Groups</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
@@ -209,11 +217,13 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                                 >
                             </td>
                             <td><?= $userId ?></td>
-                            <td>
-                                <a href="<?= e($panelBase) ?>/users/edit/<?= $userId ?>">
-                                    <?= e($username) ?>
-                                </a>
-                            </td>
+                            <?php if ($showUsernameColumn): ?>
+                                <td>
+                                    <a href="<?= e($panelBase) ?>/users/edit/<?= $userId ?>">
+                                        <?= e($username) ?>
+                                    </a>
+                                </td>
+                            <?php endif; ?>
                             <td>
                                 <?= e($displayName) ?>
                             </td>

@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/tpl/login.php
+ * ~/public/theme/raven/tpl/login.php
  * Public login helper template.
  * Docs: https://raven.lanterns.io
  */

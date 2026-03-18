@@ -402,9 +402,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
 
             $groups = new GroupRepository($appDb, $driverName, $prefix);
             $superAdminGroupId = $groups->idBySlug('super');
-            $userGroupId = $groups->idBySlug('user');
-
-            if ($superAdminGroupId === null || $userGroupId === null) {
+            if ($superAdminGroupId === null) {
                 throw new RuntimeException('Stock groups were not created correctly.');
             }
 
@@ -415,7 +413,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
                 'email' => $adminEmail,
                 'theme' => 'default',
                 'password' => $adminPassword,
-                'group_ids' => [$superAdminGroupId, $userGroupId],
+                'group_ids' => [$superAdminGroupId],
             ]);
 
             installer_write_config($configPath, $nextConfig);

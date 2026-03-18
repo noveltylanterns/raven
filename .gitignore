@@ -2,11 +2,8 @@
 /private/config.php
 !/private/config.php.dist
 /private/dat/*
-/private/dat/install.lock
 !/private/dat/
-!/private/dat/channel/
-/private/dat/channel/**
-!/private/dat/channel/.channel.php.dist
+!/private/dat/.gitkeep
 /private/ext/.state.php
 !/private/ext/.state.php.dist
 /private/ext/debug-*/

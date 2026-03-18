@@ -2,6 +2,18 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### March 18, 2026
+
+- Completed a major bugs-and-tweaks batch, including panel/public 2FA flow fixes, upload/install fixes, panel user-editor/list UX fixes, and misc installer/runtime cleanups.
+- Updated login-time 2FA method handling so recovery/email methods are pooled, authenticator apps remain individually selectable, method lists are alphabetically sorted, email dispatch requests are silent/non-enumerating, and email challenge codes use 8 digits.
+- Updated panel login 2FA UI behavior to preserve a direct `Try Security Key` action after a WebAuthn failure even when users switch to alternate methods and return to method selection.
+- Added missing public/fallback auth templates (`login`, `login_2fa`, `register`) for stock theme/fallback flows.
+- Removed legacy hardcoded gallery rendering from page templates and moved gallery output to dynamic body-block rendering through the public controller/template pipeline.
+- Fixed theme/extension re-upload behavior for exported ZIPs that contain a single wrapper directory (manifest discovery now works after flattening).
+- Fixed installer first-user group assignment so initial Super Admin is not auto-assigned to both `super` and `user`.
+- Updated runtime data tracking policy to remove `private/dat/channel/.channel.php.dist`, keep `private/dat/.gitkeep`, and ignore mutable `private/dat/*` contents.
+- Updated smoke tooling to follow current template/runtime paths (`vis` -> `tpl`, `private/tmp` -> `.tmp`), including docs/theme/security/debug/contact smoke helpers.
+
 ### March 14, 2026
 
 - Finished `Email Code` 2FA method implementation (removed stub status): email methods now normalize as confirmed, participate in interactive login challenge selection, and can be verified during `/login/2fa` flows.

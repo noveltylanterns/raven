@@ -425,7 +425,7 @@ final class SecuritySmokeRunner
             return;
         }
 
-        $sessionDir = $this->root . '/private/tmp/sessions';
+        $sessionDir = $this->root . '/.tmp/sessions';
         if (!is_dir($sessionDir)) {
             mkdir($sessionDir, 0775, true);
         }

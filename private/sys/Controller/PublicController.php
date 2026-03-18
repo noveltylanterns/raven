@@ -20,7 +20,6 @@ use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Content\BodyBlockPolicy;
 use Raven\Lib\Content\MarkdownRenderer;
 use Raven\Lib\Content\PublicPageBodyRenderer;
-use Raven\Lib\Content\PageBodyBlockCodec;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\EmbeddedFormRuntimeService;
 use Raven\Lib\Http\RequestContextResolver;
@@ -85,7 +84,6 @@ final class PublicController
     private ?RouteConfigService $routeConfigService = null;
     private ?BodyBlockPolicy $bodyBlockPolicy = null;
     private ?CaptchaService $captchaService = null;
-    private ?PageBodyBlockCodec $pageBodyBlockCodec = null;
     private ?ThemeCatalogService $themeCatalogService = null;
     private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
     private ?PublicMetaService $publicMetaService = null;
@@ -184,21 +182,13 @@ final class PublicController
             return;
         }
 
-        $galleryEnabled = (int) ($page['gallery_enabled'] ?? 0) === 1 || $this->pageBodyIncludesGalleryBlock($page);
-        $galleryImages = $galleryEnabled
-            ? $this->pageImages->listReadyForPublicPage((int) $page['id'])
-            : [];
-
         $page['content'] = $this->renderEmbeddedForms((string) ($page['content'] ?? ''));
         $page = $this->renderPageExtendedBlocks($page);
         $page = $this->decoratePageForTemplate($page);
-        $galleryImages = $this->decorateGalleryImagesForTemplate($galleryImages);
 
         $this->renderPublic('home', [
             'site' => $this->siteDataWithPageMeta($page),
             'page' => $page,
-            'galleryEnabled' => $galleryEnabled,
-            'galleryImages' => $galleryImages,
         ], 'wrapper');
     }
 
@@ -222,15 +212,9 @@ final class PublicController
 
         $channel = $this->taxonomy->findChannelBySlug($channelSlug);
 
-        $galleryEnabled = (int) ($page['gallery_enabled'] ?? 0) === 1 || $this->pageBodyIncludesGalleryBlock($page);
-        $galleryImages = $galleryEnabled
-            ? $this->pageImages->listReadyForPublicPage((int) $page['id'])
-            : [];
-
         $page['content'] = $this->renderEmbeddedForms((string) ($page['content'] ?? ''));
         $page = $this->renderPageExtendedBlocks($page);
         $page = $this->decoratePageForTemplate($page);
-        $galleryImages = $this->decorateGalleryImagesForTemplate($galleryImages);
 
         $channelTemplate = $this->resolveChannelTemplateName($channelSlug);
         $site = $this->siteDataWithPageMeta($page);
@@ -242,8 +226,6 @@ final class PublicController
         $this->renderPublic($channelTemplate, [
             'site' => $site,
             'page' => $page,
-            'galleryEnabled' => $galleryEnabled,
-            'galleryImages' => $galleryImages,
         ], 'wrapper');
     }
 
@@ -321,23 +303,15 @@ final class PublicController
             }
         }
 
-        $galleryEnabled = (int) ($page['gallery_enabled'] ?? 0) === 1 || $this->pageBodyIncludesGalleryBlock($page);
-        $galleryImages = $galleryEnabled
-            ? $this->pageImages->listReadyForPublicPage((int) $page['id'])
-            : [];
-
         $page['content'] = $this->renderEmbeddedForms((string) ($page['content'] ?? ''));
         $page = $this->renderPageExtendedBlocks($page);
         $page = $this->decoratePageForTemplate($page);
-        $galleryImages = $this->decorateGalleryImagesForTemplate($galleryImages);
 
         $pageTemplate = $this->resolvePageTemplateName($channelSlug);
 
         $this->renderPublic($pageTemplate, [
             'site' => $this->siteDataWithPageMeta($page),
             'page' => $page,
-            'galleryEnabled' => $galleryEnabled,
-            'galleryImages' => $galleryImages,
         ], 'wrapper');
     }
 
@@ -655,7 +629,7 @@ final class PublicController
     public function login(): void
     {
         if ($this->auth->isLoggedIn() && $this->auth->canAccessPanel()) {
-            \Raven\Core\Support\redirect($this->panelUrl('/'));
+            \Raven\Core\Support\redirect('/');
         }
 
         $this->renderPublic('login', [
@@ -668,6 +642,7 @@ final class PublicController
             'registrationMode' => $this->registrationMode(),
             'loginIdentifierMode' => $this->loginIdentifierMode(),
             'loginIdentifierLabel' => $this->loginIdentifierMode() === 'email' ? 'Email' : 'Username',
+            'postLoginRedirectPath' => '/',
         ], 'wrapper');
     }
 
@@ -1092,7 +1067,7 @@ final class PublicController
         }
 
         $renderedBlocks = [];
-        $hasGalleryBlock = false;
+        $galleryBlockHtml = null;
         foreach ($rawBlocks as $block) {
             $type = 'tinymce';
             $content = '';
@@ -1116,7 +1091,17 @@ final class PublicController
             }
 
             if ($this->pageBodyBlockEditorMode($type) === 'gallery') {
-                $hasGalleryBlock = true;
+                if (!is_string($galleryBlockHtml)) {
+                    $galleryBlockHtml = $this->renderPageGalleryBlockHtml($page);
+                }
+                if (trim($galleryBlockHtml) === '') {
+                    continue;
+                }
+                $renderedBlocks[] = [
+                    'html' => $galleryBlockHtml,
+                    'css_id' => $cssId,
+                    'css_class' => $cssClass,
+                ];
                 continue;
             }
 
@@ -1133,29 +1118,71 @@ final class PublicController
         }
 
         $page['extended_blocks'] = $renderedBlocks;
-        if ($hasGalleryBlock) {
-            $page['gallery_enabled'] = 1;
-        }
-
         return $page;
     }
 
     /**
-     * Returns true when at least one typed body block requests gallery output.
+     * Renders one gallery body block from page image rows.
      *
      * @param array<string, mixed> $page
      */
-    private function pageBodyIncludesGalleryBlock(array $page): bool
+    private function renderPageGalleryBlockHtml(array $page): string
     {
-        $rawBlocks = $page['extended_blocks'] ?? null;
-        if (!is_array($rawBlocks)) {
-            return false;
+        $pageId = (int) ($page['id'] ?? 0);
+        if ($pageId <= 0) {
+            return '';
         }
 
-        return $this->pageBodyBlockCodec()->hasGalleryBlock(
-            $rawBlocks,
-            fn (string $type): string => $this->pageBodyBlockEditorMode($type)
+        $galleryImages = $this->decorateGalleryImagesForTemplate(
+            $this->pageImages->listReadyForPublicPage($pageId)
         );
+        if ($galleryImages === []) {
+            return '';
+        }
+
+        $items = [];
+        foreach ($galleryImages as $image) {
+            if (!is_array($image)) {
+                continue;
+            }
+
+            $imageUrl = trim((string) ($image['image_url'] ?? ''));
+            $fullUrl = trim((string) ($image['full_url'] ?? ''));
+            if ($imageUrl === '' && $fullUrl === '') {
+                continue;
+            }
+
+            if ($imageUrl === '') {
+                $imageUrl = $fullUrl;
+            }
+            if ($fullUrl === '') {
+                $fullUrl = $imageUrl;
+            }
+
+            $altText = trim((string) ($image['alt_text'] ?? ''));
+            $caption = trim((string) ($image['caption'] ?? ''));
+            $captionHtml = $caption !== ''
+                ? '<figcaption class="small text-muted mt-2">' . $this->escapeHtml($caption) . '</figcaption>'
+                : '';
+
+            $items[] = '<div class="col-12 col-md-6 col-lg-4"><figure class="mb-0">'
+                . '<a href="' . $this->escapeHtml($fullUrl) . '">'
+                . '<img src="' . $this->escapeHtml($imageUrl) . '" class="img-fluid rounded border" alt="' . $this->escapeHtml($altText) . '">'
+                . '</a>'
+                . $captionHtml
+                . '</figure></div>';
+        }
+
+        if ($items === []) {
+            return '';
+        }
+
+        return '<section class="mt-4"><div class="row g-3">' . implode('', $items) . '</div></section>';
+    }
+
+    private function escapeHtml(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     /**
@@ -1464,15 +1491,6 @@ final class PublicController
         }
 
         return $this->bodyBlockPolicy;
-    }
-
-    private function pageBodyBlockCodec(): PageBodyBlockCodec
-    {
-        if (!$this->pageBodyBlockCodec instanceof PageBodyBlockCodec) {
-            $this->pageBodyBlockCodec = new PageBodyBlockCodec($this->input, $this->bodyBlockPolicy());
-        }
-
-        return $this->pageBodyBlockCodec;
     }
 
     private function captchaService(): CaptchaService

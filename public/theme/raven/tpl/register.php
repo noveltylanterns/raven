@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/tpl/register.php
+ * ~/public/theme/raven/tpl/register.php
  * Public registration template.
  * Docs: https://raven.lanterns.io
  */

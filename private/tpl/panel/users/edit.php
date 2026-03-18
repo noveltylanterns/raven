@@ -36,6 +36,7 @@ if (!in_array($loginIdentifierMode, ['email', 'username'], true)) {
 $usernameRequiredForAuth = $loginIdentifierMode === 'username';
 // Shared create/edit derivations keep template branching shallow.
 $userName = trim((string) ($userRow['username'] ?? ''));
+$userDisplayName = trim((string) ($userRow['display_name'] ?? ''));
 $userId = (int) ($userRow['id'] ?? 0);
 $hasPersistedUser = $userId > 0;
 $deleteFormId = 'delete-user-form';
@@ -147,6 +148,23 @@ foreach ($twoFactorMethodsRaw as $methodIndex => $methodRow) {
         'detail' => $methodDetail,
     ];
 }
+usort($twoFactorMethods, static function (array $left, array $right): int {
+    $leftLabel = strtolower(trim((string) ($left['label'] ?? '')));
+    if ($leftLabel === '') {
+        $leftLabel = strtolower(trim((string) ($left['type_label'] ?? '')));
+    }
+
+    $rightLabel = strtolower(trim((string) ($right['label'] ?? '')));
+    if ($rightLabel === '') {
+        $rightLabel = strtolower(trim((string) ($right['type_label'] ?? '')));
+    }
+
+    if ($leftLabel !== $rightLabel) {
+        return $leftLabel <=> $rightLabel;
+    }
+
+    return ((int) ($left['existing_index'] ?? 0)) <=> ((int) ($right['existing_index'] ?? 0));
+});
 $normalizedDomain = trim((string) ($site['domain'] ?? ''));
 $publicBase = $normalizedDomain;
 if ($publicBase !== '' && !preg_match('#^https?://#i', $publicBase)) {
@@ -158,7 +176,7 @@ if ($userRow !== null && $publicBase !== '' && $profileRoutesEnabled && $profile
     $userPublicUrl = $publicBase . '/' . rawurlencode($profileRoutePrefix) . '/' . rawurlencode($usernameRouteSegment);
 }
 $requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
-$activeTab = in_array($requestedTab, ['account', 'permissions', 'profile'], true) ? $requestedTab : 'account';
+$activeTab = in_array($requestedTab, ['account', 'permissions', 'profile', 'security'], true) ? $requestedTab : 'account';
 $selectedTheme = strtolower(trim((string) ($userRow['theme'] ?? 'default')));
 if (in_array($selectedTheme, ['light', 'raven'], true)) {
     $selectedTheme = 'corp';
@@ -178,7 +196,7 @@ $themeLabels = [
 <header class="card">
     <div class="card-body">
         <h1>
-            <?= $userRow === null ? 'New User' : 'Edit User: <span class="text-primary">\'' . e($userName !== '' ? $userName : 'Untitled') . '\'</span>' ?>
+            <?= $userRow === null ? 'New User' : 'Edit User: <span class="text-primary">\'' . e($userDisplayName !== '' ? $userDisplayName : ($userName !== '' ? $userName : 'Untitled')) . '\'</span>' ?>
         </h1>
         <?php if ($userRow === null): ?>
             <p class="text-muted mb-0">Create or update user accounts, group membership, theme, and avatar settings.</p>
@@ -219,6 +237,7 @@ $themeLabels = [
 <form method="post" action="<?= e($panelBase) ?>/users/save" enctype="multipart/form-data">
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $userId ?>">
+    <input type="hidden" name="tab" id="user-active-tab" value="<?= e($activeTab) ?>">
     <nav class="rvnp-editor-actions">
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save User</button>
         <a href="<?= e($panelBase) ?>/users" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Users</a>
@@ -270,6 +289,18 @@ $themeLabels = [
                 aria-selected="<?= $activeTab === 'profile' ? 'true' : 'false' ?>"
             >Profile</button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link<?= $activeTab === 'security' ? ' active' : '' ?>"
+                id="user-security-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#rvnp-editor-pane-security"
+                type="button"
+                role="tab"
+                aria-controls="rvnp-editor-pane-security"
+                aria-selected="<?= $activeTab === 'security' ? 'true' : 'false' ?>"
+            >Security</button>
+        </li>
     </ul>
 
     <div class="tab-content raven-tab-content-surface border border-top-0 p-3" id="rvnp-editor-content">
@@ -298,14 +329,6 @@ $themeLabels = [
                 <input id="email" name="email" type="email" class="form-control" required value="<?= e((string) ($userRow['email'] ?? '')) ?>">
             </div>
 
-            <div class="form-group">
-                <label for="password" class="form-label">
-                    <?= $userRow === null ? 'Password' : 'New Password (leave blank to keep current)' ?>
-                </label>
-                <input id="password" name="password" type="password" class="form-control"<?= $userRow === null ? ' required' : '' ?>>
-                <div class="form-text">Minimum 8 characters.</div>
-            </div>
-
             <div class="form-group mb-0">
                 <label for="theme" class="form-label">Panel Theme</label>
                 <!-- Theme value is persisted per user and drives panel layout theme classes. -->
@@ -318,56 +341,6 @@ $themeLabels = [
                     <?php endforeach; ?>
                 </select>
                 <div class="form-text"><code>&lt;Default&gt;</code> follows the system's configured default admin theme.</div>
-            </div>
-
-            <div class="form-group mt-3 mb-0">
-                <label class="form-label h3 d-block">Two-Factor Methods</label>
-                <p class="text-muted mb-2">Admins can remove methods here to recover locked-out users.</p>
-                <?php if ($hasPersistedUser): ?>
-                    <input type="hidden" name="two_factor_methods_present" value="1">
-                <?php endif; ?>
-                <?php if (!$hasPersistedUser): ?>
-                    <div class="form-text text-muted">Save this user first to manage 2FA methods.</div>
-                <?php elseif ($twoFactorMethods === []): ?>
-                    <div class="form-text text-muted">No 2FA methods are currently configured.</div>
-                <?php else: ?>
-                    <div id="user-two-factor-methods-list">
-                        <?php foreach ($twoFactorMethods as $index => $method): ?>
-                            <?php
-                            $methodTypeLabel = trim((string) ($method['type_label'] ?? ''));
-                            $methodLabel = trim((string) ($method['label'] ?? ''));
-                            $methodStatus = trim((string) ($method['status'] ?? ''));
-                            $methodDetail = trim((string) ($method['detail'] ?? ''));
-                            $methodDescription = trim($methodStatus . ($methodDetail !== '' ? ' | ' . $methodDetail : ''));
-                            ?>
-                            <div class="border rounded p-2 mb-2" data-preferences-two-factor-row="1" data-user-two-factor-row="1">
-                                <input
-                                    type="hidden"
-                                    data-user-two-factor-key="existing_index"
-                                    name="two_factor_methods[<?= (int) $index ?>][existing_index]"
-                                    value="<?= (int) ($method['existing_index'] ?? 0) ?>"
-                                >
-                                <div class="row g-2 align-items-end">
-                                    <div class="col-md-3">
-                                        <label class="form-label">Type</label>
-                                        <input type="text" class="form-control" value="<?= e($methodTypeLabel) ?>" disabled>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label">Label</label>
-                                        <input type="text" class="form-control" value="<?= e($methodLabel) ?>" disabled>
-                                    </div>
-                                    <div class="col-md">
-                                        <label class="form-label">Details</label>
-                                        <input type="text" class="form-control" value="<?= e($methodDescription) ?>" placeholder="Configured method" disabled>
-                                    </div>
-                                    <div class="col-auto ps-md-0 d-flex align-items-end">
-                                        <button type="button" class="btn btn-danger" data-user-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
             </div>
         </div>
 
@@ -504,6 +477,85 @@ $themeLabels = [
                     <button type="button" class="btn btn-primary" id="user-contact-profiles-add">Add More Contact Information</button>
                 <?php else: ?>
                     <div class="form-text text-muted">No contact types are configured in <code>user.contact</code>.</div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div
+            class="tab-pane fade<?= $activeTab === 'security' ? ' show active' : '' ?>"
+            id="rvnp-editor-pane-security"
+            role="tabpanel"
+            aria-labelledby="user-security-tab"
+            tabindex="0"
+        >
+            <div class="form-group">
+                <label for="password" class="form-label">
+                    <?= $userRow === null ? 'Password' : 'New Password (leave blank to keep current)' ?>
+                </label>
+                <input id="password" name="password" type="password" class="form-control"<?= $userRow === null ? ' required' : '' ?>>
+                <div class="form-text">Minimum 8 characters.</div>
+            </div>
+
+            <div class="form-group">
+                <label for="password_confirm" class="form-label">
+                    <?= $userRow === null ? 'Confirm Password' : 'Confirm New Password' ?>
+                </label>
+                <input
+                    id="password_confirm"
+                    name="password_confirm"
+                    type="password"
+                    class="form-control"
+                    <?= $userRow === null ? ' required' : '' ?>
+                >
+            </div>
+
+            <div class="form-group mb-0">
+                <label class="form-label h3 d-block">Two-Factor Methods</label>
+                <p class="text-muted mb-2">Admins can remove methods here to recover locked-out users.</p>
+                <?php if ($hasPersistedUser): ?>
+                    <input type="hidden" name="two_factor_methods_present" value="1">
+                <?php endif; ?>
+                <?php if (!$hasPersistedUser): ?>
+                    <div class="form-text text-muted">Save this user first to manage 2FA methods.</div>
+                <?php elseif ($twoFactorMethods === []): ?>
+                    <div class="form-text text-muted">No 2FA methods are currently configured.</div>
+                <?php else: ?>
+                    <div id="user-two-factor-methods-list">
+                        <?php foreach ($twoFactorMethods as $index => $method): ?>
+                            <?php
+                            $methodTypeLabel = trim((string) ($method['type_label'] ?? ''));
+                            $methodLabel = trim((string) ($method['label'] ?? ''));
+                            $methodStatus = trim((string) ($method['status'] ?? ''));
+                            $methodDetail = trim((string) ($method['detail'] ?? ''));
+                            $methodDescription = trim($methodStatus . ($methodDetail !== '' ? ' | ' . $methodDetail : ''));
+                            ?>
+                            <div class="border rounded p-2 mb-2" data-preferences-two-factor-row="1" data-user-two-factor-row="1">
+                                <input
+                                    type="hidden"
+                                    data-user-two-factor-key="existing_index"
+                                    name="two_factor_methods[<?= (int) $index ?>][existing_index]"
+                                    value="<?= (int) ($method['existing_index'] ?? 0) ?>"
+                                >
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Type</label>
+                                        <input type="text" class="form-control" value="<?= e($methodTypeLabel) ?>" disabled>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Label</label>
+                                        <input type="text" class="form-control" value="<?= e($methodLabel) ?>" disabled>
+                                    </div>
+                                    <div class="col-md">
+                                        <label class="form-label">Details</label>
+                                        <input type="text" class="form-control" value="<?= e($methodDescription) ?>" placeholder="Configured method" disabled>
+                                    </div>
+                                    <div class="col-auto ps-md-0 d-flex align-items-end">
+                                        <button type="button" class="btn btn-danger" data-user-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
@@ -687,5 +739,43 @@ $themeLabels = [
     });
 
     reindexRows();
+  })();
+</script>
+
+<script>
+  (function () {
+    var activeTabInput = document.getElementById('user-active-tab');
+    if (!(activeTabInput instanceof HTMLInputElement)) {
+      return;
+    }
+
+    function tabKeyFromButton(button) {
+      if (!(button instanceof HTMLElement)) {
+        return 'account';
+      }
+
+      var controls = String(button.getAttribute('aria-controls') || '');
+      var match = controls.match(/^rvnp-editor-pane-(account|permissions|profile|security)$/);
+      return match ? String(match[1] || 'account') : 'account';
+    }
+
+    function syncActiveTabFromDom() {
+      var activeButton = document.querySelector('#rvnp-editor-tabs button.nav-link.active[data-bs-toggle="tab"]');
+      activeTabInput.value = tabKeyFromButton(activeButton instanceof HTMLElement ? activeButton : null);
+    }
+
+    syncActiveTabFromDom();
+
+    document.addEventListener('shown.bs.tab', function (event) {
+      var target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      if (target.getAttribute('data-bs-toggle') !== 'tab') {
+        return;
+      }
+
+      activeTabInput.value = tabKeyFromButton(target);
+    });
   })();
 </script>

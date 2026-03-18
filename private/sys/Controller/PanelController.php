@@ -1993,6 +1993,7 @@ final class PanelController
             'users' => $users,
             'prefilterGroup' => $prefilterGroup,
             'groupOptions' => $groupOptions,
+            'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
             'pagination' => $this->panelPaginationViewData(
                 '/users',
                 $pagination,
@@ -2084,7 +2085,7 @@ final class PanelController
             redirect($this->panelUrl('/users'));
         }
 
-        $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['account', 'permissions', 'profile'], 'account');
+        $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['account', 'permissions', 'profile', 'security'], 'account');
         $editPath = '/users/edit' . ($id !== null ? '/' . $id : '');
         $editUrl = $this->panelEditorUrlWithTab('/users/edit', $id, $activeTab, 'account');
         $loginIdentifierMode = $this->panelLoginIdentifierMode();
@@ -2096,6 +2097,7 @@ final class PanelController
         $themeRaw = $this->input->text($post['theme'] ?? null, 50);
         $theme = $this->normalizePanelThemeChoice((string) $themeRaw, true);
         $password = $this->input->text($post['password'] ?? null, 255);
+        $passwordConfirm = $this->input->text($post['password_confirm'] ?? null, 255);
         $profileContactOptions = $this->profileContactOptions();
         $contactProfiles = $this->normalizeSubmittedContactProfiles($post['contact_profiles'] ?? null, $profileContactOptions);
         $submittedTwoFactorMethodsPresent = isset($post['two_factor_methods_present'])
@@ -2226,9 +2228,19 @@ final class PanelController
             redirect($editUrl);
         }
 
+        if ($id === null && !hash_equals($password, $passwordConfirm)) {
+            $this->flash('error', 'Password confirmation does not match.');
+            redirect($this->panelEditorUrlWithTab('/users/edit', $id, $activeTab, 'security'));
+        }
+
         if ($id !== null && $password !== '' && strlen($password) < 8) {
             $this->flash('error', 'Password must be at least 8 characters.');
             redirect($editUrl);
+        }
+
+        if ($id !== null && $password !== '' && !hash_equals($password, $passwordConfirm)) {
+            $this->flash('error', 'Password confirmation does not match.');
+            redirect($this->panelEditorUrlWithTab('/users/edit', $id, $activeTab, 'security'));
         }
 
         // Ensure users always keep at least one group assignment.
@@ -2399,7 +2411,7 @@ final class PanelController
 
         if ($twoFactorUpdateError !== null) {
             $this->flash('error', $twoFactorUpdateError);
-            redirect($this->panelEditorUrlWithTab('/users/edit', $savedId, $activeTab, 'account'));
+            redirect($this->panelEditorUrlWithTab('/users/edit', $savedId, $activeTab, 'security'));
         }
 
         $this->flash('success', 'Changes saved.');
@@ -3882,6 +3894,13 @@ final class PanelController
             redirect($this->panelUrl('/themes'));
         }
 
+        $flattenError = $this->packageInstallWorkflowService()->flattenSingleRootDirectory($targetDirectory);
+        if (is_string($flattenError)) {
+            $this->directoryTreeService()->removeDirectoryRecursively($targetDirectory);
+            $this->flash('error', $flattenError);
+            redirect($this->panelUrl('/themes'));
+        }
+
         $manifestPath = $targetDirectory . '/theme.json';
         if (!is_file($manifestPath)) {
             $this->directoryTreeService()->removeDirectoryRecursively($targetDirectory);
@@ -4268,6 +4287,13 @@ final class PanelController
         );
         if (is_string($extractError)) {
             $this->flash('error', $extractError);
+            redirect($this->panelUrl('/extensions'));
+        }
+
+        $flattenError = $this->packageInstallWorkflowService()->flattenSingleRootDirectory($targetDirectory);
+        if (is_string($flattenError)) {
+            $this->directoryTreeService()->removeDirectoryRecursively($targetDirectory);
+            $this->flash('error', $flattenError);
             redirect($this->panelUrl('/extensions'));
         }
 

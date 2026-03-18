@@ -60,12 +60,18 @@ final class LoginTwoFactorFlowService
         bool $forceMethodPicker = false
     ): array
     {
+        $pooledCodeMethods = TwoFactorChallengeHelper::pooledCodeMethods($pendingMethods);
         $selectedMethod = TwoFactorChallengeHelper::findByKey($pendingMethods, trim($selectedMethodKey));
-        $codeMethods = TwoFactorChallengeHelper::codeMethods($pendingMethods);
+        if ($selectedMethod === null) {
+            $selectedMethod = TwoFactorChallengeHelper::findByKey($pooledCodeMethods, trim($selectedMethodKey));
+        }
         $webauthnMethods = TwoFactorChallengeHelper::filterByType($pendingMethods, 'webauthn');
         $hasWebauthn = $webauthnMethods !== [];
+        if ($selectedMethod === null && !$hasWebauthn && count($pooledCodeMethods) === 1) {
+            $selectedMethod = $pooledCodeMethods[0];
+        }
         $selectedMethodType = strtolower(trim((string) ($selectedMethod['type'] ?? '')));
-        $canSwitchMethod = count(TwoFactorChallengeHelper::fallbackMethods($pendingMethods, $selectedMethod)) > 0;
+        $canSwitchMethod = count($this->fallbackCodeMethods($pendingMethods, $selectedMethod)) > 0;
 
         $showMethodPicker = false;
         $showTotpForm = false;
@@ -73,7 +79,7 @@ final class LoginTwoFactorFlowService
         if ($forceMethodPicker && count($pendingMethods) > 1) {
             $showMethodPicker = true;
         } else {
-            $showMethodPicker = !$hasWebauthn && count($codeMethods) > 1 && $selectedMethod === null;
+            $showMethodPicker = !$hasWebauthn && count($pooledCodeMethods) > 1 && $selectedMethod === null;
             $showTotpForm = in_array($selectedMethodType, ['totp', 'recovery', 'email'], true);
             $showWebauthn = $hasWebauthn && (
                 $selectedMethod === null
@@ -82,7 +88,7 @@ final class LoginTwoFactorFlowService
         }
 
         $fallbackMethods = $showWebauthn
-            ? TwoFactorChallengeHelper::fallbackMethods($pendingMethods, $selectedMethod)
+            ? $this->fallbackCodeMethods($pendingMethods, $selectedMethod)
             : [];
 
         return [
@@ -106,7 +112,12 @@ final class LoginTwoFactorFlowService
     {
         $selectedMethod = TwoFactorChallengeHelper::findByKey($pendingMethods, trim($selectedMethodKey));
         if ($selectedMethod === null) {
-            $codeMethods = TwoFactorChallengeHelper::codeMethods($pendingMethods);
+            $pooledCodeMethods = TwoFactorChallengeHelper::pooledCodeMethods($pendingMethods);
+            $selectedMethod = TwoFactorChallengeHelper::findByKey($pooledCodeMethods, trim($selectedMethodKey));
+        }
+
+        if ($selectedMethod === null) {
+            $codeMethods = TwoFactorChallengeHelper::pooledCodeMethods($pendingMethods);
             if (count($codeMethods) === 1) {
                 $selectedMethod = $codeMethods[0];
                 $selectedMethodKey = (string) ($selectedMethod['key'] ?? '');
@@ -124,7 +135,27 @@ final class LoginTwoFactorFlowService
      */
     public function resolveSelectedMethod(array $pendingMethods, string $methodKey): ?array
     {
-        return TwoFactorChallengeHelper::findByKey($pendingMethods, trim($methodKey));
+        $methodKey = trim($methodKey);
+        $selected = TwoFactorChallengeHelper::findByKey($pendingMethods, $methodKey);
+        if ($selected !== null) {
+            return $selected;
+        }
+
+        return TwoFactorChallengeHelper::findByKey(
+            TwoFactorChallengeHelper::pooledCodeMethods($pendingMethods),
+            $methodKey
+        );
+    }
+
+    /**
+     * Returns sorted code-method picker options for login challenge UI.
+     *
+     * @param array<int, array<string, mixed>> $pendingMethods
+     * @return array<int, array<string, mixed>>
+     */
+    public function pickerCodeMethods(array $pendingMethods): array
+    {
+        return TwoFactorChallengeHelper::pooledCodeMethods($pendingMethods);
     }
 
     /**
@@ -198,5 +229,30 @@ final class LoginTwoFactorFlowService
         }
 
         return TwoFactorMethodKey::extractWebauthnCredentialId(trim((string) ($method['key'] ?? '')));
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $pendingMethods
+     * @param array<string, mixed>|null $selectedMethod
+     * @return array<int, array<string, mixed>>
+     */
+    private function fallbackCodeMethods(array $pendingMethods, ?array $selectedMethod = null): array
+    {
+        $selectedKey = trim((string) ($selectedMethod['key'] ?? ''));
+        $fallback = [];
+        foreach (TwoFactorChallengeHelper::pooledCodeMethods($pendingMethods) as $method) {
+            $methodKey = trim((string) ($method['key'] ?? ''));
+            if ($methodKey === '') {
+                continue;
+            }
+
+            if ($selectedKey !== '' && $methodKey === $selectedKey) {
+                continue;
+            }
+
+            $fallback[] = $method;
+        }
+
+        return $fallback;
     }
 }

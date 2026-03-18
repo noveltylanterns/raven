@@ -90,6 +90,23 @@ foreach ($twoFactorMethodsRaw as $methodRow) {
         'qr_data_uri' => trim((string) ($methodRow['qr_data_uri'] ?? '')),
     ];
 }
+usort($twoFactorMethods, static function (array $left, array $right): int {
+    $leftLabel = strtolower(trim((string) ($left['label'] ?? '')));
+    if ($leftLabel === '') {
+        $leftLabel = strtolower(trim((string) ($left['type'] ?? '')));
+    }
+
+    $rightLabel = strtolower(trim((string) ($right['label'] ?? '')));
+    if ($rightLabel === '') {
+        $rightLabel = strtolower(trim((string) ($right['type'] ?? '')));
+    }
+
+    if ($leftLabel !== $rightLabel) {
+        return $leftLabel <=> $rightLabel;
+    }
+
+    return strtolower((string) ($left['type'] ?? '')) <=> strtolower((string) ($right['type'] ?? ''));
+});
 $selectedTheme = strtolower(trim((string) ($preferences['theme'] ?? 'default')));
 if (in_array($selectedTheme, ['light', 'raven'], true)) {
     $selectedTheme = 'corp';
@@ -376,7 +393,7 @@ $themeLabels = [
         return;
       }
 
-      setupButton.textContent = methodStatus === 'confirmed' ? 'Reset' : 'Confirm';
+      setupButton.textContent = methodStatus === 'confirmed' ? 'Reset' : 'View Setup';
     }
 
     function syncRowSections(row) {
@@ -685,8 +702,8 @@ $themeLabels = [
         setTotpFeedback(
           row,
           isReset
-            ? 'Secret reset. To finish setup, enter code from app.'
-            : 'Secret generated. To finish setup, enter code from app.',
+            ? 'Secret reset. Enter the app code and save preferences to confirm.'
+            : 'Setup ready. Enter the app code and save preferences to confirm.',
           'success'
         );
       } catch (error) {
@@ -1479,7 +1496,7 @@ $themeLabels = [
                                         <button type="button" class="btn btn-primary btn-sm" data-preferences-two-factor-totp-setup="1"><?=
                                             $methodSecret === ''
                                                 ? 'Setup App'
-                                                : ($methodStatus === 'confirmed' ? 'Reset' : 'Confirm')
+                                                : ($methodStatus === 'confirmed' ? 'Reset' : 'View Setup')
                                         ?></button>
                                     </div>
                                     <div class="small text-muted d-none position-absolute start-0 end-0" style="top:calc(100% + 0.2rem);" data-preferences-two-factor-totp-feedback="1"></div>

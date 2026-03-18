@@ -159,4 +159,72 @@ final class PackageInstallWorkflowService
 
         return null;
     }
+
+    /**
+     * Normalizes extracted package layout when archive uses one top-level wrapper directory.
+     */
+    public function flattenSingleRootDirectory(string $targetDirectory): ?string
+    {
+        $entries = $this->scandirEntries($targetDirectory);
+        if ($entries === null) {
+            return 'Failed to inspect extracted package.';
+        }
+
+        if (count($entries) !== 1) {
+            return null;
+        }
+
+        $innerRoot = $targetDirectory . '/' . $entries[0];
+        if (!is_dir($innerRoot)) {
+            return null;
+        }
+
+        $innerEntries = $this->scandirEntries($innerRoot);
+        if ($innerEntries === null) {
+            return 'Failed to inspect extracted package root directory.';
+        }
+
+        foreach ($innerEntries as $entry) {
+            $sourcePath = $innerRoot . '/' . $entry;
+            $destinationPath = $targetDirectory . '/' . $entry;
+            if (file_exists($destinationPath)) {
+                return 'Extracted package contains conflicting file paths.';
+            }
+
+            if (!@rename($sourcePath, $destinationPath)) {
+                return 'Failed to normalize extracted package structure.';
+            }
+        }
+
+        if (!@rmdir($innerRoot)) {
+            return 'Failed to finalize extracted package structure.';
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<int, string>|null
+     */
+    private function scandirEntries(string $path): ?array
+    {
+        if (!is_dir($path)) {
+            return null;
+        }
+
+        $entries = scandir($path);
+        if (!is_array($entries)) {
+            return null;
+        }
+
+        $filtered = [];
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            $filtered[] = $entry;
+        }
+
+        return $filtered;
+    }
 }

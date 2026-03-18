@@ -324,11 +324,10 @@ body { background: #fff; color: #212529; }
 - Home/page/channel templates receive:
 - `$site`
 - `$page`
-- `$galleryEnabled`
-- `$galleryImages`
 - `$page['display_title_resolved']` (bool-like)
 - `$page['extended_blocks'][]` rows with `html`, `css_id`, `class`
-- `$galleryImages[]` rows include normalized `image_url`, `full_url`, `alt_text`, `caption`
+- Gallery output is now provided through `$page['extended_blocks'][]` when a page body block uses gallery editor mode.
+- Home/page/channel templates should not depend on standalone `$galleryEnabled` or `$galleryImages` variables.
 - Category template receives:
 - `$site`
 - `$category`

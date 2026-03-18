@@ -309,13 +309,15 @@ final class AuthService
      *   method_key?: string
      * }
      */
-    public function issuePendingEmailCodeChallenge(string $selectedMethodKey): array
+    public function issuePendingEmailCodeChallenge(string $selectedMethodKey, string $submittedEmail = ''): array
     {
         return $this->twoFactorEmailChallengeService->issueChallenge(
             $this->pendingTwoFactorUserId(),
             $this->pendingTwoFactorMethods(),
             $selectedMethodKey,
-            $this->twoFactorSessionState
+            $this->twoFactorSessionState,
+            600,
+            $submittedEmail
         );
     }
 
@@ -369,13 +371,17 @@ final class AuthService
     /**
      * Verifies one submitted email code for pending 2FA session.
      */
-    public function verifyPendingEmailCode(string $submittedCode, string $selectedMethodKey = ''): bool
-    {
+    public function verifyPendingEmailCode(
+        string $submittedCode,
+        string $selectedMethodKey = '',
+        string $submittedEmail = ''
+    ): bool {
         return $this->twoFactorEmailChallengeService->verifySubmittedCode(
             $this->pendingTwoFactorUserId(),
             $selectedMethodKey,
             $submittedCode,
-            $this->twoFactorSessionState
+            $this->twoFactorSessionState,
+            $submittedEmail
         );
     }
 

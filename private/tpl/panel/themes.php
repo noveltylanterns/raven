@@ -190,7 +190,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                             accept=".zip,application/zip"
                             required
                         >
-                        <div class="form-text">Archive must include a valid <code>theme.json</code> file at archive root.</div>
+                        <div class="form-text">Archive must contain a valid <code>theme.json</code> manifest (top-level folder wrappers are supported).</div>
                     </div>
                     <div>
                         <label for="theme_upload_slug" class="form-label">Slug Override (optional)</label>

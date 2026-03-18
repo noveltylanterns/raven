@@ -9,6 +9,7 @@
 /** @var array<string, string> $site */
 /** @var string $csrfField */
 /** @var string $csrfToken */
+/** @var string|null $success */
 /** @var string|null $error */
 /** @var array<int, array<string, mixed>> $twoFactorMethods */
 /** @var bool $showMethodPicker */
@@ -19,8 +20,9 @@
 /** @var array<string, mixed>|null $selectedMethod */
 /** @var string $selectedMethodType */
 /** @var bool $canSwitchMethod */
-/** @var bool $emailCodeSent */
+/** @var string $webauthnMethodKey */
 /** @var string $emailCodeTargetMasked */
+/** @var string $selectedEmailInput */
 /** @var string $panelBaseUrl */
 
 use function Raven\Core\Support\e;
@@ -35,8 +37,9 @@ $fallbackMethods = is_array($fallbackMethods ?? null) ? $fallbackMethods : [];
 $selectedMethod = is_array($selectedMethod ?? null) ? $selectedMethod : null;
 $selectedMethodType = strtolower(trim((string) ($selectedMethodType ?? '')));
 $canSwitchMethod = (bool) ($canSwitchMethod ?? false);
-$emailCodeSent = (bool) ($emailCodeSent ?? false);
+$webauthnMethodKey = trim((string) ($webauthnMethodKey ?? ''));
 $emailCodeTargetMasked = trim((string) ($emailCodeTargetMasked ?? ''));
+$selectedEmailInput = trim((string) ($selectedEmailInput ?? ''));
 $csrfToken = trim((string) ($csrfToken ?? ''));
 
 $defaultMethodLabel = static function (string $methodType): string {
@@ -54,6 +57,10 @@ $defaultMethodLabel = static function (string $methodType): string {
         <div class="card-body">
             <h2 class="h4 mb-3">Two-Factor Verification</h2>
 
+            <?php if ($success !== null): ?>
+                <div class="alert alert-success" role="alert"><?= e($success) ?></div>
+            <?php endif; ?>
+
             <?php if ($error !== null): ?>
                 <div class="alert alert-danger" role="alert"><?= e($error) ?></div>
             <?php endif; ?>
@@ -61,6 +68,13 @@ $defaultMethodLabel = static function (string $methodType): string {
             <?php if ($showMethodPicker): ?>
                 <div class="mb-3">
                     <p class="mb-2">Choose a verification method:</p>
+                    <?php if ($webauthnMethodKey !== ''): ?>
+                        <form method="post" action="<?= e($panelBase) ?>/login/2fa/select" class="mb-2">
+                            <?= $csrfField ?>
+                            <input type="hidden" name="method_key" value="<?= e($webauthnMethodKey) ?>">
+                            <button type="submit" class="btn btn-primary w-100 text-start">Try Security Key</button>
+                        </form>
+                    <?php endif; ?>
                     <?php foreach ($twoFactorMethods as $method): ?>
                         <?php
                         $methodType = strtolower(trim((string) ($method['type'] ?? '')));
@@ -96,15 +110,31 @@ $defaultMethodLabel = static function (string $methodType): string {
                 $inputLabel = $isRecovery
                     ? 'Recovery Phrase'
                     : ($isEmail ? 'Email Code' : 'Verification Code');
-                $inputPattern = $isEmail ? '[0-9]{6}' : '[0-9]{6,8}';
+                $inputPattern = $isEmail ? '[0-9]{8}' : '[0-9]{6,8}';
                 ?>
                 <form method="post" action="<?= e($panelBase) ?>/login/2fa" novalidate>
                     <?= $csrfField ?>
                     <p class="text-muted mb-2">Method: <?= e($selectedLabel) ?></p>
-                    <?php if ($isEmail && $emailCodeTargetMasked !== ''): ?>
+                    <?php if ($isEmail): ?>
+                        <div class="mb-3">
+                            <label for="verification_email" class="form-label">Email Address</label>
+                            <input
+                                id="verification_email"
+                                name="verification_email"
+                                type="email"
+                                class="form-control"
+                                autocomplete="email"
+                                value="<?= e($selectedEmailInput) ?>"
+                                placeholder="you@example.com"
+                            >
+                        </div>
+                    <?php endif; ?>
+                    <?php if ($isEmail): ?>
                         <p class="small text-muted mb-2">
-                            <?= $emailCodeSent ? 'A verification code was sent to' : 'Enter the verification code sent to' ?>
-                            <code><?= e($emailCodeTargetMasked) ?></code>.
+                            Enter one of your saved 2FA email addresses to request a code.
+                            <?php if ($emailCodeTargetMasked !== ''): ?>
+                                Latest dispatch target: <code><?= e($emailCodeTargetMasked) ?></code>.
+                            <?php endif; ?>
                         </p>
                     <?php endif; ?>
                     <div class="mb-3">
@@ -118,7 +148,7 @@ $defaultMethodLabel = static function (string $methodType): string {
                             autocomplete="<?= e($isRecovery ? 'off' : 'one-time-code') ?>"
                             inputmode="<?= e($isRecovery ? 'text' : 'numeric') ?>"
                             <?= $isRecovery ? '' : ('pattern="' . e($inputPattern) . '"') ?>
-                            placeholder="<?= e($isRecovery ? 'twelve-word recovery phrase' : '123456') ?>"
+                            placeholder="<?= e($isRecovery ? 'twelve-word recovery phrase' : ($isEmail ? '12345678' : '123456')) ?>"
                         >
                     </div>
                     <div class="d-flex flex-wrap justify-content-center gap-2">

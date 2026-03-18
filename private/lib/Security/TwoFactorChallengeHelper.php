@@ -73,6 +73,87 @@ final class TwoFactorChallengeHelper
     }
 
     /**
+     * Returns code-based methods for UI lists with pooled recovery/email options.
+     *
+     * @param array<int, array<string, mixed>> $methods
+     * @return array<int, array<string, mixed>>
+     */
+    public static function pooledCodeMethods(array $methods): array
+    {
+        $pooled = [];
+        $hasRecovery = false;
+        $emailMap = [];
+
+        foreach ($methods as $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            $type = strtolower(trim((string) ($method['type'] ?? '')));
+            if ($type === 'totp') {
+                $methodKey = trim((string) ($method['key'] ?? ''));
+                if ($methodKey === '') {
+                    continue;
+                }
+                $pooled[] = $method;
+                continue;
+            }
+
+            if ($type === 'recovery') {
+                $hasRecovery = true;
+                continue;
+            }
+
+            if ($type !== 'email') {
+                continue;
+            }
+
+            $email = strtolower(trim((string) ($method['email'] ?? '')));
+            if ($email === '') {
+                continue;
+            }
+            $emailMap[$email] = true;
+        }
+
+        if ($hasRecovery) {
+            $pooled[] = [
+                'type' => 'recovery',
+                'key' => TwoFactorMethodKey::recoveryPool(),
+                'label' => 'Enter Recovery Phrase',
+            ];
+        }
+
+        if ($emailMap !== []) {
+            $pooled[] = [
+                'type' => 'email',
+                'key' => TwoFactorMethodKey::emailPool(),
+                'label' => 'Email Code',
+                'emails' => array_keys($emailMap),
+            ];
+        }
+
+        usort($pooled, static function (array $a, array $b): int {
+            $labelA = strtolower(trim((string) ($a['label'] ?? '')));
+            $labelB = strtolower(trim((string) ($b['label'] ?? '')));
+            if ($labelA !== $labelB) {
+                return $labelA <=> $labelB;
+            }
+
+            $typeA = strtolower(trim((string) ($a['type'] ?? '')));
+            $typeB = strtolower(trim((string) ($b['type'] ?? '')));
+            if ($typeA !== $typeB) {
+                return $typeA <=> $typeB;
+            }
+
+            $keyA = strtolower(trim((string) ($a['key'] ?? '')));
+            $keyB = strtolower(trim((string) ($b['key'] ?? '')));
+            return $keyA <=> $keyB;
+        });
+
+        return $pooled;
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $methods
      * @param array<string, mixed>|null $selectedMethod
      * @return array<int, array<string, mixed>>

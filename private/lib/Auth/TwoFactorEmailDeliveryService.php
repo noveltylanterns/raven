@@ -28,7 +28,7 @@ final class TwoFactorEmailDeliveryService
         }
 
         $code = preg_replace('/\D+/', '', $code) ?? '';
-        if (strlen($code) !== 6) {
+        if (strlen($code) !== 8) {
             return ['ok' => false, 'message' => 'Email code payload is invalid.'];
         }
 

@@ -28,7 +28,7 @@ final class ThemeTemplateSmokeRunner
     public function __construct(string $root)
     {
         $this->root = rtrim($root, '/');
-        $this->cacheDirectory = $this->root . '/private/tmp/template_tag_cache';
+        $this->cacheDirectory = $this->root . '/.tmp/template_tag_cache';
         $this->runId = time();
     }
 
@@ -42,8 +42,16 @@ final class ThemeTemplateSmokeRunner
 
     public function run(): void
     {
+        $tmpDirectory = dirname($this->cacheDirectory);
+        if (!is_dir($tmpDirectory) && !mkdir($tmpDirectory, 0775, true) && !is_dir($tmpDirectory)) {
+            throw new RuntimeException('Failed to create temporary directory for theme smoke.');
+        }
+        if (!is_dir($this->cacheDirectory) && !mkdir($this->cacheDirectory, 0775, true) && !is_dir($this->cacheDirectory)) {
+            throw new RuntimeException('Failed to create template tag cache directory for theme smoke.');
+        }
+
         $engine = new TemplateTagEngine($this->cacheDirectory);
-        $fixtureFile = $this->root . '/private/tmp/theme-tag-smoke-' . $this->runId . '.php';
+        $fixtureFile = $this->root . '/.tmp/theme-tag-smoke-' . $this->runId . '.php';
         $fixtureSource = <<<'PHP'
 escaped_title={page:title}
 raw_body={raw:page:content}
@@ -210,10 +218,10 @@ PHP;
         ];
 
         $targets = [
-            $this->root . '/public/theme/raven/vis/home.php',
-            $this->root . '/public/theme/raven/vis/wrapper.php',
-            $this->root . '/private/vis/home.php',
-            $this->root . '/private/vis/wrapper.php',
+            $this->root . '/public/theme/raven/tpl/home.php',
+            $this->root . '/public/theme/raven/tpl/wrapper.php',
+            $this->root . '/private/tpl/home.php',
+            $this->root . '/private/tpl/wrapper.php',
         ];
 
         foreach ($targets as $target) {

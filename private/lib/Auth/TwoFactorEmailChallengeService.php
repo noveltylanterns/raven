@@ -33,7 +33,8 @@ final class TwoFactorEmailChallengeService
         array $pendingMethods,
         string $selectedMethodKey,
         TwoFactorSessionStateService $sessionState,
-        int $ttlSeconds = self::DEFAULT_TTL_SECONDS
+        int $ttlSeconds = self::DEFAULT_TTL_SECONDS,
+        string $submittedEmail = ''
     ): array {
         if ($pendingUserId === null || $pendingUserId <= 0) {
             return ['ok' => false, 'message' => 'Login session expired.'];
@@ -48,14 +49,24 @@ final class TwoFactorEmailChallengeService
             return ['ok' => false, 'message' => 'Selected verification method does not support email codes.'];
         }
 
-        $email = $this->normalizeEmail((string) ($selectedMethod['email'] ?? ''));
-        if ($email === null) {
-            return ['ok' => false, 'message' => 'Email code target address is missing or invalid.'];
-        }
-
+        $email = null;
         $methodKey = trim((string) ($selectedMethod['key'] ?? ''));
-        if ($methodKey === '') {
+        if (TwoFactorMethodKey::isEmailPool($methodKey)) {
+            $email = $this->resolvePooledEmailTarget($selectedMethod, $submittedEmail);
+            if ($email === null) {
+                return ['ok' => true, 'sent' => false];
+            }
+
             $methodKey = TwoFactorMethodKey::forEmailAddress($email);
+        } else {
+            $email = $this->normalizeEmail((string) ($selectedMethod['email'] ?? ''));
+            if ($email === null) {
+                return ['ok' => false, 'message' => 'Email code target address is missing or invalid.'];
+            }
+
+            if ($methodKey === '') {
+                $methodKey = TwoFactorMethodKey::forEmailAddress($email);
+            }
         }
 
         $now = time();
@@ -97,11 +108,25 @@ final class TwoFactorEmailChallengeService
         ?int $pendingUserId,
         string $selectedMethodKey,
         string $submittedCode,
-        TwoFactorSessionStateService $sessionState
+        TwoFactorSessionStateService $sessionState,
+        string $submittedEmail = ''
     ): bool {
         $pendingUserId = (int) $pendingUserId;
         $selectedMethodKey = trim($selectedMethodKey);
-        if ($pendingUserId <= 0 || $selectedMethodKey === '') {
+        if ($pendingUserId <= 0) {
+            return false;
+        }
+
+        if (TwoFactorMethodKey::isEmailPool($selectedMethodKey)) {
+            $normalizedEmail = $this->normalizeEmail($submittedEmail);
+            if ($normalizedEmail === null) {
+                return false;
+            }
+
+            $selectedMethodKey = TwoFactorMethodKey::forEmailAddress($normalizedEmail);
+        }
+
+        if ($selectedMethodKey === '') {
             return false;
         }
 
@@ -131,13 +156,13 @@ final class TwoFactorEmailChallengeService
 
     private function generateCode(): string
     {
-        return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        return str_pad((string) random_int(0, 99999999), 8, '0', STR_PAD_LEFT);
     }
 
     private function normalizeSubmittedCode(string $submittedCode): string
     {
         $normalized = preg_replace('/\D+/', '', $submittedCode) ?? '';
-        return strlen($normalized) === 6 ? $normalized : '';
+        return strlen($normalized) === 8 ? $normalized : '';
     }
 
     private function normalizeEmail(string $email): ?string
@@ -153,5 +178,33 @@ final class TwoFactorEmailChallengeService
     private function normalizeTtlSeconds(int $ttlSeconds): int
     {
         return max(self::MIN_TTL_SECONDS, min(self::MAX_TTL_SECONDS, $ttlSeconds));
+    }
+
+    /**
+     * @param array<string, mixed> $selectedMethod
+     */
+    private function resolvePooledEmailTarget(array $selectedMethod, string $submittedEmail): ?string
+    {
+        $normalizedSubmitted = $this->normalizeEmail($submittedEmail);
+        if ($normalizedSubmitted === null) {
+            return null;
+        }
+
+        $allowedEmailsRaw = $selectedMethod['emails'] ?? [];
+        if (!is_array($allowedEmailsRaw)) {
+            return null;
+        }
+
+        $allowedMap = [];
+        foreach ($allowedEmailsRaw as $rawEmail) {
+            $email = $this->normalizeEmail((string) $rawEmail);
+            if ($email === null) {
+                continue;
+            }
+
+            $allowedMap[$email] = true;
+        }
+
+        return isset($allowedMap[$normalizedSubmitted]) ? $normalizedSubmitted : null;
     }
 }

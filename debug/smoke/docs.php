@@ -216,7 +216,7 @@ final class ConfigurationDocsSmokeRunner
             return;
         }
 
-        $sessionDir = $this->root . '/private/tmp/sessions';
+        $sessionDir = $this->root . '/.tmp/sessions';
         if (!is_dir($sessionDir)) {
             mkdir($sessionDir, 0775, true);
         }
@@ -274,62 +274,62 @@ final class ConfigurationDocsSmokeRunner
             'categories' => [
                 'docs' => 'docs/Categories.md',
                 'views' => [
-                    'private/vis/panel/categories/list.php',
-                    'private/vis/panel/categories/edit.php',
+                    'private/tpl/panel/categories/list.php',
+                    'private/tpl/panel/categories/edit.php',
                 ],
             ],
             'channels' => [
                 'docs' => 'docs/Channels.md',
                 'views' => [
-                    'private/vis/panel/channels/list.php',
-                    'private/vis/panel/channels/edit.php',
+                    'private/tpl/panel/channels/list.php',
+                    'private/tpl/panel/channels/edit.php',
                 ],
             ],
             'extensions' => [
                 'docs' => 'docs/Extensions.md',
                 'views' => [
-                    'private/vis/panel/extensions.php',
+                    'private/tpl/panel/extensions.php',
                 ],
             ],
             'groups' => [
                 'docs' => 'docs/Groups.md',
                 'views' => [
-                    'private/vis/panel/groups/list.php',
-                    'private/vis/panel/groups/edit.php',
+                    'private/tpl/panel/groups/list.php',
+                    'private/tpl/panel/groups/edit.php',
                 ],
             ],
             'pages' => [
                 'docs' => 'docs/Pages.md',
                 'views' => [
-                    'private/vis/panel/pages/list.php',
-                    'private/vis/panel/pages/edit.php',
+                    'private/tpl/panel/pages/list.php',
+                    'private/tpl/panel/pages/edit.php',
                 ],
             ],
             'preferences' => [
                 'docs' => 'docs/Preferences.md',
                 'views' => [
-                    'private/vis/panel/preferences.php',
+                    'private/tpl/panel/preferences.php',
                 ],
             ],
             'redirects' => [
                 'docs' => 'docs/Redirects.md',
                 'views' => [
-                    'private/vis/panel/redirects/list.php',
-                    'private/vis/panel/redirects/edit.php',
+                    'private/tpl/panel/redirects/list.php',
+                    'private/tpl/panel/redirects/edit.php',
                 ],
             ],
             'tags' => [
                 'docs' => 'docs/Tags.md',
                 'views' => [
-                    'private/vis/panel/tags/list.php',
-                    'private/vis/panel/tags/edit.php',
+                    'private/tpl/panel/tags/list.php',
+                    'private/tpl/panel/tags/edit.php',
                 ],
             ],
             'users' => [
                 'docs' => 'docs/Users.md',
                 'views' => [
-                    'private/vis/panel/users/list.php',
-                    'private/vis/panel/users/edit.php',
+                    'private/tpl/panel/users/list.php',
+                    'private/tpl/panel/users/edit.php',
                 ],
             ],
         ];

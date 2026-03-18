@@ -40,6 +40,8 @@ final class AuthController
     private const SESSION_2FA_WEBAUTHN_FAILED = '_raven_2fa_webauthn_failed';
     private const SESSION_2FA_WEBAUTHN_CHALLENGE = '_raven_2fa_webauthn_challenge';
     private const SESSION_2FA_FORCE_METHOD_PICKER = '_raven_2fa_force_method_picker';
+    private const SESSION_2FA_EMAIL_INPUT = '_raven_2fa_email_input';
+    private const SESSION_POST_LOGIN_REDIRECT = '_raven_post_login_redirect';
 
     private View $view;
     private Config $config;
@@ -107,6 +109,13 @@ final class AuthController
      */
     public function login(array $post): void
     {
+        $requestedPostLoginRedirect = $this->normalizePostLoginRedirect((string) ($post['redirect_to'] ?? ''));
+        if ($requestedPostLoginRedirect !== '') {
+            $_SESSION[self::SESSION_POST_LOGIN_REDIRECT] = $requestedPostLoginRedirect;
+        } else {
+            unset($_SESSION[self::SESSION_POST_LOGIN_REDIRECT]);
+        }
+
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
             redirect($this->panelUrl('/login'));
@@ -189,7 +198,8 @@ final class AuthController
             unset(
                 $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED],
                 $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE],
-                $_SESSION[self::SESSION_2FA_FORCE_METHOD_PICKER]
+                $_SESSION[self::SESSION_2FA_FORCE_METHOD_PICKER],
+                $_SESSION[self::SESSION_2FA_EMAIL_INPUT]
             );
 
             $preferredMethodKey = $this->twoFactorFlowService()->preferredMethodKeyForChallenge($interactiveMethods);
@@ -203,8 +213,7 @@ final class AuthController
         }
 
         $this->auth->markTwoFactorVerified($userId);
-
-        redirect($this->panelUrl('/'));
+        redirect($this->consumePostLoginRedirectOrDefault());
     }
 
     /**
@@ -233,6 +242,7 @@ final class AuthController
             $webauthnFailed,
             $forceMethodPicker
         );
+        $codePickerMethods = $this->twoFactorFlowService()->pickerCodeMethods($pendingMethods);
         $selectedMethod = $flowState['selected_method'];
         $selectedMethodType = (string) ($flowState['selected_method_type'] ?? '');
         $showMethodPicker = (bool) ($flowState['show_method_picker'] ?? false);
@@ -240,43 +250,13 @@ final class AuthController
         $showWebauthn = (bool) ($flowState['show_webauthn_prompt'] ?? false);
         $canSwitchMethod = (bool) ($flowState['can_switch_method'] ?? false);
         $fallbackMethods = is_array($flowState['fallback_methods'] ?? null) ? $flowState['fallback_methods'] : [];
+        $viewSuccess = $this->pullFlash('success');
         $viewError = $this->pullFlash('error');
-        $emailCodeSent = false;
+        $webauthnMethodKey = $this->twoFactorFlowService()->preferredMethodKeyForChallenge($pendingMethods) ?? '';
         $emailCodeTargetMasked = '';
-
-        if ($selectedMethodType === 'email') {
-            $emailMethodKey = is_array($selectedMethod) ? (string) ($selectedMethod['key'] ?? '') : '';
-            $challenge = $this->auth->issuePendingEmailCodeChallenge($emailMethodKey);
-            if (!(bool) ($challenge['ok'] ?? false)) {
-                if ($viewError === null || $viewError === '') {
-                    $viewError = (string) ($challenge['message'] ?? 'Unable to start email verification.');
-                }
-            } else {
-                $emailCodeTarget = (string) ($challenge['email'] ?? '');
-                $emailCodeTargetMasked = $this->twoFactorEmailDeliveryService()->maskEmail($emailCodeTarget);
-
-                if ((bool) ($challenge['sent'] ?? false)) {
-                    $delivery = $this->twoFactorEmailDeliveryService()->sendLoginCode(
-                        $emailCodeTarget,
-                        (string) ($challenge['code'] ?? ''),
-                        (string) $this->config->get('site.name', 'Raven CMS'),
-                        (string) $this->config->get('site.domain', ''),
-                        (string) $this->config->get('mail.sender_address', ''),
-                        (string) $this->config->get('mail.sender_name', 'Postmaster'),
-                        (string) $this->config->get('mail.agent', 'php_mail')
-                    );
-
-                    if (!(bool) ($delivery['ok'] ?? false)) {
-                        $this->auth->clearPendingEmailCodeChallenge((string) ($challenge['method_key'] ?? ''));
-                        $emailCodeTargetMasked = '';
-                        if ($viewError === null || $viewError === '') {
-                            $viewError = (string) ($delivery['message'] ?? 'Unable to send email verification code.');
-                        }
-                    } else {
-                        $emailCodeSent = true;
-                    }
-                }
-            }
+        $selectedEmailInput = trim((string) ($_SESSION[self::SESSION_2FA_EMAIL_INPUT] ?? ''));
+        if ($selectedMethodType === 'email' && $selectedEmailInput !== '') {
+            $emailCodeTargetMasked = $this->twoFactorEmailDeliveryService()->maskEmail($selectedEmailInput);
         }
 
         if (!$showMethodPicker) {
@@ -287,8 +267,9 @@ final class AuthController
             'site' => $this->siteData(),
             'csrfField' => $this->csrf->field(),
             'csrfToken' => $this->csrf->token(),
+            'success' => $viewSuccess,
             'error' => $viewError,
-            'twoFactorMethods' => $pendingMethods,
+            'twoFactorMethods' => $codePickerMethods,
             'showMethodPicker' => $showMethodPicker,
             'showTotpForm' => $showTotpForm,
             'showWebauthnPrompt' => $showWebauthn,
@@ -297,8 +278,9 @@ final class AuthController
             'selectedMethod' => $selectedMethod,
             'selectedMethodType' => $selectedMethodType,
             'canSwitchMethod' => $canSwitchMethod,
-            'emailCodeSent' => $emailCodeSent,
+            'webauthnMethodKey' => $webauthnMethodKey,
             'emailCodeTargetMasked' => $emailCodeTargetMasked,
+            'selectedEmailInput' => $selectedEmailInput,
             'panelBaseUrl' => $this->panelUrl(''),
             // 2FA screen remains outside authenticated panel navigation.
             'showSidebar' => false,
@@ -365,18 +347,44 @@ final class AuthController
                 redirect($this->panelUrl('/login/2fa'));
             }
 
-            if (!$this->auth->verifyPendingRecoveryCode($verificationValue, (string) ($selectedMethod['key'] ?? ''))) {
+            $selectedRecoveryKey = (string) ($selectedMethod['key'] ?? '');
+            if (\Raven\Lib\Security\TwoFactorMethodKey::isRecoveryPool($selectedRecoveryKey)) {
+                $selectedRecoveryKey = '';
+            }
+
+            if (!$this->auth->verifyPendingRecoveryCode($verificationValue, $selectedRecoveryKey)) {
                 $this->flash('error', 'Invalid recovery phrase.');
                 redirect($this->panelUrl('/login/2fa'));
             }
         } else {
+            $emailInput = trim((string) $this->input->text($post['verification_email'] ?? null, 254));
+            $_SESSION[self::SESSION_2FA_EMAIL_INPUT] = $emailInput;
             $emailCode = preg_replace('/\D+/', '', $verificationValue) ?? '';
             if ($emailCode === '') {
-                $this->flash('error', 'Email code is required.');
+                $selectedEmailKey = (string) ($selectedMethod['key'] ?? '');
+                $challenge = $this->auth->issuePendingEmailCodeChallenge($selectedEmailKey, $emailInput);
+                if ((bool) ($challenge['ok'] ?? false) && (bool) ($challenge['sent'] ?? false)) {
+                    $emailCodeTarget = (string) ($challenge['email'] ?? '');
+                    $delivery = $this->twoFactorEmailDeliveryService()->sendLoginCode(
+                        $emailCodeTarget,
+                        (string) ($challenge['code'] ?? ''),
+                        (string) $this->config->get('site.name', 'Raven CMS'),
+                        (string) $this->config->get('site.domain', ''),
+                        (string) $this->config->get('mail.sender_address', ''),
+                        (string) $this->config->get('mail.sender_name', 'Postmaster'),
+                        (string) $this->config->get('mail.agent', 'php_mail')
+                    );
+
+                    if (!(bool) ($delivery['ok'] ?? false)) {
+                        $this->auth->clearPendingEmailCodeChallenge((string) ($challenge['method_key'] ?? ''));
+                    }
+                }
+
+                $this->flash('success', 'Check your email. If it matches what we have on file, a code has been dispatched to your inbox.');
                 redirect($this->panelUrl('/login/2fa'));
             }
 
-            if (!$this->auth->verifyPendingEmailCode($emailCode, (string) ($selectedMethod['key'] ?? ''))) {
+            if (!$this->auth->verifyPendingEmailCode($emailCode, (string) ($selectedMethod['key'] ?? ''), $emailInput)) {
                 $this->flash('error', 'Invalid or expired email code.');
                 redirect($this->panelUrl('/login/2fa'));
             }
@@ -386,10 +394,11 @@ final class AuthController
             $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY],
             $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED],
             $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE],
-            $_SESSION[self::SESSION_2FA_FORCE_METHOD_PICKER]
+            $_SESSION[self::SESSION_2FA_FORCE_METHOD_PICKER],
+            $_SESSION[self::SESSION_2FA_EMAIL_INPUT]
         );
         $this->auth->markTwoFactorVerified($pendingUserId);
-        redirect($this->panelUrl('/'));
+        redirect($this->consumePostLoginRedirectOrDefault());
     }
 
     /**
@@ -419,7 +428,8 @@ final class AuthController
             unset(
                 $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY],
                 $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED],
-                $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE]
+                $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE],
+                $_SESSION[self::SESSION_2FA_EMAIL_INPUT]
             );
             redirect($this->panelUrl('/login/2fa'));
         }
@@ -435,6 +445,9 @@ final class AuthController
         $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY] = (string) ($selectedMethod['key'] ?? '');
         if (strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'webauthn') {
             unset($_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED]);
+        }
+        if (strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'email') {
+            unset($_SESSION[self::SESSION_2FA_EMAIL_INPUT]);
         }
         redirect($this->panelUrl('/login/2fa'));
     }
@@ -579,10 +592,11 @@ final class AuthController
                 $_SESSION[self::SESSION_2FA_SELECTED_METHOD_KEY],
                 $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED],
                 $_SESSION[self::SESSION_2FA_WEBAUTHN_CHALLENGE],
-                $_SESSION[self::SESSION_2FA_FORCE_METHOD_PICKER]
+                $_SESSION[self::SESSION_2FA_FORCE_METHOD_PICKER],
+                $_SESSION[self::SESSION_2FA_EMAIL_INPUT]
             );
             $this->auth->markTwoFactorVerified($pendingUserId);
-            $this->jsonResponse(['ok' => true, 'redirect' => $this->panelUrl('/')], 200);
+            $this->jsonResponse(['ok' => true, 'redirect' => $this->consumePostLoginRedirectOrDefault()], 200);
         } catch (\Throwable $exception) {
             $_SESSION[self::SESSION_2FA_WEBAUTHN_FAILED] = true;
             $this->jsonResponse([
@@ -667,6 +681,59 @@ final class AuthController
         }
 
         return 'corp';
+    }
+
+    private function consumePostLoginRedirectOrDefault(): string
+    {
+        $raw = (string) ($_SESSION[self::SESSION_POST_LOGIN_REDIRECT] ?? '');
+        unset($_SESSION[self::SESSION_POST_LOGIN_REDIRECT]);
+
+        $normalized = $this->normalizePostLoginRedirect($raw);
+        if ($normalized !== '') {
+            return $normalized;
+        }
+
+        return $this->panelUrl('/');
+    }
+
+    private function normalizePostLoginRedirect(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        if (!str_starts_with($value, '/') || str_starts_with($value, '//')) {
+            return '';
+        }
+
+        $parts = @parse_url($value);
+        if (!is_array($parts)) {
+            return '';
+        }
+
+        if (isset($parts['scheme']) || isset($parts['host']) || isset($parts['user']) || isset($parts['pass'])) {
+            return '';
+        }
+
+        $path = (string) ($parts['path'] ?? '/');
+        if ($path === '' || !str_starts_with($path, '/')) {
+            return '';
+        }
+
+        if (str_contains($path, "\0")) {
+            return '';
+        }
+
+        $normalized = $path;
+        if (isset($parts['query']) && $parts['query'] !== '') {
+            $normalized .= '?' . (string) $parts['query'];
+        }
+        if (isset($parts['fragment']) && $parts['fragment'] !== '') {
+            $normalized .= '#' . (string) $parts['fragment'];
+        }
+
+        return $normalized;
     }
 
     /**
