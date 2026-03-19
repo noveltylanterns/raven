@@ -27,8 +27,7 @@ final class ChannelFileStoreService
         $this->ensureDirectory();
         $paths = glob($this->channelDirectory . '/*.php') ?: [];
         sort($paths, SORT_STRING);
-
-        return array_values($paths);
+        return $paths;
     }
 
     public function ensureDirectory(): void
@@ -87,9 +86,13 @@ final class ChannelFileStoreService
         if ($name === '') {
             $name = ucwords(str_replace('-', ' ', $slug));
         }
+        $createdAt = trim((string) ($raw['created_at'] ?? ''));
+        if ($createdAt === '') {
+            $createdAt = gmdate('Y-m-d H:i:s');
+        }
 
         return [
-            'id' => $this->normalizeChannelId($raw['id'] ?? null) ?? 0,
+            'id' => ChannelRecordPolicy::normalizeChannelId($raw['id'] ?? null) ?? 0,
             'name' => $name,
             'slug' => $slug,
             'description' => trim((string) ($raw['description'] ?? '')),
@@ -110,9 +113,7 @@ final class ChannelFileStoreService
             'preview_image_lg_path' => ChannelRecordPolicy::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
             'custom_fields' => is_array($raw['custom_fields'] ?? null) ? $raw['custom_fields'] : [],
             'overrides' => is_array($raw['overrides'] ?? null) ? $raw['overrides'] : [],
-            'created_at' => trim((string) ($raw['created_at'] ?? '')) !== ''
-                ? trim((string) $raw['created_at'])
-                : gmdate('Y-m-d H:i:s'),
+            'created_at' => $createdAt,
         ];
     }
 
@@ -123,9 +124,7 @@ final class ChannelFileStoreService
     {
         $this->ensureDirectory();
 
-        $content = "<?php\n\n";
-        $content .= "declare(strict_types=1);\n\n";
-        $content .= 'return ' . var_export($record, true) . ";\n";
+        $content = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export($record, true) . ";\n";
 
         $tmpPath = $path . '.tmp';
         if (file_put_contents($tmpPath, $content, LOCK_EX) === false) {
@@ -157,17 +156,12 @@ final class ChannelFileStoreService
             return;
         }
 
-        $currentId = $this->normalizeChannelId($raw['id'] ?? null);
+        $currentId = ChannelRecordPolicy::normalizeChannelId($raw['id'] ?? null);
         if ($currentId === $id) {
             return;
         }
 
         $raw['id'] = $id;
         $this->writeRecordBySlug($slug, $raw);
-    }
-
-    private function normalizeChannelId(mixed $value): ?int
-    {
-        return ChannelRecordPolicy::normalizeChannelId($value);
     }
 }
