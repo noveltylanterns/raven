@@ -66,9 +66,7 @@ final class TwoFactorEmailDeliveryService
             'If you did not request this code, you can ignore this email.',
         ]);
 
-        $fromHeader = $fromName !== ''
-            ? ($fromName . ' <' . $fromAddress . '>')
-            : $fromAddress;
+        $fromHeader = $fromName . ' <' . $fromAddress . '>';
         try {
             $messageEntropy = bin2hex(random_bytes(12));
         } catch (\Throwable $exception) {

@@ -140,64 +140,41 @@ final class LoginThrottleService
             ':updated_at' => $nowText,
         ];
 
-        if ($this->driver === 'sqlite') {
-            $sql = 'INSERT INTO ' . $table . ' (
-                        bucket_hash, username_normalized, ip_address,
-                        first_failed_at, last_failed_at, failure_count, locked_until,
-                        created_at, updated_at
-                    ) VALUES (
-                        :bucket_hash, :username_normalized, :ip_address,
-                        :first_failed_at, :last_failed_at, :failure_count, :locked_until,
-                        :created_at, :updated_at
-                    )
-                    ON CONFLICT(bucket_hash) DO UPDATE SET
-                        username_normalized = excluded.username_normalized,
-                        ip_address = excluded.ip_address,
-                        first_failed_at = excluded.first_failed_at,
-                        last_failed_at = excluded.last_failed_at,
-                        failure_count = excluded.failure_count,
-                        locked_until = excluded.locked_until,
-                        updated_at = excluded.updated_at';
-        } elseif ($this->driver === 'mysql') {
-            $sql = 'INSERT INTO ' . $table . ' (
-                        bucket_hash, username_normalized, ip_address,
-                        first_failed_at, last_failed_at, failure_count, locked_until,
-                        created_at, updated_at
-                    ) VALUES (
-                        :bucket_hash, :username_normalized, :ip_address,
-                        :first_failed_at, :last_failed_at, :failure_count, :locked_until,
-                        :created_at, :updated_at
-                    )
-                    ON DUPLICATE KEY UPDATE
-                        username_normalized = VALUES(username_normalized),
-                        ip_address = VALUES(ip_address),
-                        first_failed_at = VALUES(first_failed_at),
-                        last_failed_at = VALUES(last_failed_at),
-                        failure_count = VALUES(failure_count),
-                        locked_until = VALUES(locked_until),
-                        updated_at = VALUES(updated_at)';
-        } else {
-            $sql = 'INSERT INTO ' . $table . ' (
-                        bucket_hash, username_normalized, ip_address,
-                        first_failed_at, last_failed_at, failure_count, locked_until,
-                        created_at, updated_at
-                    ) VALUES (
-                        :bucket_hash, :username_normalized, :ip_address,
-                        :first_failed_at, :last_failed_at, :failure_count, :locked_until,
-                        :created_at, :updated_at
-                    )
-                    ON CONFLICT (bucket_hash) DO UPDATE SET
-                        username_normalized = EXCLUDED.username_normalized,
-                        ip_address = EXCLUDED.ip_address,
-                        first_failed_at = EXCLUDED.first_failed_at,
-                        last_failed_at = EXCLUDED.last_failed_at,
-                        failure_count = EXCLUDED.failure_count,
-                        locked_until = EXCLUDED.locked_until,
-                        updated_at = EXCLUDED.updated_at';
-        }
+        $sql = 'INSERT INTO ' . $table . ' (
+                    bucket_hash, username_normalized, ip_address,
+                    first_failed_at, last_failed_at, failure_count, locked_until,
+                    created_at, updated_at
+                ) VALUES (
+                    :bucket_hash, :username_normalized, :ip_address,
+                    :first_failed_at, :last_failed_at, :failure_count, :locked_until,
+                    :created_at, :updated_at
+                ) ' . $this->upsertConflictClause();
 
         $stmt = $this->appDb->prepare($sql);
         $stmt->execute($params);
+    }
+
+    private function upsertConflictClause(): string
+    {
+        if ($this->driver === 'mysql') {
+            return 'ON DUPLICATE KEY UPDATE
+                    username_normalized = VALUES(username_normalized),
+                    ip_address = VALUES(ip_address),
+                    first_failed_at = VALUES(first_failed_at),
+                    last_failed_at = VALUES(last_failed_at),
+                    failure_count = VALUES(failure_count),
+                    locked_until = VALUES(locked_until),
+                    updated_at = VALUES(updated_at)';
+        }
+
+        return 'ON CONFLICT (bucket_hash) DO UPDATE SET
+                username_normalized = excluded.username_normalized,
+                ip_address = excluded.ip_address,
+                first_failed_at = excluded.first_failed_at,
+                last_failed_at = excluded.last_failed_at,
+                failure_count = excluded.failure_count,
+                locked_until = excluded.locked_until,
+                updated_at = excluded.updated_at';
     }
 
     private function deleteRow(string $bucketHash): void
@@ -230,22 +207,16 @@ final class LoginThrottleService
 
     private function normalizeIdentifier(string $identifier): string
     {
-        $normalized = strtolower(trim($identifier));
-        if ($normalized === '') {
-            return 'unknown';
-        }
-
-        return substr($normalized, 0, 100);
+        $normalized = substr(strtolower(trim($identifier)), 0, 100);
+        return $normalized === '' ? 'unknown' : $normalized;
     }
 
     private function normalizeIp(string $ipAddress): string
     {
         $candidate = trim($ipAddress);
-        if ($candidate === '' || filter_var($candidate, FILTER_VALIDATE_IP) === false) {
-            return 'unknown';
-        }
-
-        return substr($candidate, 0, 64);
+        return ($candidate !== '' && filter_var($candidate, FILTER_VALIDATE_IP) !== false)
+            ? substr($candidate, 0, 64)
+            : 'unknown';
     }
 
     private function bucketHash(string $normalizedIdentifier, string $normalizedIp): string
@@ -255,10 +226,6 @@ final class LoginThrottleService
 
     private function tableName(): string
     {
-        if ($this->driver === 'sqlite') {
-            return 'auth.login_failures';
-        }
-
-        return $this->prefix . 'login_failures';
+        return $this->driver === 'sqlite' ? 'auth.login_failures' : ($this->prefix . 'login_failures');
     }
 }

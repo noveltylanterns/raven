@@ -11,6 +11,7 @@
 - Closed the broad sys-to-lib extraction sweep phase and re-scoped next-phase work to `private/lib` consolidation: dedupe overlapping services, flatten chained pass-through delegations, and define stricter domain entrypoint boundaries.
 - Refined the `private/lib` consolidation project workflow to run as folder-by-folder sweeps (one checklist checkpoint per `private/lib/*` subfolder), with per-folder 5-phase execution and explicit performance-focused consolidation goals.
 - Completed `private/lib/Archive` folder sweep: consolidated duplicate archive-manifest slug parsing logic into a shared internal path in `PackageInstallWorkflowService` (covers both `ext.json` and `theme.json`), reduced duplicate ZIP-entry scans, and revalidated with extension/theme smoke checks.
+- Completed `private/lib/Auth` folder sweep with net complexity reduction (no new service layers): collapsed duplicated login-throttle upsert SQL branches into a shared statement path, trimmed duplicated email challenge target checks, and revalidated with auth/security smoke coverage.
 
 ### March 18, 2026
 

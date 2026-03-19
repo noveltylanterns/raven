@@ -201,16 +201,12 @@ final class TwoFactorEmailChallengeService
             return null;
         }
 
-        $allowedMap = [];
         foreach ($allowedEmailsRaw as $rawEmail) {
-            $email = $this->normalizeEmail((string) $rawEmail);
-            if ($email === null) {
-                continue;
+            if ($this->normalizeEmail((string) $rawEmail) === $normalizedSubmitted) {
+                return $normalizedSubmitted;
             }
-
-            $allowedMap[$email] = true;
         }
 
-        return isset($allowedMap[$normalizedSubmitted]) ? $normalizedSubmitted : null;
+        return null;
     }
 }
