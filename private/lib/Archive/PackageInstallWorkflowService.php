@@ -211,6 +211,26 @@ final class PackageInstallWorkflowService
      */
     public function extensionSlugFromArchiveManifest(string $tmpPath): ?string
     {
+        return $this->manifestSlugFromArchive($tmpPath, 'ext.json', 119);
+    }
+
+    /**
+     * Reads public-theme slug from archive theme.json manifest.
+     *
+     * Supports archives where theme.json is at root or one wrapper-directory deep.
+     */
+    public function themeSlugFromArchiveManifest(string $tmpPath): ?string
+    {
+        return $this->manifestSlugFromArchive($tmpPath, 'theme.json', 63);
+    }
+
+    private function manifestSlugFromArchive(string $tmpPath, string $manifestFilename, int $maxSlugLength): ?string
+    {
+        $manifestFilename = strtolower(trim($manifestFilename));
+        if ($manifestFilename === '') {
+            return null;
+        }
+
         $zip = new ZipArchive();
         $opened = $zip->open($tmpPath);
         if ($opened !== true) {
@@ -218,36 +238,10 @@ final class PackageInstallWorkflowService
         }
 
         try {
-            $candidateIndexes = [];
-            for ($index = 0; $index < $zip->numFiles; $index++) {
-                $entryName = $zip->getNameIndex($index);
-                if (!is_string($entryName) || !$this->archives->isSafeZipEntryPath($entryName)) {
-                    continue;
-                }
-
-                $normalizedEntry = trim(str_replace('\\', '/', $entryName), '/');
-                if ($normalizedEntry === '' || strtolower((string) pathinfo($normalizedEntry, PATHINFO_BASENAME)) !== 'ext.json') {
-                    continue;
-                }
-
-                $directory = trim((string) pathinfo($normalizedEntry, PATHINFO_DIRNAME), '.');
-                $depth = $directory === '' ? 0 : substr_count($directory, '/') + 1;
-                if ($depth > 1) {
-                    continue;
-                }
-
-                $candidateIndexes[] = [
-                    'index' => $index,
-                    'depth' => $depth,
-                ];
-            }
-
-            usort($candidateIndexes, static function (array $left, array $right): int {
-                return ((int) ($left['depth'] ?? 99)) <=> ((int) ($right['depth'] ?? 99));
-            });
-
+            $slugPattern = '/^[a-z0-9][a-z0-9_-]{0,' . max(0, $maxSlugLength) . '}$/';
+            $candidateIndexes = $this->manifestEntryIndexes($zip, $manifestFilename);
             foreach ($candidateIndexes as $candidate) {
-                $index = (int) ($candidate['index'] ?? -1);
+                $index = (int) $candidate;
                 if ($index < 0) {
                     continue;
                 }
@@ -269,8 +263,8 @@ final class PackageInstallWorkflowService
                 }
 
                 $slug = strtolower($slugRaw);
-                if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) === 1) {
-                    return strtolower($slug);
+                if (preg_match($slugPattern, $slug) === 1) {
+                    return $slug;
                 }
             }
         } finally {
@@ -281,79 +275,43 @@ final class PackageInstallWorkflowService
     }
 
     /**
-     * Reads public-theme slug from archive theme.json manifest.
+     * Collects candidate manifest entry indexes in preferred lookup order:
+     * - root-level manifest first
+     * - one-wrapper-directory manifest second
      *
-     * Supports archives where theme.json is at root or one wrapper-directory deep.
+     * @return array<int, int>
      */
-    public function themeSlugFromArchiveManifest(string $tmpPath): ?string
+    private function manifestEntryIndexes(ZipArchive $zip, string $manifestFilename): array
     {
-        $zip = new ZipArchive();
-        $opened = $zip->open($tmpPath);
-        if ($opened !== true) {
-            return null;
-        }
+        $rootIndexes = [];
+        $wrappedIndexes = [];
 
-        try {
-            $candidateIndexes = [];
-            for ($index = 0; $index < $zip->numFiles; $index++) {
-                $entryName = $zip->getNameIndex($index);
-                if (!is_string($entryName) || !$this->archives->isSafeZipEntryPath($entryName)) {
-                    continue;
-                }
-
-                $normalizedEntry = trim(str_replace('\\', '/', $entryName), '/');
-                if ($normalizedEntry === '' || strtolower((string) pathinfo($normalizedEntry, PATHINFO_BASENAME)) !== 'theme.json') {
-                    continue;
-                }
-
-                $directory = trim((string) pathinfo($normalizedEntry, PATHINFO_DIRNAME), '.');
-                $depth = $directory === '' ? 0 : substr_count($directory, '/') + 1;
-                if ($depth > 1) {
-                    continue;
-                }
-
-                $candidateIndexes[] = [
-                    'index' => $index,
-                    'depth' => $depth,
-                ];
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $entryName = $zip->getNameIndex($index);
+            if (!is_string($entryName) || !$this->archives->isSafeZipEntryPath($entryName)) {
+                continue;
             }
 
-            usort($candidateIndexes, static function (array $left, array $right): int {
-                return ((int) ($left['depth'] ?? 99)) <=> ((int) ($right['depth'] ?? 99));
-            });
-
-            foreach ($candidateIndexes as $candidate) {
-                $index = (int) ($candidate['index'] ?? -1);
-                if ($index < 0) {
-                    continue;
-                }
-
-                $raw = $zip->getFromIndex($index);
-                if (!is_string($raw) || trim($raw) === '') {
-                    continue;
-                }
-
-                /** @var mixed $decoded */
-                $decoded = json_decode($raw, true);
-                if (!is_array($decoded)) {
-                    continue;
-                }
-
-                $slugRaw = trim((string) ($decoded['slug'] ?? ''));
-                if ($slugRaw === '') {
-                    continue;
-                }
-
-                $slug = strtolower($slugRaw);
-                if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $slug) === 1) {
-                    return $slug;
-                }
+            $normalizedEntry = trim(str_replace('\\', '/', $entryName), '/');
+            if ($normalizedEntry === '' || strtolower((string) pathinfo($normalizedEntry, PATHINFO_BASENAME)) !== $manifestFilename) {
+                continue;
             }
-        } finally {
-            $zip->close();
+
+            $directory = trim((string) pathinfo($normalizedEntry, PATHINFO_DIRNAME), '.');
+            $depth = $directory === '' ? 0 : substr_count($directory, '/') + 1;
+            if ($depth > 1) {
+                continue;
+            }
+
+            if ($depth === 0) {
+                $rootIndexes[] = $index;
+                continue;
+            }
+
+            $wrappedIndexes[] = $index;
         }
 
-        return null;
+        return [...$rootIndexes, ...$wrappedIndexes];
     }
 
     /**

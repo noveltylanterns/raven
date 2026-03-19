@@ -10,6 +10,7 @@
 - Continued core modularization cleanup in `PublicController` by removing seven additional redundant helper wrappers (redirect-target validator pass-through, profile-contact option wrappers, site-enabled/login-mode wrappers, and request-context IP/hostname pass-throughs), with call sites routed directly to existing lib services.
 - Closed the broad sys-to-lib extraction sweep phase and re-scoped next-phase work to `private/lib` consolidation: dedupe overlapping services, flatten chained pass-through delegations, and define stricter domain entrypoint boundaries.
 - Refined the `private/lib` consolidation project workflow to run as folder-by-folder sweeps (one checklist checkpoint per `private/lib/*` subfolder), with per-folder 5-phase execution and explicit performance-focused consolidation goals.
+- Completed `private/lib/Archive` folder sweep: consolidated duplicate archive-manifest slug parsing logic into a shared internal path in `PackageInstallWorkflowService` (covers both `ext.json` and `theme.json`), reduced duplicate ZIP-entry scans, and revalidated with extension/theme smoke checks.
 
 ### March 18, 2026
 
