@@ -12,6 +12,66 @@ use Raven\Lib\Security\InputSanitizer;
  */
 final class ConfigEditorSchemaService
 {
+    /** @var array<string, string> */
+    private const PATH_LABEL_OVERRIDES = [
+        'media.images.max_filesize_kb' => 'Max Filesize (KB)',
+        'media.avatars.max_filesize_kb' => 'Max Avatar Filesize (KB)',
+        'media.avatars.max_width' => 'Max Avatar Width (px)',
+        'media.avatars.max_height' => 'Max Avatar Height (px)',
+        'media.avatars.allowed_extensions' => 'Allowed Avatar Extensions',
+        'media.images.small.width' => 'Small Width (px)',
+        'media.images.small.height' => 'Small Height (px)',
+        'media.images.med.width' => 'Medium Width (px)',
+        'media.images.med.height' => 'Medium Height (px)',
+        'media.images.large.width' => 'Large Width (px)',
+        'media.images.large.height' => 'Large Height (px)',
+        'captcha.hcaptcha.public_key' => 'Site Key',
+        'captcha.recaptcha2.public_key' => 'Site Key',
+        'captcha.recaptcha3.public_key' => 'Site Key',
+        'panel.path' => 'Panel Path',
+        'panel.default_theme' => 'Default Panel Theme',
+        'panel.brand_name' => 'Branded Panel Name',
+        'panel.brand_logo' => 'Branded Panel Logo',
+        'site.default_theme' => 'Default Site Theme',
+        'site.enabled' => 'Site Visibility',
+        'mail.agent' => 'Mail Agent',
+        'mail.sender_address' => 'Mail Sender Address',
+        'mail.sender_name' => 'Mail Sender Name',
+        'content.default_editor' => 'Default Text Editor',
+        'content.separator' => 'Default Page URL Separator',
+        'category.prefix' => 'Category URL Prefix',
+        'category.pagination' => 'Pagination',
+        'tag.prefix' => 'Tag URL Prefix',
+        'tag.pagination' => 'Pagination',
+        'meta.twitter.card' => 'Twitter Card',
+        'meta.twitter.site' => 'Twitter Site',
+        'meta.twitter.creator' => 'Twitter Creator',
+        'meta.twitter.image' => 'Twitter Image',
+        'meta.apple_touch_icon' => 'Apple Touch Icon',
+        'meta.opengraph.type' => 'OpenGraph Type',
+        'meta.opengraph.locale' => 'OpenGraph Locale',
+        'meta.opengraph.image' => 'OpenGraph Image',
+        'session.cookie.name' => 'Cookie Name',
+        'session.cookie.domain' => 'Cookie Domain',
+        'session.cookie.prefix' => 'Cookie Prefix',
+        'user.privacy' => 'Enable Profiles',
+        'user.auth.login' => 'Login Method',
+        'user.auth.registration' => 'Enable Public Registration',
+        'user.prefix' => 'Profile URL Prefix',
+        'group.privacy' => 'Show Groups',
+        'group.prefix' => 'Group URL Prefix',
+        'session.brute.max' => 'Max Login Failures',
+        'session.brute.window' => 'Login Failure Window (Seconds)',
+        'session.brute.lock' => 'Login Lock Duration (Seconds)',
+        'debug.show_public' => 'Enable Output Profiler on Public Views',
+        'debug.show_private' => 'Enable Output Profiler on Panel Views',
+        'debug.show_benchmarks' => 'Benchmarks',
+        'debug.show_queries' => 'SQL Queries',
+        'debug.show_trace' => 'Render Stack Trace',
+        'debug.show_request' => 'Request Data',
+        'debug.show_environment' => 'Environment',
+    ];
+
     private InputSanitizer $input;
     private ProfileContactService $profileContacts;
 
@@ -66,228 +126,8 @@ final class ConfigEditorSchemaService
 
     public function labelFromPath(string $path): string
     {
-        if ($path === 'media.images.max_filesize_kb') {
-            return 'Max Filesize (KB)';
-        }
-
-        if ($path === 'media.avatars.max_filesize_kb') {
-            return 'Max Avatar Filesize (KB)';
-        }
-
-        if ($path === 'media.avatars.max_width') {
-            return 'Max Avatar Width (px)';
-        }
-
-        if ($path === 'media.avatars.max_height') {
-            return 'Max Avatar Height (px)';
-        }
-
-        if ($path === 'media.avatars.allowed_extensions') {
-            return 'Allowed Avatar Extensions';
-        }
-
-        if ($path === 'media.images.small.width') {
-            return 'Small Width (px)';
-        }
-
-        if ($path === 'media.images.small.height') {
-            return 'Small Height (px)';
-        }
-
-        if ($path === 'media.images.med.width') {
-            return 'Medium Width (px)';
-        }
-
-        if ($path === 'media.images.med.height') {
-            return 'Medium Height (px)';
-        }
-
-        if ($path === 'media.images.large.width') {
-            return 'Large Width (px)';
-        }
-
-        if ($path === 'media.images.large.height') {
-            return 'Large Height (px)';
-        }
-
-        if ($path === 'captcha.hcaptcha.public_key') {
-            return 'Site Key';
-        }
-
-        if ($path === 'captcha.recaptcha2.public_key') {
-            return 'Site Key';
-        }
-
-        if ($path === 'captcha.recaptcha3.public_key') {
-            return 'Site Key';
-        }
-
-        if ($path === 'panel.path') {
-            return 'Panel Path';
-        }
-
-        if ($path === 'panel.default_theme') {
-            return 'Default Panel Theme';
-        }
-
-        if ($path === 'panel.brand_name') {
-            return 'Branded Panel Name';
-        }
-
-        if ($path === 'panel.brand_logo') {
-            return 'Branded Panel Logo';
-        }
-
-        if ($path === 'site.default_theme') {
-            return 'Default Site Theme';
-        }
-
-        if ($path === 'site.enabled') {
-            return 'Site Visibility';
-        }
-
-        if ($path === 'mail.agent') {
-            return 'Mail Agent';
-        }
-
-        if ($path === 'mail.sender_address') {
-            return 'Mail Sender Address';
-        }
-
-        if ($path === 'mail.sender_name') {
-            return 'Mail Sender Name';
-        }
-
-        if ($path === 'content.default_editor') {
-            return 'Default Text Editor';
-        }
-
-        if ($path === 'content.separator') {
-            return 'Default Page URL Separator';
-        }
-
-        if ($path === 'category.prefix') {
-            return 'Category URL Prefix';
-        }
-
-        if ($path === 'category.pagination') {
-            return 'Pagination';
-        }
-
-        if ($path === 'tag.prefix') {
-            return 'Tag URL Prefix';
-        }
-
-        if ($path === 'tag.pagination') {
-            return 'Pagination';
-        }
-
-        if ($path === 'meta.twitter.card') {
-            return 'Twitter Card';
-        }
-
-        if ($path === 'meta.twitter.site') {
-            return 'Twitter Site';
-        }
-
-        if ($path === 'meta.twitter.creator') {
-            return 'Twitter Creator';
-        }
-
-        if ($path === 'meta.twitter.image') {
-            return 'Twitter Image';
-        }
-
-        if ($path === 'meta.apple_touch_icon') {
-            return 'Apple Touch Icon';
-        }
-
-        if ($path === 'meta.opengraph.type') {
-            return 'OpenGraph Type';
-        }
-
-        if ($path === 'meta.opengraph.locale') {
-            return 'OpenGraph Locale';
-        }
-
-        if ($path === 'meta.opengraph.image') {
-            return 'OpenGraph Image';
-        }
-
-        if ($path === 'session.cookie.name') {
-            return 'Cookie Name';
-        }
-
-        if ($path === 'session.cookie.domain') {
-            return 'Cookie Domain';
-        }
-
-        if ($path === 'session.cookie.prefix') {
-            return 'Cookie Prefix';
-        }
-
-        if ($path === 'user.privacy') {
-            return 'Enable Profiles';
-        }
-
-        if ($path === 'user.auth.login') {
-            return 'Login Method';
-        }
-
-        if ($path === 'user.auth.registration') {
-            return 'Enable Public Registration';
-        }
-
-        if ($path === 'user.prefix') {
-            return 'Profile URL Prefix';
-        }
-
-        if ($path === 'group.privacy') {
-            return 'Show Groups';
-        }
-
-        if ($path === 'group.prefix') {
-            return 'Group URL Prefix';
-        }
-
-        if ($path === 'session.brute.max') {
-            return 'Max Login Failures';
-        }
-
-        if ($path === 'session.brute.window') {
-            return 'Login Failure Window (Seconds)';
-        }
-
-        if ($path === 'session.brute.lock') {
-            return 'Login Lock Duration (Seconds)';
-        }
-
-        if ($path === 'debug.show_public') {
-            return 'Enable Output Profiler on Public Views';
-        }
-
-        if ($path === 'debug.show_private') {
-            return 'Enable Output Profiler on Panel Views';
-        }
-
-        if ($path === 'debug.show_benchmarks') {
-            return 'Benchmarks';
-        }
-
-        if ($path === 'debug.show_queries') {
-            return 'SQL Queries';
-        }
-
-        if ($path === 'debug.show_trace') {
-            return 'Render Stack Trace';
-        }
-
-        if ($path === 'debug.show_request') {
-            return 'Request Data';
-        }
-
-        if ($path === 'debug.show_environment') {
-            return 'Environment';
+        if (array_key_exists($path, self::PATH_LABEL_OVERRIDES)) {
+            return self::PATH_LABEL_OVERRIDES[$path];
         }
 
         $segments = explode('.', $path);
@@ -444,7 +284,7 @@ final class ConfigEditorSchemaService
         if (!array_key_exists('enabled', $category)) {
             $category['enabled'] = true;
         } else {
-            $category['enabled'] = $this->configBool($category['enabled'], true);
+            $category['enabled'] = ConfigValueParser::bool($category['enabled'], true);
         }
 
         if (!array_key_exists('prefix', $category)) {
@@ -468,7 +308,7 @@ final class ConfigEditorSchemaService
         if (!array_key_exists('enabled', $tag)) {
             $tag['enabled'] = true;
         } else {
-            $tag['enabled'] = $this->configBool($tag['enabled'], true);
+            $tag['enabled'] = ConfigValueParser::bool($tag['enabled'], true);
         }
 
         if (!array_key_exists('prefix', $tag)) {
@@ -893,28 +733,6 @@ final class ConfigEditorSchemaService
             $debug = [];
         }
 
-        $toBool = static function (mixed $value, bool $default): bool {
-            if (is_bool($value)) {
-                return $value;
-            }
-
-            if (is_int($value) || is_float($value)) {
-                return ((int) $value) !== 0;
-            }
-
-            if (is_string($value)) {
-                $normalized = strtolower(trim($value));
-                if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
-                    return true;
-                }
-                if (in_array($normalized, ['0', 'false', 'no', 'off', ''], true)) {
-                    return false;
-                }
-            }
-
-            return $default;
-        };
-
         if (!array_key_exists('show_public', $debug) && array_key_exists('show_on_public', $debug)) {
             $debug['show_public'] = $debug['show_on_public'];
         }
@@ -928,22 +746,17 @@ final class ConfigEditorSchemaService
             $debug['show_trace'] = $debug['show_stack_trace'];
         }
 
-        $debug['show_public'] = $toBool($debug['show_public'] ?? false, false);
-        $debug['show_private'] = $toBool($debug['show_private'] ?? false, false);
-        $debug['show_benchmarks'] = $toBool($debug['show_benchmarks'] ?? true, true);
-        $debug['show_queries'] = $toBool($debug['show_queries'] ?? true, true);
-        $debug['show_trace'] = $toBool($debug['show_trace'] ?? true, true);
-        $debug['show_request'] = $toBool($debug['show_request'] ?? true, true);
-        $debug['show_environment'] = $toBool($debug['show_environment'] ?? true, true);
+        $debug['show_public'] = ConfigValueParser::bool($debug['show_public'] ?? false, false);
+        $debug['show_private'] = ConfigValueParser::bool($debug['show_private'] ?? false, false);
+        $debug['show_benchmarks'] = ConfigValueParser::bool($debug['show_benchmarks'] ?? true, true);
+        $debug['show_queries'] = ConfigValueParser::bool($debug['show_queries'] ?? true, true);
+        $debug['show_trace'] = ConfigValueParser::bool($debug['show_trace'] ?? true, true);
+        $debug['show_request'] = ConfigValueParser::bool($debug['show_request'] ?? true, true);
+        $debug['show_environment'] = ConfigValueParser::bool($debug['show_environment'] ?? true, true);
         unset($debug['show_on_public'], $debug['show_on_panel'], $debug['show_on_private'], $debug['show_stack_trace']);
 
         $config['debug'] = $debug;
         return $config;
-    }
-
-    private function configBool(mixed $value, bool $default = false): bool
-    {
-        return ConfigValueParser::bool($value, $default);
     }
 
     private function normalizeBodyTextEditorOption(string $value): string
