@@ -2,10 +2,15 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### March 19, 2026
+
+- Continued core modularization cleanup for public template routing: moved theme-chain lookup/root orchestration out of `PublicController` into `private/lib/View/PublicTemplatePipeline.php` (`renderForThemeChain` + route-template resolvers), rewired controller call sites, and removed redundant controller wrapper methods.
+
 ### March 18, 2026
 
 - Completed a major bugs-and-tweaks batch, including panel/public 2FA flow fixes, upload/install fixes, panel user-editor/list UX fixes, and misc installer/runtime cleanups.
 - Added a dedicated theme-agnostic fallback stylesheet pipeline for core public templates: `private/tpl/wrapper.php` now loads `/theme/fallback.css`, generated from `public/theme/fallback.scss` with stock Composer Bootstrap imports.
+- Continued core modularization pass for public embedded-form flow: moved runtime discovery + shortcode render orchestration into `private/lib/Extension/EmbeddedFormRuntimeService.php`, rewired `PublicController` to consume those lib helpers directly, and removed redundant in-controller helper methods.
 - Fixed a Preferences 2FA regression where saving after a successful TOTP setup could incorrectly revert the method back to pending verification.
 - Updated confirmed Preferences TOTP rows so they now show `TOTP Secret` with value `Stored securely on server` (without confirm-code input or click-to-copy), and render secret fields with softer background styling instead of solid white.
 - Updated Preferences TOTP setup modal to include inline 8-digit verification input + `Finish Setup` submit action so TOTP confirmation can be completed directly from the popup.

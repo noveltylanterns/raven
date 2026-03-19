@@ -29,6 +29,51 @@ final class EmbeddedFormRuntimeService
     }
 
     /**
+     * Discovers extension-provided embedded-form runtimes.
+     *
+     * @param array<string, mixed> $extensionServices
+     * @return array<string, EmbeddedFormRuntimeInterface>
+     */
+    public function discoverRuntimes(array $extensionServices): array
+    {
+        $runtimes = [];
+
+        foreach ($extensionServices as $serviceBucket) {
+            if (!is_array($serviceBucket)) {
+                continue;
+            }
+
+            /** @var mixed $rawCandidates */
+            $rawCandidates = $serviceBucket['embedded_form_runtimes'] ?? [];
+            if (is_object($rawCandidates)) {
+                $rawCandidates = [$rawCandidates];
+            }
+            if (!is_array($rawCandidates)) {
+                continue;
+            }
+
+            foreach ($rawCandidates as $candidate) {
+                if (!$candidate instanceof EmbeddedFormRuntimeInterface) {
+                    continue;
+                }
+
+                $type = strtolower(trim($candidate->type()));
+                if ($type === '' || $this->input->slug($type) === null) {
+                    continue;
+                }
+
+                // First writer wins so one type cannot be overridden unexpectedly.
+                if (!isset($runtimes[$type])) {
+                    $runtimes[$type] = $candidate;
+                }
+            }
+        }
+
+        ksort($runtimes);
+        return $runtimes;
+    }
+
+    /**
      * @param array<string, EmbeddedFormRuntimeInterface> $runtimes
      */
     public function runtime(string $type, array $runtimes): ?EmbeddedFormRuntimeInterface
@@ -91,6 +136,40 @@ final class EmbeddedFormRuntimeService
         }
 
         return $path;
+    }
+
+    /**
+     * Resolves and renders supported embedded-form shortcodes in public HTML.
+     *
+     * @param array<string, EmbeddedFormRuntimeInterface> $runtimes
+     * @param callable(): string $captchaMarkup
+     */
+    public function renderShortcodesForPublicRoute(
+        string $html,
+        array $runtimes,
+        string $requestUri,
+        string $csrfField,
+        callable $captchaMarkup
+    ): string {
+        $returnPath = $this->sanitizeReturnPath($requestUri);
+
+        return $this->renderShortcodes(
+            $html,
+            $runtimes,
+            function (string $type, array $definition) use ($runtimes, $returnPath, $csrfField, $captchaMarkup): string {
+                $runtime = $this->runtime($type, $runtimes);
+                if (!$runtime instanceof EmbeddedFormRuntimeInterface) {
+                    return '';
+                }
+
+                return $runtime->render(
+                    $definition,
+                    $returnPath,
+                    $csrfField,
+                    (string) $captchaMarkup()
+                );
+            }
+        );
     }
 
     /**

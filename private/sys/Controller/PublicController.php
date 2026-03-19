@@ -121,53 +121,8 @@ final class PublicController
         $this->csrf = $csrf;
         $this->publicFlash = new SessionFlash('_raven_public_flash');
         $this->identifierResolver = new LoginIdentifierResolver();
-        $this->embeddedFormRuntimes = $this->discoverEmbeddedFormRuntimes($extensionServices);
+        $this->embeddedFormRuntimes = $this->embeddedFormRuntimeService()->discoverRuntimes($extensionServices);
         $this->templateTags = new TemplateTagEngine(dirname(__DIR__, 3) . '/.tmp/template_tag_cache');
-    }
-
-    /**
-     * Discovers extension-provided embedded-form runtimes.
-     *
-     * @param array<string, mixed> $extensionServices
-     * @return array<string, EmbeddedFormRuntimeInterface>
-     */
-    private function discoverEmbeddedFormRuntimes(array $extensionServices): array
-    {
-        $runtimes = [];
-
-        foreach ($extensionServices as $serviceBucket) {
-            if (!is_array($serviceBucket)) {
-                continue;
-            }
-
-            /** @var mixed $rawCandidates */
-            $rawCandidates = $serviceBucket['embedded_form_runtimes'] ?? [];
-            if (is_object($rawCandidates)) {
-                $rawCandidates = [$rawCandidates];
-            }
-            if (!is_array($rawCandidates)) {
-                continue;
-            }
-
-            foreach ($rawCandidates as $candidate) {
-                if (!$candidate instanceof EmbeddedFormRuntimeInterface) {
-                    continue;
-                }
-
-                $type = strtolower(trim($candidate->type()));
-                if ($type === '' || $this->input->slug($type) === null) {
-                    continue;
-                }
-
-                // First writer wins so one type cannot be overridden unexpectedly.
-                if (!isset($runtimes[$type])) {
-                    $runtimes[$type] = $candidate;
-                }
-            }
-        }
-
-        ksort($runtimes);
-        return $runtimes;
     }
 
     /**
@@ -216,7 +171,12 @@ final class PublicController
         $page = $this->renderPageExtendedBlocks($page);
         $page = $this->decoratePageForTemplate($page);
 
-        $channelTemplate = $this->resolveChannelTemplateName($channelSlug);
+        $channelTemplate = $this->publicTemplatePipeline()->resolveChannelTemplateNameForThemeChain(
+            $channelSlug,
+            $this->publicThemesRoot(),
+            $this->currentPublicThemeSlug(),
+            dirname(__DIR__, 3) . '/private/tpl'
+        );
         $site = $this->siteDataWithPageMeta($page);
         if (is_array($channel)) {
             // Channel-level cover/preview uploads override default/page fallback for channel landing routes.
@@ -307,7 +267,12 @@ final class PublicController
         $page = $this->renderPageExtendedBlocks($page);
         $page = $this->decoratePageForTemplate($page);
 
-        $pageTemplate = $this->resolvePageTemplateName($channelSlug);
+        $pageTemplate = $this->publicTemplatePipeline()->resolvePageTemplateNameForThemeChain(
+            $channelSlug,
+            $this->publicThemesRoot(),
+            $this->currentPublicThemeSlug(),
+            dirname(__DIR__, 3) . '/private/tpl'
+        );
 
         $this->renderPublic($pageTemplate, [
             'site' => $this->siteDataWithPageMeta($page),
@@ -436,7 +401,12 @@ final class PublicController
             'base_path' => '/' . $categoryPrefix . '/' . rawurlencode($categorySlug),
         ];
         $pagination = $this->decoratePaginationForTemplate($pagination);
-        $categoryTemplate = $this->resolveCategoryTemplateName($categorySlug);
+        $categoryTemplate = $this->publicTemplatePipeline()->resolveCategoryTemplateNameForThemeChain(
+            $categorySlug,
+            $this->publicThemesRoot(),
+            $this->currentPublicThemeSlug(),
+            dirname(__DIR__, 3) . '/private/tpl'
+        );
 
         $this->renderPublic($categoryTemplate, [
             'site' => $this->siteDataWithTaxonomyMetaImage($category),
@@ -486,7 +456,12 @@ final class PublicController
             'base_path' => '/' . $tagPrefix . '/' . rawurlencode($tagSlug),
         ];
         $pagination = $this->decoratePaginationForTemplate($pagination);
-        $tagTemplate = $this->resolveTagTemplateName($tagSlug);
+        $tagTemplate = $this->publicTemplatePipeline()->resolveTagTemplateNameForThemeChain(
+            $tagSlug,
+            $this->publicThemesRoot(),
+            $this->currentPublicThemeSlug(),
+            dirname(__DIR__, 3) . '/private/tpl'
+        );
 
         $this->renderPublic($tagTemplate, [
             'site' => $this->siteDataWithTaxonomyMetaImage($tag),
@@ -518,7 +493,10 @@ final class PublicController
             return;
         }
 
-        $normalizedUsername = $this->normalizeProfileIdentifier($username);
+        $normalizedUsername = $this->identifierResolver->normalizeUsernameOrEmail(
+            $this->input,
+            rawurldecode($username)
+        );
         if ($normalizedUsername === null) {
             $this->notFound();
             return;
@@ -543,32 +521,6 @@ final class PublicController
             'site' => $this->siteData(),
             'profile' => $profile,
         ], 'wrapper');
-    }
-
-    /**
-     * Normalizes one profile-route identifier segment.
-     *
-     * Accepts canonical usernames and email-shaped values.
-     */
-    private function normalizeProfileIdentifier(string $rawIdentifier): ?string
-    {
-        $decoded = rawurldecode($rawIdentifier);
-        $normalizedText = $this->input->text($decoded, 254);
-        if ($normalizedText === '') {
-            return null;
-        }
-
-        $normalizedUsername = $this->input->username($normalizedText);
-        if ($normalizedUsername !== null && $normalizedUsername !== '') {
-            return $normalizedUsername;
-        }
-
-        $normalizedEmail = $this->input->email($normalizedText);
-        if ($normalizedEmail !== null && $normalizedEmail !== '') {
-            return $normalizedEmail;
-        }
-
-        return null;
     }
 
     /**
@@ -847,19 +799,11 @@ final class PublicController
     }
 
     /**
-     * Resolves one optional URL/href for contact value + configured prefix.
-     */
-    private function resolveProfileContactHref(string $value, string $urlPrefix): ?string
-    {
-        return $this->profileContactService()->resolveProfileContactHref($value, $urlPrefix);
-    }
-
-    /**
      * Handles one public embedded-form submission request by type + slug.
      */
     public function submitEmbeddedForm(string $type, string $formSlug): void
     {
-        $runtime = $this->embeddedFormRuntime($type);
+        $runtime = $this->embeddedFormRuntimeService()->runtime($type, $this->embeddedFormRuntimes);
         if ($runtime === null) {
             $this->notFound();
             return;
@@ -876,7 +820,7 @@ final class PublicController
             return;
         }
 
-        $returnPath = $this->sanitizePublicReturnPath((string) ($_POST['return_path'] ?? '/'));
+        $returnPath = $this->embeddedFormRuntimeService()->sanitizeReturnPath((string) ($_POST['return_path'] ?? '/'));
 
         try {
             $runtime->submit($slug, $returnPath, function (): ?string {
@@ -891,14 +835,6 @@ final class PublicController
             );
             $this->notFound();
         }
-    }
-
-    /**
-     * Returns one embedded-form runtime by shortcode type when available.
-     */
-    private function embeddedFormRuntime(string $type): ?EmbeddedFormRuntimeInterface
-    {
-        return $this->embeddedFormRuntimeService()->runtime($type, $this->embeddedFormRuntimes);
     }
 
     /**
@@ -999,16 +935,6 @@ final class PublicController
     }
 
     /**
-     * Resolves one safe absolute URL for OpenGraph/Twitter image tag.
-     *
-     * Accepts absolute HTTP(S) URLs or local URL paths.
-     */
-    private function absoluteMetaImageUrl(string $value, string $configuredDomain): string
-    {
-        return $this->publicMetaService()->absoluteMetaImageUrl($value, $configuredDomain);
-    }
-
-    /**
      * Resolves active public theme slug from configuration + discovered manifests.
      */
     private function currentPublicThemeSlug(): string
@@ -1032,24 +958,6 @@ final class PublicController
     private function publicThemesRoot(): string
     {
         return $this->themeCatalogService()->root();
-    }
-
-    /**
-     * Resolves active theme inheritance chain, child first.
-     *
-     * @return array<int, string>
-     */
-    private function currentPublicThemeInheritanceChain(string $themeSlug): array
-    {
-        return $this->themeCatalogService()->inheritanceChain($themeSlug);
-    }
-
-    /**
-     * Resolves one theme slug that provides the active public stylesheet.
-     */
-    private function currentPublicThemeCssSlug(string $themeSlug): string
-    {
-        return $this->themeCatalogService()->cssSlug($themeSlug);
     }
 
     /**
@@ -1663,95 +1571,17 @@ final class PublicController
     private function renderPublic(string $template, array $data = [], ?string $layout = null): void
     {
         $data = $this->decorateTemplateData($data);
-        $output = $this->publicTemplatePipeline()->render(
+        $output = $this->publicTemplatePipeline()->renderForThemeChain(
             $template,
             $data,
             $layout,
             fn (string $file, array $payload): string => $this->templateTags->renderFile($file, $payload),
-            ...$this->publicTemplateLookupRoots()
-        );
-
-        echo $output;
-    }
-
-    /**
-     * Resolves channel landing template name with slug-specific override support.
-     *
-     * Priority:
-     * 1) `tpl/channels/{channel_slug}.php`
-     * 2) `tpl/channels/index.php`
-     */
-    private function resolveChannelTemplateName(string $channelSlug): string
-    {
-        return $this->publicTemplatePipeline()->resolveChannelTemplateName(
-            $channelSlug,
-            ...$this->publicTemplateLookupRoots()
-        );
-    }
-
-    /**
-     * Resolves public page template with optional channel-specific override.
-     *
-     * Priority:
-     * 1) `tpl/pages/{channel_slug}.php` when route has a channel
-     * 2) `tpl/pages/index.php`
-     */
-    private function resolvePageTemplateName(?string $channelSlug): string
-    {
-        return $this->publicTemplatePipeline()->resolvePageTemplateName(
-            $channelSlug,
-            ...$this->publicTemplateLookupRoots()
-        );
-    }
-
-    /**
-     * Resolves category-list template name with category-slug override support.
-     *
-     * Priority:
-     * 1) `tpl/categories/{category_slug}.php`
-     * 2) `tpl/categories/index.php`
-     */
-    private function resolveCategoryTemplateName(string $categorySlug): string
-    {
-        return $this->publicTemplatePipeline()->resolveCategoryTemplateName(
-            $categorySlug,
-            ...$this->publicTemplateLookupRoots()
-        );
-    }
-
-    /**
-     * Resolves tag-list template name with tag-slug override support.
-     *
-     * Priority:
-     * 1) `tpl/tags/{tag_slug}.php`
-     * 2) `tpl/tags/index.php`
-     */
-    private function resolveTagTemplateName(string $tagSlug): string
-    {
-        return $this->publicTemplatePipeline()->resolveTagTemplateName(
-            $tagSlug,
-            ...$this->publicTemplateLookupRoots()
-        );
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function publicTemplateLookupRoots(): array
-    {
-        return $this->publicTemplatePipeline()->lookupRoots(
             $this->publicThemesRoot(),
             $this->currentPublicThemeSlug(),
             dirname(__DIR__, 3) . '/private/tpl'
         );
-    }
 
-    /**
-     * Normalizes a post-submit return path to one safe local absolute path.
-     */
-    private function sanitizePublicReturnPath(string $rawPath): string
-    {
-        return $this->embeddedFormRuntimeService()->sanitizeReturnPath($rawPath);
+        echo $output;
     }
 
     /**
@@ -1796,31 +1626,12 @@ final class PublicController
      */
     private function renderEmbeddedForms(string $html): string
     {
-        return $this->embeddedFormRuntimeService()->renderShortcodes(
+        return $this->embeddedFormRuntimeService()->renderShortcodesForPublicRoute(
             $html,
             $this->embeddedFormRuntimes,
-            fn (string $type, array $definition): string => $this->embeddedFormMarkup($type, $definition)
-        );
-    }
-
-    /**
-     * Builds public HTML markup for one embedded form definition.
-     *
-     * @param array<string, mixed> $definition
-     */
-    private function embeddedFormMarkup(string $type, array $definition): string
-    {
-        $runtime = $this->embeddedFormRuntime($type);
-        if ($runtime === null) {
-            return '';
-        }
-
-        $returnPath = $this->sanitizePublicReturnPath((string) ($_SERVER['REQUEST_URI'] ?? '/'));
-        return $runtime->render(
-            $definition,
-            $returnPath,
+            (string) ($_SERVER['REQUEST_URI'] ?? '/'),
             $this->csrf->field(),
-            $this->publicCaptchaMarkup()
+            fn (): string => $this->publicCaptchaMarkup()
         );
     }
 

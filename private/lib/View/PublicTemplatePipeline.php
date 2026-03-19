@@ -52,6 +52,54 @@ final class PublicTemplatePipeline
         return $this->resolver->resolveTagTemplateName($tagSlug, ...$lookupRoots);
     }
 
+    public function resolveChannelTemplateNameForThemeChain(
+        string $channelSlug,
+        string $themesRoot,
+        string $activeThemeSlug,
+        string $coreViewsRoot
+    ): string {
+        return $this->resolveChannelTemplateName(
+            $channelSlug,
+            ...$this->lookupRoots($themesRoot, $activeThemeSlug, $coreViewsRoot)
+        );
+    }
+
+    public function resolvePageTemplateNameForThemeChain(
+        ?string $channelSlug,
+        string $themesRoot,
+        string $activeThemeSlug,
+        string $coreViewsRoot
+    ): string {
+        return $this->resolvePageTemplateName(
+            $channelSlug,
+            ...$this->lookupRoots($themesRoot, $activeThemeSlug, $coreViewsRoot)
+        );
+    }
+
+    public function resolveCategoryTemplateNameForThemeChain(
+        string $categorySlug,
+        string $themesRoot,
+        string $activeThemeSlug,
+        string $coreViewsRoot
+    ): string {
+        return $this->resolveCategoryTemplateName(
+            $categorySlug,
+            ...$this->lookupRoots($themesRoot, $activeThemeSlug, $coreViewsRoot)
+        );
+    }
+
+    public function resolveTagTemplateNameForThemeChain(
+        string $tagSlug,
+        string $themesRoot,
+        string $activeThemeSlug,
+        string $coreViewsRoot
+    ): string {
+        return $this->resolveTagTemplateName(
+            $tagSlug,
+            ...$this->lookupRoots($themesRoot, $activeThemeSlug, $coreViewsRoot)
+        );
+    }
+
     /**
      * @param array<string, mixed> $data
      * @param callable(string, array<string, mixed>): string $renderFile
@@ -81,5 +129,27 @@ final class PublicTemplatePipeline
         $layoutData = $data;
         $layoutData['content'] = $content;
         return $renderFile($layoutFile, $layoutData);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param callable(string, array<string, mixed>): string $renderFile
+     */
+    public function renderForThemeChain(
+        string $template,
+        array $data,
+        ?string $layout,
+        callable $renderFile,
+        string $themesRoot,
+        string $activeThemeSlug,
+        string $coreViewsRoot
+    ): string {
+        return $this->render(
+            $template,
+            $data,
+            $layout,
+            $renderFile,
+            ...$this->lookupRoots($themesRoot, $activeThemeSlug, $coreViewsRoot)
+        );
     }
 }
