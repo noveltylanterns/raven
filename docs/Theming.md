@@ -17,6 +17,7 @@ Public rendering resolves templates from:
 Theme wrappers are expected at:
 
 - `public/theme/{slug}/tpl/wrapper.php`
+- Core fallback wrapper is `private/tpl/wrapper.php` and loads `/theme/fallback.css` (compiled from `public/theme/fallback.scss`).
 
 ## 2) Complete Brace-Tag Directive Inventory
 

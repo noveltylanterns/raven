@@ -107,6 +107,7 @@ body { background: #fff; color: #212529; }
 - Template root: `public/theme/{slug}/tpl/`
 - Preferred layout wrapper override: `public/theme/{slug}/tpl/wrapper.php` (falls back through parent chain, then `private/tpl/wrapper.php`)
 - Stylesheet path expected by wrapper: `public/theme/{slug}/css/style.css` (resolved from first theme in inheritance chain that contains it)
+- Core fallback wrapper stylesheet: `/theme/fallback.css` (compiled from `public/theme/fallback.scss` and intentionally Bootstrap-only)
 - Optional theme assets: `public/theme/{slug}/img/*`, `public/theme/{slug}/fonts/*`, `public/theme/{slug}/js/*`
 
 ## Bootstrap Dependency And Sass Pipeline
@@ -159,6 +160,7 @@ body { background: #fff; color: #212529; }
 - Maximum traversal depth is 12.
 - Template lookup searches each chain member in order, then `private/tpl/` fallback.
 - CSS lookup uses the first theme in chain containing `css/style.css`.
+- Core fallback wrapper (`private/tpl/wrapper.php`) does not use resolved theme CSS; it always loads `/theme/fallback.css`.
 - Wrapper uses that same resolved CSS slug for favicon path (`/theme/{resolved_css_slug}/img/favicon.png`).
 - There is no general automatic fallback resolver for arbitrary image/js files; fallback behavior is explicit in template code.
 - If a child theme wants its own favicon while inheriting parent CSS, override `tpl/wrapper.php`.
