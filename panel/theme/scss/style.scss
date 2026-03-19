@@ -897,7 +897,7 @@ $raven-btn-secondary: mix($gray-700, $secondary, 6%);
 $raven-btn-success: mix($gray-700, $success, 6%);
 $raven-btn-info: mix($gray-700, $info, 9%);
 $raven-btn-warning: mix($gray-700, $warning, 10%);
-$raven-btn-danger: mix($gray-700, $danger, 7%);
+$raven-btn-danger: mix($gray-700, $danger, 5%);
 $raven-btn-dark: mix($gray-700, $dark, 3%);
 $raven-btn-secondary-hover: mix(#000, $raven-btn-secondary, 10%);
 
@@ -943,7 +943,8 @@ body#rvnp code {
 // and text glyph fallbacks so buttons remain visible without CDN fonts.
 body#rvnp .EasyMDEContainer .editor-toolbar {
   background: var(--raven-surface-softer);
-  border-color: var(--raven-border);
+  border: 1px solid var(--raven-border);
+  border-bottom: 1px solid var(--raven-border);
 }
 
 body#rvnp:not(.theme-dark) .EasyMDEContainer .editor-toolbar {
@@ -952,59 +953,79 @@ body#rvnp:not(.theme-dark) .EasyMDEContainer .editor-toolbar {
 }
 
 body#rvnp.theme-dark .EasyMDEContainer .editor-toolbar {
-  border-color: #425a73;
+  border-color: var(--raven-border);
 }
 
 body#rvnp .EasyMDEContainer .editor-toolbar button,
 body#rvnp .EasyMDEContainer .editor-toolbar .easymde-dropdown {
   color: var(--raven-ink);
+  border-color: transparent !important;
+  box-shadow: none !important;
 }
 
 body#rvnp .EasyMDEContainer .editor-toolbar button:hover,
 body#rvnp .EasyMDEContainer .editor-toolbar button:focus-visible,
 body#rvnp .EasyMDEContainer .editor-toolbar button.active {
   background: var(--raven-surface);
-  border-color: var(--raven-border);
+  border-color: transparent !important;
+  box-shadow: none !important;
 }
 
 body#rvnp:not(.theme-dark) .EasyMDEContainer .editor-toolbar button:hover,
 body#rvnp:not(.theme-dark) .EasyMDEContainer .editor-toolbar button:focus-visible,
 body#rvnp:not(.theme-dark) .EasyMDEContainer .editor-toolbar button.active {
   background: #fffdf8;
-  border-color: #d0c3af;
+  border-color: transparent !important;
 }
 
 body#rvnp.theme-dark .EasyMDEContainer .editor-toolbar button:hover,
 body#rvnp.theme-dark .EasyMDEContainer .editor-toolbar button:focus-visible,
 body#rvnp.theme-dark .EasyMDEContainer .editor-toolbar button.active {
   background: #26364b;
-  border-color: #56718c;
+  border-color: transparent !important;
 }
 
 body#rvnp .EasyMDEContainer .editor-toolbar i.separator {
-  border-left-color: var(--raven-border);
-  border-right-color: transparent;
-}
-
-body#rvnp:not(.theme-dark) .EasyMDEContainer .editor-toolbar i.separator {
-  border-left-color: #d9cdbb;
-}
-
-body#rvnp.theme-dark .EasyMDEContainer .editor-toolbar i.separator {
-  border-left-color: #4f6780;
+  display: none;
 }
 
 body#rvnp .EasyMDEContainer .CodeMirror {
   background: var(--raven-surface);
   border-color: var(--raven-border);
+  border-top: 0;
   color: var(--raven-ink);
   resize: vertical;
   overflow: hidden;
   min-height: 12rem;
 }
 
+body#rvnp .EasyMDEContainer:focus-within {
+  border-radius: var(--bs-border-radius, 0.375rem);
+  box-shadow: 0 0 0 0.2rem var(--raven-accent-soft);
+}
+
+body#rvnp .EasyMDEContainer:focus-within .editor-toolbar {
+  border-color: var(--raven-accent);
+  border-bottom-color: var(--raven-border);
+}
+
+body#rvnp .EasyMDEContainer:focus-within .CodeMirror,
+body#rvnp .EasyMDEContainer .CodeMirror.CodeMirror-focused {
+  border-color: var(--raven-accent);
+  border-top: 0;
+  box-shadow: none;
+}
+
 body#rvnp .EasyMDEContainer .CodeMirror-fullscreen {
   resize: none;
+}
+
+body#rvnp.theme-dark .EasyMDEContainer .CodeMirror-cursor {
+  border-left-color: #f0f6fc !important;
+}
+
+body#rvnp.theme-dark .EasyMDEContainer .CodeMirror textarea {
+  caret-color: #f0f6fc !important;
 }
 
 body#rvnp .EasyMDEContainer .editor-toolbar button i.fa {
@@ -1147,6 +1168,35 @@ body#rvnp.theme-dark .input-group-text {
 body#rvnp.theme-dark .form-control::placeholder {
   color: #7d8590;
   opacity: 1;
+}
+
+body#rvnp.theme-dark .form-control[type="file"]::file-selector-button,
+body#rvnp.theme-dark .form-control[type="file"]::-webkit-file-upload-button {
+  color: #f0f6fc;
+  background-color: #46628d;
+  border-color: #46628d;
+}
+
+body#rvnp.theme-dark .form-control[type="file"]:hover::file-selector-button,
+body#rvnp.theme-dark .form-control[type="file"]:hover::-webkit-file-upload-button {
+  color: #f0f6fc;
+  background-color: #5374a2;
+  border-color: #5374a2;
+}
+
+body#rvnp.theme-dark .form-control[type="file"]:active::file-selector-button,
+body#rvnp.theme-dark .form-control[type="file"]:active::-webkit-file-upload-button {
+  color: #f0f6fc;
+  background-color: #3b547b;
+  border-color: #3b547b;
+}
+
+body#rvnp.theme-dark .form-control[type="file"]:disabled::file-selector-button,
+body#rvnp.theme-dark .form-control[type="file"]:disabled::-webkit-file-upload-button {
+  color: #f0f6fc;
+  background-color: #46628d;
+  border-color: #46628d;
+  opacity: 0.65;
 }
 
 body#rvnp.theme-dark .bg-light,
@@ -1295,12 +1345,12 @@ body#rvnp.theme-dark .btn-warning {
 }
 
 body#rvnp.theme-dark .btn-danger {
-  --bs-btn-bg: #894355;
-  --bs-btn-border-color: #894355;
-  --bs-btn-hover-bg: #9a5064;
-  --bs-btn-hover-border-color: #9a5064;
-  --bs-btn-active-bg: #723748;
-  --bs-btn-active-border-color: #723748;
+  --bs-btn-bg: #8e3e55;
+  --bs-btn-border-color: #8e3e55;
+  --bs-btn-hover-bg: #a64b68;
+  --bs-btn-hover-border-color: #a64b68;
+  --bs-btn-active-bg: #763047;
+  --bs-btn-active-border-color: #763047;
 }
 
 body#rvnp.theme-dark .btn-secondary {
@@ -1346,11 +1396,11 @@ body#rvnp.theme-dark .btn-outline-warning {
 }
 
 body#rvnp.theme-dark .btn-outline-danger {
-  --bs-btn-color: #d9a5af;
-  --bs-btn-border-color: #9a5064;
+  --bs-btn-color: #e0a1b0;
+  --bs-btn-border-color: #a64b68;
   --bs-btn-hover-color: #f0f6fc;
-  --bs-btn-hover-bg: rgba(154, 80, 100, 0.34);
-  --bs-btn-hover-border-color: #bc6f83;
+  --bs-btn-hover-bg: rgba(166, 75, 104, 0.34);
+  --bs-btn-hover-border-color: #c86f88;
 }
 
 body#rvnp.theme-dark .btn-outline-dark {

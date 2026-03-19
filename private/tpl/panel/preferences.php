@@ -507,7 +507,6 @@ $themeLabels = [
           }
         }
 
-        secretField.classList.toggle('bg-body-tertiary', isTotpConfirmed);
         if (isTotpConfirmed) {
           secretField.value = 'Stored securely on server';
           secretField.removeAttribute('name');
@@ -1828,7 +1827,7 @@ $themeLabels = [
                                     <div class="input-group input-group-sm">
                                         <input
                                             type="text"
-                                            class="form-control form-control-sm<?= $isTotpConfirmed ? ' bg-body-tertiary' : '' ?>"
+                                            class="form-control form-control-sm"
                                             data-preferences-two-factor-key="secret"
                                             <?= $totpSecretCopyEnabled ? 'data-preferences-two-factor-secret-copy="1"' : '' ?>
                                             <?= !$isTotpConfirmed ? 'name="two_factor_methods[' . (int) $index . '][secret]"' : '' ?>
