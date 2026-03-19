@@ -70,13 +70,14 @@ $invitesEmptyId = 'invites-filter-empty';
                 <?php if ($generatedToken === ''): ?>
                     <?php continue; ?>
                 <?php endif; ?>
-                <button
-                    type="button"
-                    class="btn btn-outline-secondary btn-sm text-start font-monospace"
+                <code
+                    class="d-block"
+                    role="button"
+                    tabindex="0"
                     data-invite-copy="1"
                     data-invite-copy-value="<?= e($generatedToken) ?>"
                     title="Click to copy"
-                ><?= e($generatedToken) ?></button>
+                ><?= e($generatedToken) ?></code>
             <?php endforeach; ?>
         </div>
     </div>
@@ -248,13 +249,13 @@ $invitesEmptyId = 'invites-filter-empty';
                                 </td>
                                 <td>
                                     <?php if ($tokenValue !== '' && !$legacyTokenOnly): ?>
-                                        <button
-                                            type="button"
-                                            class="btn btn-outline-secondary btn-sm font-monospace"
+                                        <code
+                                            role="button"
+                                            tabindex="0"
                                             data-invite-copy="1"
                                             data-invite-copy-value="<?= e($tokenValue) ?>"
                                             title="Click to copy"
-                                        ><code class="mb-0"><?= e($tokenValue) ?></code></button>
+                                        ><?= e($tokenValue) ?></code>
                                     <?php else: ?>
                                         <code><?= e($tokenValue !== '' ? $tokenValue : '(unavailable)') ?></code>
                                     <?php endif; ?>
@@ -568,7 +569,7 @@ $invitesEmptyId = 'invites-filter-empty';
 
         row.addEventListener('click', function (event) {
             var target = event.target;
-            if (target instanceof Element && target.closest('a, button, input, select, textarea, label, form')) {
+            if (target instanceof Element && target.closest('a, button, input, select, textarea, label, form, [data-invite-copy="1"]')) {
                 return;
             }
             togglePanel();
@@ -593,18 +594,43 @@ $invitesEmptyId = 'invites-filter-empty';
             return;
         }
 
-        var copyButton = target.closest('[data-invite-copy="1"]');
-        if (!(copyButton instanceof HTMLButtonElement)) {
+        var copyTarget = target.closest('[data-invite-copy="1"]');
+        if (!(copyTarget instanceof HTMLElement)) {
             return;
         }
 
-        var value = String(copyButton.getAttribute('data-invite-copy-value') || '').trim();
+        var value = String(copyTarget.getAttribute('data-invite-copy-value') || '').trim();
         if (value === '') {
             return;
         }
 
         void copyTextValue(value).then(function (copied) {
-            showCopyTooltip(copyButton, copied);
+            showCopyTooltip(copyTarget, copied);
+        });
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (!(event instanceof KeyboardEvent)) {
+            return;
+        }
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+        var target = event.target;
+        if (!(target instanceof Element)) {
+            return;
+        }
+        var copyTarget = target.closest('[data-invite-copy="1"]');
+        if (!(copyTarget instanceof HTMLElement)) {
+            return;
+        }
+        event.preventDefault();
+        var value = String(copyTarget.getAttribute('data-invite-copy-value') || '').trim();
+        if (value === '') {
+            return;
+        }
+        void copyTextValue(value).then(function (copied) {
+            showCopyTooltip(copyTarget, copied);
         });
     });
 })();

@@ -2742,14 +2742,54 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
     });
   }
 
+  function midnightPanelThemeActive() {
+    return document.body instanceof HTMLElement && document.body.classList.contains('theme-dark');
+  }
+
+  function readPanelThemeCssVar(name, fallback) {
+    if (!(document.body instanceof HTMLElement) || !window.getComputedStyle) {
+      return fallback;
+    }
+
+    var value = String(window.getComputedStyle(document.body).getPropertyValue(name) || '').trim();
+    return value !== '' ? value : fallback;
+  }
+
+  function tinyMceContentStyleForTheme() {
+    var fontFamily = 'sans-serif';
+    if (!midnightPanelThemeActive()) {
+      // Keep editor body typography generic sans-serif even when panel UI uses custom fonts.
+      return 'body { font-family: ' + fontFamily + '; }';
+    }
+
+    var surface = readPanelThemeCssVar('--raven-surface', '#161b22');
+    var ink = readPanelThemeCssVar('--raven-ink', '#c9d1d9');
+    var border = readPanelThemeCssVar('--raven-border', '#30363d');
+    var muted = readPanelThemeCssVar('--raven-muted', '#8b949e');
+    var link = '#79c0ff';
+    var strong = '#f0f6fc';
+
+    return [
+      'body {',
+      'font-family: ' + fontFamily + ';',
+      'background: ' + surface + ';',
+      'color: ' + ink + ';',
+      '}',
+      'a { color: ' + link + '; }',
+      'hr { border-color: ' + border + '; }',
+      'blockquote { border-left: 3px solid ' + border + '; color: ' + muted + '; margin-left: 0; padding-left: 0.8rem; }',
+      'code, pre { background: #0d1117; color: ' + ink + '; border: 1px solid ' + border + '; border-radius: 0.25rem; }',
+      'h1, h2, h3, h4, h5, h6, strong, b { color: ' + strong + '; }'
+    ].join(' ');
+  }
+
   function tinyMceConfigForTarget(textarea) {
-    return {
+    var config = {
       // Explicitly acknowledge TinyMCE OSS usage to suppress eval-mode warnings.
       license_key: 'gpl',
       target: textarea,
       height: 420,
-      // Keep editor body typography generic sans-serif even when panel UI uses custom fonts.
-      content_style: 'body { font-family: sans-serif; }',
+      content_style: tinyMceContentStyleForTheme(),
       menubar: false,
       branding: false,
       promotion: false,
@@ -2761,6 +2801,14 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
         + ((Array.isArray(ravenShortcodeItems) && ravenShortcodeItems.length > 0) ? ' ravenExtensions' : ''),
       setup: registerPageEditorButtons
     };
+
+    if (midnightPanelThemeActive()) {
+      // Midnight panel theme maps to TinyMCE dark UI/content bundles.
+      config.skin = 'oxide-dark';
+      config.content_css = 'dark';
+    }
+
+    return config;
   }
 
   function initTinyMceForTextarea(textarea) {
