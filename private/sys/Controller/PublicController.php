@@ -344,7 +344,7 @@ final class PublicController
         }
 
         $targetUrl = trim((string) ($redirect['target_url'] ?? ''));
-        if (!$this->isAllowedRedirectTargetUrl($targetUrl)) {
+        if (!RedirectTargetValidator::isAllowedHttpOrRootPath($targetUrl)) {
             return false;
         }
 
@@ -354,19 +354,11 @@ final class PublicController
     }
 
     /**
-     * Safety check for redirect targets loaded from persistence.
-     */
-    private function isAllowedRedirectTargetUrl(string $targetUrl): bool
-    {
-        return RedirectTargetValidator::isAllowedHttpOrRootPath($targetUrl);
-    }
-
-    /**
      * Renders category listing route `/{category_prefix}/{category_slug}/{page?}`.
      */
     public function category(string $categorySlug, int $pageNumber = 1): void
     {
-        $categoryPrefix = $this->categoryRoutePrefix();
+        $categoryPrefix = $this->routeConfigService()->categoryRoutePrefix();
         if ($categoryPrefix === '') {
             $this->notFound();
             return;
@@ -421,7 +413,7 @@ final class PublicController
      */
     public function tag(string $tagSlug, int $pageNumber = 1): void
     {
-        $tagPrefix = $this->tagRoutePrefix();
+        $tagPrefix = $this->routeConfigService()->tagRoutePrefix();
         if ($tagPrefix === '') {
             $this->notFound();
             return;
@@ -476,9 +468,9 @@ final class PublicController
      */
     public function profile(string $username): void
     {
-        $profileMode = $this->profileMode();
+        $profileMode = $this->routeConfigService()->profileMode();
         $isLoggedIn = $this->auth->isLoggedIn();
-        if ($this->profileRoutePrefix() === '') {
+        if ($this->routeConfigService()->profileRoutePrefix() === '') {
             $this->notFound();
             return;
         }
@@ -528,9 +520,9 @@ final class PublicController
      */
     public function group(string $groupSlug): void
     {
-        $groupMode = $this->groupMode();
+        $groupMode = $this->routeConfigService()->groupMode();
         $isLoggedIn = $this->auth->isLoggedIn();
-        if ($this->groupRoutePrefix() === '') {
+        if ($this->routeConfigService()->groupRoutePrefix() === '') {
             $this->notFound();
             return;
         }
@@ -584,6 +576,7 @@ final class PublicController
             \Raven\Core\Support\redirect('/');
         }
 
+        $loginIdentifierMode = $this->identifierResolver->modeFromConfig($this->config);
         $this->renderPublic('login', [
             'site' => $this->siteData(),
             'csrfField' => $this->csrf->field(),
@@ -591,9 +584,9 @@ final class PublicController
             'flashError' => $this->pullPublicFlash('error'),
             'panelLoginPath' => $this->panelUrl('/login'),
             'registrationPath' => '/register',
-            'registrationMode' => $this->registrationMode(),
-            'loginIdentifierMode' => $this->loginIdentifierMode(),
-            'loginIdentifierLabel' => $this->loginIdentifierMode() === 'email' ? 'Email' : 'Username',
+            'registrationMode' => $this->routeConfigService()->registrationMode(),
+            'loginIdentifierMode' => $loginIdentifierMode,
+            'loginIdentifierLabel' => $loginIdentifierMode === 'email' ? 'Email' : 'Username',
             'postLoginRedirectPath' => '/',
         ], 'wrapper');
     }
@@ -603,8 +596,8 @@ final class PublicController
      */
     public function register(): void
     {
-        $registrationMode = $this->registrationMode();
-        $loginIdentifierMode = $this->loginIdentifierMode();
+        $registrationMode = $this->routeConfigService()->registrationMode();
+        $loginIdentifierMode = $this->identifierResolver->modeFromConfig($this->config);
         $this->renderPublic('register', [
             'site' => $this->siteData(),
             'csrfField' => $this->csrf->field(),
@@ -631,15 +624,15 @@ final class PublicController
             \Raven\Core\Support\redirect('/register');
         }
 
-        $registrationMode = $this->registrationMode();
+        $registrationMode = $this->routeConfigService()->registrationMode();
         if ($registrationMode === 'closed') {
             $this->flashPublic('error', 'Registration is currently closed.');
             \Raven\Core\Support\redirect('/register');
         }
 
-        $loginIdentifierMode = $this->loginIdentifierMode();
+        $loginIdentifierMode = $this->identifierResolver->modeFromConfig($this->config);
         $rawUsername = $this->input->text($post['username'] ?? null, 254);
-        $normalizedUsername = $this->normalizeUserIdentifierValue($rawUsername);
+        $normalizedUsername = $this->identifierResolver->normalizeUsernameOrEmail($this->input, $rawUsername);
         $displayName = $this->input->text($post['display_name'] ?? null, 160);
         $email = $this->input->email($post['email'] ?? null);
         $password = $this->input->text($post['password'] ?? null, 255);
@@ -756,38 +749,6 @@ final class PublicController
     }
 
     /**
-     * Returns default profile-contact option map (slug => metadata).
-     *
-     * @return array<string, array{label: string, url_prefix: string}>
-     */
-    private function defaultProfileContactOptions(): array
-    {
-        return $this->profileContactService()->defaultOptions();
-    }
-
-    /**
-     * Returns contact-option defaults that are mandatory and cannot be removed.
-     *
-     * @return array<string, array{label: string, url_prefix: string}>
-     */
-    private function requiredProfileContactOptions(): array
-    {
-        return $this->profileContactService()->requiredOptions();
-    }
-
-    /**
-     * Normalizes one profile-contact option map from config.
-     *
-     * @return array<string, array{label: string, url_prefix: string}>
-     */
-    private function profileContactOptions(): array
-    {
-        return $this->profileContactService()->normalizeOptionsConfig(
-            $this->config->get('user.contact', $this->defaultProfileContactOptions())
-        );
-    }
-
-    /**
      * Attaches label/href metadata to public profile contact rows.
      *
      * @param array<string, mixed> $profile
@@ -795,7 +756,11 @@ final class PublicController
      */
     private function decoratePublicProfileContacts(array $profile): array
     {
-        return $this->profileContactService()->decorateProfileContacts($profile, $this->profileContactOptions());
+        $profileContactOptions = $this->profileContactService()->normalizeOptionsConfig(
+            $this->config->get('user.contact', $this->profileContactService()->defaultOptions())
+        );
+
+        return $this->profileContactService()->decorateProfileContacts($profile, $profileContactOptions);
     }
 
     /**
@@ -842,7 +807,10 @@ final class PublicController
      */
     public function enforceSiteAvailability(): bool
     {
-        $mode = $this->siteEnabledMode();
+        $mode = strtolower(trim((string) $this->config->get('site.enabled', 'public')));
+        if (!in_array($mode, ['public', 'private', 'disabled'], true)) {
+            $mode = 'public';
+        }
         $isLoggedIn = $this->auth->isLoggedIn();
         $payload = $this->publicRouteRenderService()->availabilityGatePayload(
             $mode,
@@ -880,19 +848,6 @@ final class PublicController
     }
 
     /**
-     * Returns configured global frontend availability mode.
-     */
-    private function siteEnabledMode(): string
-    {
-        $mode = strtolower(trim((string) $this->config->get('site.enabled', 'public')));
-        if (!in_array($mode, ['public', 'private', 'disabled'], true)) {
-            return 'public';
-        }
-
-        return $mode;
-    }
-
-    /**
      * Collects site config values required by public templates.
      *
      * @return array<string, string>
@@ -910,12 +865,16 @@ final class PublicController
      */
     private function siteDataWithPageMeta(array $page): array
     {
+        $profileContactOptions = $this->profileContactService()->normalizeOptionsConfig(
+            $this->config->get('user.contact', $this->profileContactService()->defaultOptions())
+        );
+
         return $this->publicMetaService()->siteDataWithPageMeta(
             $page,
             $this->siteData(),
             fn (int $pageId): ?string => $this->pageImages->previewImageUrlForPage($pageId),
             fn (int $authorUserId): ?array => $this->users->findById($authorUserId),
-            $this->profileContactOptions()
+            $profileContactOptions
         );
     }
 
@@ -940,16 +899,6 @@ final class PublicController
     private function currentPublicThemeSlug(): string
     {
         return $this->themeCatalogService()->activeSlugFromConfig($this->config);
-    }
-
-    /**
-     * Returns discoverable public themes from `public/theme/{slug}/theme.json`.
-     *
-     * @return array<string, string>
-     */
-    private function publicThemeOptions(): array
-    {
-        return $this->themeCatalogService()->options();
     }
 
     /**
@@ -1163,94 +1112,6 @@ final class PublicController
     }
 
     /**
-     * Returns configured category-list route prefix.
-     */
-    private function categoryRoutePrefix(): string
-    {
-        return $this->routeConfigService()->categoryRoutePrefix();
-    }
-
-    /**
-     * Returns configured tag-list route prefix.
-     */
-    private function tagRoutePrefix(): string
-    {
-        return $this->routeConfigService()->tagRoutePrefix();
-    }
-
-    /**
-     * Returns true when category taxonomy is enabled.
-     */
-    private function categoryEnabled(): bool
-    {
-        return $this->routeConfigService()->categoryEnabled();
-    }
-
-    /**
-     * Returns true when tag taxonomy is enabled.
-     */
-    private function tagEnabled(): bool
-    {
-        return $this->routeConfigService()->tagEnabled();
-    }
-
-    /**
-     * Normalizes one config scalar to a boolean value.
-     */
-    private function configBool(mixed $value, bool $default = false): bool
-    {
-        return $this->routeConfigService()->configBool($value, $default);
-    }
-
-    /**
-     * Returns configured public profile route prefix.
-     */
-    private function profileRoutePrefix(): string
-    {
-        return $this->routeConfigService()->profileRoutePrefix();
-    }
-
-    /**
-     * Returns configured public profile mode.
-     */
-    private function profileMode(): string
-    {
-        return $this->routeConfigService()->profileMode();
-    }
-
-    /**
-     * Returns configured public group route prefix.
-     */
-    private function groupRoutePrefix(): string
-    {
-        return $this->routeConfigService()->groupRoutePrefix();
-    }
-
-    /**
-     * Returns configured public group mode.
-     */
-    private function groupMode(): string
-    {
-        return $this->routeConfigService()->groupMode();
-    }
-
-    /**
-     * Resolves configured registration mode.
-     */
-    private function registrationMode(): string
-    {
-        return $this->routeConfigService()->registrationMode();
-    }
-
-    /**
-     * Resolves configured panel login identifier mode.
-     */
-    private function loginIdentifierMode(): string
-    {
-        return $this->identifierResolver->modeFromConfig($this->config);
-    }
-
-    /**
      * Returns registration default group ids.
      *
      * @return array<int>
@@ -1265,14 +1126,6 @@ final class PublicController
         }
 
         return [];
-    }
-
-    /**
-     * Normalizes one user identifier (username or email-shaped value).
-     */
-    private function normalizeUserIdentifierValue(string $rawValue): ?string
-    {
-        return $this->identifierResolver->normalizeUsernameOrEmail($this->input, $rawValue);
     }
 
     /**
@@ -1469,14 +1322,6 @@ final class PublicController
     }
 
     /**
-     * Normalizes one taxonomy route-prefix value and falls back safely.
-     */
-    private function normalizeTaxonomyRoutePrefix(string $configured, string $fallback, bool $allowBlank = false): string
-    {
-        return $this->routeConfigService()->normalizeRoutePrefix($configured, $fallback, $allowBlank);
-    }
-
-    /**
      * Expands pagination payload into template-ready link rows.
      *
      * @param array<string, mixed> $pagination
@@ -1585,29 +1430,13 @@ final class PublicController
     }
 
     /**
-     * Returns normalized client IP when present and valid.
-     */
-    private function normalizeClientIp(string $rawIp): ?string
-    {
-        return $this->requestContextResolver()->normalizeClientIp($rawIp);
-    }
-
-    /**
-     * Resolves reverse-DNS hostname for one normalized client IP.
-     */
-    private function resolveClientHostname(?string $ipAddress): ?string
-    {
-        return $this->requestContextResolver()->resolveClientHostname($ipAddress);
-    }
-
-    /**
      * Verifies configured public captcha response in current request.
      *
      * @return string|null One user-facing validation error, or null when captcha passes.
      */
     private function validatePublicCaptcha(): ?string
     {
-        $remoteIp = $this->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+        $remoteIp = $this->requestContextResolver()->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
         return $this->captchaService()->validateSubmission($_POST, $remoteIp);
     }
 

@@ -5,6 +5,11 @@
 ### March 19, 2026
 
 - Continued core modularization cleanup for public template routing: moved theme-chain lookup/root orchestration out of `PublicController` into `private/lib/View/PublicTemplatePipeline.php` (`renderForThemeChain` + route-template resolvers), rewired controller call sites, and removed redundant controller wrapper methods.
+- Continued core modularization cleanup in `PublicController` by removing another redundant wrapper batch (unused route/profile/theme helper pass-through methods) and rewiring registration username normalization directly through `LoginIdentifierResolver`.
+- Continued core modularization cleanup in `PublicController` by removing seven route-config pass-through wrappers (`category/tag/profile/group/registration` helpers) and rewiring all call sites directly through `RouteConfigService`.
+- Continued core modularization cleanup in `PublicController` by removing seven additional redundant helper wrappers (redirect-target validator pass-through, profile-contact option wrappers, site-enabled/login-mode wrappers, and request-context IP/hostname pass-throughs), with call sites routed directly to existing lib services.
+- Closed the broad sys-to-lib extraction sweep phase and re-scoped next-phase work to `private/lib` consolidation: dedupe overlapping services, flatten chained pass-through delegations, and define stricter domain entrypoint boundaries.
+- Refined the `private/lib` consolidation project workflow to run as folder-by-folder sweeps (one checklist checkpoint per `private/lib/*` subfolder), with per-folder 5-phase execution and explicit performance-focused consolidation goals.
 
 ### March 18, 2026
 
