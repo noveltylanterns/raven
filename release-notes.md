@@ -20,6 +20,7 @@
 - Completed `private/lib/Extension` folder sweep with net complexity reduction: deduplicated extension state map normalization across load/save paths, reduced repeated state-file reads in save helpers, simplified fallback state handling, and revalidated extension/CLI/theme smoke flows.
 - Completed `private/lib/Filesystem` folder sweep with net complexity reduction: simplified recursive delete branch handling in `DirectoryTreeService` while preserving behavior and revalidated with CLI smoke coverage.
 - Completed `private/lib/Http` folder sweep with net complexity reduction: consolidated duplicated session flash bucket handling and trimmed upload-file tree flattening boilerplate, with CLI/security smoke revalidation.
+- Completed `private/lib/Media` folder sweep with net complexity reduction: removed duplicated image variant sizing/orientation logic from taxonomy image uploads by delegating to `ImageVariantProcessor`, while preserving behavior and revalidating via CLI/theme/extension smoke coverage.
 
 ### March 18, 2026
 

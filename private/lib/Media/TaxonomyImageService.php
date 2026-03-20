@@ -13,11 +13,13 @@ final class TaxonomyImageService
 {
     private Config $config;
     private string $projectRoot;
+    private ImageVariantProcessor $variantProcessor;
 
     public function __construct(Config $config, string $projectRoot)
     {
         $this->config = $config;
         $this->projectRoot = rtrim($projectRoot, '/\\');
+        $this->variantProcessor = new ImageVariantProcessor($config);
     }
 
     /**
@@ -68,20 +70,7 @@ final class TaxonomyImageService
      */
     public function imageVariantSpecs(): array
     {
-        return [
-            'sm' => [
-                'width' => max(0, (int) $this->config->get('media.images.small.width', 200)),
-                'height' => max(0, (int) $this->config->get('media.images.small.height', 200)),
-            ],
-            'md' => [
-                'width' => max(0, (int) $this->config->get('media.images.med.width', 600)),
-                'height' => max(0, (int) $this->config->get('media.images.med.height', 600)),
-            ],
-            'lg' => [
-                'width' => max(0, (int) $this->config->get('media.images.large.width', 1000)),
-                'height' => max(0, (int) $this->config->get('media.images.large.height', 1000)),
-            ],
-        ];
+        return $this->variantProcessor->variantSpecs();
     }
 
     /**
@@ -318,7 +307,7 @@ final class TaxonomyImageService
             $source = new \Imagick();
             $source->readImage($tmpPath);
             $source->setIteratorIndex(0);
-            $this->autoOrient($source);
+            $this->variantProcessor->autoOrient($source);
 
             if ((bool) $this->config->get('media.images.strip_exif', true)) {
                 $source->stripImage();
@@ -343,7 +332,7 @@ final class TaxonomyImageService
 
             foreach ($this->imageVariantSpecs() as $variantKey => $spec) {
                 $variant = clone $source;
-                $target = $this->resolveVariantSize(
+                $target = $this->variantProcessor->resolveVariantSize(
                     $sourceWidth,
                     $sourceHeight,
                     (int) ($spec['width'] ?? 0),
@@ -434,74 +423,6 @@ final class TaxonomyImageService
         }
 
         @rmdir($directory);
-    }
-
-    /**
-     * @return array{width: int, height: int}
-     */
-    private function resolveVariantSize(int $sourceWidth, int $sourceHeight, int $maxWidth, int $maxHeight): array
-    {
-        if ($sourceWidth < 1 || $sourceHeight < 1) {
-            return ['width' => 1, 'height' => 1];
-        }
-
-        if ($maxWidth <= 0 && $maxHeight <= 0) {
-            return ['width' => $sourceWidth, 'height' => $sourceHeight];
-        }
-
-        if ($maxWidth <= 0) {
-            $scale = min(1.0, $maxHeight / $sourceHeight);
-        } elseif ($maxHeight <= 0) {
-            $scale = min(1.0, $maxWidth / $sourceWidth);
-        } else {
-            $scale = min(1.0, $maxWidth / $sourceWidth, $maxHeight / $sourceHeight);
-        }
-
-        $targetWidth = max(1, (int) round($sourceWidth * $scale));
-        $targetHeight = max(1, (int) round($sourceHeight * $scale));
-
-        if ($maxWidth > 0) {
-            $targetWidth = min($targetWidth, $maxWidth);
-        }
-        if ($maxHeight > 0) {
-            $targetHeight = min($targetHeight, $maxHeight);
-        }
-
-        return ['width' => $targetWidth, 'height' => $targetHeight];
-    }
-
-    private function autoOrient(\Imagick $image): void
-    {
-        $orientation = $image->getImageOrientation();
-        switch ($orientation) {
-            case \Imagick::ORIENTATION_TOPRIGHT:
-                $image->flopImage();
-                break;
-            case \Imagick::ORIENTATION_BOTTOMRIGHT:
-                $image->rotateImage('#000', 180);
-                break;
-            case \Imagick::ORIENTATION_BOTTOMLEFT:
-                $image->flipImage();
-                break;
-            case \Imagick::ORIENTATION_LEFTTOP:
-                $image->flopImage();
-                $image->rotateImage('#000', 90);
-                break;
-            case \Imagick::ORIENTATION_RIGHTTOP:
-                $image->rotateImage('#000', 90);
-                break;
-            case \Imagick::ORIENTATION_RIGHTBOTTOM:
-                $image->flopImage();
-                $image->rotateImage('#000', -90);
-                break;
-            case \Imagick::ORIENTATION_LEFTBOTTOM:
-                $image->rotateImage('#000', -90);
-                break;
-            default:
-                break;
-        }
-
-        $image->setImageOrientation(\Imagick::ORIENTATION_TOPLEFT);
     }
 
     private function uploadErrorMessage(int $code): string
