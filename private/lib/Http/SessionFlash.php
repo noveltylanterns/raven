@@ -18,18 +18,15 @@ final class SessionFlash
 
     public function put(string $key, string $value): void
     {
-        if (!isset($_SESSION[$this->sessionKey]) || !is_array($_SESSION[$this->sessionKey])) {
-            $_SESSION[$this->sessionKey] = [];
-        }
-
-        $_SESSION[$this->sessionKey][$key] = $value;
+        $store = &$this->sessionStore();
+        $store[$key] = $value;
     }
 
     public function pull(string $key): ?string
     {
-        $value = $_SESSION[$this->sessionKey][$key] ?? null;
-        unset($_SESSION[$this->sessionKey][$key]);
-
+        $store = &$this->sessionStore();
+        $value = $store[$key] ?? null;
+        unset($store[$key]);
         return is_string($value) ? $value : null;
     }
 
@@ -38,11 +35,8 @@ final class SessionFlash
      */
     public function putList(string $key, array $values): void
     {
-        if (!isset($_SESSION[$this->sessionKey]) || !is_array($_SESSION[$this->sessionKey])) {
-            $_SESSION[$this->sessionKey] = [];
-        }
-
-        $_SESSION[$this->sessionKey][$key] = array_values($values);
+        $store = &$this->sessionStore();
+        $store[$key] = array_values($values);
     }
 
     /**
@@ -50,9 +44,9 @@ final class SessionFlash
      */
     public function pullList(string $key): ?array
     {
-        $value = $_SESSION[$this->sessionKey][$key] ?? null;
-        unset($_SESSION[$this->sessionKey][$key]);
-
+        $store = &$this->sessionStore();
+        $value = $store[$key] ?? null;
+        unset($store[$key]);
         if (!is_array($value)) {
             return null;
         }
@@ -65,5 +59,14 @@ final class SessionFlash
         }
 
         return $normalized;
+    }
+
+    private function &sessionStore(): array
+    {
+        if (!isset($_SESSION[$this->sessionKey]) || !is_array($_SESSION[$this->sessionKey])) {
+            $_SESSION[$this->sessionKey] = [];
+        }
+
+        return $_SESSION[$this->sessionKey];
     }
 }

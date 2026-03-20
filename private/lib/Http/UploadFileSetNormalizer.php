@@ -50,17 +50,12 @@ final class UploadFileSetNormalizer
     ): void {
         if (is_array($nameNode)) {
             foreach ($nameNode as $index => $childNameNode) {
-                $childTypeNode = is_array($typeNode) && array_key_exists($index, $typeNode) ? $typeNode[$index] : null;
-                $childTmpNameNode = is_array($tmpNameNode) && array_key_exists($index, $tmpNameNode) ? $tmpNameNode[$index] : null;
-                $childErrorNode = is_array($errorNode) && array_key_exists($index, $errorNode) ? $errorNode[$index] : UPLOAD_ERR_NO_FILE;
-                $childSizeNode = is_array($sizeNode) && array_key_exists($index, $sizeNode) ? $sizeNode[$index] : null;
-
                 $this->flattenNodes(
                     $childNameNode,
-                    $childTypeNode,
-                    $childTmpNameNode,
-                    $childErrorNode,
-                    $childSizeNode,
+                    is_array($typeNode) && array_key_exists($index, $typeNode) ? $typeNode[$index] : null,
+                    is_array($tmpNameNode) && array_key_exists($index, $tmpNameNode) ? $tmpNameNode[$index] : null,
+                    is_array($errorNode) && array_key_exists($index, $errorNode) ? $errorNode[$index] : UPLOAD_ERR_NO_FILE,
+                    is_array($sizeNode) && array_key_exists($index, $sizeNode) ? $sizeNode[$index] : null,
                     $uploads
                 );
             }

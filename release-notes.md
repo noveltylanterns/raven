@@ -19,6 +19,7 @@
 - Completed `private/lib/Debug` folder sweep with net complexity reduction: removed repetitive section-render branching in debug toolbar markup assembly via a shared gated section helper, kept lazy section rendering behavior, and revalidated with debug-toolbar/CLI smoke coverage.
 - Completed `private/lib/Extension` folder sweep with net complexity reduction: deduplicated extension state map normalization across load/save paths, reduced repeated state-file reads in save helpers, simplified fallback state handling, and revalidated extension/CLI/theme smoke flows.
 - Completed `private/lib/Filesystem` folder sweep with net complexity reduction: simplified recursive delete branch handling in `DirectoryTreeService` while preserving behavior and revalidated with CLI smoke coverage.
+- Completed `private/lib/Http` folder sweep with net complexity reduction: consolidated duplicated session flash bucket handling and trimmed upload-file tree flattening boilerplate, with CLI/security smoke revalidation.
 
 ### March 18, 2026
 
