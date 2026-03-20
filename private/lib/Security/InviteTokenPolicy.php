@@ -46,28 +46,25 @@ final class InviteTokenPolicy
             return null;
         }
 
-        if (preg_match('/^[A-Z0-9]+$/', $normalized) !== 1) {
-            return null;
-        }
-
         return $normalized;
     }
 
     public function normalizeExpiresAt(?int $expiresAt): ?int
     {
-        if ($expiresAt === null || $expiresAt <= 0) {
-            return null;
-        }
-
-        return $expiresAt;
+        return $this->normalizePositiveInt($expiresAt);
     }
 
     public function normalizeCreatedByUserId(?int $createdByUserId): ?int
     {
-        if ($createdByUserId === null || $createdByUserId <= 0) {
+        return $this->normalizePositiveInt($createdByUserId);
+    }
+
+    private function normalizePositiveInt(?int $value): ?int
+    {
+        if ($value === null || $value <= 0) {
             return null;
         }
 
-        return $createdByUserId;
+        return $value;
     }
 }

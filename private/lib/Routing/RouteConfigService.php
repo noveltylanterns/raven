@@ -62,21 +62,12 @@ final class RouteConfigService
 
     public function profileMode(): string
     {
-        $mode = strtolower(trim((string) $this->config->get('user.privacy', 'disabled')));
-        if (!in_array($mode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
-            return 'disabled';
-        }
-
-        return $mode;
+        return $this->normalizeMode((string) $this->config->get('user.privacy', 'disabled'), ['public_full', 'public_limited', 'private', 'disabled'], 'disabled');
     }
 
     public function profileRoutesEnabledForRoutingTable(): bool
     {
-        if ($this->profileRoutePrefix() === '') {
-            return false;
-        }
-
-        return in_array($this->profileMode(), ['public_full', 'public_limited', 'private'], true);
+        return $this->profileRoutePrefix() !== '' && in_array($this->profileMode(), ['public_full', 'public_limited', 'private'], true);
     }
 
     public function groupRoutePrefix(): string
@@ -86,34 +77,17 @@ final class RouteConfigService
 
     public function groupMode(): string
     {
-        $mode = strtolower(trim((string) $this->config->get('group.privacy', 'disabled')));
-        if ($mode === 'public') {
-            $mode = 'public_full';
-        }
-        if (!in_array($mode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
-            return 'disabled';
-        }
-
-        return $mode;
+        return $this->normalizeMode((string) $this->config->get('group.privacy', 'disabled'), ['public_full', 'public_limited', 'private', 'disabled'], 'disabled', ['public' => 'public_full']);
     }
 
     public function groupRoutesEnabledForRoutingTable(): bool
     {
-        if ($this->groupRoutePrefix() === '') {
-            return false;
-        }
-
-        return in_array($this->groupMode(), ['public_full', 'public_limited', 'private'], true);
+        return $this->groupRoutePrefix() !== '' && in_array($this->groupMode(), ['public_full', 'public_limited', 'private'], true);
     }
 
     public function registrationMode(): string
     {
-        $mode = strtolower(trim((string) $this->config->get('user.auth.registration', 'closed')));
-        if (!in_array($mode, ['open', 'invite', 'closed'], true)) {
-            return 'closed';
-        }
-
-        return $mode;
+        return $this->normalizeMode((string) $this->config->get('user.auth.registration', 'closed'), ['open', 'invite', 'closed'], 'closed');
     }
 
     public function normalizeRoutePrefix(string $configured, string $fallback, bool $allowBlank = false): string
@@ -127,5 +101,15 @@ final class RouteConfigService
             $channelValue,
             (string) $this->config->get('content.separator', '-')
         );
+    }
+
+    private function normalizeMode(string $value, array $allowed, string $fallback, array $aliases = []): string
+    {
+        $mode = strtolower(trim($value));
+        if (isset($aliases[$mode])) {
+            $mode = $aliases[$mode];
+        }
+
+        return in_array($mode, $allowed, true) ? $mode : $fallback;
     }
 }

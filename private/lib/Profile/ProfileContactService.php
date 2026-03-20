@@ -11,6 +11,13 @@ use Raven\Lib\Security\InputSanitizer;
  */
 final class ProfileContactService
 {
+    private const REQUIRED_OPTION_KEYS = [
+        'email' => true,
+        'phone' => true,
+        'homepage' => true,
+        'x' => true,
+    ];
+
     private InputSanitizer $input;
 
     public function __construct(InputSanitizer $input)
@@ -50,17 +57,7 @@ final class ProfileContactService
      */
     public function requiredOptions(): array
     {
-        $defaults = $this->defaultOptions();
-        $required = [];
-        foreach (['email', 'phone', 'homepage', 'x'] as $slug) {
-            if (!isset($defaults[$slug])) {
-                continue;
-            }
-
-            $required[$slug] = $defaults[$slug];
-        }
-
-        return $required;
+        return array_intersect_key($this->defaultOptions(), self::REQUIRED_OPTION_KEYS);
     }
 
     /**
@@ -68,9 +65,9 @@ final class ProfileContactService
      */
     public function normalizeOptionsConfig(mixed $raw): array
     {
-        $source = is_array($raw) ? $raw : $this->defaultOptions();
         $defaults = $this->defaultOptions();
-        $requiredDefaults = $this->requiredOptions();
+        $source = is_array($raw) ? $raw : $defaults;
+        $requiredDefaults = array_intersect_key($defaults, self::REQUIRED_OPTION_KEYS);
         $normalized = [];
         $priorities = [];
         foreach ($source as $key => $definition) {
@@ -111,13 +108,11 @@ final class ProfileContactService
                 continue;
             }
 
-            if (!isset($normalized[$slug]) || $priority >= $existingPriority) {
-                $normalized[$slug] = [
-                    'label' => $safeLabel,
-                    'url_prefix' => $safePrefix,
-                ];
-                $priorities[$slug] = $priority;
-            }
+            $normalized[$slug] = [
+                'label' => $safeLabel,
+                'url_prefix' => $safePrefix,
+            ];
+            $priorities[$slug] = $priority;
         }
 
         foreach ($requiredDefaults as $requiredSlug => $requiredConfig) {

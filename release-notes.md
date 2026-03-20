@@ -22,6 +22,12 @@
 - Completed `private/lib/Http` folder sweep with net complexity reduction: consolidated duplicated session flash bucket handling and trimmed upload-file tree flattening boilerplate, with CLI/security smoke revalidation.
 - Completed `private/lib/Media` folder sweep with net complexity reduction: removed duplicated image variant sizing/orientation logic from taxonomy image uploads by delegating to `ImageVariantProcessor`, while preserving behavior and revalidating via CLI/theme/extension smoke coverage.
 - Completed `private/lib/Pagination` folder sweep with net complexity reduction: simplified pagination state/link assembly paths and trimmed query-normalization branching while preserving output shape, with CLI/theme/extension smoke revalidation.
+- Completed `private/lib/Panel` folder sweep with net complexity reduction: simplified author-option sorting/return paths in `PanelPageAuthorOptionBuilder` by trimming redundant intermediate variables and fallback branching, with CLI smoke revalidation.
+- Completed `private/lib/Profile` folder sweep with net complexity reduction: deduplicated required contact-option key selection via a shared constant, removed redundant option overwrite branching, and trimmed duplicate default-option resolution in `ProfileContactService`, with CLI smoke revalidation.
+- Completed `private/lib/Profiling` folder sweep with net complexity reduction: streamlined query metadata normalization, removed duplicate query-count/truncation branches in `RequestProfiler`, and revalidated with CLI + debug-toolbar smoke coverage.
+- Completed `private/lib/Routing` folder sweep with net complexity reduction: consolidated repeated route/group/profile/registration mode normalization in `RouteConfigService`, trimmed duplicated routing-table enable checks, and revalidated with full routing lint plus CLI/themes smoke coverage.
+- Completed `private/lib/Security` folder sweep with net complexity reduction: deduplicated positive-int coercion and removed redundant token-character validation in `InviteTokenPolicy`, simplified status fallback branching in `TwoFactorMethodRules`, and revalidated with full security-folder lint plus CLI/security/input-sanitizer smoke coverage.
+- Completed `private/lib/Session` folder sweep with net complexity reduction: simplified session-name prefix validation and host-domain matching branches in `SessionCookiePolicy`, and revalidated with session-adjacent CLI/security smoke coverage.
 
 ### March 18, 2026
 

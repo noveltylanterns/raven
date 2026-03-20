@@ -54,11 +54,9 @@ final class SessionCookiePolicy
         }
 
         $cookiePrefix = trim((string) $config->get('session.cookie.prefix', 'rvn_'));
-        if ($cookiePrefix !== '' && preg_match('/^[a-zA-Z0-9_-]{1,40}$/', $cookiePrefix) === 1) {
-            $prefixedSessionName = $cookiePrefix . $sessionName;
-            if (preg_match('/^[a-zA-Z0-9_-]{1,64}$/', $prefixedSessionName) === 1) {
-                $sessionName = $prefixedSessionName;
-            }
+        $prefixedSessionName = $cookiePrefix . $sessionName;
+        if ($cookiePrefix !== '' && preg_match('/^[a-zA-Z0-9_-]{1,40}$/', $cookiePrefix) === 1 && preg_match('/^[a-zA-Z0-9_-]{1,64}$/', $prefixedSessionName) === 1) {
+            $sessionName = $prefixedSessionName;
         }
 
         return $sessionName;
@@ -80,9 +78,7 @@ final class SessionCookiePolicy
         $requestHost = $this->normalizedRequestHost($server);
         if ($cookieDomain !== '' && $requestHost !== '') {
             $cookieDomainForMatch = ltrim($cookieDomain, '.');
-            $hostMatchesCookieDomain = $requestHost === $cookieDomainForMatch
-                || str_ends_with($requestHost, '.' . $cookieDomainForMatch);
-            if (!$hostMatchesCookieDomain) {
+            if ($requestHost !== $cookieDomainForMatch && !str_ends_with($requestHost, '.' . $cookieDomainForMatch)) {
                 $cookieDomain = '';
             }
         }
@@ -98,7 +94,7 @@ final class SessionCookiePolicy
         }
 
         if (str_contains($requestHost, ',')) {
-            $requestHost = trim((string) explode(',', $requestHost, 2)[0]);
+            $requestHost = trim((string) strtok($requestHost, ','));
         }
 
         if (str_starts_with($requestHost, '[')) {
@@ -110,7 +106,7 @@ final class SessionCookiePolicy
             $lastColonPos = strrpos($requestHost, ':');
             if ($lastColonPos !== false && substr_count($requestHost, ':') === 1) {
                 $maybePort = substr($requestHost, $lastColonPos + 1);
-                if ($maybePort !== '' && ctype_digit($maybePort)) {
+                if (ctype_digit((string) $maybePort)) {
                     $requestHost = substr($requestHost, 0, $lastColonPos);
                 }
             }

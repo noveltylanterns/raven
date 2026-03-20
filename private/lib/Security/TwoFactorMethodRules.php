@@ -60,10 +60,7 @@ final class TwoFactorMethodRules
         if ($normalizedType === 'totp') {
             return 'pending';
         }
-        if ($normalizedType === 'recovery') {
-            return 'confirmed';
-        }
-        if ($normalizedType === 'email') {
+        if (in_array($normalizedType, ['recovery', 'email'], true)) {
             return 'confirmed';
         }
 
@@ -81,8 +78,6 @@ final class TwoFactorMethodRules
 
     public static function dedupeKey(string $type, string $label, string $value): string
     {
-        return strtolower(
-            self::normalizeType($type) . "\n" . trim($label) . "\n" . trim($value)
-        );
+        return strtolower(self::normalizeType($type) . "\n" . trim($label) . "\n" . trim($value));
     }
 }

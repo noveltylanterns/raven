@@ -69,9 +69,12 @@ final class RequestProfiler
             return;
         }
 
+        $connection = strtolower(trim($connection));
+        $mode = strtolower(trim($mode));
+
         self::$queries[] = [
-            'connection' => strtolower(trim($connection)) !== '' ? strtolower(trim($connection)) : 'app',
-            'mode' => strtolower(trim($mode)) !== '' ? strtolower(trim($mode)) : 'execute',
+            'connection' => $connection !== '' ? $connection : 'app',
+            'mode' => $mode !== '' ? $mode : 'execute',
             'sql' => $sql,
             'params' => self::normalizeParams($params ?? []),
             'duration_ms' => max(0.0, round($durationMs, 3)),
@@ -136,6 +139,7 @@ final class RequestProfiler
         foreach (self::$queries as $query) {
             $queryTimeMs += (float) ($query['duration_ms'] ?? 0.0);
         }
+        $queryLoggedCount = count(self::$queries);
 
         return [
             'enabled' => self::$enabled,
@@ -144,8 +148,8 @@ final class RequestProfiler
             'duration_ms' => $durationMs,
             'memory_usage_bytes' => memory_get_usage(true),
             'memory_peak_bytes' => memory_get_peak_usage(true),
-            'query_count' => count(self::$queries) + self::$droppedQueries,
-            'query_logged_count' => count(self::$queries),
+            'query_count' => $queryLoggedCount + self::$droppedQueries,
+            'query_logged_count' => $queryLoggedCount,
             'query_dropped_count' => self::$droppedQueries,
             'query_time_ms' => round($queryTimeMs, 3),
             'queries' => self::$queries,
@@ -229,22 +233,13 @@ final class RequestProfiler
 
         if (is_string($value)) {
             $value = preg_replace('/\s+/', ' ', $value) ?? $value;
-            $value = trim($value);
-            if (strlen($value) > 400) {
-                return substr($value, 0, 400) . '…';
-            }
-
-            return $value;
+            return self::truncateValue(trim($value));
         }
 
         if (is_array($value)) {
             $encoded = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             if (is_string($encoded)) {
-                if (strlen($encoded) > 400) {
-                    return substr($encoded, 0, 400) . '…';
-                }
-
-                return $encoded;
+                return self::truncateValue($encoded);
             }
 
             return '[array]';
@@ -256,5 +251,13 @@ final class RequestProfiler
 
         return '[' . gettype($value) . ']';
     }
-}
 
+    private static function truncateValue(string $value): string
+    {
+        if (strlen($value) <= 400) {
+            return $value;
+        }
+
+        return substr($value, 0, 400) . '…';
+    }
+}

@@ -41,10 +41,10 @@ final class PanelPageAuthorOptionBuilder
             ];
         }
 
-        $result = array_values($options);
-        usort($result, static function (array $left, array $right): int {
-            $leftLabel = strtolower(trim((string) (($left['display_name'] ?? '') !== '' ? $left['display_name'] : $left['username'])));
-            $rightLabel = strtolower(trim((string) (($right['display_name'] ?? '') !== '' ? $right['display_name'] : $right['username'])));
+        $options = array_values($options);
+        usort($options, static function (array $left, array $right): int {
+            $leftLabel = strtolower(trim((string) (($left['display_name'] ?? '') ?: ($left['username'] ?? ''))));
+            $rightLabel = strtolower(trim((string) (($right['display_name'] ?? '') ?: ($right['username'] ?? ''))));
             if ($leftLabel !== $rightLabel) {
                 return $leftLabel <=> $rightLabel;
             }
@@ -52,7 +52,6 @@ final class PanelPageAuthorOptionBuilder
             return ((int) ($left['id'] ?? 0)) <=> ((int) ($right['id'] ?? 0));
         });
 
-        return $result;
+        return $options;
     }
 }
-
