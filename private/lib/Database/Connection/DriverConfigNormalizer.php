@@ -39,9 +39,7 @@ final class DriverConfigNormalizer
      */
     public function mysql(array $config): array
     {
-        /** @var array<string, mixed> $mysql */
-        $mysql = (array) ($config['mysql'] ?? []);
-        return $mysql;
+        return $this->section($config, 'mysql');
     }
 
     /**
@@ -50,9 +48,7 @@ final class DriverConfigNormalizer
      */
     public function pgsql(array $config): array
     {
-        /** @var array<string, mixed> $pgsql */
-        $pgsql = (array) ($config['pgsql'] ?? []);
-        return $pgsql;
+        return $this->section($config, 'pgsql');
     }
 
     /**
@@ -60,8 +56,7 @@ final class DriverConfigNormalizer
      */
     public function sqliteBasePath(array $config): string
     {
-        /** @var array<string, mixed> $sqlite */
-        $sqlite = (array) ($config['sqlite'] ?? []);
+        $sqlite = $this->section($config, 'sqlite');
         $basePath = rtrim((string) ($sqlite['base_path'] ?? ''), '/');
         if ($basePath === '') {
             throw new RuntimeException('Missing SQLite base path configuration.');
@@ -69,5 +64,15 @@ final class DriverConfigNormalizer
 
         return $basePath;
     }
-}
 
+    /**
+     * @param array<string, mixed> $config
+     * @return array<string, mixed>
+     */
+    private function section(array $config, string $key): array
+    {
+        /** @var array<string, mixed> $section */
+        $section = (array) ($config[$key] ?? []);
+        return $section;
+    }
+}

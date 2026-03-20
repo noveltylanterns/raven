@@ -15,6 +15,7 @@
 - Completed `private/lib/Channel` folder sweep with net complexity reduction: removed redundant channel-id wrapper indirection, collapsed repeated created-at normalization, trimmed file-list/write-path boilerplate, and revalidated channel CLI workflows.
 - Completed `private/lib/Config` folder sweep with net complexity reduction: replaced the large config-label if-chain with a static map, removed duplicate bool-casting logic in debug config normalization, simplified config file serialization boilerplate, and revalidated config/CLI workflows.
 - Completed `private/lib/Content` folder sweep with net complexity reduction: consolidated duplicate taxonomy list/count query branches into shared helpers, trimmed page persistence write/delete parameter boilerplate, and revalidated content-adjacent CLI/theme smoke flows.
+- Completed `private/lib/Database` folder sweep with net complexity reduction: removed duplicate schema/runtime table-name mapping by delegating schema resolution to the runtime resolver, collapsed repeated schema-pipeline component lookups, and trimmed driver-config section extraction boilerplate with schema/CLI smoke revalidation.
 
 ### March 18, 2026
 
