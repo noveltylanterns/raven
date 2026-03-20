@@ -18,6 +18,7 @@
 - Completed `private/lib/Database` folder sweep with net complexity reduction: removed duplicate schema/runtime table-name mapping by delegating schema resolution to the runtime resolver, collapsed repeated schema-pipeline component lookups, and trimmed driver-config section extraction boilerplate with schema/CLI smoke revalidation.
 - Completed `private/lib/Debug` folder sweep with net complexity reduction: removed repetitive section-render branching in debug toolbar markup assembly via a shared gated section helper, kept lazy section rendering behavior, and revalidated with debug-toolbar/CLI smoke coverage.
 - Completed `private/lib/Extension` folder sweep with net complexity reduction: deduplicated extension state map normalization across load/save paths, reduced repeated state-file reads in save helpers, simplified fallback state handling, and revalidated extension/CLI/theme smoke flows.
+- Completed `private/lib/Filesystem` folder sweep with net complexity reduction: simplified recursive delete branch handling in `DirectoryTreeService` while preserving behavior and revalidated with CLI smoke coverage.
 
 ### March 18, 2026
 

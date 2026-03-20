@@ -21,11 +21,7 @@ final class DirectoryTreeService
         );
 
         foreach ($iterator as $item) {
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-            } else {
-                @unlink($item->getPathname());
-            }
+            $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname());
         }
 
         @rmdir($directory);
