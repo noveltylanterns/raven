@@ -28,7 +28,8 @@ final class ExtensionRegistry
     private static ?ExtensionProviderValidator $providerValidator = null;
     private static ?ExtensionStateLoader $stateLoader = null;
     /**
-     * Returns enabled extension directory map from `private/ext/.state.php`.
+     * Returns enabled extension directory map from `private/dat/ext/.state.php`
+     * with a legacy fallback to `private/ext/.state.php`.
      *
      * @return array<string, bool>
      */
@@ -59,7 +60,8 @@ final class ExtensionRegistry
     }
 
     /**
-     * Returns extension permission-bit map from `private/ext/.state.php`.
+     * Returns extension permission-bit map from `private/dat/ext/.state.php`
+     * with a legacy fallback to `private/ext/.state.php`.
      *
      * @param array<int, int> $allowedBits
      * @return array<string, int>

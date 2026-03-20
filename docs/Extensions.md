@@ -27,7 +27,7 @@ At minimum, each extension needs:
 
 Core panel bootstrap (`panel/index.php`) does this:
 
-1. Reads extension enablement state from `private/ext/.state.php` (or `.state.php.dist` fallback).
+1. Reads extension enablement state from `private/dat/ext/.state.php` (with legacy fallback from `private/ext/.state.php` on older installs).
 2. Validates extension directory names and manifests.
 3. Builds nav items from extension directory slug and manifest type/name.
 4. Loads optional extension providers (`ext.php`, `lib/schema.php`, route registrars) for enabled, valid extensions.
@@ -37,7 +37,7 @@ Core panel bootstrap (`panel/index.php`) does this:
 
 Shared state file:
 
-- `private/ext/.state.php`
+- `private/dat/ext/.state.php`
 
 State keys:
 
@@ -61,7 +61,7 @@ DB-backed extension data examples:
 
 Shared/core-managed data examples:
 
-- Enablement and permission masks in `private/ext/.state.php`
+- Enablement and permission masks in `private/dat/ext/.state.php`
 - Signup submissions in DB table `ext_signups_submissions` via `SignupSubmissionRepository`
 
 So the correct model is:

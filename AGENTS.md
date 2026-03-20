@@ -1,6 +1,6 @@
 # Raven CMS Agent Guide
 
-Last updated: 2026-03-14
+Last updated: 2026-03-19
 
 ## Upon Opening
 - Hello, this your Captain speaking. I am the original developer of this software I have placed you guardian over.
@@ -46,6 +46,24 @@ Last updated: 2026-03-14
 - site/frontend behavior in themes (`public/theme/{slug}/`)
 - feature behavior in extensions (`private/ext/{slug}/`)
 - Avoid core-file edits for theme-only or extension-only customization.
+
+## Core Architecture Guardrails
+- Ownership model:
+- `private/sys/` is Raven core runtime code. It owns controllers, repositories, service-container wiring, compatibility shims, and other orchestration that must stay attached to the live core runtime.
+- `private/lib/` is Raven core reusable code. It owns shared modules such as policies, codecs, normalizers, validators, query builders, render helpers, persistence helpers, and other reusable units that should not be trapped inside a single runtime entrypoint.
+- `private/ext/` is extension territory. It owns user-provided feature code and Raven's official plugin-style packages; optional feature behavior belongs there instead of being patched into core.
+- `private/tpl/` owns core fallback views and templates only; do not use it as a dumping ground for business logic.
+- `private/dat/` owns persistent non-`.tmp` runtime data that should survive normal execution and update cycles.
+- `.tmp/` owns disposable runtime state such as cache/session/export scratch data and should stay safe to clear/rebuild.
+- Placement rules:
+- If new logic is reusable across multiple core entrypoints, expresses a domain rule, or can stand alone without being tightly coupled to one request flow, put it in `private/lib/{Domain}/`.
+- If new logic mainly translates request/response state, coordinates a core use-case, preserves a compatibility contract, or acts as the runtime-facing entrypoint for a subsystem, keep it in `private/sys/`.
+- If behavior is specific to one extension, one theme, or an optional package, keep it out of core and implement it in `private/ext/{slug}/` or `public/theme/{slug}/`.
+- Before adding a new core class, check whether an existing `private/lib/{Domain}/` module is the canonical home and extend that first instead of creating overlapping helpers.
+- Do not add pass-through wrappers in `private/sys/` or `private/lib/` that only rename one downstream call without adding real policy, normalization, compatibility, or boundary value.
+- Avoid catch-all dumping grounds such as `Common`, `Misc`, or extra helper piles; place core code in the narrowest domain folder that actually owns the responsibility.
+- Prefer one canonical domain entrypoint where practical, and flatten no-op service-to-service hops in hot paths instead of stacking abstractions.
+- When core responsibilities move or new `private/lib/` modules are added, update this `AGENTS.md` file-tree summary in the same task so future agents inherit the same boundary rules.
 
 ## Theme Rules
 - Public themes must live in `public/theme/{slug}/`.
@@ -131,11 +149,11 @@ Factory config.php defaults, for installation runtime and future reference.
 
 #### /private/dat/
 Where private site content (sqlite databases, other data stores that don't need to be accessible by the web process) is stashed. Much of it is sorted by type.
+- `/private/dat/ext/.state.php` - Environment-local extension enablement and permission state map. (runtime-managed, update-safe location)
+- `/private/dat/ext/.state.php.dist` - Factory extension-state template used by installer/bootstrap fallback workflows.
 
 #### /private/ext/
 Where extensions are stored. Not all extensions will have all these files, but they will follow this rough format:
-- `/private/ext/.state.php` - Environment-local extension enablement and permission state map. (generated during install from .state.php.dist)
-- `/private/ext/.state.php.dist` - Factory .state.php defaults, for installation runtime and future reference.
 - `/private/ext/AGENTS.md` - Agent guidance for custom extension creation.
 - `/private/ext/*/` - Each extension gets its own self-contained folder right here. (http-accessible assets go in parallel `/public/uploads/ext/{slug}/` or `/panel/ext/{slug}/` folders, but only when absolutely necessary.)
 - `/private/ext/*/ext.json` - Extension manifest metadata & internal API bind location.

@@ -10,10 +10,14 @@ namespace Raven\Lib\Extension;
 final class ExtensionStateStore
 {
     private string $extensionsBasePath;
+    private string $stateBasePath;
 
-    public function __construct(string $extensionsBasePath)
+    public function __construct(string $extensionsBasePath, ?string $stateBasePath = null)
     {
         $this->extensionsBasePath = rtrim($extensionsBasePath, '/\\');
+        $this->stateBasePath = $stateBasePath !== null
+            ? rtrim($stateBasePath, '/\\')
+            : dirname($this->extensionsBasePath) . '/dat/ext';
     }
 
     public function basePath(): string
@@ -22,6 +26,11 @@ final class ExtensionStateStore
     }
 
     public function stateFilePath(): string
+    {
+        return $this->stateBasePath . '/.state.php';
+    }
+
+    public function legacyStateFilePath(): string
     {
         return $this->extensionsBasePath . '/.state.php';
     }
@@ -37,6 +46,17 @@ final class ExtensionStateStore
         }
     }
 
+    public function ensureStateDirectory(): void
+    {
+        if (is_dir($this->stateBasePath)) {
+            return;
+        }
+
+        if (!mkdir($this->stateBasePath, 0775, true) && !is_dir($this->stateBasePath)) {
+            throw new \RuntimeException('Failed to create private/dat/ext directory.');
+        }
+    }
+
     /**
      * @return array{
      *   enabled: array<string, bool>,
@@ -46,7 +66,7 @@ final class ExtensionStateStore
      */
     public function loadStateData(): array
     {
-        $statePath = $this->stateFilePath();
+        $statePath = $this->resolveReadableStatePath();
         if (!is_file($statePath)) {
             return $this->defaultStateData();
         }
@@ -152,13 +172,14 @@ final class ExtensionStateStore
         $content = "<?php\n\n";
         $content .= "/**\n";
         $content .= " * RAVEN CMS\n";
-        $content .= " * ~/private/ext/.state.php\n";
+        $content .= " * ~/private/dat/ext/.state.php\n";
         $content .= " * Persisted extension enablement map and permission settings managed by panel.\n";
         $content .= " * Docs: https://raven.lanterns.io\n";
         $content .= " */\n\n";
         $content .= "declare(strict_types=1);\n\n";
         $content .= "return " . $export . ";\n";
 
+        $this->ensureStateDirectory();
         $written = file_put_contents($this->stateFilePath(), $content, LOCK_EX);
         if ($written === false) {
             throw new \RuntimeException('Failed to persist extension state.');
@@ -190,6 +211,16 @@ final class ExtensionStateStore
             'permissions' => [],
             'permission_bits' => [],
         ];
+    }
+
+    private function resolveReadableStatePath(): string
+    {
+        $primaryPath = $this->stateFilePath();
+        if (is_file($primaryPath)) {
+            return $primaryPath;
+        }
+
+        return $this->legacyStateFilePath();
     }
 
     /**

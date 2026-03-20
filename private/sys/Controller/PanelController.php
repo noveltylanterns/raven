@@ -5349,7 +5349,7 @@ final class PanelController
     }
 
     /**
-     * Saves enabled extension map to `private/ext/.state.php`.
+     * Saves enabled extension map to `private/dat/ext/.state.php`.
      *
      * @param array<string, bool> $enabledMap
      */
@@ -5359,7 +5359,7 @@ final class PanelController
     }
 
     /**
-     * Saves required extension permission-bit map to `private/ext/.state.php`.
+     * Saves required extension permission-bit map to `private/dat/ext/.state.php`.
      *
      * @param array<string, int> $permissionMap
      */
@@ -5379,7 +5379,7 @@ final class PanelController
     }
 
     /**
-     * Saves extension enablement + permission-mask state to `private/ext/.state.php`.
+     * Saves extension enablement + permission-mask state to `private/dat/ext/.state.php`.
      *
      * @param array<string, bool> $enabledMap
      * @param array<string, int> $permissionMap

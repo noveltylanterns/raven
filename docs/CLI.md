@@ -211,7 +211,7 @@ CLI commands are wired to the same repository/config structures used by panel fl
 - category/tag/redirect use repository CRUD methods
 - channel uses filesystem-backed `ChannelRepository`
 - config updates persist through `Config::save()`
-- extension enablement uses `private/ext/.state.php` state map
+- extension enablement uses the runtime state map at `private/dat/ext/.state.php`
 
 ## 8) QA Contract
 

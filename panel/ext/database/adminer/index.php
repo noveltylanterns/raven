@@ -89,7 +89,10 @@ $isDatabaseExtensionEnabled = static function () use ($root): bool {
         return false;
     }
 
-    $statePath = $root . '/private/ext/.state.php';
+    $statePath = $root . '/private/dat/ext/.state.php';
+    if (!is_file($statePath)) {
+        $statePath = $root . '/private/ext/.state.php';
+    }
     if (!is_file($statePath)) {
         return false;
     }

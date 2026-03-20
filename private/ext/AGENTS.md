@@ -240,13 +240,13 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - Optional extension-owned panel templates: `private/ext/{directory_name}/tpl/*.php`
 
 ## Extension Enablement State
-- Runtime enablement state file: `private/ext/.state.php`
-- Commit-safe template: `private/ext/.state.php.dist`
+- Runtime enablement state file: `private/dat/ext/.state.php`
+- Commit-safe template: `private/dat/ext/.state.php.dist`
 - Shared parser: `private/sys/Core/Extension/ExtensionRegistry.php` (used by bootstrap/panel/public runtime checks)
 - State structure:
 - `enabled`: `{extension_directory => true}`
 - `permissions`: `{extension_directory => panel_permission_bit}` for non-system extensions
-- Installer seeds `private/ext/.state.php` from `.state.php.dist` during install.
+- Installer seeds `private/dat/ext/.state.php` from `.state.php.dist` during install.
 - Extensions are enabled only when:
 - extension directory exists
 - directory is listed enabled in `.state.php`
@@ -277,7 +277,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - `helper`, `content`, `plugin`, `module`, and `system` may expose panel routes/views.
 - Only `module` may expose public routes/views.
 - System-category extension links require `Manage System Configuration`; unauthorized users must not see or access them.
-- Non-system extension panel pages enforce the extension's configured permission mask from `private/ext/.state.php` (`permissions` map).
+- Non-system extension panel pages enforce the extension's configured permission mask from `private/dat/ext/.state.php` (`permissions` map).
 
 ## Panel Route Registration Contract
 - If enabled, Raven attempts to load `private/ext/{name}/lib/routes_panel.php`.
@@ -311,7 +311,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - File must return a callable:
 - `function (array &$app): void`
 - Provider should register extension services into the shared app container (for example repositories/controllers/helpers required by extension routes/runtime).
-- Bootstrap providers are loaded only for enabled extensions listed in `private/ext/.state.php` with valid directory names.
+- Bootstrap providers are loaded only for enabled extensions listed in `private/dat/ext/.state.php` with valid directory names.
 - Extension source autoloading (`private/ext/{name}/src/`) is also enabled only for extensions marked enabled in `.state.php`.
 
 ## Extension Schema Contract

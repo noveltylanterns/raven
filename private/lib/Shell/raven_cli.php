@@ -439,7 +439,7 @@ function raven_cli_find_row_by_slug(array $rows, string $slug): ?array
  */
 function raven_cli_extension_state_load(string $root): array
 {
-    $statePath = rtrim($root, '/') . '/private/ext/.state.php';
+    $statePath = raven_cli_extension_state_path($root);
     if (!is_file($statePath)) {
         return ['enabled' => [], 'permissions' => []];
     }
@@ -503,7 +503,7 @@ function raven_cli_extension_state_load(string $root): array
  */
 function raven_cli_extension_state_save(string $root, array $enabled, array $permissions): void
 {
-    $statePath = rtrim($root, '/') . '/private/ext/.state.php';
+    $statePath = raven_cli_extension_state_primary_path($root);
 
     $safeEnabled = [];
     foreach ($enabled as $slug => $flag) {
@@ -531,7 +531,7 @@ function raven_cli_extension_state_save(string $root, array $enabled, array $per
     $content = "<?php\n\n";
     $content .= "/**\n";
     $content .= " * RAVEN CMS\n";
-    $content .= " * ~/private/ext/.state.php\n";
+    $content .= " * ~/private/dat/ext/.state.php\n";
     $content .= " * Persisted extension enablement map and permission settings managed by panel/CLI.\n";
     $content .= " * Docs: https://raven.lanterns.io\n";
     $content .= " */\n\n";
@@ -541,15 +541,35 @@ function raven_cli_extension_state_save(string $root, array $enabled, array $per
         'permissions' => $safePermissions,
     ], true) . ";\n";
 
+    $stateDirectory = dirname($statePath);
+    if (!is_dir($stateDirectory) && !mkdir($stateDirectory, 0775, true) && !is_dir($stateDirectory)) {
+        throw new RuntimeException('Failed to create private/dat/ext directory.');
+    }
+
     $written = file_put_contents($statePath, $content, LOCK_EX);
     if ($written === false) {
-        throw new RuntimeException('Failed to persist private/ext/.state.php.');
+        throw new RuntimeException('Failed to persist private/dat/ext/.state.php.');
     }
 
     clearstatcache(true, $statePath);
     if (function_exists('opcache_invalidate')) {
         @opcache_invalidate($statePath, true);
     }
+}
+
+function raven_cli_extension_state_primary_path(string $root): string
+{
+    return rtrim($root, '/') . '/private/dat/ext/.state.php';
+}
+
+function raven_cli_extension_state_path(string $root): string
+{
+    $primaryPath = raven_cli_extension_state_primary_path($root);
+    if (is_file($primaryPath)) {
+        return $primaryPath;
+    }
+
+    return rtrim($root, '/') . '/private/ext/.state.php';
 }
 
 function raven_cli_remove_directory_recursive(string $directory): void

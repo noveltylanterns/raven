@@ -56,8 +56,8 @@ function installer_write_config(string $path, array $config): void
 $root = dirname(__DIR__);
 $configPath = $root . '/private/config.php';
 $configTemplatePath = $root . '/private/config.php.dist';
-$extensionStatePath = $root . '/private/ext/.state.php';
-$extensionStateTemplatePath = $root . '/private/ext/.state.php.dist';
+$extensionStatePath = $root . '/private/dat/ext/.state.php';
+$extensionStateTemplatePath = $root . '/private/dat/ext/.state.php.dist';
 $lockPath = $root . '/private/dat/install.lock';
 $sqliteDefaultBasePath = rtrim($root, '/') . '/private/dat/db';
 
@@ -420,7 +420,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
 
             // Seed runtime extension state from committed defaults template.
             if (!is_file($extensionStateTemplatePath)) {
-                throw new RuntimeException('Missing extension state template private/ext/.state.php.dist.');
+                throw new RuntimeException('Missing extension state template private/dat/ext/.state.php.dist.');
             }
 
             $stateTemplateContent = file_get_contents($extensionStateTemplatePath);
@@ -434,7 +434,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
             }
 
             if (file_put_contents($extensionStatePath, $stateTemplateContent, LOCK_EX) === false) {
-                throw new RuntimeException('Failed to write private/ext/.state.php.');
+                throw new RuntimeException('Failed to write private/dat/ext/.state.php.');
             }
 
             $lockDirectory = dirname($lockPath);
@@ -490,7 +490,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         <h1>Raven CMS Installer</h1>
         <p class="note">
             This installer writes <code>private/config.php</code>, initializes database schema, creates the first Super Admin account,
-            seeds <code>private/ext/.state.php</code> from <code>private/ext/.state.php.dist</code>,
+            seeds <code>private/dat/ext/.state.php</code> from <code>private/dat/ext/.state.php.dist</code>,
             and then writes a lock file at <code>private/dat/install.lock</code>.
             Delete <code>public/install.php</code> after setup.
         </p>

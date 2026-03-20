@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Raven\Lib\Extension;
 
 /**
- * Loads extension enablement/permission state from `private/ext/.state.php`.
+ * Loads extension enablement/permission state from `private/dat/ext/.state.php`
+ * with a legacy fallback to `private/ext/.state.php`.
  */
 final class ExtensionStateLoader
 {
@@ -15,7 +16,7 @@ final class ExtensionStateLoader
     public function loadState(string $root): array
     {
         $emptyState = ['enabled' => [], 'permissions' => []];
-        $statePath = rtrim($root, '/') . '/private/ext/.state.php';
+        $statePath = $this->resolveStatePath($root);
         if (!is_file($statePath)) {
             return $emptyState;
         }
@@ -44,5 +45,16 @@ final class ExtensionStateLoader
             'enabled' => is_array($enabled) ? $enabled : [],
             'permissions' => is_array($permissions) ? $permissions : [],
         ];
+    }
+
+    private function resolveStatePath(string $root): string
+    {
+        $normalizedRoot = rtrim($root, '/');
+        $primaryPath = $normalizedRoot . '/private/dat/ext/.state.php';
+        if (is_file($primaryPath)) {
+            return $primaryPath;
+        }
+
+        return $normalizedRoot . '/private/ext/.state.php';
     }
 }

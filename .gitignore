@@ -4,8 +4,10 @@
 /private/dat/*
 !/private/dat/
 !/private/dat/.gitkeep
+!/private/dat/ext/
+/private/dat/ext/.state.php
+!/private/dat/ext/.state.php.dist
 /private/ext/.state.php
-!/private/ext/.state.php.dist
 /private/ext/debug-*/
 
 # Uploaded media files (keep directory, ignore contents)

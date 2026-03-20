@@ -4,6 +4,8 @@
 
 ### March 19, 2026
 
+- Moved extension enablement state persistence/template to `private/dat/ext/.state.php` and `private/dat/ext/.state.php.dist`, updated installer/CLI/runtime/docs accordingly, and kept a legacy read fallback for older installs that still have `private/ext/.state.php`.
+- Added long-term architecture guardrails to `AGENTS.md` defining the ownership boundary as `private/sys` = core runtime/orchestration, `private/lib` = reusable core modules, `private/ext` = user-provided or official plugin-style feature code, `private/tpl` = views/templates, and `private/dat` = persistent non-`.tmp` runtime data, with explicit placement rules to keep future modularization from drifting backward.
 - Continued core modularization cleanup for public template routing: moved theme-chain lookup/root orchestration out of `PublicController` into `private/lib/View/PublicTemplatePipeline.php` (`renderForThemeChain` + route-template resolvers), rewired controller call sites, and removed redundant controller wrapper methods.
 - Continued core modularization cleanup in `PublicController` by removing another redundant wrapper batch (unused route/profile/theme helper pass-through methods) and rewiring registration username normalization directly through `LoginIdentifierResolver`.
 - Continued core modularization cleanup in `PublicController` by removing seven route-config pass-through wrappers (`category/tag/profile/group/registration` helpers) and rewiring all call sites directly through `RouteConfigService`.
