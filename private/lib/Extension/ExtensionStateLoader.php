@@ -14,9 +14,10 @@ final class ExtensionStateLoader
      */
     public function loadState(string $root): array
     {
+        $emptyState = ['enabled' => [], 'permissions' => []];
         $statePath = rtrim($root, '/') . '/private/ext/.state.php';
         if (!is_file($statePath)) {
-            return ['enabled' => [], 'permissions' => []];
+            return $emptyState;
         }
 
         clearstatcache(true, $statePath);
@@ -27,7 +28,7 @@ final class ExtensionStateLoader
         /** @var mixed $rawState */
         $rawState = require $statePath;
         if (!is_array($rawState)) {
-            return ['enabled' => [], 'permissions' => []];
+            return $emptyState;
         }
 
         /** @var mixed $enabled */
@@ -45,4 +46,3 @@ final class ExtensionStateLoader
         ];
     }
 }
-

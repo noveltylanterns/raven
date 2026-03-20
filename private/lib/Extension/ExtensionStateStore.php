@@ -48,11 +48,7 @@ final class ExtensionStateStore
     {
         $statePath = $this->stateFilePath();
         if (!is_file($statePath)) {
-            return [
-                'enabled' => [],
-                'permissions' => [],
-                'permission_bits' => [],
-            ];
+            return $this->defaultStateData();
         }
 
         clearstatcache(true, $statePath);
@@ -63,11 +59,7 @@ final class ExtensionStateStore
         /** @var mixed $loaded */
         $loaded = require $statePath;
         if (!is_array($loaded)) {
-            return [
-                'enabled' => [],
-                'permissions' => [],
-                'permission_bits' => [],
-            ];
+            return $this->defaultStateData();
         }
 
         /** @var mixed $rawEnabled */
@@ -75,87 +67,15 @@ final class ExtensionStateStore
         if (!array_key_exists('enabled', $loaded) && array_key_exists('permissions', $loaded)) {
             $rawEnabled = [];
         }
-        if (!is_array($rawEnabled)) {
-            $rawEnabled = [];
-        }
-
         /** @var mixed $rawPermissions */
         $rawPermissions = $loaded['permissions'] ?? [];
-        if (!is_array($rawPermissions)) {
-            $rawPermissions = [];
-        }
-
         /** @var mixed $rawPermissionBits */
         $rawPermissionBits = $loaded['permission_bits'] ?? [];
-        if (!is_array($rawPermissionBits)) {
-            $rawPermissionBits = [];
-        }
-
-        $enabled = [];
-        foreach ($rawEnabled as $name => $isEnabled) {
-            $directory = (string) $name;
-            if (!$this->isSafeExtensionDirectoryName($directory)) {
-                continue;
-            }
-
-            if ((bool) $isEnabled) {
-                $enabled[$directory] = true;
-            }
-        }
-
-        $permissions = [];
-        foreach ($rawPermissions as $name => $rawBit) {
-            $directory = (string) $name;
-            if (!$this->isSafeExtensionDirectoryName($directory)) {
-                continue;
-            }
-
-            $bit = (int) $rawBit;
-            if ($bit <= 0) {
-                continue;
-            }
-
-            $permissions[$directory] = $bit;
-        }
-
-        $permissionBits = [];
-        foreach ($rawPermissionBits as $name => $levelsRaw) {
-            $directory = (string) $name;
-            if (!$this->isSafeExtensionDirectoryName($directory) || !is_array($levelsRaw)) {
-                continue;
-            }
-
-            $normalizedLevels = [];
-            foreach ($levelsRaw as $levelKey => $rawBit) {
-                $level = strtolower(trim((string) $levelKey));
-                if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $level) !== 1) {
-                    continue;
-                }
-
-                $bit = (int) $rawBit;
-                if ($bit <= 0) {
-                    continue;
-                }
-
-                $normalizedLevels[$level] = $bit;
-            }
-
-            if ($normalizedLevels === []) {
-                continue;
-            }
-
-            ksort($normalizedLevels);
-            $permissionBits[$directory] = $normalizedLevels;
-        }
-
-        ksort($enabled);
-        ksort($permissions);
-        ksort($permissionBits);
 
         return [
-            'enabled' => $enabled,
-            'permissions' => $permissions,
-            'permission_bits' => $permissionBits,
+            'enabled' => $this->normalizeEnabledMap(is_array($rawEnabled) ? $rawEnabled : []),
+            'permissions' => $this->normalizePermissionMap(is_array($rawPermissions) ? $rawPermissions : []),
+            'permission_bits' => $this->normalizePermissionBitsMap(is_array($rawPermissionBits) ? $rawPermissionBits : []),
         ];
     }
 
@@ -188,9 +108,8 @@ final class ExtensionStateStore
      */
     public function saveEnabledMap(array $enabledMap): void
     {
-        $permissionMap = $this->loadPermissionMap();
-        $permissionBitsMap = $this->loadPermissionBitsMap();
-        $this->saveState($enabledMap, $permissionMap, $permissionBitsMap);
+        $state = $this->loadStateData();
+        $this->saveState($enabledMap, $state['permissions'], $state['permission_bits']);
     }
 
     /**
@@ -198,9 +117,8 @@ final class ExtensionStateStore
      */
     public function savePermissionMap(array $permissionMap): void
     {
-        $enabledMap = $this->loadEnabledMap();
-        $permissionBitsMap = $this->loadPermissionBitsMap();
-        $this->saveState($enabledMap, $permissionMap, $permissionBitsMap);
+        $state = $this->loadStateData();
+        $this->saveState($state['enabled'], $permissionMap, $state['permission_bits']);
     }
 
     /**
@@ -208,9 +126,8 @@ final class ExtensionStateStore
      */
     public function savePermissionBitsMap(array $permissionBitsMap): void
     {
-        $enabledMap = $this->loadEnabledMap();
-        $permissionMap = $this->loadPermissionMap();
-        $this->saveState($enabledMap, $permissionMap, $permissionBitsMap);
+        $state = $this->loadStateData();
+        $this->saveState($state['enabled'], $state['permissions'], $permissionBitsMap);
     }
 
     /**
@@ -221,66 +138,11 @@ final class ExtensionStateStore
     public function saveState(array $enabledMap, array $permissionMap, array $permissionBitsMap = []): void
     {
         if ($permissionBitsMap === []) {
-            $permissionBitsMap = $this->loadPermissionBitsMap();
+            $permissionBitsMap = $this->loadStateData()['permission_bits'];
         }
-
-        $filteredEnabled = [];
-        foreach ($enabledMap as $name => $isEnabled) {
-            $directory = (string) $name;
-            if (!$this->isSafeExtensionDirectoryName($directory) || !$isEnabled) {
-                continue;
-            }
-
-            $filteredEnabled[$directory] = true;
-        }
-        ksort($filteredEnabled);
-
-        $filteredPermissions = [];
-        foreach ($permissionMap as $name => $rawBit) {
-            $directory = (string) $name;
-            if (!$this->isSafeExtensionDirectoryName($directory)) {
-                continue;
-            }
-
-            $bit = (int) $rawBit;
-            if ($bit <= 0) {
-                continue;
-            }
-
-            $filteredPermissions[$directory] = $bit;
-        }
-        ksort($filteredPermissions);
-
-        $filteredPermissionBits = [];
-        foreach ($permissionBitsMap as $name => $levelsRaw) {
-            $directory = (string) $name;
-            if (!$this->isSafeExtensionDirectoryName($directory) || !is_array($levelsRaw)) {
-                continue;
-            }
-
-            $normalizedLevels = [];
-            foreach ($levelsRaw as $levelKey => $rawBit) {
-                $level = strtolower(trim((string) $levelKey));
-                if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $level) !== 1) {
-                    continue;
-                }
-
-                $bit = (int) $rawBit;
-                if ($bit <= 0) {
-                    continue;
-                }
-
-                $normalizedLevels[$level] = $bit;
-            }
-
-            if ($normalizedLevels === []) {
-                continue;
-            }
-
-            ksort($normalizedLevels);
-            $filteredPermissionBits[$directory] = $normalizedLevels;
-        }
-        ksort($filteredPermissionBits);
+        $filteredEnabled = $this->normalizeEnabledMap($enabledMap);
+        $filteredPermissions = $this->normalizePermissionMap($permissionMap);
+        $filteredPermissionBits = $this->normalizePermissionBitsMap($permissionBitsMap);
 
         $export = var_export([
             'enabled' => $filteredEnabled,
@@ -312,5 +174,90 @@ final class ExtensionStateStore
     private function isSafeExtensionDirectoryName(string $name): bool
     {
         return (bool) preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/', $name);
+    }
+
+    /**
+     * @return array{
+     *   enabled: array<string, bool>,
+     *   permissions: array<string, int>,
+     *   permission_bits: array<string, array<string, int>>
+     * }
+     */
+    private function defaultStateData(): array
+    {
+        return [
+            'enabled' => [],
+            'permissions' => [],
+            'permission_bits' => [],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $enabledMap
+     * @return array<string, bool>
+     */
+    private function normalizeEnabledMap(array $enabledMap): array
+    {
+        $normalized = [];
+        foreach ($enabledMap as $name => $isEnabled) {
+            $directory = (string) $name;
+            if ($this->isSafeExtensionDirectoryName($directory) && (bool) $isEnabled) {
+                $normalized[$directory] = true;
+            }
+        }
+
+        ksort($normalized);
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $permissionMap
+     * @return array<string, int>
+     */
+    private function normalizePermissionMap(array $permissionMap): array
+    {
+        $normalized = [];
+        foreach ($permissionMap as $name => $rawBit) {
+            $directory = (string) $name;
+            $bit = (int) $rawBit;
+            if ($this->isSafeExtensionDirectoryName($directory) && $bit > 0) {
+                $normalized[$directory] = $bit;
+            }
+        }
+
+        ksort($normalized);
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $permissionBitsMap
+     * @return array<string, array<string, int>>
+     */
+    private function normalizePermissionBitsMap(array $permissionBitsMap): array
+    {
+        $normalized = [];
+        foreach ($permissionBitsMap as $name => $levelsRaw) {
+            $directory = (string) $name;
+            if (!$this->isSafeExtensionDirectoryName($directory) || !is_array($levelsRaw)) {
+                continue;
+            }
+
+            $normalizedLevels = [];
+            foreach ($levelsRaw as $levelKey => $rawBit) {
+                $level = strtolower(trim((string) $levelKey));
+                $bit = (int) $rawBit;
+                if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $level) === 1 && $bit > 0) {
+                    $normalizedLevels[$level] = $bit;
+                }
+            }
+
+            if ($normalizedLevels !== []) {
+                ksort($normalizedLevels);
+                $normalized[$directory] = $normalizedLevels;
+            }
+        }
+
+        ksort($normalized);
+        return $normalized;
     }
 }
