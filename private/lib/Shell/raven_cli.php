@@ -144,16 +144,11 @@ final class RavenCliContext
 
         if (function_exists('readline')) {
             $raw = readline($text);
-            if ($raw === false) {
-                return $default;
-            }
-
-            $value = trim($raw);
-            return $value !== '' ? $value : $default;
+        } else {
+            fwrite(STDOUT, $text);
+            $raw = fgets(STDIN);
         }
 
-        fwrite(STDOUT, $text);
-        $raw = fgets(STDIN);
         if ($raw === false) {
             return $default;
         }
@@ -2606,18 +2601,10 @@ function raven_cli_theme_slug_is_valid(string $slug): bool
     return preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $slug) === 1;
 }
 
-/**
- * @return array<int, string>
- */
-function raven_cli_theme_stock_slugs(): array
-{
-    return ['raven'];
-}
-
 function raven_cli_theme_is_stock_slug(string $slug): bool
 {
     $normalized = strtolower(trim($slug));
-    return in_array($normalized, raven_cli_theme_stock_slugs(), true);
+    return in_array($normalized, ['raven'], true);
 }
 
 /**
