@@ -62,36 +62,11 @@ final class DebugToolbarMarkupBuilder
         $summaryStatus = 'HTTP ' . $statusCode;
 
         $sections = [];
-        if (!empty($settings['show_benchmarks'])) {
-            $sections[] = self::section(
-                'Benchmarks',
-                self::renderBenchmarks($profile, $context)
-            );
-        }
-        if (!empty($settings['show_queries'])) {
-            $sections[] = self::section(
-                'SQL Queries',
-                self::renderQueries($queryRows, (int) ($profile['query_dropped_count'] ?? 0))
-            );
-        }
-        if (!empty($settings['show_stack_trace'])) {
-            $sections[] = self::section(
-                'Render Stack Trace',
-                self::renderTrace($traceRows)
-            );
-        }
-        if (!empty($settings['show_request'])) {
-            $sections[] = self::section(
-                'Request Data',
-                self::renderRequestData()
-            );
-        }
-        if (!empty($settings['show_environment'])) {
-            $sections[] = self::section(
-                'Environment',
-                self::renderEnvironment($scope, $hostname, $requestPath)
-            );
-        }
+        self::appendSection($sections, $settings, 'show_benchmarks', 'Benchmarks', static fn (): string => self::renderBenchmarks($profile, $context));
+        self::appendSection($sections, $settings, 'show_queries', 'SQL Queries', static fn (): string => self::renderQueries($queryRows, (int) ($profile['query_dropped_count'] ?? 0)));
+        self::appendSection($sections, $settings, 'show_stack_trace', 'Render Stack Trace', static fn (): string => self::renderTrace($traceRows));
+        self::appendSection($sections, $settings, 'show_request', 'Request Data', static fn (): string => self::renderRequestData());
+        self::appendSection($sections, $settings, 'show_environment', 'Environment', static fn (): string => self::renderEnvironment($scope, $hostname, $requestPath));
         if ($sections === []) {
             $sections[] = self::section(
                 'Profiler',
@@ -289,6 +264,18 @@ final class DebugToolbarMarkupBuilder
         return '<section class="rvnd-section"><h3>' . self::e($title) . '</h3><div class="rvnd-body">' . $body . '</div></section>';
     }
 
+    private static function appendSection(
+        array &$sections,
+        array $settings,
+        string $flag,
+        string $title,
+        callable $render
+    ): void {
+        if (!empty($settings[$flag])) {
+            $sections[] = self::section($title, (string) $render());
+        }
+    }
+
     private static function formatBytes(int $bytes): string
     {
         if ($bytes < 1) {
@@ -307,4 +294,3 @@ final class DebugToolbarMarkupBuilder
         return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
     }
 }
-

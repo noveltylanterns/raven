@@ -16,6 +16,7 @@
 - Completed `private/lib/Config` folder sweep with net complexity reduction: replaced the large config-label if-chain with a static map, removed duplicate bool-casting logic in debug config normalization, simplified config file serialization boilerplate, and revalidated config/CLI workflows.
 - Completed `private/lib/Content` folder sweep with net complexity reduction: consolidated duplicate taxonomy list/count query branches into shared helpers, trimmed page persistence write/delete parameter boilerplate, and revalidated content-adjacent CLI/theme smoke flows.
 - Completed `private/lib/Database` folder sweep with net complexity reduction: removed duplicate schema/runtime table-name mapping by delegating schema resolution to the runtime resolver, collapsed repeated schema-pipeline component lookups, and trimmed driver-config section extraction boilerplate with schema/CLI smoke revalidation.
+- Completed `private/lib/Debug` folder sweep with net complexity reduction: removed repetitive section-render branching in debug toolbar markup assembly via a shared gated section helper, kept lazy section rendering behavior, and revalidated with debug-toolbar/CLI smoke coverage.
 
 ### March 18, 2026
 
