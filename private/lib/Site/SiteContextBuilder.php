@@ -51,23 +51,11 @@ final class SiteContextBuilder
         string $twitterImage,
         string $ogImage
     ): array {
-        return [
-            'name' => (string) $config->get('site.name', 'Raven CMS'),
-            'domain' => (string) $config->get('site.domain', 'localhost'),
-            'panel_path' => (string) $config->get('panel.path', 'panel'),
+        return array_merge($this->publicMetaBase($config, $publicTheme, $publicThemeCss), [
             'current_url' => $currentUrl,
-            'apple_touch_icon' => trim((string) $config->get('meta.apple_touch_icon', '')),
-            'robots' => trim((string) $config->get('meta.robots', 'index,follow')),
-            'twitter_card' => trim((string) $config->get('meta.twitter.card', '')),
-            'twitter_site' => trim((string) $config->get('meta.twitter.site', '')),
-            'twitter_creator' => trim((string) $config->get('meta.twitter.creator', '')),
             'twitter_image' => $twitterImage,
             'og_image' => $ogImage,
-            'og_type' => trim((string) $config->get('meta.opengraph.type', 'website')),
-            'og_locale' => trim((string) $config->get('meta.opengraph.locale', 'en_US')),
-            'public_theme' => $publicTheme,
-            'public_theme_css' => $publicThemeCss,
-        ];
+        ]);
     }
 
     /**
@@ -75,18 +63,27 @@ final class SiteContextBuilder
      */
     public function publicFallback(Config $config, string $publicTheme, string $publicThemeCss): array
     {
+        return array_merge($this->publicMetaBase($config, $publicTheme, $publicThemeCss), [
+            'current_url' => '',
+            'twitter_image' => trim((string) $config->get('meta.twitter.image', '')),
+            'og_image' => trim((string) $config->get('meta.opengraph.image', '')),
+        ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function publicMetaBase(Config $config, string $publicTheme, string $publicThemeCss): array
+    {
         return [
             'name' => (string) $config->get('site.name', 'Raven CMS'),
             'domain' => (string) $config->get('site.domain', 'localhost'),
             'panel_path' => (string) $config->get('panel.path', 'panel'),
-            'current_url' => '',
             'apple_touch_icon' => trim((string) $config->get('meta.apple_touch_icon', '')),
             'robots' => trim((string) $config->get('meta.robots', 'index,follow')),
             'twitter_card' => trim((string) $config->get('meta.twitter.card', '')),
             'twitter_site' => trim((string) $config->get('meta.twitter.site', '')),
             'twitter_creator' => trim((string) $config->get('meta.twitter.creator', '')),
-            'twitter_image' => trim((string) $config->get('meta.twitter.image', '')),
-            'og_image' => trim((string) $config->get('meta.opengraph.image', '')),
             'og_type' => trim((string) $config->get('meta.opengraph.type', 'website')),
             'og_locale' => trim((string) $config->get('meta.opengraph.locale', 'en_US')),
             'public_theme' => $publicTheme,

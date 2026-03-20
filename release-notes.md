@@ -29,6 +29,7 @@
 - Completed `private/lib/Security` folder sweep with net complexity reduction: deduplicated positive-int coercion and removed redundant token-character validation in `InviteTokenPolicy`, simplified status fallback branching in `TwoFactorMethodRules`, and revalidated with full security-folder lint plus CLI/security/input-sanitizer smoke coverage.
 - Completed `private/lib/Session` folder sweep with net complexity reduction: simplified session-name prefix validation and host-domain matching branches in `SessionCookiePolicy`, and revalidated with session-adjacent CLI/security smoke coverage.
 - Completed `private/lib/Shell` folder sweep with net complexity reduction: removed duplicated prompt fallback handling and trimmed unnecessary theme stock-slug indirection in `raven_cli.php`, with CLI/extensions/themes smoke revalidation.
+- Completed `private/lib/Site` folder sweep with net complexity reduction: consolidated duplicate public meta payload keys in `SiteContextBuilder` behind a shared base map, and revalidated with site-adjacent CLI/themes smoke coverage.
 
 ### March 18, 2026
 
