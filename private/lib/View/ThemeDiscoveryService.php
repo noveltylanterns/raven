@@ -24,6 +24,7 @@ final class ThemeDiscoveryService
         if (!is_dir($themesRoot)) {
             return [];
         }
+        $themesRoot = rtrim($themesRoot, '/\\');
 
         $directoryEntries = scandir($themesRoot);
         if (!is_array($directoryEntries)) {
@@ -41,7 +42,7 @@ final class ThemeDiscoveryService
                 continue;
             }
 
-            $themeDirectory = rtrim($themesRoot, '/\\') . DIRECTORY_SEPARATOR . $slug;
+            $themeDirectory = $themesRoot . DIRECTORY_SEPARATOR . $slug;
             if (!is_dir($themeDirectory)) {
                 continue;
             }
@@ -70,10 +71,6 @@ final class ThemeDiscoveryService
             $manifests[$slug] = $normalized;
         }
 
-        if ($manifests === []) {
-            return [];
-        }
-
         uasort($manifests, static function (array $left, array $right): int {
             return strcasecmp((string) ($left['name'] ?? ''), (string) ($right['name'] ?? ''));
         });
@@ -81,4 +78,3 @@ final class ThemeDiscoveryService
         return $manifests;
     }
 }
-

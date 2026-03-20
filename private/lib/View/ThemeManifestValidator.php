@@ -22,15 +22,7 @@ final class ThemeManifestValidator
 
         $isChildTheme = $this->toBool($manifest['is_child_theme'] ?? false);
         $parentTheme = strtolower(trim((string) ($manifest['parent_theme'] ?? '')));
-        if (!$isChildTheme) {
-            $parentTheme = '';
-        }
-
-        if ($parentTheme !== '' && !$this->isValidSlug($parentTheme)) {
-            $parentTheme = '';
-        }
-
-        if ($parentTheme === $themeSlug) {
+        if (!$isChildTheme || !$this->isValidSlug($parentTheme) || $parentTheme === $themeSlug) {
             $parentTheme = '';
         }
 
@@ -60,4 +52,3 @@ final class ThemeManifestValidator
         return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
     }
 }
-
