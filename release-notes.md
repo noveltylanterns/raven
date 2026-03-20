@@ -14,6 +14,7 @@
 - Completed `private/lib/Auth` folder sweep with net complexity reduction (no new service layers): collapsed duplicated login-throttle upsert SQL branches into a shared statement path, trimmed duplicated email challenge target checks, and revalidated with auth/security smoke coverage.
 - Completed `private/lib/Channel` folder sweep with net complexity reduction: removed redundant channel-id wrapper indirection, collapsed repeated created-at normalization, trimmed file-list/write-path boilerplate, and revalidated channel CLI workflows.
 - Completed `private/lib/Config` folder sweep with net complexity reduction: replaced the large config-label if-chain with a static map, removed duplicate bool-casting logic in debug config normalization, simplified config file serialization boilerplate, and revalidated config/CLI workflows.
+- Completed `private/lib/Content` folder sweep with net complexity reduction: consolidated duplicate taxonomy list/count query branches into shared helpers, trimmed page persistence write/delete parameter boilerplate, and revalidated content-adjacent CLI/theme smoke flows.
 
 ### March 18, 2026
 

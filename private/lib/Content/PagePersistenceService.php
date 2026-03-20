@@ -45,6 +45,20 @@ final class PagePersistenceService
         $now = (string) ($payload['now'] ?? gmdate('Y-m-d H:i:s'));
         $categoryIds = is_array($payload['category_ids'] ?? null) ? $payload['category_ids'] : [];
         $tagIds = is_array($payload['tag_ids'] ?? null) ? $payload['tag_ids'] : [];
+        $writeParams = [
+            ':title' => (string) ($payload['title'] ?? ''),
+            ':slug' => (string) ($payload['slug'] ?? ''),
+            ':content' => (string) ($payload['content'] ?? ''),
+            ':extended' => (string) ($payload['extended'] ?? ''),
+            ':description' => (string) ($payload['description'] ?? ''),
+            ':display_title' => (int) ($payload['display_title'] ?? 1),
+            ':gallery_enabled' => (int) ($payload['gallery_enabled'] ?? 0),
+            ':channel_id' => $payload['channel_id'] ?? null,
+            ':is_published' => (int) ($payload['is_published'] ?? 0),
+            ':published_at' => $payload['published_at'] ?? null,
+            ':author_user_id' => $payload['author_user_id'] ?? null,
+            ':updated_at' => $now,
+        ];
 
         $db->beginTransaction();
 
@@ -67,21 +81,7 @@ final class PagePersistenceService
                      WHERE id = :id'
                 );
 
-                $stmt->execute([
-                    ':title' => (string) ($payload['title'] ?? ''),
-                    ':slug' => (string) ($payload['slug'] ?? ''),
-                    ':content' => (string) ($payload['content'] ?? ''),
-                    ':extended' => (string) ($payload['extended'] ?? ''),
-                    ':description' => (string) ($payload['description'] ?? ''),
-                    ':display_title' => (int) ($payload['display_title'] ?? 1),
-                    ':gallery_enabled' => (int) ($payload['gallery_enabled'] ?? 0),
-                    ':author_user_id' => $payload['author_user_id'] ?? null,
-                    ':channel_id' => $payload['channel_id'] ?? null,
-                    ':is_published' => (int) ($payload['is_published'] ?? 0),
-                    ':published_at' => $payload['published_at'] ?? null,
-                    ':updated_at' => $now,
-                    ':id' => $id,
-                ]);
+                $stmt->execute($writeParams + [':id' => $id]);
 
                 $pageId = $id;
             } else {
@@ -91,21 +91,7 @@ final class PagePersistenceService
                     VALUES (:title, :slug, :content, :extended, :description, :display_title, :gallery_enabled, :channel_id, :is_published, :published_at, :author_user_id, :created_at, :updated_at)'
                 );
 
-                $stmt->execute([
-                    ':title' => (string) ($payload['title'] ?? ''),
-                    ':slug' => (string) ($payload['slug'] ?? ''),
-                    ':content' => (string) ($payload['content'] ?? ''),
-                    ':extended' => (string) ($payload['extended'] ?? ''),
-                    ':description' => (string) ($payload['description'] ?? ''),
-                    ':display_title' => (int) ($payload['display_title'] ?? 1),
-                    ':gallery_enabled' => (int) ($payload['gallery_enabled'] ?? 0),
-                    ':channel_id' => $payload['channel_id'] ?? null,
-                    ':is_published' => (int) ($payload['is_published'] ?? 0),
-                    ':published_at' => $payload['published_at'] ?? null,
-                    ':author_user_id' => $payload['author_user_id'] ?? null,
-                    ':created_at' => $now,
-                    ':updated_at' => $now,
-                ]);
+                $stmt->execute($writeParams + [':created_at' => $now]);
 
                 $pageId = (int) $db->lastInsertId();
             }
@@ -142,18 +128,17 @@ final class PagePersistenceService
         $db->beginTransaction();
 
         try {
-            if ($categoryEnabled) {
-                $detachCategories = $db->prepare(
-                    'DELETE FROM ' . $pageCategoriesTable . ' WHERE page_id = :page_id'
-                );
-                $detachCategories->execute([':page_id' => $id]);
-            }
+            $pageIdParams = [':page_id' => $id];
 
-            if ($tagEnabled) {
-                $detachTags = $db->prepare(
-                    'DELETE FROM ' . $pageTagsTable . ' WHERE page_id = :page_id'
+            foreach ([[$categoryEnabled, $pageCategoriesTable], [$tagEnabled, $pageTagsTable]] as [$enabled, $table]) {
+                if (!$enabled) {
+                    continue;
+                }
+
+                $detachTaxonomy = $db->prepare(
+                    'DELETE FROM ' . $table . ' WHERE page_id = :page_id'
                 );
-                $detachTags->execute([':page_id' => $id]);
+                $detachTaxonomy->execute($pageIdParams);
             }
 
             $detachImageVariants = $db->prepare(
@@ -162,12 +147,12 @@ final class PagePersistenceService
                     SELECT id FROM ' . $pageImagesTable . ' WHERE page_id = :page_id
                  )'
             );
-            $detachImageVariants->execute([':page_id' => $id]);
+            $detachImageVariants->execute($pageIdParams);
 
             $detachImages = $db->prepare(
                 'DELETE FROM ' . $pageImagesTable . ' WHERE page_id = :page_id'
             );
-            $detachImages->execute([':page_id' => $id]);
+            $detachImages->execute($pageIdParams);
 
             $delete = $db->prepare('DELETE FROM ' . $pagesTable . ' WHERE id = :id');
             $delete->execute([':id' => $id]);
