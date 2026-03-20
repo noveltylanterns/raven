@@ -17,14 +17,14 @@ final class Pagination
         $totalItems = max(0, $totalItems);
         $perPage = max(1, $perPage);
         $totalPages = max(1, (int) ceil($totalItems / $perPage));
-        $currentPage = min(max(1, $requestedPage), $totalPages);
+        $current = min(max(1, $requestedPage), $totalPages);
 
         return [
-            'current' => $currentPage,
+            'current' => $current,
             'per_page' => $perPage,
             'total_items' => $totalItems,
             'total_pages' => $totalPages,
-            'offset' => ($currentPage - 1) * $perPage,
+            'offset' => ($current - 1) * $perPage,
         ];
     }
 
@@ -38,11 +38,9 @@ final class Pagination
         $normalizedQuery = [];
         foreach ($query as $key => $value) {
             $stringValue = trim((string) ($value ?? ''));
-            if ($stringValue === '') {
-                continue;
+            if ($stringValue !== '') {
+                $normalizedQuery[$key] = $stringValue;
             }
-
-            $normalizedQuery[$key] = $stringValue;
         }
 
         return [
@@ -63,21 +61,15 @@ final class Pagination
     {
         $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
         $current = max(1, (int) ($pagination['current'] ?? 1));
-        $basePath = trim((string) ($pagination['base_path'] ?? ''));
-        if ($basePath === '') {
-            $basePath = '/';
-        }
-
-        $links = [];
-        for ($i = 1; $i <= $totalPages; $i++) {
-            $links[] = [
+        $basePath = trim((string) ($pagination['base_path'] ?? '')) ?: '/';
+        $pagination['links'] = array_map(
+            static fn (int $i): array => [
                 'label' => (string) $i,
                 'href' => $basePath . ($i === 1 ? '' : '/' . $i),
                 'is_current' => $i === $current,
-            ];
-        }
-
-        $pagination['links'] = $links;
+            ],
+            range(1, $totalPages)
+        );
 
         return $pagination;
     }
