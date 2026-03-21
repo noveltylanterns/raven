@@ -82,29 +82,10 @@ final class TemplateTagEngine
 
         if (is_scalar($value)) {
             $rendered = (string) $value;
-            if (!$raw && $this->isTrustedTemplateFragmentPath($path)) {
-                return $rendered;
-            }
             return $raw ? $rendered : e($rendered);
         }
 
         return '';
-    }
-
-    private function isTrustedTemplateFragmentPath(string $path): bool
-    {
-        return in_array($path, [
-            'meta:apple_touch_icon',
-            'meta:canonical',
-            'meta:og_locale',
-            'meta:og_type',
-            'meta:og_url',
-            'meta:robots',
-            'meta:x_card',
-            'meta:x_creator',
-            'meta:x_site',
-            'meta:x_url',
-        ], true);
     }
 
     /**

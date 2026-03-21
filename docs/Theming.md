@@ -110,16 +110,14 @@ Common shared keys:
 - `meta:desc`
 - `meta:document_title`
 - `meta:apple_touch_icon`
-- `meta:canonical`
 - `meta:robots`
 - `meta:image`
+- `meta:url`
 - `meta:og_locale`
 - `meta:og_type`
-- `meta:og_url`
 - `meta:x_card`
 - `meta:x_creator`
 - `meta:x_site`
-- `meta:x_url`
 
 ## 5) Theme CLI Workflows
 
@@ -262,21 +260,19 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `item:username` | current loop item username, when iterating `members` | username |
 | `item:value` | current loop item value, when iterating `profile:contact_profiles` | contact value text |
 
-#### 9.2.5 Meta Fragment Tags
+#### 9.2.5 Meta Property Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
-| `meta:apple_touch_icon` | prebuilt conditional Apple touch icon `<link>` markup | trusted HTML string; use as `{meta:apple_touch_icon}` |
-| `meta:canonical` | prebuilt conditional canonical `<link>` markup | trusted HTML string; use as `{meta:canonical}` |
+| `meta:apple_touch_icon` | public template Apple touch icon URL | URL string |
 | `meta:image` | shared metadata image URL for OpenGraph and X cards | absolute URL |
-| `meta:og_locale` | prebuilt conditional OpenGraph locale `<meta>` markup | trusted HTML string; use as `{meta:og_locale}` |
-| `meta:og_type` | prebuilt conditional OpenGraph type `<meta>` markup | trusted HTML string; use as `{meta:og_type}` |
-| `meta:og_url` | prebuilt conditional OpenGraph URL `<meta>` markup | trusted HTML string; use as `{meta:og_url}` |
-| `meta:robots` | prebuilt conditional robots `<meta>` markup | trusted HTML string; use as `{meta:robots}` |
-| `meta:x_card` | prebuilt conditional X card `<meta>` markup | trusted HTML string; use as `{meta:x_card}` |
-| `meta:x_creator` | prebuilt conditional X creator `<meta>` markup | trusted HTML string; use as `{meta:x_creator}` |
-| `meta:x_site` | prebuilt conditional X site `<meta>` markup | trusted HTML string; use as `{meta:x_site}` |
-| `meta:x_url` | prebuilt conditional X URL `<meta>` markup | trusted HTML string; use as `{meta:x_url}` |
+| `meta:og_locale` | public template OpenGraph locale value | locale string |
+| `meta:og_type` | public template OpenGraph type value | type string |
+| `meta:robots` | public template robots value | robots directive string |
+| `meta:url` | shared metadata page URL for canonical, OpenGraph, and X tags | absolute URL without forced trailing slash |
+| `meta:x_card` | public template X card value | card type string |
+| `meta:x_creator` | public template X creator value | creator handle or name string |
+| `meta:x_site` | public template X site value | site handle or name string |
 
 #### 9.2.6 Member Tags
 

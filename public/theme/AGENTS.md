@@ -317,7 +317,7 @@ body { background: #fff; color: #212529; }
 - `$site` with keys including `name`, `scheme`, `url`, `domain`, `current_url`
 - `$theme` with keys including `slug`, `css`, `url`
 - `$panel` with keys including `slug`, `url`
-- `$meta` with keys including `title`, `desc`, `image`, `document_title`, plus standalone fragment tags such as `apple_touch_icon`, `canonical`, `robots`, `og_*`, and `x_*`
+- `$meta` with keys including `title`, `desc`, `image`, `url`, `document_title`, `apple_touch_icon`, `robots`, `og_locale`, `og_type`, `x_card`, `x_creator`, and `x_site`
 - `$meta['image']` defaults to global meta config values, but runtime may override it by route context:
 - page/home routes: page preview image
 - category/tag routes: taxonomy preview/cover image

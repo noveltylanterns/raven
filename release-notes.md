@@ -11,7 +11,9 @@
 - Renamed the public template metadata root to the shorter canonical `meta:*` namespace and updated stock/scaffold wrappers plus theme docs to match.
 - Moved document-head template metadata keys out of `site:*` into `meta:*`, including `apple_touch_icon`, `robots`, `og_*`, and `x_*`, and updated stock wrappers/docs to match.
 - Shortened the public description value tag from `meta:description` to `meta:desc` and updated stock/fallback wrappers, scaffolds, and theme docs to match.
-- Collapsed `meta:og_image` and `meta:x_image` into a single `meta:image` value tag, with wrappers emitting the OpenGraph/X image tags explicitly through `{if meta:image}` blocks.
+- Collapsed `meta:og_image` and `meta:x_image` into a single `meta:image` value tag, with wrappers emitting the OpenGraph and X image `<meta>` elements directly.
+- Collapsed `meta:canonical`, `meta:og_url`, and `meta:x_url` into a single `meta:url` value tag, with wrappers emitting the canonical, OpenGraph, and X URL tags directly.
+- Flattened the remaining head metadata tags back to plain `meta:*` values (`apple_touch_icon`, `robots`, `og_locale`, `og_type`, `x_card`, `x_creator`, `x_site`) so wrappers and scaffolds emit literal `<link>` and `<meta>` elements directly.
 - Shortened the remaining public template payload names to canonical forms (`item:url`, `page:show_title`, `group:member_count`, `profile_denied`, `group_denied`) and removed stale gallery-root references from theme docs.
 - Moved extension enablement state persistence/template to `private/dat/ext/.state.php` and `private/dat/ext/.state.php.dist`, updated installer/CLI/runtime/docs accordingly, and kept a legacy read fallback for older installs that still have `private/ext/.state.php`.
 - Added long-term architecture guardrails to `AGENTS.md` defining the ownership boundary as `private/sys` = core runtime/orchestration, `private/lib` = reusable core modules, `private/ext` = user-provided or official plugin-style feature code, `private/tpl` = views/templates, and `private/dat` = persistent non-`.tmp` runtime data, with explicit placement rules to keep future modularization from drifting backward.

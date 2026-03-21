@@ -15,34 +15,30 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 <!doctype html>
 <html lang="en">
 <head>
+
 <title>{meta:document_title}</title>
+<link rel="canonical" href="{meta:url}">
 <link rel="icon" type="image/png" href="{site:url}/theme/raven/img/favicon.png">
-<link rel="stylesheet" href="{site:url}/theme/fallback.css">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-{meta:apple_touch_icon}
-{meta:canonical}
-{if meta:desc}<meta name="description" content="{meta:desc}">
-{/if}
-{meta:robots}
-{if meta:desc}<meta property="og:description" content="{meta:desc}">
-{/if}
-{if meta:image}<meta property="og:image" content="{meta:image}">
-{/if}
-{meta:og_locale}
+<meta name="description" content="{meta:desc}">
+<meta name="robots" content="{meta:robots}">
+<meta property="og:description" content="{meta:desc}">
+<meta property="og:image" content="{meta:image}">
+<meta property="og:locale" content="{meta:og_locale}">
 <meta property="og:site_name" content="{site:name}">
 <meta property="og:title" content="{meta:document_title}">
-{meta:og_type}
-{meta:og_url}
-{meta:x_card}
-{meta:x_creator}
-{if meta:desc}<meta property="twitter:description" content="{meta:desc}">
-{/if}
-{if meta:image}<meta property="twitter:image" content="{meta:image}">
-{/if}
-{meta:x_site}
+<meta property="og:type" content="{meta:og_type}">
+<meta property="og:url" content="{meta:url}">
+<meta property="twitter:card" content="{meta:x_card}">
+<meta property="twitter:creator" content="{meta:x_creator}">
+<meta property="twitter:description" content="{meta:desc}">
+<meta property="twitter:image" content="{meta:image}">
+<meta property="twitter:site" content="{meta:x_site}">
 <meta property="twitter:title" content="{meta:document_title}">
-{meta:x_url}
+<meta property="twitter:url" content="{meta:url}">
+<link rel="apple-touch-icon" href="{meta:apple_touch_icon}">
+<link rel="stylesheet" href="{site:url}/theme/fallback.css">
 
 </head>
 <body>

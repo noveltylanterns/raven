@@ -193,8 +193,8 @@ PHP;
                 'title' => 'Smoke',
                 'desc' => 'Theme smoke render.',
                 'image' => 'http://localhost/og.png',
+                'url' => 'http://localhost',
                 'document_title' => 'Smoke [Raven CMS]',
-                'canonical' => '<link rel="canonical" href="http://localhost/">',
             ],
             'content' => '<main>Smoke Content</main>',
             'page' => [

@@ -7,8 +7,6 @@ namespace Raven\Lib\View;
 use Raven\Lib\Pagination\Pagination;
 use Raven\Lib\Security\InputSanitizer;
 
-use function Raven\Core\Support\e;
-
 /**
  * Shared template-facing payload decoration helpers for public views.
  */
@@ -269,6 +267,7 @@ final class PublicTemplateDecorator
         if ($meta['x_site'] === '') {
             $meta['x_site'] = $siteName;
         }
+        $meta['url'] = $this->normalizedMetaUrl((string) ($site['current_url'] ?? ''));
 
         unset(
             $site['apple_touch_icon'],
@@ -346,7 +345,6 @@ final class PublicTemplateDecorator
         $meta['title'] = $viewTitle;
         $meta['desc'] = $metaDescription;
         $meta['document_title'] = $documentTitle;
-        $meta = $this->decorateMetaFragmentsForTemplate($site, $meta);
 
         $data['site'] = $site;
         $data['meta'] = $meta;
@@ -354,77 +352,45 @@ final class PublicTemplateDecorator
         return $data;
     }
 
-    /**
-     * @param array<string, mixed> $site
-     * @param array<string, mixed> $meta
-     * @return array<string, string>
-     */
-    private function decorateMetaFragmentsForTemplate(array $site, array $meta): array
+    private function normalizedMetaUrl(string $url): string
     {
-        $currentUrl = trim((string) ($site['current_url'] ?? ''));
-        $description = trim((string) ($meta['description'] ?? ''));
-
-        $meta['apple_touch_icon'] = $this->headVoidTag('link', [
-                'rel' => 'apple-touch-icon',
-                'href' => trim((string) ($meta['apple_touch_icon'] ?? '')),
-            ]);
-        $meta['canonical'] = $this->headVoidTag('link', [
-            'rel' => 'canonical',
-            'href' => $currentUrl,
-        ]);
-        $meta['robots'] = $this->headVoidTag('meta', [
-                'name' => 'robots',
-                'content' => trim((string) ($meta['robots'] ?? '')),
-            ]);
-        $meta['og_locale'] = $this->headVoidTag('meta', [
-                'property' => 'og:locale',
-                'content' => trim((string) ($meta['og_locale'] ?? '')),
-            ]);
-        $meta['og_type'] = $this->headVoidTag('meta', [
-                'property' => 'og:type',
-                'content' => trim((string) ($meta['og_type'] ?? '')),
-            ]);
-        $meta['og_url'] = $this->headVoidTag('meta', [
-                'property' => 'og:url',
-                'content' => $currentUrl,
-            ]);
-        $meta['x_card'] = $this->headVoidTag('meta', [
-                'property' => 'twitter:card',
-                'content' => trim((string) ($meta['x_card'] ?? '')),
-            ]);
-        $meta['x_creator'] = $this->headVoidTag('meta', [
-                'property' => 'twitter:creator',
-                'content' => trim((string) ($meta['x_creator'] ?? '')),
-            ]);
-        $meta['x_site'] = $this->headVoidTag('meta', [
-                'property' => 'twitter:site',
-                'content' => trim((string) ($meta['x_site'] ?? '')),
-            ]);
-        $meta['x_url'] = $this->headVoidTag('meta', [
-                'property' => 'twitter:url',
-                'content' => $currentUrl,
-            ]);
-
-        return $meta;
-    }
-
-    /**
-     * @param array<string, string> $attributes
-     */
-    private function headVoidTag(string $tagName, array $attributes): string
-    {
-        foreach ($attributes as $value) {
-            if (trim($value) === '') {
-                return '';
-            }
+        $url = trim($url);
+        if ($url === '') {
+            return '';
         }
 
-        $parts = [];
-        foreach ($attributes as $name => $value) {
-            $parts[] = $name . '="' . e($value) . '"';
+        $parts = parse_url($url);
+        if (!is_array($parts)) {
+            return rtrim($url, '/');
         }
 
-        return '<' . $tagName . ' ' . implode(' ', $parts) . '>';
+        $scheme = isset($parts['scheme']) ? $parts['scheme'] . '://' : '';
+        $host = trim((string) ($parts['host'] ?? ''));
+        if ($host === '') {
+            return rtrim($url, '/');
+        }
+
+        $authority = $host;
+        if (isset($parts['port'])) {
+            $authority .= ':' . $parts['port'];
+        }
+
+        $path = trim((string) ($parts['path'] ?? ''));
+        if ($path === '' || $path === '/') {
+            $path = '';
+        } else {
+            $path = rtrim($path, '/');
+        }
+
+        $normalized = $scheme . $authority . $path;
+        if (isset($parts['query']) && $parts['query'] !== '') {
+            $normalized .= '?' . $parts['query'];
+        }
+        if (isset($parts['fragment']) && $parts['fragment'] !== '') {
+            $normalized .= '#' . $parts['fragment'];
+        }
+
+        return $normalized;
     }
 
     /**
