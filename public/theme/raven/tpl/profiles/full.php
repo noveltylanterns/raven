@@ -13,19 +13,19 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 }
 ?>
 <section>
-    {if profile:display_name_resolved}
-    <h2>{profile:display_name_resolved}</h2>
-    {/if}
-    {if not profile:display_name_resolved}
-    <h2>Profile</h2>
-    {/if}
+{if profile:display_name_resolved}
+    <h1>{profile:display_name_resolved}</h1>
+{/if}
+{if not profile:display_name_resolved}
+    <h1>Profile</h1>
+{/if}
 
-    {if profile:username}
-    <p class="text-muted mb-3">@{profile:username}</p>
-    {/if}
+{if profile:username}
+    <p class="text-muted">@{profile:username}</p>
+{/if}
 
-    {if profile:has_avatar}
-    <p class="mb-0">
+{if profile:has_avatar}
+    <p>
         <img
             src="{profile:avatar_thumb_url}"
             onerror="this.onerror=null;this.src='{profile:avatar_url}';"
@@ -34,12 +34,12 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
             style="max-width: 160px; height: auto;"
         >
     </p>
-    {/if}
+{/if}
 
-    {if profile:contact_profiles}
-    <ul class="list-unstyled mt-3 mb-0">
+{if profile:contact_profiles}
+    <ul class="list-unstyled mt-3">
         {each profile:contact_profiles}
-        <li class="mb-1">
+        <li>
             {if item:label}
             <strong>{item:label}:</strong>
             {/if}
@@ -53,5 +53,5 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
         </li>
         {/each}
     </ul>
-    {/if}
+{/if}
 </section>

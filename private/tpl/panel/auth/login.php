@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/tpl/panel/login.php
+ * ~/private/tpl/panel/auth/login.php
  * Admin panel view template for this screen.
  * Docs: https://raven.lanterns.io
  */

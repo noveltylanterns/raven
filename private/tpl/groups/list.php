@@ -13,19 +13,19 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 }
 ?>
 <section>
-    {if group:name}
-    <h2>Group: {group:name}</h2>
-    {/if}
-    {if not group:name}
-    <h2>Group</h2>
-    {/if}
+{if group:name}
+    <h1 class="mb-3">Group: {group:name}</h1>
+{/if}
+{if not group:name}
+    <h1 class="mb-3">Group</h1>
+{/if}
 
-    {if group:slug}
-    <p class="text-muted mb-2">Slug: {group:slug}</p>
-    {/if}
-    <p class="text-muted mb-3">{group:member_count} Users</p>
+{if group:slug}
+    <p class="text-muted">Slug: {group:slug}</p>
+{/if}
+    <p class="text-muted">{group:member_count} Users</p>
 
-    {if members}
+{if members}
     <ul class="list-group">
         {each members}
         <li class="list-group-item d-flex align-items-center gap-2">
@@ -54,8 +54,8 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
         </li>
         {/each}
     </ul>
-    {/if}
-    {if not members}
-    <p class="mb-0">No members are assigned to this group.</p>
-    {/if}
+{/if}
+{if not members}
+    <p>No members are assigned to this group.</p>
+{/if}
 </section>

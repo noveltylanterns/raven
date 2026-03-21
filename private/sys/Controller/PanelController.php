@@ -419,14 +419,7 @@ final class PanelController
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['content', 'meta', 'media'], 'content');
         $title = $this->input->text($post['title'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
-        $legacyContent = $this->input->html($post['content'] ?? null, 500000);
         $extendedBlocks = $this->normalizeExtendedBlocksInput($post['extended_blocks'] ?? []);
-        if ($extendedBlocks === [] && trim($legacyContent) !== '') {
-            $extendedBlocks[] = [
-                'type' => 'tinymce',
-                'content' => $legacyContent,
-            ];
-        }
         $description = $this->input->text($post['description'] ?? null, 1000);
         $channelSlug = $this->input->slug($post['channel_slug'] ?? null);
         $status = strtolower((string) $this->input->text($post['status'] ?? null, 20));
@@ -5022,7 +5015,7 @@ final class PanelController
     }
 
     /**
-     * Renders active public theme `messages/404` with wrapper layout.
+     * Renders active public theme `status/404` with wrapper layout.
      *
      * This is used for denied panel pages and can be called by extension routes
      * so unauthorized requests do not reveal panel URL inventory.
@@ -5033,7 +5026,7 @@ final class PanelController
 
         $renderer = $this->publicFallbackRenderer();
         $activeTheme = $this->activePublicThemeSlug();
-        $templateFile = $renderer->resolveTemplateFile('messages/404', $activeTheme);
+        $templateFile = $renderer->resolveTemplateFile('status/404', $activeTheme);
         if ($templateFile === null) {
             header('Content-Type: text/plain; charset=utf-8');
             echo 'Not Found';

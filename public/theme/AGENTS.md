@@ -181,8 +181,8 @@ body { background: #fff; color: #212529; }
 - Global frontend mode comes from config key `site.enabled`:
 - `public`: frontend available to guests and logged-in users that have `View Public Site`
 - `private`: guests are denied; logged-in users require `View Private Site`
-- `disabled`: frontend uses `tpl/messages/disabled.php` for both guests and logged-in users
-- Theme authors should ensure `tpl/messages/denied.php`, `tpl/messages/404.php`, and `tpl/messages/disabled.php` are present/styled consistently.
+- `disabled`: frontend uses `tpl/status/disabled.php` for both guests and logged-in users
+- Theme authors should ensure `tpl/status/denied.php`, `tpl/status/404.php`, and `tpl/status/disabled.php` are present/styled consistently.
 - Reserved first segments are blocked from public content routes:
 - configured panel path
 - `panel`
@@ -219,14 +219,14 @@ body { background: #fff; color: #212529; }
 
 ## Template Override Matrix
 - Not Found page:
-- template key: `messages/404`
-- file: `tpl/messages/404.php`
+- template key: `status/404`
+- file: `tpl/status/404.php`
 - Permission denied page:
-- template key: `messages/denied`
-- file: `tpl/messages/denied.php`
+- template key: `status/denied`
+- file: `tpl/status/denied.php`
 - Site disabled page:
-- template key: `messages/disabled`
-- file: `tpl/messages/disabled.php`
+- template key: `status/disabled`
+- file: `tpl/status/disabled.php`
 - Home page (`/`):
 - template key: `home`
 - file: `tpl/home.php`
@@ -255,13 +255,22 @@ body { background: #fff; color: #212529; }
 - `tpl/profiles/full.php` for `public_full`
 - `tpl/profiles/full.php` for logged-in users and `tpl/profiles/limited.php` for logged-out users in `public_limited`
 - `tpl/profiles/full.php` for logged-in users in `private`
-- `tpl/profiles/index.php` for disabled mode (delegates to `tpl/messages/404.php`) and private-mode logged-out placeholder (`403`, delegates to `tpl/messages/denied.php`)
+- `tpl/profiles/index.php` for disabled mode (delegates to `tpl/status/404.php`) and private-mode logged-out placeholder (`403`, delegates to `tpl/status/denied.php`)
 - Group render:
 - template key: dynamic by `session.show_groups`
 - files:
 - `tpl/groups/list.php` for `public`
 - `tpl/groups/list.php` for logged-in users in `private`
-- `tpl/groups/index.php` for disabled mode (delegates to `tpl/messages/404.php`) and private-mode logged-out placeholder (`403`, delegates to `tpl/messages/denied.php`)
+- `tpl/groups/index.php` for disabled mode (delegates to `tpl/status/404.php`) and private-mode logged-out placeholder (`403`, delegates to `tpl/status/denied.php`)
+- Public login helper:
+- template key: `auth/login`
+- file: `tpl/auth/login.php`
+- Public two-factor helper:
+- template key: `auth/login_2fa`
+- file: `tpl/auth/login_2fa.php`
+- Public registration helper:
+- template key: `auth/register`
+- file: `tpl/auth/register.php`
 - Stock-group display names are editable in panel; do not rely on hardcoded stock names in templates for authorization assumptions.
 - Group-role behavior is keyed by reserved stock slugs (`super`, `admin`, `editor`, `user`, `guest`, `validating`, `banned`).
 
@@ -274,7 +283,7 @@ body { background: #fff; color: #212529; }
 
 ### Supported Tags
 - Escaped value (default): `{site:name}`, `{page:title}`, `{pagination:total_pages}`
-- Raw value (unescaped): `{raw:page:content}`
+- Raw value (unescaped): `{raw:item:html}`
 - Conditionals:
 - `{if page:title}...{/if}`
 - `{if not tag:name}...{/if}`
@@ -282,6 +291,13 @@ body { background: #fff; color: #212529; }
 - `{each pages}...{/each}`
 - Inside loops, current row is available at `item`:
 - `{item:title}`, `{item:url}`, `{item:channel_slug}`
+
+### Strict Template Redirects
+- A public template can delegate completely to one of the stock message views by rendering exactly one redirect tag as its only output:
+- `{redirect:404}` -> `status/404`
+- `{redirect:denied}` -> `status/denied`
+- `{redirect:disabled}` -> `status/disabled`
+- These are strict redirects, not includes. If you mix other markup around them, Raven will not treat the template as redirected.
 
 ### Path Resolution Rules
 - Paths are colon-delimited: `{root:child:leaf}`.
@@ -299,9 +315,9 @@ body { background: #fff; color: #212529; }
 ## Current Stock Raven View Files
 - `tpl/wrapper.php`
 - `tpl/home.php`
-- `tpl/messages/404.php`
-- `tpl/messages/denied.php`
-- `tpl/messages/disabled.php`
+- `tpl/status/404.php`
+- `tpl/status/denied.php`
+- `tpl/status/disabled.php`
 - `tpl/pages/index.php`
 - `tpl/channels/index.php`
 - `tpl/categories/index.php`
@@ -311,15 +327,19 @@ body { background: #fff; color: #212529; }
 - `tpl/profiles/index.php`
 - `tpl/groups/list.php`
 - `tpl/groups/index.php`
+- `tpl/auth/login.php`
+- `tpl/auth/login_2fa.php`
+- `tpl/auth/register.php`
 
 ## Template Data Contract
 - Wrapper receives:
 - `$site` with keys including `name`, `scheme`, `url`, `domain`, `current_url`
 - `$theme` with keys including `slug`, `css`, `url`
 - `$panel` with keys including `slug`, `url`
-- `$meta` with keys including `title`, `desc`, `image`, `url`, `document_title`, `apple_touch_icon`, `robots`, `og_locale`, `og_type`, `x_card`, `x_creator`, and `x_site`
+- `$meta` with keys including `title`, `desc`, `image`, `url`, `apple_touch_icon`, `robots`, `og_locale`, `og_type`, `x_card`, `x_creator`, and `x_site`
+- `$meta['image']` is the single shared image value used by the wrapper's `og:image` and `twitter:image` tags
 - `$meta['image']` defaults to global meta config values, but runtime may override it by route context:
-- page/home routes: page preview image
+- page/home routes: `lg` variant of the page image marked as preview
 - category/tag routes: taxonomy preview/cover image
 - channel landing routes: channel preview/cover image
 - `$content` rendered body HTML
@@ -328,9 +348,10 @@ body { background: #fff; color: #212529; }
 - Home/page/channel templates receive:
 - `$site`
 - `$page`
-- `$page['show_title']` (bool-like)
-- `$page['extended_blocks'][]` rows with `html`, `css_id`, `class`
-- Gallery output is provided through `$page['extended_blocks'][]` when a page body block uses gallery editor mode.
+- `$page['channel_id']` (int|null)
+- `$page['title_show']` (bool-like)
+- `$page['content'][]` rows with `html`, `css_id`, `class`
+- Gallery output is provided through `$page['content'][]` when a page body block uses gallery editor mode.
 - Category template receives:
 - `$site`
 - `$category`
@@ -358,7 +379,7 @@ body { background: #fff; color: #212529; }
 - Group unavailable placeholder receives `group_denied` (bool-like)
 
 ## Embedded Form Rendering In Page Content
-- Page `content` and `extended_blocks` are shortcode-processed at runtime.
+- Page body blocks are shortcode-processed at runtime before they reach templates.
 - Supported tags:
 - `[contact slug="..."]`
 - `[signups slug="..."]`

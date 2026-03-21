@@ -2,6 +2,20 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### March 21, 2026
+
+- Renamed the strict 404 theme redirect tag from `redirect:not_found` to `redirect:404`, updated the core profile fallback template and theme smoke/docs to use the numeric form, and removed the temporary legacy alias after confirming nothing active still depended on it.
+- Collapsed runtime social-image payloads to one shared `meta:image` source, so wrappers emit both `og:image` and `twitter:image` from the same value instead of carrying separate `og_image`/`twitter_image` fields through the template payload.
+- Tightened page-level meta image override behavior so only the page image explicitly marked as preview can override the site default, and only its `lg` variant URL is used for the shared wrapper meta image.
+- Removed the redundant `meta:title_full` template value; wrappers and generated theme scaffolds now compose document/social titles directly from `meta:title` plus `site:name`.
+- Renamed public status templates from `tpl/messages/*` to `tpl/status/*`, and updated runtime status routing, strict redirect tokens, fallback theme docs, and local stock theme copies to match the new path.
+- Moved public auth templates from root `tpl/*` into `tpl/auth/*`, updated public render keys/docs, and aligned the local stock theme copies with the new namespace.
+- Moved panel auth templates from `tpl/panel/*` into `tpl/panel/auth/*`, and updated panel auth render keys plus the core file-tree summary to match the nested namespace.
+- Replaced the public login helper's panel-auth form target with a real public `/login` and `/login/2fa` flow, including CSRF validation, login throttling, supported code-based 2FA verification, and sanitized return-path redirects back to the prompting public page or `/`.
+- Consolidated the duplicated panel/public login and login-2FA controller state machine into shared `private/lib/Auth` workflow/session helpers, so password auth, 2FA method selection, email-code dispatch, and WebAuthn challenge handling now run through the same core logic on both surfaces.
+- Fixed the public login 2FA WebAuthn client flow to use the same request shape and browser capability checks as the panel login screen, restoring passkey/security-key verification and in-page fallback behavior.
+- Hardened public post-login redirect handling so auth-route referers like `/login` and `/login/2fa` no longer overwrite the intended public return target or cause successful 2FA verification to bounce back into an expired auth screen.
+
 ### March 19, 2026
 
 - Added `site.scheme` runtime config plus public template `site:url`/`site:scheme` data so wrappers can emit a deterministic home URL, and rewired generated absolute public/meta URLs to honor the configured `http` vs `https` scheme instead of inferring it only from the incoming request.
@@ -16,7 +30,10 @@
 - Collapsed `meta:canonical`, `meta:og_url`, and `meta:x_url` into a single `meta:url` value tag, with wrappers emitting the canonical, OpenGraph, and X URL tags directly.
 - Flattened the remaining head metadata tags back to plain `meta:*` values (`apple_touch_icon`, `robots`, `og_locale`, `og_type`, `x_card`, `x_creator`, `x_site`) so wrappers and scaffolds emit literal `<link>` and `<meta>` elements directly.
 - Added global `content.route_mode` (`slug|id`) for root-page URLs, allowed channels to use `inherit` for system-default routing, and expanded explicit channel `page_route_mode` support to slug, day-slug, month-slug, id, day-id, and month-id; updated panel config/channel/page previews, public route parsing/canonicalization, routing inventory output, CLI docs, and channel/config docs to match.
-- Shortened the remaining public template payload names to canonical forms (`item:url`, `page:show_title`, `group:member_count`, `profile_denied`, `group_denied`) and removed stale gallery-root references from theme docs.
+- Renamed the template-facing page body loop from `page:extended_blocks` to `page:content`, so rendered body blocks now arrive under the shorter canonical `page:content[]` tag path in fallback/stock themes, scaffolds, smoke fixtures, and theme docs.
+- Added stable template-facing `page:channel_id` and renamed the page display-title flag from `page:show_title` to `page:title_show`, with fallback/stock themes, scaffolds, smoke fixtures, and theme docs updated to match.
+- Added strict `redirect:not_found`, `redirect:denied`, and `redirect:disabled` template tags that delegate a view to the corresponding stock message template when rendered alone.
+- Shortened the remaining public template payload names to canonical forms (`item:url`, `page:title_show`, `group:member_count`, `profile_denied`, `group_denied`) and removed stale gallery-root references from theme docs.
 - Moved extension enablement state persistence/template to `private/dat/ext/.state.php` and `private/dat/ext/.state.php.dist`, updated installer/CLI/runtime/docs accordingly, and kept a legacy read fallback for older installs that still have `private/ext/.state.php`.
 - Added long-term architecture guardrails to `AGENTS.md` defining the ownership boundary as `private/sys` = core runtime/orchestration, `private/lib` = reusable core modules, `private/ext` = user-provided or official plugin-style feature code, `private/tpl` = views/templates, and `private/dat` = persistent non-`.tmp` runtime data, with explicit placement rules to keep future modularization from drifting backward.
 - Continued core modularization cleanup for public template routing: moved theme-chain lookup/root orchestration out of `PublicController` into `private/lib/View/PublicTemplatePipeline.php` (`renderForThemeChain` + route-template resolvers), rewired controller call sites, and removed redundant controller wrapper methods.

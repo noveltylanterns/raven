@@ -9,7 +9,7 @@ use Raven\Lib\Security\LoginTwoFactorFlowService;
 use Raven\Lib\Security\WebAuthnService;
 
 /**
- * Shared panel login WebAuthn challenge context preparation helpers.
+ * Shared panel/public login WebAuthn challenge context preparation helpers.
  */
 final class LoginWebAuthnChallengeService
 {

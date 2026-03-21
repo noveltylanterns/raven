@@ -419,10 +419,9 @@ final class PageImageRepository
     /**
      * Returns one best-fit public image URL for page-level meta tags.
      *
-     * Priority:
-     * 1) first ready image marked preview
-     * 2) first ready image marked cover
-     * 3) first ready image by sort order/id
+     * Only an explicit ready preview image can override site-level meta image config.
+     * When present, the public wrapper uses that image's large variant for both
+     * OpenGraph and X/Twitter tags via the shared `meta:image` template value.
      */
     public function previewImageUrlForPage(int $pageId): ?string
     {
@@ -431,51 +430,19 @@ final class PageImageRepository
             return null;
         }
 
-        $ready = [];
         foreach ($images as $image) {
             if ((string) ($image['status'] ?? '') !== 'ready') {
                 continue;
             }
-
-            $ready[] = $image;
-        }
-
-        if ($ready === []) {
-            return null;
-        }
-
-        $selectedImage = null;
-        foreach ($ready as $image) {
             if (!empty($image['is_preview'])) {
-                $selectedImage = $image;
-                break;
+                $variants = is_array($image['variants'] ?? null) ? $image['variants'] : [];
+                $largeVariant = $variants['lg'] ?? null;
+                $url = trim((string) (is_array($largeVariant) ? ($largeVariant['url'] ?? '') : ''));
+                return $url !== '' ? $url : null;
             }
         }
 
-        if ($selectedImage === null) {
-            foreach ($ready as $image) {
-                if (!empty($image['is_cover'])) {
-                    $selectedImage = $image;
-                    break;
-                }
-            }
-        }
-
-        if ($selectedImage === null) {
-            $selectedImage = $ready[0];
-        }
-
-        $variants = is_array($selectedImage['variants'] ?? null) ? $selectedImage['variants'] : [];
-        foreach (['lg', 'med', 'sm'] as $variantKey) {
-            $variant = $variants[$variantKey] ?? null;
-            $url = trim((string) (is_array($variant) ? ($variant['url'] ?? '') : ''));
-            if ($url !== '') {
-                return $url;
-            }
-        }
-
-        $sourceUrl = trim((string) ($selectedImage['url'] ?? ''));
-        return $sourceUrl === '' ? null : $sourceUrl;
+        return null;
     }
 
     /**

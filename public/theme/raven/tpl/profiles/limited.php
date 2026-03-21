@@ -13,11 +13,11 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 }
 ?>
 <section>
-    {if profile:display_name_resolved}
-    <h2>{profile:display_name_resolved}</h2>
-    {/if}
-    {if not profile:display_name_resolved}
-    <h2>Profile</h2>
-    {/if}
-    <p class="text-muted mb-0">Limited profile view.</p>
+{if profile:display_name_resolved}
+    <h1>{profile:display_name_resolved}</h1>
+{/if}
+{if not profile:display_name_resolved}
+    <h1>Profile</h1>
+{/if}
+    <p class="text-muted">Limited profile view.</p>
 </section>

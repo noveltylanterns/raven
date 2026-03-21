@@ -47,16 +47,7 @@ final class PublicMetaService
             $this->requestContextResolver->currentRequestUrl($configuredDomain, $configuredScheme),
             $publicTheme,
             $publicThemeCss,
-            $this->absoluteMetaImageUrl(
-                trim((string) $config->get('meta.twitter.image', '')),
-                $configuredDomain,
-                $configuredScheme
-            ),
-            $this->absoluteMetaImageUrl(
-                trim((string) $config->get('meta.opengraph.image', '')),
-                $configuredDomain,
-                $configuredScheme
-            )
+            $this->resolvedConfiguredMetaImageUrl($config, $configuredDomain, $configuredScheme)
         );
     }
 
@@ -96,8 +87,7 @@ final class PublicMetaService
             return $site;
         }
 
-        $site['og_image'] = $previewImageUrl;
-        $site['twitter_image'] = $previewImageUrl;
+        $site['meta_image'] = $previewImageUrl;
 
         return $site;
     }
@@ -136,8 +126,7 @@ final class PublicMetaService
                 continue;
             }
 
-            $site['og_image'] = $resolved;
-            $site['twitter_image'] = $resolved;
+            $site['meta_image'] = $resolved;
             return $site;
         }
 
@@ -165,6 +154,19 @@ final class PublicMetaService
         $host = $this->requestContextResolver->resolveRequestHost($configuredDomain);
 
         return $scheme . '://' . $host . $path;
+    }
+
+    private function resolvedConfiguredMetaImageUrl(
+        Config $config,
+        string $configuredDomain,
+        string $configuredScheme
+    ): string {
+        $configured = trim((string) $config->get('meta.opengraph.image', ''));
+        if ($configured === '') {
+            $configured = trim((string) $config->get('meta.twitter.image', ''));
+        }
+
+        return $this->absoluteMetaImageUrl($configured, $configuredDomain, $configuredScheme);
     }
 
     /**

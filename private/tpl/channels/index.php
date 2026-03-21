@@ -13,18 +13,15 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 }
 ?>
 <article>
-    {if page:show_title}
-    <h2>{page:title}</h2>
-    {/if}
-    {if page:channel_slug}
-    <p class="text-muted small mb-0">Channel: {page:channel_slug}</p>
-    {/if}
-
-    <div>{raw:page:content}</div>
-
-    {if page:extended_blocks}
-    {each page:extended_blocks}
-    <div{if item:css_id} id="{item:css_id}"{/if} class="{item:class}">{raw:item:html}</div>
-    {/each}
-    {/if}
+{if page:title_show}
+    <h1 class="mb-3">{page:title}</h1>
+{/if}
+{if page:channel_slug}
+    <p class="text-muted small">Channel: {page:channel_slug}</p>
+{/if}
+{if page:content}
+{each page:content}
+    <div{if item:css_id} id="{item:css_id}"{/if} class="{item:class} mt-3">{raw:item:html}</div>
+{/each}
+{/if}
 </article>

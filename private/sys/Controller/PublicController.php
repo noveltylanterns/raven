@@ -16,12 +16,16 @@ namespace Raven\Controller;
 use Raven\Core\Auth\AuthService;
 use Raven\Core\Config;
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
+use Raven\Lib\Auth\LoginAttemptWorkflowService;
+use Raven\Lib\Auth\LoginChallengeWorkflowService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Auth\LoginUiStateService;
 use Raven\Lib\Content\BodyBlockPolicy;
 use Raven\Lib\Content\MarkdownRenderer;
 use Raven\Lib\Content\PublicPageBodyRenderer;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\EmbeddedFormRuntimeService;
+use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\RequestContextResolver;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Profile\ProfileContactService;
@@ -75,6 +79,9 @@ final class PublicController
     /** @var array<string, array{label: string, editor: string}>|null */
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
+    private ?LoginUiStateService $loginUiState = null;
+    private ?LoginAttemptWorkflowService $loginAttemptWorkflowService = null;
+    private ?LoginChallengeWorkflowService $loginChallengeWorkflowService = null;
     private ?MarkdownRenderer $markdownRenderer = null;
     private ?RequestContextResolver $requestContextResolver = null;
     private ?PublicTemplateResolver $publicTemplateResolver = null;
@@ -137,7 +144,6 @@ final class PublicController
             return;
         }
 
-        $page['content'] = $this->renderEmbeddedForms((string) ($page['content'] ?? ''));
         $page = $this->renderPageExtendedBlocks($page);
         $page = $this->decoratePageForTemplate($page);
 
@@ -167,7 +173,6 @@ final class PublicController
 
         $channel = $this->taxonomy->findChannelBySlug($channelSlug);
 
-        $page['content'] = $this->renderEmbeddedForms((string) ($page['content'] ?? ''));
         $page = $this->renderPageExtendedBlocks($page);
         $page = $this->decoratePageForTemplate($page);
 
@@ -291,7 +296,6 @@ final class PublicController
             \Raven\Core\Support\redirect('/' . rawurlencode($canonicalSegment), 301);
         }
 
-        $page['content'] = $this->renderEmbeddedForms((string) ($page['content'] ?? ''));
         $page = $this->renderPageExtendedBlocks($page);
         $page = $this->decoratePageForTemplate($page);
 
@@ -610,23 +614,230 @@ final class PublicController
      */
     public function login(): void
     {
-        if ($this->auth->isLoggedIn() && $this->auth->canAccessPanel()) {
-            \Raven\Core\Support\redirect('/');
+        $redirectPath = $this->publicPostLoginRedirectFromRequest();
+        if ($this->auth->isLoggedIn() && $this->auth->isTwoFactorVerifiedForUser()) {
+            \Raven\Core\Support\redirect($redirectPath);
+        }
+
+        if ($this->auth->pendingTwoFactorUserId() !== null) {
+            $this->storePublicPostLoginRedirect($redirectPath);
+            \Raven\Core\Support\redirect($this->loginTwoFactorPathWithRedirect($redirectPath));
         }
 
         $loginIdentifierMode = $this->identifierResolver->modeFromConfig($this->config);
-        $this->renderPublic('login', [
+        $this->renderPublic('auth/login', [
             'site' => $this->siteData(),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullPublicFlash('success'),
             'flashError' => $this->pullPublicFlash('error'),
-            'panelLoginPath' => $this->panelUrl('/login'),
+            'loginPath' => $this->loginPathWithRedirect($redirectPath),
             'registrationPath' => '/register',
             'registrationMode' => $this->routeConfigService()->registrationMode(),
             'loginIdentifierMode' => $loginIdentifierMode,
             'loginIdentifierLabel' => $loginIdentifierMode === 'email' ? 'Email' : 'Username',
-            'postLoginRedirectPath' => '/',
+            'postLoginRedirectPath' => $redirectPath,
         ], 'wrapper');
+    }
+
+    /**
+     * Processes public login form submission.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function loginSubmit(array $post): void
+    {
+        $requestedRedirect = $this->publicPostLoginRedirectFromValue((string) ($post['redirect_to'] ?? ''));
+        $this->storePublicPostLoginRedirect($requestedRedirect);
+
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flashPublic('error', 'Invalid CSRF token.');
+            \Raven\Core\Support\redirect($this->loginPathWithRedirect($requestedRedirect));
+        }
+
+        $result = $this->loginAttemptWorkflowService()->attempt(
+            $this->auth,
+            $post,
+            $_SERVER,
+            $this->loginUiState()
+        );
+
+        if (($result['status'] ?? '') === 'two_factor_required') {
+            \Raven\Core\Support\redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
+        }
+
+        if (($result['status'] ?? '') === 'verified') {
+            \Raven\Core\Support\redirect($this->consumePublicPostLoginRedirectOrDefault());
+        }
+
+        if (($result['status'] ?? '') === 'missing_user') {
+            $this->auth->logout();
+            $this->clearPublicPostLoginRedirect();
+        }
+
+        $this->flashPublic('error', (string) ($result['message'] ?? 'Login failed.'));
+        \Raven\Core\Support\redirect($this->loginPathWithRedirect($requestedRedirect));
+    }
+
+    /**
+     * Renders public login-time 2FA challenge.
+     */
+    public function loginTwoFactor(): void
+    {
+        $redirectPath = $this->publicPostLoginRedirectFromRequest();
+        if ($redirectPath !== '/') {
+            $this->storePublicPostLoginRedirect($redirectPath);
+        }
+
+        $viewState = $this->loginChallengeWorkflowService()->buildViewState($this->auth, $this->loginUiState());
+        if (!(bool) ($viewState['ok'] ?? false)) {
+            $this->auth->logout();
+            $this->clearPublicPostLoginRedirect();
+            $this->flashPublic('error', (string) ($viewState['message'] ?? 'Your login session expired. Please log in again.'));
+            \Raven\Core\Support\redirect($this->loginPathWithRedirect($redirectPath));
+        }
+
+        $this->renderPublic('auth/login_2fa', [
+            'site' => $this->siteData(),
+            'csrfField' => $this->csrf->field(),
+            'csrfToken' => $this->csrf->token(),
+            'success' => $this->pullPublicFlash('success'),
+            'error' => $this->pullPublicFlash('error'),
+            'verifyPath' => $this->loginTwoFactorPathWithRedirect($redirectPath),
+            'selectPath' => $this->loginTwoFactorSelectPathWithRedirect($redirectPath),
+            'webauthnOptionsPath' => '/login/2fa/webauthn/options',
+            'webauthnVerifyPath' => '/login/2fa/webauthn/verify',
+            'loginPath' => $this->loginPathWithRedirect($redirectPath),
+            'postLoginRedirectPath' => $redirectPath,
+        ] + $viewState, 'wrapper');
+    }
+
+    /**
+     * Verifies public login-time 2FA challenge.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function loginTwoFactorSubmit(array $post): void
+    {
+        $requestedRedirect = $this->publicPostLoginRedirectFromValue((string) ($post['redirect_to'] ?? ''));
+        $this->storePublicPostLoginRedirect($requestedRedirect);
+
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flashPublic('error', 'Invalid CSRF token.');
+            \Raven\Core\Support\redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
+        }
+
+        $result = $this->loginChallengeWorkflowService()->verifyCodeChallenge($this->auth, $this->loginUiState(), $post);
+        if (($result['status'] ?? '') === 'expired') {
+            $this->auth->logout();
+            $this->clearPublicPostLoginRedirect();
+            $this->flashPublic('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
+            \Raven\Core\Support\redirect($this->loginPathWithRedirect($requestedRedirect));
+        }
+
+        if (($result['status'] ?? '') === 'email_sent') {
+            $this->flashPublic('success', (string) ($result['message'] ?? 'Check your email for a verification code.'));
+            \Raven\Core\Support\redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
+        }
+
+        if (($result['status'] ?? '') === 'unsupported') {
+            $this->auth->logout();
+            $this->clearPublicPostLoginRedirect();
+            $this->flashPublic('error', 'This verification method is not supported in the public login form.');
+            \Raven\Core\Support\redirect($this->loginPathWithRedirect($requestedRedirect));
+        }
+
+        if (($result['status'] ?? '') !== 'verified') {
+            $this->flashPublic('error', (string) ($result['message'] ?? 'Verification failed.'));
+            \Raven\Core\Support\redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
+        }
+
+        \Raven\Core\Support\redirect($this->consumePublicPostLoginRedirectOrDefault());
+    }
+
+    /**
+     * Selects one pending public-login 2FA method.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function loginTwoFactorSelect(array $post): void
+    {
+        $requestedRedirect = $this->publicPostLoginRedirectFromValue((string) ($post['redirect_to'] ?? ''));
+        $this->storePublicPostLoginRedirect($requestedRedirect);
+
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flashPublic('error', 'Invalid CSRF token.');
+            \Raven\Core\Support\redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
+        }
+
+        $result = $this->loginChallengeWorkflowService()->selectMethod($this->auth, $this->loginUiState(), $post);
+        if (($result['status'] ?? '') === 'expired') {
+            $this->auth->logout();
+            $this->clearPublicPostLoginRedirect();
+            $this->flashPublic('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
+            \Raven\Core\Support\redirect($this->loginPathWithRedirect($requestedRedirect));
+        }
+
+        if (($result['status'] ?? '') === 'invalid_method') {
+            $this->flashPublic('error', (string) ($result['message'] ?? 'Selected verification method is invalid.'));
+        }
+
+        \Raven\Core\Support\redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
+    }
+
+    /**
+     * Returns WebAuthn assertion options for pending public-login 2FA challenge.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function loginTwoFactorWebauthnOptions(array $post): void
+    {
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
+            return;
+        }
+
+        $result = $this->loginChallengeWorkflowService()->webauthnOptions($this->auth, $this->loginUiState(), $_SERVER);
+        if (!(bool) ($result['ok'] ?? false)) {
+            $this->jsonResponse(
+                ['ok' => false, 'message' => (string) ($result['message'] ?? 'Failed to initialize WebAuthn challenge.')],
+                (int) ($result['http_status'] ?? 400)
+            );
+            return;
+        }
+
+        $this->jsonResponse(
+            is_array($result['payload'] ?? null) ? $result['payload'] : ['ok' => true],
+            (int) ($result['http_status'] ?? 200)
+        );
+    }
+
+    /**
+     * Verifies WebAuthn assertion for pending public-login challenge.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function loginTwoFactorWebauthnVerify(array $post): void
+    {
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
+            return;
+        }
+
+        $result = $this->loginChallengeWorkflowService()->verifyWebauthn(
+            $this->auth,
+            $this->loginUiState(),
+            $post,
+            $_SERVER
+        );
+        if (!(bool) ($result['ok'] ?? false)) {
+            $this->jsonResponse(
+                ['ok' => false, 'message' => (string) ($result['message'] ?? 'Security key verification failed.')],
+                (int) ($result['http_status'] ?? 400)
+            );
+            return;
+        }
+
+        $this->jsonResponse(['ok' => true, 'redirect' => $this->consumePublicPostLoginRedirectOrDefault()], 200);
     }
 
     /**
@@ -636,7 +847,7 @@ final class PublicController
     {
         $registrationMode = $this->routeConfigService()->registrationMode();
         $loginIdentifierMode = $this->identifierResolver->modeFromConfig($this->config);
-        $this->renderPublic('register', [
+        $this->renderPublic('auth/register', [
             'site' => $this->siteData(),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullPublicFlash('success'),
@@ -864,7 +1075,7 @@ final class PublicController
 
         http_response_code((int) ($payload['status'] ?? 403));
         $this->renderPublic(
-            (string) ($payload['template'] ?? 'messages/denied'),
+            (string) ($payload['template'] ?? 'status/denied'),
             is_array($payload['data'] ?? null) ? $payload['data'] : [],
             (string) ($payload['layout'] ?? 'wrapper')
         );
@@ -879,7 +1090,7 @@ final class PublicController
         $payload = $this->publicRouteRenderService()->notFoundPayload($this->siteData());
         http_response_code((int) ($payload['status'] ?? 404));
         $this->renderPublic(
-            (string) ($payload['template'] ?? 'messages/404'),
+            (string) ($payload['template'] ?? 'status/404'),
             is_array($payload['data'] ?? null) ? $payload['data'] : [],
             (string) ($payload['layout'] ?? 'wrapper')
         );
@@ -955,7 +1166,6 @@ final class PublicController
      */
     private function renderPageExtendedBlocks(array $page): array
     {
-        $page['content'] = $this->renderEmbeddedForms((string) ($page['content'] ?? ''));
         $rawBlocks = $page['extended_blocks'] ?? null;
         if (!is_array($rawBlocks)) {
             $rawBlocks = [];
@@ -1182,6 +1392,154 @@ final class PublicController
         return $this->publicFlash->pull($key);
     }
 
+    private function consumePublicPostLoginRedirectOrDefault(): string
+    {
+        $raw = $this->loginUiState()->consumePostLoginRedirect();
+        $normalized = $this->publicPostLoginRedirectFromValue($raw);
+        return $normalized !== '' ? $normalized : '/';
+    }
+
+    private function clearPublicPostLoginRedirect(): void
+    {
+        $this->loginUiState()->clearAll();
+    }
+
+    private function storePublicPostLoginRedirect(string $value): void
+    {
+        $normalized = $this->publicPostLoginRedirectFromValue($value);
+        $this->loginUiState()->storePostLoginRedirect($normalized !== '' ? $normalized : '/');
+    }
+
+    private function publicPostLoginRedirectFromRequest(): string
+    {
+        $queryValue = $this->publicPostLoginRedirectFromValue((string) ($_GET['redirect_to'] ?? ''));
+        if ($queryValue !== '') {
+            return $queryValue;
+        }
+
+        $storedValue = $this->publicPostLoginRedirectFromValue($this->loginUiState()->postLoginRedirect());
+        if ($storedValue !== '') {
+            return $storedValue;
+        }
+
+        $referer = trim((string) ($_SERVER['HTTP_REFERER'] ?? ''));
+        if ($referer !== '' && RedirectTargetValidator::isAllowedHttpOrRootPath($referer)) {
+            $parts = parse_url($referer);
+            if (is_array($parts)) {
+                $host = strtolower(trim((string) ($parts['host'] ?? '')));
+                $currentHost = strtolower($this->requestContextResolver()->resolveRequestHost((string) $this->config->get('site.domain', 'localhost')));
+                if ($host !== '' && $host === $currentHost) {
+                    $candidate = (string) ($parts['path'] ?? '/');
+                    if (isset($parts['query']) && $parts['query'] !== '') {
+                        $candidate .= '?' . (string) $parts['query'];
+                    }
+                    $normalized = $this->publicPostLoginRedirectFromValue($candidate);
+                    if ($normalized !== '' && !$this->isPublicAuthPath($normalized)) {
+                        return $normalized;
+                    }
+                }
+            }
+        }
+
+        return '/';
+    }
+
+    private function publicPostLoginRedirectFromValue(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        if (!str_starts_with($value, '/') || str_starts_with($value, '//')) {
+            return '';
+        }
+
+        $parts = @parse_url($value);
+        if (!is_array($parts)) {
+            return '';
+        }
+
+        if (isset($parts['scheme']) || isset($parts['host']) || isset($parts['user']) || isset($parts['pass'])) {
+            return '';
+        }
+
+        $path = (string) ($parts['path'] ?? '/');
+        if ($path === '' || !str_starts_with($path, '/')) {
+            return '';
+        }
+
+        if (str_contains($path, "\0")) {
+            return '';
+        }
+
+        $panelBase = trim($this->panelUrl(''));
+        if ($panelBase !== '' && str_starts_with($path, $panelBase)) {
+            return '';
+        }
+
+        if ($this->isPublicAuthPath($path)) {
+            return '';
+        }
+
+        $normalized = $path;
+        if (isset($parts['query']) && $parts['query'] !== '') {
+            $normalized .= '?' . (string) $parts['query'];
+        }
+        if (isset($parts['fragment']) && $parts['fragment'] !== '') {
+            $normalized .= '#' . (string) $parts['fragment'];
+        }
+
+        return $normalized;
+    }
+
+    private function loginPathWithRedirect(string $redirectPath): string
+    {
+        $normalized = $this->publicPostLoginRedirectFromValue($redirectPath);
+        if ($normalized === '' || $normalized === '/') {
+            return '/login';
+        }
+
+        return '/login?redirect_to=' . rawurlencode($normalized);
+    }
+
+    private function loginTwoFactorPathWithRedirect(string $redirectPath): string
+    {
+        $normalized = $this->publicPostLoginRedirectFromValue($redirectPath);
+        if ($normalized === '' || $normalized === '/') {
+            return '/login/2fa';
+        }
+
+        return '/login/2fa?redirect_to=' . rawurlencode($normalized);
+    }
+
+    private function loginTwoFactorSelectPathWithRedirect(string $redirectPath): string
+    {
+        $normalized = $this->publicPostLoginRedirectFromValue($redirectPath);
+        if ($normalized === '' || $normalized === '/') {
+            return '/login/2fa/select';
+        }
+
+        return '/login/2fa/select?redirect_to=' . rawurlencode($normalized);
+    }
+
+    private function isPublicAuthPath(string $path): bool
+    {
+        $path = (string) parse_url($path, PHP_URL_PATH);
+        if ($path === '') {
+            return false;
+        }
+
+        return in_array($path, [
+            '/login',
+            '/login/2fa',
+            '/login/2fa/select',
+            '/login/2fa/webauthn/options',
+            '/login/2fa/webauthn/verify',
+            '/register',
+        ], true);
+    }
+
     /**
      * Builds panel URL with configured panel-path prefix.
      */
@@ -1229,6 +1587,30 @@ final class PublicController
         return $this->requestContextResolver;
     }
 
+    private function loginUiState(): LoginUiStateService
+    {
+        if (!$this->loginUiState instanceof LoginUiStateService) {
+            $this->loginUiState = LoginUiStateService::forPublic();
+        }
+
+        return $this->loginUiState;
+    }
+
+    private function loginAttemptWorkflowService(): LoginAttemptWorkflowService
+    {
+        if (!$this->loginAttemptWorkflowService instanceof LoginAttemptWorkflowService) {
+            $this->loginAttemptWorkflowService = new LoginAttemptWorkflowService(
+                $this->config,
+                $this->input,
+                $this->identifierResolver,
+                new \Raven\Lib\Auth\LoginAttemptPolicy($this->config, $this->requestContextResolver()),
+                new \Raven\Lib\Security\LoginTwoFactorFlowService()
+            );
+        }
+
+        return $this->loginAttemptWorkflowService;
+    }
+
     private function publicChannelPageRouteService(): PublicChannelPageRouteService
     {
         if (!$this->publicChannelPageRouteService instanceof PublicChannelPageRouteService) {
@@ -1236,6 +1618,29 @@ final class PublicController
         }
 
         return $this->publicChannelPageRouteService;
+    }
+
+    private function loginChallengeWorkflowService(): LoginChallengeWorkflowService
+    {
+        if (!$this->loginChallengeWorkflowService instanceof LoginChallengeWorkflowService) {
+            $this->loginChallengeWorkflowService = new LoginChallengeWorkflowService(
+                $this->config,
+                $this->input,
+                new \Raven\Lib\Security\LoginTwoFactorFlowService(),
+                new \Raven\Lib\Auth\LoginWebAuthnChallengeService(),
+                new \Raven\Lib\Auth\TwoFactorEmailDeliveryService()
+            );
+        }
+
+        return $this->loginChallengeWorkflowService;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function jsonResponse(array $payload, int $status = 200): void
+    {
+        HttpResponse::json($payload, $status, true);
     }
 
     private function publicTemplateResolver(): PublicTemplateResolver

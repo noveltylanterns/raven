@@ -40,6 +40,10 @@ Last updated: 2026-03-11
 - `php debug/smoke/debug-toolbar.php`
 - Documentation smoke checks:
 - `php debug/smoke/docs.php`
+- Shared auth login/2FA smoke:
+- `php debug/smoke/auth-workflow.php`
+- Routing smoke checks:
+- `php debug/smoke/routing.php`
 - Theme/template-tag smoke checks:
 - `php debug/smoke/themes.php`
 - Extension subtype/boundary smoke + debug fixture seeding:

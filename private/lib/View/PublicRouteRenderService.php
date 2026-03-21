@@ -66,19 +66,19 @@ final class PublicRouteRenderService
                 return $this->allowPayload();
             }
 
-            return $this->blockedPayload(503, 'messages/disabled', $siteData);
+            return $this->blockedPayload(503, 'status/disabled', $siteData);
         }
 
         if ($mode === 'private') {
             if (!$isLoggedIn || !$canViewPrivateSite) {
-                return $this->blockedPayload(403, 'messages/denied', $siteData);
+                return $this->blockedPayload(403, 'status/denied', $siteData);
             }
 
             return $this->allowPayload();
         }
 
         if (!$canViewPublicSite) {
-            return $this->blockedPayload(403, 'messages/denied', $siteData);
+            return $this->blockedPayload(403, 'status/denied', $siteData);
         }
 
         return $this->allowPayload();
@@ -92,7 +92,7 @@ final class PublicRouteRenderService
     {
         return [
             'status' => 404,
-            'template' => 'messages/404',
+            'template' => 'status/404',
             'layout' => 'wrapper',
             'data' => ['site' => $siteData],
         ];

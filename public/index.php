@@ -204,6 +204,30 @@ $router->add('GET', '/login', static function () use ($controller): void {
     $controller->login();
 });
 
+$router->add('POST', '/login', static function () use ($controller): void {
+    $controller->loginSubmit($_POST);
+});
+
+$router->add('GET', '/login/2fa', static function () use ($controller): void {
+    $controller->loginTwoFactor();
+});
+
+$router->add('POST', '/login/2fa', static function () use ($controller): void {
+    $controller->loginTwoFactorSubmit($_POST);
+});
+
+$router->add('POST', '/login/2fa/select', static function () use ($controller): void {
+    $controller->loginTwoFactorSelect($_POST);
+});
+
+$router->add('POST', '/login/2fa/webauthn/options', static function () use ($controller): void {
+    $controller->loginTwoFactorWebauthnOptions($_POST);
+});
+
+$router->add('POST', '/login/2fa/webauthn/verify', static function () use ($controller): void {
+    $controller->loginTwoFactorWebauthnVerify($_POST);
+});
+
 $router->add('GET', '/register', static function () use ($controller): void {
     $controller->register();
 });

@@ -11,6 +11,7 @@ use RuntimeException;
  */
 final class PublicTemplatePipeline
 {
+    private const TEMPLATE_REDIRECT_PREFIX = '__RVN_TEMPLATE_REDIRECT__:';
     private PublicTemplateResolver $resolver;
 
     public function __construct(PublicTemplateResolver $resolver)
@@ -111,12 +112,7 @@ final class PublicTemplatePipeline
         callable $renderFile,
         string ...$lookupRoots
     ): string {
-        $templateFile = $this->resolveTemplateFile($template, ...$lookupRoots);
-        if ($templateFile === null) {
-            throw new RuntimeException('Public template not found: ' . $template);
-        }
-
-        $content = $renderFile($templateFile, $data);
+        $content = $this->renderResolvedTemplate($template, $data, $renderFile, 0, ...$lookupRoots);
         if ($layout === null) {
             return $content;
         }
@@ -129,6 +125,61 @@ final class PublicTemplatePipeline
         $layoutData = $data;
         $layoutData['content'] = $content;
         return $renderFile($layoutFile, $layoutData);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param callable(string, array<string, mixed>): string $renderFile
+     */
+    private function renderResolvedTemplate(
+        string $template,
+        array $data,
+        callable $renderFile,
+        int $depth,
+        string ...$lookupRoots
+    ): string {
+        if ($depth > 4) {
+            throw new RuntimeException('Public template redirect depth exceeded for: ' . $template);
+        }
+
+        $templateFile = $this->resolveTemplateFile($template, ...$lookupRoots);
+        if ($templateFile === null) {
+            throw new RuntimeException('Public template not found: ' . $template);
+        }
+
+        $content = $renderFile($templateFile, $data);
+        $redirectTemplate = $this->templateRedirectTarget($content);
+        if ($redirectTemplate === null || $redirectTemplate === $template) {
+            return $content;
+        }
+
+        $this->applyTemplateRedirectStatus($redirectTemplate);
+        return $this->renderResolvedTemplate($redirectTemplate, $data, $renderFile, $depth + 1, ...$lookupRoots);
+    }
+
+    private function templateRedirectTarget(string $content): ?string
+    {
+        $trimmed = trim($content);
+        if ($trimmed === '' || !str_starts_with($trimmed, self::TEMPLATE_REDIRECT_PREFIX)) {
+            return null;
+        }
+
+        $target = trim(substr($trimmed, strlen(self::TEMPLATE_REDIRECT_PREFIX)));
+        return $target === '' ? null : $target;
+    }
+
+    private function applyTemplateRedirectStatus(string $template): void
+    {
+        $status = match ($template) {
+            'status/denied' => 403,
+            'status/404' => 404,
+            'status/disabled' => 503,
+            default => null,
+        };
+
+        if (is_int($status)) {
+            http_response_code($status);
+        }
     }
 
     /**

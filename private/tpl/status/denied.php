@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/public/theme/raven/tpl/messages/denied.php
- * Public-facing permission-denied message template.
+ * ~/private/tpl/status/denied.php
+ * Public-facing permission-denied status template fallback.
  * Docs: https://raven.lanterns.io
  */
 
@@ -13,6 +13,6 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 }
 ?>
 <section>
-    <h2 class="h4">Permission Denied</h2>
+    <h1 class="mb-3">Permission Denied</h1>
     <p>You do not have permission to access this page.</p>
 </section>

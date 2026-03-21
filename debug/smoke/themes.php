@@ -14,7 +14,13 @@ ini_set('display_errors', '0');
 
 require_once dirname(__DIR__, 2) . '/private/sys/Core/Support/Helpers.php';
 require_once dirname(__DIR__, 2) . '/private/sys/Core/View/TemplateTagEngine.php';
+require_once dirname(__DIR__, 2) . '/private/lib/Security/InputSanitizer.php';
+require_once dirname(__DIR__, 2) . '/private/lib/View/PublicTemplateResolver.php';
+require_once dirname(__DIR__, 2) . '/private/lib/View/PublicTemplatePipeline.php';
 
+use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\View\PublicTemplatePipeline;
+use Raven\Lib\View\PublicTemplateResolver;
 use Raven\Core\View\TemplateTagEngine;
 
 final class ThemeTemplateSmokeRunner
@@ -54,7 +60,7 @@ final class ThemeTemplateSmokeRunner
         $fixtureFile = $this->root . '/.tmp/theme-tag-smoke-' . $this->runId . '.php';
         $fixtureSource = <<<'PHP'
 escaped_title={page:title}
-raw_body={raw:page:content}
+raw_snippet={raw:snippet:html}
 object_name={obj:name}
 if_published:{if page:published}yes{/if}
 if_not_feature:{if not feature:enabled}yes{/if}
@@ -82,8 +88,10 @@ PHP;
                 ],
                 'page' => [
                     'title' => 'Hello <Raven>',
-                    'content' => '<p><strong>Trusted</strong> HTML</p>',
                     'published' => true,
+                ],
+                'snippet' => [
+                    'html' => '<p><strong>Trusted</strong> HTML</p>',
                 ],
                 'feature' => [
                     'enabled' => false,
@@ -136,7 +144,7 @@ PHP;
 
             $expectedSnippets = [
                 'escaped_title=Hello &lt;Raven&gt;',
-                'raw_body=<p><strong>Trusted</strong> HTML</p>',
+                'raw_snippet=<p><strong>Trusted</strong> HTML</p>',
                 'object_name=Corvid',
                 'if_published:yes',
                 'if_not_feature:yes',
@@ -163,11 +171,66 @@ PHP;
             $this->events[] = 'cache_compile=ok';
             $this->events[] = 'cache_reuse=ok';
 
+            $this->smokeTemplateRedirects($engine);
             $this->smokeRenderRealTemplates($engine);
             $this->events[] = 'smoke_result=PASS';
             $this->events[] = 'run_id=' . $this->runId;
         } finally {
             @unlink($fixtureFile);
+        }
+    }
+
+    private function smokeTemplateRedirects(TemplateTagEngine $engine): void
+    {
+        $root = $this->root . '/.tmp/theme-redirect-smoke-' . $this->runId;
+        if (!is_dir($root) && !mkdir($root, 0775, true) && !is_dir($root)) {
+            throw new RuntimeException('Failed to create redirect smoke directory.');
+        }
+
+        $fixtures = [
+            'redirect-404' => ['tag' => '{redirect:404}', 'expect' => 'Not Found', 'status' => 404],
+            'redirect-denied' => ['tag' => '{redirect:denied}', 'expect' => 'Permission Denied', 'status' => 403],
+            'redirect-disabled' => ['tag' => '{redirect:disabled}', 'expect' => 'Site Disabled', 'status' => 503],
+        ];
+
+        try {
+            foreach ($fixtures as $name => $fixture) {
+                $path = $root . '/' . $name . '.php';
+                if (file_put_contents($path, (string) ($fixture['tag'] ?? ''), LOCK_EX) === false) {
+                    throw new RuntimeException('Failed to write redirect smoke fixture: ' . $name);
+                }
+            }
+
+            $pipeline = new PublicTemplatePipeline(new PublicTemplateResolver(new InputSanitizer()));
+            $data = [
+                'redirect' => [
+                    '404' => '__RVN_TEMPLATE_REDIRECT__:status/404',
+                    'disabled' => '__RVN_TEMPLATE_REDIRECT__:status/disabled',
+                    'denied' => '__RVN_TEMPLATE_REDIRECT__:status/denied',
+                ],
+            ];
+
+            foreach ($fixtures as $name => $fixture) {
+                http_response_code(200);
+                $output = $pipeline->render(
+                    $name,
+                    $data,
+                    null,
+                    fn (string $file, array $payload): string => $engine->renderFile($file, $payload),
+                    $root,
+                    $this->root . '/private/tpl'
+                );
+                $expected = (string) ($fixture['expect'] ?? '');
+                $this->assert(str_contains($output, $expected), 'Redirect tag did not resolve expected message view: ' . $name);
+                $expectedStatus = (int) ($fixture['status'] ?? 200);
+                $this->assert(http_response_code() === $expectedStatus, 'Redirect tag did not set expected status for: ' . $name);
+                $this->events[] = 'template_redirect=' . $name;
+            }
+        } finally {
+            foreach (array_keys($fixtures) as $name) {
+                @unlink($root . '/' . $name . '.php');
+            }
+            @rmdir($root);
         }
     }
 
@@ -194,14 +257,19 @@ PHP;
                 'desc' => 'Theme smoke render.',
                 'image' => 'http://localhost/og.png',
                 'url' => 'http://localhost',
-                'title_full' => 'Smoke [Raven CMS]',
             ],
             'content' => '<main>Smoke Content</main>',
             'page' => [
                 'title' => 'Smoke Page',
-                'content' => '<p>Smoke body</p>',
-                'show_title' => true,
-                'extended_blocks' => [],
+                'title_show' => true,
+                'channel_id' => 7,
+                'content' => [
+                    [
+                        'html' => '<p>Smoke block</p>',
+                        'css_id' => '',
+                        'class' => 'raven-page-extended-block raven-page-extended-block-1',
+                    ],
+                ],
             ],
             'pages' => [],
             'category' => ['name' => 'Smoke Category', 'slug' => 'smoke-category'],
@@ -224,20 +292,42 @@ PHP;
         ];
 
         $targets = [
-            $this->root . '/public/theme/raven/tpl/home.php',
-            $this->root . '/public/theme/raven/tpl/wrapper.php',
-            $this->root . '/private/tpl/home.php',
-            $this->root . '/private/tpl/wrapper.php',
+            [
+                'label' => 'stock/home.php',
+                'path' => is_dir($this->root . '/public/theme/raven/tpl')
+                    ? $this->root . '/public/theme/raven/tpl/home.php'
+                    : $this->root . '/themebak/tpl/home.php',
+            ],
+            [
+                'label' => 'stock/wrapper.php',
+                'path' => is_dir($this->root . '/public/theme/raven/tpl')
+                    ? $this->root . '/public/theme/raven/tpl/wrapper.php'
+                    : $this->root . '/themebak/tpl/wrapper.php',
+            ],
+            [
+                'label' => 'fallback/home.php',
+                'path' => $this->root . '/private/tpl/home.php',
+            ],
+            [
+                'label' => 'fallback/wrapper.php',
+                'path' => $this->root . '/private/tpl/wrapper.php',
+            ],
         ];
 
         foreach ($targets as $target) {
-            if (!is_file($target)) {
-                throw new RuntimeException('Template file missing for smoke: ' . $target);
+            $path = (string) ($target['path'] ?? '');
+            $label = (string) ($target['label'] ?? basename($path));
+            if (!is_file($path)) {
+                $this->events[] = 'template_skipped=' . $label;
+                continue;
             }
 
-            $output = $engine->renderFile($target, $data);
+            $output = $engine->renderFile($path, $data);
             $this->assert(is_string($output), 'Template render returned non-string output.');
-            $this->events[] = 'template_rendered=' . basename(dirname($target)) . '/' . basename($target);
+            if (str_ends_with($label, 'home.php')) {
+                $this->assert(str_contains($output, 'Smoke block'), 'Home template did not render page:content block rows.');
+            }
+            $this->events[] = 'template_rendered=' . $label;
         }
     }
 

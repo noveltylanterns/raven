@@ -194,7 +194,7 @@ Extended blocks persistence model:
 
 - panel posts `extended_blocks[]` (0..n items)
 - repository stores the array as JSON in `pages.extended`
-- read hydration exposes `extended_blocks` (array) for templates and keeps `extended` as a flattened compatibility string
+- read hydration exposes `extended_blocks` (array) for downstream page rendering/decorators, and public template decoration then maps rendered body rows to `page:content`
 
 `PageRepository::save(...)` details:
 
@@ -237,11 +237,11 @@ Page media on public output:
 
 Meta image behavior:
 
-- site defaults come from config (`meta.twitter.image`, `meta.opengraph.image`)
-- page views can override with page preview image
-- page override priority: `is_preview` -> `is_cover` -> first ready image
-- variant preference for meta image URL: `lg` -> `med` -> `sm` -> original
-- OG/Twitter image URLs are normalized to safe absolute HTTP(S) URLs
+- the wrapper emits both `og:image` and `twitter:image` from shared `meta:image`
+- site defaults come from config, collapsed to one effective runtime meta image
+- page views override only when one ready page image is marked `is_preview`
+- page-level override uses that preview image's `lg` variant URL
+- runtime normalizes the final shared meta image URL to safe absolute HTTP(S) form
 
 ### Security/Validation Expectations
 

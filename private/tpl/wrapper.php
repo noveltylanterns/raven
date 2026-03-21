@@ -11,12 +11,19 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
     http_response_code(404);
     exit('Not Found');
 }
+
+$siteName = trim((string) ($site['name'] ?? 'Raven CMS'));
+if ($siteName === '') {
+    $siteName = 'Raven CMS';
+}
+$metaTitle = trim((string) ($meta['title'] ?? ''));
+$documentTitle = $metaTitle === '' ? $siteName : ($metaTitle . ' [' . $siteName . ']');
 ?>
 <!doctype html>
 <html lang="en">
 <head>
 
-<title>{meta:title_full}</title>
+<title>{meta:title} [{site:name}]</title>
 <link rel="canonical" href="{meta:url}">
 <link rel="icon" type="image/png" href="{site:url}/theme/raven/img/favicon.png">
 <meta charset="utf-8">
@@ -27,7 +34,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 <meta property="og:image" content="{meta:image}">
 <meta property="og:locale" content="{meta:og_locale}">
 <meta property="og:site_name" content="{site:name}">
-<meta property="og:title" content="{meta:title_full}">
+<meta property="og:title" content="{meta:title} [{site:name}]">
 <meta property="og:type" content="{meta:og_type}">
 <meta property="og:url" content="{meta:url}">
 <meta property="twitter:card" content="{meta:x_card}">
@@ -35,7 +42,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 <meta property="twitter:description" content="{meta:desc}">
 <meta property="twitter:image" content="{meta:image}">
 <meta property="twitter:site" content="{meta:x_site}">
-<meta property="twitter:title" content="{meta:title_full}">
+<meta property="twitter:title" content="{meta:title} [{site:name}]">
 <meta property="twitter:url" content="{meta:url}">
 <link rel="apple-touch-icon" href="{meta:apple_touch_icon}">
 <link rel="stylesheet" href="{site:url}/theme/fallback.css">
@@ -43,11 +50,16 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 </head>
 <body>
 
-<header>
-    <h1><a href="{site:url}" title="{site:name}">{site:name}</a></h1>
-</header>
+<nav class="navbar bg-dark" data-bs-theme="dark">
+    <div class="container">
+        <a href="{site:url}" class="navbar-brand">
+            <img src="{site:url}/theme/logo.png" alt="{site:name}" height="30" class="d-inline-block align-text-top">
+            {site:name}
+        </a>
+    </div>
+</nav>
 
-<main class="container">
+<main class="container mt-3 mb-3">
 {raw:content}
 </main>
 

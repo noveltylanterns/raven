@@ -13,15 +13,12 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 }
 ?>
 <article>
-    {if page:show_title}
-    <h2>{page:title}</h2>
-    {/if}
-
-    <div>{raw:page:content}</div>
-
-    {if page:extended_blocks}
-    {each page:extended_blocks}
+{if page:title_show}
+    <h1>{page:title}</h1>
+{/if}
+{if page:content}
+{each page:content}
     <div{if item:css_id} id="{item:css_id}"{/if} class="{item:class}">{raw:item:html}</div>
-    {/each}
-    {/if}
+{/each}
+{/if}
 </article>

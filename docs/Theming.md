@@ -28,7 +28,7 @@ All supported tag directives are listed below.
   - `{page:title}`
   - `{pagination:total_pages}`
 - Raw value output (unescaped):
-  - `{raw:page:content}`
+  - `{raw:item:html}`
 - Truthy conditional open:
   - `{if page:title}`
 - Falsy conditional open:
@@ -108,7 +108,6 @@ Common shared keys:
 - `panel:url`
 - `meta:title`
 - `meta:desc`
-- `meta:title_full`
 - `meta:apple_touch_icon`
 - `meta:robots`
 - `meta:image`
@@ -205,9 +204,9 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `{/if}` | closes `{if ...}` conditional | no output |
 | `{each path}` | iterates an array tag path such as `{each pages}` or `{each pagination:links}` | no direct output; pushes `item` loop scope |
 | `{if not path}` | falsy check for a tag path such as `{if not profile_denied}` | no direct output; conditionally renders enclosed markup |
-| `{if path}` | truthy check for a tag path such as `{if page:show_title}` | no direct output; conditionally renders enclosed markup |
+| `{if path}` | truthy check for a tag path such as `{if page:title_show}` | no direct output; conditionally renders enclosed markup |
 | `{path}` | escaped scalar lookup such as `{site:name}` | HTML-escaped string |
-| `{raw:path}` | raw scalar lookup such as `{raw:page:content}` | unescaped string |
+| `{raw:path}` | raw scalar lookup such as `{raw:item:html}` | unescaped string |
 
 ### 9.2 Stable Data Tags
 
@@ -243,14 +242,14 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `item:avatar_url` | current loop item avatar URL, when iterating `members` | avatar original URL |
 | `item:caption` | current loop item caption, when iterating gallery-like rows | caption text |
 | `item:channel_slug` | current loop item channel slug, when iterating `pages` | channel slug |
-| `item:class` | current loop item CSS class string, when iterating `page:extended_blocks` | CSS class list |
-| `item:css_id` | current loop item CSS id token, when iterating `page:extended_blocks` | CSS id |
+| `item:class` | current loop item CSS class string, when iterating `page:content` | CSS class list |
+| `item:css_id` | current loop item CSS id token, when iterating `page:content` | CSS id |
 | `item:display_name_resolved` | current loop item display name, when iterating `members` | resolved display name |
 | `item:flags:featured` | nested loop-item flag example supported by path resolver | scalar nested flag value |
 | `item:full_url` | current loop item full-size image URL, when iterating gallery-like rows | absolute or root-relative image URL |
 | `item:has_avatar` | current loop item avatar-presence flag, when iterating `members` | boolean-like truthy/falsey flag |
 | `item:href` | current loop item link href, when iterating pagination or contact rows | URL/path string |
-| `item:html` | current loop item rendered HTML fragment, when iterating `page:extended_blocks` | trusted HTML string; use with `{raw:item:html}` |
+| `item:html` | current loop item rendered HTML fragment, when iterating `page:content` | trusted HTML string; use with `{raw:item:html}` |
 | `item:image_url` | current loop item image URL, when iterating gallery-like rows | absolute or root-relative image URL |
 | `item:is_current` | current loop item current-page flag, when iterating `pagination:links` | boolean-like truthy/falsey flag |
 | `item:is_external` | current loop item external-link flag, when iterating `profile:contact_profiles` | boolean-like truthy/falsey flag |
@@ -266,12 +265,11 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | --- | --- | --- |
 | `meta:apple_touch_icon` | public template Apple touch icon URL | URL string |
 | `meta:desc` | public template metadata description | meta description text |
-| `meta:image` | shared metadata image URL for OpenGraph and X cards | absolute URL |
+| `meta:image` | shared metadata image URL for the wrapper's OpenGraph and X cards | absolute URL |
 | `meta:og_locale` | public template OpenGraph locale value | locale string |
 | `meta:og_type` | public template OpenGraph type value | type string |
 | `meta:robots` | public template robots value | robots directive string |
 | `meta:title` | logical route title before site suffix | title text |
-| `meta:title_full` | full document title assembled for `<title>` and social tags | complete document title |
 | `meta:url` | shared metadata page URL for canonical, OpenGraph, and X tags | absolute URL without forced trailing slash |
 | `meta:x_card` | public template X card value | card type string |
 | `meta:x_creator` | public template X creator value | creator handle or name string |
@@ -287,13 +285,13 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
+| `page:channel_id` | page payload parent channel id when page belongs to a channel | integer id or empty |
 | `page:channel_slug` | page payload channel slug when page belongs to a channel | channel slug |
-| `page:content` | page payload main rendered body source | trusted HTML string; use with `{raw:page:content}` |
+| `page:content` | page payload rendered content block rows | array for `{each page:content}` |
 | `page:description` | page payload description when present | page description text |
-| `page:extended_blocks` | page payload rendered extended block rows | array for `{each page:extended_blocks}` |
-| `page:show_title` | page payload normalized display-title flag | boolean-like truthy/falsey flag |
 | `page:slug` | page payload slug | page slug |
 | `page:title` | page payload title | page title |
+| `page:title_show` | page payload normalized display-title flag | boolean-like truthy/falsey flag |
 | `pages` | category/tag route page list | array for `{each pages}` |
 
 #### 9.2.8 Pagination Tags
@@ -326,7 +324,15 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `profile:username` | profile payload username | username |
 | `profile_denied` | profile placeholder payload flag for private-mode denial | boolean-like truthy/falsey flag |
 
-#### 9.2.11 Site Tags
+#### 9.2.11 Redirect Tags
+
+| Key | What It Calls | Returns |
+| --- | --- | --- |
+| `redirect:denied` | strict template redirect to `status/denied` | internal redirect token; render it alone to delegate the view |
+| `redirect:disabled` | strict template redirect to `status/disabled` | internal redirect token; render it alone to delegate the view |
+| `redirect:404` | strict template redirect to `status/404` | internal redirect token; render it alone to delegate the view |
+
+#### 9.2.12 Site Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -336,7 +342,7 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `site:scheme` | configured public scheme | `http` or `https` |
 | `site:url` | configured public site base URL | absolute site URL without trailing slash |
 
-#### 9.2.12 Tag Tags
+#### 9.2.13 Tag Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -344,7 +350,7 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `tag:name` | tag route payload display name | tag name |
 | `tag:slug` | tag route payload slug | tag slug |
 
-#### 9.2.13 Theme Tags
+#### 9.2.14 Theme Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -355,4 +361,5 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 Notes:
 
 - `item:*` depends on the active `{each ...}` loop target.
+- `redirect:*` is a strict template redirect, not an include. It only redirects when it is the template's sole rendered output.
 - Additional scalar children on `page`, `category`, `tag`, `profile`, `group`, `members`, and `pages` may also be readable when Raven includes them in the payload, but the table above is the stable contract themes should rely on.

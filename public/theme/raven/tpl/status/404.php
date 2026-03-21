@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/tpl/messages/404.php
- * Public-facing not-found message template fallback.
+ * ~/public/theme/raven/tpl/status/404.php
+ * Public-facing not-found status template.
  * Docs: https://raven.lanterns.io
  */
 
@@ -13,6 +13,6 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 }
 ?>
 <section>
-    <h2 class="h4">Not Found</h2>
+    <h1>Not Found</h1>
     <p>The requested page could not be found.</p>
 </section>

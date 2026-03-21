@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Security;
 
 /**
- * Shared helper for panel login-time interactive 2FA flow state.
+ * Shared helper for panel/public login-time interactive 2FA flow state.
  */
 final class LoginTwoFactorFlowService
 {

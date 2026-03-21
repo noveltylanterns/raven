@@ -95,11 +95,19 @@ Group assignment notes:
   - `private/tpl/panel/users/list.php`
   - `private/tpl/panel/users/edit.php`
   - `private/tpl/panel/users/invites.php`
-  - `private/tpl/login.php`
-  - `private/tpl/register.php`
+  - `private/tpl/panel/auth/login.php`
+  - `private/tpl/panel/auth/login_2fa.php`
+- Public auth views:
+  - `private/tpl/auth/login.php`
+  - `private/tpl/auth/login_2fa.php`
+  - `private/tpl/auth/register.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
   - `private/sys/Controller/PublicController.php`
+- Shared login workflow:
+  - `private/lib/Auth/LoginAttemptWorkflowService.php`
+  - `private/lib/Auth/LoginChallengeWorkflowService.php`
+  - `private/lib/Auth/LoginUiStateService.php`
 - Persistence:
   - `private/sys/Repository/UserRepository.php`
   - `private/sys/Repository/InviteTokenRepository.php`
@@ -124,6 +132,12 @@ All state-changing routes use CSRF validation.
 Public routes (declared in `public/index.php`):
 
 - `GET /login` -> public login helper view
+- `POST /login` -> public login submit handler
+- `GET /login/2fa` -> public two-factor challenge form
+- `POST /login/2fa` -> public two-factor challenge submit handler
+- `POST /login/2fa/select` -> public two-factor method selection
+- `POST /login/2fa/webauthn/options` -> public WebAuthn assertion-options endpoint
+- `POST /login/2fa/webauthn/verify` -> public WebAuthn assertion verify endpoint
 - `GET /register` -> registration form
 - `POST /register` -> registration submit handler
 

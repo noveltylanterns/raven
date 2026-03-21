@@ -64,11 +64,18 @@ final class PublicTemplateDecorator
      */
     public function decoratePageForTemplate(array $page): array
     {
-        $page['show_title'] = !array_key_exists('display_title', $page)
+        unset($page['content']);
+
+        $page['title_show'] = !array_key_exists('display_title', $page)
             || (int) ($page['display_title'] ?? 1) === 1;
+        unset($page['show_title']);
+
+        if (array_key_exists('channel_id', $page)) {
+            $channelId = (int) ($page['channel_id'] ?? 0);
+            $page['channel_id'] = $channelId > 0 ? $channelId : null;
+        }
 
         $rawBlocks = is_array($page['extended_blocks'] ?? null) ? $page['extended_blocks'] : [];
-        $hasBodyContent = trim((string) ($page['content'] ?? '')) !== '';
         $renderedBlocks = [];
         $displayIndex = 0;
 
@@ -88,7 +95,7 @@ final class PublicTemplateDecorator
                 'raven-page-extended-block-' . $displayIndex,
             ];
 
-            if ($hasBodyContent || $displayIndex > 1) {
+            if ($displayIndex > 1) {
                 array_unshift($classNames, 'mt-3');
             }
 
@@ -104,7 +111,8 @@ final class PublicTemplateDecorator
             ];
         }
 
-        $page['extended_blocks'] = $renderedBlocks;
+        unset($page['extended_blocks']);
+        $page['content'] = $renderedBlocks;
         return $page;
     }
 
@@ -246,13 +254,16 @@ final class PublicTemplateDecorator
             'url' => $panelUrl,
         ];
 
+        $data['redirect'] = [
+            '404' => '__RVN_TEMPLATE_REDIRECT__:status/404',
+            'disabled' => '__RVN_TEMPLATE_REDIRECT__:status/disabled',
+            'denied' => '__RVN_TEMPLATE_REDIRECT__:status/denied',
+        ];
+
         $meta = is_array($data['meta'] ?? null) ? $data['meta'] : [];
         $meta['apple_touch_icon'] = trim((string) ($site['apple_touch_icon'] ?? ''));
         $meta['robots'] = trim((string) ($site['robots'] ?? ''));
-        $meta['image'] = trim((string) ($site['og_image'] ?? ''));
-        if ($meta['image'] === '') {
-            $meta['image'] = trim((string) ($site['twitter_image'] ?? ''));
-        }
+        $meta['image'] = trim((string) ($site['meta_image'] ?? ''));
         $meta['og_type'] = trim((string) ($site['og_type'] ?? ''));
         if ($meta['og_type'] === '') {
             $meta['og_type'] = 'website';
@@ -271,13 +282,12 @@ final class PublicTemplateDecorator
 
         unset(
             $site['apple_touch_icon'],
+            $site['meta_image'],
             $site['robots'],
-            $site['og_image'],
             $site['og_type'],
             $site['og_locale'],
             $site['twitter_card'],
             $site['twitter_creator'],
-            $site['twitter_image'],
             $site['twitter_site'],
             $site['theme'],
             $site['theme_css'],
@@ -340,11 +350,8 @@ final class PublicTemplateDecorator
             }
         }
 
-        $documentTitle = $viewTitle === '' ? $siteName : ($viewTitle . ' [' . $siteName . ']');
-
         $meta['title'] = $viewTitle;
         $meta['desc'] = $metaDescription;
-        $meta['title_full'] = $documentTitle;
 
         $data['site'] = $site;
         $data['meta'] = $meta;

@@ -13,22 +13,22 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 }
 ?>
 <section>
-    <h2>Category: {category:name}</h2>
+    <h1>Category: {category:name}</h1>
 
-    {if pages}
-    <ul class="list-group mb-3">
+{if pages}
+    <ul class="list-group">
         {each pages}
         <li class="list-group-item">
             <a href="{item:url}">{item:title}</a>
         </li>
         {/each}
     </ul>
-    {/if}
-    {if not pages}
+{/if}
+{if not pages}
     <p>No pages found in this category yet.</p>
-    {/if}
+{/if}
 
-    {if pagination:links}
+{if pagination:links}
     <nav aria-label="Category pagination">
         <ul class="pagination">
             {each pagination:links}
@@ -41,5 +41,6 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
             {/each}
         </ul>
     </nav>
-    {/if}
+{/if}
+
 </section>

@@ -181,7 +181,10 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Auth/GroupPublicRouteService.php` - Shared public group-route query helper for route-enabled group payloads and member row hydration.
 - `/private/lib/Auth/GroupRolePolicy.php` - Shared usergroup slug normalization and stock-role route/permission policy helper.
 - `/private/lib/Auth/LoginAttemptPolicy.php` - Shared login-attempt throttle policy helper for max/window/lock config normalization and request IP bucketing.
+- `/private/lib/Auth/LoginAttemptWorkflowService.php` - Shared password-auth workflow for panel/public login forms, covering identifier normalization, throttle checks, credential auth, and 2FA challenge bootstrap.
+- `/private/lib/Auth/LoginChallengeWorkflowService.php` - Shared interactive login 2FA workflow for panel/public flows, covering method-picker state, code verification, email dispatch, and WebAuthn challenge orchestration.
 - `/private/lib/Auth/LoginIdentifierResolver.php` - Shared login identifier mode + username/email normalization helper.
+- `/private/lib/Auth/LoginUiStateService.php` - Shared surface-scoped login redirect and login-2FA UI session-state helper for panel/public controllers.
 - `/private/lib/Auth/LoginWebAuthnChallengeService.php` - Shared WebAuthn login challenge context helper for option/verify payload preparation with method-state guards.
 - `/private/lib/Auth/LoginThrottleService.php` - Shared persistent login-throttle bucket service for lockout checks and failure upserts.
 - `/private/lib/Auth/PasswordChangePolicy.php` - Shared password-change validation policy for account flows (new/confirm matching and minimum-length enforcement).
@@ -362,9 +365,9 @@ Core fallback templates:
 - `/private/tpl/groups/limited.php` - Core fallback limited-visibility group listing template.
 - `/private/tpl/groups/list.php` - Core fallback group listing template.
 - `/private/tpl/home.php` - Core fallback homepage template.
-- `/private/tpl/messages/404.php` - Core fallback not-found message template.
-- `/private/tpl/messages/denied.php` - Core fallback permission-denied message template.
-- `/private/tpl/messages/disabled.php` - Core fallback site-disabled message template.
+- `/private/tpl/status/404.php` - Core fallback not-found status template.
+- `/private/tpl/status/denied.php` - Core fallback permission-denied status template.
+- `/private/tpl/status/disabled.php` - Core fallback site-disabled status template.
 - `/private/tpl/pages/index.php` - Core fallback page template.
 - `/private/tpl/profiles/full.php` - Core fallback full profile template.
 - `/private/tpl/profiles/index.php` - Core fallback profile-route wrapper/entry template.
@@ -383,7 +386,11 @@ Core fallback templates:
 - `/private/tpl/panel/themes.php` - Panel public theme manager template.
 - `/private/tpl/panel/groups/edit.php` - Panel group create/edit template.
 - `/private/tpl/panel/groups/list.php` - Panel group list template.
-- `/private/tpl/panel/login.php` - Panel login screen template.
+- `/private/tpl/panel/auth/login.php` - Panel login screen template.
+- `/private/tpl/panel/auth/login_2fa.php` - Panel two-factor verification template.
+- `/private/tpl/auth/login.php` - Public login helper template.
+- `/private/tpl/auth/login_2fa.php` - Public two-factor verification helper template.
+- `/private/tpl/auth/register.php` - Public registration template.
 - `/private/tpl/panel/pages/edit.php` - Panel page create/edit template.
 - `/private/tpl/panel/pages/list.php` - Panel page list template.
 - `/private/tpl/panel/preferences.php` - Panel user preferences editor template.

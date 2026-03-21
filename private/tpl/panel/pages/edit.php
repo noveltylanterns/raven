@@ -228,15 +228,6 @@ foreach ($galleryImages as $galleryImage) {
     ];
 }
 $bodyBlocks = [];
-$legacyContent = (string) ($page['content'] ?? '');
-if (trim($legacyContent) !== '') {
-    $bodyBlocks[] = [
-        'type' => 'tinymce',
-        'content' => $legacyContent,
-        'css_id' => '',
-        'css_class' => '',
-    ];
-}
 $rawExtendedBlocks = $page['extended_blocks'] ?? null;
 if (is_array($rawExtendedBlocks)) {
     foreach ($rawExtendedBlocks as $entry) {

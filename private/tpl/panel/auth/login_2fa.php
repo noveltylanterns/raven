@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/tpl/panel/login_2fa.php
+ * ~/private/tpl/panel/auth/login_2fa.php
  * Admin panel 2FA challenge template.
  */
 

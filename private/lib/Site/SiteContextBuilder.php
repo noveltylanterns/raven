@@ -49,8 +49,7 @@ final class SiteContextBuilder
         string $currentUrl,
         string $publicTheme,
         string $publicThemeCss,
-        string $twitterImage,
-        string $ogImage
+        string $metaImage
     ): array {
         $themeUrl = $this->themeUrl($siteUrl, $publicThemeCss);
 
@@ -58,8 +57,7 @@ final class SiteContextBuilder
             'url' => $siteUrl,
             'current_url' => $currentUrl,
             'theme_url' => $themeUrl,
-            'twitter_image' => $twitterImage,
-            'og_image' => $ogImage,
+            'meta_image' => $metaImage,
         ]);
     }
 
@@ -74,8 +72,7 @@ final class SiteContextBuilder
             'url' => $siteUrl,
             'current_url' => '',
             'theme_url' => $this->themeUrl($siteUrl, $publicThemeCss),
-            'twitter_image' => trim((string) $config->get('meta.twitter.image', '')),
-            'og_image' => trim((string) $config->get('meta.opengraph.image', '')),
+            'meta_image' => $this->defaultMetaImageFromConfig($config),
         ]);
     }
 
@@ -99,6 +96,16 @@ final class SiteContextBuilder
             'theme' => $publicTheme,
             'theme_css' => $publicThemeCss,
         ];
+    }
+
+    private function defaultMetaImageFromConfig(Config $config): string
+    {
+        $opengraph = trim((string) $config->get('meta.opengraph.image', ''));
+        if ($opengraph !== '') {
+            return $opengraph;
+        }
+
+        return trim((string) $config->get('meta.twitter.image', ''));
     }
 
     private function siteSchemeFromConfig(Config $config): string
