@@ -127,7 +127,7 @@ Storage detail:
 
 - Tag listing routes resolve under `/{tag.prefix}/{tag_slug}/{page?}`.
 - If `tag.prefix` is blank, tag routes are disabled.
-- Template priority: `views/tags/{tag_slug}.php` then `views/tags/index.php`.
+- Template priority: `tpl/tag/{tag_slug}.php` then `tpl/tag/index.php`.
 
 ### Security/Validation Expectations
 

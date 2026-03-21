@@ -243,12 +243,12 @@ body { background: #fff; color: #212529; }
 - `tpl/channels/index.php`
 - Category listing render:
 - priority:
-- `tpl/categories/{category_slug}.php`
-- `tpl/categories/index.php`
+- `tpl/category/{category_slug}.php`
+- `tpl/category/index.php`
 - Tag listing render:
 - priority:
-- `tpl/tags/{tag_slug}.php`
-- `tpl/tags/index.php`
+- `tpl/tag/{tag_slug}.php`
+- `tpl/tag/index.php`
 - Profile render:
 - template key: dynamic by `session.profile_mode`
 - files:
@@ -320,8 +320,8 @@ body { background: #fff; color: #212529; }
 - `tpl/status/disabled.php`
 - `tpl/page/index.php`
 - `tpl/channels/index.php`
-- `tpl/categories/index.php`
-- `tpl/tags/index.php`
+- `tpl/category/index.php`
+- `tpl/tag/index.php`
 - `tpl/profile/full.php`
 - `tpl/profile/limited.php`
 - `tpl/profile/index.php`

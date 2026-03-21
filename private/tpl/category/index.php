@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/tpl/tags/index.php
+ * ~/private/tpl/category/index.php
  * Public-facing view template for site output.
  * Docs: https://raven.lanterns.io
  */
@@ -13,7 +13,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 }
 ?>
 <section>
-    <h1 class="mb-3">Tag: {tag:name}</h1>
+    <h1 class="mb-3">Category: {category:name}</h1>
 
 {if pages}
     <ul class="list-group mt-3 mb-3">
@@ -25,11 +25,11 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
     </ul>
 {/if}
 {if not pages}
-    <p>No pages found for this tag yet.</p>
+    <p>No pages found in this category yet.</p>
 {/if}
 
 {if pagination:links}
-    <nav aria-label="Tag pagination">
+    <nav aria-label="Category pagination">
         <ul class="pagination">
             {each pagination:links}
             {if item:is_current}

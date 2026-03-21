@@ -359,7 +359,7 @@ Sometimes temporary files get stashed here.
 
 #### /private/tpl/
 Core fallback templates:
-- `/private/tpl/categories/index.php` - Core fallback category listing template.
+- `/private/tpl/category/index.php` - Core fallback category listing template.
 - `/private/tpl/channels/index.php` - Core fallback channel landing template.
 - `/private/tpl/group/index.php` - Core fallback group-route wrapper/entry template.
 - `/private/tpl/group/limited.php` - Core fallback limited-visibility group listing template.
@@ -372,7 +372,7 @@ Core fallback templates:
 - `/private/tpl/profile/full.php` - Core fallback full profile template.
 - `/private/tpl/profile/index.php` - Core fallback profile-route wrapper/entry template.
 - `/private/tpl/profile/limited.php` - Core fallback limited-visibility profile template.
-- `/private/tpl/tags/index.php` - Core fallback tag listing template.
+- `/private/tpl/tag/index.php` - Core fallback tag listing template.
 - `/private/tpl/wrapper.php` - Core fallback public layout wrapper template.
 
 ###### Core panel-specific templates:

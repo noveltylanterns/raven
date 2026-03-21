@@ -380,7 +380,7 @@ final class PanelListProfilerRunner
             'pages' => static function () use ($app): void {
                 $rows = $app['page']->listForPanel(100, 0);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
-                $app['page']->taxonomyAssignmentsForPages($pageIds);
+                $app['page']->taxonomyAssignmentIdsByPage($pageIds);
             },
             'channel' => static fn () => $app['channel']->listAll(),
             'category' => static fn () => $app['category']->listAll(),
@@ -394,7 +394,7 @@ final class PanelListProfilerRunner
             $legacyFlows['pages_prefiltered'] = static function () use ($app): void {
                 $rows = $app['page']->listForPanel(1000, 0);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
-                $app['page']->taxonomyAssignmentsForPages($pageIds);
+                $app['page']->taxonomyAssignmentIdsByPage($pageIds);
             };
         }
         if ($groupName !== null) {
@@ -406,7 +406,7 @@ final class PanelListProfilerRunner
                 $app['page']->countForPanel();
                 $rows = $app['page']->listForPanel(50, 0);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
-                $app['page']->taxonomyAssignmentsForPages($pageIds);
+                $app['page']->taxonomyAssignmentIdsByPage($pageIds);
             },
             'channels' => static function () use ($app): void {
                 $app['channel']->countForPanel();
@@ -439,7 +439,7 @@ final class PanelListProfilerRunner
                 $app['page']->countForPanel($channelSlug, $categoryId, $tagId);
                 $rows = $app['page']->listForPanel(50, 0, $channelSlug, $categoryId, $tagId);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
-                $app['page']->taxonomyAssignmentsForPages($pageIds);
+                $app['page']->taxonomyAssignmentIdsByPage($pageIds);
             };
         }
         if ($groupName !== null) {

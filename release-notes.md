@@ -16,6 +16,7 @@
 - Fixed the public login 2FA WebAuthn client flow to use the same request shape and browser capability checks as the panel login screen, restoring passkey/security-key verification and in-page fallback behavior.
 - Hardened public post-login redirect handling so auth-route referers like `/login` and `/login/2fa` no longer overwrite the intended public return target or cause successful 2FA verification to bounce back into an expired auth screen.
 - Standardized the remaining core page/user/group/profile surface naming to singular route and template roots (`/panel/page`, `/panel/user`, `/panel/group`, `tpl/page/*`, `tpl/profile/*`, `tpl/group/*`), updated service-container keys to `page`/`user`/`group`, and refreshed the docs/smokes/file-tree manifest to match.
+- Continued the singular-root cleanup through taxonomy public views by moving category/tag template families to `tpl/category/*` and `tpl/tag/*`, updating public template resolution/docs/theme guidance, and renaming older page-taxonomy helper methods to `assignedCategoryRowsForPage`, `assignedTagRowsForPage`, and `taxonomyAssignmentIdsByPage`.
 - Renamed global content config keys `content.default_editor` to `content.editor_default` and `content.separator` to `content.route_separator`, and aligned the panel/page-editor/runtime variable names with the channel `editor_override` and `route_separator` terminology.
 - Renamed `site.scheme` to `site.protocol` and aligned the related config-editor/site-context/internal variable names to use `protocol` consistently.
 

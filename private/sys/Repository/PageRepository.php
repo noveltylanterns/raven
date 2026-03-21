@@ -721,7 +721,7 @@ final class PageRepository
      *
      * @return array<int, array{id: int, name: string, slug: string}>
      */
-    public function assignedCategoriesForPage(int $pageId): array
+    public function assignedCategoryRowsForPage(int $pageId): array
     {
         if (!$this->categoryEnabled) {
             return [];
@@ -758,7 +758,7 @@ final class PageRepository
      *
      * @return array<int, array{id: int, name: string, slug: string}>
      */
-    public function assignedTagsForPage(int $pageId): array
+    public function assignedTagRowsForPage(int $pageId): array
     {
         if (!$this->tagEnabled) {
             return [];
@@ -796,7 +796,7 @@ final class PageRepository
      * @param array<int> $pageIds
      * @return array<int, array{categories: array<int>, tags: array<int>}>
      */
-    public function taxonomyAssignmentsForPages(array $pageIds): array
+    public function taxonomyAssignmentIdsByPage(array $pageIds): array
     {
         $normalizedPageIds = $this->normalizeIds($pageIds);
         if ($normalizedPageIds === []) {

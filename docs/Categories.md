@@ -127,7 +127,7 @@ Storage detail:
 
 - Category listing routes resolve under `/{category.prefix}/{category_slug}/{page?}`.
 - If `category.prefix` is blank, category routes are disabled.
-- Template priority: `views/categories/{category_slug}.php` then `views/categories/index.php`.
+- Template priority: `tpl/category/{category_slug}.php` then `tpl/category/index.php`.
 
 ### Security/Validation Expectations
 

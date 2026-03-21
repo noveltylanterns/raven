@@ -87,30 +87,30 @@ final class PublicTemplateResolver
     {
         $normalizedSlug = $this->input->slug($categorySlug);
         if ($normalizedSlug === null) {
-            return 'categories/index';
+            return 'category/index';
         }
 
-        $slugTemplate = 'categories/' . $normalizedSlug;
+        $slugTemplate = 'category/' . $normalizedSlug;
         if ($this->resolveTemplateFile($slugTemplate, ...$lookupRoots) !== null) {
             return $slugTemplate;
         }
 
-        return 'categories/index';
+        return 'category/index';
     }
 
     public function resolveTagTemplateName(string $tagSlug, string ...$lookupRoots): string
     {
         $normalizedSlug = $this->input->slug($tagSlug);
         if ($normalizedSlug === null) {
-            return 'tags/index';
+            return 'tag/index';
         }
 
-        $slugTemplate = 'tags/' . $normalizedSlug;
+        $slugTemplate = 'tag/' . $normalizedSlug;
         if ($this->resolveTemplateFile($slugTemplate, ...$lookupRoots) !== null) {
             return $slugTemplate;
         }
 
-        return 'tags/index';
+        return 'tag/index';
     }
 
     /**

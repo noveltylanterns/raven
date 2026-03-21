@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/public/theme/raven/tpl/tags/index.php
+ * ~/public/theme/raven/tpl/tag/index.php
  * Public-facing view template for site output.
  * Docs: https://raven.lanterns.io
  */

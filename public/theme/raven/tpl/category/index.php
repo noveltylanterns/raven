@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/public/theme/raven/tpl/categories/index.php
+ * ~/public/theme/raven/tpl/category/index.php
  * Public-facing view template for site output.
  * Docs: https://raven.lanterns.io
  */
