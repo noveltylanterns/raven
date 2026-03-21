@@ -314,9 +314,9 @@ body { background: #fff; color: #212529; }
 
 ## Template Data Contract
 - Wrapper receives:
-- `$site` with keys including `name`, `scheme`, `url`, `theme`, `theme_css`, `theme_url`, `domain`, `panel_path`, `current_url`, `robots`, `twitter_*`, `og_*`
-- `$meta` with keys: `title`, `description`, `document_title`
-- `$site['og_image']`/`$site['twitter_image']` default to global meta config values, but runtime may override them by route context:
+- `$site` with keys including `name`, `scheme`, `url`, `theme`, `theme_css`, `theme_url`, `domain`, `panel_path`, `current_url`
+- `$meta` with keys including `title`, `description`, `document_title`, `apple_touch_icon`, `robots`, `og_*`, `x_*`
+- `$meta['og_image']`/`$meta['x_image']` default to global meta config values, but runtime may override them by route context:
 - page/home routes: page preview image
 - category/tag routes: taxonomy preview/cover image
 - channel landing routes: channel preview/cover image

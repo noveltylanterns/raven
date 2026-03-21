@@ -226,18 +226,40 @@ final class PublicTemplateDecorator
 
         $siteUrl = trim((string) ($site['url'] ?? ''));
         if ($siteUrl !== '') {
-            $site['theme_url'] = rtrim($siteUrl, '/') . '/theme/' . rawurlencode($themeCss) . '/';
+            $site['theme_url'] = rtrim($siteUrl, '/') . '/theme/' . rawurlencode($themeCss);
         }
 
-        if (trim((string) ($site['twitter_site'] ?? '')) === '') {
-            $site['twitter_site'] = $siteName;
+        $meta = is_array($data['meta'] ?? null) ? $data['meta'] : [];
+        $meta['apple_touch_icon'] = trim((string) ($site['apple_touch_icon'] ?? ''));
+        $meta['robots'] = trim((string) ($site['robots'] ?? ''));
+        $meta['og_image'] = trim((string) ($site['og_image'] ?? ''));
+        $meta['og_type'] = trim((string) ($site['og_type'] ?? ''));
+        if ($meta['og_type'] === '') {
+            $meta['og_type'] = 'website';
         }
-        if (trim((string) ($site['og_type'] ?? '')) === '') {
-            $site['og_type'] = 'website';
+        $meta['og_locale'] = trim((string) ($site['og_locale'] ?? ''));
+        if ($meta['og_locale'] === '') {
+            $meta['og_locale'] = 'en_US';
         }
-        if (trim((string) ($site['og_locale'] ?? '')) === '') {
-            $site['og_locale'] = 'en_US';
+        $meta['x_card'] = trim((string) ($site['twitter_card'] ?? ''));
+        $meta['x_creator'] = trim((string) ($site['twitter_creator'] ?? ''));
+        $meta['x_image'] = trim((string) ($site['twitter_image'] ?? ''));
+        $meta['x_site'] = trim((string) ($site['twitter_site'] ?? ''));
+        if ($meta['x_site'] === '') {
+            $meta['x_site'] = $siteName;
         }
+
+        unset(
+            $site['apple_touch_icon'],
+            $site['robots'],
+            $site['og_image'],
+            $site['og_type'],
+            $site['og_locale'],
+            $site['twitter_card'],
+            $site['twitter_creator'],
+            $site['twitter_image'],
+            $site['twitter_site']
+        );
 
         $viewTitle = '';
         $metaDescription = '';
@@ -297,11 +319,10 @@ final class PublicTemplateDecorator
         $documentTitle = $viewTitle === '' ? $siteName : ($viewTitle . ' [' . $siteName . ']');
 
         $data['site'] = $site;
-        $data['meta'] = [
-            'title' => $viewTitle,
-            'description' => $metaDescription,
-            'document_title' => $documentTitle,
-        ];
+        $meta['title'] = $viewTitle;
+        $meta['description'] = $metaDescription;
+        $meta['document_title'] = $documentTitle;
+        $data['meta'] = $meta;
 
         return $data;
     }

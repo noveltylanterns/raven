@@ -16,8 +16,8 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 <html lang="en">
 <head>
     <title>{meta:document_title}</title>
-{if site:apple_touch_icon}
-    <link rel="apple-touch-icon" href="{site:apple_touch_icon}">
+{if meta:apple_touch_icon}
+    <link rel="apple-touch-icon" href="{meta:apple_touch_icon}">
 {/if}
 {if site:current_url}
     <link rel="canonical" href="{site:current_url}">
@@ -28,37 +28,37 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 {if meta:description}
     <meta name="description" content="{meta:description}">
 {/if}
-{if site:robots}
-    <meta name="robots" content="{site:robots}">
+{if meta:robots}
+    <meta name="robots" content="{meta:robots}">
 {/if}
     <meta name="viewport" content="width=device-width, initial-scale=1">
 {if meta:description}
     <meta property="og:description" content="{meta:description}">
 {/if}
-{if site:og_image}
-    <meta property="og:image" content="{site:og_image}">
+{if meta:og_image}
+    <meta property="og:image" content="{meta:og_image}">
 {/if}
-    <meta property="og:locale" content="{site:og_locale}">
+    <meta property="og:locale" content="{meta:og_locale}">
     <meta property="og:site_name" content="{site:name}">
     <meta property="og:title" content="{meta:document_title}">
-    <meta property="og:type" content="{site:og_type}">
+    <meta property="og:type" content="{meta:og_type}">
 {if site:current_url}
     <meta property="og:url" content="{site:current_url}">
 {/if}
-{if site:twitter_card}
-    <meta property="twitter:card" content="{site:twitter_card}">
+{if meta:x_card}
+    <meta property="twitter:card" content="{meta:x_card}">
 {/if}
-{if site:twitter_creator}
-    <meta property="twitter:creator" content="{site:twitter_creator}">
+{if meta:x_creator}
+    <meta property="twitter:creator" content="{meta:x_creator}">
 {/if}
 {if meta:description}
     <meta property="twitter:description" content="{meta:description}">
 {/if}
-{if site:twitter_image}
-    <meta property="twitter:image" content="{site:twitter_image}">
+{if meta:x_image}
+    <meta property="twitter:image" content="{meta:x_image}">
 {/if}
-{if site:twitter_site}
-    <meta property="twitter:site" content="{site:twitter_site}">
+{if meta:x_site}
+    <meta property="twitter:site" content="{meta:x_site}">
 {/if}
     <meta property="twitter:title" content="{meta:document_title}">
 {if site:current_url}

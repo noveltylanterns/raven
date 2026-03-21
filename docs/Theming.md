@@ -105,6 +105,15 @@ Common shared keys:
 - `meta:title`
 - `meta:description`
 - `meta:document_title`
+- `meta:apple_touch_icon`
+- `meta:robots`
+- `meta:og_image`
+- `meta:og_locale`
+- `meta:og_type`
+- `meta:x_card`
+- `meta:x_creator`
+- `meta:x_image`
+- `meta:x_site`
 
 ## 5) Theme CLI Workflows
 
@@ -230,9 +239,18 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `item:username` | current loop item username, when iterating `members` | username |
 | `item:value` | current loop item value, when iterating `profile:contact_profiles` | contact value text |
 | `members` | group route member list | array for `{each members}` |
+| `meta:apple_touch_icon` | configured Apple touch icon URL | absolute URL |
 | `meta:description` | public template metadata description | meta description text |
 | `meta:document_title` | full document title assembled for `<title>` and social tags | complete document title |
+| `meta:og_image` | resolved OpenGraph image URL | absolute URL |
+| `meta:og_locale` | resolved OpenGraph locale | locale string |
+| `meta:og_type` | resolved OpenGraph type | type string |
+| `meta:robots` | configured robots policy | robots meta content |
 | `meta:title` | logical route title before site suffix | title text |
+| `meta:x_card` | resolved X card type | card type string |
+| `meta:x_creator` | resolved X creator handle | handle string |
+| `meta:x_image` | resolved X image URL | absolute URL |
+| `meta:x_site` | resolved X site handle/name | handle or text string |
 | `page:channel_slug` | page payload channel slug when page belongs to a channel | channel slug |
 | `page:content` | page payload main rendered body source | trusted HTML string; use with `{raw:page:content}` |
 | `page:description` | page payload description when present | page description text |
@@ -254,23 +272,14 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `profile:has_avatar` | profile payload avatar-presence flag | boolean-like truthy/falsey flag |
 | `profile:username` | profile payload username | username |
 | `profile_denied` | profile placeholder payload flag for private-mode denial | boolean-like truthy/falsey flag |
-| `site:apple_touch_icon` | configured Apple touch icon URL | absolute URL |
 | `site:current_url` | current request URL | absolute URL |
 | `site:domain` | configured site host/domain value | host or host/path string |
 | `site:name` | configured site name | site name |
-| `site:og_image` | resolved OpenGraph image URL | absolute URL |
-| `site:og_locale` | resolved OpenGraph locale | locale string |
-| `site:og_type` | resolved OpenGraph type | type string |
 | `site:panel_path` | configured panel route prefix | panel path slug |
-| `site:robots` | configured robots policy | robots meta content |
 | `site:scheme` | configured public scheme | `http` or `https` |
 | `site:theme` | active public theme slug | theme slug |
 | `site:theme_css` | resolved theme slug that provides active CSS/assets | theme slug |
 | `site:theme_url` | resolved public theme asset base URL | absolute `/theme/{slug}` URL without trailing slash |
-| `site:twitter_card` | resolved Twitter card type | card type string |
-| `site:twitter_creator` | resolved Twitter creator handle | handle string |
-| `site:twitter_image` | resolved Twitter image URL | absolute URL |
-| `site:twitter_site` | resolved Twitter site handle/name | handle or text string |
 | `site:url` | configured public site base URL | absolute site URL without trailing slash |
 | `tag:description` | tag route payload description when present | tag description text |
 | `tag:name` | tag route payload display name | tag name |
