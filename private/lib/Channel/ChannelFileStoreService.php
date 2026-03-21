@@ -56,6 +56,8 @@ final class ChannelFileStoreService
             return [];
         }
 
+        $this->invalidatePhpFileCache($path);
+
         try {
             /** @var mixed $raw */
             $raw = require $path;
@@ -71,6 +73,8 @@ final class ChannelFileStoreService
      */
     public function loadRecordFromPath(string $path, string $slug): ?array
     {
+        $this->invalidatePhpFileCache($path);
+
         try {
             /** @var mixed $raw */
             $raw = require $path;
@@ -135,6 +139,9 @@ final class ChannelFileStoreService
             @unlink($tmpPath);
             throw new RuntimeException('Failed to finalize channel file.');
         }
+
+        $this->invalidatePhpFileCache($tmpPath);
+        $this->invalidatePhpFileCache($path);
     }
 
     /**
@@ -163,5 +170,18 @@ final class ChannelFileStoreService
 
         $raw['id'] = $id;
         $this->writeRecordBySlug($slug, $raw);
+    }
+
+    private function invalidatePhpFileCache(string $path): void
+    {
+        $normalized = trim($path);
+        if ($normalized === '') {
+            return;
+        }
+
+        clearstatcache(true, $normalized);
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($normalized, true);
+        }
     }
 }
