@@ -114,7 +114,7 @@ final class SiteContextBuilder
             $domain = 'localhost';
         }
 
-        $path = '/';
+        $path = '';
 
         if (str_contains($domain, '://')) {
             $parsedHost = trim((string) parse_url($domain, PHP_URL_HOST));
@@ -123,7 +123,7 @@ final class SiteContextBuilder
             if ($parsedHost !== '') {
                 $domain = $parsedHost . (is_int($parsedPort) && $parsedPort > 0 ? ':' . $parsedPort : '');
                 $path = '/' . trim($parsedPath, '/');
-                $path = $path === '/' ? '/' : ($path . '/');
+                $path = $path === '/' ? '' : $path;
             } else {
                 $domain = 'localhost';
             }
@@ -132,7 +132,7 @@ final class SiteContextBuilder
                 $parts = explode('/', $domain, 2);
                 $domain = (string) ($parts[0] ?? '');
                 $path = '/' . trim((string) ($parts[1] ?? ''), '/');
-                $path = $path === '/' ? '/' : ($path . '/');
+                $path = $path === '/' ? '' : $path;
             }
 
             $domain = preg_replace('/[\/?#].*$/', '', $domain) ?? $domain;
@@ -152,6 +152,6 @@ final class SiteContextBuilder
             $themeCssSlug = 'raven';
         }
 
-        return rtrim($siteUrl, '/') . '/theme/' . rawurlencode($themeCssSlug) . '/';
+        return rtrim($siteUrl, '/') . '/theme/' . rawurlencode($themeCssSlug);
     }
 }

@@ -66,7 +66,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= \Raven\Core\Support\e((string) ($site['name'] ?? 'Raven CMS')); ?></title>
-  <link rel="stylesheet" href="<?= \Raven\Core\Support\e((string) ($site['theme_url'] ?? '/theme/raven/')); ?>css/style.css">
+  <link rel="stylesheet" href="<?= \Raven\Core\Support\e((string) ($site['theme_url'] ?? '/theme/raven')); ?>/css/style.css">
 </head>
 <body>
 <?= $content ?? ''; ?>
@@ -115,7 +115,7 @@ body { background: #fff; color: #212529; }
 - CSS pipeline contract is: `composer/twbs/bootstrap/scss/bootstrap` -> `public/theme/{slug}/scss/style.scss` -> `public/theme/{slug}/css/style.css`.
 - In stock Raven theme, `public/theme/raven/scss/style.scss` imports Bootstrap SCSS directly with `@import "../../../../composer/twbs/bootstrap/scss/bootstrap";`.
 - Theme variables/tokens must be set in `scss/style.scss` before the Bootstrap import when you need to override Bootstrap defaults.
-- The public wrapper loads only `{site:theme_url}css/style.css`; do not add a separate Bootstrap CSS link in wrapper templates.
+- The public wrapper loads only `{site:theme_url}/css/style.css`; do not add a separate Bootstrap CSS link in wrapper templates.
 - You can hand-write `css/style.css`, but the most update-proof and efficient approach is a single-entry `scss/style.scss` that compiles the full Bootstrap stack plus your overrides.
 - For most basic UI customization (type scale, spacing, colors, buttons, forms, utilities), the Sass pipeline is the preferred editing path.
 - `css/style.css` is a build artifact. Treat `scss/style.scss` (and partials) as source of truth, then recompile.
@@ -161,7 +161,7 @@ body { background: #fff; color: #212529; }
 - Template lookup searches each chain member in order, then `private/tpl/` fallback.
 - CSS lookup uses the first theme in chain containing `css/style.css`.
 - Core fallback wrapper (`private/tpl/wrapper.php`) does not use resolved theme CSS; it always loads `/theme/fallback.css`.
-- Wrapper uses that same resolved CSS slug for favicon path (`{site:theme_url}img/favicon.png`).
+- Wrapper uses that same resolved CSS slug for favicon path (`{site:theme_url}/img/favicon.png`).
 - There is no general automatic fallback resolver for arbitrary image/js files; fallback behavior is explicit in template code.
 - If a child theme wants its own favicon while inheriting parent CSS, override `tpl/wrapper.php`.
 

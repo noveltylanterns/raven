@@ -49,7 +49,7 @@ final class ThemeScaffoldService
             . "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
             . "    <title>{meta:document_title}</title>\n"
             . "    <meta name=\"description\" content=\"{meta:description}\">\n"
-            . "    <link rel=\"stylesheet\" href=\"{site:theme_url}css/style.css\">\n"
+            . "    <link rel=\"stylesheet\" href=\"{site:theme_url}/css/style.css\">\n"
             . "</head>\n"
             . "<body>\n"
             . "{raw:content}\n"

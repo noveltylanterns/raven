@@ -179,10 +179,10 @@ PHP;
                 'name' => 'Raven CMS',
                 'theme' => 'raven',
                 'theme_css' => 'raven',
-                'theme_url' => 'http://localhost/theme/raven/',
+                'theme_url' => 'http://localhost/theme/raven',
                 'panel_path' => 'panel',
                 'domain' => 'localhost',
-                'url' => 'http://localhost/',
+                'url' => 'http://localhost',
                 'current_url' => 'http://localhost/',
             ],
             'meta' => [

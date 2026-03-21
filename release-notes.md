@@ -4,8 +4,9 @@
 
 ### March 19, 2026
 
-- Added `site.scheme` runtime config plus public template `site:url`/`site:scheme` data so wrappers can emit a deterministic home URL with trailing slash, and rewired generated absolute public/meta URLs to honor the configured `http` vs `https` scheme instead of inferring it only from the incoming request.
+- Added `site.scheme` runtime config plus public template `site:url`/`site:scheme` data so wrappers can emit a deterministic home URL, and rewired generated absolute public/meta URLs to honor the configured `http` vs `https` scheme instead of inferring it only from the incoming request.
 - Added `site:theme`, `site:theme_css`, and `site:theme_url` public template data, and updated stock/scaffold wrappers to use the shorter canonical theme keys.
+- Normalized `site:url` and `site:theme_url` to return absolute base URLs without forced trailing slashes, and updated stock/scaffold theme asset examples to append `/css/...` and `/img/...` explicitly.
 - Renamed the public template metadata root to the shorter canonical `meta:*` namespace and updated stock/scaffold wrappers plus theme docs to match.
 - Shortened the remaining public template payload names to canonical forms (`item:url`, `page:show_title`, `group:member_count`, `profile_denied`, `group_denied`) and removed stale gallery-root references from theme docs.
 - Moved extension enablement state persistence/template to `private/dat/ext/.state.php` and `private/dat/ext/.state.php.dist`, updated installer/CLI/runtime/docs accordingly, and kept a legacy read fallback for older installs that still have `private/ext/.state.php`.

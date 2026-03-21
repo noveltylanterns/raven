@@ -36,7 +36,7 @@ final class RequestContextResolver
     }
 
     /**
-     * Returns normalized public site base URL with a trailing slash.
+     * Returns normalized public site base URL without a forced trailing slash.
      *
      * @param array<string, mixed>|null $server
      */
@@ -140,7 +140,7 @@ final class RequestContextResolver
     {
         $configuredDomain = trim($configuredDomain);
         if ($configuredDomain === '') {
-            return '/';
+            return '';
         }
 
         $path = '';
@@ -152,7 +152,7 @@ final class RequestContextResolver
         }
 
         $path = '/' . trim((string) $path, '/');
-        return $path === '/' ? '/' : ($path . '/');
+        return $path === '/' ? '' : $path;
     }
 
     public function normalizeClientIp(string $rawIp): ?string

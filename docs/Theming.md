@@ -266,12 +266,12 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `site:scheme` | configured public scheme | `http` or `https` |
 | `site:theme` | active public theme slug | theme slug |
 | `site:theme_css` | resolved theme slug that provides active CSS/assets | theme slug |
-| `site:theme_url` | resolved public theme asset base URL | absolute `/theme/{slug}/` URL with trailing slash |
+| `site:theme_url` | resolved public theme asset base URL | absolute `/theme/{slug}` URL without trailing slash |
 | `site:twitter_card` | resolved Twitter card type | card type string |
 | `site:twitter_creator` | resolved Twitter creator handle | handle string |
 | `site:twitter_image` | resolved Twitter image URL | absolute URL |
 | `site:twitter_site` | resolved Twitter site handle/name | handle or text string |
-| `site:url` | configured public site base URL | absolute site URL with trailing slash |
+| `site:url` | configured public site base URL | absolute site URL without trailing slash |
 | `tag:description` | tag route payload description when present | tag description text |
 | `tag:name` | tag route payload display name | tag name |
 | `tag:slug` | tag route payload slug | tag slug |
