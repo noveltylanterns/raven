@@ -26,17 +26,16 @@ return array (
   'meta' =>
   array (
     'apple_touch_icon' => 'https://SITE_DOMAIN/theme/logo.png',
+    'image' => 'https://SITE_DOMAIN/theme/logo.png',
     'robots' => 'index,follow',
     'twitter' =>
     array (
       'card' => 'summary',
       'site' => '',
       'creator' => '',
-      'image' => 'https://SITE_DOMAIN/theme/logo.png',
     ),
     'opengraph' =>
     array (
-      'image' => 'https://SITE_DOMAIN/theme/logo.png',
       'type' => 'website',
       'locale' => 'en_US',
     ),

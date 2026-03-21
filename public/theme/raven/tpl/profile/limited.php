@@ -13,10 +13,9 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 }
 ?>
 <section>
-{if profile:display_name_resolved}
-    <h1>{profile:display_name_resolved}</h1>
-{/if}
-{if not profile:display_name_resolved}
+{if profile:name}
+    <h1>{profile:name}</h1>
+{else}
     <h1>Profile</h1>
 {/if}
     <p class="text-muted">Limited profile view.</p>

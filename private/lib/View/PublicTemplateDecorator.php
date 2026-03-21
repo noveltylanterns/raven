@@ -66,6 +66,9 @@ final class PublicTemplateDecorator
     {
         unset($page['content']);
 
+        $page['desc'] = trim((string) ($page['description'] ?? ''));
+        unset($page['description']);
+
         $page['title_show'] = !array_key_exists('display_title', $page)
             || (int) ($page['display_title'] ?? 1) === 1;
         unset($page['show_title']);
@@ -148,15 +151,16 @@ final class PublicTemplateDecorator
     {
         $displayName = trim((string) ($profile['display_name'] ?? ''));
         $username = trim((string) ($profile['username'] ?? ''));
-        $profile['display_name_resolved'] = $displayName !== '' ? $displayName : $username;
+        $profile['name'] = $displayName !== '' ? $displayName : $username;
 
         $avatar = $this->avatarTemplateDataFromPath((string) ($profile['avatar_path'] ?? ''));
         $profile['avatar_filename'] = $avatar['filename'];
-        $profile['avatar_url'] = $avatar['url'];
-        $profile['avatar_thumb_url'] = $avatar['thumb_url'];
-        $profile['has_avatar'] = $avatar['filename'] !== '';
+        $profile['avatar_full'] = $avatar['url'];
+        $profile['avatar_thumb'] = $avatar['thumb_url'];
+        $profile['avatar'] = $avatar['filename'] !== '';
 
         $contacts = is_array($profile['contact_profiles'] ?? null) ? $profile['contact_profiles'] : [];
+        $contactValues = [];
         foreach ($contacts as $index => $contact) {
             if (!is_array($contact)) {
                 continue;
@@ -164,8 +168,22 @@ final class PublicTemplateDecorator
 
             $href = trim((string) ($contact['href'] ?? ''));
             $contacts[$index]['is_external'] = preg_match('#^https?://#i', $href) === 1;
+
+            $type = trim((string) ($contact['type'] ?? ''));
+            if ($type !== '' && !array_key_exists($type, $contactValues)) {
+                $contactValues[$type] = trim((string) ($contact['value'] ?? ''));
+            }
         }
-        $profile['contact_profiles'] = $contacts;
+        $profile['contacts'] = $contacts;
+        $profile['contact'] = $contactValues;
+
+        unset(
+            $profile['display_name_resolved'],
+            $profile['avatar_url'],
+            $profile['avatar_thumb_url'],
+            $profile['has_avatar'],
+            $profile['contact_profiles']
+        );
 
         return $profile;
     }
@@ -183,13 +201,20 @@ final class PublicTemplateDecorator
 
             $displayName = trim((string) ($member['display_name'] ?? ''));
             $username = trim((string) ($member['username'] ?? ''));
-            $members[$index]['display_name_resolved'] = $displayName !== '' ? $displayName : $username;
+            $members[$index]['name'] = $displayName !== '' ? $displayName : $username;
 
             $avatar = $this->avatarTemplateDataFromPath((string) ($member['avatar_path'] ?? ''));
             $members[$index]['avatar_filename'] = $avatar['filename'];
-            $members[$index]['avatar_url'] = $avatar['url'];
-            $members[$index]['avatar_thumb_url'] = $avatar['thumb_url'];
-            $members[$index]['has_avatar'] = $avatar['filename'] !== '';
+            $members[$index]['avatar_full'] = $avatar['url'];
+            $members[$index]['avatar_thumb'] = $avatar['thumb_url'];
+            $members[$index]['avatar'] = $avatar['filename'] !== '';
+
+            unset(
+                $members[$index]['display_name_resolved'],
+                $members[$index]['avatar_url'],
+                $members[$index]['avatar_thumb_url'],
+                $members[$index]['has_avatar']
+            );
         }
 
         return $members;
@@ -202,7 +227,8 @@ final class PublicTemplateDecorator
      */
     public function decorateGroupForTemplate(array $group, array $members): array
     {
-        $group['member_count'] = max(count($members), (int) ($group['member_count'] ?? 0));
+        $group['count'] = max(count($members), (int) ($group['member_count'] ?? 0));
+        unset($group['member_count']);
         return $group;
     }
 
@@ -227,19 +253,19 @@ final class PublicTemplateDecorator
             $theme = 'raven';
         }
 
-        $themeCss = trim((string) ($site['theme_css'] ?? $themeData['css'] ?? $theme));
-        if ($themeCss === '') {
-            $themeCss = 'raven';
+        $themeActive = trim((string) ($site['theme_active'] ?? $themeData['active'] ?? $theme));
+        if ($themeActive === '') {
+            $themeActive = 'raven';
         }
 
         $siteUrl = trim((string) ($site['url'] ?? ''));
         $themeUrl = trim((string) ($site['theme_url'] ?? $themeData['url'] ?? ''));
         if ($themeUrl === '' && $siteUrl !== '') {
-            $themeUrl = rtrim($siteUrl, '/') . '/theme/' . rawurlencode($themeCss);
+            $themeUrl = rtrim($siteUrl, '/') . '/theme/' . rawurlencode($themeActive);
         }
         $data['theme'] = [
             'slug' => $theme,
-            'css' => $themeCss,
+            'active' => $themeActive,
             'url' => $themeUrl,
         ];
 
@@ -290,10 +316,18 @@ final class PublicTemplateDecorator
             $site['twitter_creator'],
             $site['twitter_site'],
             $site['theme'],
-            $site['theme_css'],
+            $site['theme_active'],
             $site['theme_url'],
             $site['panel_path']
         );
+
+        foreach (['page', 'category', 'tag', 'channel'] as $root) {
+            if (!is_array($data[$root] ?? null)) {
+                continue;
+            }
+
+            $data[$root] = $this->normalizeDescTemplateField($data[$root]);
+        }
 
         $viewTitle = '';
         $metaDescription = '';
@@ -302,7 +336,7 @@ final class PublicTemplateDecorator
 
         if (is_array($data['page'] ?? null)) {
             $viewTitle = trim((string) ($data['page']['title'] ?? ''));
-            $metaDescription = trim((string) ($data['page']['description'] ?? ''));
+            $metaDescription = trim((string) ($data['page']['desc'] ?? ''));
         } elseif (is_array($data['category'] ?? null)) {
             $categoryName = trim((string) ($data['category']['name'] ?? ''));
             if ($categoryName !== '') {
@@ -311,7 +345,7 @@ final class PublicTemplateDecorator
                     $viewTitle .= ' (Page ' . $pageNumber . ')';
                 }
 
-                $metaDescription = trim((string) ($data['category']['description'] ?? ''));
+                $metaDescription = trim((string) ($data['category']['desc'] ?? ''));
                 if ($metaDescription === '') {
                     $metaDescription = 'Browse pages in category ' . $categoryName . '.';
                 }
@@ -324,10 +358,13 @@ final class PublicTemplateDecorator
                     $viewTitle .= ' (Page ' . $pageNumber . ')';
                 }
 
-                $metaDescription = 'Browse pages tagged ' . $tagName . '.';
+                $metaDescription = trim((string) ($data['tag']['desc'] ?? ''));
+                if ($metaDescription === '') {
+                    $metaDescription = 'Browse pages tagged ' . $tagName . '.';
+                }
             }
         } elseif (is_array($data['profile'] ?? null)) {
-            $profileName = trim((string) ($data['profile']['display_name_resolved'] ?? $data['profile']['display_name'] ?? ''));
+            $profileName = trim((string) ($data['profile']['name'] ?? $data['profile']['display_name'] ?? ''));
             if ($profileName === '') {
                 $profileName = trim((string) ($data['profile']['username'] ?? ''));
             }
@@ -398,6 +435,18 @@ final class PublicTemplateDecorator
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function normalizeDescTemplateField(array $payload): array
+    {
+        $payload['desc'] = trim((string) ($payload['desc'] ?? $payload['description'] ?? ''));
+        unset($payload['description']);
+
+        return $payload;
     }
 
     /**

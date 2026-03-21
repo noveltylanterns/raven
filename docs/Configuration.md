@@ -125,7 +125,7 @@ Grouped sections:
 
 Meta-path input behavior:
 
-- `meta.apple_touch_icon`, `meta.twitter.image`, and `meta.opengraph.image` are edited as local path input with a `{site.protocol}://{site.domain}/` prefix display.
+- `meta.apple_touch_icon` and `meta.image` are edited as local path input with a `{site.protocol}://{site.domain}/` prefix display.
 
 #### Security Tab
 
@@ -211,7 +211,7 @@ Important rules include:
 - cookie domain/prefix format validation
 - login throttling integer minimums
 - media image/avatar numeric and allowlist validation
-- `meta.opengraph.image` disallows full absolute URL paste and requires local path semantics
+- `meta.image` disallows full absolute URL paste and requires local path semantics
 - `debug.*` keys are normalized as booleans and seeded when missing
 
 ### UI Grouping And Rendering Model
@@ -293,14 +293,13 @@ The following config keys are expected to appear in this document and in runtime
 - `media.avatars.max_height`
 - `media.avatars.allowed_extensions`
 - `meta.apple_touch_icon`
+- `meta.image`
 - `meta.robots`
 - `meta.opengraph.type`
 - `meta.opengraph.locale`
-- `meta.opengraph.image`
 - `meta.twitter.card`
 - `meta.twitter.site`
 - `meta.twitter.creator`
-- `meta.twitter.image`
 - `session.cookie.name`
 - `session.cookie.domain`
 - `session.cookie.prefix`

@@ -43,6 +43,22 @@ final class TemplateTagCompiler
         $rawTagPlaceholders = [];
 
         $compiled = preg_replace_callback(
+            '/\{ifelse\s+not\s+' . $pathPattern . '\}/',
+            static fn (array $matches): string => '<?php elseif (!$__rvn_tags->truthy('
+                . var_export((string) ($matches[1] ?? ''), true)
+                . ', $__rvn_scope)): ?>',
+            $compiled
+        ) ?? $compiled;
+
+        $compiled = preg_replace_callback(
+            '/\{ifelse\s+' . $pathPattern . '\}/',
+            static fn (array $matches): string => '<?php elseif ($__rvn_tags->truthy('
+                . var_export((string) ($matches[1] ?? ''), true)
+                . ', $__rvn_scope)): ?>',
+            $compiled
+        ) ?? $compiled;
+
+        $compiled = preg_replace_callback(
             '/\{if\s+not\s+' . $pathPattern . '\}/',
             static fn (array $matches): string => '<?php if (!$__rvn_tags->truthy('
                 . var_export((string) ($matches[1] ?? ''), true)
@@ -59,6 +75,7 @@ final class TemplateTagCompiler
         ) ?? $compiled;
 
         $compiled = preg_replace('/\{\/if\}/', '<?php endif; ?>', $compiled) ?? $compiled;
+        $compiled = preg_replace('/\{else\}/', '<?php else: ?>', $compiled) ?? $compiled;
 
         $compiled = preg_replace_callback(
             '/\{each\s+' . $pathPattern . '\}/',
@@ -97,4 +114,3 @@ final class TemplateTagCompiler
         return $compiled;
     }
 }
-

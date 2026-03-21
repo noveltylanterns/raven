@@ -239,8 +239,8 @@ body { background: #fff; color: #212529; }
 - `tpl/page/index.php`
 - Channel landing render:
 - priority:
-- `tpl/channels/{channel_slug}.php`
-- `tpl/channels/index.php`
+- `tpl/channel/{channel_slug}.php`
+- `tpl/channel/index.php`
 - Category listing render:
 - priority:
 - `tpl/category/{category_slug}.php`
@@ -287,6 +287,8 @@ body { background: #fff; color: #212529; }
 - Conditionals:
 - `{if page:title}...{/if}`
 - `{if not tag:name}...{/if}`
+- `{if page:title}...{else}...{/if}`
+- `{if page:title}...{ifelse page:slug}...{else}...{/if}`
 - Loops:
 - `{each pages}...{/each}`
 - Inside loops, current row is available at `item`:
@@ -319,7 +321,7 @@ body { background: #fff; color: #212529; }
 - `tpl/status/denied.php`
 - `tpl/status/disabled.php`
 - `tpl/page/index.php`
-- `tpl/channels/index.php`
+- `tpl/channel/index.php`
 - `tpl/category/index.php`
 - `tpl/tag/index.php`
 - `tpl/profile/full.php`
@@ -333,8 +335,8 @@ body { background: #fff; color: #212529; }
 
 ## Template Data Contract
 - Wrapper receives:
-- `$site` with keys including `name`, `scheme`, `url`, `domain`, `current_url`
-- `$theme` with keys including `slug`, `css`, `url`
+- `$site` with keys including `name`, `protocol`, `url`, `domain`, `current_url`
+- `$theme` with keys including `slug`, `active`, `url`
 - `$panel` with keys including `slug`, `url`
 - `$meta` with keys including `title`, `desc`, `image`, `url`, `apple_touch_icon`, `robots`, `og_locale`, `og_type`, `x_card`, `x_creator`, and `x_site`
 - `$meta['image']` is the single shared image value used by the wrapper's `og:image` and `twitter:image` tags
@@ -343,39 +345,47 @@ body { background: #fff; color: #212529; }
 - category/tag routes: taxonomy preview/cover image
 - channel landing routes: channel preview/cover image
 - `$content` rendered body HTML
-- optionally one of: `$page`, `$category`, `$tag`, `$profile`, `$group`
+- optionally one of: `$page`, `$channel`, `$category`, `$tag`, `$profile`, `$group`
 - optionally `$pagination`
 - Home/page/channel templates receive:
 - `$site`
 - `$page`
+- optional `$channel` with `id`, `name`, `slug`, `desc`
 - `$page['channel_id']` (int|null)
+- `$page['id']` (int)
+- `$page['desc']` (string)
 - `$page['title_show']` (bool-like)
 - `$page['content'][]` rows with `html`, `css_id`, `class`
 - Gallery output is provided through `$page['content'][]` when a page body block uses gallery editor mode.
 - Category template receives:
 - `$site`
 - `$category`
+- `$category['id']`
+- `$category['desc']`
 - `$pages`
 - `$pagination`
 - `$pagination['links'][]` rows with `label`, `href`, `is_current`
 - Tag template receives:
 - `$site`
 - `$tag`
+- `$tag['id']`
+- `$tag['desc']`
 - `$pages`
 - `$pagination`
 - `$pagination['links'][]` rows with `label`, `href`, `is_current`
 - Profile template receives:
 - `$site`
 - `$profile`
-- `$profile['display_name_resolved']`, `has_avatar`, `avatar_url`, `avatar_thumb_url`
-- `$profile['contact_profiles'][]` rows include `label`, `value`, `href`, `is_external`
+- `$profile['id']`, `name`, `avatar`, `avatar_full`, `avatar_thumb`
+- `$profile['contact'][$type]` exposes direct contact values such as `x`, `email`, `homepage`
+- `$profile['contacts'][]` rows include `type`, `label`, `value`, `href`, `is_external`
 - Profile unavailable placeholder receives `profile_denied` (bool-like)
 - Group template receives:
 - `$site`
 - `$group`
 - `$members`
-- `$group['member_count']`
-- `$members[]` rows include `display_name_resolved`, `has_avatar`, `avatar_url`, `avatar_thumb_url`
+- `$group['id']`, `count`
+- `$members[]` rows include `id`, `name`, `avatar`, `avatar_full`, `avatar_thumb`
 - Group unavailable placeholder receives `group_denied` (bool-like)
 
 ## Embedded Form Rendering In Page Content

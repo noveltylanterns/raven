@@ -440,7 +440,7 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
     $isDebugCheckboxField = str_starts_with($path, 'debug.');
     $isImageUploadTargetField = $path === 'media.images.upload_target';
     $isNoLimitField = in_array($path, ['media.images.max_filesize_kb', 'media.images.max_files_per_upload', 'media.avatars.max_filesize_kb'], true);
-    $isDomainPrefixedMetaPathField = in_array($path, ['meta.twitter.image', 'meta.apple_touch_icon', 'meta.opengraph.image', 'panel.brand_logo'], true);
+    $isDomainPrefixedMetaPathField = in_array($path, ['meta.image', 'meta.apple_touch_icon', 'panel.brand_logo'], true);
     $isDbSpecificField = $path === 'database.table_prefix'
         || str_starts_with($path, 'database.sqlite.')
         || str_starts_with($path, 'database.mysql.')

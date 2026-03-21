@@ -245,7 +245,7 @@ PHP;
             ],
             'theme' => [
                 'slug' => 'raven',
-                'css' => 'raven',
+                'active' => 'raven',
                 'url' => 'http://localhost/theme/raven',
             ],
             'panel' => [
@@ -275,13 +275,13 @@ PHP;
             'category' => ['name' => 'Smoke Category', 'slug' => 'smoke-category'],
             'tag' => ['name' => 'Smoke Tag', 'slug' => 'smoke-tag'],
             'profile' => [
-                'display_name_resolved' => 'Smoke User',
+                'name' => 'Smoke User',
                 'username' => 'smoke',
-                'contact_profiles' => [],
+                'contacts' => [],
             ],
             'group' => [
                 'name' => 'Smoke Group',
-                'member_count' => 0,
+                'count' => 0,
             ],
             'members' => [],
             'pagination' => [

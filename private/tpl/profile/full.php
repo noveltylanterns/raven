@@ -13,10 +13,9 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 }
 ?>
 <section>
-{if profile:display_name_resolved}
-    <h1 class="mb-3">{profile:display_name_resolved}</h1>
-{/if}
-{if not profile:display_name_resolved}
+{if profile:name}
+    <h1 class="mb-3">{profile:name}</h1>
+{else}
     <h1 class="mb-3">Profile</h1>
 {/if}
 
@@ -24,21 +23,21 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
     <p class="text-muted">@{profile:username}</p>
 {/if}
 
-{if profile:has_avatar}
+{if profile:avatar}
     <p>
         <img
-            src="{profile:avatar_thumb_url}"
-            onerror="this.onerror=null;this.src='{profile:avatar_url}';"
-            alt="{profile:display_name_resolved}"
+            src="{profile:avatar_thumb}"
+            onerror="this.onerror=null;this.src='{profile:avatar_full}';"
+            alt="{profile:name}"
             class="img-thumbnail"
             style="max-width: 160px; height: auto;"
         >
     </p>
 {/if}
 
-{if profile:contact_profiles}
+{if profile:contacts}
     <ul class="list-unstyled mt-3">
-        {each profile:contact_profiles}
+        {each profile:contacts}
         <li>
             {if item:label}
             <strong>{item:label}:</strong>

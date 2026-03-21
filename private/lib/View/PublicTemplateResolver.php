@@ -57,15 +57,15 @@ final class PublicTemplateResolver
     {
         $normalizedSlug = $this->input->slug($channelSlug);
         if ($normalizedSlug === null) {
-            return 'channels/index';
+            return 'channel/index';
         }
 
-        $slugTemplate = 'channels/' . $normalizedSlug;
+        $slugTemplate = 'channel/' . $normalizedSlug;
         if ($this->resolveTemplateFile($slugTemplate, ...$lookupRoots) !== null) {
             return $slugTemplate;
         }
 
-        return 'channels/index';
+        return 'channel/index';
     }
 
     public function resolvePageTemplateName(?string $channelSlug, string ...$lookupRoots): string

@@ -136,7 +136,7 @@ Storage detail:
 - `/{channel}/{page-id}`
 - `/{channel}/{YYYY-MM-DD}-{page-id}`
 - `/{channel}/{YYYY-MM}-{page-id}`
-- Channel landing template priority: `views/channels/{channel_slug}.php` then `views/channels/index.php`.
+- Channel landing template priority: `views/channel/{channel_slug}.php` then `views/channel/index.php`.
 
 ### Security/Validation Expectations
 

@@ -190,6 +190,7 @@ final class PublicController
 
         $this->renderPublic($channelTemplate, [
             'site' => $site,
+            'channel' => is_array($channel) ? $channel : null,
             'page' => $page,
         ], 'wrapper');
     }
@@ -202,6 +203,7 @@ final class PublicController
         $requestedSlug = strtolower(trim($pageSlug));
         $lookupSlug = $requestedSlug;
         $lookupTarget = null;
+        $channel = null;
         $channelRouteMode = 'slug';
         $channelWordSeparator = 'inherit';
 
@@ -308,6 +310,7 @@ final class PublicController
 
         $this->renderPublic($pageTemplate, [
             'site' => $this->siteDataWithPageMeta($page),
+            'channel' => is_array($channel) ? $channel : null,
             'page' => $page,
         ], 'wrapper');
     }
@@ -1099,7 +1102,7 @@ final class PublicController
     /**
      * Collects site config values required by public templates.
      *
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
     private function siteData(): array
     {
@@ -1110,7 +1113,7 @@ final class PublicController
      * Returns site data with page-level social metadata overrides when available.
      *
      * @param array<string, mixed> $page
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
     private function siteDataWithPageMeta(array $page): array
     {
@@ -1131,8 +1134,8 @@ final class PublicController
      * Returns site data with taxonomy-level OG/Twitter image override when available.
      *
      * @param array<string, mixed> $taxonomy
-     * @param array<string, string>|null $baseSiteData
-     * @return array<string, string>
+     * @param array<string, mixed>|null $baseSiteData
+     * @return array<string, mixed>
      */
     private function siteDataWithTaxonomyMetaImage(array $taxonomy, ?array $baseSiteData = null): array
     {

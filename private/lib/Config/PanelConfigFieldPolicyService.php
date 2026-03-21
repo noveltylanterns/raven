@@ -369,16 +369,10 @@ final class PanelConfigFieldPolicyService
             return $this->input->text($value, 120);
         }
 
-        if (in_array($path, ['meta.twitter.image', 'meta.apple_touch_icon', 'panel.brand_logo'], true)) {
+        if (in_array($path, ['meta.image', 'meta.apple_touch_icon', 'panel.brand_logo'], true)) {
             $siteProtocol = (string) ($workingConfig['site']['protocol'] ?? $this->config->get('site.protocol', 'https'));
             $siteDomain = (string) ($workingConfig['site']['domain'] ?? $this->config->get('site.domain', ''));
             return $this->normalizer->normalizeMetaAbsoluteUrlPathValue($siteProtocol, $siteDomain, $value);
-        }
-
-        if ($path === 'meta.opengraph.image') {
-            $siteProtocol = (string) ($workingConfig['site']['protocol'] ?? $this->config->get('site.protocol', 'https'));
-            $siteDomain = (string) ($workingConfig['site']['domain'] ?? $this->config->get('site.domain', ''));
-            return $this->normalizer->normalizeMetaAbsoluteUrlPathValue($siteProtocol, $siteDomain, $value, false);
         }
 
         if ($path === 'panel.default_theme') {

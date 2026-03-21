@@ -360,7 +360,7 @@ Sometimes temporary files get stashed here.
 #### /private/tpl/
 Core fallback templates:
 - `/private/tpl/category/index.php` - Core fallback category listing template.
-- `/private/tpl/channels/index.php` - Core fallback channel landing template.
+- `/private/tpl/channel/index.php` - Core fallback channel landing template.
 - `/private/tpl/group/index.php` - Core fallback group-route wrapper/entry template.
 - `/private/tpl/group/limited.php` - Core fallback limited-visibility group listing template.
 - `/private/tpl/group/list.php` - Core fallback group listing template.

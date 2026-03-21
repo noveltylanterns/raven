@@ -102,7 +102,7 @@ Common shared keys:
 - `site:protocol`
 - `site:current_url`
 - `theme:slug`
-- `theme:css`
+- `theme:active`
 - `theme:url`
 - `panel:slug`
 - `panel:url`
@@ -200,9 +200,12 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
+| `{else}` | fallback branch inside an open `{if ...}` block | no output |
 | `{/each}` | closes `{each ...}` loop scope | no output |
 | `{/if}` | closes `{if ...}` conditional | no output |
 | `{each path}` | iterates an array tag path such as `{each pages}` or `{each pagination:links}` | no direct output; pushes `item` loop scope |
+| `{ifelse not path}` | elseif falsy check inside an open `{if ...}` block | no direct output; conditionally renders enclosed markup |
+| `{ifelse path}` | elseif truthy check inside an open `{if ...}` block | no direct output; conditionally renders enclosed markup |
 | `{if not path}` | falsy check for a tag path such as `{if not profile_denied}` | no direct output; conditionally renders enclosed markup |
 | `{if path}` | truthy check for a tag path such as `{if page:title_show}` | no direct output; conditionally renders enclosed markup |
 | `{path}` | escaped scalar lookup such as `{site:name}` | HTML-escaped string |
@@ -214,52 +217,63 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
-| `category:description` | category route payload description when present | category description text |
+| `category:desc` | category route payload description when present | category description text |
+| `category:id` | category route payload id | integer id |
 | `category:name` | category route payload display name | category name |
 | `category:slug` | category route payload slug | category slug |
 
-#### 9.2.2 Content Tags
+#### 9.2.2 Channel Tags
+
+| Key | What It Calls | Returns |
+| --- | --- | --- |
+| `channel:desc` | channel route payload description when present | channel description text |
+| `channel:id` | channel route payload id | integer id |
+| `channel:name` | channel route payload display name | channel name |
+| `channel:slug` | channel route payload slug | channel slug |
+
+#### 9.2.3 Content Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
 | `content` | wrapper-layout rendered inner template body | rendered HTML string; use with `{raw:content}` |
 
-#### 9.2.3 Group Tags
+#### 9.2.4 Group Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
-| `group:member_count` | group route payload normalized member count | integer-like member count |
+| `group:count` | group route payload normalized member count | integer-like member count |
+| `group:id` | group route payload id | integer id |
 | `group:name` | group route payload display name | group name |
 | `group:slug` | group route payload slug | group slug |
 | `group_denied` | group placeholder payload flag for private-mode denial | boolean-like truthy/falsey flag |
 
-#### 9.2.4 Item Tags
+#### 9.2.5 Item Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
 | `item:alt_text` | current loop item image alt text, when iterating gallery-like rows | image alt text |
-| `item:avatar_thumb_url` | current loop item avatar thumbnail URL, when iterating `members` | avatar thumbnail URL |
-| `item:avatar_url` | current loop item avatar URL, when iterating `members` | avatar original URL |
+| `item:avatar` | current loop item avatar-presence flag, when iterating `members` | boolean-like truthy/falsey flag |
+| `item:avatar_full` | current loop item avatar URL, when iterating `members` | avatar original URL |
+| `item:avatar_thumb` | current loop item avatar thumbnail URL, when iterating `members` | avatar thumbnail URL |
 | `item:caption` | current loop item caption, when iterating gallery-like rows | caption text |
 | `item:channel_slug` | current loop item channel slug, when iterating `pages` | channel slug |
 | `item:class` | current loop item CSS class string, when iterating `page:content` | CSS class list |
 | `item:css_id` | current loop item CSS id token, when iterating `page:content` | CSS id |
-| `item:display_name_resolved` | current loop item display name, when iterating `members` | resolved display name |
 | `item:flags:featured` | nested loop-item flag example supported by path resolver | scalar nested flag value |
 | `item:full_url` | current loop item full-size image URL, when iterating gallery-like rows | absolute or root-relative image URL |
-| `item:has_avatar` | current loop item avatar-presence flag, when iterating `members` | boolean-like truthy/falsey flag |
 | `item:href` | current loop item link href, when iterating pagination or contact rows | URL/path string |
 | `item:html` | current loop item rendered HTML fragment, when iterating `page:content` | trusted HTML string; use with `{raw:item:html}` |
 | `item:image_url` | current loop item image URL, when iterating gallery-like rows | absolute or root-relative image URL |
 | `item:is_current` | current loop item current-page flag, when iterating `pagination:links` | boolean-like truthy/falsey flag |
-| `item:is_external` | current loop item external-link flag, when iterating `profile:contact_profiles` | boolean-like truthy/falsey flag |
+| `item:is_external` | current loop item external-link flag, when iterating `profile:contacts` | boolean-like truthy/falsey flag |
 | `item:label` | current loop item label, when iterating pagination or contact rows | label text |
+| `item:name` | current loop item display name, when iterating `members` | display name or username fallback |
 | `item:title` | current loop item title, when iterating `pages` | page title |
 | `item:url` | current loop item public URL, when iterating `pages` | root-relative page URL |
 | `item:username` | current loop item username, when iterating `members` | username |
-| `item:value` | current loop item value, when iterating `profile:contact_profiles` | contact value text |
+| `item:value` | current loop item value, when iterating `profile:contacts` | contact value text |
 
-#### 9.2.5 Meta Tags
+#### 9.2.6 Meta Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -275,26 +289,27 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `meta:x_creator` | public template X creator value | creator handle or name string |
 | `meta:x_site` | public template X site value | site handle or name string |
 
-#### 9.2.6 Member Tags
+#### 9.2.7 Member Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
 | `members` | group route member list | array for `{each members}` |
 
-#### 9.2.7 Page Tags
+#### 9.2.8 Page Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
 | `page:channel_id` | page payload parent channel id when page belongs to a channel | integer id or empty |
 | `page:channel_slug` | page payload channel slug when page belongs to a channel | channel slug |
 | `page:content` | page payload rendered content block rows | array for `{each page:content}` |
-| `page:description` | page payload description when present | page description text |
+| `page:desc` | page payload description when present | page description text |
+| `page:id` | page payload id | integer id |
 | `page:slug` | page payload slug | page slug |
 | `page:title` | page payload title | page title |
 | `page:title_show` | page payload normalized display-title flag | boolean-like truthy/falsey flag |
 | `pages` | category/tag route page list | array for `{each pages}` |
 
-#### 9.2.8 Pagination Tags
+#### 9.2.9 Pagination Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -305,26 +320,28 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `pagination:total_items` | pagination payload total item count | integer-like total count |
 | `pagination:total_pages` | pagination payload total page count | integer-like total pages |
 
-#### 9.2.9 Panel Tags
+#### 9.2.10 Panel Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
 | `panel:slug` | configured panel route prefix | panel path slug |
 | `panel:url` | absolute panel base URL | absolute panel URL without trailing slash |
 
-#### 9.2.10 Profile Tags
+#### 9.2.11 Profile Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
-| `profile:avatar_thumb_url` | profile payload avatar thumbnail URL | avatar thumbnail URL |
-| `profile:avatar_url` | profile payload avatar URL | avatar original URL |
-| `profile:contact_profiles` | profile payload normalized contact rows | array for `{each profile:contact_profiles}` |
-| `profile:display_name_resolved` | profile payload resolved display name | display name or username fallback |
-| `profile:has_avatar` | profile payload avatar-presence flag | boolean-like truthy/falsey flag |
+| `profile:avatar` | profile payload avatar-presence flag | boolean-like truthy/falsey flag |
+| `profile:avatar_full` | profile payload avatar URL | avatar original URL |
+| `profile:avatar_thumb` | profile payload avatar thumbnail URL | avatar thumbnail URL |
+| `profile:contact:{type}` | profile payload contact value by type such as `profile:contact:x` | contact value text |
+| `profile:contacts` | profile payload normalized contact rows | array for `{each profile:contacts}` |
+| `profile:id` | profile payload id | integer id |
+| `profile:name` | profile payload resolved display name | display name or username fallback |
 | `profile:username` | profile payload username | username |
 | `profile_denied` | profile placeholder payload flag for private-mode denial | boolean-like truthy/falsey flag |
 
-#### 9.2.11 Redirect Tags
+#### 9.2.12 Redirect Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -332,7 +349,7 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `redirect:disabled` | strict template redirect to `status/disabled` | internal redirect token; render it alone to delegate the view |
 | `redirect:404` | strict template redirect to `status/404` | internal redirect token; render it alone to delegate the view |
 
-#### 9.2.12 Site Tags
+#### 9.2.13 Site Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -342,19 +359,20 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `site:protocol` | configured public protocol | `http` or `https` |
 | `site:url` | configured public site base URL | absolute site URL without trailing slash |
 
-#### 9.2.13 Tag Tags
+#### 9.2.14 Tag Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
-| `tag:description` | tag route payload description when present | tag description text |
+| `tag:desc` | tag route payload description when present | tag description text |
+| `tag:id` | tag route payload id | integer id |
 | `tag:name` | tag route payload display name | tag name |
 | `tag:slug` | tag route payload slug | tag slug |
 
-#### 9.2.14 Theme Tags
+#### 9.2.15 Theme Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
-| `theme:css` | resolved theme slug that provides active CSS/assets | theme slug |
+| `theme:active` | resolved theme slug that provides active CSS/assets | theme slug |
 | `theme:slug` | active public theme slug | theme slug |
 | `theme:url` | resolved public theme asset base URL | absolute `/theme/{slug}` URL without trailing slash |
 

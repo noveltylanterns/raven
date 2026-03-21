@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/public/theme/raven/tpl/channels/index.php
+ * ~/public/theme/raven/tpl/channel/index.php
  * Public-facing channel landing template for site output.
  * Docs: https://raven.lanterns.io
  */
@@ -16,8 +16,8 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 {if page:title_show}
     <h1>{page:title}</h1>
 {/if}
-{if page:channel_slug}
-    <p class="text-muted small">Channel: {page:channel_slug}</p>
+{if channel:slug}
+    <p class="text-muted small">Channel: {channel:slug}</p>
 {/if}
 {if page:content}
 {each page:content}

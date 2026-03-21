@@ -4,6 +4,7 @@
 
 ### March 21, 2026
 
+- Continued the public-template contract cleanup: renamed profile avatar/name/contact tags to `profile:avatar*` / `profile:name` / `profile:contacts`, added direct `profile:contact:{type}` lookups, renamed `group:member_count` to `group:count`, renamed template-facing `*:description` values to `*:desc`, added documented `*:id` and `channel:*` roots, added `{else}` / `{ifelse ...}` compiler support, collapsed config meta images to one `meta.image` key, and moved channel landing templates from `tpl/channels/*` to `tpl/channel/*`.
 - Renamed the strict 404 theme redirect tag from `redirect:not_found` to `redirect:404`, updated the core profile fallback template and theme smoke/docs to use the numeric form, and removed the temporary legacy alias after confirming nothing active still depended on it.
 - Collapsed runtime social-image payloads to one shared `meta:image` source, so wrappers emit both `og:image` and `twitter:image` from the same value instead of carrying separate `og_image`/`twitter_image` fields through the template payload.
 - Tightened page-level meta image override behavior so only the page image explicitly marked as preview can override the site default, and only its `lg` variant URL is used for the shared wrapper meta image.

@@ -48,12 +48,12 @@ final class SiteContextBuilder
         string $siteUrl,
         string $currentUrl,
         string $publicTheme,
-        string $publicThemeCss,
+        string $publicThemeActive,
         string $metaImage
     ): array {
-        $themeUrl = $this->themeUrl($siteUrl, $publicThemeCss);
+        $themeUrl = $this->themeUrl($siteUrl, $publicThemeActive);
 
-        return array_merge($this->publicMetaBase($config, $publicTheme, $publicThemeCss), [
+        return array_merge($this->publicMetaBase($config, $publicTheme, $publicThemeActive), [
             'url' => $siteUrl,
             'current_url' => $currentUrl,
             'theme_url' => $themeUrl,
@@ -64,14 +64,14 @@ final class SiteContextBuilder
     /**
      * @return array<string, string>
      */
-    public function publicFallback(Config $config, string $publicTheme, string $publicThemeCss): array
+    public function publicFallback(Config $config, string $publicTheme, string $publicThemeActive): array
     {
         $siteUrl = $this->siteUrlFromConfig($config);
 
-        return array_merge($this->publicMetaBase($config, $publicTheme, $publicThemeCss), [
+        return array_merge($this->publicMetaBase($config, $publicTheme, $publicThemeActive), [
             'url' => $siteUrl,
             'current_url' => '',
-            'theme_url' => $this->themeUrl($siteUrl, $publicThemeCss),
+            'theme_url' => $this->themeUrl($siteUrl, $publicThemeActive),
             'meta_image' => $this->defaultMetaImageFromConfig($config),
         ]);
     }
@@ -79,7 +79,7 @@ final class SiteContextBuilder
     /**
      * @return array<string, string>
      */
-    private function publicMetaBase(Config $config, string $publicTheme, string $publicThemeCss): array
+    private function publicMetaBase(Config $config, string $publicTheme, string $publicThemeActive): array
     {
         return [
             'name' => (string) $config->get('site.name', 'Raven CMS'),
@@ -94,18 +94,13 @@ final class SiteContextBuilder
             'og_type' => trim((string) $config->get('meta.opengraph.type', 'website')),
             'og_locale' => trim((string) $config->get('meta.opengraph.locale', 'en_US')),
             'theme' => $publicTheme,
-            'theme_css' => $publicThemeCss,
+            'theme_active' => $publicThemeActive,
         ];
     }
 
     private function defaultMetaImageFromConfig(Config $config): string
     {
-        $opengraph = trim((string) $config->get('meta.opengraph.image', ''));
-        if ($opengraph !== '') {
-            return $opengraph;
-        }
-
-        return trim((string) $config->get('meta.twitter.image', ''));
+        return trim((string) $config->get('meta.image', ''));
     }
 
     private function siteProtocolFromConfig(Config $config): string

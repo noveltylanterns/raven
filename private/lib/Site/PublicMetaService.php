@@ -39,14 +39,14 @@ final class PublicMetaService
         $publicTheme = $this->themeCatalogService->activeSlugFromConfig($config);
         $configuredProtocol = (string) $config->get('site.protocol', 'https');
         $configuredDomain = (string) $config->get('site.domain', 'localhost');
-        $publicThemeCss = $this->themeCatalogService->cssSlug($publicTheme);
+        $publicThemeActive = $this->themeCatalogService->cssSlug($publicTheme);
 
         return $this->siteContextBuilder->publicBase(
             $config,
             $this->requestContextResolver->siteBaseUrl($configuredDomain, $configuredProtocol),
             $this->requestContextResolver->currentRequestUrl($configuredDomain, $configuredProtocol),
             $publicTheme,
-            $publicThemeCss,
+            $publicThemeActive,
             $this->resolvedConfiguredMetaImageUrl($config, $configuredDomain, $configuredProtocol)
         );
     }
@@ -161,10 +161,7 @@ final class PublicMetaService
         string $configuredDomain,
         string $configuredProtocol
     ): string {
-        $configured = trim((string) $config->get('meta.opengraph.image', ''));
-        if ($configured === '') {
-            $configured = trim((string) $config->get('meta.twitter.image', ''));
-        }
+        $configured = trim((string) $config->get('meta.image', ''));
 
         return $this->absoluteMetaImageUrl($configured, $configuredDomain, $configuredProtocol);
     }
