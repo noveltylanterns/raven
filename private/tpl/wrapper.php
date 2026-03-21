@@ -15,7 +15,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 <!doctype html>
 <html lang="en">
 <head>
-    <title>{view_meta:document_title}</title>
+    <title>{meta:document_title}</title>
 {if site:apple_touch_icon}
     <link rel="apple-touch-icon" href="{site:apple_touch_icon}">
 {/if}
@@ -25,22 +25,22 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
     <link rel="icon" type="image/png" href="/theme/raven/img/favicon.png">
     <link rel="stylesheet" href="/theme/fallback.css">
     <meta charset="utf-8">
-{if view_meta:description}
-    <meta name="description" content="{view_meta:description}">
+{if meta:description}
+    <meta name="description" content="{meta:description}">
 {/if}
 {if site:robots}
     <meta name="robots" content="{site:robots}">
 {/if}
     <meta name="viewport" content="width=device-width, initial-scale=1">
-{if view_meta:description}
-    <meta property="og:description" content="{view_meta:description}">
+{if meta:description}
+    <meta property="og:description" content="{meta:description}">
 {/if}
 {if site:og_image}
     <meta property="og:image" content="{site:og_image}">
 {/if}
     <meta property="og:locale" content="{site:og_locale}">
     <meta property="og:site_name" content="{site:name}">
-    <meta property="og:title" content="{view_meta:document_title}">
+    <meta property="og:title" content="{meta:document_title}">
     <meta property="og:type" content="{site:og_type}">
 {if site:current_url}
     <meta property="og:url" content="{site:current_url}">
@@ -51,8 +51,8 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 {if site:twitter_creator}
     <meta property="twitter:creator" content="{site:twitter_creator}">
 {/if}
-{if view_meta:description}
-    <meta property="twitter:description" content="{view_meta:description}">
+{if meta:description}
+    <meta property="twitter:description" content="{meta:description}">
 {/if}
 {if site:twitter_image}
     <meta property="twitter:image" content="{site:twitter_image}">
@@ -60,7 +60,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 {if site:twitter_site}
     <meta property="twitter:site" content="{site:twitter_site}">
 {/if}
-    <meta property="twitter:title" content="{view_meta:document_title}">
+    <meta property="twitter:title" content="{meta:document_title}">
 {if site:current_url}
     <meta property="twitter:url" content="{site:current_url}">
 {/if}
@@ -68,7 +68,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 <body>
 
 <header>
-    <h1><a href="{site:domain}" title="{site:name}">{site:name}</a></h1>
+    <h1><a href="{site:url}" title="{site:name}">{site:name}</a></h1>
 </header>
 
 <main class="container">

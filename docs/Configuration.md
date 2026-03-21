@@ -46,6 +46,7 @@ Tab behavior notes:
 
 - `Site` section:
   - core `site.*` fields
+  - `site.scheme` controls whether Raven emits generated absolute URLs as `http://` or `https://`
   - `site.default_theme` remains stored in `private/config.php` but is managed via Theme Manager / `rvn-theme` (not editable in Configuration)
 - `Panel` section:
   - `panel.path`
@@ -124,7 +125,7 @@ Grouped sections:
 
 Meta-path input behavior:
 
-- `meta.apple_touch_icon`, `meta.twitter.image`, and `meta.opengraph.image` are edited as local path input with a `https://{site.domain}/` prefix display.
+- `meta.apple_touch_icon`, `meta.twitter.image`, and `meta.opengraph.image` are edited as local path input with a `{site.scheme}://{site.domain}/` prefix display.
 
 #### Security Tab
 
@@ -202,7 +203,7 @@ Path-specific normalization is centralized in `normalizeConfigFieldValue(...)` a
 
 Important rules include:
 
-- constrained enums (`site.enabled`, `database.driver`, `captcha.provider`, `mail.agent`, etc.)
+- constrained enums (`site.enabled`, `site.scheme`, `database.driver`, `captcha.provider`, `mail.agent`, etc.)
 - `panel.default_theme` constrained to `corp`, `ice`, or `midnight` (legacy `light`/`dark` normalize to `corp`/`midnight`)
 - `user.auth.login` constrained to `email` or `username`
 - `user.auth.registration` constrained to `open`, `invite`, or `closed`
@@ -236,6 +237,7 @@ The following config keys are expected to appear in this document and in runtime
 
 - `site.domain`
 - `site.enabled`
+- `site.scheme`
 - `site.name`
 - `panel.path`
 - `panel.default_theme`

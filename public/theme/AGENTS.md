@@ -66,7 +66,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= \Raven\Core\Support\e((string) ($site['name'] ?? 'Raven CMS')); ?></title>
-  <link rel="stylesheet" href="/theme/<?= \Raven\Core\Support\e((string) ($site['public_theme_css'] ?? $site['public_theme'] ?? 'raven')); ?>/css/style.css">
+  <link rel="stylesheet" href="<?= \Raven\Core\Support\e((string) ($site['theme_url'] ?? '/theme/raven/')); ?>css/style.css">
 </head>
 <body>
 <?= $content ?? ''; ?>
@@ -90,7 +90,7 @@ body { background: #fff; color: #212529; }
 ## Common Failure Patterns To Avoid
 - Putting templates in `private/tpl/` instead of `public/theme/{slug}/tpl/`.
 - Forgetting wrapper guard, which allows direct template execution.
-- Hardcoding a theme slug in asset paths instead of using `$site['public_theme_css']` resolution.
+- Hardcoding a theme slug in asset paths instead of using `$site['theme_url']`.
 - Overriding too many templates unnecessarily instead of inheriting fallback behavior.
 
 ## Critical Rule: Do Not Modify Core
@@ -115,7 +115,7 @@ body { background: #fff; color: #212529; }
 - CSS pipeline contract is: `composer/twbs/bootstrap/scss/bootstrap` -> `public/theme/{slug}/scss/style.scss` -> `public/theme/{slug}/css/style.css`.
 - In stock Raven theme, `public/theme/raven/scss/style.scss` imports Bootstrap SCSS directly with `@import "../../../../composer/twbs/bootstrap/scss/bootstrap";`.
 - Theme variables/tokens must be set in `scss/style.scss` before the Bootstrap import when you need to override Bootstrap defaults.
-- The public wrapper loads only `/theme/{resolved_css_slug}/css/style.css`; do not add a separate Bootstrap CSS link in wrapper templates.
+- The public wrapper loads only `{site:theme_url}css/style.css`; do not add a separate Bootstrap CSS link in wrapper templates.
 - You can hand-write `css/style.css`, but the most update-proof and efficient approach is a single-entry `scss/style.scss` that compiles the full Bootstrap stack plus your overrides.
 - For most basic UI customization (type scale, spacing, colors, buttons, forms, utilities), the Sass pipeline is the preferred editing path.
 - `css/style.css` is a build artifact. Treat `scss/style.scss` (and partials) as source of truth, then recompile.
@@ -161,7 +161,7 @@ body { background: #fff; color: #212529; }
 - Template lookup searches each chain member in order, then `private/tpl/` fallback.
 - CSS lookup uses the first theme in chain containing `css/style.css`.
 - Core fallback wrapper (`private/tpl/wrapper.php`) does not use resolved theme CSS; it always loads `/theme/fallback.css`.
-- Wrapper uses that same resolved CSS slug for favicon path (`/theme/{resolved_css_slug}/img/favicon.png`).
+- Wrapper uses that same resolved CSS slug for favicon path (`{site:theme_url}img/favicon.png`).
 - There is no general automatic fallback resolver for arbitrary image/js files; fallback behavior is explicit in template code.
 - If a child theme wants its own favicon while inheriting parent CSS, override `tpl/wrapper.php`.
 
@@ -281,7 +281,7 @@ body { background: #fff; color: #212529; }
 - Loops:
 - `{each pages}...{/each}`
 - Inside loops, current row is available at `item`:
-- `{item:title}`, `{item:public_path}`, `{item:channel_slug}`
+- `{item:title}`, `{item:url}`, `{item:channel_slug}`
 
 ### Path Resolution Rules
 - Paths are colon-delimited: `{root:child:leaf}`.
@@ -314,8 +314,8 @@ body { background: #fff; color: #212529; }
 
 ## Template Data Contract
 - Wrapper receives:
-- `$site` with keys including `name`, `domain`, `panel_path`, `current_url`, `robots`, `twitter_*`, `og_*`, `public_theme`, `public_theme_css`
-- `$view_meta` with keys: `title`, `description`, `document_title`
+- `$site` with keys including `name`, `scheme`, `url`, `theme`, `theme_css`, `theme_url`, `domain`, `panel_path`, `current_url`, `robots`, `twitter_*`, `og_*`
+- `$meta` with keys: `title`, `description`, `document_title`
 - `$site['og_image']`/`$site['twitter_image']` default to global meta config values, but runtime may override them by route context:
 - page/home routes: page preview image
 - category/tag routes: taxonomy preview/cover image
@@ -326,10 +326,9 @@ body { background: #fff; color: #212529; }
 - Home/page/channel templates receive:
 - `$site`
 - `$page`
-- `$page['display_title_resolved']` (bool-like)
+- `$page['show_title']` (bool-like)
 - `$page['extended_blocks'][]` rows with `html`, `css_id`, `class`
-- Gallery output is now provided through `$page['extended_blocks'][]` when a page body block uses gallery editor mode.
-- Home/page/channel templates should not depend on standalone `$galleryEnabled` or `$galleryImages` variables.
+- Gallery output is provided through `$page['extended_blocks'][]` when a page body block uses gallery editor mode.
 - Category template receives:
 - `$site`
 - `$category`
@@ -347,14 +346,14 @@ body { background: #fff; color: #212529; }
 - `$profile`
 - `$profile['display_name_resolved']`, `has_avatar`, `avatar_url`, `avatar_thumb_url`
 - `$profile['contact_profiles'][]` rows include `label`, `value`, `href`, `is_external`
-- Profile unavailable placeholder receives `profile_show_denied` (bool-like)
+- Profile unavailable placeholder receives `profile_denied` (bool-like)
 - Group template receives:
 - `$site`
 - `$group`
 - `$members`
-- `$group['member_count_resolved']`
+- `$group['member_count']`
 - `$members[]` rows include `display_name_resolved`, `has_avatar`, `avatar_url`, `avatar_thumb_url`
-- Group unavailable placeholder receives `group_show_denied` (bool-like)
+- Group unavailable placeholder receives `group_denied` (bool-like)
 
 ## Embedded Form Rendering In Page Content
 - Page `content` and `extended_blocks` are shortcode-processed at runtime.

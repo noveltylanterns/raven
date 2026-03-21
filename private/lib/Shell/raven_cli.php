@@ -2670,9 +2670,9 @@ function raven_cli_theme_scaffold_files(array $meta): array
         . "<head>\n"
         . "  <meta charset=\"utf-8\">\n"
         . "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
-        . "  <title>{view_meta:document_title}</title>\n"
-        . "  <meta name=\"description\" content=\"{view_meta:description}\">\n"
-        . "  <link rel=\"stylesheet\" href=\"/theme/{site:public_theme_css}/css/style.css\">\n"
+        . "  <title>{meta:document_title}</title>\n"
+        . "  <meta name=\"description\" content=\"{meta:description}\">\n"
+        . "  <link rel=\"stylesheet\" href=\"{site:theme_url}css/style.css\">\n"
         . "</head>\n"
         . "<body>\n"
         . "{raw:content}\n"
@@ -2694,7 +2694,7 @@ function raven_cli_theme_scaffold_files(array $meta): array
         . "?>\n"
         . "<section class=\"container py-4\">\n"
         . "  <h1>{site:name}</h1>\n"
-        . "  {if page:display_title_resolved}<h2>{page:title}</h2>{/if}\n"
+        . "  {if page:show_title}<h2>{page:title}</h2>{/if}\n"
         . "  <div>{raw:page:content}</div>\n"
         . "</section>\n";
 

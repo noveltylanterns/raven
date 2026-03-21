@@ -46,7 +46,11 @@ $siteDomainRaw = trim($siteDomainRaw);
 if ($siteDomainRaw === '') {
     $siteDomainRaw = 'localhost';
 }
-$metaUrlPathPrefix = 'https://' . $siteDomainRaw . '/';
+$siteSchemeRaw = strtolower(trim((string) (($configSnapshot['site']['scheme'] ?? 'https'))));
+if (!in_array($siteSchemeRaw, ['http', 'https'], true)) {
+    $siteSchemeRaw = 'https';
+}
+$metaUrlPathPrefix = $siteSchemeRaw . '://' . $siteDomainRaw . '/';
 
 // Split configuration fields by top-level section so the editor can present tabbed panes.
 $basicSiteConfigFields = [];
@@ -425,6 +429,7 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
     $isDefaultTextEditorField = $path === 'content.default_editor';
     $isPageUrlSeparatorField = $path === 'content.separator';
     $isSiteEnabledField = $path === 'site.enabled';
+    $isSiteSchemeField = $path === 'site.scheme';
     $isPanelDefaultThemeField = $path === 'panel.default_theme';
     $isPublicProfilesModeField = $path === 'user.privacy';
     $isShowGroupsField = $path === 'group.privacy';
@@ -477,7 +482,7 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
             $inputValue = ltrim($inputValue, '/');
         }
     }
-    $isRequired = in_array($path, ['site.domain', 'panel.path', 'site.enabled', 'database.driver', 'captcha.provider', 'mail.agent', 'content.default_editor', 'content.separator', 'panel.default_theme', 'session.cookie.name', 'user.privacy', 'group.privacy', 'user.auth.login', 'user.auth.registration'], true);
+    $isRequired = in_array($path, ['site.domain', 'site.scheme', 'panel.path', 'site.enabled', 'database.driver', 'captcha.provider', 'mail.agent', 'content.default_editor', 'content.separator', 'panel.default_theme', 'session.cookie.name', 'user.privacy', 'group.privacy', 'user.auth.login', 'user.auth.registration'], true);
     $disableUriNote = match ($path) {
         'category.prefix' => ' (leave blank to disable category URIs)',
         'tag.prefix' => ' (leave blank to disable tag URIs)',
@@ -580,6 +585,16 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
                 <option value="public"<?= (string) $field['value'] === 'public' ? ' selected' : '' ?>>Public</option>
                 <option value="private"<?= (string) $field['value'] === 'private' ? ' selected' : '' ?>>Private</option>
                 <option value="disabled"<?= (string) $field['value'] === 'disabled' ? ' selected' : '' ?>>Disabled</option>
+            </select>
+        <?php elseif ($isSiteSchemeField): ?>
+            <select
+                class="form-select font-monospace"
+                id="<?= e($inputId) ?>"
+                name="<?= e($fieldName) ?>"
+                required
+            >
+                <option value="https"<?= (string) $field['value'] === 'https' ? ' selected' : '' ?>>https</option>
+                <option value="http"<?= (string) $field['value'] === 'http' ? ' selected' : '' ?>>http</option>
             </select>
         <?php elseif ($isPanelDefaultThemeField): ?>
             <!-- Default panel theme is constrained to supported panel variants. -->

@@ -4,6 +4,10 @@
 
 ### March 19, 2026
 
+- Added `site.scheme` runtime config plus public template `site:url`/`site:scheme` data so wrappers can emit a deterministic home URL with trailing slash, and rewired generated absolute public/meta URLs to honor the configured `http` vs `https` scheme instead of inferring it only from the incoming request.
+- Added `site:theme`, `site:theme_css`, and `site:theme_url` public template data, and updated stock/scaffold wrappers to use the shorter canonical theme keys.
+- Renamed the public template metadata root to the shorter canonical `meta:*` namespace and updated stock/scaffold wrappers plus theme docs to match.
+- Shortened the remaining public template payload names to canonical forms (`item:url`, `page:show_title`, `group:member_count`, `profile_denied`, `group_denied`) and removed stale gallery-root references from theme docs.
 - Moved extension enablement state persistence/template to `private/dat/ext/.state.php` and `private/dat/ext/.state.php.dist`, updated installer/CLI/runtime/docs accordingly, and kept a legacy read fallback for older installs that still have `private/ext/.state.php`.
 - Added long-term architecture guardrails to `AGENTS.md` defining the ownership boundary as `private/sys` = core runtime/orchestration, `private/lib` = reusable core modules, `private/ext` = user-provided or official plugin-style feature code, `private/tpl` = views/templates, and `private/dat` = persistent non-`.tmp` runtime data, with explicit placement rules to keep future modularization from drifting backward.
 - Continued core modularization cleanup for public template routing: moved theme-chain lookup/root orchestration out of `PublicController` into `private/lib/View/PublicTemplatePipeline.php` (`renderForThemeChain` + route-template resolvers), rewired controller call sites, and removed redundant controller wrapper methods.

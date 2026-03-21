@@ -17,6 +17,7 @@ declare(strict_types=1);
 return array (
   'site' =>
   array (
+    'scheme' => 'https',
     'domain' => 'SITE_DOMAIN',
     'name' => 'Raven CMS',
     'enabled' => 'public',

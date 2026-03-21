@@ -12,13 +12,13 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
     exit('Not Found');
 }
 ?>
-{if group_show_denied}
+{if group_denied}
 <section>
     <h2>Permission Denied</h2>
     <p>You do not have permission to access this page.</p>
 </section>
 {/if}
-{if not group_show_denied}
+{if not group_denied}
 <section>
     <h2>Not Found</h2>
     <p>The requested page could not be found.</p>

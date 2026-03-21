@@ -21,7 +21,7 @@ final class PublicRouteRenderService
             'layout' => 'wrapper',
             'data' => [
                 'site' => $siteData,
-                'profile_show_denied' => $error === 'permission_denied' && $mode === 'private',
+                'profile_denied' => $error === 'permission_denied' && $mode === 'private',
             ],
         ];
     }
@@ -38,7 +38,7 @@ final class PublicRouteRenderService
             'layout' => 'wrapper',
             'data' => [
                 'site' => $siteData,
-                'group_show_denied' => $error === 'permission_denied' && $mode === 'private',
+                'group_denied' => $error === 'permission_denied' && $mode === 'private',
             ],
         ];
     }

@@ -12,13 +12,13 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
     exit('Not Found');
 }
 ?>
-{if profile_show_denied}
+{if profile_denied}
 <section>
     <h2>Permission Denied</h2>
     <p>You do not have permission to access this page.</p>
 </section>
 {/if}
-{if not profile_show_denied}
+{if not profile_denied}
 <section>
     <h2>Not Found</h2>
     <p>The requested page could not be found.</p>

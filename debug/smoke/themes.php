@@ -63,7 +63,7 @@ missing_value=[{page:missing}]
 pagination_first={pagination:links:0:label}
 loop_start
 {each pages}
-- {item:title}|{item:public_path}|{item:flags:featured}
+- {item:title}|{item:url}|{item:flags:featured}
 {/each}
 loop_end
 nested_loop
@@ -79,7 +79,7 @@ PHP;
             $data = [
                 'site' => [
                     'name' => 'Raven CMS',
-                    'public_theme_css' => 'raven',
+                    'theme_css' => 'raven',
                 ],
                 'page' => [
                     'title' => 'Hello <Raven>',
@@ -95,14 +95,14 @@ PHP;
                 'pages' => [
                     [
                         'title' => 'First & One',
-                        'public_path' => '/first',
+                        'url' => '/first',
                         'flags' => [
                             'featured' => true,
                         ],
                     ],
                     [
                         'title' => 'Second',
-                        'public_path' => '/second',
+                        'url' => '/second',
                         'flags' => [
                             'featured' => false,
                         ],
@@ -177,13 +177,15 @@ PHP;
         $data = [
             'site' => [
                 'name' => 'Raven CMS',
-                'public_theme' => 'raven',
-                'public_theme_css' => 'raven',
+                'theme' => 'raven',
+                'theme_css' => 'raven',
+                'theme_url' => 'http://localhost/theme/raven/',
                 'panel_path' => 'panel',
                 'domain' => 'localhost',
+                'url' => 'http://localhost/',
                 'current_url' => 'http://localhost/',
             ],
-            'view_meta' => [
+            'meta' => [
                 'title' => 'Smoke',
                 'description' => 'Theme smoke render.',
                 'document_title' => 'Smoke [Raven CMS]',
@@ -192,12 +194,10 @@ PHP;
             'page' => [
                 'title' => 'Smoke Page',
                 'content' => '<p>Smoke body</p>',
-                'display_title_resolved' => true,
+                'show_title' => true,
                 'extended_blocks' => [],
             ],
             'pages' => [],
-            'galleryEnabled' => false,
-            'galleryImages' => [],
             'category' => ['name' => 'Smoke Category', 'slug' => 'smoke-category'],
             'tag' => ['name' => 'Smoke Tag', 'slug' => 'smoke-tag'],
             'profile' => [
@@ -207,7 +207,7 @@ PHP;
             ],
             'group' => [
                 'name' => 'Smoke Group',
-                'member_count_resolved' => 0,
+                'member_count' => 0,
             ],
             'members' => [],
             'pagination' => [

@@ -12,10 +12,10 @@ final class RequestContextResolver
     /**
      * @param array<string, mixed>|null $server
      */
-    public function currentRequestUrl(string $configuredDomain, ?array $server = null): string
+    public function currentRequestUrl(string $configuredDomain, string $configuredScheme = '', ?array $server = null): string
     {
         $serverMap = $server ?? $_SERVER;
-        $scheme = $this->resolveRequestScheme($serverMap);
+        $scheme = $this->resolveRequestScheme($serverMap, $configuredScheme);
         $host = $this->resolveRequestHost($configuredDomain, $serverMap);
 
         $requestUri = (string) ($serverMap['REQUEST_URI'] ?? '/');
@@ -36,10 +36,30 @@ final class RequestContextResolver
     }
 
     /**
+     * Returns normalized public site base URL with a trailing slash.
+     *
      * @param array<string, mixed>|null $server
      */
-    public function resolveRequestScheme(?array $server = null): string
+    public function siteBaseUrl(string $configuredDomain, string $configuredScheme = '', ?array $server = null): string
     {
+        $serverMap = $server ?? $_SERVER;
+        $scheme = $this->resolveRequestScheme($serverMap, $configuredScheme);
+        $host = $this->resolveRequestHost($configuredDomain, $serverMap);
+        $path = $this->resolveConfiguredBasePath($configuredDomain);
+
+        return $scheme . '://' . $host . $path;
+    }
+
+    /**
+     * @param array<string, mixed>|null $server
+     */
+    public function resolveRequestScheme(?array $server = null, string $configuredScheme = ''): string
+    {
+        $normalizedConfigured = strtolower(trim($configuredScheme));
+        if (in_array($normalizedConfigured, ['http', 'https'], true)) {
+            return $normalizedConfigured;
+        }
+
         $serverMap = $server ?? $_SERVER;
         $forwarded = strtolower(trim((string) ($serverMap['HTTP_X_FORWARDED_PROTO'] ?? '')));
         if (in_array($forwarded, ['http', 'https'], true)) {
@@ -114,6 +134,25 @@ final class RequestContextResolver
 
         // Accept bracketed IPv6 hosts with optional port.
         return preg_match('/^\[[a-f0-9:]+\](?::\d{1,5})?$/i', $value) === 1;
+    }
+
+    public function resolveConfiguredBasePath(string $configuredDomain): string
+    {
+        $configuredDomain = trim($configuredDomain);
+        if ($configuredDomain === '') {
+            return '/';
+        }
+
+        $path = '';
+        if (str_contains($configuredDomain, '://')) {
+            $path = (string) parse_url($configuredDomain, PHP_URL_PATH);
+        } elseif (str_contains($configuredDomain, '/')) {
+            $parts = explode('/', $configuredDomain, 2);
+            $path = '/' . (string) ($parts[1] ?? '');
+        }
+
+        $path = '/' . trim((string) $path, '/');
+        return $path === '/' ? '/' : ($path . '/');
     }
 
     public function normalizeClientIp(string $rawIp): ?string

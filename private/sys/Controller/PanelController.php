@@ -5741,7 +5741,7 @@ final class PanelController
                 ? $taxonomyRoutingData['redirects']
                 : [],
             'pages_for_routing' => $this->pages->listAllForRouting(),
-            'build_page_public_path' => fn (
+            'build_page_url' => fn (
                 string $pageSlug,
                 string $channelSlug,
                 string $publishedAt,

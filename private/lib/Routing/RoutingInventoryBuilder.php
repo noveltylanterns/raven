@@ -42,7 +42,7 @@ final class RoutingInventoryBuilder
      *   tag_routing_options?: array<int, array<string, mixed>>,
      *   redirect_routing_rows?: array<int, array<string, mixed>>,
      *   pages_for_routing?: array<int, array<string, mixed>>,
-     *   build_page_public_path?: callable(string, string, string, string, string): string,
+     *   build_page_url?: callable(string, string, string, string, string): string,
      *   channel_landing_map_builder?: callable(array): array,
      *   panel_url?: callable(string): string,
      *   normalize_user_identifier?: callable(string): ?string,
@@ -63,14 +63,14 @@ final class RoutingInventoryBuilder
      */
     public function buildRows(array $context): array
     {
-        $buildPagePublicPath = $context['build_page_public_path'] ?? null;
+        $buildPageUrl = $context['build_page_url'] ?? null;
         $buildChannelLandingMap = $context['channel_landing_map_builder'] ?? null;
         $panelUrl = $context['panel_url'] ?? null;
         $normalizeUserIdentifier = $context['normalize_user_identifier'] ?? null;
         $slugifyGroupName = $context['slugify_group_name'] ?? null;
 
         if (
-            !is_callable($buildPagePublicPath)
+            !is_callable($buildPageUrl)
             || !is_callable($buildChannelLandingMap)
             || !is_callable($panelUrl)
             || !is_callable($normalizeUserIdentifier)
@@ -190,7 +190,7 @@ final class RoutingInventoryBuilder
             }
 
             $channelSlug = trim((string) ($page['channel_slug'] ?? ''));
-            $publicUrl = $buildPagePublicPath(
+            $publicUrl = $buildPageUrl(
                 $pageSlug,
                 $channelSlug,
                 (string) ($page['published_at'] ?? ''),

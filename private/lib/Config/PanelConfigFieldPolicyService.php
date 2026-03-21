@@ -76,6 +76,15 @@ final class PanelConfigFieldPolicyService
             return $mode;
         }
 
+        if ($path === 'site.scheme') {
+            $scheme = strtolower(trim($value));
+            if (!in_array($scheme, ['http', 'https'], true)) {
+                throw new \RuntimeException('site.scheme must be http or https.');
+            }
+
+            return $scheme;
+        }
+
         if ($path === 'database.driver') {
             $driver = strtolower($value);
             if (!in_array($driver, ['sqlite', 'mysql', 'pgsql'], true)) {
@@ -352,13 +361,15 @@ final class PanelConfigFieldPolicyService
         }
 
         if (in_array($path, ['meta.twitter.image', 'meta.apple_touch_icon', 'panel.brand_logo'], true)) {
+            $siteScheme = (string) ($workingConfig['site']['scheme'] ?? $this->config->get('site.scheme', 'https'));
             $siteDomain = (string) ($workingConfig['site']['domain'] ?? $this->config->get('site.domain', ''));
-            return $this->normalizer->normalizeMetaAbsoluteUrlPathValue($siteDomain, $value);
+            return $this->normalizer->normalizeMetaAbsoluteUrlPathValue($siteScheme, $siteDomain, $value);
         }
 
         if ($path === 'meta.opengraph.image') {
+            $siteScheme = (string) ($workingConfig['site']['scheme'] ?? $this->config->get('site.scheme', 'https'));
             $siteDomain = (string) ($workingConfig['site']['domain'] ?? $this->config->get('site.domain', ''));
-            return $this->normalizer->normalizeMetaAbsoluteUrlPathValue($siteDomain, $value, false);
+            return $this->normalizer->normalizeMetaAbsoluteUrlPathValue($siteScheme, $siteDomain, $value, false);
         }
 
         if ($path === 'panel.default_theme') {

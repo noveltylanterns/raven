@@ -45,14 +45,19 @@ final class SiteContextBuilder
      */
     public function publicBase(
         Config $config,
+        string $siteUrl,
         string $currentUrl,
         string $publicTheme,
         string $publicThemeCss,
         string $twitterImage,
         string $ogImage
     ): array {
+        $themeUrl = $this->themeUrl($siteUrl, $publicThemeCss);
+
         return array_merge($this->publicMetaBase($config, $publicTheme, $publicThemeCss), [
+            'url' => $siteUrl,
             'current_url' => $currentUrl,
+            'theme_url' => $themeUrl,
             'twitter_image' => $twitterImage,
             'og_image' => $ogImage,
         ]);
@@ -63,8 +68,12 @@ final class SiteContextBuilder
      */
     public function publicFallback(Config $config, string $publicTheme, string $publicThemeCss): array
     {
+        $siteUrl = $this->siteUrlFromConfig($config);
+
         return array_merge($this->publicMetaBase($config, $publicTheme, $publicThemeCss), [
+            'url' => $siteUrl,
             'current_url' => '',
+            'theme_url' => $this->themeUrl($siteUrl, $publicThemeCss),
             'twitter_image' => trim((string) $config->get('meta.twitter.image', '')),
             'og_image' => trim((string) $config->get('meta.opengraph.image', '')),
         ]);
@@ -77,6 +86,7 @@ final class SiteContextBuilder
     {
         return [
             'name' => (string) $config->get('site.name', 'Raven CMS'),
+            'scheme' => $this->siteSchemeFromConfig($config),
             'domain' => (string) $config->get('site.domain', 'localhost'),
             'panel_path' => (string) $config->get('panel.path', 'panel'),
             'apple_touch_icon' => trim((string) $config->get('meta.apple_touch_icon', '')),
@@ -86,8 +96,62 @@ final class SiteContextBuilder
             'twitter_creator' => trim((string) $config->get('meta.twitter.creator', '')),
             'og_type' => trim((string) $config->get('meta.opengraph.type', 'website')),
             'og_locale' => trim((string) $config->get('meta.opengraph.locale', 'en_US')),
-            'public_theme' => $publicTheme,
-            'public_theme_css' => $publicThemeCss,
+            'theme' => $publicTheme,
+            'theme_css' => $publicThemeCss,
         ];
+    }
+
+    private function siteSchemeFromConfig(Config $config): string
+    {
+        $scheme = strtolower(trim((string) $config->get('site.scheme', 'https')));
+        return in_array($scheme, ['http', 'https'], true) ? $scheme : 'https';
+    }
+
+    private function siteUrlFromConfig(Config $config): string
+    {
+        $domain = trim((string) $config->get('site.domain', 'localhost'));
+        if ($domain === '') {
+            $domain = 'localhost';
+        }
+
+        $path = '/';
+
+        if (str_contains($domain, '://')) {
+            $parsedHost = trim((string) parse_url($domain, PHP_URL_HOST));
+            $parsedPort = parse_url($domain, PHP_URL_PORT);
+            $parsedPath = (string) parse_url($domain, PHP_URL_PATH);
+            if ($parsedHost !== '') {
+                $domain = $parsedHost . (is_int($parsedPort) && $parsedPort > 0 ? ':' . $parsedPort : '');
+                $path = '/' . trim($parsedPath, '/');
+                $path = $path === '/' ? '/' : ($path . '/');
+            } else {
+                $domain = 'localhost';
+            }
+        } else {
+            if (str_contains($domain, '/')) {
+                $parts = explode('/', $domain, 2);
+                $domain = (string) ($parts[0] ?? '');
+                $path = '/' . trim((string) ($parts[1] ?? ''), '/');
+                $path = $path === '/' ? '/' : ($path . '/');
+            }
+
+            $domain = preg_replace('/[\/?#].*$/', '', $domain) ?? $domain;
+            $domain = trim($domain);
+            if ($domain === '') {
+                $domain = 'localhost';
+            }
+        }
+
+        return $this->siteSchemeFromConfig($config) . '://' . $domain . $path;
+    }
+
+    private function themeUrl(string $siteUrl, string $themeCssSlug): string
+    {
+        $themeCssSlug = trim($themeCssSlug);
+        if ($themeCssSlug === '') {
+            $themeCssSlug = 'raven';
+        }
+
+        return rtrim($siteUrl, '/') . '/theme/' . rawurlencode($themeCssSlug) . '/';
     }
 }

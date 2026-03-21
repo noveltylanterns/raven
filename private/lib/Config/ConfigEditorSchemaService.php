@@ -32,6 +32,7 @@ final class ConfigEditorSchemaService
         'panel.default_theme' => 'Default Panel Theme',
         'panel.brand_name' => 'Branded Panel Name',
         'panel.brand_logo' => 'Branded Panel Logo',
+        'site.scheme' => 'Site URL Scheme',
         'site.default_theme' => 'Default Site Theme',
         'site.enabled' => 'Site Visibility',
         'mail.agent' => 'Mail Agent',
@@ -576,6 +577,16 @@ final class ConfigEditorSchemaService
                 $mode = 'public';
             }
             $site['enabled'] = $mode;
+        }
+
+        if (!array_key_exists('scheme', $site)) {
+            $site['scheme'] = 'https';
+        } else {
+            $scheme = strtolower(trim((string) ($site['scheme'] ?? '')));
+            if (!in_array($scheme, ['http', 'https'], true)) {
+                $scheme = 'https';
+            }
+            $site['scheme'] = $scheme;
         }
 
         if (!array_key_exists('default_theme', $site)) {

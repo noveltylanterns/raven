@@ -295,17 +295,17 @@ final class PublicController
 
             $slug = $this->input->slug((string) ($page['slug'] ?? ''));
             if ($slug === null || $slug === '') {
-                $pages[$index]['public_path'] = '/';
+                $pages[$index]['url'] = '/';
                 continue;
             }
 
             $channelSlug = $this->input->slug((string) ($page['channel_slug'] ?? ''));
             if ($channelSlug === null || $channelSlug === '') {
-                $pages[$index]['public_path'] = '/' . rawurlencode($slug);
+                $pages[$index]['url'] = '/' . rawurlencode($slug);
                 continue;
             }
 
-            $pages[$index]['public_path'] = '/'
+            $pages[$index]['url'] = '/'
                 . rawurlencode($channelSlug)
                 . '/'
                 . rawurlencode(

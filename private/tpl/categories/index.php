@@ -19,7 +19,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
     <ul class="list-group mb-3">
         {each pages}
         <li class="list-group-item">
-            <a href="{item:public_path}">{item:title}</a>
+            <a href="{item:url}">{item:title}</a>
         </li>
         {/each}
     </ul>

@@ -10,6 +10,7 @@ namespace Raven\Lib\Config;
 final class ConfigEditorNormalizer
 {
     public function normalizeMetaAbsoluteUrlPathValue(
+        string $siteScheme,
         string $siteDomain,
         string $rawPathOrUrl,
         bool $allowAbsoluteUrlPaste = true
@@ -36,7 +37,7 @@ final class ConfigEditorNormalizer
             throw new \RuntimeException('site.domain must be set before saving URL-path meta fields.');
         }
 
-        return 'https://' . $normalizedDomain . '/' . ltrim($rawPathOrUrl, '/');
+        return $this->normalizeSiteScheme($siteScheme) . '://' . $normalizedDomain . '/' . ltrim($rawPathOrUrl, '/');
     }
 
     public function normalizeDomainHostForUrlPrefix(string $rawDomain): string
@@ -56,6 +57,12 @@ final class ConfigEditorNormalizer
 
         $rawDomain = preg_replace('/[\/?#].*$/', '', $rawDomain) ?? $rawDomain;
         return trim($rawDomain);
+    }
+
+    public function normalizeSiteScheme(string $rawScheme): string
+    {
+        $scheme = strtolower(trim($rawScheme));
+        return in_array($scheme, ['http', 'https'], true) ? $scheme : 'https';
     }
 
     public function normalizeInt(string $path, string $value): int

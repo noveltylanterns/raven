@@ -30,7 +30,7 @@ final class PublicTemplateDecorator
                 continue;
             }
 
-            $path = trim((string) ($page['public_path'] ?? ''));
+            $path = trim((string) ($page['url'] ?? ''));
             if ($path === '') {
                 $slug = $this->input->slug((string) ($page['slug'] ?? ''));
                 $channelSlug = $this->input->slug((string) ($page['channel_slug'] ?? ''));
@@ -43,7 +43,7 @@ final class PublicTemplateDecorator
                 }
             }
 
-            $pages[$index]['public_path'] = $path;
+            $pages[$index]['url'] = $path;
         }
 
         return $pages;
@@ -64,7 +64,7 @@ final class PublicTemplateDecorator
      */
     public function decoratePageForTemplate(array $page): array
     {
-        $page['display_title_resolved'] = !array_key_exists('display_title', $page)
+        $page['show_title'] = !array_key_exists('display_title', $page)
             || (int) ($page['display_title'] ?? 1) === 1;
 
         $rawBlocks = is_array($page['extended_blocks'] ?? null) ? $page['extended_blocks'] : [];
@@ -194,7 +194,7 @@ final class PublicTemplateDecorator
      */
     public function decorateGroupForTemplate(array $group, array $members): array
     {
-        $group['member_count_resolved'] = max(count($members), (int) ($group['member_count'] ?? 0));
+        $group['member_count'] = max(count($members), (int) ($group['member_count'] ?? 0));
         return $group;
     }
 
@@ -212,11 +212,22 @@ final class PublicTemplateDecorator
         }
         $site['name'] = $siteName;
 
-        $publicThemeCss = trim((string) ($site['public_theme_css'] ?? $site['public_theme'] ?? 'raven'));
-        if ($publicThemeCss === '') {
-            $publicThemeCss = 'raven';
+        $theme = trim((string) ($site['theme'] ?? 'raven'));
+        if ($theme === '') {
+            $theme = 'raven';
         }
-        $site['public_theme_css'] = $publicThemeCss;
+        $site['theme'] = $theme;
+
+        $themeCss = trim((string) ($site['theme_css'] ?? $theme));
+        if ($themeCss === '') {
+            $themeCss = 'raven';
+        }
+        $site['theme_css'] = $themeCss;
+
+        $siteUrl = trim((string) ($site['url'] ?? ''));
+        if ($siteUrl !== '') {
+            $site['theme_url'] = rtrim($siteUrl, '/') . '/theme/' . rawurlencode($themeCss) . '/';
+        }
 
         if (trim((string) ($site['twitter_site'] ?? '')) === '') {
             $site['twitter_site'] = $siteName;
@@ -286,7 +297,7 @@ final class PublicTemplateDecorator
         $documentTitle = $viewTitle === '' ? $siteName : ($viewTitle . ' [' . $siteName . ']');
 
         $data['site'] = $site;
-        $data['view_meta'] = [
+        $data['meta'] = [
             'title' => $viewTitle,
             'description' => $metaDescription,
             'document_title' => $documentTitle,

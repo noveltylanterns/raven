@@ -13,7 +13,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 }
 ?>
 <article>
-    {if page:display_title_resolved}
+    {if page:show_title}
     <h2>{page:title}</h2>
     {/if}
 

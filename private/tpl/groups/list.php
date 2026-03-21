@@ -23,7 +23,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
     {if group:slug}
     <p class="text-muted mb-2">Slug: {group:slug}</p>
     {/if}
-    <p class="text-muted mb-3">{group:member_count_resolved} Users</p>
+    <p class="text-muted mb-3">{group:member_count} Users</p>
 
     {if members}
     <ul class="list-group">
