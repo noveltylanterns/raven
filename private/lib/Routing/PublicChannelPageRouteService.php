@@ -29,25 +29,18 @@ final class PublicChannelPageRouteService
     }
 
     /**
-     * Resolves one lookup slug from a routed channel-page segment.
+     * Resolves one lookup target from a routed channel-page segment.
+     *
+     * @return array{type: 'slug', slug: string}|array{type: 'id', id: int}|null
      */
-    public function resolveLookupSlug(string $requestedSlug, string $routeMode, string $wordSeparator): ?string
+    public function resolveLookupTarget(string $requestedSlug, string $routeMode, string $wordSeparator): ?array
     {
-        $routeMode = $this->normalizeRouteMode($routeMode);
-        if ($routeMode === 'date_slug') {
-            $parsed = ChannelRoutePolicy::parseDateSlugSegment($this->input, $requestedSlug, $wordSeparator);
-            if (!is_array($parsed)) {
-                return null;
-            }
-
-            return (string) ($parsed['slug'] ?? '');
-        }
-
-        return ChannelRoutePolicy::normalizeSlugForLookup($this->input, $requestedSlug, $wordSeparator);
+        return ChannelRoutePolicy::resolveLookupTarget($this->input, $requestedSlug, $routeMode, $wordSeparator);
     }
 
     public function canonicalSegment(
         string $slug,
+        int $pageId,
         string $publishedAt,
         string $routeMode,
         string $wordSeparator,
@@ -56,6 +49,7 @@ final class PublicChannelPageRouteService
         return ChannelRoutePolicy::buildRouteSegment(
             $this->input,
             $slug,
+            $pageId,
             $publishedAt,
             $routeMode,
             $wordSeparator,

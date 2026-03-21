@@ -201,6 +201,59 @@ final class PageRepository
     }
 
     /**
+     * Finds one public page by id and optional channel slug.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findPublicPageById(int $pageId, ?string $channelSlug = null): ?array
+    {
+        if ($pageId < 1) {
+            return null;
+        }
+
+        $pages = $this->table('pages');
+        $sql = 'SELECT p.*
+                FROM ' . $pages . ' p
+                WHERE p.id = :page_id
+                  AND p.is_published = :is_published';
+
+        $params = [
+            ':page_id' => $pageId,
+            ':is_published' => 1,
+        ];
+
+        $channel = null;
+        if ($channelSlug === null) {
+            $sql .= ' AND p.channel_id IS NULL';
+        } else {
+            $channel = $this->channels->findBySlug($channelSlug);
+            if ($channel === null) {
+                return null;
+            }
+
+            $channelId = (int) ($channel['id'] ?? 0);
+            if ($channelId < 1) {
+                return null;
+            }
+
+            $sql .= ' AND p.channel_id = :channel_id';
+            $params[':channel_id'] = $channelId;
+        }
+
+        $sql .= ' LIMIT 1';
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        $row = $stmt->fetch();
+        if ($row === false) {
+            return null;
+        }
+
+        return $this->withChannelContext($this->hydratePageRow($row), $channel);
+    }
+
+    /**
      * Returns one total-count for panel page index with optional prefilters.
      */
     public function countForPanel(?string $channelSlug = null, ?int $categoryId = null, ?int $tagId = null): int

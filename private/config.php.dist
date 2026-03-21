@@ -99,6 +99,7 @@ return array (
   'content' =>
   array (
     'default_editor' => 'tinymce',
+    'route_mode' => 'slug',
     'separator' => '-',
   ),
   'captcha' =>

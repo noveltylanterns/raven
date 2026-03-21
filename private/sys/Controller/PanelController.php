@@ -328,7 +328,7 @@ final class PanelController
                 (string) ($channelOption['text_editor_override'] ?? 'inherit')
             );
             $channelOption['page_route_mode'] = $this->normalizeChannelPageRouteMode(
-                (string) ($channelOption['page_route_mode'] ?? 'slug')
+                (string) ($channelOption['page_route_mode'] ?? 'inherit')
             );
             $channelOption['page_url_separator'] = $this->normalizeChannelPageUrlSeparator(
                 (string) ($channelOption['page_url_separator'] ?? 'inherit')
@@ -381,6 +381,7 @@ final class PanelController
             'defaultTextEditor' => $this->normalizeBodyTextEditorOption(
                 (string) $this->config->get('content.default_editor', 'tinymce')
             ),
+            'defaultPageRouteMode' => $this->globalPageRouteMode(),
             'defaultPageUrlSeparator' => $this->normalizeGlobalPageUrlSeparator(
                 (string) $this->config->get('content.separator', '-')
             ),
@@ -608,7 +609,7 @@ final class PanelController
      */
     private function normalizeChannelPageRouteMode(string $value): string
     {
-        return ChannelRoutePolicy::normalizeRouteMode($value);
+        return $this->routeConfigService()->normalizeChannelPageRouteMode($value);
     }
 
     /**
@@ -625,6 +626,16 @@ final class PanelController
     private function normalizeGlobalPageUrlSeparator(string $value): string
     {
         return ChannelRoutePolicy::normalizeGlobalSeparator($value);
+    }
+
+    private function globalPageRouteMode(): string
+    {
+        return $this->routeConfigService()->globalPageRouteMode();
+    }
+
+    private function effectiveChannelPageRouteMode(string $channelValue): string
+    {
+        return $this->routeConfigService()->effectiveChannelPageRouteMode($channelValue);
     }
 
     /**
@@ -958,7 +969,7 @@ final class PanelController
                 (string) ($channel['text_editor_override'] ?? 'inherit')
             );
             $channel['page_route_mode'] = $this->normalizeChannelPageRouteMode(
-                (string) ($channel['page_route_mode'] ?? 'slug')
+                (string) ($channel['page_route_mode'] ?? 'inherit')
             );
             $channel['page_url_separator'] = $this->normalizeChannelPageUrlSeparator(
                 (string) ($channel['page_url_separator'] ?? 'inherit')
@@ -1008,7 +1019,7 @@ final class PanelController
             (string) ($post['text_editor_override'] ?? 'inherit')
         );
         $pageRouteMode = $this->normalizeChannelPageRouteMode(
-            (string) ($post['page_route_mode'] ?? 'slug')
+            (string) ($post['page_route_mode'] ?? 'inherit')
         );
         $pageUrlSeparator = $this->normalizeChannelPageUrlSeparator(
             (string) ($post['page_url_separator'] ?? 'inherit')
@@ -5743,12 +5754,14 @@ final class PanelController
             'pages_for_routing' => $this->pages->listAllForRouting(),
             'build_page_url' => fn (
                 string $pageSlug,
+                int $pageId,
                 string $channelSlug,
                 string $publishedAt,
                 string $channelPageRouteMode,
                 string $channelPageUrlSeparator
             ): string => $this->routingPublicPathForPage(
                 $pageSlug,
+                $pageId,
                 $channelSlug,
                 $publishedAt,
                 $channelPageRouteMode,
@@ -5766,6 +5779,7 @@ final class PanelController
      */
     private function routingPublicPathForPage(
         string $pageSlug,
+        int $pageId,
         string $channelSlug,
         string $publishedAt,
         string $channelPageRouteMode,
@@ -5773,9 +5787,12 @@ final class PanelController
     ): string {
         return $this->panelRoutingPreviewService()->routingPublicPathForPage(
             $pageSlug,
+            $pageId,
             $channelSlug,
             $publishedAt,
-            $channelPageRouteMode,
+            $channelSlug === ''
+                ? $this->globalPageRouteMode()
+                : $this->effectiveChannelPageRouteMode($channelPageRouteMode),
             $channelPageUrlSeparator,
             (string) $this->config->get('content.separator', '-')
         );

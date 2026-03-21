@@ -1466,7 +1466,7 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
             $description = $app['input']->text($description, 1000);
 
             $editor = strtolower(trim((string) raven_cli_option($options, 'editor', is_array($existing) ? (string) ($existing['text_editor_override'] ?? 'inherit') : 'inherit')));
-            $routeMode = strtolower(trim((string) raven_cli_option($options, 'route-mode', is_array($existing) ? (string) ($existing['page_route_mode'] ?? 'slug') : 'slug')));
+            $routeMode = strtolower(trim((string) raven_cli_option($options, 'route-mode', is_array($existing) ? (string) ($existing['page_route_mode'] ?? 'inherit') : 'inherit')));
             $separator = trim((string) raven_cli_option($options, 'separator', is_array($existing) ? (string) ($existing['page_url_separator'] ?? 'inherit') : 'inherit'));
 
             $id = $repo->save([

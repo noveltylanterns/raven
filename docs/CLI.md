@@ -76,7 +76,7 @@ CRUD for channels (flat file metadata + linked ids):
 
 - `list`
 - `show --id <id>` or `show --slug <slug>`
-- `create --name <name> --slug <slug> [--description <text>] [--editor <inherit|tinymce|plaintext|autobr|markdown>] [--route-mode <slug|date_slug>] [--separator <inherit|-|_>]`
+- `create --name <name> --slug <slug> [--description <text>] [--editor <inherit|tinymce|plaintext|autobr|markdown>] [--route-mode <inherit|slug|date_slug|month_slug|id|date_id|month_id>] [--separator <inherit|-|_>]`
 - `update --id <id>|--slug <slug> ...` (same payload fields)
 - `delete --id <id>` or `delete --slug <slug>`
 

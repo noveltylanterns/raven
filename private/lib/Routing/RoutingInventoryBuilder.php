@@ -42,7 +42,7 @@ final class RoutingInventoryBuilder
      *   tag_routing_options?: array<int, array<string, mixed>>,
      *   redirect_routing_rows?: array<int, array<string, mixed>>,
      *   pages_for_routing?: array<int, array<string, mixed>>,
-     *   build_page_url?: callable(string, string, string, string, string): string,
+     *   build_page_url?: callable(string, int, string, string, string, string): string,
      *   channel_landing_map_builder?: callable(array): array,
      *   panel_url?: callable(string): string,
      *   normalize_user_identifier?: callable(string): ?string,
@@ -125,7 +125,7 @@ final class RoutingInventoryBuilder
                 $channelsById[$channelId] = [
                     'slug' => (string) ($channelOption['slug'] ?? ''),
                     'name' => (string) ($channelOption['name'] ?? ''),
-                    'page_route_mode' => (string) ($channelOption['page_route_mode'] ?? 'slug'),
+                    'page_route_mode' => (string) ($channelOption['page_route_mode'] ?? 'inherit'),
                     'page_url_separator' => (string) ($channelOption['page_url_separator'] ?? 'inherit'),
                 ];
             }
@@ -134,7 +134,7 @@ final class RoutingInventoryBuilder
             $channelId = (int) ($pageForRouting['channel_id'] ?? 0);
             $pageForRouting['channel_slug'] = (string) ($channelsById[$channelId]['slug'] ?? '');
             $pageForRouting['channel_name'] = (string) ($channelsById[$channelId]['name'] ?? '');
-            $pageForRouting['channel_page_route_mode'] = (string) ($channelsById[$channelId]['page_route_mode'] ?? 'slug');
+            $pageForRouting['channel_page_route_mode'] = (string) ($channelsById[$channelId]['page_route_mode'] ?? 'inherit');
             $pageForRouting['channel_page_url_separator'] = (string) ($channelsById[$channelId]['page_url_separator'] ?? 'inherit');
         }
         unset($pageForRouting);
@@ -192,9 +192,10 @@ final class RoutingInventoryBuilder
             $channelSlug = trim((string) ($page['channel_slug'] ?? ''));
             $publicUrl = $buildPageUrl(
                 $pageSlug,
+                (int) ($page['id'] ?? 0),
                 $channelSlug,
                 (string) ($page['published_at'] ?? ''),
-                (string) ($page['channel_page_route_mode'] ?? 'slug'),
+                (string) ($page['channel_page_route_mode'] ?? 'inherit'),
                 (string) ($page['channel_page_url_separator'] ?? 'inherit')
             );
 

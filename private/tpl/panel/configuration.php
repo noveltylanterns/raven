@@ -427,6 +427,7 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
     $isCaptchaProviderField = $path === 'captcha.provider';
     $isMailAgentField = $path === 'mail.agent';
     $isDefaultTextEditorField = $path === 'content.default_editor';
+    $isDefaultPageUrlModeField = $path === 'content.route_mode';
     $isPageUrlSeparatorField = $path === 'content.separator';
     $isSiteEnabledField = $path === 'site.enabled';
     $isSiteSchemeField = $path === 'site.scheme';
@@ -482,7 +483,7 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
             $inputValue = ltrim($inputValue, '/');
         }
     }
-    $isRequired = in_array($path, ['site.domain', 'site.scheme', 'panel.path', 'site.enabled', 'database.driver', 'captcha.provider', 'mail.agent', 'content.default_editor', 'content.separator', 'panel.default_theme', 'session.cookie.name', 'user.privacy', 'group.privacy', 'user.auth.login', 'user.auth.registration'], true);
+    $isRequired = in_array($path, ['site.domain', 'site.scheme', 'panel.path', 'site.enabled', 'database.driver', 'captcha.provider', 'mail.agent', 'content.default_editor', 'content.route_mode', 'content.separator', 'panel.default_theme', 'session.cookie.name', 'user.privacy', 'group.privacy', 'user.auth.login', 'user.auth.registration'], true);
     $disableUriNote = match ($path) {
         'category.prefix' => ' (leave blank to disable category URIs)',
         'tag.prefix' => ' (leave blank to disable tag URIs)',
@@ -563,6 +564,16 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
                 <option value="plaintext"<?= (string) $field['value'] === 'plaintext' ? ' selected' : '' ?>>plaintext</option>
                 <option value="autobr"<?= (string) $field['value'] === 'autobr' ? ' selected' : '' ?>>auto &lt;br&gt;</option>
                 <option value="markdown"<?= (string) $field['value'] === 'markdown' ? ' selected' : '' ?>>markdown</option>
+            </select>
+        <?php elseif ($isDefaultPageUrlModeField): ?>
+            <select
+                class="form-select font-monospace"
+                id="<?= e($inputId) ?>"
+                name="<?= e($fieldName) ?>"
+                required
+            >
+                <option value="slug"<?= (string) $field['value'] === 'slug' ? ' selected' : '' ?>>/{slug}</option>
+                <option value="id"<?= (string) $field['value'] === 'id' ? ' selected' : '' ?>>/{id}</option>
             </select>
         <?php elseif ($isPageUrlSeparatorField): ?>
             <!-- Page URL separator controls generated channel page route segments. -->

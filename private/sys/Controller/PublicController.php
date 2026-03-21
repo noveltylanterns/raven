@@ -196,8 +196,9 @@ final class PublicController
     {
         $requestedSlug = strtolower(trim($pageSlug));
         $lookupSlug = $requestedSlug;
+        $lookupTarget = null;
         $channelRouteMode = 'slug';
-        $channelWordSeparator = '-';
+        $channelWordSeparator = 'inherit';
 
         if ($channelSlug !== null) {
             $channel = $this->taxonomy->findChannelBySlug($channelSlug);
@@ -210,20 +211,18 @@ final class PublicController
                 return;
             }
 
-            $channelRouteMode = $this->publicChannelPageRouteService()->normalizeRouteMode(
-                (string) ($channel['page_route_mode'] ?? 'slug')
-            );
+            $channelRouteMode = $this->effectiveChannelPageRouteMode((string) ($channel['page_route_mode'] ?? 'inherit'));
             $channelWordSeparator = $this->publicChannelPageRouteService()->resolveWordSeparator(
                 (string) ($channel['page_url_separator'] ?? 'inherit'),
                 (string) $this->config->get('content.separator', '-')
             );
 
-            $resolvedLookupSlug = $this->publicChannelPageRouteService()->resolveLookupSlug(
+            $lookupTarget = $this->publicChannelPageRouteService()->resolveLookupTarget(
                 $requestedSlug,
                 $channelRouteMode,
                 $channelWordSeparator
             );
-            if (!is_string($resolvedLookupSlug) || $resolvedLookupSlug === '') {
+            if (!is_array($lookupTarget)) {
                 if ($this->tryRedirect($requestedSlug, $channelSlug)) {
                     return;
                 }
@@ -232,10 +231,36 @@ final class PublicController
                 return;
             }
 
-            $lookupSlug = $resolvedLookupSlug;
+            if ((string) ($lookupTarget['type'] ?? '') === 'slug') {
+                $lookupSlug = (string) ($lookupTarget['slug'] ?? '');
+            }
+        } else {
+            $channelRouteMode = $this->globalPageRouteMode();
+            $lookupTarget = $this->publicChannelPageRouteService()->resolveLookupTarget(
+                $requestedSlug,
+                $channelRouteMode,
+                (string) $this->config->get('content.separator', '-')
+            );
+            if (!is_array($lookupTarget)) {
+                if ($this->tryRedirect($requestedSlug, null)) {
+                    return;
+                }
+
+                $this->notFound();
+                return;
+            }
+
+            if ((string) ($lookupTarget['type'] ?? '') === 'slug') {
+                $lookupSlug = (string) ($lookupTarget['slug'] ?? '');
+            }
         }
 
-        $page = $this->pages->findPublicPage($lookupSlug, $channelSlug);
+        $page = null;
+        if (is_array($lookupTarget ?? null) && (string) ($lookupTarget['type'] ?? '') === 'id') {
+            $page = $this->pages->findPublicPageById((int) ($lookupTarget['id'] ?? 0), $channelSlug);
+        } else {
+            $page = $this->pages->findPublicPage($lookupSlug, $channelSlug);
+        }
 
         if ($page === null) {
             // If no page exists at this path, attempt redirect fallback before 404.
@@ -247,20 +272,23 @@ final class PublicController
             return;
         }
 
+        $canonicalSegment = $this->publicChannelPageRouteService()->canonicalSegment(
+            (string) ($page['slug'] ?? ''),
+            (int) ($page['id'] ?? 0),
+            (string) ($page['published_at'] ?? ''),
+            $channelRouteMode,
+            $channelWordSeparator,
+            (string) $this->config->get('content.separator', '-')
+        );
         if ($channelSlug !== null) {
-            $canonicalSegment = $this->publicChannelPageRouteService()->canonicalSegment(
-                (string) ($page['slug'] ?? ''),
-                (string) ($page['published_at'] ?? ''),
-                $channelRouteMode,
-                $channelWordSeparator,
-                (string) $this->config->get('content.separator', '-')
-            );
             if ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedSlug) !== 0) {
                 \Raven\Core\Support\redirect(
                     '/' . rawurlencode($channelSlug) . '/' . rawurlencode($canonicalSegment),
                     301
                 );
             }
+        } elseif ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedSlug) !== 0) {
+            \Raven\Core\Support\redirect('/' . rawurlencode($canonicalSegment), 301);
         }
 
         $page['content'] = $this->renderEmbeddedForms((string) ($page['content'] ?? ''));
@@ -294,6 +322,7 @@ final class PublicController
             }
 
             $slug = $this->input->slug((string) ($page['slug'] ?? ''));
+            $pageId = (int) ($page['id'] ?? 0);
             if ($slug === null || $slug === '') {
                 $pages[$index]['url'] = '/';
                 continue;
@@ -301,7 +330,15 @@ final class PublicController
 
             $channelSlug = $this->input->slug((string) ($page['channel_slug'] ?? ''));
             if ($channelSlug === null || $channelSlug === '') {
-                $pages[$index]['url'] = '/' . rawurlencode($slug);
+                $rootSegment = $this->publicChannelPageRouteService()->canonicalSegment(
+                    $slug,
+                    $pageId,
+                    (string) ($page['published_at'] ?? ''),
+                    $this->globalPageRouteMode(),
+                    'inherit',
+                    (string) $this->config->get('content.separator', '-')
+                );
+                $pages[$index]['url'] = '/' . rawurlencode($rootSegment !== '' ? $rootSegment : $slug);
                 continue;
             }
 
@@ -311,8 +348,9 @@ final class PublicController
                 . rawurlencode(
                     $this->publicChannelPageRouteService()->canonicalSegment(
                         $slug,
+                        $pageId,
                         (string) ($page['published_at'] ?? ''),
-                        (string) ($page['channel_page_route_mode'] ?? 'slug'),
+                        $this->effectiveChannelPageRouteMode((string) ($page['channel_page_route_mode'] ?? 'inherit')),
                         (string) ($page['channel_page_url_separator'] ?? 'inherit'),
                         (string) $this->config->get('content.separator', '-')
                     )
@@ -1243,6 +1281,16 @@ final class PublicController
         }
 
         return $this->routeConfigService;
+    }
+
+    private function globalPageRouteMode(): string
+    {
+        return $this->routeConfigService()->globalPageRouteMode();
+    }
+
+    private function effectiveChannelPageRouteMode(string $channelValue): string
+    {
+        return $this->routeConfigService()->effectiveChannelPageRouteMode($channelValue);
     }
 
     private function bodyBlockPolicy(): BodyBlockPolicy

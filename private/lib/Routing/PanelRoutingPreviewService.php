@@ -26,32 +26,35 @@ final class PanelRoutingPreviewService
 
     public function routingPublicPathForPage(
         string $pageSlug,
+        int $pageId,
         string $channelSlug,
         string $publishedAt,
         string $channelPageRouteMode,
         string $channelPageUrlSeparator,
         string $contentSeparator = '-'
     ): string {
+        $routeMode = ChannelRoutePolicy::normalizeRouteMode($channelPageRouteMode);
         $normalizedSlug = $this->input->slug($pageSlug);
-        if ($normalizedSlug === null || $normalizedSlug === '') {
+        if (!ChannelRoutePolicy::usesPageId($routeMode) && ($normalizedSlug === null || $normalizedSlug === '')) {
             return '/';
         }
 
         $normalizedChannel = $this->input->slug($channelSlug);
-        if ($normalizedChannel === null || $normalizedChannel === '') {
-            return '/' . $normalizedSlug;
-        }
-
         $routeSegment = ChannelRoutePolicy::buildRouteSegment(
             $this->input,
-            $normalizedSlug,
+            (string) $normalizedSlug,
+            $pageId,
             $publishedAt,
-            $channelPageRouteMode,
+            $routeMode,
             $channelPageUrlSeparator,
             $contentSeparator
         );
-        if ($routeSegment === '') {
+        if ($routeSegment === '' && !ChannelRoutePolicy::usesPageId($routeMode)) {
             $routeSegment = $normalizedSlug;
+        }
+
+        if ($normalizedChannel === null || $normalizedChannel === '') {
+            return '/' . $routeSegment;
         }
 
         return '/' . $normalizedChannel . '/' . $routeSegment;

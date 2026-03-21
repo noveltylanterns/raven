@@ -26,6 +26,7 @@ declare(strict_types=1);
 /** @var string $imageUploadTarget */
 /** @var int $imageMaxFilesPerUpload */
 /** @var string $defaultTextEditor */
+/** @var string $defaultPageRouteMode */
 /** @var string $defaultPageUrlSeparator */
 /** @var array<string, array{label?: string, editor?: string}> $bodyBlockTypeDefinitions */
 /** @var array<int, array{extension: string, label: string, shortcode: string}> $shortcodeInsertItems */
@@ -52,6 +53,9 @@ $galleryEnabled = (int) ($page['gallery_enabled'] ?? 0) === 1;
 $defaultTextEditor = in_array($defaultTextEditor ?? '', ['tinymce', 'plaintext', 'autobr', 'markdown'], true)
     ? (string) $defaultTextEditor
     : 'tinymce';
+$defaultPageRouteMode = in_array($defaultPageRouteMode ?? 'slug', ['slug', 'id'], true)
+    ? (string) $defaultPageRouteMode
+    : 'slug';
 $categoryEnabled = (bool) ($categoryEnabled ?? true);
 $tagEnabled = (bool) ($tagEnabled ?? true);
 $defaultPageUrlSeparator = in_array($defaultPageUrlSeparator ?? '-', ['-', '_'], true)
@@ -135,9 +139,9 @@ foreach ($channelOptions as $channelOption) {
     }
     $channelEditorOverrides[$optionSlug] = $override;
 
-    $routeMode = strtolower(trim((string) ($channelOption['page_route_mode'] ?? 'slug')));
-    if (!in_array($routeMode, ['slug', 'date_slug'], true)) {
-        $routeMode = 'slug';
+    $routeMode = strtolower(trim((string) ($channelOption['page_route_mode'] ?? 'inherit')));
+    if (!in_array($routeMode, ['inherit', 'slug', 'date_slug', 'month_slug', 'id', 'date_id', 'month_id'], true)) {
+        $routeMode = 'inherit';
     }
     $channelRouteModes[$optionSlug] = $routeMode;
 
@@ -151,7 +155,10 @@ $selectedChannelEditorOverride = (string) ($channelEditorOverrides[$selectedChan
 $effectiveTextEditor = $selectedChannelEditorOverride === 'inherit'
     ? $defaultTextEditor
     : $selectedChannelEditorOverride;
-$selectedChannelRouteMode = (string) ($channelRouteModes[$selectedChannelSlug] ?? 'slug');
+$selectedChannelRouteMode = (string) ($channelRouteModes[$selectedChannelSlug] ?? 'inherit');
+$effectivePageRouteMode = $selectedChannelSlug === '' || $selectedChannelRouteMode === 'inherit'
+    ? $defaultPageRouteMode
+    : $selectedChannelRouteMode;
 $selectedChannelUrlSeparator = (string) ($channelUrlSeparators[$selectedChannelSlug] ?? 'inherit');
 $effectiveChannelUrlSeparator = $selectedChannelUrlSeparator === 'inherit'
     ? $defaultPageUrlSeparator
@@ -164,6 +171,7 @@ $maxFilesPerUploadNote = $imageMaxFilesPerUpload > 0
 
 // Build a permalink preview for published pages shown in the editor header area.
 $pageSlug = trim((string) ($page['slug'] ?? ''));
+$pageId = (int) ($page['id'] ?? 0);
 $normalizedDomain = trim((string) ($site['domain'] ?? ''));
 $permalinkBase = $normalizedDomain;
 if ($permalinkBase !== '' && !preg_match('#^https?://#i', $permalinkBase)) {
@@ -171,18 +179,18 @@ if ($permalinkBase !== '' && !preg_match('#^https?://#i', $permalinkBase)) {
 }
 $permalinkBase = rtrim($permalinkBase, '/');
 $permalinkPathParts = [];
-$routeSegment = trim($pageSlug, '/');
-if ($routeSegment !== '' && $selectedChannelSlug !== '' && $effectiveChannelUrlSeparator === '_') {
-    $routeSegment = str_replace('-', '_', $routeSegment);
-}
-if ($routeSegment !== '' && $selectedChannelSlug !== '' && $selectedChannelRouteMode === 'date_slug') {
-    $publishedAt = trim((string) ($page['published_at'] ?? ''));
-    if (preg_match('/^\d{4}-\d{2}-\d{2}/', $publishedAt, $dateParts) === 1) {
-        $routeSegment = ((string) ($dateParts[0] ?? gmdate('Y-m-d'))) . '-' . $routeSegment;
-    } else {
-        $routeSegment = gmdate('Y-m-d') . '-' . $routeSegment;
-    }
-}
+$routeSegment = trim(
+    \Raven\Lib\Routing\ChannelRoutePolicy::buildRouteSegment(
+        new \Raven\Lib\Security\InputSanitizer(),
+        $pageSlug,
+        $pageId,
+        (string) ($page['published_at'] ?? ''),
+        $effectivePageRouteMode,
+        $selectedChannelUrlSeparator,
+        $defaultPageUrlSeparator
+    ),
+    '/'
+);
 if ($selectedChannelSlug !== '') {
     $permalinkPathParts[] = trim($selectedChannelSlug, '/');
 }
@@ -190,7 +198,7 @@ if ($routeSegment !== '') {
     $permalinkPathParts[] = $routeSegment;
 }
 $publishedPermalink = null;
-if ($selectedStatus === 'published' && $permalinkBase !== '' && $pageSlug !== '') {
+if ($selectedStatus === 'published' && $permalinkBase !== '' && $routeSegment !== '') {
     $publishedPermalink = $permalinkBase . '/' . implode('/', $permalinkPathParts);
 }
 
@@ -577,9 +585,9 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                 if (!in_array($channelEditorOverride, ['inherit', 'tinymce', 'plaintext', 'autobr', 'markdown'], true)) {
                                     $channelEditorOverride = 'inherit';
                                 }
-                                $channelRouteMode = strtolower(trim((string) ($channel['page_route_mode'] ?? 'slug')));
-                                if (!in_array($channelRouteMode, ['slug', 'date_slug'], true)) {
-                                    $channelRouteMode = 'slug';
+                                $channelRouteMode = strtolower(trim((string) ($channel['page_route_mode'] ?? 'inherit')));
+                                if (!in_array($channelRouteMode, ['inherit', 'slug', 'date_slug', 'month_slug', 'id', 'date_id', 'month_id'], true)) {
+                                    $channelRouteMode = 'inherit';
                                 }
                                 $channelUrlSeparator = trim((string) ($channel['page_url_separator'] ?? 'inherit'));
                                 if (!in_array($channelUrlSeparator, ['inherit', '-', '_'], true)) {

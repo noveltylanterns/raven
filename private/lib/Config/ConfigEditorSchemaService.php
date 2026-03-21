@@ -39,6 +39,7 @@ final class ConfigEditorSchemaService
         'mail.sender_address' => 'Mail Sender Address',
         'mail.sender_name' => 'Mail Sender Name',
         'content.default_editor' => 'Default Text Editor',
+        'content.route_mode' => 'Default Page URL Mode',
         'content.separator' => 'Default Page URL Separator',
         'category.prefix' => 'Category URL Prefix',
         'category.pagination' => 'Pagination',
@@ -226,6 +227,9 @@ final class ConfigEditorSchemaService
         if (!array_key_exists('default_editor', $content) && array_key_exists('default_text_editor', $content)) {
             $content['default_editor'] = $content['default_text_editor'];
         }
+        if (!array_key_exists('route_mode', $content) && array_key_exists('page_route_mode', $content)) {
+            $content['route_mode'] = $content['page_route_mode'];
+        }
         if (!array_key_exists('separator', $content) && array_key_exists('page_url_separator', $content)) {
             $content['separator'] = $content['page_url_separator'];
         }
@@ -233,10 +237,13 @@ final class ConfigEditorSchemaService
         $content['default_editor'] = $this->normalizeBodyTextEditorOption(
             (string) ($content['default_editor'] ?? 'tinymce')
         );
+        $content['route_mode'] = $this->normalizeGlobalPageRouteMode(
+            (string) ($content['route_mode'] ?? 'slug')
+        );
         $content['separator'] = $this->normalizeGlobalPageUrlSeparator(
             (string) ($content['separator'] ?? '-')
         );
-        unset($content['default_text_editor'], $content['page_url_separator']);
+        unset($content['default_text_editor'], $content['page_route_mode'], $content['page_url_separator']);
 
         $config['content'] = $content;
         return $config;
@@ -784,5 +791,13 @@ final class ConfigEditorSchemaService
         return in_array($separator, ['-', '_'], true)
             ? $separator
             : '-';
+    }
+
+    private function normalizeGlobalPageRouteMode(string $value): string
+    {
+        $mode = strtolower(trim($value));
+        return in_array($mode, ['slug', 'id'], true)
+            ? $mode
+            : 'slug';
     }
 }

@@ -127,7 +127,15 @@ Storage detail:
 ### Public Routing Touchpoints
 
 - Channel landing routes use single segment `/{channel_slug}` with page fallback rules.
-- Channel pages resolve at `/{channel_slug}/{page_slug}`.
+- Channel pages resolve at `/{channel_slug}/{segment}`, where `{segment}` depends on the channel's effective `page_route_mode`.
+- When a channel is set to `inherit`, it uses the global `content.route_mode` default (`slug` or `id`).
+- Supported channel page-route segments:
+- `/{channel}/{page-slug}`
+- `/{channel}/{YYYY-MM-DD}-{page-slug}`
+- `/{channel}/{YYYY-MM}-{page-slug}`
+- `/{channel}/{page-id}`
+- `/{channel}/{YYYY-MM-DD}-{page-id}`
+- `/{channel}/{YYYY-MM}-{page-id}`
 - Channel landing template priority: `views/channels/{channel_slug}.php` then `views/channels/index.php`.
 
 ### Security/Validation Expectations
@@ -148,11 +156,16 @@ When channel behavior changes, update this document in the same task. That inclu
 - `Default Text Editor Override`
 - `Page URL Mode`
 - `Page URL Separator`
+- `Use System Default`
 - `Use Global Default`
 - `- (Hyphen)`
 - `_ (Underscore)`
 - `/{channel}/{page-slug}`
 - `/{channel}/{YYYY-MM-DD}-{page-slug}`
+- `/{channel}/{YYYY-MM}-{page-slug}`
+- `/{channel}/{page-id}`
+- `/{channel}/{YYYY-MM-DD}-{page-id}`
+- `/{channel}/{YYYY-MM}-{page-id}`
 - `Rich Text (TinyMCE)`
 - `Plaintext`
 - `Markdown`

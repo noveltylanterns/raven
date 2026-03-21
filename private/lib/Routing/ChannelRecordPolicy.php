@@ -24,7 +24,7 @@ final class ChannelRecordPolicy
 
     public static function normalizePageRouteMode(string $value): string
     {
-        return ChannelRoutePolicy::normalizeRouteMode($value);
+        return ChannelRoutePolicy::normalizeChannelRouteMode($value);
     }
 
     public static function normalizePageUrlSeparator(string $value): string

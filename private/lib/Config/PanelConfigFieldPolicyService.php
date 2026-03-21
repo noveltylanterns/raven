@@ -331,6 +331,15 @@ final class PanelConfigFieldPolicyService
             return $editor;
         }
 
+        if ($path === 'content.route_mode') {
+            $mode = strtolower(trim($value));
+            if (!in_array($mode, ['slug', 'id'], true)) {
+                throw new \RuntimeException('content.route_mode must be slug or id.');
+            }
+
+            return $mode;
+        }
+
         if ($path === 'content.separator') {
             $separator = $normalizeGlobalPageUrlSeparator($value);
             if ($separator === '-' && trim($value) !== '-') {

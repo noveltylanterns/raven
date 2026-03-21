@@ -30,9 +30,9 @@ $textEditorOverride = strtolower(trim((string) ($channel['text_editor_override']
 if (!in_array($textEditorOverride, ['inherit', 'tinymce', 'plaintext', 'autobr', 'markdown'], true)) {
     $textEditorOverride = 'inherit';
 }
-$pageRouteMode = strtolower(trim((string) ($channel['page_route_mode'] ?? 'slug')));
-if (!in_array($pageRouteMode, ['slug', 'date_slug'], true)) {
-    $pageRouteMode = 'slug';
+$pageRouteMode = strtolower(trim((string) ($channel['page_route_mode'] ?? 'inherit')));
+if (!in_array($pageRouteMode, ['inherit', 'slug', 'date_slug', 'month_slug', 'id', 'date_id', 'month_id'], true)) {
+    $pageRouteMode = 'inherit';
 }
 $pageUrlSeparator = trim((string) ($channel['page_url_separator'] ?? 'inherit'));
 if (!in_array($pageUrlSeparator, ['inherit', '-', '_'], true)) {
@@ -218,8 +218,13 @@ if ($channel !== null && $publicBase !== '' && $channelSlug !== '') {
             <div class="form-group mb-0">
                 <label for="page_route_mode" class="form-label">Page URL Mode</label>
                 <select id="page_route_mode" name="page_route_mode" class="form-select">
+                    <option value="inherit"<?= $pageRouteMode === 'inherit' ? ' selected' : '' ?>>Use System Default</option>
                     <option value="slug"<?= $pageRouteMode === 'slug' ? ' selected' : '' ?>>/{channel}/{page-slug}</option>
                     <option value="date_slug"<?= $pageRouteMode === 'date_slug' ? ' selected' : '' ?>>/{channel}/{YYYY-MM-DD}-{page-slug}</option>
+                    <option value="month_slug"<?= $pageRouteMode === 'month_slug' ? ' selected' : '' ?>>/{channel}/{YYYY-MM}-{page-slug}</option>
+                    <option value="id"<?= $pageRouteMode === 'id' ? ' selected' : '' ?>>/{channel}/{page-id}</option>
+                    <option value="date_id"<?= $pageRouteMode === 'date_id' ? ' selected' : '' ?>>/{channel}/{YYYY-MM-DD}-{page-id}</option>
+                    <option value="month_id"<?= $pageRouteMode === 'month_id' ? ' selected' : '' ?>>/{channel}/{YYYY-MM}-{page-id}</option>
                 </select>
                 <div class="form-text">
                     Applies to page routes under this channel only. Channel landing routes stay at <code>/<?= e($channelSlug !== '' ? $channelSlug : 'channel') ?></code>.

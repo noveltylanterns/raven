@@ -99,7 +99,7 @@ final class ChannelFileStoreService
             'text_editor_override' => ChannelRecordPolicy::normalizeTextEditorOverride(
                 (string) ($raw['text_editor_override'] ?? 'inherit')
             ),
-            'page_route_mode' => ChannelRecordPolicy::normalizePageRouteMode((string) ($raw['page_route_mode'] ?? 'slug')),
+            'page_route_mode' => ChannelRecordPolicy::normalizePageRouteMode((string) ($raw['page_route_mode'] ?? 'inherit')),
             'page_url_separator' => ChannelRecordPolicy::normalizePageUrlSeparator(
                 (string) ($raw['page_url_separator'] ?? 'inherit')
             ),

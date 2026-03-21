@@ -214,7 +214,7 @@ final class ChannelRepository
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
                 'text_editor_override' => (string) ($channel['text_editor_override'] ?? 'inherit'),
-                'page_route_mode' => (string) ($channel['page_route_mode'] ?? 'slug'),
+                'page_route_mode' => (string) ($channel['page_route_mode'] ?? 'inherit'),
                 'page_url_separator' => (string) ($channel['page_url_separator'] ?? 'inherit'),
             ];
         }
@@ -300,7 +300,7 @@ final class ChannelRepository
         $slug = strtolower(trim((string) ($data['slug'] ?? '')));
         $description = trim((string) ($data['description'] ?? ''));
         $textEditorOverride = $this->normalizeTextEditorOverride((string) ($data['text_editor_override'] ?? 'inherit'));
-        $pageRouteMode = $this->normalizePageRouteMode((string) ($data['page_route_mode'] ?? 'slug'));
+        $pageRouteMode = $this->normalizePageRouteMode((string) ($data['page_route_mode'] ?? 'inherit'));
         $pageUrlSeparator = $this->normalizePageUrlSeparator((string) ($data['page_url_separator'] ?? 'inherit'));
 
         if ($name === '' || !$this->isValidSlug($slug)) {
@@ -393,7 +393,7 @@ final class ChannelRepository
         $raw['slug'] = $slug;
         $raw['description'] = (string) ($record['description'] ?? '');
         $raw['text_editor_override'] = (string) ($record['text_editor_override'] ?? 'inherit');
-        $raw['page_route_mode'] = (string) ($record['page_route_mode'] ?? 'slug');
+        $raw['page_route_mode'] = (string) ($record['page_route_mode'] ?? 'inherit');
         $raw['page_url_separator'] = (string) ($record['page_url_separator'] ?? 'inherit');
         $raw['cover_image_path'] = $this->normalizeNullablePath($paths['cover_image_path'] ?? null);
         $raw['cover_image_sm_path'] = $this->normalizeNullablePath($paths['cover_image_sm_path'] ?? null);

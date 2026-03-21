@@ -103,6 +103,23 @@ final class RouteConfigService
         );
     }
 
+    public function globalPageRouteMode(): string
+    {
+        $mode = strtolower(trim((string) $this->config->get('content.route_mode', 'slug')));
+        return in_array($mode, ['slug', 'id'], true) ? $mode : 'slug';
+    }
+
+    public function normalizeChannelPageRouteMode(string $value): string
+    {
+        return ChannelRoutePolicy::normalizeChannelRouteMode($value);
+    }
+
+    public function effectiveChannelPageRouteMode(string $channelValue): string
+    {
+        $mode = $this->normalizeChannelPageRouteMode($channelValue);
+        return $mode === 'inherit' ? $this->globalPageRouteMode() : ChannelRoutePolicy::normalizeRouteMode($mode);
+    }
+
     private function normalizeMode(string $value, array $allowed, string $fallback, array $aliases = []): string
     {
         $mode = strtolower(trim($value));

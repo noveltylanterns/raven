@@ -248,6 +248,7 @@ The following config keys are expected to appear in this document and in runtime
 - `mail.sender_address`
 - `mail.sender_name`
 - `content.default_editor`
+- `content.route_mode`
 - `content.separator`
 - `category.enabled`
 - `tag.enabled`
