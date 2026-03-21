@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/tpl/wrapper.php
+ * ~/public/theme/raven/tpl/wrapper.php
  * Shared layout template for rendered views.
  * Docs: https://raven.lanterns.io
  */
@@ -16,8 +16,8 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 <html lang="en">
 <head>
 <title>{meta:document_title}</title>
-<link rel="icon" type="image/png" href="{site:url}/theme/raven/img/favicon.png">
-<link rel="stylesheet" href="{site:url}/theme/fallback.css">
+<link rel="icon" type="image/png" href="{theme:url}/img/favicon.png">
+<link rel="stylesheet" href="{theme:url}/css/style.css">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 {meta:apple_touch_icon}
@@ -55,5 +55,6 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 {raw:content}
 </main>
 
+<script src="/bootstrap.bundle.min.js"></script>
 </body>
 </html>

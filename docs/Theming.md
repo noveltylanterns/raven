@@ -72,6 +72,7 @@ Depending on route/template, these top-level roots are available:
   - `site`
   - `theme`
   - `panel`
+  - `head`
   - `meta`
 - page/home/channel routes:
   - `page`
@@ -106,17 +107,19 @@ Common shared keys:
 - `panel:slug`
 - `panel:url`
 - `meta:title`
-- `meta:description`
+- `meta:desc`
 - `meta:document_title`
 - `meta:apple_touch_icon`
+- `meta:canonical`
 - `meta:robots`
-- `meta:og_image`
+- `meta:image`
 - `meta:og_locale`
 - `meta:og_type`
+- `meta:og_url`
 - `meta:x_card`
 - `meta:x_creator`
-- `meta:x_image`
 - `meta:x_site`
+- `meta:x_url`
 
 ## 5) Theme CLI Workflows
 
@@ -259,30 +262,37 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `item:username` | current loop item username, when iterating `members` | username |
 | `item:value` | current loop item value, when iterating `profile:contact_profiles` | contact value text |
 
-#### 9.2.5 Member Tags
+#### 9.2.5 Meta Fragment Tags
+
+| Key | What It Calls | Returns |
+| --- | --- | --- |
+| `meta:apple_touch_icon` | prebuilt conditional Apple touch icon `<link>` markup | trusted HTML string; use as `{meta:apple_touch_icon}` |
+| `meta:canonical` | prebuilt conditional canonical `<link>` markup | trusted HTML string; use as `{meta:canonical}` |
+| `meta:image` | shared metadata image URL for OpenGraph and X cards | absolute URL |
+| `meta:og_locale` | prebuilt conditional OpenGraph locale `<meta>` markup | trusted HTML string; use as `{meta:og_locale}` |
+| `meta:og_type` | prebuilt conditional OpenGraph type `<meta>` markup | trusted HTML string; use as `{meta:og_type}` |
+| `meta:og_url` | prebuilt conditional OpenGraph URL `<meta>` markup | trusted HTML string; use as `{meta:og_url}` |
+| `meta:robots` | prebuilt conditional robots `<meta>` markup | trusted HTML string; use as `{meta:robots}` |
+| `meta:x_card` | prebuilt conditional X card `<meta>` markup | trusted HTML string; use as `{meta:x_card}` |
+| `meta:x_creator` | prebuilt conditional X creator `<meta>` markup | trusted HTML string; use as `{meta:x_creator}` |
+| `meta:x_site` | prebuilt conditional X site `<meta>` markup | trusted HTML string; use as `{meta:x_site}` |
+| `meta:x_url` | prebuilt conditional X URL `<meta>` markup | trusted HTML string; use as `{meta:x_url}` |
+
+#### 9.2.6 Member Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
 | `members` | group route member list | array for `{each members}` |
 
-#### 9.2.6 Meta Tags
+#### 9.2.7 Meta Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
-| `meta:apple_touch_icon` | configured Apple touch icon URL | absolute URL |
-| `meta:description` | public template metadata description | meta description text |
+| `meta:desc` | public template metadata description | meta description text |
 | `meta:document_title` | full document title assembled for `<title>` and social tags | complete document title |
-| `meta:og_image` | resolved OpenGraph image URL | absolute URL |
-| `meta:og_locale` | resolved OpenGraph locale | locale string |
-| `meta:og_type` | resolved OpenGraph type | type string |
-| `meta:robots` | configured robots policy | robots meta content |
 | `meta:title` | logical route title before site suffix | title text |
-| `meta:x_card` | resolved X card type | card type string |
-| `meta:x_creator` | resolved X creator handle | handle string |
-| `meta:x_image` | resolved X image URL | absolute URL |
-| `meta:x_site` | resolved X site handle/name | handle or text string |
 
-#### 9.2.7 Page Tags
+#### 9.2.8 Page Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -295,7 +305,7 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `page:title` | page payload title | page title |
 | `pages` | category/tag route page list | array for `{each pages}` |
 
-#### 9.2.8 Pagination Tags
+#### 9.2.9 Pagination Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -306,14 +316,14 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `pagination:total_items` | pagination payload total item count | integer-like total count |
 | `pagination:total_pages` | pagination payload total page count | integer-like total pages |
 
-#### 9.2.9 Panel Tags
+#### 9.2.10 Panel Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
 | `panel:slug` | configured panel route prefix | panel path slug |
 | `panel:url` | absolute panel base URL | absolute panel URL without trailing slash |
 
-#### 9.2.10 Profile Tags
+#### 9.2.11 Profile Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -325,7 +335,7 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `profile:username` | profile payload username | username |
 | `profile_denied` | profile placeholder payload flag for private-mode denial | boolean-like truthy/falsey flag |
 
-#### 9.2.11 Site Tags
+#### 9.2.12 Site Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -335,7 +345,7 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `site:scheme` | configured public scheme | `http` or `https` |
 | `site:url` | configured public site base URL | absolute site URL without trailing slash |
 
-#### 9.2.12 Tag Tags
+#### 9.2.13 Tag Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -343,7 +353,7 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `tag:name` | tag route payload display name | tag name |
 | `tag:slug` | tag route payload slug | tag slug |
 
-#### 9.2.13 Theme Tags
+#### 9.2.14 Theme Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |

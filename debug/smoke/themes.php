@@ -191,8 +191,10 @@ PHP;
             ],
             'meta' => [
                 'title' => 'Smoke',
-                'description' => 'Theme smoke render.',
+                'desc' => 'Theme smoke render.',
+                'image' => 'http://localhost/og.png',
                 'document_title' => 'Smoke [Raven CMS]',
+                'canonical' => '<link rel="canonical" href="http://localhost/">',
             ],
             'content' => '<main>Smoke Content</main>',
             'page' => [

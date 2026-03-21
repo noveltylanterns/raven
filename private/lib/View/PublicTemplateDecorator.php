@@ -7,6 +7,8 @@ namespace Raven\Lib\View;
 use Raven\Lib\Pagination\Pagination;
 use Raven\Lib\Security\InputSanitizer;
 
+use function Raven\Core\Support\e;
+
 /**
  * Shared template-facing payload decoration helpers for public views.
  */
@@ -249,7 +251,10 @@ final class PublicTemplateDecorator
         $meta = is_array($data['meta'] ?? null) ? $data['meta'] : [];
         $meta['apple_touch_icon'] = trim((string) ($site['apple_touch_icon'] ?? ''));
         $meta['robots'] = trim((string) ($site['robots'] ?? ''));
-        $meta['og_image'] = trim((string) ($site['og_image'] ?? ''));
+        $meta['image'] = trim((string) ($site['og_image'] ?? ''));
+        if ($meta['image'] === '') {
+            $meta['image'] = trim((string) ($site['twitter_image'] ?? ''));
+        }
         $meta['og_type'] = trim((string) ($site['og_type'] ?? ''));
         if ($meta['og_type'] === '') {
             $meta['og_type'] = 'website';
@@ -260,7 +265,6 @@ final class PublicTemplateDecorator
         }
         $meta['x_card'] = trim((string) ($site['twitter_card'] ?? ''));
         $meta['x_creator'] = trim((string) ($site['twitter_creator'] ?? ''));
-        $meta['x_image'] = trim((string) ($site['twitter_image'] ?? ''));
         $meta['x_site'] = trim((string) ($site['twitter_site'] ?? ''));
         if ($meta['x_site'] === '') {
             $meta['x_site'] = $siteName;
@@ -339,13 +343,88 @@ final class PublicTemplateDecorator
 
         $documentTitle = $viewTitle === '' ? $siteName : ($viewTitle . ' [' . $siteName . ']');
 
-        $data['site'] = $site;
         $meta['title'] = $viewTitle;
-        $meta['description'] = $metaDescription;
+        $meta['desc'] = $metaDescription;
         $meta['document_title'] = $documentTitle;
+        $meta = $this->decorateMetaFragmentsForTemplate($site, $meta);
+
+        $data['site'] = $site;
         $data['meta'] = $meta;
 
         return $data;
+    }
+
+    /**
+     * @param array<string, mixed> $site
+     * @param array<string, mixed> $meta
+     * @return array<string, string>
+     */
+    private function decorateMetaFragmentsForTemplate(array $site, array $meta): array
+    {
+        $currentUrl = trim((string) ($site['current_url'] ?? ''));
+        $description = trim((string) ($meta['description'] ?? ''));
+
+        $meta['apple_touch_icon'] = $this->headVoidTag('link', [
+                'rel' => 'apple-touch-icon',
+                'href' => trim((string) ($meta['apple_touch_icon'] ?? '')),
+            ]);
+        $meta['canonical'] = $this->headVoidTag('link', [
+            'rel' => 'canonical',
+            'href' => $currentUrl,
+        ]);
+        $meta['robots'] = $this->headVoidTag('meta', [
+                'name' => 'robots',
+                'content' => trim((string) ($meta['robots'] ?? '')),
+            ]);
+        $meta['og_locale'] = $this->headVoidTag('meta', [
+                'property' => 'og:locale',
+                'content' => trim((string) ($meta['og_locale'] ?? '')),
+            ]);
+        $meta['og_type'] = $this->headVoidTag('meta', [
+                'property' => 'og:type',
+                'content' => trim((string) ($meta['og_type'] ?? '')),
+            ]);
+        $meta['og_url'] = $this->headVoidTag('meta', [
+                'property' => 'og:url',
+                'content' => $currentUrl,
+            ]);
+        $meta['x_card'] = $this->headVoidTag('meta', [
+                'property' => 'twitter:card',
+                'content' => trim((string) ($meta['x_card'] ?? '')),
+            ]);
+        $meta['x_creator'] = $this->headVoidTag('meta', [
+                'property' => 'twitter:creator',
+                'content' => trim((string) ($meta['x_creator'] ?? '')),
+            ]);
+        $meta['x_site'] = $this->headVoidTag('meta', [
+                'property' => 'twitter:site',
+                'content' => trim((string) ($meta['x_site'] ?? '')),
+            ]);
+        $meta['x_url'] = $this->headVoidTag('meta', [
+                'property' => 'twitter:url',
+                'content' => $currentUrl,
+            ]);
+
+        return $meta;
+    }
+
+    /**
+     * @param array<string, string> $attributes
+     */
+    private function headVoidTag(string $tagName, array $attributes): string
+    {
+        foreach ($attributes as $value) {
+            if (trim($value) === '') {
+                return '';
+            }
+        }
+
+        $parts = [];
+        foreach ($attributes as $name => $value) {
+            $parts[] = $name . '="' . e($value) . '"';
+        }
+
+        return '<' . $tagName . ' ' . implode(' ', $parts) . '>';
     }
 
     /**

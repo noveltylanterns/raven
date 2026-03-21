@@ -48,7 +48,7 @@ final class ThemeScaffoldService
             . "    <meta charset=\"utf-8\">\n"
             . "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
             . "    <title>{meta:document_title}</title>\n"
-            . "    <meta name=\"description\" content=\"{meta:description}\">\n"
+            . "    {if meta:desc}<meta name=\"description\" content=\"{meta:desc}\">{/if}\n"
             . "    <link rel=\"stylesheet\" href=\"{theme:url}/css/style.css\">\n"
             . "</head>\n"
             . "<body>\n"
