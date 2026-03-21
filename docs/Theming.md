@@ -70,6 +70,8 @@ Depending on route/template, these top-level roots are available:
 
 - shared roots:
   - `site`
+  - `theme`
+  - `panel`
   - `meta`
 - page/home/channel routes:
   - `page`
@@ -95,13 +97,14 @@ Common shared keys:
 
 - `site:name`
 - `site:url`
-- `site:theme`
-- `site:theme_css`
-- `site:theme_url`
 - `site:domain`
 - `site:scheme`
-- `site:panel_path`
 - `site:current_url`
+- `theme:slug`
+- `theme:css`
+- `theme:url`
+- `panel:slug`
+- `panel:url`
 - `meta:title`
 - `meta:description`
 - `meta:document_title`
@@ -265,6 +268,8 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `pagination:per_page` | pagination payload items per page | integer-like page size |
 | `pagination:total_items` | pagination payload total item count | integer-like total count |
 | `pagination:total_pages` | pagination payload total page count | integer-like total pages |
+| `panel:slug` | configured panel route prefix | panel path slug |
+| `panel:url` | absolute panel base URL | absolute panel URL without trailing slash |
 | `profile:avatar_thumb_url` | profile payload avatar thumbnail URL | avatar thumbnail URL |
 | `profile:avatar_url` | profile payload avatar URL | avatar original URL |
 | `profile:contact_profiles` | profile payload normalized contact rows | array for `{each profile:contact_profiles}` |
@@ -275,15 +280,14 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `site:current_url` | current request URL | absolute URL |
 | `site:domain` | configured site host/domain value | host or host/path string |
 | `site:name` | configured site name | site name |
-| `site:panel_path` | configured panel route prefix | panel path slug |
 | `site:scheme` | configured public scheme | `http` or `https` |
-| `site:theme` | active public theme slug | theme slug |
-| `site:theme_css` | resolved theme slug that provides active CSS/assets | theme slug |
-| `site:theme_url` | resolved public theme asset base URL | absolute `/theme/{slug}` URL without trailing slash |
 | `site:url` | configured public site base URL | absolute site URL without trailing slash |
 | `tag:description` | tag route payload description when present | tag description text |
 | `tag:name` | tag route payload display name | tag name |
 | `tag:slug` | tag route payload slug | tag slug |
+| `theme:css` | resolved theme slug that provides active CSS/assets | theme slug |
+| `theme:slug` | active public theme slug | theme slug |
+| `theme:url` | resolved public theme asset base URL | absolute `/theme/{slug}` URL without trailing slash |
 
 Notes:
 

@@ -79,7 +79,6 @@ PHP;
             $data = [
                 'site' => [
                     'name' => 'Raven CMS',
-                    'theme_css' => 'raven',
                 ],
                 'page' => [
                     'title' => 'Hello <Raven>',
@@ -177,13 +176,18 @@ PHP;
         $data = [
             'site' => [
                 'name' => 'Raven CMS',
-                'theme' => 'raven',
-                'theme_css' => 'raven',
-                'theme_url' => 'http://localhost/theme/raven',
-                'panel_path' => 'panel',
                 'domain' => 'localhost',
                 'url' => 'http://localhost',
                 'current_url' => 'http://localhost/',
+            ],
+            'theme' => [
+                'slug' => 'raven',
+                'css' => 'raven',
+                'url' => 'http://localhost/theme/raven',
+            ],
+            'panel' => [
+                'slug' => 'panel',
+                'url' => 'http://localhost/panel',
             ],
             'meta' => [
                 'title' => 'Smoke',

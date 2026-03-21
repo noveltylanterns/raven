@@ -5,8 +5,9 @@
 ### March 19, 2026
 
 - Added `site.scheme` runtime config plus public template `site:url`/`site:scheme` data so wrappers can emit a deterministic home URL, and rewired generated absolute public/meta URLs to honor the configured `http` vs `https` scheme instead of inferring it only from the incoming request.
-- Added `site:theme`, `site:theme_css`, and `site:theme_url` public template data, and updated stock/scaffold wrappers to use the shorter canonical theme keys.
-- Normalized `site:url` and `site:theme_url` to return absolute base URLs without forced trailing slashes, and updated stock/scaffold theme asset examples to append `/css/...` and `/img/...` explicitly.
+- Added public template `theme:slug`, `theme:css`, and `theme:url` data, and updated stock/scaffold wrappers to use the dedicated `theme:*` root instead of storing theme metadata under `site:*`.
+- Normalized `site:url`, `theme:url`, and `panel:url` to return absolute base URLs without forced trailing slashes, and updated stock/scaffold theme asset examples to append `/css/...` and `/img/...` explicitly.
+- Moved public panel route metadata from `site:panel_path` to `panel:slug` plus `panel:url`.
 - Renamed the public template metadata root to the shorter canonical `meta:*` namespace and updated stock/scaffold wrappers plus theme docs to match.
 - Moved document-head template metadata keys out of `site:*` into `meta:*`, including `apple_touch_icon`, `robots`, `og_*`, and `x_*`, and updated stock wrappers/docs to match.
 - Shortened the remaining public template payload names to canonical forms (`item:url`, `page:show_title`, `group:member_count`, `profile_denied`, `group_denied`) and removed stale gallery-root references from theme docs.

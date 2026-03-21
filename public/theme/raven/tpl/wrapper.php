@@ -22,8 +22,8 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 {if site:current_url}
     <link rel="canonical" href="{site:current_url}">
 {/if}
-    <link rel="icon" type="image/png" href="{site:theme_url}/img/favicon.png">
-    <link rel="stylesheet" href="{site:theme_url}/css/style.css">
+    <link rel="icon" type="image/png" href="{theme:url}/img/favicon.png">
+    <link rel="stylesheet" href="{theme:url}/css/style.css">
     <meta charset="utf-8">
 {if meta:description}
     <meta name="description" content="{meta:description}">

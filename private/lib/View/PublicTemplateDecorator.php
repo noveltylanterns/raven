@@ -212,22 +212,39 @@ final class PublicTemplateDecorator
         }
         $site['name'] = $siteName;
 
-        $theme = trim((string) ($site['theme'] ?? 'raven'));
+        $themeData = is_array($data['theme'] ?? null) ? $data['theme'] : [];
+
+        $theme = trim((string) ($site['theme'] ?? $themeData['slug'] ?? 'raven'));
         if ($theme === '') {
             $theme = 'raven';
         }
-        $site['theme'] = $theme;
 
-        $themeCss = trim((string) ($site['theme_css'] ?? $theme));
+        $themeCss = trim((string) ($site['theme_css'] ?? $themeData['css'] ?? $theme));
         if ($themeCss === '') {
             $themeCss = 'raven';
         }
-        $site['theme_css'] = $themeCss;
 
         $siteUrl = trim((string) ($site['url'] ?? ''));
-        if ($siteUrl !== '') {
-            $site['theme_url'] = rtrim($siteUrl, '/') . '/theme/' . rawurlencode($themeCss);
+        $themeUrl = trim((string) ($site['theme_url'] ?? $themeData['url'] ?? ''));
+        if ($themeUrl === '' && $siteUrl !== '') {
+            $themeUrl = rtrim($siteUrl, '/') . '/theme/' . rawurlencode($themeCss);
         }
+        $data['theme'] = [
+            'slug' => $theme,
+            'css' => $themeCss,
+            'url' => $themeUrl,
+        ];
+
+        $panelData = is_array($data['panel'] ?? null) ? $data['panel'] : [];
+        $panelSlug = trim((string) ($site['panel_path'] ?? $panelData['slug'] ?? 'panel'), '/');
+        $panelUrl = trim((string) ($panelData['url'] ?? ''));
+        if ($panelUrl === '' && $siteUrl !== '') {
+            $panelUrl = $panelSlug === '' ? $siteUrl : (rtrim($siteUrl, '/') . '/' . $panelSlug);
+        }
+        $data['panel'] = [
+            'slug' => $panelSlug,
+            'url' => $panelUrl,
+        ];
 
         $meta = is_array($data['meta'] ?? null) ? $data['meta'] : [];
         $meta['apple_touch_icon'] = trim((string) ($site['apple_touch_icon'] ?? ''));
@@ -258,7 +275,11 @@ final class PublicTemplateDecorator
             $site['twitter_card'],
             $site['twitter_creator'],
             $site['twitter_image'],
-            $site['twitter_site']
+            $site['twitter_site'],
+            $site['theme'],
+            $site['theme_css'],
+            $site['theme_url'],
+            $site['panel_path']
         );
 
         $viewTitle = '';
