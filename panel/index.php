@@ -51,7 +51,7 @@ $panelController = new PanelController(
     $app['page'],
     $app['redirect'],
     $app['tag'],
-    $app['taxonomy'],
+    $app['taxonomy_lookup'],
     $app['user'],
     $app['invite_tokens']
 );

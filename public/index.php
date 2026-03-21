@@ -156,7 +156,7 @@ $controller = new PublicController(
     $app['page_images'],
     $app['page'],
     $app['redirect'],
-    $app['taxonomy'],
+    $app['taxonomy_lookup'],
     $app['user'],
     $app['invite_tokens'],
     $app['input'],

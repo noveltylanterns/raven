@@ -60,7 +60,7 @@ $renderPublicNotFound = static function () use ($app): void {
         $app,
         $app['redirect'],
         $app['tag'],
-        $app['taxonomy'],
+        $app['taxonomy_lookup'],
         $app,
         $app['invite_tokens']
     );

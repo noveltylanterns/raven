@@ -76,7 +76,7 @@ use Raven\Repository\PageImageRepository;
 use Raven\Repository\PageRepository;
 use Raven\Repository\RedirectRepository;
 use Raven\Repository\TagRepository;
-use Raven\Repository\TaxonomyRepository;
+use Raven\Repository\TaxonomyLookupRepository;
 use Raven\Repository\UserRepository;
 
 use function Raven\Core\Support\redirect;
@@ -103,7 +103,7 @@ final class PanelController
     private PageRepository $pageRepo;
     private RedirectRepository $redirectRepo;
     private TagRepository $tagRepo;
-    private TaxonomyRepository $taxonomyRepo;
+    private TaxonomyLookupRepository $taxonomyLookupRepo;
     private UserRepository $userRepo;
     private InviteTokenRepository $inviteTokens;
     /** @var array<string, array{label: string, editor: string}>|null */
@@ -159,7 +159,7 @@ final class PanelController
         PageRepository $pageRepo,
         RedirectRepository $redirectRepo,
         TagRepository $tagRepo,
-        TaxonomyRepository $taxonomyRepo,
+        TaxonomyLookupRepository $taxonomyLookupRepo,
         UserRepository $userRepo,
         InviteTokenRepository $inviteTokens
     ) {
@@ -179,7 +179,7 @@ final class PanelController
         $this->pageRepo = $pageRepo;
         $this->redirectRepo = $redirectRepo;
         $this->tagRepo = $tagRepo;
-        $this->taxonomyRepo = $taxonomyRepo;
+        $this->taxonomyLookupRepo = $taxonomyLookupRepo;
         $this->userRepo = $userRepo;
         $this->inviteTokens = $inviteTokens;
     }
@@ -317,8 +317,8 @@ final class PanelController
         // Load channel/category/tag options and page assignments in one query.
         $categoryEnabled = $this->categoryEnabled();
         $tagEnabled = $this->tagEnabled();
-        $taxonomyData = $this->taxonomyRepo->listPageEditorTaxonomyData($id ?? 0, $categoryEnabled, $tagEnabled);
-        $channelOptions = is_array($taxonomyData['channel_options'] ?? null) ? $taxonomyData['channel_options'] : [];
+        $taxonomyOptionSets = $this->taxonomyLookupRepo->listPageEditorOptionSets($id ?? 0, $categoryEnabled, $tagEnabled);
+        $channelOptions = is_array($taxonomyOptionSets['channel_options'] ?? null) ? $taxonomyOptionSets['channel_options'] : [];
         foreach ($channelOptions as &$channelOption) {
             if (!is_array($channelOption)) {
                 continue;
@@ -357,10 +357,10 @@ final class PanelController
                 $pageNavChannel = '';
             }
         }
-        $categoryOptions = is_array($taxonomyData['category_options'] ?? null) ? $taxonomyData['category_options'] : [];
-        $tagOptions = is_array($taxonomyData['tag_options'] ?? null) ? $taxonomyData['tag_options'] : [];
-        $assignedCategoryOptions = is_array($taxonomyData['assigned_category_options'] ?? null) ? $taxonomyData['assigned_category_options'] : [];
-        $assignedTagOptions = is_array($taxonomyData['assigned_tag_options'] ?? null) ? $taxonomyData['assigned_tag_options'] : [];
+        $categoryOptionsAll = is_array($taxonomyOptionSets['category_options_all'] ?? null) ? $taxonomyOptionSets['category_options_all'] : [];
+        $tagOptionsAll = is_array($taxonomyOptionSets['tag_options_all'] ?? null) ? $taxonomyOptionSets['tag_options_all'] : [];
+        $categoryOptionsSelected = is_array($taxonomyOptionSets['category_options_selected'] ?? null) ? $taxonomyOptionSets['category_options_selected'] : [];
+        $tagOptionsSelected = is_array($taxonomyOptionSets['tag_options_selected'] ?? null) ? $taxonomyOptionSets['tag_options_selected'] : [];
         $currentUserId = $this->auth->userId();
 
         $this->view->render('panel/page/edit', [
@@ -369,10 +369,10 @@ final class PanelController
             'currentUserId' => $currentUserId !== null ? $currentUserId : 0,
             'authorOptions' => $this->pageAuthorOptions(),
             'channelOptions' => $channelOptions,
-            'categoryOptions' => $categoryOptions,
-            'tagOptions' => $tagOptions,
-            'assignedCategoryOptions' => $assignedCategoryOptions,
-            'assignedTagOptions' => $assignedTagOptions,
+            'categoryOptionsAll' => $categoryOptionsAll,
+            'tagOptionsAll' => $tagOptionsAll,
+            'categoryOptionsSelected' => $categoryOptionsSelected,
+            'tagOptionsSelected' => $tagOptionsSelected,
             'categoryEnabled' => $categoryEnabled,
             'tagEnabled' => $tagEnabled,
             'galleryImages' => $galleryImages,
@@ -4861,9 +4861,9 @@ final class PanelController
      *
      * @param array<int, array<string, string|null>> $pathSets
      */
-    private function cleanupTaxonomyImagePathSets(string $taxonomyType, int $taxonomyId, array $pathSets): void
+    private function cleanupTaxonomyImagePathSets(string $taxonomyBucket, int $taxonomyId, array $pathSets): void
     {
-        $this->taxonomyImageService()->cleanupPathSets($taxonomyType, $taxonomyId, $pathSets);
+        $this->taxonomyImageService()->cleanupPathSets($taxonomyBucket, $taxonomyId, $pathSets);
     }
 
     /**
@@ -4871,9 +4871,9 @@ final class PanelController
      *
      * @param array<int, string>|array<string, string|null> $paths
      */
-    private function deleteTaxonomyStoredPaths(string $taxonomyType, int $taxonomyId, array $paths): void
+    private function deleteTaxonomyStoredPaths(string $taxonomyBucket, int $taxonomyId, array $paths): void
     {
-        $this->taxonomyImageService()->deleteStoredPaths($taxonomyType, $taxonomyId, $paths);
+        $this->taxonomyImageService()->deleteStoredPaths($taxonomyBucket, $taxonomyId, $paths);
     }
 
     /**
@@ -4895,9 +4895,9 @@ final class PanelController
      *   error?: string
      * }
      */
-    private function storeTaxonomyImageUpload(string $taxonomyType, int $taxonomyId, string $slot, array $upload): array
+    private function storeTaxonomyImageUpload(string $taxonomyBucket, int $taxonomyId, string $slot, array $upload): array
     {
-        return $this->taxonomyImageService()->storeUpload($taxonomyType, $taxonomyId, $slot, $upload);
+        return $this->taxonomyImageService()->storeUpload($taxonomyBucket, $taxonomyId, $slot, $upload);
     }
 
     /**
@@ -5225,7 +5225,7 @@ final class PanelController
             $enabledMap,
             $this->extensionsBasePath(),
             fn (string $extensionPath): array => $this->readExtensionManifest($extensionPath),
-            fn (string $tableName): array => $this->taxonomyRepo->listEnabledExtensionForms($tableName)
+            fn (string $tableName): array => $this->taxonomyLookupRepo->listEnabledExtensionForms($tableName)
         );
     }
 
@@ -5254,7 +5254,7 @@ final class PanelController
     private function listExtensionsForPanel(): array
     {
         return $this->extensionCatalogService()->listForPanel(
-            fn (string $tableName): array => $this->taxonomyRepo->listEnabledExtensionForms($tableName)
+            fn (string $tableName): array => $this->taxonomyLookupRepo->listEnabledExtensionForms($tableName)
         );
     }
 
@@ -5280,7 +5280,7 @@ final class PanelController
     {
         return $this->extensionCatalogService()->readManifest(
             $extensionPath,
-            fn (string $tableName): array => $this->taxonomyRepo->listEnabledExtensionForms($tableName)
+            fn (string $tableName): array => $this->taxonomyLookupRepo->listEnabledExtensionForms($tableName)
         );
     }
 
@@ -5708,7 +5708,7 @@ final class PanelController
         $routingGroups = is_array($routingAuthData['group_rows'] ?? null) ? $routingAuthData['group_rows'] : [];
         $routingUsers = is_array($routingAuthData['user_rows'] ?? null) ? $routingAuthData['user_rows'] : [];
 
-        $taxonomyRoutingData = $this->taxonomyRepo->listRoutingInventoryData(
+        $taxonomyRoutingOptionSets = $this->taxonomyLookupRepo->listRoutingInventoryData(
             $categoryPrefix !== '',
             $tagPrefix !== '',
             true
@@ -5732,17 +5732,17 @@ final class PanelController
             'can_edit_groups' => $this->auth->hasPanelPermissionBit(PanelAccess::GROUPS_EDIT),
             'routing_groups' => $routingGroups,
             'routing_users' => $routingUsers,
-            'channel_routing_options' => is_array($taxonomyRoutingData['channel_options'] ?? null)
-                ? $taxonomyRoutingData['channel_options']
+            'channel_routing_options' => is_array($taxonomyRoutingOptionSets['channel_options'] ?? null)
+                ? $taxonomyRoutingOptionSets['channel_options']
                 : [],
-            'category_routing_options' => is_array($taxonomyRoutingData['category_options'] ?? null)
-                ? $taxonomyRoutingData['category_options']
+            'category_routing_options' => is_array($taxonomyRoutingOptionSets['category_options_all'] ?? null)
+                ? $taxonomyRoutingOptionSets['category_options_all']
                 : [],
-            'tag_routing_options' => is_array($taxonomyRoutingData['tag_options'] ?? null)
-                ? $taxonomyRoutingData['tag_options']
+            'tag_routing_options' => is_array($taxonomyRoutingOptionSets['tag_options_all'] ?? null)
+                ? $taxonomyRoutingOptionSets['tag_options_all']
                 : [],
-            'redirect_routing_rows' => is_array($taxonomyRoutingData['redirect_rows'] ?? null)
-                ? $taxonomyRoutingData['redirect_rows']
+            'redirect_routing_rows' => is_array($taxonomyRoutingOptionSets['redirect_rows'] ?? null)
+                ? $taxonomyRoutingOptionSets['redirect_rows']
                 : [],
             'pages_for_routing' => $this->pageRepo->listAllForRouting(),
             'build_page_url' => fn (

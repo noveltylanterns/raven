@@ -16,10 +16,10 @@ declare(strict_types=1);
 /** @var int $currentUserId */
 /** @var array<int, array{id: int, username: string, display_name: string}> $authorOptions */
 /** @var array<int, array<string, mixed>> $channelOptions */
-/** @var array<int, array<string, mixed>> $categoryOptions */
-/** @var array<int, array<string, mixed>> $tagOptions */
-/** @var array<int, array{id: int, name: string, slug: string}> $assignedCategoryOptions */
-/** @var array<int, array{id: int, name: string, slug: string}> $assignedTagOptions */
+/** @var array<int, array<string, mixed>> $categoryOptionsAll */
+/** @var array<int, array<string, mixed>> $tagOptionsAll */
+/** @var array<int, array{id: int, name: string, slug: string}> $categoryOptionsSelected */
+/** @var array<int, array{id: int, name: string, slug: string}> $tagOptionsSelected */
 /** @var bool $categoryEnabled */
 /** @var bool $tagEnabled */
 /** @var array<int, array<string, mixed>> $galleryImages */
@@ -599,13 +599,13 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                     </div>
 
                     <?php if ($categoryEnabled): ?>
-                    <div class="form-group" data-rvn-chip-picker="categories">
+                    <div class="form-group" data-rvn-chip-picker="category">
                         <label class="form-label" for="add-category-button">Categories</label>
-                        <div class="d-flex flex-wrap align-items-center gap-2" data-rvn-chip-list="categories">
-                            <?php foreach ($assignedCategoryOptions as $category): ?>
+                        <div class="d-flex flex-wrap align-items-center gap-2" data-rvn-chip-list="category">
+                            <?php foreach ($categoryOptionsSelected as $category): ?>
                                 <span class="badge text-bg-primary d-inline-flex align-items-center gap-2" data-rvn-chip-id="<?= (int) $category['id'] ?>">
                                     <span><?= e((string) $category['name']) ?></span>
-                                    <button type="button" class="btn btn-sm p-0 border-0 text-white" data-rvn-chip-remove="categories" aria-label="Remove category">&times;</button>
+                                    <button type="button" class="btn btn-sm p-0 border-0 text-white" data-rvn-chip-remove="category" aria-label="Remove category">&times;</button>
                                     <input type="hidden" name="category_ids[]" value="<?= (int) $category['id'] ?>">
                                 </span>
                             <?php endforeach; ?>
@@ -615,10 +615,10 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                     Add Category
                                 </button>
                                 <ul class="dropdown-menu">
-                                    <?php if ($categoryOptions === []): ?>
+                                    <?php if ($categoryOptionsAll === []): ?>
                                         <li><span class="dropdown-item-text text-muted">No categories available</span></li>
                                     <?php else: ?>
-                                        <?php foreach ($categoryOptions as $categoryOption): ?>
+                                        <?php foreach ($categoryOptionsAll as $categoryOption): ?>
                                             <?php
                                             $categoryId = (int) ($categoryOption['id'] ?? 0);
                                             $categoryName = (string) ($categoryOption['name'] ?? '');
@@ -628,7 +628,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                                 <button
                                                     type="button"
                                                     class="dropdown-item"
-                                                    data-rvn-add-chip="categories"
+                                                    data-rvn-add-chip="category"
                                                     data-rvn-option-id="<?= $categoryId ?>"
                                                     data-rvn-option-label="<?= e($categoryName) ?>"
                                                 >
@@ -645,13 +645,13 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                     <?php endif; ?>
 
                     <?php if ($tagEnabled): ?>
-                    <div class="form-group" data-rvn-chip-picker="tags">
+                    <div class="form-group" data-rvn-chip-picker="tag">
                         <label class="form-label" for="add-tag-button">Tags</label>
-                        <div class="d-flex flex-wrap align-items-center gap-2" data-rvn-chip-list="tags">
-                            <?php foreach ($assignedTagOptions as $tag): ?>
+                        <div class="d-flex flex-wrap align-items-center gap-2" data-rvn-chip-list="tag">
+                            <?php foreach ($tagOptionsSelected as $tag): ?>
                                 <span class="badge text-bg-secondary d-inline-flex align-items-center gap-2" data-rvn-chip-id="<?= (int) $tag['id'] ?>">
                                     <span><?= e((string) $tag['name']) ?></span>
-                                    <button type="button" class="btn btn-sm p-0 border-0 text-white" data-rvn-chip-remove="tags" aria-label="Remove tag">&times;</button>
+                                    <button type="button" class="btn btn-sm p-0 border-0 text-white" data-rvn-chip-remove="tag" aria-label="Remove tag">&times;</button>
                                     <input type="hidden" name="tag_ids[]" value="<?= (int) $tag['id'] ?>">
                                 </span>
                             <?php endforeach; ?>
@@ -661,10 +661,10 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                     Add Tag
                                 </button>
                                 <ul class="dropdown-menu">
-                                    <?php if ($tagOptions === []): ?>
+                                    <?php if ($tagOptionsAll === []): ?>
                                         <li><span class="dropdown-item-text text-muted">No tags available</span></li>
                                     <?php else: ?>
-                                        <?php foreach ($tagOptions as $tagOption): ?>
+                                        <?php foreach ($tagOptionsAll as $tagOption): ?>
                                             <?php
                                             $tagId = (int) ($tagOption['id'] ?? 0);
                                             $tagName = (string) ($tagOption['name'] ?? '');
@@ -674,7 +674,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                                 <button
                                                     type="button"
                                                     class="dropdown-item"
-                                                    data-rvn-add-chip="tags"
+                                                    data-rvn-add-chip="tag"
                                                     data-rvn-option-id="<?= $tagId ?>"
                                                     data-rvn-option-label="<?= e($tagName) ?>"
                                                 >
@@ -1841,7 +1841,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
   })();
 
   // Manages badge-cloud category/tag pickers inside the page editor form.
-  function initRavenChipPicker(kind, inputName, badgeClass) {
+  function initRavenChipPicker(kind, inputName, badgeClass, removeLabel) {
     var picker = document.querySelector('[data-rvn-chip-picker="' + kind + '"]');
     if (!picker) {
       return;
@@ -1883,7 +1883,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
       removeButton.type = 'button';
       removeButton.className = 'btn btn-sm p-0 border-0 text-white';
       removeButton.setAttribute('data-rvn-chip-remove', kind);
-      removeButton.setAttribute('aria-label', 'Remove ' + kind.slice(0, -1));
+      removeButton.setAttribute('aria-label', 'Remove ' + removeLabel);
       removeButton.innerHTML = '&times;';
 
       var hiddenInput = document.createElement('input');
@@ -1931,10 +1931,10 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
   }
 
   <?php if ($categoryEnabled): ?>
-  initRavenChipPicker('categories', 'category_ids[]', 'text-bg-primary');
+  initRavenChipPicker('category', 'category_ids[]', 'text-bg-primary', 'category');
   <?php endif; ?>
   <?php if ($tagEnabled): ?>
-  initRavenChipPicker('tags', 'tag_ids[]', 'text-bg-secondary');
+  initRavenChipPicker('tag', 'tag_ids[]', 'text-bg-secondary', 'tag');
   <?php endif; ?>
 
   var ravenGalleryItems = <?= json_encode($tinyMceGalleryItems, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) ?>;

@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Repository/TaxonomyRepository.php
+ * ~/private/sys/Repository/TaxonomyLookupRepository.php
  * Repository for database persistence operations.
  * Docs: https://raven.lanterns.io
  */
@@ -20,9 +20,9 @@ use Raven\Lib\Routing\ChannelContextService;
 use RuntimeException;
 
 /**
- * Small repository for channel/category/tag public lookups.
+ * Lookup repository for channel/category/tag rows and taxonomy option sets.
  */
-final class TaxonomyRepository
+final class TaxonomyLookupRepository
 {
     private PDO $db;
     private string $driver;
@@ -119,8 +119,8 @@ final class TaxonomyRepository
      *
      * @return array{
      *   channel_options: array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>,
-     *   category_options: array<int, array{id: int, name: string, slug: string}>,
-     *   tag_options: array<int, array{id: int, name: string, slug: string}>
+     *   category_options_all: array<int, array{id: int, name: string, slug: string}>,
+     *   tag_options_all: array<int, array{id: int, name: string, slug: string}>
      * }
      */
     public function listRoutingOptions(): array
@@ -144,8 +144,8 @@ final class TaxonomyRepository
         $rows = $stmt->fetchAll() ?: [];
         $result = [
             'channel_options' => $this->channelRepo->listOptions(),
-            'category_options' => [],
-            'tag_options' => [],
+            'category_options_all' => [],
+            'tag_options_all' => [],
         ];
 
         foreach ($rows as $row) {
@@ -160,7 +160,7 @@ final class TaxonomyRepository
 
             $optionType = strtolower(trim((string) ($row['option_type'] ?? '')));
             if ($optionType === 'category') {
-                $result['category_options'][] = [
+                $result['category_options_all'][] = [
                     'id' => $id,
                     'name' => $name,
                     'slug' => $slug,
@@ -168,7 +168,7 @@ final class TaxonomyRepository
                 continue;
             }
             if ($optionType === 'tag') {
-                $result['tag_options'][] = [
+                $result['tag_options_all'][] = [
                     'id' => $id,
                     'name' => $name,
                     'slug' => $slug,
@@ -184,8 +184,8 @@ final class TaxonomyRepository
      *
      * @return array{
      *   channel_options: array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>,
-     *   category_options: array<int, array{id: int, name: string, slug: string}>,
-     *   tag_options: array<int, array{id: int, name: string, slug: string}>,
+     *   category_options_all: array<int, array{id: int, name: string, slug: string}>,
+     *   tag_options_all: array<int, array{id: int, name: string, slug: string}>,
      *   redirect_rows: array<int, array<string, mixed>>
      * }
      */
@@ -200,8 +200,8 @@ final class TaxonomyRepository
 
         $result = [
             'channel_options' => $this->channelRepo->listOptions(),
-            'category_options' => [],
-            'tag_options' => [],
+            'category_options_all' => [],
+            'tag_options_all' => [],
             'redirect_rows' => [],
         ];
 
@@ -219,7 +219,7 @@ final class TaxonomyRepository
                     continue;
                 }
 
-                $result['category_options'][] = [
+                $result['category_options_all'][] = [
                     'id' => $id,
                     'name' => (string) ($row['name'] ?? ''),
                     'slug' => $slug,
@@ -241,7 +241,7 @@ final class TaxonomyRepository
                     continue;
                 }
 
-                $result['tag_options'][] = [
+                $result['tag_options_all'][] = [
                     'id' => $id,
                     'name' => (string) ($row['name'] ?? ''),
                     'slug' => $slug,
@@ -287,13 +287,13 @@ final class TaxonomyRepository
      *
      * @return array{
      *   channel_options: array<int, array{id: int, name: string, slug: string}>,
-     *   category_options: array<int, array{id: int, name: string, slug: string}>,
-     *   tag_options: array<int, array{id: int, name: string, slug: string}>,
-     *   assigned_category_options: array<int, array{id: int, name: string, slug: string}>,
-     *   assigned_tag_options: array<int, array{id: int, name: string, slug: string}>
+     *   category_options_all: array<int, array{id: int, name: string, slug: string}>,
+     *   tag_options_all: array<int, array{id: int, name: string, slug: string}>,
+     *   category_options_selected: array<int, array{id: int, name: string, slug: string}>,
+     *   tag_options_selected: array<int, array{id: int, name: string, slug: string}>
      * }
      */
-    public function listPageEditorTaxonomyData(
+    public function listPageEditorOptionSets(
         int $pageId,
         bool $includeCategories = true,
         bool $includeTags = true
@@ -301,10 +301,10 @@ final class TaxonomyRepository
     {
         $result = [
             'channel_options' => $this->channelRepo->listOptions(),
-            'category_options' => [],
-            'tag_options' => [],
-            'assigned_category_options' => [],
-            'assigned_tag_options' => [],
+            'category_options_all' => [],
+            'tag_options_all' => [],
+            'category_options_selected' => [],
+            'tag_options_selected' => [],
         ];
         if (!$includeCategories && !$includeTags) {
             return $result;
@@ -376,16 +376,16 @@ final class TaxonomyRepository
             $isAssigned = (int) ($row['is_assigned'] ?? 0) === 1;
 
             if ($optionType === 'category') {
-                $result['category_options'][] = $entry;
+                $result['category_options_all'][] = $entry;
                 if ($isAssigned) {
-                    $result['assigned_category_options'][] = $entry;
+                    $result['category_options_selected'][] = $entry;
                 }
                 continue;
             }
             if ($optionType === 'tag') {
-                $result['tag_options'][] = $entry;
+                $result['tag_options_all'][] = $entry;
                 if ($isAssigned) {
-                    $result['assigned_tag_options'][] = $entry;
+                    $result['tag_options_selected'][] = $entry;
                 }
             }
         }

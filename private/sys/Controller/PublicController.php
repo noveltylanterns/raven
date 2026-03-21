@@ -50,7 +50,7 @@ use Raven\Repository\InviteTokenRepository;
 use Raven\Repository\PageImageRepository;
 use Raven\Repository\PageRepository;
 use Raven\Repository\RedirectRepository;
-use Raven\Repository\TaxonomyRepository;
+use Raven\Repository\TaxonomyLookupRepository;
 use Raven\Repository\UserRepository;
 
 /**
@@ -65,7 +65,7 @@ final class PublicController
     private PageImageRepository $pageImages;
     private PageRepository $pageRepo;
     private RedirectRepository $redirectRepo;
-    private TaxonomyRepository $taxonomyRepo;
+    private TaxonomyLookupRepository $taxonomyLookupRepo;
     private UserRepository $userRepo;
     private InviteTokenRepository $inviteTokens;
     private InputSanitizer $input;
@@ -106,7 +106,7 @@ final class PublicController
         PageImageRepository $pageImages,
         PageRepository $pageRepo,
         RedirectRepository $redirectRepo,
-        TaxonomyRepository $taxonomyRepo,
+        TaxonomyLookupRepository $taxonomyLookupRepo,
         UserRepository $userRepo,
         InviteTokenRepository $inviteTokens,
         InputSanitizer $input,
@@ -121,7 +121,7 @@ final class PublicController
         $this->pageImages = $pageImages;
         $this->pageRepo = $pageRepo;
         $this->redirectRepo = $redirectRepo;
-        $this->taxonomyRepo = $taxonomyRepo;
+        $this->taxonomyLookupRepo = $taxonomyLookupRepo;
         $this->userRepo = $userRepo;
         $this->inviteTokens = $inviteTokens;
         $this->input = $input;
@@ -171,7 +171,7 @@ final class PublicController
             return;
         }
 
-        $channel = $this->taxonomyRepo->findChannelBySlug($channelSlug);
+        $channel = $this->taxonomyLookupRepo->findChannelBySlug($channelSlug);
 
         $page = $this->renderPageExtendedBlocks($page);
         $page = $this->decoratePageForTemplate($page);
@@ -206,7 +206,7 @@ final class PublicController
         $channelWordSeparator = 'inherit';
 
         if ($channelSlug !== null) {
-            $channel = $this->taxonomyRepo->findChannelBySlug($channelSlug);
+            $channel = $this->taxonomyLookupRepo->findChannelBySlug($channelSlug);
             if ($channel === null) {
                 if ($this->tryRedirect($requestedSlug, $channelSlug)) {
                     return;
@@ -406,7 +406,7 @@ final class PublicController
             return;
         }
 
-        $category = $this->taxonomyRepo->findCategoryBySlug($categorySlug);
+        $category = $this->taxonomyLookupRepo->findCategoryBySlug($categorySlug);
 
         if ($category === null) {
             $this->notFound();
@@ -461,7 +461,7 @@ final class PublicController
             return;
         }
 
-        $tag = $this->taxonomyRepo->findTagBySlug($tagSlug);
+        $tag = $this->taxonomyLookupRepo->findTagBySlug($tagSlug);
 
         if ($tag === null) {
             $this->notFound();

@@ -13,7 +13,7 @@ use Raven\Controller\PublicController;
 use Raven\Lib\Profiling\RequestProfiler;
 use Raven\Repository\GroupRepository;
 use Raven\Repository\PageRepository;
-use Raven\Repository\TaxonomyRepository;
+use Raven\Repository\TaxonomyLookupRepository;
 use Raven\Repository\UserRepository;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
@@ -94,8 +94,8 @@ final class PublicRouteProfilerRunner
         $app = $this->bootstrapApp('/');
         /** @var PageRepository $pages */
         $pages = $app['page'];
-        /** @var TaxonomyRepository $taxonomy */
-        $taxonomy = $app['taxonomy'];
+        /** @var TaxonomyLookupRepository $taxonomyLookup */
+        $taxonomyLookup = $app['taxonomy_lookup'];
         /** @var UserRepository $users */
         $users = $app['user'];
         /** @var GroupRepository $groups */
@@ -124,10 +124,10 @@ final class PublicRouteProfilerRunner
         $profileRoutesEnabled = $profilePrefix !== '' && in_array($profileMode, ['public_full', 'public_limited', 'private'], true);
         $groupRoutesEnabled = $groupPrefix !== '' && in_array($groupMode, ['public', 'private'], true);
 
-        $taxonomyRouting = $taxonomy->listRoutingInventoryData($categoryPrefix !== '', $tagPrefix !== '', true);
-        $channels = is_array($taxonomyRouting['channel_options'] ?? null) ? $taxonomyRouting['channel_options'] : [];
-        $categories = is_array($taxonomyRouting['category_options'] ?? null) ? $taxonomyRouting['category_options'] : [];
-        $tags = is_array($taxonomyRouting['tag_options'] ?? null) ? $taxonomyRouting['tag_options'] : [];
+        $taxonomyRouteOptionSets = $taxonomyLookup->listRoutingInventoryData($categoryPrefix !== '', $tagPrefix !== '', true);
+        $channels = is_array($taxonomyRouteOptionSets['channel_options'] ?? null) ? $taxonomyRouteOptionSets['channel_options'] : [];
+        $categories = is_array($taxonomyRouteOptionSets['category_options_all'] ?? null) ? $taxonomyRouteOptionSets['category_options_all'] : [];
+        $tags = is_array($taxonomyRouteOptionSets['tag_options_all'] ?? null) ? $taxonomyRouteOptionSets['tag_options_all'] : [];
         $pagesForRouting = $pages->listAllForRouting();
         $channelSlugById = [];
         foreach ($channels as $channel) {
@@ -403,7 +403,7 @@ final class PublicRouteProfilerRunner
             $app['page_images'],
             $app['page'],
             $app['redirect'],
-            $app['taxonomy'],
+            $app['taxonomy_lookup'],
             $app['user'],
             $app['invite_tokens'],
             $app['input'],

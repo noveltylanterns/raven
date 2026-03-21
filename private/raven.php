@@ -28,7 +28,7 @@ use Raven\Repository\PageImageRepository;
 use Raven\Repository\PageRepository;
 use Raven\Repository\RedirectRepository;
 use Raven\Repository\TagRepository;
-use Raven\Repository\TaxonomyRepository;
+use Raven\Repository\TaxonomyLookupRepository;
 use Raven\Repository\UserRepository;
 
 /**
@@ -163,7 +163,7 @@ return (static function (): array {
         'page' => new PageRepository($appDb, $driver, $prefix, $channelRepo, $categoryEnabled, $tagEnabled),
         'redirect' => new RedirectRepository($appDb, $driver, $prefix, $channelRepo),
         'tag' => new TagRepository($appDb, $driver, $prefix),
-        'taxonomy' => new TaxonomyRepository($appDb, $driver, $prefix, $channelRepo),
+        'taxonomy_lookup' => new TaxonomyLookupRepository($appDb, $driver, $prefix, $channelRepo),
         'user' => new UserRepository($authDb, $appDb, $driver, $prefix),
     ];
 

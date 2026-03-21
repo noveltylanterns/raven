@@ -351,7 +351,7 @@ Core system files:
 - `/private/sys/Repository/PageRepository.php` - Page repository CRUD, routing, taxonomy, and body-block persistence (now using shared page body-block codec + panel filter-clause + taxonomy assignment/public taxonomy query/persistence services from `/private/lib/Content/`, page-editor gallery hydration helpers from `/private/lib/Media/`, and shared channel context/path-scope helpers from `/private/lib/Routing/`).
 - `/private/sys/Repository/RedirectRepository.php` - Redirect repository CRUD/query layer, now delegating path-scope uniqueness and channel-context hydration helpers to `/private/lib/Routing/`.
 - `/private/sys/Repository/TagRepository.php` - Tag repository CRUD/query layer.
-- `/private/sys/Repository/TaxonomyRepository.php` - Shared taxonomy repository helpers and cross-taxonomy queries, now reusing shared channel-context and runtime table-name helpers from `/private/lib/`.
+- `/private/sys/Repository/TaxonomyLookupRepository.php` - Shared taxonomy lookup/option helpers and cross-taxonomy queries, now reusing shared channel-context and runtime table-name helpers from `/private/lib/`.
 - `/private/sys/Repository/UserRepository.php` - User repository CRUD/profile/contact/group membership persistence, now reusing shared auth payload codec helpers for contact profile normalization, shared user-group catalog mapping, panel-user list/page query orchestration + row hydration, shared routing-data assembly/user persistence/membership write helpers from `/private/lib/Auth/`, and shared runtime table-name resolution helpers from `/private/lib/Database/Runtime/`.
 
 #### /.tmp/
