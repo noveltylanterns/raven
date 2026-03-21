@@ -260,15 +260,18 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `item:username` | current loop item username, when iterating `members` | username |
 | `item:value` | current loop item value, when iterating `profile:contact_profiles` | contact value text |
 
-#### 9.2.5 Meta Property Tags
+#### 9.2.5 Meta Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
 | `meta:apple_touch_icon` | public template Apple touch icon URL | URL string |
+| `meta:desc` | public template metadata description | meta description text |
+| `meta:document_title` | full document title assembled for `<title>` and social tags | complete document title |
 | `meta:image` | shared metadata image URL for OpenGraph and X cards | absolute URL |
 | `meta:og_locale` | public template OpenGraph locale value | locale string |
 | `meta:og_type` | public template OpenGraph type value | type string |
 | `meta:robots` | public template robots value | robots directive string |
+| `meta:title` | logical route title before site suffix | title text |
 | `meta:url` | shared metadata page URL for canonical, OpenGraph, and X tags | absolute URL without forced trailing slash |
 | `meta:x_card` | public template X card value | card type string |
 | `meta:x_creator` | public template X creator value | creator handle or name string |
@@ -280,15 +283,7 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | --- | --- | --- |
 | `members` | group route member list | array for `{each members}` |
 
-#### 9.2.7 Meta Tags
-
-| Key | What It Calls | Returns |
-| --- | --- | --- |
-| `meta:desc` | public template metadata description | meta description text |
-| `meta:document_title` | full document title assembled for `<title>` and social tags | complete document title |
-| `meta:title` | logical route title before site suffix | title text |
-
-#### 9.2.8 Page Tags
+#### 9.2.7 Page Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -301,7 +296,7 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `page:title` | page payload title | page title |
 | `pages` | category/tag route page list | array for `{each pages}` |
 
-#### 9.2.9 Pagination Tags
+#### 9.2.8 Pagination Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -312,14 +307,14 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `pagination:total_items` | pagination payload total item count | integer-like total count |
 | `pagination:total_pages` | pagination payload total page count | integer-like total pages |
 
-#### 9.2.10 Panel Tags
+#### 9.2.9 Panel Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
 | `panel:slug` | configured panel route prefix | panel path slug |
 | `panel:url` | absolute panel base URL | absolute panel URL without trailing slash |
 
-#### 9.2.11 Profile Tags
+#### 9.2.10 Profile Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -331,7 +326,7 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `profile:username` | profile payload username | username |
 | `profile_denied` | profile placeholder payload flag for private-mode denial | boolean-like truthy/falsey flag |
 
-#### 9.2.12 Site Tags
+#### 9.2.11 Site Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -341,7 +336,7 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `site:scheme` | configured public scheme | `http` or `https` |
 | `site:url` | configured public site base URL | absolute site URL without trailing slash |
 
-#### 9.2.13 Tag Tags
+#### 9.2.12 Tag Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
@@ -349,7 +344,7 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `tag:name` | tag route payload display name | tag name |
 | `tag:slug` | tag route payload slug | tag slug |
 
-#### 9.2.14 Theme Tags
+#### 9.2.13 Theme Tags
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
