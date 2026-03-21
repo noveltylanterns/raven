@@ -16,7 +16,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 <html lang="en">
 <head>
 
-<title>{meta:document_title}</title>
+<title>{meta:title_full}</title>
 <link rel="canonical" href="{meta:url}">
 <link rel="icon" type="image/png" href="{site:url}/theme/raven/img/favicon.png">
 <meta charset="utf-8">
@@ -27,7 +27,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 <meta property="og:image" content="{meta:image}">
 <meta property="og:locale" content="{meta:og_locale}">
 <meta property="og:site_name" content="{site:name}">
-<meta property="og:title" content="{meta:document_title}">
+<meta property="og:title" content="{meta:title_full}">
 <meta property="og:type" content="{meta:og_type}">
 <meta property="og:url" content="{meta:url}">
 <meta property="twitter:card" content="{meta:x_card}">
@@ -35,7 +35,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 <meta property="twitter:description" content="{meta:desc}">
 <meta property="twitter:image" content="{meta:image}">
 <meta property="twitter:site" content="{meta:x_site}">
-<meta property="twitter:title" content="{meta:document_title}">
+<meta property="twitter:title" content="{meta:title_full}">
 <meta property="twitter:url" content="{meta:url}">
 <link rel="apple-touch-icon" href="{meta:apple_touch_icon}">
 <link rel="stylesheet" href="{site:url}/theme/fallback.css">

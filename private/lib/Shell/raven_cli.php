@@ -2670,7 +2670,7 @@ function raven_cli_theme_scaffold_files(array $meta): array
         . "<head>\n"
         . "  <meta charset=\"utf-8\">\n"
         . "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
-        . "  <title>{meta:document_title}</title>\n"
+        . "  <title>{meta:title_full}</title>\n"
         . "  <meta name=\"description\" content=\"{meta:desc}\">\n"
         . "  <link rel=\"stylesheet\" href=\"{theme:url}/css/style.css\">\n"
         . "</head>\n"

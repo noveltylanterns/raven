@@ -344,7 +344,7 @@ final class PublicTemplateDecorator
 
         $meta['title'] = $viewTitle;
         $meta['desc'] = $metaDescription;
-        $meta['document_title'] = $documentTitle;
+        $meta['title_full'] = $documentTitle;
 
         $data['site'] = $site;
         $data['meta'] = $meta;

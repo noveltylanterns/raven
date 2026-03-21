@@ -108,7 +108,7 @@ Common shared keys:
 - `panel:url`
 - `meta:title`
 - `meta:desc`
-- `meta:document_title`
+- `meta:title_full`
 - `meta:apple_touch_icon`
 - `meta:robots`
 - `meta:image`
@@ -266,12 +266,12 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | --- | --- | --- |
 | `meta:apple_touch_icon` | public template Apple touch icon URL | URL string |
 | `meta:desc` | public template metadata description | meta description text |
-| `meta:document_title` | full document title assembled for `<title>` and social tags | complete document title |
 | `meta:image` | shared metadata image URL for OpenGraph and X cards | absolute URL |
 | `meta:og_locale` | public template OpenGraph locale value | locale string |
 | `meta:og_type` | public template OpenGraph type value | type string |
 | `meta:robots` | public template robots value | robots directive string |
 | `meta:title` | logical route title before site suffix | title text |
+| `meta:title_full` | full document title assembled for `<title>` and social tags | complete document title |
 | `meta:url` | shared metadata page URL for canonical, OpenGraph, and X tags | absolute URL without forced trailing slash |
 | `meta:x_card` | public template X card value | card type string |
 | `meta:x_creator` | public template X creator value | creator handle or name string |

@@ -11,6 +11,7 @@
 - Renamed the public template metadata root to the shorter canonical `meta:*` namespace and updated stock/scaffold wrappers plus theme docs to match.
 - Moved document-head template metadata keys out of `site:*` into `meta:*`, including `apple_touch_icon`, `robots`, `og_*`, and `x_*`, and updated stock wrappers/docs to match.
 - Shortened the public description value tag from `meta:description` to `meta:desc` and updated stock/fallback wrappers, scaffolds, and theme docs to match.
+- Renamed the full document title tag from `meta:document_title` to `meta:title_full` and updated wrappers, scaffolds, smoke fixtures, and theme docs to match.
 - Collapsed `meta:og_image` and `meta:x_image` into a single `meta:image` value tag, with wrappers emitting the OpenGraph and X image `<meta>` elements directly.
 - Collapsed `meta:canonical`, `meta:og_url`, and `meta:x_url` into a single `meta:url` value tag, with wrappers emitting the canonical, OpenGraph, and X URL tags directly.
 - Flattened the remaining head metadata tags back to plain `meta:*` values (`apple_touch_icon`, `robots`, `og_locale`, `og_type`, `x_card`, `x_creator`, `x_site`) so wrappers and scaffolds emit literal `<link>` and `<meta>` elements directly.
