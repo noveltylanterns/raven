@@ -69,11 +69,39 @@ $app = require dirname(__DIR__) . '/private/raven.php';
 $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 $debugToolbarSettings = DebugToolbarConfigResolver::fromConfig($app['config']);
 $debugToolbarEnabled = false;
+$isPublicAuthHelperPath = static function (string $path) use ($requestPath): bool {
+    $normalized = trim($path !== '' ? $path : $requestPath);
+    $normalized = (string) parse_url($normalized, PHP_URL_PATH);
+    $normalized = '/' . ltrim($normalized, '/');
+    if ($normalized !== '/') {
+        $normalized = rtrim($normalized, '/');
+    }
+
+    return in_array($normalized, [
+        '/login',
+        '/login/2fa',
+        '/login/2fa/select',
+        '/login/2fa/webauthn/options',
+        '/login/2fa/webauthn/verify',
+        '/register',
+    ], true);
+};
+$canRenderPublicDebugToolbar = static function () use ($app, $isPublicAuthHelperPath, $requestPath): bool {
+    if (!isset($app['auth']) || $isPublicAuthHelperPath($requestPath)) {
+        return false;
+    }
+
+    $userId = $app['auth']->userId();
+    if ($userId === null || !$app['auth']->canManageConfiguration($userId)) {
+        return false;
+    }
+
+    return $app['auth']->isTwoFactorVerifiedForUser($userId);
+};
 
 if (
     $requestMethod === 'GET'
-    && isset($app['auth'])
-    && $app['auth']->canManageConfiguration()
+    && $canRenderPublicDebugToolbar()
 ) {
     if ($debugToolbarSettings['show_on_public']) {
         RequestProfiler::start((float) ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true)), 'public');
@@ -83,13 +111,13 @@ if (
 }
 
 if ($debugToolbarEnabled) {
-    ob_start(static function (string $body) use ($app, $debugToolbarSettings, $requestPath, $requestMethod): string {
+    ob_start(static function (string $body) use ($app, $debugToolbarSettings, $requestPath, $requestMethod, $canRenderPublicDebugToolbar): string {
         if (!RequestProfiler::isEnabled() || !DebugToolbarRenderer::isHtmlResponseCandidate($body)) {
             return $body;
         }
 
         // Defense-in-depth: always re-check current auth permission before rendering.
-        if (!isset($app['auth']) || !$app['auth']->canManageConfiguration()) {
+        if (!$canRenderPublicDebugToolbar()) {
             return $body;
         }
 

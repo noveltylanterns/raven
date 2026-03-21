@@ -14,8 +14,11 @@ ini_set('display_errors', '0');
 
 final class DebugToolbarSmokeRunner
 {
+    private const RECOVERY_PHRASE = 'abandon ability able about above absent absorb abstract absurd abuse access accident';
+
     private string $root;
     private string $runnerPath;
+    private string $configPath;
     /** @var array<int, string> */
     private array $phpCommand = [];
     private string $panelPath;
@@ -26,6 +29,8 @@ final class DebugToolbarSmokeRunner
     private string $tempEmail = '';
     private string $tempPassword = '';
     private string $loginIdentifierMode = 'email';
+    private bool $restoreConfig = false;
+    private ?string $originalConfigRaw = null;
     /** @var array<string, string> */
     private array $guestCookies = [];
     /** @var array<string, string> */
@@ -37,11 +42,12 @@ final class DebugToolbarSmokeRunner
     {
         $this->root = rtrim($root, '/');
         $this->runnerPath = $this->root . '/debug/util/request-runner.php';
+        $this->configPath = $this->root . '/private/config.php';
         $this->phpCommand = $this->resolvePhpCommand();
         $this->runId = time();
 
         /** @var array<string, mixed> $config */
-        $config = require $this->root . '/private/config.php';
+        $config = require $this->configPath;
         $this->panelPath = trim((string) (($config['panel']['path'] ?? 'panel')));
         if ($this->panelPath === '') {
             $this->panelPath = 'panel';
@@ -89,6 +95,7 @@ final class DebugToolbarSmokeRunner
 
     public function run(): void
     {
+        $this->enableDebugToolbarScopes();
         $this->createTempSuperUser();
 
         try {
@@ -96,6 +103,11 @@ final class DebugToolbarSmokeRunner
             $this->assert($guestPanelLogin['status'] === 200, 'Guest GET /' . $this->panelPath . '/login expected 200.');
             $this->assert(!$this->hasToolbar($guestPanelLogin['body']), 'Guest panel login should not include debug toolbar.');
             $this->events[] = 'guest_panel_login_toolbar=absent';
+
+            $guestRegister = $this->request('/public/index.php', 'GET', '/register', $this->guestCookies);
+            $this->assert($guestRegister['status'] === 200, 'Guest GET /register expected 200.');
+            $this->assert(!$this->hasToolbar($guestRegister['body']), 'Guest public register helper should not include debug toolbar.');
+            $this->events[] = 'guest_register_toolbar=absent';
 
             $guestPublic = $this->request('/public/index.php', 'GET', '/', $this->guestCookies);
             $this->assert($guestPublic['status'] >= 200 && $guestPublic['status'] < 500, 'Guest GET / expected non-fatal status.');
@@ -117,6 +129,39 @@ final class DebugToolbarSmokeRunner
             $this->events[] = 'super_login_post_session=' . ($loginPost['session_id'] !== '' ? $loginPost['session_id'] : '<empty>');
             $this->assert(in_array($loginPost['status'], [302, 303], true), 'Super login POST should redirect.');
 
+            $pendingPanelTwoFactor = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/login/2fa', $this->superCookies);
+            $this->assert($pendingPanelTwoFactor['status'] === 200, 'Pending panel GET /' . $this->panelPath . '/login/2fa expected 200.');
+            $this->assert(!$this->hasToolbar($pendingPanelTwoFactor['body']), 'Pending panel 2FA page should not include debug toolbar.');
+            $this->events[] = 'panel_login_2fa_toolbar=absent';
+
+            $pendingPublicLogin = $this->request('/public/index.php', 'GET', '/login', $this->superCookies);
+            $this->assert(in_array($pendingPublicLogin['status'], [200, 302, 303], true), 'Pending public GET /login expected 200 or redirect.');
+            $this->assert(!$this->hasToolbar($pendingPublicLogin['body']), 'Pending public login helper should not include debug toolbar.');
+            $this->events[] = 'public_login_toolbar=absent_pending';
+
+            $pendingPublicTwoFactor = $this->request('/public/index.php', 'GET', '/login/2fa', $this->superCookies);
+            $this->assert($pendingPublicTwoFactor['status'] === 200, 'Pending public GET /login/2fa expected 200.');
+            $this->assert(!$this->hasToolbar($pendingPublicTwoFactor['body']), 'Pending public 2FA page should not include debug toolbar.');
+            $this->events[] = 'public_login_2fa_toolbar=absent';
+
+            $pendingPublicRegister = $this->request('/public/index.php', 'GET', '/register', $this->superCookies);
+            $this->assert($pendingPublicRegister['status'] === 200, 'Pending public GET /register expected 200.');
+            $this->assert(!$this->hasToolbar($pendingPublicRegister['body']), 'Pending public register helper should not include debug toolbar.');
+            $this->events[] = 'public_register_toolbar=absent_pending';
+
+            $pendingPublicHome = $this->request('/public/index.php', 'GET', '/', $this->superCookies);
+            $this->assert($pendingPublicHome['status'] >= 200 && $pendingPublicHome['status'] < 500, 'Pending public GET / expected non-fatal status.');
+            $this->assert(!$this->hasToolbar($pendingPublicHome['body']), 'Pending public site should not include debug toolbar.');
+            $this->events[] = 'public_home_toolbar=absent_pending';
+
+            $twoFactorCsrf = $this->extractCsrf($pendingPanelTwoFactor['body']);
+            $this->assert($twoFactorCsrf !== '', 'Missing pending panel 2FA CSRF token.');
+            $verifyTwoFactor = $this->request('/panel/index.php', 'POST', '/' . $this->panelPath . '/login/2fa', $this->superCookies, [
+                '_csrf' => $twoFactorCsrf,
+                'verification_code' => self::RECOVERY_PHRASE,
+            ]);
+            $this->assert(in_array($verifyTwoFactor['status'], [302, 303], true), 'Panel recovery verification should redirect.');
+
             $superPreferences = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/preferences', $this->superCookies);
             $this->events[] = 'super_preferences_status=' . $superPreferences['status'];
             $this->events[] = 'super_preferences_session=' . ($superPreferences['session_id'] !== '' ? $superPreferences['session_id'] : '<empty>');
@@ -124,19 +169,21 @@ final class DebugToolbarSmokeRunner
                 $superPreferences['status'] === 200,
                 'Super preferences load expected 200 after login, got ' . $superPreferences['status'] . '.'
             );
+            $this->assert($this->hasToolbar($superPreferences['body']), 'Verified panel page should include toolbar when panel scope is enabled.');
+            $this->events[] = 'super_panel_toolbar=present';
 
             $superPublic = $this->request('/public/index.php', 'GET', '/', $this->superCookies);
             $this->events[] = 'super_public_status=' . $superPublic['status'];
             $this->events[] = 'super_public_body_len=' . strlen($superPublic['body']);
             $this->events[] = 'super_public_session=' . ($superPublic['session_id'] !== '' ? $superPublic['session_id'] : '<empty>');
             $this->assert($superPublic['status'] >= 200 && $superPublic['status'] < 500, 'Super GET / expected non-fatal status.');
-            $this->assert(!$this->hasToolbar($superPublic['body']), 'Super public page should not include toolbar when public scope is disabled by default.');
-            $this->events[] = 'super_public_toolbar=absent_default';
+            $this->assert($this->hasToolbar($superPublic['body']), 'Verified public page should include toolbar when public scope is enabled.');
+            $this->events[] = 'super_public_toolbar=present';
 
-            $superPanel = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/preferences', $this->superCookies);
-            $this->assert($superPanel['status'] === 200, 'Super GET /' . $this->panelPath . '/preferences expected 200.');
-            $this->assert(!$this->hasToolbar($superPanel['body']), 'Super panel page should not include toolbar when panel scope disabled by default.');
-            $this->events[] = 'super_panel_toolbar=absent_default';
+            $verifiedRegister = $this->request('/public/index.php', 'GET', '/register', $this->superCookies);
+            $this->assert($verifiedRegister['status'] === 200, 'Verified public GET /register expected 200.');
+            $this->assert(!$this->hasToolbar($verifiedRegister['body']), 'Verified public register helper should not include debug toolbar.');
+            $this->events[] = 'public_register_toolbar=absent_verified';
 
             $routingExport = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/routing/export', $this->superCookies);
             $this->assert($routingExport['status'] === 200, 'GET /' . $this->panelPath . '/routing/export expected 200.');
@@ -148,7 +195,48 @@ final class DebugToolbarSmokeRunner
             $this->events[] = 'temp_user=' . $this->tempUsername;
         } finally {
             $this->cleanupTempUser();
+            $this->restoreOriginalConfig();
         }
+    }
+
+    private function enableDebugToolbarScopes(): void
+    {
+        $raw = file_get_contents($this->configPath);
+        if (!is_string($raw) || trim($raw) === '') {
+            throw new RuntimeException('Unable to read private/config.php.');
+        }
+
+        $this->originalConfigRaw = $raw;
+
+        /** @var array<string, mixed> $config */
+        $config = require $this->configPath;
+        if (!isset($config['debug']) || !is_array($config['debug'])) {
+            $config['debug'] = [];
+        }
+
+        $config['debug']['show_private'] = true;
+        $config['debug']['show_public'] = true;
+        $config['debug']['show_queries'] = true;
+        $config['debug']['show_benchmarks'] = true;
+
+        $encoded = "<?php\n\nreturn " . var_export($config, true) . ";\n";
+        if (file_put_contents($this->configPath, $encoded) === false) {
+            throw new RuntimeException('Unable to write debug-toolbar smoke settings to private/config.php.');
+        }
+
+        $this->restoreConfig = true;
+        $this->events[] = 'config_debug_show_private=1';
+        $this->events[] = 'config_debug_show_public=1';
+    }
+
+    private function restoreOriginalConfig(): void
+    {
+        if (!$this->restoreConfig || $this->originalConfigRaw === null) {
+            return;
+        }
+
+        file_put_contents($this->configPath, $this->originalConfigRaw);
+        $this->events[] = 'config_restored=1';
     }
 
     private function createTempSuperUser(): void
@@ -183,7 +271,33 @@ final class DebugToolbarSmokeRunner
         if (!$canManageConfiguration) {
             throw new RuntimeException('Temporary super user is missing Manage System Configuration permission.');
         }
+
+        $prefs = $app['auth']->userPreferences($this->tempUserId);
+        if (!is_array($prefs)) {
+            throw new RuntimeException('Unable to load temporary super user preferences.');
+        }
+
+        $updateResult = $app['auth']->updateUserPreferences($this->tempUserId, [
+            'username' => (string) ($prefs['username'] ?? $this->tempUsername),
+            'display_name' => (string) ($prefs['display_name'] ?? ('Codex Debug ' . $this->runId)),
+            'email' => (string) ($prefs['email'] ?? $this->tempEmail),
+            'theme' => (string) ($prefs['theme'] ?? 'default'),
+            'password' => null,
+            'contact_profiles' => is_array($prefs['contact_profiles'] ?? null) ? $prefs['contact_profiles'] : [],
+            'two_factor_methods' => [[
+                'type' => 'recovery',
+                'recovery_code' => self::RECOVERY_PHRASE,
+                'reusable' => true,
+            ]],
+            'set_avatar' => false,
+            'avatar_path' => $prefs['avatar_path'] ?? null,
+        ]);
+        if (!(bool) ($updateResult['ok'] ?? false)) {
+            throw new RuntimeException('Failed to seed temporary super user 2FA methods.');
+        }
+
         $this->events[] = 'temp_user_id=' . $this->tempUserId;
+        $this->events[] = 'temp_user_recovery_seeded=ok';
     }
 
     private function cleanupTempUser(): void
@@ -306,7 +420,7 @@ final class DebugToolbarSmokeRunner
 
     private function hasToolbar(string $body): bool
     {
-        return str_contains($body, 'id="raven-debug-toolbar"') || str_contains($body, 'data-raven-debugger="1"');
+        return str_contains($body, 'id="rvnd"') || str_contains($body, 'data-rvn-debugger="1"');
     }
 
     /**

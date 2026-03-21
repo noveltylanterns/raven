@@ -251,6 +251,7 @@ if ($section === 'login') {
 } elseif ($section !== 'dashboard' && $resolvedPageTitle !== '') {
     $documentTitle = $resolvedPageTitle . ' [' . $baseDocumentTitle . ']';
 }
+$includePanelLayoutScripts = $section !== 'login';
 ?>
 <!doctype html>
 <html lang="en">
@@ -721,6 +722,7 @@ if ($section === 'login') {
         </main>
     </div>
 </div>
+<?php if ($includePanelLayoutScripts): ?>
 <script src="/bootstrap.bundle.min.js"></script>
 <script>
     (function () {
@@ -1266,5 +1268,6 @@ if ($section === 'login') {
         });
     })();
 </script>
+<?php endif; ?>
 </body>
 </html>

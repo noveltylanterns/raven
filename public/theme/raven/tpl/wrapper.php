@@ -50,7 +50,7 @@ $documentTitle = $metaTitle === '' ? $siteName : ($metaTitle . ' [' . $siteName 
 </head>
 <body>
 
-<nav class="navbar bg-dark" data-bs-theme="dark">
+<nav class="navbar bg-dark mb-4" data-bs-theme="dark">
     <div class="container">
         <a href="{site:url}" class="navbar-brand">
             <img src="{theme:url}/img/logo-white.png" alt="{site:name}" height="30" class="d-inline-block align-text-top">

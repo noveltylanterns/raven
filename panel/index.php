@@ -1048,11 +1048,37 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
 $method = $requestMethod;
 $debugToolbarSettings = DebugToolbarConfigResolver::fromConfig($app['config']);
 $debugToolbarEnabled = false;
+$isPanelAuthHelperInternalPath = static function (string $path) use ($internalPath): bool {
+    $normalized = trim($path !== '' ? $path : $internalPath);
+    $normalized = '/' . ltrim($normalized, '/');
+    if ($normalized !== '/') {
+        $normalized = rtrim($normalized, '/');
+    }
+
+    return in_array($normalized, [
+        '/login',
+        '/login/2fa',
+        '/login/2fa/select',
+        '/login/2fa/webauthn/options',
+        '/login/2fa/webauthn/verify',
+    ], true);
+};
+$canRenderPanelDebugToolbar = static function () use ($app, $isPanelAuthHelperInternalPath, $internalPath): bool {
+    if (!isset($app['auth']) || $isPanelAuthHelperInternalPath($internalPath)) {
+        return false;
+    }
+
+    $userId = $app['auth']->userId();
+    if ($userId === null || !$app['auth']->canManageConfiguration($userId)) {
+        return false;
+    }
+
+    return $app['auth']->isTwoFactorVerifiedForUser($userId);
+};
 
 if (
     $method === 'GET'
-    && isset($app['auth'])
-    && $app['auth']->canManageConfiguration()
+    && $canRenderPanelDebugToolbar()
 ) {
     if ($debugToolbarSettings['show_on_panel']) {
         RequestProfiler::start((float) ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true)), 'panel');
@@ -1062,13 +1088,13 @@ if (
 }
 
 if ($debugToolbarEnabled) {
-    ob_start(static function (string $body) use ($app, $debugToolbarSettings, $internalPath, $method): string {
+    ob_start(static function (string $body) use ($app, $debugToolbarSettings, $internalPath, $method, $canRenderPanelDebugToolbar): string {
         if (!RequestProfiler::isEnabled() || !DebugToolbarRenderer::isHtmlResponseCandidate($body)) {
             return $body;
         }
 
         // Defense-in-depth: always re-check current auth permission before rendering.
-        if (!isset($app['auth']) || !$app['auth']->canManageConfiguration()) {
+        if (!$canRenderPanelDebugToolbar()) {
             return $body;
         }
 

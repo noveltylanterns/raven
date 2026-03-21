@@ -46,30 +46,29 @@ $defaultMethodLabel = static function (string $methodType): string {
     };
 };
 ?>
-<section class="card">
-    <div class="card-body">
-        <h1>Two-Factor Verification</h1>
+<section>
+    <h1>Two-Factor Verification</h1>
 
-        <?php if ($success !== null): ?>
-        <div class="alert alert-success" role="alert"><?= e($success) ?></div>
-        <?php endif; ?>
-        <?php if ($error !== null): ?>
-        <div class="alert alert-danger" role="alert"><?= e($error) ?></div>
-        <?php endif; ?>
+    <?php if ($success !== null): ?>
+    <div class="alert alert-success" role="alert"><?= e($success) ?></div>
+    <?php endif; ?>
+    <?php if ($error !== null): ?>
+    <div class="alert alert-danger" role="alert"><?= e($error) ?></div>
+    <?php endif; ?>
 
-        <?php if ($showMethodPicker): ?>
-        <div class="mb-3">
-            <p class="mb-2">Choose a verification method:</p>
-            <?php if ($webauthnMethodKey !== ''): ?>
-            <form method="post" action="<?= e($selectPath) ?>" class="mb-2">
-                <?= (string) ($csrfField ?? '') ?>
-                <input type="hidden" name="redirect_to" value="<?= e($postLoginRedirectPath !== '' ? $postLoginRedirectPath : '/') ?>">
-                <input type="hidden" name="method_key" value="<?= e($webauthnMethodKey) ?>">
-                <button type="submit" class="btn btn-primary w-100 text-start">Try Security Key</button>
-            </form>
-            <?php endif; ?>
-            <?php foreach ($twoFactorMethods as $method): ?>
-                <?php
+    <?php if ($showMethodPicker): ?>
+    <div class="mb-3">
+        <p class="mb-2">Choose a verification method:</p>
+        <?php if ($webauthnMethodKey !== ''): ?>
+        <form method="post" action="<?= e($selectPath) ?>" class="mb-2">
+            <?= (string) ($csrfField ?? '') ?>
+            <input type="hidden" name="redirect_to" value="<?= e($postLoginRedirectPath !== '' ? $postLoginRedirectPath : '/') ?>">
+            <input type="hidden" name="method_key" value="<?= e($webauthnMethodKey) ?>">
+            <button type="submit" class="btn btn-primary w-100 text-start">Try Security Key</button>
+        </form>
+        <?php endif; ?>
+        <?php foreach ($twoFactorMethods as $method): ?>
+            <?php
                 $methodType = strtolower(trim((string) ($method['type'] ?? '')));
                 $methodKey = trim((string) ($method['key'] ?? ''));
                 if ($methodKey === '') {
@@ -79,16 +78,16 @@ $defaultMethodLabel = static function (string $methodType): string {
                 if ($methodLabel === '') {
                     $methodLabel = $defaultMethodLabel($methodType);
                 }
-                ?>
+            ?>
             <form method="post" action="<?= e($selectPath) ?>" class="mb-2">
-                <?= (string) ($csrfField ?? '') ?>
+            <?= (string) ($csrfField ?? '') ?>
                 <input type="hidden" name="redirect_to" value="<?= e($postLoginRedirectPath !== '' ? $postLoginRedirectPath : '/') ?>">
                 <input type="hidden" name="method_key" value="<?= e($methodKey) ?>">
                 <button type="submit" class="btn btn-primary w-100 text-start"><?= e($methodLabel) ?></button>
             </form>
-            <?php endforeach; ?>
-        </div>
-        <?php endif; ?>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
 
         <?php if ($showTotpForm): ?>
             <?php
@@ -412,5 +411,4 @@ $defaultMethodLabel = static function (string $methodType): string {
 
         <hr>
         <p class="mb-0"><a href="<?= e($loginPath) ?>">Back to Login</a></p>
-    </div>
 </section>
