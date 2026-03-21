@@ -29,7 +29,7 @@ return array (
     'robots' => 'index,follow',
     'twitter' =>
     array (
-      'card' => '',
+      'card' => 'summary',
       'site' => '',
       'creator' => '',
       'image' => '',
