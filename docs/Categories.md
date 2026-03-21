@@ -4,7 +4,7 @@
 
 This document explains Raven's Category system for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever category structure, category routes, or Category panel views change (`private/tpl/panel/categories/*`, category controller/repository behavior, or category public routing).
+Maintenance note: keep this file updated whenever category structure, category routes, or Category panel views change (`private/tpl/panel/category/*`, category controller/repository behavior, or category public routing).
 
 ## 1) Panel Guide (Create And Edit Categories)
 
@@ -12,7 +12,7 @@ Maintenance note: keep this file updated whenever category structure, category r
 
 - Open panel sidebar: `Taxonomy` -> `Categories`.
 
-### Category List (`/categories`)
+### Category List (`/category`)
 
 What you can do:
 
@@ -32,7 +32,7 @@ Columns shown:
 - `Pages` (count of linked pages)
 - `Actions`
 
-### Category Editor (`/categories/edit` and `/categories/edit/{id}`)
+### Category Editor (`/category/edit` and `/category/edit/{id}`)
 
 Top and bottom action bars (same controls in both places):
 
@@ -65,8 +65,8 @@ Delete behavior note:
 ### Key Files
 
 - Panel views:
-  - `private/tpl/panel/categories/list.php`
-  - `private/tpl/panel/categories/edit.php`
+  - `private/tpl/panel/category/list.php`
+  - `private/tpl/panel/category/edit.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Persistence:
@@ -76,11 +76,11 @@ Delete behavior note:
 
 Declared in `panel/index.php`:
 
-- `GET /categories` -> list
-- `GET /categories/edit` -> create form
-- `GET /categories/edit/{id}` -> edit form
-- `POST /categories/save` -> create/update
-- `POST /categories/delete` -> delete (single or bulk)
+- `GET /category` -> list
+- `GET /category/edit` -> create form
+- `GET /category/edit/{id}` -> edit form
+- `POST /category/save` -> create/update
+- `POST /category/delete` -> delete (single or bulk)
 
 All state-changing routes use CSRF validation.
 
@@ -88,20 +88,20 @@ All state-changing routes use CSRF validation.
 
 `PanelController` category handlers:
 
-- `categoriesList()`
+- `categoryList()`
   - Requires login + `Manage Taxonomy` permission.
   - Renders list with `CategoryRepository::listAll()`.
-- `categoriesEdit(?int $id)`
+- `categoryEdit(?int $id)`
   - Loads existing row when id is provided.
-  - Missing id row triggers flash error + redirect to `/categories`.
-- `categoriesSave(array $post, array $files = [])`
+  - Missing id row triggers flash error + redirect to `/category`.
+- `categorySave(array $post, array $files = [])`
   - Validates CSRF.
   - Sanitizes/normalizes `id`, `name`, `slug`, `description` via `InputSanitizer`.
   - Requires non-empty `name` and valid `slug`.
   - Saves text fields via `CategoryRepository::save(...)`.
   - Processes optional `cover_image` and `preview_image` uploads (single-file each), optional remove flags, and writes image-path columns via `CategoryRepository::updateImagePaths(...)`.
   - Upload files/variants are stored under `public/uploads/categories/{id}/` using configured `media.images.*` rules.
-- `categoriesDelete(array $post)`
+- `categoryDelete(array $post)`
   - Validates CSRF.
   - Supports single delete (`id`) and bulk delete (`selected_ids[]`).
   - Removes associated stored cover/preview image files for deleted categories.
@@ -125,8 +125,8 @@ Storage detail:
 
 ### Public Routing Touchpoints
 
-- Category listing routes resolve under `/{categories.prefix}/{category_slug}/{page?}`.
-- If `categories.prefix` is blank, category routes are disabled.
+- Category listing routes resolve under `/{category.prefix}/{category_slug}/{page?}`.
+- If `category.prefix` is blank, category routes are disabled.
 - Template priority: `views/categories/{category_slug}.php` then `views/categories/index.php`.
 
 ### Security/Validation Expectations

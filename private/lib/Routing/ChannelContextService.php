@@ -55,11 +55,11 @@ final class ChannelContextService
     public static function applyPageChannelContext(array $row, ?array $channel): array
     {
         $row = self::applyBasicChannelContext($row, $channel);
-        $row['channel_page_route_mode'] = $channel !== null
-            ? (string) ($channel['page_route_mode'] ?? 'inherit')
+        $row['route_mode_effective'] = $channel !== null
+            ? (string) ($channel['route_mode'] ?? 'inherit')
             : 'inherit';
-        $row['channel_page_url_separator'] = $channel !== null
-            ? (string) ($channel['page_url_separator'] ?? 'inherit')
+        $row['route_separator_effective'] = $channel !== null
+            ? (string) ($channel['route_separator'] ?? 'inherit')
             : 'inherit';
 
         return $row;

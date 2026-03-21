@@ -171,7 +171,7 @@ final class ConfigurationDocsSmokeRunner
     {
         $app = require $this->root . '/private/raven.php';
 
-        $superGroupId = $app['groups']->idBySlug('super');
+        $superGroupId = $app['group']->idBySlug('super');
         if ($superGroupId === null) {
             throw new RuntimeException('Unable to resolve super group slug.');
         }
@@ -180,7 +180,7 @@ final class ConfigurationDocsSmokeRunner
         $this->tempEmail = $this->tempUsername . '@example.test';
         $this->tempPassword = 'CodexDocs!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $app['users']->save([
+        $this->tempUserId = (int) $app['user']->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Docs ' . $this->runId,
@@ -206,7 +206,7 @@ final class ConfigurationDocsSmokeRunner
         }
 
         $app = require $this->root . '/private/raven.php';
-        $app['users']->deleteById($this->tempUserId);
+        $app['user']->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }
 
@@ -271,65 +271,65 @@ final class ConfigurationDocsSmokeRunner
     private function checkPanelModuleDocsCoverage(): array
     {
         $specs = [
-            'categories' => [
+            'category' => [
                 'docs' => 'docs/Categories.md',
                 'views' => [
-                    'private/tpl/panel/categories/list.php',
-                    'private/tpl/panel/categories/edit.php',
+                    'private/tpl/panel/category/list.php',
+                    'private/tpl/panel/category/edit.php',
                 ],
             ],
-            'channels' => [
+            'channel' => [
                 'docs' => 'docs/Channels.md',
                 'views' => [
-                    'private/tpl/panel/channels/list.php',
-                    'private/tpl/panel/channels/edit.php',
+                    'private/tpl/panel/channel/list.php',
+                    'private/tpl/panel/channel/edit.php',
                 ],
             ],
-            'extensions' => [
+            'extension' => [
                 'docs' => 'docs/Extensions.md',
                 'views' => [
                     'private/tpl/panel/extensions.php',
                 ],
             ],
-            'groups' => [
+            'group' => [
                 'docs' => 'docs/Groups.md',
                 'views' => [
-                    'private/tpl/panel/groups/list.php',
-                    'private/tpl/panel/groups/edit.php',
+                    'private/tpl/panel/group/list.php',
+                    'private/tpl/panel/group/edit.php',
                 ],
             ],
-            'pages' => [
+            'page' => [
                 'docs' => 'docs/Pages.md',
                 'views' => [
-                    'private/tpl/panel/pages/list.php',
-                    'private/tpl/panel/pages/edit.php',
+                    'private/tpl/panel/page/list.php',
+                    'private/tpl/panel/page/edit.php',
                 ],
             ],
-            'preferences' => [
+            'preference' => [
                 'docs' => 'docs/Preferences.md',
                 'views' => [
                     'private/tpl/panel/preferences.php',
                 ],
             ],
-            'redirects' => [
+            'redirect' => [
                 'docs' => 'docs/Redirects.md',
                 'views' => [
-                    'private/tpl/panel/redirects/list.php',
-                    'private/tpl/panel/redirects/edit.php',
+                    'private/tpl/panel/redirect/list.php',
+                    'private/tpl/panel/redirect/edit.php',
                 ],
             ],
-            'tags' => [
+            'tag' => [
                 'docs' => 'docs/Tags.md',
                 'views' => [
-                    'private/tpl/panel/tags/list.php',
-                    'private/tpl/panel/tags/edit.php',
+                    'private/tpl/panel/tag/list.php',
+                    'private/tpl/panel/tag/edit.php',
                 ],
             ],
-            'users' => [
+            'user' => [
                 'docs' => 'docs/Users.md',
                 'views' => [
-                    'private/tpl/panel/users/list.php',
-                    'private/tpl/panel/users/edit.php',
+                    'private/tpl/panel/user/list.php',
+                    'private/tpl/panel/user/edit.php',
                 ],
             ],
         ];

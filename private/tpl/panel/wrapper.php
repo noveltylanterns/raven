@@ -20,8 +20,8 @@
 /** @var bool|null $canManageGroups */
 /** @var bool|null $canManageConfiguration */
 /** @var string|null $userTheme */
-/** @var string|null $pagesNav */
-/** @var string|null $pagesNavChannel */
+/** @var string|null $pageNav */
+/** @var string|null $pageNavChannel */
 /** @var string|null $pageTitle */
 
 use function Raven\Core\Support\e;
@@ -68,10 +68,10 @@ if (!is_bool($tagEnabled)) {
     $tagEnabled = true;
 }
 $userTheme = strtolower((string) ($userTheme ?? 'default'));
-$pagesNav = is_string($pagesNav ?? null) ? $pagesNav : null;
-$pagesNavChannel = strtolower(trim((string) ($pagesNavChannel ?? '')));
-if ($pagesNavChannel !== '' && preg_match('/^[a-z0-9][a-z0-9_-]{0,127}$/', $pagesNavChannel) !== 1) {
-    $pagesNavChannel = '';
+$pageNav = is_string($pageNav ?? null) ? $pageNav : null;
+$pageNavChannel = strtolower(trim((string) ($pageNavChannel ?? '')));
+if ($pageNavChannel !== '' && preg_match('/^[a-z0-9][a-z0-9_-]{0,127}$/', $pageNavChannel) !== 1) {
+    $pageNavChannel = '';
 }
 if (!in_array($userTheme, ['default', 'corp', 'ice', 'midnight', 'light', 'dark'], true)) {
     // Guard against unexpected persisted values to keep class names predictable.
@@ -211,7 +211,7 @@ usort($systemNavItems, static function (array $left, array $right): int {
 });
 
 $currentSection = is_string($section) ? $section : '';
-$createPageAccordionOpen = $currentSection === 'pages' && $pagesNav === 'create';
+$createPageAccordionOpen = $currentSection === 'page' && $pageNav === 'create';
 $showCreatePageAccordion = $pageCreateChannelItems !== [];
 
 $siteName = trim((string) ($site['name'] ?? 'Raven CMS'));
@@ -467,15 +467,15 @@ $includePanelLayoutScripts = $section !== 'login';
                                     <summary class="rvnp-nav-subsummary<?= $createPageAccordionOpen ? ' active' : '' ?>">Create Page</summary>
                                     <ul class="nav nav-pills flex-column gap-1 rvnp-nav-sublist">
                                         <li class="nav-item">
-                                            <a class="nav-link<?= ($section === 'pages' && $pagesNav === 'create' && $pagesNavChannel === '') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages/edit">
+                                            <a class="nav-link<?= ($section === 'page' && $pageNav === 'create' && $pageNavChannel === '') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/page/edit">
                                                 In Root
                                             </a>
                                         </li>
                                         <?php foreach ($pageCreateChannelItems as $channelItem): ?>
                                             <li class="nav-item">
                                                 <a
-                                                    class="nav-link<?= ($section === 'pages' && $pagesNav === 'create' && $pagesNavChannel === (string) $channelItem['slug']) ? ' active' : '' ?>"
-                                                    href="<?= e($panelBase) ?>/pages/edit?channel=<?= e(rawurlencode((string) $channelItem['slug'])) ?>"
+                                                    class="nav-link<?= ($section === 'page' && $pageNav === 'create' && $pageNavChannel === (string) $channelItem['slug']) ? ' active' : '' ?>"
+                                                    href="<?= e($panelBase) ?>/page/edit?channel=<?= e(rawurlencode((string) $channelItem['slug'])) ?>"
                                                 >
                                                     In <?= e((string) $channelItem['label']) ?>
                                                 </a>
@@ -484,10 +484,10 @@ $includePanelLayoutScripts = $section !== 'login';
                                     </ul>
                                 </details>
                                 <?php else: ?>
-                                    <a class="nav-link<?= ($section === 'pages' && $pagesNav === 'create') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages/edit">Create Page</a>
+                                    <a class="nav-link<?= ($section === 'page' && $pageNav === 'create') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/page/edit">Create Page</a>
                                 <?php endif; ?>
                             </li>
-                            <li class="nav-item"><a class="nav-link<?= ($section === 'pages' && $pagesNav === 'list') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages">List Pages</a></li>
+                            <li class="nav-item"><a class="nav-link<?= ($section === 'page' && $pageNav === 'list') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/page">List Pages</a></li>
                         </ul>
                     <?php endif; ?>
 
@@ -508,10 +508,10 @@ $includePanelLayoutScripts = $section !== 'login';
                         <h2 class="h6 text-uppercase text-white-50">Accounts</h2>
                         <ul class="nav nav-pills flex-column gap-1 mb-3">
                             <?php if ($canManageGroups): ?>
-                                <li class="nav-item"><a class="nav-link<?= $section === 'groups' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/groups">Groups</a></li>
+                                <li class="nav-item"><a class="nav-link<?= $section === 'group' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/group">Groups</a></li>
                             <?php endif; ?>
                             <?php if ($canManageUsers): ?>
-                                <li class="nav-item"><a class="nav-link<?= $section === 'users' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/users">Users</a></li>
+                                <li class="nav-item"><a class="nav-link<?= $section === 'user' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/user">Users</a></li>
                             <?php endif; ?>
                         </ul>
                     <?php endif; ?>
@@ -520,13 +520,13 @@ $includePanelLayoutScripts = $section !== 'login';
                         <h2 class="h6 text-uppercase text-white-50">Taxonomy</h2>
                         <ul class="nav nav-pills flex-column gap-1 mb-3">
                             <?php if ($categoryEnabled): ?>
-                            <li class="nav-item"><a class="nav-link<?= $section === 'categories' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/categories">Categories</a></li>
+                            <li class="nav-item"><a class="nav-link<?= $section === 'category' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/category">Categories</a></li>
                             <?php endif; ?>
-                            <li class="nav-item"><a class="nav-link<?= $section === 'channels' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/channels">Channels</a></li>
-                            <li class="nav-item"><a class="nav-link<?= $section === 'redirects' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/redirects">Redirects</a></li>
+                            <li class="nav-item"><a class="nav-link<?= $section === 'channel' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/channel">Channels</a></li>
+                            <li class="nav-item"><a class="nav-link<?= $section === 'redirect' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/redirect">Redirects</a></li>
                             <li class="nav-item"><a class="nav-link<?= $section === 'routing' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/routing">Routing Table</a></li>
                             <?php if ($tagEnabled): ?>
-                            <li class="nav-item"><a class="nav-link<?= $section === 'tags' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/tags">Tags</a></li>
+                            <li class="nav-item"><a class="nav-link<?= $section === 'tag' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/tag">Tags</a></li>
                             <?php endif; ?>
                         </ul>
                     <?php endif; ?>
@@ -618,15 +618,15 @@ $includePanelLayoutScripts = $section !== 'login';
                                         <summary class="rvnp-nav-subsummary<?= $createPageAccordionOpen ? ' active' : '' ?>">Create Page</summary>
                                         <ul class="nav nav-pills flex-column gap-1 rvnp-nav-sublist">
                                             <li class="nav-item">
-                                                <a class="nav-link<?= ($section === 'pages' && $pagesNav === 'create' && $pagesNavChannel === '') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages/edit">
+                                                <a class="nav-link<?= ($section === 'page' && $pageNav === 'create' && $pageNavChannel === '') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/page/edit">
                                                     In Root
                                                 </a>
                                             </li>
                                             <?php foreach ($pageCreateChannelItems as $channelItem): ?>
                                                 <li class="nav-item">
                                                     <a
-                                                        class="nav-link<?= ($section === 'pages' && $pagesNav === 'create' && $pagesNavChannel === (string) $channelItem['slug']) ? ' active' : '' ?>"
-                                                        href="<?= e($panelBase) ?>/pages/edit?channel=<?= e(rawurlencode((string) $channelItem['slug'])) ?>"
+                                                        class="nav-link<?= ($section === 'page' && $pageNav === 'create' && $pageNavChannel === (string) $channelItem['slug']) ? ' active' : '' ?>"
+                                                        href="<?= e($panelBase) ?>/page/edit?channel=<?= e(rawurlencode((string) $channelItem['slug'])) ?>"
                                                     >
                                                         In <?= e((string) $channelItem['label']) ?>
                                                     </a>
@@ -635,10 +635,10 @@ $includePanelLayoutScripts = $section !== 'login';
                                         </ul>
                                     </details>
                                     <?php else: ?>
-                                        <a class="nav-link<?= ($section === 'pages' && $pagesNav === 'create') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages/edit">Create Page</a>
+                                        <a class="nav-link<?= ($section === 'page' && $pageNav === 'create') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/page/edit">Create Page</a>
                                     <?php endif; ?>
                                 </li>
-                                <li class="nav-item"><a class="nav-link<?= ($section === 'pages' && $pagesNav === 'list') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/pages">List Pages</a></li>
+                                <li class="nav-item"><a class="nav-link<?= ($section === 'page' && $pageNav === 'list') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/page">List Pages</a></li>
                             </ul>
                         <?php endif; ?>
 
@@ -660,10 +660,10 @@ $includePanelLayoutScripts = $section !== 'login';
                             <h2 class="h6 text-uppercase text-muted">Accounts</h2>
                             <ul class="nav nav-pills flex-column gap-1 mb-3">
                                 <?php if ($canManageGroups): ?>
-                                    <li class="nav-item"><a class="nav-link<?= $section === 'groups' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/groups">Groups</a></li>
+                                    <li class="nav-item"><a class="nav-link<?= $section === 'group' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/group">Groups</a></li>
                                 <?php endif; ?>
                                 <?php if ($canManageUsers): ?>
-                                    <li class="nav-item"><a class="nav-link<?= $section === 'users' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/users">Users</a></li>
+                                    <li class="nav-item"><a class="nav-link<?= $section === 'user' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/user">Users</a></li>
                                 <?php endif; ?>
                             </ul>
                         <?php endif; ?>
@@ -673,13 +673,13 @@ $includePanelLayoutScripts = $section !== 'login';
                             <h2 class="h6 text-uppercase text-muted">Taxonomy</h2>
                             <ul class="nav nav-pills flex-column gap-1 mb-3">
                                 <?php if ($categoryEnabled): ?>
-                                <li class="nav-item"><a class="nav-link<?= $section === 'categories' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/categories">Categories</a></li>
+                                <li class="nav-item"><a class="nav-link<?= $section === 'category' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/category">Categories</a></li>
                                 <?php endif; ?>
-                                <li class="nav-item"><a class="nav-link<?= $section === 'channels' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/channels">Channels</a></li>
-                                <li class="nav-item"><a class="nav-link<?= $section === 'redirects' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/redirects">Redirects</a></li>
+                                <li class="nav-item"><a class="nav-link<?= $section === 'channel' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/channel">Channels</a></li>
+                                <li class="nav-item"><a class="nav-link<?= $section === 'redirect' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/redirect">Redirects</a></li>
                                 <li class="nav-item"><a class="nav-link<?= $section === 'routing' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/routing">Routing Table</a></li>
                                 <?php if ($tagEnabled): ?>
-                                <li class="nav-item"><a class="nav-link<?= $section === 'tags' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/tags">Tags</a></li>
+                                <li class="nav-item"><a class="nav-link<?= $section === 'tag' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/tag">Tags</a></li>
                                 <?php endif; ?>
                             </ul>
                         <?php endif; ?>

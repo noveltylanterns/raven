@@ -22,15 +22,19 @@ Fields/options:
 
 - `Username` (required)
 - `Display Name`
-- `Email` (required)
+- `Email Address` (required)
+- `Change Password` button reveals password-change inputs
 - `New Password` (optional, leave blank to keep current)
+- `Enter new password again to confirm:` helper text under the confirmation field
 - `Panel Theme` (`<Default>`, `Corporate`, `Ice`, `Midnight`)
 - `Avatar` file upload (`gif/jpg/jpeg/png`)
 - `Remove current avatar` checkbox (shown only when avatar exists)
 - `Two-Factor Methods` (Security tab)
+  - section label `Two-Factor Authentication`
   - `Setup App`
   - `Setup TOTP` (legacy label)
   - `Manual Key`
+  - `Authenticator Code`
   - `Type` (`Authenticator App (TOTP)`, `Recovery Phrase`, `Security Key (WebAuthn)`, `Email Code`)
   - `Label`
   - `TOTP Secret / Confirm Code`
@@ -131,6 +135,11 @@ When Preferences behavior changes, update this document in the same task. That i
 - `Add More Contact Information`
 - `Type`
 - `Value`
+- `Email Address`
+- `Change Password`
+- `Enter new password again to confirm:`
+- `Two-Factor Authentication`
+- `Authenticator Code`
 - `Two-Factor Methods`
 - `Setup TOTP`
 - `Setup App`

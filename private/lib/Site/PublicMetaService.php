@@ -37,17 +37,17 @@ final class PublicMetaService
     public function siteData(Config $config): array
     {
         $publicTheme = $this->themeCatalogService->activeSlugFromConfig($config);
-        $configuredScheme = (string) $config->get('site.scheme', 'https');
+        $configuredProtocol = (string) $config->get('site.protocol', 'https');
         $configuredDomain = (string) $config->get('site.domain', 'localhost');
         $publicThemeCss = $this->themeCatalogService->cssSlug($publicTheme);
 
         return $this->siteContextBuilder->publicBase(
             $config,
-            $this->requestContextResolver->siteBaseUrl($configuredDomain, $configuredScheme),
-            $this->requestContextResolver->currentRequestUrl($configuredDomain, $configuredScheme),
+            $this->requestContextResolver->siteBaseUrl($configuredDomain, $configuredProtocol),
+            $this->requestContextResolver->currentRequestUrl($configuredDomain, $configuredProtocol),
             $publicTheme,
             $publicThemeCss,
-            $this->resolvedConfiguredMetaImageUrl($config, $configuredDomain, $configuredScheme)
+            $this->resolvedConfiguredMetaImageUrl($config, $configuredDomain, $configuredProtocol)
         );
     }
 
@@ -81,7 +81,7 @@ final class PublicMetaService
         $previewImageUrl = $this->absoluteMetaImageUrl(
             trim((string) (($pagePreviewImageUrlResolver)($pageId) ?? '')),
             (string) ($site['domain'] ?? 'localhost'),
-            (string) ($site['scheme'] ?? 'https')
+            (string) ($site['protocol'] ?? 'https')
         );
         if ($previewImageUrl === '') {
             return $site;
@@ -120,7 +120,7 @@ final class PublicMetaService
             $resolved = $this->absoluteMetaImageUrl(
                 $candidate,
                 $configuredDomain,
-                (string) ($site['scheme'] ?? 'https')
+                (string) ($site['protocol'] ?? 'https')
             );
             if ($resolved === '') {
                 continue;
@@ -133,7 +133,7 @@ final class PublicMetaService
         return $site;
     }
 
-    public function absoluteMetaImageUrl(string $value, string $configuredDomain, string $configuredScheme = ''): string
+    public function absoluteMetaImageUrl(string $value, string $configuredDomain, string $configuredProtocol = ''): string
     {
         $value = trim(str_replace(["\r", "\n", "\0"], '', $value));
         if ($value === '') {
@@ -150,7 +150,7 @@ final class PublicMetaService
         }
 
         $path = str_starts_with($value, '/') ? $value : ('/' . ltrim($value, '/'));
-        $scheme = $this->requestContextResolver->resolveRequestScheme(null, $configuredScheme);
+        $scheme = $this->requestContextResolver->resolveRequestScheme(null, $configuredProtocol);
         $host = $this->requestContextResolver->resolveRequestHost($configuredDomain);
 
         return $scheme . '://' . $host . $path;
@@ -159,14 +159,14 @@ final class PublicMetaService
     private function resolvedConfiguredMetaImageUrl(
         Config $config,
         string $configuredDomain,
-        string $configuredScheme
+        string $configuredProtocol
     ): string {
         $configured = trim((string) $config->get('meta.opengraph.image', ''));
         if ($configured === '') {
             $configured = trim((string) $config->get('meta.twitter.image', ''));
         }
 
-        return $this->absoluteMetaImageUrl($configured, $configuredDomain, $configuredScheme);
+        return $this->absoluteMetaImageUrl($configured, $configuredDomain, $configuredProtocol);
     }
 
     /**

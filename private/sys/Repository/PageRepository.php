@@ -31,7 +31,7 @@ final class PageRepository
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private ChannelRepository $channels;
+    private ChannelRepository $channelRepo;
     private bool $categoryEnabled;
     private bool $tagEnabled;
     private PageBodyBlockCodec $bodyBlockCodec;
@@ -45,7 +45,7 @@ final class PageRepository
         PDO $db,
         string $driver,
         string $prefix,
-        ChannelRepository $channels,
+        ChannelRepository $channelRepo,
         bool $categoryEnabled = true,
         bool $tagEnabled = true
     )
@@ -54,7 +54,7 @@ final class PageRepository
         $this->driver = $driver;
         // Prefix is only used in shared-db modes; SQLite uses attached DB names instead.
         $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
-        $this->channels = $channels;
+        $this->channelRepo = $channelRepo;
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
         $this->bodyBlockCodec = new PageBodyBlockCodec();
@@ -113,7 +113,7 @@ final class PageRepository
     public function findChannelHomepage(string $channelSlug): ?array
     {
         $pages = $this->table('pages');
-        $channel = $this->channels->findBySlug($channelSlug);
+        $channel = $this->channelRepo->findBySlug($channelSlug);
         if ($channel === null) {
             return null;
         }
@@ -173,7 +173,7 @@ final class PageRepository
         if ($channelSlug === null) {
             $sql .= ' AND p.channel_id IS NULL';
         } else {
-            $channel = $this->channels->findBySlug($channelSlug);
+            $channel = $this->channelRepo->findBySlug($channelSlug);
             if ($channel === null) {
                 return null;
             }
@@ -226,7 +226,7 @@ final class PageRepository
         if ($channelSlug === null) {
             $sql .= ' AND p.channel_id IS NULL';
         } else {
-            $channel = $this->channels->findBySlug($channelSlug);
+            $channel = $this->channelRepo->findBySlug($channelSlug);
             if ($channel === null) {
                 return null;
             }
@@ -1110,7 +1110,7 @@ final class PageRepository
      */
     private function channelsByIdMap(): array
     {
-        return ChannelContextService::channelsByIdMap($this->channels->listRecords());
+        return ChannelContextService::channelsByIdMap($this->channelRepo->listRecords());
     }
 
     /**
@@ -1142,7 +1142,7 @@ final class PageRepository
     {
         return ChannelContextService::resolveChannelIdBySlug(
             $slug,
-            fn (string $normalized): ?int => $this->channels->idBySlug($normalized),
+            fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),
             'Selected channel does not exist.'
         );
     }
@@ -1236,7 +1236,7 @@ final class PageRepository
             $tagId,
             $pageCategoriesTable,
             $pageTagsTable,
-            fn (string $slug): ?int => $this->channels->idBySlug($slug),
+            fn (string $slug): ?int => $this->channelRepo->idBySlug($slug),
             $placeholderPrefix,
             $includeCategoryFilters,
             $includeTagFilters

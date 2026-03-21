@@ -4,7 +4,7 @@
 
 This document explains Raven's Page system for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever page structure, page-related routes, or Page panel views change (`private/tpl/panel/pages/*`, page controller/repository/media flows, or page public-render behavior).
+Maintenance note: keep this file updated whenever page structure, page-related routes, or Page panel views change (`private/tpl/panel/page/*`, page controller/repository/media flows, or page public-render behavior).
 
 ## 1) Panel Guide (Create And Edit Pages)
 
@@ -12,7 +12,7 @@ Maintenance note: keep this file updated whenever page structure, page-related r
 
 - Open panel sidebar: `Content` -> `List Pages` or `Create Page`.
 
-### Page List (`/pages`)
+### Page List (`/page`)
 
 What you can do:
 
@@ -35,7 +35,7 @@ Columns shown:
 - `Status` (`Published` or `Draft`)
 - `Actions`
 
-### Page Editor (`/pages/edit` and `/pages/edit/{id}`)
+### Page Editor (`/page/edit` and `/page/edit/{id}`)
 
 Top and bottom action bars (same controls in both places):
 
@@ -137,8 +137,8 @@ Behavior notes:
 ### Key Files
 
 - Panel views:
-  - `private/tpl/panel/pages/list.php`
-  - `private/tpl/panel/pages/edit.php`
+  - `private/tpl/panel/page/list.php`
+  - `private/tpl/panel/page/edit.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Public controller:
@@ -154,19 +154,19 @@ Behavior notes:
 
 Declared in `panel/index.php`:
 
-- `GET /pages` -> list
-- `GET /pages/edit` -> create form
-- `GET /pages/edit/{id}` -> edit form
-- `POST /pages/save` -> create/update
-- `POST /pages/gallery/upload` -> gallery upload
-- `POST /pages/gallery/delete` -> gallery delete (single or bulk)
-- `POST /pages/delete` -> page delete (single or bulk)
+- `GET /page` -> list
+- `GET /page/edit` -> create form
+- `GET /page/edit/{id}` -> edit form
+- `POST /page/save` -> create/update
+- `POST /page/gallery/upload` -> gallery upload
+- `POST /page/gallery/delete` -> gallery delete (single or bulk)
+- `POST /page/delete` -> page delete (single or bulk)
 
 All state-changing routes use CSRF validation.
 
 ### Save Flow (Page + Taxonomy + Media)
 
-`PanelController::pagesSave()` pipeline:
+`PanelController::pageSave()` pipeline:
 
 1. Requires login + `Manage Content` permission.
 2. Validates CSRF.

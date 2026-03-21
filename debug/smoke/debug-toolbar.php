@@ -242,7 +242,7 @@ final class DebugToolbarSmokeRunner
     private function createTempSuperUser(): void
     {
         $app = require $this->root . '/private/raven.php';
-        $groupId = $app['groups']->idBySlug('super');
+        $groupId = $app['group']->idBySlug('super');
         if ($groupId === null) {
             throw new RuntimeException('Unable to resolve super group for smoke user.');
         }
@@ -251,7 +251,7 @@ final class DebugToolbarSmokeRunner
         $this->tempEmail = $this->tempUsername . '@example.test';
         $this->tempPassword = 'CodexDebug!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $app['users']->save([
+        $this->tempUserId = (int) $app['user']->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Debug ' . $this->runId,
@@ -307,7 +307,7 @@ final class DebugToolbarSmokeRunner
         }
 
         $app = require $this->root . '/private/raven.php';
-        $app['users']->deleteById($this->tempUserId);
+        $app['user']->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }
 

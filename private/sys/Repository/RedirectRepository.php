@@ -27,15 +27,15 @@ final class RedirectRepository
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private ChannelRepository $channels;
+    private ChannelRepository $channelRepo;
 
-    public function __construct(PDO $db, string $driver, string $prefix, ChannelRepository $channels)
+    public function __construct(PDO $db, string $driver, string $prefix, ChannelRepository $channelRepo)
     {
         $this->db = $db;
         $this->driver = $driver;
         // Prefix is ignored for SQLite because attached database aliases are used instead.
         $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
-        $this->channels = $channels;
+        $this->channelRepo = $channelRepo;
     }
 
     /**
@@ -203,13 +203,13 @@ final class RedirectRepository
      *
      * @return array{
      *   redirect: array<string, mixed>|null,
-     *   channels: array<int, array{id: int, name: string, slug: string}>
+     *   channel_options: array<int, array{id: int, name: string, slug: string}>
      * }
      */
     public function editFormData(?int $id = null): array
     {
         $redirects = $this->table('redirects');
-        $channelOptions = $this->channels->listOptions();
+        $channelOptions = $this->channelRepo->listOptions();
         $redirectRow = null;
         $normalizedId = $id !== null && $id > 0 ? $id : 0;
         if ($normalizedId > 0) {
@@ -228,7 +228,7 @@ final class RedirectRepository
 
         return [
             'redirect' => $redirectRow,
-            'channels' => $channelOptions,
+            'channel_options' => $channelOptions,
         ];
     }
 
@@ -386,7 +386,7 @@ final class RedirectRepository
      */
     private function channelsByIdMap(): array
     {
-        return ChannelContextService::channelsByIdMap($this->channels->listRecords());
+        return ChannelContextService::channelsByIdMap($this->channelRepo->listRecords());
     }
 
     /**
@@ -408,7 +408,7 @@ final class RedirectRepository
     {
         return ChannelContextService::resolveChannelIdBySlug(
             $slug,
-            fn (string $normalized): ?int => $this->channels->idBySlug($normalized),
+            fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),
             'Selected channel does not exist.'
         );
     }

@@ -151,14 +151,14 @@ final class UserRepository
     }
 
     /**
-     * Returns routing-table auth payload (groups/users) using one auth query.
+     * Returns routing-table auth payload (group/user rows) using one auth query.
      *
      * Query branches are included only for requested route families, keeping SQL
      * shorter when either group or user routing is disabled.
      *
      * @return array{
-     *   groups: array<int, array<string, mixed>>,
-     *   users: array<int, array<string, mixed>>
+     *   group_rows: array<int, array<string, mixed>>,
+     *   user_rows: array<int, array<string, mixed>>
      * }
      */
     public function listRoutingData(bool $includeGroups, bool $includeUsers): array

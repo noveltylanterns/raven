@@ -4,7 +4,7 @@
 
 This document explains Raven's Channel system for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever channel structure, channel routes, or Channel panel views change (`private/tpl/panel/channels/*`, channel controller/repository behavior, or channel public routing).
+Maintenance note: keep this file updated whenever channel structure, channel routes, or Channel panel views change (`private/tpl/panel/channel/*`, channel controller/repository behavior, or channel public routing).
 
 ## 1) Panel Guide (Create And Edit Channels)
 
@@ -12,7 +12,7 @@ Maintenance note: keep this file updated whenever channel structure, channel rou
 
 - Open panel sidebar: `Taxonomy` -> `Channels`.
 
-### Channel List (`/channels`)
+### Channel List (`/channel`)
 
 What you can do:
 
@@ -32,7 +32,7 @@ Columns shown:
 - `Pages` (count of linked pages)
 - `Actions`
 
-### Channel Editor (`/channels/edit` and `/channels/edit/{id}`)
+### Channel Editor (`/channel/edit` and `/channel/edit/{id}`)
 
 Top and bottom action bars (same controls in both places):
 
@@ -65,8 +65,8 @@ Delete behavior note:
 ### Key Files
 
 - Panel views:
-  - `private/tpl/panel/channels/list.php`
-  - `private/tpl/panel/channels/edit.php`
+  - `private/tpl/panel/channel/list.php`
+  - `private/tpl/panel/channel/edit.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Persistence:
@@ -76,11 +76,11 @@ Delete behavior note:
 
 Declared in `panel/index.php`:
 
-- `GET /channels` -> list
-- `GET /channels/edit` -> create form
-- `GET /channels/edit/{id}` -> edit form
-- `POST /channels/save` -> create/update
-- `POST /channels/delete` -> delete (single or bulk)
+- `GET /channel` -> list
+- `GET /channel/edit` -> create form
+- `GET /channel/edit/{id}` -> edit form
+- `POST /channel/save` -> create/update
+- `POST /channel/delete` -> delete (single or bulk)
 
 All state-changing routes use CSRF validation.
 
@@ -88,20 +88,20 @@ All state-changing routes use CSRF validation.
 
 `PanelController` channel handlers:
 
-- `channelsList()`
+- `channelList()`
   - Requires login + `Manage Taxonomy` permission.
   - Renders list with `ChannelRepository::listAll()`.
-- `channelsEdit(?int $id)`
+- `channelEdit(?int $id)`
   - Loads existing row when id is provided.
-  - Missing id row triggers flash error + redirect to `/channels`.
-- `channelsSave(array $post, array $files = [])`
+  - Missing id row triggers flash error + redirect to `/channel`.
+- `channelSave(array $post, array $files = [])`
   - Validates CSRF.
   - Sanitizes/normalizes `id`, `name`, `slug`, `description` via `InputSanitizer`.
   - Requires non-empty `name` and valid `slug`.
   - Saves text fields via `ChannelRepository::save(...)`.
   - Processes optional `cover_image` and `preview_image` uploads (single-file each), optional remove flags, and writes image-path columns via `ChannelRepository::updateImagePaths(...)`.
   - Upload files/variants are stored under `public/uploads/channels/{id}/` using configured `media.images.*` rules.
-- `channelsDelete(array $post)`
+- `channelDelete(array $post)`
   - Validates CSRF.
   - Supports single delete (`id`) and bulk delete (`selected_ids[]`).
   - Removes associated stored cover/preview image files for deleted channels.
@@ -127,7 +127,7 @@ Storage detail:
 ### Public Routing Touchpoints
 
 - Channel landing routes use single segment `/{channel_slug}` with page fallback rules.
-- Channel pages resolve at `/{channel_slug}/{segment}`, where `{segment}` depends on the channel's effective `page_route_mode`.
+- Channel pages resolve at `/{channel_slug}/{segment}`, where `{segment}` depends on the channel's effective `route_mode`.
 - When a channel is set to `inherit`, it uses the global `content.route_mode` default (`slug` or `id`).
 - Supported channel page-route segments:
 - `/{channel}/{page-slug}`
@@ -153,9 +153,9 @@ When channel behavior changes, update this document in the same task. That inclu
 
 - `Basic`
 - `Content`
-- `Default Text Editor Override`
-- `Page URL Mode`
-- `Page URL Separator`
+- `Editor Override`
+- `Route Mode`
+- `Route Separator`
 - `Use System Default`
 - `Use Global Default`
 - `- (Hyphen)`

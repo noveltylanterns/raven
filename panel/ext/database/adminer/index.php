@@ -26,13 +26,15 @@ $renderPublicNotFound = static function () use ($app): void {
         'csrf',
         'page_images',
         'page_image_manager',
-        'categories',
-        'channels',
+        'category',
+        'channel',
         'groups',
         'pages',
-        'redirects',
-        'tags',
+        'redirect',
+        'tag',
+        'taxonomy',
         'users',
+        'invite_tokens',
     ];
 
     foreach ($requiredKeys as $requiredKey) {
@@ -52,13 +54,15 @@ $renderPublicNotFound = static function () use ($app): void {
         $app['csrf'],
         $app['page_images'],
         $app['page_image_manager'],
-        $app['categories'],
-        $app['channels'],
-        $app['groups'],
-        $app['pages'],
-        $app['redirects'],
-        $app['tags'],
-        $app['users']
+        $app['category'],
+        $app['channel'],
+        $app,
+        $app,
+        $app['redirect'],
+        $app['tag'],
+        $app['taxonomy'],
+        $app,
+        $app['invite_tokens']
     );
 
     $panelController->renderPublicNotFound();

@@ -4,7 +4,7 @@
 
 This document explains Raven's User system for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever user structure, user routes, or User panel views change (`private/tpl/panel/users/*`, user controller/repository behavior, or user-group assignment rules).
+Maintenance note: keep this file updated whenever user structure, user routes, or User panel views change (`private/tpl/panel/user/*`, user controller/repository behavior, or user-group assignment rules).
 
 ## 1) Panel Guide (Create And Edit Users)
 
@@ -12,7 +12,7 @@ Maintenance note: keep this file updated whenever user structure, user routes, o
 
 - Open panel sidebar: `Users & Permissions` -> `Users`.
 
-### User List (`/users`)
+### User List (`/user`)
 
 What you can do:
 
@@ -39,7 +39,7 @@ Important delete note:
 
 - You cannot delete your currently logged-in account from this screen.
 
-### Invite Tokens (`/users/invites`)
+### Invite Tokens (`/user/invites`)
 
 What you can do:
 
@@ -55,7 +55,7 @@ Important behavior:
 - stored rows now include full token values (plus hash metadata for validation)
 - `Reusable` tokens can be used multiple times until expiry; `Single-use` tokens expire after first successful use
 
-### User Editor (`/users/edit` and `/users/edit/{id}`)
+### User Editor (`/user/edit` and `/user/edit/{id}`)
 
 Top and bottom action bars (same controls in both places):
 
@@ -68,9 +68,12 @@ Fields/options:
 - `Username` (required)
 - `Display Name`
 - `Email` (required)
+- `Change Password` button on existing users
 - `Password`
   - Required on create
   - Optional on edit (leave blank to keep existing password)
+- `Confirm Password` when password entry is enabled
+- `Enter new password again to confirm:` helper text under the confirmation field
 - `Panel Theme` (`<Default>`, `Corporate`, `Ice`, `Midnight`)
 - `Avatar`
   - file upload (`gif/jpg/jpeg/png`)
@@ -92,9 +95,9 @@ Group assignment notes:
 ### Key Files
 
 - Panel views:
-  - `private/tpl/panel/users/list.php`
-  - `private/tpl/panel/users/edit.php`
-  - `private/tpl/panel/users/invites.php`
+  - `private/tpl/panel/user/list.php`
+  - `private/tpl/panel/user/edit.php`
+  - `private/tpl/panel/user/invites.php`
   - `private/tpl/panel/auth/login.php`
   - `private/tpl/panel/auth/login_2fa.php`
 - Public auth views:
@@ -103,6 +106,7 @@ Group assignment notes:
   - `private/tpl/auth/register.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
+- Public controller:
   - `private/sys/Controller/PublicController.php`
 - Shared login workflow:
   - `private/lib/Auth/LoginAttemptWorkflowService.php`
@@ -117,15 +121,15 @@ Group assignment notes:
 
 Declared in `panel/index.php`:
 
-- `GET /users` -> list
-- `GET /users/edit` -> create form
-- `GET /users/edit/{id}` -> edit form
-- `POST /users/save` -> create/update
-- `POST /users/delete` -> delete (single or bulk)
-- `GET /users/invites` -> invite token list/admin
-- `POST /users/invites/create` -> create one token
-- `POST /users/invites/generate` -> generate single-use token batch
-- `POST /users/invites/delete` -> delete one token
+- `GET /user` -> list
+- `GET /user/edit` -> create form
+- `GET /user/edit/{id}` -> edit form
+- `POST /user/save` -> create/update
+- `POST /user/delete` -> delete (single or bulk)
+- `GET /user/invites` -> invite token list/admin
+- `POST /user/invites/create` -> create one token
+- `POST /user/invites/generate` -> generate single-use token batch
+- `POST /user/invites/delete` -> delete one token
 
 All state-changing routes use CSRF validation.
 
@@ -145,14 +149,14 @@ Public routes (declared in `public/index.php`):
 
 `PanelController` user handlers:
 
-- `usersList()`
+- `userList()`
   - Requires login + `Manage Users` permission.
   - Renders list with `UserRepository::listAll()`.
-- `usersEdit(?int $id)`
+- `userEdit(?int $id)`
   - Loads existing row when id is provided.
   - Provides group options and theme options.
   - Includes capability flags (`canAssignSuperAdmin`, `canAssignConfigurationGroups`).
-- `usersSave(array $post, array $files)`
+- `userSave(array $post, array $files)`
   - Validates CSRF.
   - Sanitizes/normalizes user fields via `InputSanitizer`.
   - Validates username/email/theme.
@@ -167,7 +171,7 @@ Public routes (declared in `public/index.php`):
   - If avatar is `<=120x120`, thumb file is a direct copy of the sanitized original.
   - Saves through `UserRepository::save(...)`.
   - Removes superseded avatar file when avatar changes/removal succeeds.
-- `usersDelete(array $post)`
+- `userDelete(array $post)`
   - Validates CSRF.
   - Blocks self-delete in both single and bulk flows.
   - Supports bulk delete with deleted/failed/skipped counters.
@@ -217,6 +221,9 @@ When user behavior changes, update this document in the same task. That includes
 ### UI Labels Reference
 
 - `Profile`
+- `Change Password`
+- `Confirm Password`
+- `Enter new password again to confirm:`
 - `Contact Information`
 - `Add More Contact Information`
 - `Two-Factor Methods`

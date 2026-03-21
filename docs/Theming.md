@@ -99,7 +99,7 @@ Common shared keys:
 - `site:name`
 - `site:url`
 - `site:domain`
-- `site:scheme`
+- `site:protocol`
 - `site:current_url`
 - `theme:slug`
 - `theme:css`
@@ -339,7 +339,7 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `site:current_url` | current request URL | absolute URL |
 | `site:domain` | configured site host/domain value | host or host/path string |
 | `site:name` | configured site name | site name |
-| `site:scheme` | configured public scheme | `http` or `https` |
+| `site:protocol` | configured public protocol | `http` or `https` |
 | `site:url` | configured public site base URL | absolute site URL without trailing slash |
 
 #### 9.2.13 Tag Tags

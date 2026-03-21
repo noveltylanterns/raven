@@ -27,15 +27,15 @@ final class TaxonomyRepository
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private ChannelRepository $channels;
+    private ChannelRepository $channelRepo;
 
-    public function __construct(PDO $db, string $driver, string $prefix, ChannelRepository $channels)
+    public function __construct(PDO $db, string $driver, string $prefix, ChannelRepository $channelRepo)
     {
         $this->db = $db;
         $this->driver = $driver;
         // Prefix is ignored for SQLite because attached database aliases are used instead.
         $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
-        $this->channels = $channels;
+        $this->channelRepo = $channelRepo;
     }
 
     /**
@@ -45,7 +45,7 @@ final class TaxonomyRepository
      */
     public function findChannelBySlug(string $slug): ?array
     {
-        return $this->channels->findBySlug($slug);
+        return $this->channelRepo->findBySlug($slug);
     }
 
     /**
@@ -115,12 +115,12 @@ final class TaxonomyRepository
     }
 
     /**
-     * Returns routing-option sets for channels/categories/tags in one query.
+     * Returns routing-option sets for channel/category/tag routes in one query.
      *
      * @return array{
-     *   channels: array<int, array{id: int, name: string, slug: string, text_editor_override: string, page_route_mode: string, page_url_separator: string}>,
-     *   categories: array<int, array{id: int, name: string, slug: string}>,
-     *   tags: array<int, array{id: int, name: string, slug: string}>
+     *   channel_options: array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>,
+     *   category_options: array<int, array{id: int, name: string, slug: string}>,
+     *   tag_options: array<int, array{id: int, name: string, slug: string}>
      * }
      */
     public function listRoutingOptions(): array
@@ -143,9 +143,9 @@ final class TaxonomyRepository
 
         $rows = $stmt->fetchAll() ?: [];
         $result = [
-            'channels' => $this->channels->listOptions(),
-            'categories' => [],
-            'tags' => [],
+            'channel_options' => $this->channelRepo->listOptions(),
+            'category_options' => [],
+            'tag_options' => [],
         ];
 
         foreach ($rows as $row) {
@@ -160,7 +160,7 @@ final class TaxonomyRepository
 
             $optionType = strtolower(trim((string) ($row['option_type'] ?? '')));
             if ($optionType === 'category') {
-                $result['categories'][] = [
+                $result['category_options'][] = [
                     'id' => $id,
                     'name' => $name,
                     'slug' => $slug,
@@ -168,7 +168,7 @@ final class TaxonomyRepository
                 continue;
             }
             if ($optionType === 'tag') {
-                $result['tags'][] = [
+                $result['tag_options'][] = [
                     'id' => $id,
                     'name' => $name,
                     'slug' => $slug,
@@ -183,10 +183,10 @@ final class TaxonomyRepository
      * Returns routing inventory taxonomy data in one query.
      *
      * @return array{
-     *   channels: array<int, array{id: int, name: string, slug: string, text_editor_override: string, page_route_mode: string, page_url_separator: string}>,
-     *   categories: array<int, array{id: int, name: string, slug: string}>,
-     *   tags: array<int, array{id: int, name: string, slug: string}>,
-     *   redirects: array<int, array<string, mixed>>
+     *   channel_options: array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>,
+     *   category_options: array<int, array{id: int, name: string, slug: string}>,
+     *   tag_options: array<int, array{id: int, name: string, slug: string}>,
+     *   redirect_rows: array<int, array<string, mixed>>
      * }
      */
     public function listRoutingInventoryData(
@@ -199,10 +199,10 @@ final class TaxonomyRepository
         $redirects = $this->table('redirects');
 
         $result = [
-            'channels' => $this->channels->listOptions(),
-            'categories' => [],
-            'tags' => [],
-            'redirects' => [],
+            'channel_options' => $this->channelRepo->listOptions(),
+            'category_options' => [],
+            'tag_options' => [],
+            'redirect_rows' => [],
         ];
 
         if ($includeCategories) {
@@ -219,7 +219,7 @@ final class TaxonomyRepository
                     continue;
                 }
 
-                $result['categories'][] = [
+                $result['category_options'][] = [
                     'id' => $id,
                     'name' => (string) ($row['name'] ?? ''),
                     'slug' => $slug,
@@ -241,7 +241,7 @@ final class TaxonomyRepository
                     continue;
                 }
 
-                $result['tags'][] = [
+                $result['tag_options'][] = [
                     'id' => $id,
                     'name' => (string) ($row['name'] ?? ''),
                     'slug' => $slug,
@@ -275,7 +275,7 @@ final class TaxonomyRepository
                     'is_active' => (int) ($row['is_active'] ?? 0),
                     'target_url' => (string) ($row['target_url'] ?? ''),
                 ];
-                $result['redirects'][] = ChannelContextService::applyBasicChannelContext($redirectRow, $channel);
+                $result['redirect_rows'][] = ChannelContextService::applyBasicChannelContext($redirectRow, $channel);
             }
         }
 
@@ -286,11 +286,11 @@ final class TaxonomyRepository
      * Returns page-editor taxonomy options and assigned category/tag rows in one query.
      *
      * @return array{
-     *   channels: array<int, array{id: int, name: string, slug: string}>,
-     *   categories: array<int, array{id: int, name: string, slug: string}>,
-     *   tags: array<int, array{id: int, name: string, slug: string}>,
-     *   assigned_categories: array<int, array{id: int, name: string, slug: string}>,
-     *   assigned_tags: array<int, array{id: int, name: string, slug: string}>
+     *   channel_options: array<int, array{id: int, name: string, slug: string}>,
+     *   category_options: array<int, array{id: int, name: string, slug: string}>,
+     *   tag_options: array<int, array{id: int, name: string, slug: string}>,
+     *   assigned_category_options: array<int, array{id: int, name: string, slug: string}>,
+     *   assigned_tag_options: array<int, array{id: int, name: string, slug: string}>
      * }
      */
     public function listPageEditorTaxonomyData(
@@ -300,11 +300,11 @@ final class TaxonomyRepository
     ): array
     {
         $result = [
-            'channels' => $this->channels->listOptions(),
-            'categories' => [],
-            'tags' => [],
-            'assigned_categories' => [],
-            'assigned_tags' => [],
+            'channel_options' => $this->channelRepo->listOptions(),
+            'category_options' => [],
+            'tag_options' => [],
+            'assigned_category_options' => [],
+            'assigned_tag_options' => [],
         ];
         if (!$includeCategories && !$includeTags) {
             return $result;
@@ -322,10 +322,7 @@ final class TaxonomyRepository
                     c.id,
                     c.name,
                     c.slug,
-                    CASE WHEN pc.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned,
-                    \'\' AS channel_text_editor_override,
-                    \'\' AS channel_page_route_mode,
-                    \'\' AS channel_page_url_separator
+                    CASE WHEN pc.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned
                  FROM ' . $categories . ' c
                  LEFT JOIN ' . $pageCategories . ' pc
                     ON pc.category_id = c.id
@@ -342,10 +339,7 @@ final class TaxonomyRepository
                     t.id,
                     t.name,
                     t.slug,
-                    CASE WHEN pt.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned,
-                    \'\' AS channel_text_editor_override,
-                    \'\' AS channel_page_route_mode,
-                    \'\' AS channel_page_url_separator
+                    CASE WHEN pt.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned
                  FROM ' . $tags . ' t
                  LEFT JOIN ' . $pageTags . ' pt
                     ON pt.tag_id = t.id
@@ -354,7 +348,7 @@ final class TaxonomyRepository
         }
 
         $stmt = $this->db->prepare(
-            'SELECT option_type, id, name, slug, is_assigned, channel_text_editor_override, channel_page_route_mode, channel_page_url_separator
+            'SELECT option_type, id, name, slug, is_assigned
              FROM (
                  ' . implode("\n                 UNION ALL\n                 ", $unionSelects) . '
              ) options
@@ -382,16 +376,16 @@ final class TaxonomyRepository
             $isAssigned = (int) ($row['is_assigned'] ?? 0) === 1;
 
             if ($optionType === 'category') {
-                $result['categories'][] = $entry;
+                $result['category_options'][] = $entry;
                 if ($isAssigned) {
-                    $result['assigned_categories'][] = $entry;
+                    $result['assigned_category_options'][] = $entry;
                 }
                 continue;
             }
             if ($optionType === 'tag') {
-                $result['tags'][] = $entry;
+                $result['tag_options'][] = $entry;
                 if ($isAssigned) {
-                    $result['assigned_tags'][] = $entry;
+                    $result['assigned_tag_options'][] = $entry;
                 }
             }
         }
@@ -452,7 +446,7 @@ final class TaxonomyRepository
      */
     private function channelsByIdMap(): array
     {
-        return ChannelContextService::channelsByIdMap($this->channels->listRecords());
+        return ChannelContextService::channelsByIdMap($this->channelRepo->listRecords());
     }
 
     /**

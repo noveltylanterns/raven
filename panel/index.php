@@ -45,14 +45,14 @@ $panelController = new PanelController(
     $app['csrf'],
     $app['page_images'],
     $app['page_image_manager'],
-    $app['categories'],
-    $app['channels'],
-    $app['groups'],
-    $app['pages'],
-    $app['redirects'],
-    $app['tags'],
+    $app['category'],
+    $app['channel'],
+    $app['group'],
+    $app['page'],
+    $app['redirect'],
+    $app['tag'],
     $app['taxonomy'],
-    $app['users'],
+    $app['user'],
     $app['invite_tokens']
 );
 
@@ -506,7 +506,7 @@ $_SESSION['_raven_nav_system_extensions'] = $systemExtensionNavItems;
 // Provide channel-aware shortcuts for Create Page sidebar/mobile accordion sublinks.
 $pageCreateChannelItems = [];
 if ($hasPanelPermissionBit(PanelAccess::PAGES_CREATE)) {
-    foreach ($app['channels']->listOptions() as $channelOption) {
+    foreach ($app['channel']->listOptions() as $channelOption) {
         if (!is_array($channelOption)) {
             continue;
         }
@@ -568,17 +568,17 @@ $router->add('GET', '/', static function () use ($panelController): void {
     $panelController->dashboard();
 });
 
-// Pages routes.
+// Page routes.
 // Includes list/create/edit/save plus gallery media and delete actions.
-$router->add('GET', '/pages', static function () use ($panelController): void {
-    $panelController->pagesList();
+$router->add('GET', '/page', static function () use ($panelController): void {
+    $panelController->pageList();
 });
 
-$router->add('GET', '/pages/edit', static function () use ($panelController): void {
-    $panelController->pagesEdit(null);
+$router->add('GET', '/page/edit', static function () use ($panelController): void {
+    $panelController->pageEdit(null);
 });
 
-$router->add('GET', '/pages/edit/{id}', static function (array $params) use ($panelController, $app): void {
+$router->add('GET', '/page/edit/{id}', static function (array $params) use ($panelController, $app): void {
     $id = $app['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
@@ -587,39 +587,39 @@ $router->add('GET', '/pages/edit/{id}', static function (array $params) use ($pa
         return;
     }
 
-    $panelController->pagesEdit($id);
+    $panelController->pageEdit($id);
 });
 
-$router->add('POST', '/pages/save', static function () use ($panelController): void {
-    $panelController->pagesSave($_POST);
+$router->add('POST', '/page/save', static function () use ($panelController): void {
+    $panelController->pageSave($_POST);
 });
 
 // Uploads one image into a page gallery (Media tab action).
-$router->add('POST', '/pages/gallery/upload', static function () use ($panelController): void {
-    $panelController->pagesGalleryUpload($_POST, $_FILES);
+$router->add('POST', '/page/gallery/upload', static function () use ($panelController): void {
+    $panelController->pageGalleryUpload($_POST, $_FILES);
 });
 
 // Deletes one gallery image from a page (Media tab action).
-$router->add('POST', '/pages/gallery/delete', static function () use ($panelController): void {
-    $panelController->pagesGalleryDelete($_POST);
+$router->add('POST', '/page/gallery/delete', static function () use ($panelController): void {
+    $panelController->pageGalleryDelete($_POST);
 });
 
 // Deletes one page from the Pages index action column.
-$router->add('POST', '/pages/delete', static function () use ($panelController): void {
-    $panelController->pagesDelete($_POST);
+$router->add('POST', '/page/delete', static function () use ($panelController): void {
+    $panelController->pageDelete($_POST);
 });
 
 // Channel routes (list + edit + save + delete).
 // Channel CRUD remains in the panel controller while routing stays declarative.
-$router->add('GET', '/channels', static function () use ($panelController): void {
-    $panelController->channelsList();
+$router->add('GET', '/channel', static function () use ($panelController): void {
+    $panelController->channelList();
 });
 
-$router->add('GET', '/channels/edit', static function () use ($panelController): void {
-    $panelController->channelsEdit(null);
+$router->add('GET', '/channel/edit', static function () use ($panelController): void {
+    $panelController->channelEdit(null);
 });
 
-$router->add('GET', '/channels/edit/{id}', static function (array $params) use ($panelController, $app): void {
+$router->add('GET', '/channel/edit/{id}', static function (array $params) use ($panelController, $app): void {
     $id = $app['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
@@ -628,30 +628,30 @@ $router->add('GET', '/channels/edit/{id}', static function (array $params) use (
         return;
     }
 
-    $panelController->channelsEdit($id);
+    $panelController->channelEdit($id);
 });
 
-$router->add('POST', '/channels/save', static function () use ($panelController): void {
-    $panelController->channelsSave($_POST, $_FILES);
+$router->add('POST', '/channel/save', static function () use ($panelController): void {
+    $panelController->channelSave($_POST, $_FILES);
 });
 
-$router->add('POST', '/channels/delete', static function () use ($panelController): void {
-    $panelController->channelsDelete($_POST);
+$router->add('POST', '/channel/delete', static function () use ($panelController): void {
+    $panelController->channelDelete($_POST);
 });
 
 // Category/Tag/Redirect/User/Group routes.
 // Kept explicit (instead of dynamic routing) for clarity and predictable auth gates.
 
 if ($categoryEnabled) {
-    $router->add('GET', '/categories', static function () use ($panelController): void {
-        $panelController->categoriesList();
+    $router->add('GET', '/category', static function () use ($panelController): void {
+        $panelController->categoryList();
     });
 
-    $router->add('GET', '/categories/edit', static function () use ($panelController): void {
-        $panelController->categoriesEdit(null);
+    $router->add('GET', '/category/edit', static function () use ($panelController): void {
+        $panelController->categoryEdit(null);
     });
 
-    $router->add('GET', '/categories/edit/{id}', static function (array $params) use ($panelController, $app): void {
+    $router->add('GET', '/category/edit/{id}', static function (array $params) use ($panelController, $app): void {
         $id = $app['input']->int($params['id'] ?? null, 1);
 
         if ($id === null) {
@@ -660,28 +660,28 @@ if ($categoryEnabled) {
             return;
         }
 
-        $panelController->categoriesEdit($id);
+        $panelController->categoryEdit($id);
     });
 
-    $router->add('POST', '/categories/save', static function () use ($panelController): void {
-        $panelController->categoriesSave($_POST, $_FILES);
+    $router->add('POST', '/category/save', static function () use ($panelController): void {
+        $panelController->categorySave($_POST, $_FILES);
     });
 
-    $router->add('POST', '/categories/delete', static function () use ($panelController): void {
-        $panelController->categoriesDelete($_POST);
+    $router->add('POST', '/category/delete', static function () use ($panelController): void {
+        $panelController->categoryDelete($_POST);
     });
 }
 
 if ($tagEnabled) {
-    $router->add('GET', '/tags', static function () use ($panelController): void {
-        $panelController->tagsList();
+    $router->add('GET', '/tag', static function () use ($panelController): void {
+        $panelController->tagList();
     });
 
-    $router->add('GET', '/tags/edit', static function () use ($panelController): void {
-        $panelController->tagsEdit(null);
+    $router->add('GET', '/tag/edit', static function () use ($panelController): void {
+        $panelController->tagEdit(null);
     });
 
-    $router->add('GET', '/tags/edit/{id}', static function (array $params) use ($panelController, $app): void {
+    $router->add('GET', '/tag/edit/{id}', static function (array $params) use ($panelController, $app): void {
         $id = $app['input']->int($params['id'] ?? null, 1);
 
         if ($id === null) {
@@ -690,27 +690,27 @@ if ($tagEnabled) {
             return;
         }
 
-        $panelController->tagsEdit($id);
+        $panelController->tagEdit($id);
     });
 
-    $router->add('POST', '/tags/save', static function () use ($panelController): void {
-        $panelController->tagsSave($_POST, $_FILES);
+    $router->add('POST', '/tag/save', static function () use ($panelController): void {
+        $panelController->tagSave($_POST, $_FILES);
     });
 
-    $router->add('POST', '/tags/delete', static function () use ($panelController): void {
-        $panelController->tagsDelete($_POST);
+    $router->add('POST', '/tag/delete', static function () use ($panelController): void {
+        $panelController->tagDelete($_POST);
     });
 }
 
-$router->add('GET', '/redirects', static function () use ($panelController): void {
-    $panelController->redirectsList();
+$router->add('GET', '/redirect', static function () use ($panelController): void {
+    $panelController->redirectList();
 });
 
-$router->add('GET', '/redirects/edit', static function () use ($panelController): void {
-    $panelController->redirectsEdit(null);
+$router->add('GET', '/redirect/edit', static function () use ($panelController): void {
+    $panelController->redirectEdit(null);
 });
 
-$router->add('GET', '/redirects/edit/{id}', static function (array $params) use ($panelController, $app): void {
+$router->add('GET', '/redirect/edit/{id}', static function (array $params) use ($panelController, $app): void {
     $id = $app['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
@@ -719,26 +719,26 @@ $router->add('GET', '/redirects/edit/{id}', static function (array $params) use 
         return;
     }
 
-    $panelController->redirectsEdit($id);
+    $panelController->redirectEdit($id);
 });
 
-$router->add('POST', '/redirects/save', static function () use ($panelController): void {
-    $panelController->redirectsSave($_POST);
+$router->add('POST', '/redirect/save', static function () use ($panelController): void {
+    $panelController->redirectSave($_POST);
 });
 
-$router->add('POST', '/redirects/delete', static function () use ($panelController): void {
-    $panelController->redirectsDelete($_POST);
+$router->add('POST', '/redirect/delete', static function () use ($panelController): void {
+    $panelController->redirectDelete($_POST);
 });
 
-$router->add('GET', '/users', static function () use ($panelController): void {
-    $panelController->usersList();
+$router->add('GET', '/user', static function () use ($panelController): void {
+    $panelController->userList();
 });
 
-$router->add('GET', '/users/edit', static function () use ($panelController): void {
-    $panelController->usersEdit(null);
+$router->add('GET', '/user/edit', static function () use ($panelController): void {
+    $panelController->userEdit(null);
 });
 
-$router->add('GET', '/users/edit/{id}', static function (array $params) use ($panelController, $app): void {
+$router->add('GET', '/user/edit/{id}', static function (array $params) use ($panelController, $app): void {
     $id = $app['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
@@ -747,42 +747,42 @@ $router->add('GET', '/users/edit/{id}', static function (array $params) use ($pa
         return;
     }
 
-    $panelController->usersEdit($id);
+    $panelController->userEdit($id);
 });
 
-$router->add('POST', '/users/save', static function () use ($panelController): void {
-    $panelController->usersSave($_POST, $_FILES);
+$router->add('POST', '/user/save', static function () use ($panelController): void {
+    $panelController->userSave($_POST, $_FILES);
 });
 
-$router->add('POST', '/users/delete', static function () use ($panelController): void {
-    $panelController->usersDelete($_POST);
+$router->add('POST', '/user/delete', static function () use ($panelController): void {
+    $panelController->userDelete($_POST);
 });
 
-$router->add('GET', '/users/invites', static function () use ($panelController): void {
+$router->add('GET', '/user/invites', static function () use ($panelController): void {
     $panelController->userInvites();
 });
 
-$router->add('POST', '/users/invites/create', static function () use ($panelController): void {
+$router->add('POST', '/user/invites/create', static function () use ($panelController): void {
     $panelController->userInvitesCreate($_POST);
 });
 
-$router->add('POST', '/users/invites/generate', static function () use ($panelController): void {
+$router->add('POST', '/user/invites/generate', static function () use ($panelController): void {
     $panelController->userInvitesGenerate($_POST);
 });
 
-$router->add('POST', '/users/invites/delete', static function () use ($panelController): void {
+$router->add('POST', '/user/invites/delete', static function () use ($panelController): void {
     $panelController->userInvitesDelete($_POST);
 });
 
-$router->add('GET', '/groups', static function () use ($panelController): void {
-    $panelController->groupsList();
+$router->add('GET', '/group', static function () use ($panelController): void {
+    $panelController->groupList();
 });
 
-$router->add('GET', '/groups/edit', static function () use ($panelController): void {
-    $panelController->groupsEdit(null);
+$router->add('GET', '/group/edit', static function () use ($panelController): void {
+    $panelController->groupEdit(null);
 });
 
-$router->add('GET', '/groups/edit/{id}', static function (array $params) use ($panelController, $app): void {
+$router->add('GET', '/group/edit/{id}', static function (array $params) use ($panelController, $app): void {
     $id = $app['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
@@ -791,15 +791,15 @@ $router->add('GET', '/groups/edit/{id}', static function (array $params) use ($p
         return;
     }
 
-    $panelController->groupsEdit($id);
+    $panelController->groupEdit($id);
 });
 
-$router->add('POST', '/groups/save', static function () use ($panelController): void {
-    $panelController->groupsSave($_POST);
+$router->add('POST', '/group/save', static function () use ($panelController): void {
+    $panelController->groupSave($_POST);
 });
 
-$router->add('POST', '/groups/delete', static function () use ($panelController): void {
-    $panelController->groupsDelete($_POST);
+$router->add('POST', '/group/delete', static function () use ($panelController): void {
+    $panelController->groupDelete($_POST);
 });
 
 $router->add('GET', '/preferences', static function () use ($panelController): void {

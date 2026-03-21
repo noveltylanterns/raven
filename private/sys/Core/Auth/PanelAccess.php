@@ -35,7 +35,7 @@ final class PanelAccess
     /** Allows page/content operations (excluding taxonomy management). */
     public const MANAGE_CONTENT = 2;
 
-    /** Allows taxonomy operations (channels/categories/tags). */
+    /** Allows taxonomy operations (channel/category/tag). */
     public const MANAGE_TAXONOMY = 64;
 
     /** Allows user management. */
@@ -47,43 +47,43 @@ final class PanelAccess
     /** Allows system configuration management (Configuration, Extensions, Updates). */
     public const MANAGE_CONFIGURATION = 16;
 
-    /** Pages route permissions (`/pages*`). */
+    /** Page route permissions (`/page*`). */
     public const PAGES_VIEW = 1024;
     public const PAGES_CREATE = 2048;
     public const PAGES_EDIT = 4096;
     public const PAGES_DELETE = 8192;
 
-    /** Channels route permissions (`/channels*`). */
+    /** Channel route permissions (`/channel*`). */
     public const CHANNELS_VIEW = 16384;
     public const CHANNELS_CREATE = 32768;
     public const CHANNELS_EDIT = 65536;
     public const CHANNELS_DELETE = 131072;
 
-    /** Categories route permissions (`/categories*`). */
+    /** Category route permissions (`/category*`). */
     public const CATEGORIES_VIEW = 262144;
     public const CATEGORIES_CREATE = 524288;
     public const CATEGORIES_EDIT = 1048576;
     public const CATEGORIES_DELETE = 2097152;
 
-    /** Tags route permissions (`/tags*`). */
+    /** Tag route permissions (`/tag*`). */
     public const TAGS_VIEW = 4194304;
     public const TAGS_CREATE = 8388608;
     public const TAGS_EDIT = 16777216;
     public const TAGS_DELETE = 33554432;
 
-    /** Redirects route permissions (`/redirects*`). */
+    /** Redirect route permissions (`/redirect*`). */
     public const REDIRECTS_VIEW = 67108864;
     public const REDIRECTS_CREATE = 134217728;
     public const REDIRECTS_EDIT = 268435456;
     public const REDIRECTS_DELETE = 536870912;
 
-    /** Users route permissions (`/users*`). */
+    /** User route permissions (`/user*`). */
     public const USERS_VIEW = 1073741824;
     public const USERS_CREATE = 2147483648;
     public const USERS_EDIT = 4294967296;
     public const USERS_DELETE = 8589934592;
 
-    /** Groups route permissions (`/groups*`). */
+    /** Group route permissions (`/group*`). */
     public const GROUPS_VIEW = 17179869184;
     public const GROUPS_CREATE = 34359738368;
     public const GROUPS_EDIT = 68719476736;

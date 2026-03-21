@@ -84,10 +84,10 @@ final class SecuritySmokeRunner
         $loginUri = '/' . $this->panelPath . '/login';
         $prefsUri = '/' . $this->panelPath . '/preferences';
         $logoutUri = '/' . $this->panelPath . '/logout';
-        $redirectListUri = '/' . $this->panelPath . '/redirects';
-        $redirectEditUri = '/' . $this->panelPath . '/redirects/edit';
-        $redirectSaveUri = '/' . $this->panelPath . '/redirects/save';
-        $redirectDeleteUri = '/' . $this->panelPath . '/redirects/delete';
+        $redirectListUri = '/' . $this->panelPath . '/redirect';
+        $redirectEditUri = '/' . $this->panelPath . '/redirect/edit';
+        $redirectSaveUri = '/' . $this->panelPath . '/redirect/save';
+        $redirectDeleteUri = '/' . $this->panelPath . '/redirect/delete';
 
         try {
             $this->createdRedirectSlug = 'security-smoke-' . $this->runId;
@@ -252,7 +252,7 @@ final class SecuritySmokeRunner
             $hostilePanelQuery = $this->request(
                 $this->root . '/panel/index.php',
                 'GET',
-                '/' . $this->panelPath . '/redirects?page=1%20OR%201%3D1'
+                '/' . $this->panelPath . '/redirect?page=1%20OR%201%3D1'
             );
             $this->assert($hostilePanelQuery['status'] === 200, 'Hostile panel query should not bypass or break list route.');
             $this->assertNoSqlErrorLeak($hostilePanelQuery['body']);
@@ -309,7 +309,7 @@ final class SecuritySmokeRunner
     private function groupsCount(): int
     {
         $app = require $this->root . '/private/raven.php';
-        $rows = $app['groups']->listAll();
+        $rows = $app['group']->listAll();
         return is_array($rows) ? count($rows) : 0;
     }
 
@@ -319,7 +319,7 @@ final class SecuritySmokeRunner
     private function findRedirectBySlug(string $slug): ?array
     {
         $app = require $this->root . '/private/raven.php';
-        $rows = $app['redirects']->listAll();
+        $rows = $app['redirect']->listAll();
         if (!is_array($rows)) {
             return null;
         }
@@ -357,14 +357,14 @@ final class SecuritySmokeRunner
         }
 
         $app = require $this->root . '/private/raven.php';
-        $app['redirects']->deleteById($id);
+        $app['redirect']->deleteById($id);
     }
 
     private function createTempSuperUser(): void
     {
         $app = require $this->root . '/private/raven.php';
 
-        $superGroupId = $app['groups']->idBySlug('super');
+        $superGroupId = $app['group']->idBySlug('super');
         if ($superGroupId === null) {
             throw new RuntimeException('Unable to resolve super group slug.');
         }
@@ -372,7 +372,7 @@ final class SecuritySmokeRunner
         $this->tempUsername = 'codex_security_' . $this->runId;
         $this->tempPassword = 'CodexSecurity!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $app['users']->save([
+        $this->tempUserId = (int) $app['user']->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Security ' . $this->runId,
@@ -398,7 +398,7 @@ final class SecuritySmokeRunner
         }
 
         $app = require $this->root . '/private/raven.php';
-        $app['users']->deleteById($this->tempUserId);
+        $app['user']->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }
 

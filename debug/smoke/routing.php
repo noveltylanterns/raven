@@ -92,13 +92,13 @@ final class RoutingSmokeRunner
         $this->assert((string) ($rootSlug['canonical_path'] ?? '') === '/hello-world', 'Global slug mode canonical root path mismatch.');
         $this->events[] = 'root_slug=ok';
 
-        $config->set('content.separator', '_');
+        $config->set('content.route_separator', '_');
         $rootUnderscore = $this->resolvePublicPath($config, $routeConfig, $routeService, $channels, $pages, 'hello_world', null);
         $this->assert((int) ($rootUnderscore['page']['id'] ?? 0) === 7, 'Underscore separator should resolve root slug page.');
         $this->assert((string) ($rootUnderscore['canonical_path'] ?? '') === '/hello_world', 'Underscore separator canonical root path mismatch.');
         $this->events[] = 'root_slug_separator=ok';
 
-        $config->set('content.separator', '-');
+        $config->set('content.route_separator', '-');
         $inheritSlug = $this->resolvePublicPath($config, $routeConfig, $routeService, $channels, $pages, 'smoke-post', 'news');
         $this->assert((int) ($inheritSlug['page']['id'] ?? 0) === 42, 'Inherited channel slug mode should resolve channel page by slug.');
         $this->assert((string) ($inheritSlug['canonical_path'] ?? '') === '/news/smoke-post', 'Inherited channel slug canonical path mismatch.');
@@ -174,9 +174,9 @@ PHP;
                 'name' => 'News',
                 'slug' => 'news',
                 'description' => '',
-                'text_editor_override' => 'inherit',
-                'page_route_mode' => 'inherit',
-                'page_url_separator' => 'inherit',
+                'editor_override' => 'inherit',
+                'route_mode' => 'inherit',
+                'route_separator' => 'inherit',
                 'created_at' => '2026-03-20 00:00:00',
             ],
             'blog' => [
@@ -184,9 +184,9 @@ PHP;
                 'name' => 'Blog',
                 'slug' => 'blog',
                 'description' => '',
-                'text_editor_override' => 'inherit',
-                'page_route_mode' => 'month_id',
-                'page_url_separator' => 'inherit',
+                'editor_override' => 'inherit',
+                'route_mode' => 'month_id',
+                'route_separator' => 'inherit',
                 'created_at' => '2026-03-20 00:00:00',
             ],
         ];
@@ -247,8 +247,8 @@ PHP;
             $channel = $channels->findBySlug($channelSlug);
             $this->assert($channel !== null, 'Missing channel fixture for ' . $channelSlug . '.');
 
-            $routeMode = $routeConfig->effectiveChannelPageRouteMode((string) ($channel['page_route_mode'] ?? 'inherit'));
-            $wordSeparator = $routeConfig->resolveChannelPageUrlSeparator((string) ($channel['page_url_separator'] ?? 'inherit'));
+            $routeMode = $routeConfig->effectiveChannelRouteMode((string) ($channel['route_mode'] ?? 'inherit'));
+            $wordSeparator = $routeConfig->resolveChannelRouteSeparator((string) ($channel['route_separator'] ?? 'inherit'));
             $lookupTarget = $routeService->resolveLookupTarget($requestedSegment, $routeMode, $wordSeparator);
             $this->assert(is_array($lookupTarget), 'Failed to parse channel route segment "' . $requestedSegment . '".');
             if ((string) ($lookupTarget['type'] ?? '') === 'slug') {
@@ -259,7 +259,7 @@ PHP;
             $lookupTarget = $routeService->resolveLookupTarget(
                 $requestedSegment,
                 $routeMode,
-                (string) $config->get('content.separator', '-')
+                (string) $config->get('content.route_separator', '-')
             );
             $this->assert(is_array($lookupTarget), 'Failed to parse root route segment "' . $requestedSegment . '".');
             if ((string) ($lookupTarget['type'] ?? '') === 'slug') {
@@ -280,7 +280,7 @@ PHP;
             (string) ($page['published_at'] ?? ''),
             $routeMode,
             $wordSeparator,
-            (string) $config->get('content.separator', '-')
+            (string) $config->get('content.route_separator', '-')
         );
         $canonicalPath = $channelSlug !== null
             ? '/' . rawurlencode($channelSlug) . '/' . rawurlencode($canonicalSegment)

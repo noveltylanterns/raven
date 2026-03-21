@@ -12,10 +12,10 @@ final class RequestContextResolver
     /**
      * @param array<string, mixed>|null $server
      */
-    public function currentRequestUrl(string $configuredDomain, string $configuredScheme = '', ?array $server = null): string
+    public function currentRequestUrl(string $configuredDomain, string $configuredProtocol = '', ?array $server = null): string
     {
         $serverMap = $server ?? $_SERVER;
-        $scheme = $this->resolveRequestScheme($serverMap, $configuredScheme);
+        $scheme = $this->resolveRequestScheme($serverMap, $configuredProtocol);
         $host = $this->resolveRequestHost($configuredDomain, $serverMap);
 
         $requestUri = (string) ($serverMap['REQUEST_URI'] ?? '/');
@@ -40,10 +40,10 @@ final class RequestContextResolver
      *
      * @param array<string, mixed>|null $server
      */
-    public function siteBaseUrl(string $configuredDomain, string $configuredScheme = '', ?array $server = null): string
+    public function siteBaseUrl(string $configuredDomain, string $configuredProtocol = '', ?array $server = null): string
     {
         $serverMap = $server ?? $_SERVER;
-        $scheme = $this->resolveRequestScheme($serverMap, $configuredScheme);
+        $scheme = $this->resolveRequestScheme($serverMap, $configuredProtocol);
         $host = $this->resolveRequestHost($configuredDomain, $serverMap);
         $path = $this->resolveConfiguredBasePath($configuredDomain);
 
@@ -53,9 +53,9 @@ final class RequestContextResolver
     /**
      * @param array<string, mixed>|null $server
      */
-    public function resolveRequestScheme(?array $server = null, string $configuredScheme = ''): string
+    public function resolveRequestScheme(?array $server = null, string $configuredProtocol = ''): string
     {
-        $normalizedConfigured = strtolower(trim($configuredScheme));
+        $normalizedConfigured = strtolower(trim($configuredProtocol));
         if (in_array($normalizedConfigured, ['http', 'https'], true)) {
             return $normalizedConfigured;
         }

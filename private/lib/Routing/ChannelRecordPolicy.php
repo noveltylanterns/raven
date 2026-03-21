@@ -14,7 +14,7 @@ final class ChannelRecordPolicy
         return preg_match('/^[a-z0-9][a-z0-9-]*$/', strtolower(trim($slug))) === 1;
     }
 
-    public static function normalizeTextEditorOverride(string $value): string
+    public static function normalizeEditorOverride(string $value): string
     {
         $normalized = strtolower(trim($value));
         return in_array($normalized, ['inherit', 'tinymce', 'plaintext', 'autobr', 'markdown'], true)
@@ -22,12 +22,12 @@ final class ChannelRecordPolicy
             : 'inherit';
     }
 
-    public static function normalizePageRouteMode(string $value): string
+    public static function normalizeRouteMode(string $value): string
     {
         return ChannelRoutePolicy::normalizeChannelRouteMode($value);
     }
 
-    public static function normalizePageUrlSeparator(string $value): string
+    public static function normalizeRouteSeparator(string $value): string
     {
         return ChannelRoutePolicy::normalizeChannelSeparator($value);
     }

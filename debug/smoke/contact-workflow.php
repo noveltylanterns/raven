@@ -361,9 +361,9 @@ final class ContactWorkflowSmokeRunner
     {
         $app = require $this->root . '/private/raven.php';
 
-        $groupId = $app['groups']->idBySlug('super');
+        $groupId = $app['group']->idBySlug('super');
         if ($groupId === null) {
-            $groupId = $app['groups']->idBySlug('admin');
+            $groupId = $app['group']->idBySlug('admin');
         }
         if ($groupId === null) {
             throw new RuntimeException('No super/admin group is available to assign smoke user.');
@@ -373,7 +373,7 @@ final class ContactWorkflowSmokeRunner
         $this->tempEmail = $this->tempUsername . '@example.test';
         $this->tempPassword = 'CodexSmoke!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $app['users']->save([
+        $this->tempUserId = (int) $app['user']->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Smoke ' . $this->runId,
@@ -398,7 +398,7 @@ final class ContactWorkflowSmokeRunner
         }
 
         $app = require $this->root . '/private/raven.php';
-        $app['users']->deleteById($this->tempUserId);
+        $app['user']->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }
 

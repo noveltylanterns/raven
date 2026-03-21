@@ -17,7 +17,7 @@ declare(strict_types=1);
 return array (
   'site' =>
   array (
-    'scheme' => 'https',
+    'protocol' => 'https',
     'domain' => 'SITE_DOMAIN',
     'name' => 'Raven CMS',
     'enabled' => 'public',
@@ -25,18 +25,18 @@ return array (
   ),
   'meta' =>
   array (
-    'apple_touch_icon' => '',
+    'apple_touch_icon' => 'https://SITE_DOMAIN/theme/logo.png',
     'robots' => 'index,follow',
     'twitter' =>
     array (
       'card' => 'summary',
       'site' => '',
       'creator' => '',
-      'image' => '',
+      'image' => 'https://SITE_DOMAIN/theme/logo.png',
     ),
     'opengraph' =>
     array (
-      'image' => '',
+      'image' => 'https://SITE_DOMAIN/theme/logo.png',
       'type' => 'website',
       'locale' => 'en_US',
     ),
@@ -98,9 +98,9 @@ return array (
   ),
   'content' =>
   array (
-    'default_editor' => 'tinymce',
+    'editor_default' => 'tinymce',
     'route_mode' => 'slug',
-    'separator' => '-',
+    'route_separator' => '-',
   ),
   'captcha' =>
   array (

@@ -93,22 +93,22 @@ final class PublicRouteProfilerRunner
     {
         $app = $this->bootstrapApp('/');
         /** @var PageRepository $pages */
-        $pages = $app['pages'];
+        $pages = $app['page'];
         /** @var TaxonomyRepository $taxonomy */
         $taxonomy = $app['taxonomy'];
         /** @var UserRepository $users */
-        $users = $app['users'];
+        $users = $app['user'];
         /** @var GroupRepository $groups */
-        $groups = $app['groups'];
+        $groups = $app['group'];
         /** @var array<string, mixed> $configSnapshot */
         $configSnapshot = $app['config']->all();
 
         $categoryPrefix = $this->normalizedOptionalPrefix(
-            (string) (($configSnapshot['categories']['prefix'] ?? 'cat')),
+            (string) (($configSnapshot['category']['prefix'] ?? 'cat')),
             'cat'
         );
         $tagPrefix = $this->normalizedOptionalPrefix(
-            (string) (($configSnapshot['tags']['prefix'] ?? 'tag')),
+            (string) (($configSnapshot['tag']['prefix'] ?? 'tag')),
             'tag'
         );
         $profilePrefix = $this->normalizedOptionalPrefix(
@@ -125,9 +125,9 @@ final class PublicRouteProfilerRunner
         $groupRoutesEnabled = $groupPrefix !== '' && in_array($groupMode, ['public', 'private'], true);
 
         $taxonomyRouting = $taxonomy->listRoutingInventoryData($categoryPrefix !== '', $tagPrefix !== '', true);
-        $channels = is_array($taxonomyRouting['channels'] ?? null) ? $taxonomyRouting['channels'] : [];
-        $categories = is_array($taxonomyRouting['categories'] ?? null) ? $taxonomyRouting['categories'] : [];
-        $tags = is_array($taxonomyRouting['tags'] ?? null) ? $taxonomyRouting['tags'] : [];
+        $channels = is_array($taxonomyRouting['channel_options'] ?? null) ? $taxonomyRouting['channel_options'] : [];
+        $categories = is_array($taxonomyRouting['category_options'] ?? null) ? $taxonomyRouting['category_options'] : [];
+        $tags = is_array($taxonomyRouting['tag_options'] ?? null) ? $taxonomyRouting['tag_options'] : [];
         $pagesForRouting = $pages->listAllForRouting();
         $channelSlugById = [];
         foreach ($channels as $channel) {
@@ -399,12 +399,13 @@ final class PublicRouteProfilerRunner
             $app['view'],
             $app['config'],
             $app['auth'],
-            $app['groups'],
+            $app['group'],
             $app['page_images'],
-            $app['pages'],
-            $app['redirects'],
+            $app['page'],
+            $app['redirect'],
             $app['taxonomy'],
-            $app['users'],
+            $app['user'],
+            $app['invite_tokens'],
             $app['input'],
             $app['csrf'],
             is_array($app['extension_services'] ?? null) ? (array) $app['extension_services'] : []

@@ -488,12 +488,6 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
 <div class="wrap">
     <div class="card">
         <h1>Raven CMS Installer</h1>
-        <p class="note">
-            This installer writes <code>private/config.php</code>, initializes database schema, creates the first Super Admin account,
-            seeds <code>private/dat/ext/.state.php</code> from <code>private/dat/ext/.state.php.dist</code>,
-            and then writes a lock file at <code>private/dat/install.lock</code>.
-            Delete <code>public/install.php</code> after setup.
-        </p>
     </div>
 
     <?php if ($errors !== []): ?>

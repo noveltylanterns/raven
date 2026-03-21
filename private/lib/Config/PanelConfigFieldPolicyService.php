@@ -34,7 +34,7 @@ final class PanelConfigFieldPolicyService
      *
      * @param array<string, mixed> $workingConfig
      * @param callable(string): string $normalizeBodyTextEditorOption
-     * @param callable(string): string $normalizeGlobalPageUrlSeparator
+     * @param callable(string): string $normalizeGlobalRouteSeparator
      * @param callable(string, bool): ?string $normalizePanelThemeChoice
      * @param array<string, string> $publicThemeOptions
      */
@@ -44,7 +44,7 @@ final class PanelConfigFieldPolicyService
         string $rawValue,
         array $workingConfig,
         callable $normalizeBodyTextEditorOption,
-        callable $normalizeGlobalPageUrlSeparator,
+        callable $normalizeGlobalRouteSeparator,
         callable $normalizePanelThemeChoice,
         array $publicThemeOptions
     ): mixed {
@@ -76,13 +76,13 @@ final class PanelConfigFieldPolicyService
             return $mode;
         }
 
-        if ($path === 'site.scheme') {
-            $scheme = strtolower(trim($value));
-            if (!in_array($scheme, ['http', 'https'], true)) {
-                throw new \RuntimeException('site.scheme must be http or https.');
+        if ($path === 'site.protocol') {
+            $protocol = strtolower(trim($value));
+            if (!in_array($protocol, ['http', 'https'], true)) {
+                throw new \RuntimeException('site.protocol must be http or https.');
             }
 
-            return $scheme;
+            return $protocol;
         }
 
         if ($path === 'database.driver') {
@@ -320,11 +320,11 @@ final class PanelConfigFieldPolicyService
             return $agent;
         }
 
-        if ($path === 'content.default_editor') {
+        if ($path === 'content.editor_default') {
             $editor = $normalizeBodyTextEditorOption($value);
             if ($editor === 'tinymce' && strtolower(trim($value)) !== 'tinymce') {
                 throw new \RuntimeException(
-                    'content.default_editor must be tinymce, plaintext, autobr, or markdown.'
+                    'content.editor_default must be tinymce, plaintext, autobr, or markdown.'
                 );
             }
 
@@ -340,11 +340,11 @@ final class PanelConfigFieldPolicyService
             return $mode;
         }
 
-        if ($path === 'content.separator') {
-            $separator = $normalizeGlobalPageUrlSeparator($value);
+        if ($path === 'content.route_separator') {
+            $separator = $normalizeGlobalRouteSeparator($value);
             if ($separator === '-' && trim($value) !== '-') {
                 throw new \RuntimeException(
-                    'content.separator must be - or _.'
+                    'content.route_separator must be - or _.'
                 );
             }
 
@@ -370,15 +370,15 @@ final class PanelConfigFieldPolicyService
         }
 
         if (in_array($path, ['meta.twitter.image', 'meta.apple_touch_icon', 'panel.brand_logo'], true)) {
-            $siteScheme = (string) ($workingConfig['site']['scheme'] ?? $this->config->get('site.scheme', 'https'));
+            $siteProtocol = (string) ($workingConfig['site']['protocol'] ?? $this->config->get('site.protocol', 'https'));
             $siteDomain = (string) ($workingConfig['site']['domain'] ?? $this->config->get('site.domain', ''));
-            return $this->normalizer->normalizeMetaAbsoluteUrlPathValue($siteScheme, $siteDomain, $value);
+            return $this->normalizer->normalizeMetaAbsoluteUrlPathValue($siteProtocol, $siteDomain, $value);
         }
 
         if ($path === 'meta.opengraph.image') {
-            $siteScheme = (string) ($workingConfig['site']['scheme'] ?? $this->config->get('site.scheme', 'https'));
+            $siteProtocol = (string) ($workingConfig['site']['protocol'] ?? $this->config->get('site.protocol', 'https'));
             $siteDomain = (string) ($workingConfig['site']['domain'] ?? $this->config->get('site.domain', ''));
-            return $this->normalizer->normalizeMetaAbsoluteUrlPathValue($siteScheme, $siteDomain, $value, false);
+            return $this->normalizer->normalizeMetaAbsoluteUrlPathValue($siteProtocol, $siteDomain, $value, false);
         }
 
         if ($path === 'panel.default_theme') {

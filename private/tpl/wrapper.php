@@ -34,6 +34,7 @@ $documentTitle = $metaTitle === '' ? $siteName : ($metaTitle . ' [' . $siteName 
 <meta property="og:image" content="{meta:image}">
 <meta property="og:locale" content="{meta:og_locale}">
 <meta property="og:site_name" content="{site:name}">
+<meta property="og:secure_url" content="{meta:url}">
 <meta property="og:title" content="{meta:title} [{site:name}]">
 <meta property="og:type" content="{meta:og_type}">
 <meta property="og:url" content="{meta:url}">

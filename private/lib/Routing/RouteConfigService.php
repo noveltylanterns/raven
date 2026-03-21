@@ -95,11 +95,11 @@ final class RouteConfigService
         return PanelUrl::normalizeRoutePrefix($this->input, $configured, $fallback, $allowBlank);
     }
 
-    public function resolveChannelPageUrlSeparator(string $channelValue): string
+    public function resolveChannelRouteSeparator(string $channelValue): string
     {
         return ChannelRoutePolicy::resolveSeparator(
             $channelValue,
-            (string) $this->config->get('content.separator', '-')
+            (string) $this->config->get('content.route_separator', '-')
         );
     }
 
@@ -109,14 +109,14 @@ final class RouteConfigService
         return in_array($mode, ['slug', 'id'], true) ? $mode : 'slug';
     }
 
-    public function normalizeChannelPageRouteMode(string $value): string
+    public function normalizeChannelRouteMode(string $value): string
     {
         return ChannelRoutePolicy::normalizeChannelRouteMode($value);
     }
 
-    public function effectiveChannelPageRouteMode(string $channelValue): string
+    public function effectiveChannelRouteMode(string $channelValue): string
     {
-        $mode = $this->normalizeChannelPageRouteMode($channelValue);
+        $mode = $this->normalizeChannelRouteMode($channelValue);
         return $mode === 'inherit' ? $this->globalPageRouteMode() : ChannelRoutePolicy::normalizeRouteMode($mode);
     }
 

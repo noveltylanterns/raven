@@ -4,7 +4,7 @@
 
 This document explains Raven's Tag system for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever tag structure, tag routes, or Tag panel views change (`private/tpl/panel/tags/*`, tag controller/repository behavior, or tag public routing).
+Maintenance note: keep this file updated whenever tag structure, tag routes, or Tag panel views change (`private/tpl/panel/tag/*`, tag controller/repository behavior, or tag public routing).
 
 ## 1) Panel Guide (Create And Edit Tags)
 
@@ -12,7 +12,7 @@ Maintenance note: keep this file updated whenever tag structure, tag routes, or 
 
 - Open panel sidebar: `Taxonomy` -> `Tags`.
 
-### Tag List (`/tags`)
+### Tag List (`/tag`)
 
 What you can do:
 
@@ -32,7 +32,7 @@ Columns shown:
 - `Pages` (count of linked pages)
 - `Actions`
 
-### Tag Editor (`/tags/edit` and `/tags/edit/{id}`)
+### Tag Editor (`/tag/edit` and `/tag/edit/{id}`)
 
 Top and bottom action bars (same controls in both places):
 
@@ -65,8 +65,8 @@ Delete behavior note:
 ### Key Files
 
 - Panel views:
-  - `private/tpl/panel/tags/list.php`
-  - `private/tpl/panel/tags/edit.php`
+  - `private/tpl/panel/tag/list.php`
+  - `private/tpl/panel/tag/edit.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Persistence:
@@ -76,11 +76,11 @@ Delete behavior note:
 
 Declared in `panel/index.php`:
 
-- `GET /tags` -> list
-- `GET /tags/edit` -> create form
-- `GET /tags/edit/{id}` -> edit form
-- `POST /tags/save` -> create/update
-- `POST /tags/delete` -> delete (single or bulk)
+- `GET /tag` -> list
+- `GET /tag/edit` -> create form
+- `GET /tag/edit/{id}` -> edit form
+- `POST /tag/save` -> create/update
+- `POST /tag/delete` -> delete (single or bulk)
 
 All state-changing routes use CSRF validation.
 
@@ -88,20 +88,20 @@ All state-changing routes use CSRF validation.
 
 `PanelController` tag handlers:
 
-- `tagsList()`
+- `tagList()`
   - Requires login + `Manage Taxonomy` permission.
   - Renders list with `TagRepository::listAll()`.
-- `tagsEdit(?int $id)`
+- `tagEdit(?int $id)`
   - Loads existing row when id is provided.
-  - Missing id row triggers flash error + redirect to `/tags`.
-- `tagsSave(array $post, array $files = [])`
+  - Missing id row triggers flash error + redirect to `/tag`.
+- `tagSave(array $post, array $files = [])`
   - Validates CSRF.
   - Sanitizes/normalizes `id`, `name`, `slug`, `description` via `InputSanitizer`.
   - Requires non-empty `name` and valid `slug`.
   - Saves text fields via `TagRepository::save(...)`.
   - Processes optional `cover_image` and `preview_image` uploads (single-file each), optional remove flags, and writes image-path columns via `TagRepository::updateImagePaths(...)`.
   - Upload files/variants are stored under `public/uploads/tags/{id}/` using configured `media.images.*` rules.
-- `tagsDelete(array $post)`
+- `tagDelete(array $post)`
   - Validates CSRF.
   - Supports single delete (`id`) and bulk delete (`selected_ids[]`).
   - Removes associated stored cover/preview image files for deleted tags.
@@ -125,8 +125,8 @@ Storage detail:
 
 ### Public Routing Touchpoints
 
-- Tag listing routes resolve under `/{tags.prefix}/{tag_slug}/{page?}`.
-- If `tags.prefix` is blank, tag routes are disabled.
+- Tag listing routes resolve under `/{tag.prefix}/{tag_slug}/{page?}`.
+- If `tag.prefix` is blank, tag routes are disabled.
 - Template priority: `views/tags/{tag_slug}.php` then `views/tags/index.php`.
 
 ### Security/Validation Expectations

@@ -15,10 +15,13 @@
 - Consolidated the duplicated panel/public login and login-2FA controller state machine into shared `private/lib/Auth` workflow/session helpers, so password auth, 2FA method selection, email-code dispatch, and WebAuthn challenge handling now run through the same core logic on both surfaces.
 - Fixed the public login 2FA WebAuthn client flow to use the same request shape and browser capability checks as the panel login screen, restoring passkey/security-key verification and in-page fallback behavior.
 - Hardened public post-login redirect handling so auth-route referers like `/login` and `/login/2fa` no longer overwrite the intended public return target or cause successful 2FA verification to bounce back into an expired auth screen.
+- Standardized the remaining core page/user/group/profile surface naming to singular route and template roots (`/panel/page`, `/panel/user`, `/panel/group`, `tpl/page/*`, `tpl/profile/*`, `tpl/group/*`), updated service-container keys to `page`/`user`/`group`, and refreshed the docs/smokes/file-tree manifest to match.
+- Renamed global content config keys `content.default_editor` to `content.editor_default` and `content.separator` to `content.route_separator`, and aligned the panel/page-editor/runtime variable names with the channel `editor_override` and `route_separator` terminology.
+- Renamed `site.scheme` to `site.protocol` and aligned the related config-editor/site-context/internal variable names to use `protocol` consistently.
 
 ### March 19, 2026
 
-- Added `site.scheme` runtime config plus public template `site:url`/`site:scheme` data so wrappers can emit a deterministic home URL, and rewired generated absolute public/meta URLs to honor the configured `http` vs `https` scheme instead of inferring it only from the incoming request.
+- Added configured site protocol metadata plus public template `site:url`/`site:protocol` data so wrappers can emit a deterministic home URL, and rewired generated absolute public/meta URLs to honor the configured `http` vs `https` protocol instead of inferring it only from the incoming request.
 - Added public template `theme:slug`, `theme:css`, and `theme:url` data, and updated stock/scaffold wrappers to use the dedicated `theme:*` root instead of storing theme metadata under `site:*`.
 - Normalized `site:url`, `theme:url`, and `panel:url` to return absolute base URLs without forced trailing slashes, and updated stock/scaffold theme asset examples to append `/css/...` and `/img/...` explicitly.
 - Moved public panel route metadata from `site:panel_path` to `panel:slug` plus `panel:url`.
@@ -29,7 +32,7 @@
 - Collapsed `meta:og_image` and `meta:x_image` into a single `meta:image` value tag, with wrappers emitting the OpenGraph and X image `<meta>` elements directly.
 - Collapsed `meta:canonical`, `meta:og_url`, and `meta:x_url` into a single `meta:url` value tag, with wrappers emitting the canonical, OpenGraph, and X URL tags directly.
 - Flattened the remaining head metadata tags back to plain `meta:*` values (`apple_touch_icon`, `robots`, `og_locale`, `og_type`, `x_card`, `x_creator`, `x_site`) so wrappers and scaffolds emit literal `<link>` and `<meta>` elements directly.
-- Added global `content.route_mode` (`slug|id`) for root-page URLs, allowed channels to use `inherit` for system-default routing, and expanded explicit channel `page_route_mode` support to slug, day-slug, month-slug, id, day-id, and month-id; updated panel config/channel/page previews, public route parsing/canonicalization, routing inventory output, CLI docs, and channel/config docs to match.
+- Added global `content.route_mode` (`slug|id`) for root-page URLs, allowed channels to use `inherit` for system-default routing, and expanded explicit channel `route_mode` support to slug, day-slug, month-slug, id, day-id, and month-id; updated panel config/channel/page previews, public route parsing/canonicalization, routing inventory output, CLI docs, and channel/config docs to match.
 - Renamed the template-facing page body loop from `page:extended_blocks` to `page:content`, so rendered body blocks now arrive under the shorter canonical `page:content[]` tag path in fallback/stock themes, scaffolds, smoke fixtures, and theme docs.
 - Added stable template-facing `page:channel_id` and renamed the page display-title flag from `page:show_title` to `page:title_show`, with fallback/stock themes, scaffolds, smoke fixtures, and theme docs updated to match.
 - Added strict `redirect:not_found`, `redirect:denied`, and `redirect:disabled` template tags that delegate a view to the corresponding stock message template when rendered alone.

@@ -32,15 +32,15 @@ final class ConfigEditorSchemaService
         'panel.default_theme' => 'Default Panel Theme',
         'panel.brand_name' => 'Branded Panel Name',
         'panel.brand_logo' => 'Branded Panel Logo',
-        'site.scheme' => 'Site URL Scheme',
+        'site.protocol' => 'Protocol',
         'site.default_theme' => 'Default Site Theme',
-        'site.enabled' => 'Site Visibility',
+        'site.enabled' => 'Visibility',
         'mail.agent' => 'Mail Agent',
         'mail.sender_address' => 'Mail Sender Address',
         'mail.sender_name' => 'Mail Sender Name',
-        'content.default_editor' => 'Default Text Editor',
-        'content.route_mode' => 'Default Page URL Mode',
-        'content.separator' => 'Default Page URL Separator',
+        'content.editor_default' => 'Default Text Editor',
+        'content.route_mode' => 'Default Routing Mode',
+        'content.route_separator' => 'Default Routing Separator',
         'category.prefix' => 'Category URL Prefix',
         'category.pagination' => 'Pagination',
         'tag.prefix' => 'Tag URL Prefix',
@@ -56,11 +56,11 @@ final class ConfigEditorSchemaService
         'session.cookie.name' => 'Cookie Name',
         'session.cookie.domain' => 'Cookie Domain',
         'session.cookie.prefix' => 'Cookie Prefix',
-        'user.privacy' => 'Enable Profiles',
+        'user.privacy' => 'Profile Visibility',
         'user.auth.login' => 'Login Method',
-        'user.auth.registration' => 'Enable Public Registration',
+        'user.auth.registration' => 'Enable Registration',
         'user.prefix' => 'Profile URL Prefix',
-        'group.privacy' => 'Show Groups',
+        'group.privacy' => 'Group Visibility',
         'group.prefix' => 'Group URL Prefix',
         'session.brute.max' => 'Max Login Failures',
         'session.brute.window' => 'Login Failure Window (Seconds)',
@@ -224,26 +224,15 @@ final class ConfigEditorSchemaService
             $content = [];
         }
 
-        if (!array_key_exists('default_editor', $content) && array_key_exists('default_text_editor', $content)) {
-            $content['default_editor'] = $content['default_text_editor'];
-        }
-        if (!array_key_exists('route_mode', $content) && array_key_exists('page_route_mode', $content)) {
-            $content['route_mode'] = $content['page_route_mode'];
-        }
-        if (!array_key_exists('separator', $content) && array_key_exists('page_url_separator', $content)) {
-            $content['separator'] = $content['page_url_separator'];
-        }
-
-        $content['default_editor'] = $this->normalizeBodyTextEditorOption(
-            (string) ($content['default_editor'] ?? 'tinymce')
+        $content['editor_default'] = $this->normalizeBodyTextEditorOption(
+            (string) ($content['editor_default'] ?? 'tinymce')
         );
         $content['route_mode'] = $this->normalizeGlobalPageRouteMode(
             (string) ($content['route_mode'] ?? 'slug')
         );
-        $content['separator'] = $this->normalizeGlobalPageUrlSeparator(
-            (string) ($content['separator'] ?? '-')
+        $content['route_separator'] = $this->normalizeGlobalRouteSeparator(
+            (string) ($content['route_separator'] ?? '-')
         );
-        unset($content['default_text_editor'], $content['page_route_mode'], $content['page_url_separator']);
 
         $config['content'] = $content;
         return $config;
@@ -259,34 +248,10 @@ final class ConfigEditorSchemaService
         if (!is_array($category)) {
             $category = [];
         }
-        $legacyCategories = $config['categories'] ?? null;
-        if (is_array($legacyCategories)) {
-            if (!array_key_exists('enabled', $category) && array_key_exists('enabled', $legacyCategories)) {
-                $category['enabled'] = $legacyCategories['enabled'];
-            }
-            if (!array_key_exists('prefix', $category) && array_key_exists('prefix', $legacyCategories)) {
-                $category['prefix'] = $legacyCategories['prefix'];
-            }
-            if (!array_key_exists('pagination', $category) && array_key_exists('pagination', $legacyCategories)) {
-                $category['pagination'] = $legacyCategories['pagination'];
-            }
-        }
 
         $tag = $config['tag'] ?? null;
         if (!is_array($tag)) {
             $tag = [];
-        }
-        $legacyTags = $config['tags'] ?? null;
-        if (is_array($legacyTags)) {
-            if (!array_key_exists('enabled', $tag) && array_key_exists('enabled', $legacyTags)) {
-                $tag['enabled'] = $legacyTags['enabled'];
-            }
-            if (!array_key_exists('prefix', $tag) && array_key_exists('prefix', $legacyTags)) {
-                $tag['prefix'] = $legacyTags['prefix'];
-            }
-            if (!array_key_exists('pagination', $tag) && array_key_exists('pagination', $legacyTags)) {
-                $tag['pagination'] = $legacyTags['pagination'];
-            }
         }
 
         if (!array_key_exists('enabled', $category)) {
@@ -339,7 +304,7 @@ final class ConfigEditorSchemaService
 
         $config['category'] = $category;
         $config['tag'] = $tag;
-        unset($config['categories'], $config['tags'], $config['tagging'], $config['pagination']);
+        unset($config['tagging'], $config['pagination']);
         return $config;
     }
 
@@ -586,14 +551,14 @@ final class ConfigEditorSchemaService
             $site['enabled'] = $mode;
         }
 
-        if (!array_key_exists('scheme', $site)) {
-            $site['scheme'] = 'https';
+        if (!array_key_exists('protocol', $site)) {
+            $site['protocol'] = 'https';
         } else {
-            $scheme = strtolower(trim((string) ($site['scheme'] ?? '')));
-            if (!in_array($scheme, ['http', 'https'], true)) {
-                $scheme = 'https';
+            $protocol = strtolower(trim((string) ($site['protocol'] ?? '')));
+            if (!in_array($protocol, ['http', 'https'], true)) {
+                $protocol = 'https';
             }
-            $site['scheme'] = $scheme;
+            $site['protocol'] = $protocol;
         }
 
         if (!array_key_exists('default_theme', $site)) {
@@ -785,7 +750,7 @@ final class ConfigEditorSchemaService
             : 'tinymce';
     }
 
-    private function normalizeGlobalPageUrlSeparator(string $value): string
+    private function normalizeGlobalRouteSeparator(string $value): string
     {
         $separator = trim($value);
         return in_array($separator, ['-', '_'], true)

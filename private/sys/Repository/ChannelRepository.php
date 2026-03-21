@@ -203,7 +203,7 @@ final class ChannelRepository
     /**
      * Returns minimal channel options for panel select controls.
      *
-     * @return array<int, array{id: int, name: string, slug: string, text_editor_override: string, page_route_mode: string, page_url_separator: string}>
+     * @return array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>
      */
     public function listOptions(): array
     {
@@ -213,9 +213,9 @@ final class ChannelRepository
                 'id' => (int) ($channel['id'] ?? 0),
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
-                'text_editor_override' => (string) ($channel['text_editor_override'] ?? 'inherit'),
-                'page_route_mode' => (string) ($channel['page_route_mode'] ?? 'inherit'),
-                'page_url_separator' => (string) ($channel['page_url_separator'] ?? 'inherit'),
+                'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
+                'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
+                'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),
             ];
         }
 
@@ -288,9 +288,9 @@ final class ChannelRepository
      *   name: string,
      *   slug: string,
      *   description: string,
-     *   text_editor_override?: string,
-     *   page_route_mode?: string,
-     *   page_url_separator?: string
+     *   editor_override?: string,
+     *   route_mode?: string,
+     *   route_separator?: string
      * } $data
      */
     public function save(array $data): int
@@ -299,9 +299,9 @@ final class ChannelRepository
         $name = trim((string) ($data['name'] ?? ''));
         $slug = strtolower(trim((string) ($data['slug'] ?? '')));
         $description = trim((string) ($data['description'] ?? ''));
-        $textEditorOverride = $this->normalizeTextEditorOverride((string) ($data['text_editor_override'] ?? 'inherit'));
-        $pageRouteMode = $this->normalizePageRouteMode((string) ($data['page_route_mode'] ?? 'inherit'));
-        $pageUrlSeparator = $this->normalizePageUrlSeparator((string) ($data['page_url_separator'] ?? 'inherit'));
+        $editorOverride = $this->normalizeEditorOverride((string) ($data['editor_override'] ?? 'inherit'));
+        $routeMode = $this->normalizeRouteMode((string) ($data['route_mode'] ?? 'inherit'));
+        $routeSeparator = $this->normalizeRouteSeparator((string) ($data['route_separator'] ?? 'inherit'));
 
         if ($name === '' || !$this->isValidSlug($slug)) {
             throw new RuntimeException('Channel name and slug are required.');
@@ -331,9 +331,9 @@ final class ChannelRepository
             'name' => $name,
             'slug' => $slug,
             'description' => $description,
-            'text_editor_override' => $textEditorOverride,
-            'page_route_mode' => $pageRouteMode,
-            'page_url_separator' => $pageUrlSeparator,
+            'editor_override' => $editorOverride,
+            'route_mode' => $routeMode,
+            'route_separator' => $routeSeparator,
             'cover_image_path' => $this->normalizeNullablePath($currentRaw['cover_image_path'] ?? null),
             'cover_image_sm_path' => $this->normalizeNullablePath($currentRaw['cover_image_sm_path'] ?? null),
             'cover_image_md_path' => $this->normalizeNullablePath($currentRaw['cover_image_md_path'] ?? null),
@@ -387,27 +387,29 @@ final class ChannelRepository
             throw new RuntimeException('Channel slug is invalid.');
         }
 
-        $raw = $this->channelFileStoreService->loadRawBySlug($slug);
-        $raw['id'] = (int) ($record['id'] ?? $id);
-        $raw['name'] = (string) ($record['name'] ?? '');
-        $raw['slug'] = $slug;
-        $raw['description'] = (string) ($record['description'] ?? '');
-        $raw['text_editor_override'] = (string) ($record['text_editor_override'] ?? 'inherit');
-        $raw['page_route_mode'] = (string) ($record['page_route_mode'] ?? 'inherit');
-        $raw['page_url_separator'] = (string) ($record['page_url_separator'] ?? 'inherit');
-        $raw['cover_image_path'] = $this->normalizeNullablePath($paths['cover_image_path'] ?? null);
-        $raw['cover_image_sm_path'] = $this->normalizeNullablePath($paths['cover_image_sm_path'] ?? null);
-        $raw['cover_image_md_path'] = $this->normalizeNullablePath($paths['cover_image_md_path'] ?? null);
-        $raw['cover_image_lg_path'] = $this->normalizeNullablePath($paths['cover_image_lg_path'] ?? null);
-        $raw['preview_image_path'] = $this->normalizeNullablePath($paths['preview_image_path'] ?? null);
-        $raw['preview_image_sm_path'] = $this->normalizeNullablePath($paths['preview_image_sm_path'] ?? null);
-        $raw['preview_image_md_path'] = $this->normalizeNullablePath($paths['preview_image_md_path'] ?? null);
-        $raw['preview_image_lg_path'] = $this->normalizeNullablePath($paths['preview_image_lg_path'] ?? null);
-        $raw['custom_fields'] = is_array($raw['custom_fields'] ?? null) ? $raw['custom_fields'] : [];
-        $raw['overrides'] = is_array($raw['overrides'] ?? null) ? $raw['overrides'] : [];
-        $raw['created_at'] = trim((string) ($raw['created_at'] ?? '')) !== ''
-            ? (string) $raw['created_at']
-            : gmdate('Y-m-d H:i:s');
+        $currentRaw = $this->channelFileStoreService->loadRawBySlug($slug);
+        $raw = [
+            'id' => (int) ($record['id'] ?? $id),
+            'name' => (string) ($record['name'] ?? ''),
+            'slug' => $slug,
+            'description' => (string) ($record['description'] ?? ''),
+            'editor_override' => (string) ($record['editor_override'] ?? 'inherit'),
+            'route_mode' => (string) ($record['route_mode'] ?? 'inherit'),
+            'route_separator' => (string) ($record['route_separator'] ?? 'inherit'),
+            'cover_image_path' => $this->normalizeNullablePath($paths['cover_image_path'] ?? null),
+            'cover_image_sm_path' => $this->normalizeNullablePath($paths['cover_image_sm_path'] ?? null),
+            'cover_image_md_path' => $this->normalizeNullablePath($paths['cover_image_md_path'] ?? null),
+            'cover_image_lg_path' => $this->normalizeNullablePath($paths['cover_image_lg_path'] ?? null),
+            'preview_image_path' => $this->normalizeNullablePath($paths['preview_image_path'] ?? null),
+            'preview_image_sm_path' => $this->normalizeNullablePath($paths['preview_image_sm_path'] ?? null),
+            'preview_image_md_path' => $this->normalizeNullablePath($paths['preview_image_md_path'] ?? null),
+            'preview_image_lg_path' => $this->normalizeNullablePath($paths['preview_image_lg_path'] ?? null),
+            'custom_fields' => is_array($currentRaw['custom_fields'] ?? null) ? $currentRaw['custom_fields'] : [],
+            'overrides' => is_array($currentRaw['overrides'] ?? null) ? $currentRaw['overrides'] : [],
+            'created_at' => trim((string) ($currentRaw['created_at'] ?? '')) !== ''
+                ? (string) $currentRaw['created_at']
+                : gmdate('Y-m-d H:i:s'),
+        ];
 
         $this->channelFileStoreService->writeRecordBySlug($slug, $raw);
         $this->channelsCache = null;
@@ -495,19 +497,19 @@ final class ChannelRepository
         return ChannelRecordPolicy::isValidSlug($slug);
     }
 
-    private function normalizeTextEditorOverride(string $value): string
+    private function normalizeEditorOverride(string $value): string
     {
-        return ChannelRecordPolicy::normalizeTextEditorOverride($value);
+        return ChannelRecordPolicy::normalizeEditorOverride($value);
     }
 
-    private function normalizePageRouteMode(string $value): string
+    private function normalizeRouteMode(string $value): string
     {
-        return ChannelRecordPolicy::normalizePageRouteMode($value);
+        return ChannelRecordPolicy::normalizeRouteMode($value);
     }
 
-    private function normalizePageUrlSeparator(string $value): string
+    private function normalizeRouteSeparator(string $value): string
     {
-        return ChannelRecordPolicy::normalizePageUrlSeparator($value);
+        return ChannelRecordPolicy::normalizeRouteSeparator($value);
     }
 
     private function normalizeNullablePath(mixed $value): ?string

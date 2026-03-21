@@ -253,7 +253,7 @@ final class AuthWorkflowSmokeRunner
     {
         $app = require $this->root . '/private/raven.php';
 
-        $superGroupId = $app['groups']->idBySlug('super');
+        $superGroupId = $app['group']->idBySlug('super');
         if ($superGroupId === null) {
             throw new RuntimeException('Unable to resolve super group slug.');
         }
@@ -262,7 +262,7 @@ final class AuthWorkflowSmokeRunner
         $this->tempEmail = $this->tempUsername . '@example.test';
         $this->tempPassword = 'CodexAuth!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $app['users']->save([
+        $this->tempUserId = (int) $app['user']->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Auth ' . $this->runId,
@@ -313,7 +313,7 @@ final class AuthWorkflowSmokeRunner
         }
 
         $app = require $this->root . '/private/raven.php';
-        $app['users']->deleteById($this->tempUserId);
+        $app['user']->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }
 

@@ -46,11 +46,11 @@ $siteDomainRaw = trim($siteDomainRaw);
 if ($siteDomainRaw === '') {
     $siteDomainRaw = 'localhost';
 }
-$siteSchemeRaw = strtolower(trim((string) (($configSnapshot['site']['scheme'] ?? 'https'))));
-if (!in_array($siteSchemeRaw, ['http', 'https'], true)) {
-    $siteSchemeRaw = 'https';
+$siteProtocolRaw = strtolower(trim((string) (($configSnapshot['site']['protocol'] ?? 'https'))));
+if (!in_array($siteProtocolRaw, ['http', 'https'], true)) {
+    $siteProtocolRaw = 'https';
 }
-$metaUrlPathPrefix = $siteSchemeRaw . '://' . $siteDomainRaw . '/';
+$metaUrlPathPrefix = $siteProtocolRaw . '://' . $siteDomainRaw . '/';
 
 // Split configuration fields by top-level section so the editor can present tabbed panes.
 $basicSiteConfigFields = [];
@@ -426,11 +426,11 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
     $isDatabaseDriverField = $path === 'database.driver';
     $isCaptchaProviderField = $path === 'captcha.provider';
     $isMailAgentField = $path === 'mail.agent';
-    $isDefaultTextEditorField = $path === 'content.default_editor';
-    $isDefaultPageUrlModeField = $path === 'content.route_mode';
-    $isPageUrlSeparatorField = $path === 'content.separator';
+    $isEditorDefaultField = $path === 'content.editor_default';
+    $isRouteModeDefaultField = $path === 'content.route_mode';
+    $isRouteSeparatorDefaultField = $path === 'content.route_separator';
     $isSiteEnabledField = $path === 'site.enabled';
-    $isSiteSchemeField = $path === 'site.scheme';
+    $isSiteProtocolField = $path === 'site.protocol';
     $isPanelDefaultThemeField = $path === 'panel.default_theme';
     $isPublicProfilesModeField = $path === 'user.privacy';
     $isShowGroupsField = $path === 'group.privacy';
@@ -483,12 +483,12 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
             $inputValue = ltrim($inputValue, '/');
         }
     }
-    $isRequired = in_array($path, ['site.domain', 'site.scheme', 'panel.path', 'site.enabled', 'database.driver', 'captcha.provider', 'mail.agent', 'content.default_editor', 'content.route_mode', 'content.separator', 'panel.default_theme', 'session.cookie.name', 'user.privacy', 'group.privacy', 'user.auth.login', 'user.auth.registration'], true);
+    $isRequired = in_array($path, ['site.domain', 'site.protocol', 'panel.path', 'site.enabled', 'database.driver', 'captcha.provider', 'mail.agent', 'content.editor_default', 'content.route_mode', 'content.route_separator', 'panel.default_theme', 'session.cookie.name', 'user.privacy', 'group.privacy', 'user.auth.login', 'user.auth.registration'], true);
     $disableUriNote = match ($path) {
-        'category.prefix' => ' (leave blank to disable category URIs)',
-        'tag.prefix' => ' (leave blank to disable tag URIs)',
-        'user.prefix' => ' (leave blank to disable profile URIs)',
-        'group.prefix' => ' (leave blank to disable member list URIs)',
+        'category.prefix' => ' (leave blank to disable category URLs)',
+        'tag.prefix' => ' (leave blank to disable tag URLs)',
+        'user.prefix' => ' (leave blank to disable profile URLs)',
+        'group.prefix' => ' (leave blank to disable member list URLs)',
         default => '',
     };
     ?>
@@ -552,8 +552,8 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
             >
                 <option value="php_mail"<?= (string) $field['value'] === 'php_mail' ? ' selected' : '' ?>>php_mail</option>
             </select>
-        <?php elseif ($isDefaultTextEditorField): ?>
-            <!-- Default text editor is constrained to installed core editor drivers. -->
+        <?php elseif ($isEditorDefaultField): ?>
+            <!-- Editor default is constrained to installed core editor drivers. -->
             <select
                 class="form-select font-monospace"
                 id="<?= e($inputId) ?>"
@@ -565,7 +565,7 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
                 <option value="autobr"<?= (string) $field['value'] === 'autobr' ? ' selected' : '' ?>>auto &lt;br&gt;</option>
                 <option value="markdown"<?= (string) $field['value'] === 'markdown' ? ' selected' : '' ?>>markdown</option>
             </select>
-        <?php elseif ($isDefaultPageUrlModeField): ?>
+        <?php elseif ($isRouteModeDefaultField): ?>
             <select
                 class="form-select font-monospace"
                 id="<?= e($inputId) ?>"
@@ -575,8 +575,8 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
                 <option value="slug"<?= (string) $field['value'] === 'slug' ? ' selected' : '' ?>>/{slug}</option>
                 <option value="id"<?= (string) $field['value'] === 'id' ? ' selected' : '' ?>>/{id}</option>
             </select>
-        <?php elseif ($isPageUrlSeparatorField): ?>
-            <!-- Page URL separator controls generated channel page route segments. -->
+        <?php elseif ($isRouteSeparatorDefaultField): ?>
+            <!-- Route separator controls generated root and channel page route segments. -->
             <select
                 class="form-select font-monospace"
                 id="<?= e($inputId) ?>"
@@ -597,7 +597,7 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
                 <option value="private"<?= (string) $field['value'] === 'private' ? ' selected' : '' ?>>Private</option>
                 <option value="disabled"<?= (string) $field['value'] === 'disabled' ? ' selected' : '' ?>>Disabled</option>
             </select>
-        <?php elseif ($isSiteSchemeField): ?>
+        <?php elseif ($isSiteProtocolField): ?>
             <select
                 class="form-select font-monospace"
                 id="<?= e($inputId) ?>"

@@ -282,7 +282,7 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Routing/PublicChannelPageRouteService.php` - Shared public channel page-route parsing and canonical segment helper for channel/date/title slug modes.
 - `/private/lib/Routing/RedirectTargetValidator.php` - Shared redirect target allowlist validator for absolute HTTP(S) and root-relative URL safety.
 - `/private/lib/Routing/RouteConfigService.php` - Shared route-prefix/privacy/auth-mode config resolver used by panel/public controllers and routing inventories.
-- `/private/lib/Routing/RoutingInventoryBuilder.php` - Shared panel routing-inventory row builder for pages/channels/taxonomy/users/groups/redirects with conflict annotation.
+- `/private/lib/Routing/RoutingInventoryBuilder.php` - Shared panel routing-inventory row builder for page/channel/taxonomy/user/group/redirect with conflict annotation.
 - `/private/lib/Routing/RouteDispatchResult.php` - Immutable route dispatch result contract (handled state + params/response).
 - `/private/lib/Routing/RouteRequest.php` - Immutable route request contract (normalized method/path).
 - `/private/lib/Routing/Router.php` - Reusable HTTP path router with `{param}` placeholder matching.
@@ -361,46 +361,46 @@ Sometimes temporary files get stashed here.
 Core fallback templates:
 - `/private/tpl/categories/index.php` - Core fallback category listing template.
 - `/private/tpl/channels/index.php` - Core fallback channel landing template.
-- `/private/tpl/groups/index.php` - Core fallback group-route wrapper/entry template.
-- `/private/tpl/groups/limited.php` - Core fallback limited-visibility group listing template.
-- `/private/tpl/groups/list.php` - Core fallback group listing template.
+- `/private/tpl/group/index.php` - Core fallback group-route wrapper/entry template.
+- `/private/tpl/group/limited.php` - Core fallback limited-visibility group listing template.
+- `/private/tpl/group/list.php` - Core fallback group listing template.
 - `/private/tpl/home.php` - Core fallback homepage template.
 - `/private/tpl/status/404.php` - Core fallback not-found status template.
 - `/private/tpl/status/denied.php` - Core fallback permission-denied status template.
 - `/private/tpl/status/disabled.php` - Core fallback site-disabled status template.
-- `/private/tpl/pages/index.php` - Core fallback page template.
-- `/private/tpl/profiles/full.php` - Core fallback full profile template.
-- `/private/tpl/profiles/index.php` - Core fallback profile-route wrapper/entry template.
-- `/private/tpl/profiles/limited.php` - Core fallback limited-visibility profile template.
+- `/private/tpl/page/index.php` - Core fallback page template.
+- `/private/tpl/profile/full.php` - Core fallback full profile template.
+- `/private/tpl/profile/index.php` - Core fallback profile-route wrapper/entry template.
+- `/private/tpl/profile/limited.php` - Core fallback limited-visibility profile template.
 - `/private/tpl/tags/index.php` - Core fallback tag listing template.
 - `/private/tpl/wrapper.php` - Core fallback public layout wrapper template.
 
 ###### Core panel-specific templates:
-- `/private/tpl/panel/categories/edit.php` - Panel category create/edit template.
-- `/private/tpl/panel/categories/list.php` - Panel category list template.
-- `/private/tpl/panel/channels/edit.php` - Panel channel create/edit template.
-- `/private/tpl/panel/channels/list.php` - Panel channel list template.
+- `/private/tpl/panel/category/edit.php` - Panel category create/edit template.
+- `/private/tpl/panel/category/list.php` - Panel category list template.
+- `/private/tpl/panel/channel/edit.php` - Panel channel create/edit template.
+- `/private/tpl/panel/channel/list.php` - Panel channel list template.
 - `/private/tpl/panel/configuration.php` - Panel system configuration editor template.
 - `/private/tpl/panel/dashboard.php` - Panel dashboard landing template.
 - `/private/tpl/panel/extensions.php` - Panel extension manager template.
 - `/private/tpl/panel/themes.php` - Panel public theme manager template.
-- `/private/tpl/panel/groups/edit.php` - Panel group create/edit template.
-- `/private/tpl/panel/groups/list.php` - Panel group list template.
+- `/private/tpl/panel/group/edit.php` - Panel group create/edit template.
+- `/private/tpl/panel/group/list.php` - Panel group list template.
 - `/private/tpl/panel/auth/login.php` - Panel login screen template.
 - `/private/tpl/panel/auth/login_2fa.php` - Panel two-factor verification template.
 - `/private/tpl/auth/login.php` - Public login helper template.
 - `/private/tpl/auth/login_2fa.php` - Public two-factor verification helper template.
 - `/private/tpl/auth/register.php` - Public registration template.
-- `/private/tpl/panel/pages/edit.php` - Panel page create/edit template.
-- `/private/tpl/panel/pages/list.php` - Panel page list template.
+- `/private/tpl/panel/page/edit.php` - Panel page create/edit template.
+- `/private/tpl/panel/page/list.php` - Panel page list template.
 - `/private/tpl/panel/preferences.php` - Panel user preferences editor template.
-- `/private/tpl/panel/redirects/edit.php` - Panel redirect create/edit template.
-- `/private/tpl/panel/redirects/list.php` - Panel redirect list template.
+- `/private/tpl/panel/redirect/edit.php` - Panel redirect create/edit template.
+- `/private/tpl/panel/redirect/list.php` - Panel redirect list template.
 - `/private/tpl/panel/routing.php` - Panel routing inventory/list template.
-- `/private/tpl/panel/tags/edit.php` - Panel tag create/edit template.
-- `/private/tpl/panel/tags/list.php` - Panel tag list template.
-- `/private/tpl/panel/users/edit.php` - Panel user create/edit template.
-- `/private/tpl/panel/users/list.php` - Panel user list template.
+- `/private/tpl/panel/tag/edit.php` - Panel tag create/edit template.
+- `/private/tpl/panel/tag/list.php` - Panel tag list template.
+- `/private/tpl/panel/user/edit.php` - Panel user create/edit template.
+- `/private/tpl/panel/user/list.php` - Panel user list template.
 - `/private/tpl/panel/wrapper.php` - Panel layout wrapper template used by panel pages.
 
 ### /public/

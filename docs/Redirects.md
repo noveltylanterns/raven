@@ -4,7 +4,7 @@
 
 This document explains Raven's Redirect system for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever redirect structure, redirect routes, or Redirect panel views change (`private/tpl/panel/redirects/*`, redirect controller/repository behavior, or public redirect resolution).
+Maintenance note: keep this file updated whenever redirect structure, redirect routes, or Redirect panel views change (`private/tpl/panel/redirect/*`, redirect controller/repository behavior, or public redirect resolution).
 
 ## 1) Panel Guide (Create And Edit Redirects)
 
@@ -12,7 +12,7 @@ Maintenance note: keep this file updated whenever redirect structure, redirect r
 
 - Open panel sidebar: `Taxonomy` -> `Redirects`.
 
-### Redirect List (`/redirects`)
+### Redirect List (`/redirect`)
 
 What you can do:
 
@@ -36,7 +36,7 @@ Columns shown:
 - `Status` (`Active` or `Inactive`)
 - `Actions`
 
-### Redirect Editor (`/redirects/edit` and `/redirects/edit/{id}`)
+### Redirect Editor (`/redirect/edit` and `/redirect/edit/{id}`)
 
 Top and bottom action bars (same controls in both places):
 
@@ -63,8 +63,8 @@ Fields/options:
 ### Key Files
 
 - Panel views:
-  - `private/tpl/panel/redirects/list.php`
-  - `private/tpl/panel/redirects/edit.php`
+  - `private/tpl/panel/redirect/list.php`
+  - `private/tpl/panel/redirect/edit.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Persistence:
@@ -74,11 +74,11 @@ Fields/options:
 
 Declared in `panel/index.php`:
 
-- `GET /redirects` -> list
-- `GET /redirects/edit` -> create form
-- `GET /redirects/edit/{id}` -> edit form
-- `POST /redirects/save` -> create/update
-- `POST /redirects/delete` -> delete (single or bulk)
+- `GET /redirect` -> list
+- `GET /redirect/edit` -> create form
+- `GET /redirect/edit/{id}` -> edit form
+- `POST /redirect/save` -> create/update
+- `POST /redirect/delete` -> delete (single or bulk)
 
 All state-changing routes use CSRF validation.
 
@@ -86,14 +86,14 @@ All state-changing routes use CSRF validation.
 
 `PanelController` redirect handlers:
 
-- `redirectsList()`
+- `redirectList()`
   - Requires login + `Manage Taxonomy` permission.
   - Renders list with `RedirectRepository::listAll()`.
-- `redirectsEdit(?int $id)`
+- `redirectEdit(?int $id)`
   - Loads existing row when id is provided.
   - Provides channel options from `ChannelRepository::listAll()`.
-  - Missing id row triggers flash error + redirect to `/redirects`.
-- `redirectsSave(array $post)`
+  - Missing id row triggers flash error + redirect to `/redirect`.
+- `redirectSave(array $post)`
   - Validates CSRF.
   - Sanitizes/normalizes posted fields via `InputSanitizer`.
   - Requires title + valid slug.
@@ -102,7 +102,7 @@ All state-changing routes use CSRF validation.
   - Validates posted `channel_slug` against actual channel list.
   - Validates target URL format (`isAllowedRedirectTargetUrl`).
   - Saves via `RedirectRepository::save(...)`.
-- `redirectsDelete(array $post)`
+- `redirectDelete(array $post)`
   - Validates CSRF.
   - Supports single delete (`id`) and bulk delete (`selected_ids[]`).
   - Reports deleted/failed counts for bulk operations.

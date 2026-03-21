@@ -1070,7 +1070,7 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
 
     try {
         $app = $context->app();
-        $repo = $app['categories'];
+        $repo = $app['category'];
 
         if ($action === 'list') {
             $rows = $repo->listAll();
@@ -1226,7 +1226,7 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
 
     try {
         $app = $context->app();
-        $repo = $app['tags'];
+        $repo = $app['tag'];
 
         if ($action === 'list') {
             $rows = $repo->listAll();
@@ -1382,7 +1382,7 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
 
     try {
         $app = $context->app();
-        $repo = $app['channels'];
+        $repo = $app['channel'];
 
         if ($action === 'list') {
             $rows = $repo->listAll();
@@ -1465,18 +1465,18 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
             }
             $description = $app['input']->text($description, 1000);
 
-            $editor = strtolower(trim((string) raven_cli_option($options, 'editor', is_array($existing) ? (string) ($existing['text_editor_override'] ?? 'inherit') : 'inherit')));
-            $routeMode = strtolower(trim((string) raven_cli_option($options, 'route-mode', is_array($existing) ? (string) ($existing['page_route_mode'] ?? 'inherit') : 'inherit')));
-            $separator = trim((string) raven_cli_option($options, 'separator', is_array($existing) ? (string) ($existing['page_url_separator'] ?? 'inherit') : 'inherit'));
+            $editor = strtolower(trim((string) raven_cli_option($options, 'editor', is_array($existing) ? (string) ($existing['editor_override'] ?? 'inherit') : 'inherit')));
+            $routeMode = strtolower(trim((string) raven_cli_option($options, 'route-mode', is_array($existing) ? (string) ($existing['route_mode'] ?? 'inherit') : 'inherit')));
+            $separator = trim((string) raven_cli_option($options, 'separator', is_array($existing) ? (string) ($existing['route_separator'] ?? 'inherit') : 'inherit'));
 
             $id = $repo->save([
                 'id' => is_array($existing) ? (int) ($existing['id'] ?? 0) : null,
                 'name' => $name,
                 'slug' => $slug,
                 'description' => $description,
-                'text_editor_override' => $editor,
-                'page_route_mode' => $routeMode,
-                'page_url_separator' => $separator,
+                'editor_override' => $editor,
+                'route_mode' => $routeMode,
+                'route_separator' => $separator,
             ]);
 
             if ($context->json) {
@@ -1545,7 +1545,7 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
 
     try {
         $app = $context->app();
-        $repo = $app['groups'];
+        $repo = $app['group'];
 
         $orderedPermissions = [
             'view_public' => PanelAccess::VIEW_PUBLIC_SITE,
@@ -1820,7 +1820,7 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
 
     try {
         $app = $context->app();
-        $repo = $app['redirects'];
+        $repo = $app['redirect'];
 
         $findRedirect = static function (array $options) use ($repo): ?array {
             $idRaw = raven_cli_option($options, 'id', null);

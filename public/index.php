@@ -152,12 +152,12 @@ $controller = new PublicController(
     $app['view'],
     $app['config'],
     $app['auth'],
-    $app['groups'],
+    $app['group'],
     $app['page_images'],
-    $app['pages'],
-    $app['redirects'],
+    $app['page'],
+    $app['redirect'],
     $app['taxonomy'],
-    $app['users'],
+    $app['user'],
     $app['invite_tokens'],
     $app['input'],
     $app['csrf'],
@@ -190,7 +190,7 @@ if ($categoryPrefix !== '' && $tagPrefix !== '' && $categoryPrefix === $tagPrefi
 if ($groupPrefix !== '' && in_array($groupPrefix, [$categoryPrefix, $tagPrefix], true)) {
     $groupPrefix = 'group';
     if (in_array($groupPrefix, [$categoryPrefix, $tagPrefix], true)) {
-        $groupPrefix = 'groups';
+        $groupPrefix = 'grp';
     }
 }
 
@@ -204,7 +204,7 @@ if ($profilePrefix !== '' && in_array($profilePrefix, [$categoryPrefix, $tagPref
 if ($groupPrefix !== '' && $groupPrefix === $profilePrefix) {
     $groupPrefix = 'group';
     if ($groupPrefix === $profilePrefix || in_array($groupPrefix, [$categoryPrefix, $tagPrefix], true)) {
-        $groupPrefix = 'groups';
+        $groupPrefix = 'grp';
     }
 }
 

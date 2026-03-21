@@ -14,7 +14,7 @@ declare(strict_types=1);
 /** @var array<string, string> $site */
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
-/** @var array{total: int, pages: int, channels: int, redirects: int, conflicts: int} $routeSummary */
+/** @var array{total: int, page: int, channel: int, redirect: int, conflicts: int} $routeSummary */
 /** @var array<int, array{
  *   type_key: string,
  *   type_label: string,
@@ -80,7 +80,7 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
         <div class="card h-100">
             <div class="card-body">
                 <div class="small text-muted text-uppercase">Pages</div>
-                <div class="h3 mb-0"><?= (int) ($routeSummary['pages'] ?? 0) ?></div>
+                <div class="h3 mb-0"><?= (int) ($routeSummary['page'] ?? 0) ?></div>
             </div>
         </div>
     </div>
@@ -88,7 +88,7 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
         <div class="card h-100">
             <div class="card-body">
                 <div class="small text-muted text-uppercase">Channels</div>
-                <div class="h3 mb-0"><?= (int) ($routeSummary['channels'] ?? 0) ?></div>
+                <div class="h3 mb-0"><?= (int) ($routeSummary['channel'] ?? 0) ?></div>
             </div>
         </div>
     </div>
@@ -96,7 +96,7 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
         <div class="card h-100">
             <div class="card-body">
                 <div class="small text-muted text-uppercase">Redirects</div>
-                <div class="h3 mb-0"><?= (int) ($routeSummary['redirects'] ?? 0) ?></div>
+                <div class="h3 mb-0"><?= (int) ($routeSummary['redirect'] ?? 0) ?></div>
             </div>
         </div>
     </div>

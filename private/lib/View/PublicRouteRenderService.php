@@ -17,7 +17,7 @@ final class PublicRouteRenderService
     {
         return [
             'status' => $error === 'permission_denied' ? 403 : 404,
-            'template' => 'profiles/index',
+            'template' => 'profile/index',
             'layout' => 'wrapper',
             'data' => [
                 'site' => $siteData,
@@ -34,7 +34,7 @@ final class PublicRouteRenderService
     {
         return [
             'status' => $error === 'permission_denied' ? 403 : 404,
-            'template' => 'groups/index',
+            'template' => 'group/index',
             'layout' => 'wrapper',
             'data' => [
                 'site' => $siteData,

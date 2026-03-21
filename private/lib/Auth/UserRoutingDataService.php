@@ -7,15 +7,15 @@ namespace Raven\Lib\Auth;
 use PDO;
 
 /**
- * Shared routing-table auth payload assembler for groups/users.
+ * Shared routing-table auth payload assembler for group/user rows.
  */
 final class UserRoutingDataService
 {
     /**
      * @param callable(array<int, array<string, mixed>>, array<int, array<int, array{name: string, permission_mask: int}>>): array<int, array<string, mixed>> $hydratePanelUsers
      * @return array{
-     *   groups: array<int, array<string, mixed>>,
-     *   users: array<int, array<string, mixed>>
+     *   group_rows: array<int, array<string, mixed>>,
+     *   user_rows: array<int, array<string, mixed>>
      * }
      */
     public function listRoutingData(
@@ -29,8 +29,8 @@ final class UserRoutingDataService
     ): array {
         if (!$includeGroups && !$includeUsers) {
             return [
-                'groups' => [],
-                'users' => [],
+                'group_rows' => [],
+                'user_rows' => [],
             ];
         }
 
@@ -175,8 +175,8 @@ final class UserRoutingDataService
         }
 
         return [
-            'groups' => $groupRows,
-            'users' => $hydratePanelUsers(array_values($usersById), $groupMap),
+            'group_rows' => $groupRows,
+            'user_rows' => $hydratePanelUsers(array_values($usersById), $groupMap),
         ];
     }
 }

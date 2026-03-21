@@ -100,12 +100,12 @@ final class ChannelFileStoreService
             'name' => $name,
             'slug' => $slug,
             'description' => trim((string) ($raw['description'] ?? '')),
-            'text_editor_override' => ChannelRecordPolicy::normalizeTextEditorOverride(
-                (string) ($raw['text_editor_override'] ?? 'inherit')
+            'editor_override' => ChannelRecordPolicy::normalizeEditorOverride(
+                (string) ($raw['editor_override'] ?? 'inherit')
             ),
-            'page_route_mode' => ChannelRecordPolicy::normalizePageRouteMode((string) ($raw['page_route_mode'] ?? 'inherit')),
-            'page_url_separator' => ChannelRecordPolicy::normalizePageUrlSeparator(
-                (string) ($raw['page_url_separator'] ?? 'inherit')
+            'route_mode' => ChannelRecordPolicy::normalizeRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
+            'route_separator' => ChannelRecordPolicy::normalizeRouteSeparator(
+                (string) ($raw['route_separator'] ?? 'inherit')
             ),
             'cover_image_path' => ChannelRecordPolicy::normalizeNullablePath($raw['cover_image_path'] ?? null),
             'cover_image_sm_path' => ChannelRecordPolicy::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
@@ -169,7 +169,49 @@ final class ChannelFileStoreService
         }
 
         $raw['id'] = $id;
-        $this->writeRecordBySlug($slug, $raw);
+        $this->writeRecordBySlug($slug, $this->canonicalizeRecord($slug, $raw));
+    }
+
+    /**
+     * @param array<string, mixed> $raw
+     * @return array<string, mixed>
+     */
+    private function canonicalizeRecord(string $slug, array $raw): array
+    {
+        $name = trim((string) ($raw['name'] ?? ''));
+        if ($name === '') {
+            $name = ucwords(str_replace('-', ' ', $slug));
+        }
+
+        $createdAt = trim((string) ($raw['created_at'] ?? ''));
+        if ($createdAt === '') {
+            $createdAt = gmdate('Y-m-d H:i:s');
+        }
+
+        return [
+            'id' => ChannelRecordPolicy::normalizeChannelId($raw['id'] ?? null) ?? 0,
+            'name' => $name,
+            'slug' => $slug,
+            'description' => trim((string) ($raw['description'] ?? '')),
+            'editor_override' => ChannelRecordPolicy::normalizeEditorOverride(
+                (string) ($raw['editor_override'] ?? 'inherit')
+            ),
+            'route_mode' => ChannelRecordPolicy::normalizeRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
+            'route_separator' => ChannelRecordPolicy::normalizeRouteSeparator(
+                (string) ($raw['route_separator'] ?? 'inherit')
+            ),
+            'cover_image_path' => ChannelRecordPolicy::normalizeNullablePath($raw['cover_image_path'] ?? null),
+            'cover_image_sm_path' => ChannelRecordPolicy::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
+            'cover_image_md_path' => ChannelRecordPolicy::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
+            'cover_image_lg_path' => ChannelRecordPolicy::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
+            'preview_image_path' => ChannelRecordPolicy::normalizeNullablePath($raw['preview_image_path'] ?? null),
+            'preview_image_sm_path' => ChannelRecordPolicy::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
+            'preview_image_md_path' => ChannelRecordPolicy::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
+            'preview_image_lg_path' => ChannelRecordPolicy::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
+            'custom_fields' => is_array($raw['custom_fields'] ?? null) ? $raw['custom_fields'] : [],
+            'overrides' => is_array($raw['overrides'] ?? null) ? $raw['overrides'] : [],
+            'created_at' => $createdAt,
+        ];
     }
 
     private function invalidatePhpFileCache(string $path): void

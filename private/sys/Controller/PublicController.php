@@ -61,12 +61,12 @@ final class PublicController
     private View $view;
     private Config $config;
     private AuthService $auth;
-    private GroupRepository $groups;
+    private GroupRepository $groupRepo;
     private PageImageRepository $pageImages;
-    private PageRepository $pages;
-    private RedirectRepository $redirects;
-    private TaxonomyRepository $taxonomy;
-    private UserRepository $users;
+    private PageRepository $pageRepo;
+    private RedirectRepository $redirectRepo;
+    private TaxonomyRepository $taxonomyRepo;
+    private UserRepository $userRepo;
     private InviteTokenRepository $inviteTokens;
     private InputSanitizer $input;
     private Csrf $csrf;
@@ -102,12 +102,12 @@ final class PublicController
         View $view,
         Config $config,
         AuthService $auth,
-        GroupRepository $groups,
+        GroupRepository $groupRepo,
         PageImageRepository $pageImages,
-        PageRepository $pages,
-        RedirectRepository $redirects,
-        TaxonomyRepository $taxonomy,
-        UserRepository $users,
+        PageRepository $pageRepo,
+        RedirectRepository $redirectRepo,
+        TaxonomyRepository $taxonomyRepo,
+        UserRepository $userRepo,
         InviteTokenRepository $inviteTokens,
         InputSanitizer $input,
         Csrf $csrf,
@@ -117,12 +117,12 @@ final class PublicController
         $this->view = $view;
         $this->config = $config;
         $this->auth = $auth;
-        $this->groups = $groups;
+        $this->groupRepo = $groupRepo;
         $this->pageImages = $pageImages;
-        $this->pages = $pages;
-        $this->redirects = $redirects;
-        $this->taxonomy = $taxonomy;
-        $this->users = $users;
+        $this->pageRepo = $pageRepo;
+        $this->redirectRepo = $redirectRepo;
+        $this->taxonomyRepo = $taxonomyRepo;
+        $this->userRepo = $userRepo;
         $this->inviteTokens = $inviteTokens;
         $this->input = $input;
         $this->csrf = $csrf;
@@ -137,7 +137,7 @@ final class PublicController
      */
     public function home(): void
     {
-        $page = $this->pages->findHomepage();
+        $page = $this->pageRepo->findHomepage();
 
         if ($page === null) {
             $this->notFound();
@@ -164,14 +164,14 @@ final class PublicController
      */
     public function channel(string $channelSlug): void
     {
-        $page = $this->pages->findChannelHomepage($channelSlug);
+        $page = $this->pageRepo->findChannelHomepage($channelSlug);
 
         if ($page === null) {
             $this->page($channelSlug, null);
             return;
         }
 
-        $channel = $this->taxonomy->findChannelBySlug($channelSlug);
+        $channel = $this->taxonomyRepo->findChannelBySlug($channelSlug);
 
         $page = $this->renderPageExtendedBlocks($page);
         $page = $this->decoratePageForTemplate($page);
@@ -206,7 +206,7 @@ final class PublicController
         $channelWordSeparator = 'inherit';
 
         if ($channelSlug !== null) {
-            $channel = $this->taxonomy->findChannelBySlug($channelSlug);
+            $channel = $this->taxonomyRepo->findChannelBySlug($channelSlug);
             if ($channel === null) {
                 if ($this->tryRedirect($requestedSlug, $channelSlug)) {
                     return;
@@ -216,10 +216,10 @@ final class PublicController
                 return;
             }
 
-            $channelRouteMode = $this->effectiveChannelPageRouteMode((string) ($channel['page_route_mode'] ?? 'inherit'));
+            $channelRouteMode = $this->effectiveChannelRouteMode((string) ($channel['route_mode'] ?? 'inherit'));
             $channelWordSeparator = $this->publicChannelPageRouteService()->resolveWordSeparator(
-                (string) ($channel['page_url_separator'] ?? 'inherit'),
-                (string) $this->config->get('content.separator', '-')
+                (string) ($channel['route_separator'] ?? 'inherit'),
+                (string) $this->config->get('content.route_separator', '-')
             );
 
             $lookupTarget = $this->publicChannelPageRouteService()->resolveLookupTarget(
@@ -244,7 +244,7 @@ final class PublicController
             $lookupTarget = $this->publicChannelPageRouteService()->resolveLookupTarget(
                 $requestedSlug,
                 $channelRouteMode,
-                (string) $this->config->get('content.separator', '-')
+                (string) $this->config->get('content.route_separator', '-')
             );
             if (!is_array($lookupTarget)) {
                 if ($this->tryRedirect($requestedSlug, null)) {
@@ -262,9 +262,9 @@ final class PublicController
 
         $page = null;
         if (is_array($lookupTarget ?? null) && (string) ($lookupTarget['type'] ?? '') === 'id') {
-            $page = $this->pages->findPublicPageById((int) ($lookupTarget['id'] ?? 0), $channelSlug);
+            $page = $this->pageRepo->findPublicPageById((int) ($lookupTarget['id'] ?? 0), $channelSlug);
         } else {
-            $page = $this->pages->findPublicPage($lookupSlug, $channelSlug);
+            $page = $this->pageRepo->findPublicPage($lookupSlug, $channelSlug);
         }
 
         if ($page === null) {
@@ -283,7 +283,7 @@ final class PublicController
             (string) ($page['published_at'] ?? ''),
             $channelRouteMode,
             $channelWordSeparator,
-            (string) $this->config->get('content.separator', '-')
+            (string) $this->config->get('content.route_separator', '-')
         );
         if ($channelSlug !== null) {
             if ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedSlug) !== 0) {
@@ -340,7 +340,7 @@ final class PublicController
                     (string) ($page['published_at'] ?? ''),
                     $this->globalPageRouteMode(),
                     'inherit',
-                    (string) $this->config->get('content.separator', '-')
+                    (string) $this->config->get('content.route_separator', '-')
                 );
                 $pages[$index]['url'] = '/' . rawurlencode($rootSegment !== '' ? $rootSegment : $slug);
                 continue;
@@ -354,9 +354,9 @@ final class PublicController
                         $slug,
                         $pageId,
                         (string) ($page['published_at'] ?? ''),
-                        $this->effectiveChannelPageRouteMode((string) ($page['channel_page_route_mode'] ?? 'inherit')),
-                        (string) ($page['channel_page_url_separator'] ?? 'inherit'),
-                        (string) $this->config->get('content.separator', '-')
+                        $this->effectiveChannelRouteMode((string) ($page['route_mode_effective'] ?? 'inherit')),
+                        (string) ($page['route_separator_effective'] ?? 'inherit'),
+                        (string) $this->config->get('content.route_separator', '-')
                     )
                 );
         }
@@ -380,7 +380,7 @@ final class PublicController
      */
     private function tryRedirect(string $pageSlug, ?string $channelSlug = null): bool
     {
-        $redirect = $this->redirects->findActiveByPath($pageSlug, $channelSlug);
+        $redirect = $this->redirectRepo->findActiveByPath($pageSlug, $channelSlug);
         if ($redirect === null) {
             return false;
         }
@@ -406,7 +406,7 @@ final class PublicController
             return;
         }
 
-        $category = $this->taxonomy->findCategoryBySlug($categorySlug);
+        $category = $this->taxonomyRepo->findCategoryBySlug($categorySlug);
 
         if ($category === null) {
             $this->notFound();
@@ -416,7 +416,7 @@ final class PublicController
         $perPage = max(1, (int) $this->config->get('category.pagination', 10));
         $pageNumber = max(1, $pageNumber);
         $offset = ($pageNumber - 1) * $perPage;
-        $pageResult = $this->pages->listPageByCategorySlug($categorySlug, $perPage, $offset);
+        $pageResult = $this->pageRepo->listPageByCategorySlug($categorySlug, $perPage, $offset);
         $total = (int) ($pageResult['total'] ?? 0);
         $totalPages = max(1, (int) ceil($total / $perPage));
 
@@ -461,7 +461,7 @@ final class PublicController
             return;
         }
 
-        $tag = $this->taxonomy->findTagBySlug($tagSlug);
+        $tag = $this->taxonomyRepo->findTagBySlug($tagSlug);
 
         if ($tag === null) {
             $this->notFound();
@@ -471,7 +471,7 @@ final class PublicController
         $perPage = max(1, (int) $this->config->get('tag.pagination', 10));
         $pageNumber = max(1, $pageNumber);
         $offset = ($pageNumber - 1) * $perPage;
-        $pageResult = $this->pages->listPageByTagSlug($tagSlug, $perPage, $offset);
+        $pageResult = $this->pageRepo->listPageByTagSlug($tagSlug, $perPage, $offset);
         $total = (int) ($pageResult['total'] ?? 0);
         $totalPages = max(1, (int) ceil($total / $perPage));
 
@@ -536,7 +536,7 @@ final class PublicController
             return;
         }
 
-        $profile = $this->users->findPublicProfileByUsername($normalizedUsername);
+        $profile = $this->userRepo->findPublicProfileByUsername($normalizedUsername);
         if ($profile === null) {
             $this->notFound();
             return;
@@ -545,10 +545,10 @@ final class PublicController
         $profile = $this->decorateProfileForTemplate($profile);
 
         $template = match ($profileMode) {
-            'public_full' => 'profiles/full',
-            'public_limited' => $isLoggedIn ? 'profiles/full' : 'profiles/limited',
-            'private' => 'profiles/full',
-            default => 'profiles/index',
+            'public_full' => 'profile/full',
+            'public_limited' => $isLoggedIn ? 'profile/full' : 'profile/limited',
+            'private' => 'profile/full',
+            default => 'profile/index',
         };
 
         $this->renderPublic($template, [
@@ -585,7 +585,7 @@ final class PublicController
             return;
         }
 
-        $groupRouteData = $this->groups->findPublicRouteDataBySlug($normalizedSlug);
+        $groupRouteData = $this->groupRepo->findPublicRouteDataBySlug($normalizedSlug);
         if ($groupRouteData === null) {
             $this->notFound();
             return;
@@ -596,10 +596,10 @@ final class PublicController
         $members = $this->decorateGroupMembersForTemplate($members);
         $group = $this->decorateGroupForTemplate($group, $members);
         $template = match ($groupMode) {
-            'public_full' => 'groups/list',
-            'public_limited' => $isLoggedIn ? 'groups/list' : 'groups/limited',
-            'private' => 'groups/list',
-            default => 'groups/index',
+            'public_full' => 'group/list',
+            'public_limited' => $isLoggedIn ? 'group/list' : 'group/limited',
+            'private' => 'group/list',
+            default => 'group/index',
         };
 
         $this->renderPublic($template, [
@@ -931,7 +931,7 @@ final class PublicController
 
         $savedUserId = null;
         try {
-            $savedUserId = $this->users->save([
+            $savedUserId = $this->userRepo->save([
                 'id' => null,
                 'username' => is_string($normalizedUsername) ? $normalizedUsername : '',
                 'display_name' => $displayName !== '' ? $displayName : (string) $email,
@@ -950,7 +950,7 @@ final class PublicController
                 if ($inviteId < 1 || !$this->inviteTokens->consume($inviteId, $isReusable, $now)) {
                     if (is_int($savedUserId) && $savedUserId > 0) {
                         try {
-                            $this->users->deleteById($savedUserId);
+                            $this->userRepo->deleteById($savedUserId);
                         } catch (\Throwable) {
                             // Keep original consume failure message.
                         }
@@ -977,7 +977,7 @@ final class PublicController
         $payload = $this->publicRouteRenderService()->profileUnavailablePayload($error, $mode, $this->siteData());
         http_response_code((int) ($payload['status'] ?? 404));
         $this->renderPublic(
-            (string) ($payload['template'] ?? 'profiles/index'),
+            (string) ($payload['template'] ?? 'profile/index'),
             is_array($payload['data'] ?? null) ? $payload['data'] : [],
             (string) ($payload['layout'] ?? 'wrapper')
         );
@@ -991,7 +991,7 @@ final class PublicController
         $payload = $this->publicRouteRenderService()->groupUnavailablePayload($error, $mode, $this->siteData());
         http_response_code((int) ($payload['status'] ?? 404));
         $this->renderPublic(
-            (string) ($payload['template'] ?? 'groups/index'),
+            (string) ($payload['template'] ?? 'group/index'),
             is_array($payload['data'] ?? null) ? $payload['data'] : [],
             (string) ($payload['layout'] ?? 'wrapper')
         );
@@ -1122,7 +1122,7 @@ final class PublicController
             $page,
             $this->siteData(),
             fn (int $pageId): ?string => $this->pageImages->previewImageUrlForPage($pageId),
-            fn (int $authorUserId): ?array => $this->users->findById($authorUserId),
+            fn (int $authorUserId): ?array => $this->userRepo->findById($authorUserId),
             $profileContactOptions
         );
     }
@@ -1367,7 +1367,7 @@ final class PublicController
     private function registrationGroupIds(): array
     {
         foreach (['user', 'guest', 'validating'] as $slug) {
-            $groupId = $this->groups->idBySlug($slug);
+            $groupId = $this->groupRepo->idBySlug($slug);
             if (is_int($groupId) && $groupId > 0) {
                 return [$groupId];
             }
@@ -1693,9 +1693,9 @@ final class PublicController
         return $this->routeConfigService()->globalPageRouteMode();
     }
 
-    private function effectiveChannelPageRouteMode(string $channelValue): string
+    private function effectiveChannelRouteMode(string $channelValue): string
     {
-        return $this->routeConfigService()->effectiveChannelPageRouteMode($channelValue);
+        return $this->routeConfigService()->effectiveChannelRouteMode($channelValue);
     }
 
     private function bodyBlockPolicy(): BodyBlockPolicy

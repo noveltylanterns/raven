@@ -42,7 +42,7 @@ use function Raven\Core\Support\e;
     <div class="card-body">
         <h1><?= e($section) ?></h1>
         <p class="text-muted mb-0">This section is scaffolded and will be implemented in the next pass.</p>
-        <?php if (($section === 'users' && !$canManageUsers) || ($section === 'groups' && !$canManageGroups)): ?>
+        <?php if (($section === 'user' && !$canManageUsers) || ($section === 'group' && !$canManageGroups)): ?>
         <p class="text-danger mt-2 mb-0">Manage Users or Manage Groups permission is required for this section.</p>
         <?php endif; ?>
     </div>

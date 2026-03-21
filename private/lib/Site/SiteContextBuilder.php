@@ -83,7 +83,7 @@ final class SiteContextBuilder
     {
         return [
             'name' => (string) $config->get('site.name', 'Raven CMS'),
-            'scheme' => $this->siteSchemeFromConfig($config),
+            'protocol' => $this->siteProtocolFromConfig($config),
             'domain' => (string) $config->get('site.domain', 'localhost'),
             'panel_path' => (string) $config->get('panel.path', 'panel'),
             'apple_touch_icon' => trim((string) $config->get('meta.apple_touch_icon', '')),
@@ -108,10 +108,10 @@ final class SiteContextBuilder
         return trim((string) $config->get('meta.twitter.image', ''));
     }
 
-    private function siteSchemeFromConfig(Config $config): string
+    private function siteProtocolFromConfig(Config $config): string
     {
-        $scheme = strtolower(trim((string) $config->get('site.scheme', 'https')));
-        return in_array($scheme, ['http', 'https'], true) ? $scheme : 'https';
+        $protocol = strtolower(trim((string) $config->get('site.protocol', 'https')));
+        return in_array($protocol, ['http', 'https'], true) ? $protocol : 'https';
     }
 
     private function siteUrlFromConfig(Config $config): string
@@ -149,7 +149,7 @@ final class SiteContextBuilder
             }
         }
 
-        return $this->siteSchemeFromConfig($config) . '://' . $domain . $path;
+        return $this->siteProtocolFromConfig($config) . '://' . $domain . $path;
     }
 
     private function themeUrl(string $siteUrl, string $themeCssSlug): string

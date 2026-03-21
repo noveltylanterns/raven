@@ -140,7 +140,7 @@ return (static function (): array {
 
     $input = new InputSanitizer();
     $pageImages = new PageImageRepository($appDb, $driver, $prefix);
-    $channels = new ChannelRepository($appDb, $driver, $prefix, $root . '/private/dat/channel');
+    $channelRepo = new ChannelRepository($appDb, $driver, $prefix, $root . '/private/dat/channel');
     $categoryEnabled = ConfigValueParser::bool($config->get('category.enabled', true), true);
     $tagEnabled = ConfigValueParser::bool($config->get('tag.enabled', true), true);
     $app = [
@@ -154,17 +154,17 @@ return (static function (): array {
         'view' => new View($root . '/private/tpl'),
         'input' => $input,
         'csrf' => new Csrf(),
-        'categories' => new CategoryRepository($appDb, $driver, $prefix),
-        'channels' => $channels,
-        'groups' => new GroupRepository($appDb, $driver, $prefix),
+        'category' => new CategoryRepository($appDb, $driver, $prefix),
+        'channel' => $channelRepo,
+        'group' => new GroupRepository($appDb, $driver, $prefix),
         'invite_tokens' => new InviteTokenRepository($authDb, $driver, $prefix),
         'page_images' => $pageImages,
         'page_image_manager' => new PageImageManager($config, $input, $pageImages, $root),
-        'pages' => new PageRepository($appDb, $driver, $prefix, $channels, $categoryEnabled, $tagEnabled),
-        'redirects' => new RedirectRepository($appDb, $driver, $prefix, $channels),
-        'tags' => new TagRepository($appDb, $driver, $prefix),
-        'taxonomy' => new TaxonomyRepository($appDb, $driver, $prefix, $channels),
-        'users' => new UserRepository($authDb, $appDb, $driver, $prefix),
+        'page' => new PageRepository($appDb, $driver, $prefix, $channelRepo, $categoryEnabled, $tagEnabled),
+        'redirect' => new RedirectRepository($appDb, $driver, $prefix, $channelRepo),
+        'tag' => new TagRepository($appDb, $driver, $prefix),
+        'taxonomy' => new TaxonomyRepository($appDb, $driver, $prefix, $channelRepo),
+        'user' => new UserRepository($authDb, $appDb, $driver, $prefix),
     ];
 
     // Load service providers from enabled extensions.

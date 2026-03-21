@@ -4,7 +4,7 @@
 
 This document explains Raven's Group system for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever group structure, group routes, or Group panel views change (`private/tpl/panel/groups/*`, group controller/repository behavior, or permission/routing contracts).
+Maintenance note: keep this file updated whenever group structure, group routes, or Group panel views change (`private/tpl/panel/group/*`, group controller/repository behavior, or permission/routing contracts).
 
 ## 1) Panel Guide (Create And Edit Groups)
 
@@ -12,7 +12,7 @@ Maintenance note: keep this file updated whenever group structure, group routes,
 
 - Open panel sidebar: `Users & Permissions` -> `Groups`.
 
-### Group List (`/groups`)
+### Group List (`/group`)
 
 What you can do:
 
@@ -39,7 +39,7 @@ Important list notes:
 - Stock groups cannot be deleted.
 - If system-level group routing is disabled, routed values may display struck-through.
 
-### Group Editor (`/groups/edit` and `/groups/edit/{id}`)
+### Group Editor (`/group/edit` and `/group/edit/{id}`)
 
 Top and bottom action bars (same controls in both places):
 
@@ -56,6 +56,7 @@ Fields/options:
 - `Permissions & Routing`:
   - Public permission checkboxes
   - Panel permission checkboxes
+  - permission matrix includes `Panel Section` column headings for panel-route ACL mapping
   - `Enable URI Routing for this group` checkbox (disabled when system/group rules prohibit it)
 
 Extra editor behavior:
@@ -78,8 +79,8 @@ Stock-group constraints visible in UI:
 ### Key Files
 
 - Panel views:
-  - `private/tpl/panel/groups/list.php`
-  - `private/tpl/panel/groups/edit.php`
+  - `private/tpl/panel/group/list.php`
+  - `private/tpl/panel/group/edit.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Persistence:
@@ -89,11 +90,11 @@ Stock-group constraints visible in UI:
 
 Declared in `panel/index.php`:
 
-- `GET /groups` -> list
-- `GET /groups/edit` -> create form
-- `GET /groups/edit/{id}` -> edit form
-- `POST /groups/save` -> create/update
-- `POST /groups/delete` -> delete (single or bulk)
+- `GET /group` -> list
+- `GET /group/edit` -> create form
+- `GET /group/edit/{id}` -> edit form
+- `POST /group/save` -> create/update
+- `POST /group/delete` -> delete (single or bulk)
 
 All state-changing routes use CSRF validation.
 
@@ -101,20 +102,20 @@ All state-changing routes use CSRF validation.
 
 `PanelController` group handlers:
 
-- `groupsList()`
+- `groupList()`
   - Requires login + `Manage Groups` permission.
   - Renders list with `GroupRepository::listAll()`.
-- `groupsEdit(?int $id)`
+- `groupEdit(?int $id)`
   - Loads existing row when id is provided.
   - Includes permission definitions, route prefix, and system-level group routing flag.
-  - Missing id row triggers flash error + redirect to `/groups`.
-- `groupsSave(array $post)`
+  - Missing id row triggers flash error + redirect to `/group`.
+- `groupSave(array $post)`
   - Validates CSRF.
   - Sanitizes/normalizes id/name/slug and permission bit payload.
   - Enforces stock-role routing/permission constraints.
   - Enforces super-admin-only change policy for `MANAGE_CONFIGURATION` bit.
   - Saves via `GroupRepository::save(...)`.
-- `groupsDelete(array $post)`
+- `groupDelete(array $post)`
   - Validates CSRF.
   - Supports single delete (`id`) and bulk delete (`selected_ids[]`).
   - Repository enforces stock-group deletion protection.
@@ -163,4 +164,5 @@ When group behavior changes, update this document in the same task. That include
 
 - `Basic`
 - `Next`
+- `Panel Section`
 - `Previous`

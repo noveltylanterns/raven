@@ -125,8 +125,8 @@ final class RoutingInventoryBuilder
                 $channelsById[$channelId] = [
                     'slug' => (string) ($channelOption['slug'] ?? ''),
                     'name' => (string) ($channelOption['name'] ?? ''),
-                    'page_route_mode' => (string) ($channelOption['page_route_mode'] ?? 'inherit'),
-                    'page_url_separator' => (string) ($channelOption['page_url_separator'] ?? 'inherit'),
+                    'route_mode' => (string) ($channelOption['route_mode'] ?? 'inherit'),
+                    'route_separator' => (string) ($channelOption['route_separator'] ?? 'inherit'),
                 ];
             }
         }
@@ -134,8 +134,8 @@ final class RoutingInventoryBuilder
             $channelId = (int) ($pageForRouting['channel_id'] ?? 0);
             $pageForRouting['channel_slug'] = (string) ($channelsById[$channelId]['slug'] ?? '');
             $pageForRouting['channel_name'] = (string) ($channelsById[$channelId]['name'] ?? '');
-            $pageForRouting['channel_page_route_mode'] = (string) ($channelsById[$channelId]['page_route_mode'] ?? 'inherit');
-            $pageForRouting['channel_page_url_separator'] = (string) ($channelsById[$channelId]['page_url_separator'] ?? 'inherit');
+            $pageForRouting['route_mode_effective'] = (string) ($channelsById[$channelId]['route_mode'] ?? 'inherit');
+            $pageForRouting['route_separator_effective'] = (string) ($channelsById[$channelId]['route_separator'] ?? 'inherit');
         }
         unset($pageForRouting);
         $channelLandingMap = $buildChannelLandingMap($pagesForRouting);
@@ -171,7 +171,7 @@ final class RoutingInventoryBuilder
                 'type_key' => 'channel',
                 'type_label' => 'Channel',
                 'source_label' => trim((string) ($channel['name'] ?? '')) !== '' ? (string) $channel['name'] : $channelSlug,
-                'edit_url' => $canEditChannels ? (string) $panelUrl('/channels/edit/' . $channelId) : '',
+                'edit_url' => $canEditChannels ? (string) $panelUrl('/channel/edit/' . $channelId) : '',
                 'public_url' => $publicUrl,
                 'target_url' => $publicUrl,
                 'status_key' => $statusKey,
@@ -195,8 +195,8 @@ final class RoutingInventoryBuilder
                 (int) ($page['id'] ?? 0),
                 $channelSlug,
                 (string) ($page['published_at'] ?? ''),
-                (string) ($page['channel_page_route_mode'] ?? 'inherit'),
-                (string) ($page['channel_page_url_separator'] ?? 'inherit')
+                (string) ($page['route_mode_effective'] ?? 'inherit'),
+                (string) ($page['route_separator_effective'] ?? 'inherit')
             );
 
             $statusKey = (int) ($page['is_published'] ?? 0) === 1 ? 'published' : 'draft';
@@ -216,7 +216,7 @@ final class RoutingInventoryBuilder
                 'type_key' => 'page',
                 'type_label' => 'Page',
                 'source_label' => trim((string) ($page['title'] ?? '')) !== '' ? (string) $page['title'] : $pageSlug,
-                'edit_url' => $canEditPages ? (string) $panelUrl('/pages/edit/' . $pageId) : '',
+                'edit_url' => $canEditPages ? (string) $panelUrl('/page/edit/' . $pageId) : '',
                 'public_url' => $publicUrl,
                 'target_url' => $publicUrl,
                 'status_key' => $statusKey,
@@ -245,7 +245,7 @@ final class RoutingInventoryBuilder
                     'source_label' => trim((string) ($category['name'] ?? '')) !== ''
                         ? (string) $category['name']
                         : $categorySlug,
-                    'edit_url' => $canEditCategories ? (string) $panelUrl('/categories/edit/' . $categoryId) : '',
+                    'edit_url' => $canEditCategories ? (string) $panelUrl('/category/edit/' . $categoryId) : '',
                     'public_url' => $publicUrl,
                     'target_url' => $publicUrl,
                     'status_key' => 'active',
@@ -273,7 +273,7 @@ final class RoutingInventoryBuilder
                     'type_key' => 'tag',
                     'type_label' => 'Tag',
                     'source_label' => trim((string) ($tag['name'] ?? '')) !== '' ? (string) $tag['name'] : $tagSlug,
-                    'edit_url' => $canEditTags ? (string) $panelUrl('/tags/edit/' . $tagId) : '',
+                    'edit_url' => $canEditTags ? (string) $panelUrl('/tag/edit/' . $tagId) : '',
                     'public_url' => $publicUrl,
                     'target_url' => $publicUrl,
                     'status_key' => 'active',
@@ -321,7 +321,7 @@ final class RoutingInventoryBuilder
                     'type_key' => 'group',
                     'type_label' => 'Group',
                     'source_label' => $groupName,
-                    'edit_url' => $canEditGroups ? (string) $panelUrl('/groups/edit/' . $groupId) : '',
+                    'edit_url' => $canEditGroups ? (string) $panelUrl('/group/edit/' . $groupId) : '',
                     'public_url' => $publicUrl,
                     'target_url' => $publicUrl,
                     'status_key' => 'users_' . $memberCount,
@@ -360,7 +360,7 @@ final class RoutingInventoryBuilder
                     'type_key' => 'user',
                     'type_label' => 'User',
                     'source_label' => $username,
-                    'edit_url' => $canEditUsers ? (string) $panelUrl('/users/edit/' . $userId) : '',
+                    'edit_url' => $canEditUsers ? (string) $panelUrl('/user/edit/' . $userId) : '',
                     'public_url' => $publicUrl,
                     'target_url' => $publicUrl,
                     'status_key' => $statusKey,
@@ -401,7 +401,7 @@ final class RoutingInventoryBuilder
                 'type_key' => 'redirect',
                 'type_label' => 'Redirect',
                 'source_label' => trim((string) ($redirect['title'] ?? '')) !== '' ? (string) $redirect['title'] : $redirectSlug,
-                'edit_url' => $canEditRedirects ? (string) $panelUrl('/redirects/edit/' . $redirectId) : '',
+                'edit_url' => $canEditRedirects ? (string) $panelUrl('/redirect/edit/' . $redirectId) : '',
                 'public_url' => $publicUrl,
                 'target_url' => trim((string) ($redirect['target_url'] ?? '')),
                 'status_key' => $statusKey,

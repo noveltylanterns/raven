@@ -97,14 +97,14 @@ final class PanelController
     private LoginIdentifierResolver $identifierResolver;
     private PageImageRepository $pageImages;
     private PageImageManager $pageImageManager;
-    private CategoryRepository $categories;
-    private ChannelRepository $channels;
-    private GroupRepository $groups;
-    private PageRepository $pages;
-    private RedirectRepository $redirects;
-    private TagRepository $tags;
-    private TaxonomyRepository $taxonomy;
-    private UserRepository $users;
+    private CategoryRepository $categoryRepo;
+    private ChannelRepository $channelRepo;
+    private GroupRepository $groupRepo;
+    private PageRepository $pageRepo;
+    private RedirectRepository $redirectRepo;
+    private TagRepository $tagRepo;
+    private TaxonomyRepository $taxonomyRepo;
+    private UserRepository $userRepo;
     private InviteTokenRepository $inviteTokens;
     /** @var array<string, array{label: string, editor: string}>|null */
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
@@ -153,14 +153,14 @@ final class PanelController
         Csrf $csrf,
         PageImageRepository $pageImages,
         PageImageManager $pageImageManager,
-        CategoryRepository $categories,
-        ChannelRepository $channels,
-        GroupRepository $groups,
-        PageRepository $pages,
-        RedirectRepository $redirects,
-        TagRepository $tags,
-        TaxonomyRepository $taxonomy,
-        UserRepository $users,
+        CategoryRepository $categoryRepo,
+        ChannelRepository $channelRepo,
+        GroupRepository $groupRepo,
+        PageRepository $pageRepo,
+        RedirectRepository $redirectRepo,
+        TagRepository $tagRepo,
+        TaxonomyRepository $taxonomyRepo,
+        UserRepository $userRepo,
         InviteTokenRepository $inviteTokens
     ) {
         $this->view = $view;
@@ -173,14 +173,14 @@ final class PanelController
         $this->identifierResolver = new LoginIdentifierResolver();
         $this->pageImages = $pageImages;
         $this->pageImageManager = $pageImageManager;
-        $this->categories = $categories;
-        $this->channels = $channels;
-        $this->groups = $groups;
-        $this->pages = $pages;
-        $this->redirects = $redirects;
-        $this->tags = $tags;
-        $this->taxonomy = $taxonomy;
-        $this->users = $users;
+        $this->categoryRepo = $categoryRepo;
+        $this->channelRepo = $channelRepo;
+        $this->groupRepo = $groupRepo;
+        $this->pageRepo = $pageRepo;
+        $this->redirectRepo = $redirectRepo;
+        $this->tagRepo = $tagRepo;
+        $this->taxonomyRepo = $taxonomyRepo;
+        $this->userRepo = $userRepo;
         $this->inviteTokens = $inviteTokens;
     }
 
@@ -210,12 +210,12 @@ final class PanelController
     }
 
     /**
-     * Pages list route.
+     * Page list route.
      */
-    public function pagesList(): void
+    public function pageList(): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('pages', 'view')) {
+        if (!$this->requireRoutePermissionOrForbidden('page', 'view')) {
             return;
         }
 
@@ -230,7 +230,7 @@ final class PanelController
         }
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->pages->listPageForPanel(
+        $pageResult = $this->pageRepo->listPageForPanel(
             $perPage,
             ($requestedPage - 1) * $perPage,
             $prefilterChannel !== '' ? $prefilterChannel : null,
@@ -238,21 +238,21 @@ final class PanelController
             $prefilterTagId > 0 ? $prefilterTagId : null
         );
         $totalItems = (int) ($pageResult['total'] ?? 0);
-        $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $pageRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->pages->listPageForPanel(
+            $pageResult = $this->pageRepo->listPageForPanel(
                 $perPage,
                 $pagination['offset'],
                 $prefilterChannel !== '' ? $prefilterChannel : null,
                 $prefilterCategoryId > 0 ? $prefilterCategoryId : null,
                 $prefilterTagId > 0 ? $prefilterTagId : null
             );
-            $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+            $pageRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
         $prefilterCategoryIds = $prefilterCategoryId > 0 ? [$prefilterCategoryId] : [];
         $prefilterTagIds = $prefilterTagId > 0 ? [$prefilterTagId] : [];
-        foreach ($pages as &$pageRow) {
+        foreach ($pageRows as &$pageRow) {
             // Server-side page prefilters already constrain result rows, so list rows only
             // need the active prefilter ids for client-side in-page filter persistence.
             $pageRow['category_ids'] = $prefilterCategoryIds;
@@ -260,14 +260,14 @@ final class PanelController
         }
         unset($pageRow);
 
-        $this->view->render('panel/pages/list', [
+        $this->view->render('panel/page/list', [
             'site' => $this->siteData(),
-            'pages' => $pages,
+            'pages' => $pageRows,
             'prefilterChannel' => strtolower($prefilterChannel),
             'prefilterCategoryId' => $prefilterCategoryId,
             'prefilterTagId' => $prefilterTagId,
             'pagination' => $this->panelPaginationViewData(
-                '/pages',
+                '/page',
                 $pagination,
                 [
                     'channel' => $prefilterChannel,
@@ -278,29 +278,29 @@ final class PanelController
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
-            'section' => 'pages',
-            'pagesNav' => 'list',
+            'section' => 'page',
+            'pageNav' => 'list',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
     }
 
     /**
-     * Pages edit/create route.
+     * Page edit/create route.
      */
-    public function pagesEdit(?int $id = null): void
+    public function pageEdit(?int $id = null): void
     {
         $this->requirePanelLogin();
         $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('pages', $requiredAction)) {
+        if (!$this->requireRoutePermissionOrForbidden('page', $requiredAction)) {
             return;
         }
 
-        $pagesNavChannel = '';
+        $pageNavChannel = '';
         if ($id === null) {
             $requestedChannel = $this->input->slug($_GET['channel'] ?? null);
             if (is_string($requestedChannel) && $requestedChannel !== '') {
-                $pagesNavChannel = $requestedChannel;
+                $pageNavChannel = $requestedChannel;
             }
         }
 
@@ -308,7 +308,7 @@ final class PanelController
         $page = null;
         $galleryImages = [];
         if ($id !== null) {
-            $editData = $this->pages->editFormDataById($id);
+            $editData = $this->pageRepo->editFormDataById($id);
             if (is_array($editData)) {
                 $page = is_array($editData['page'] ?? null) ? $editData['page'] : null;
                 $galleryImages = is_array($editData['gallery_images'] ?? null) ? $editData['gallery_images'] : [];
@@ -317,32 +317,32 @@ final class PanelController
         // Load channel/category/tag options and page assignments in one query.
         $categoryEnabled = $this->categoryEnabled();
         $tagEnabled = $this->tagEnabled();
-        $taxonomyData = $this->taxonomy->listPageEditorTaxonomyData($id ?? 0, $categoryEnabled, $tagEnabled);
-        $channelOptions = is_array($taxonomyData['channels'] ?? null) ? $taxonomyData['channels'] : [];
+        $taxonomyData = $this->taxonomyRepo->listPageEditorTaxonomyData($id ?? 0, $categoryEnabled, $tagEnabled);
+        $channelOptions = is_array($taxonomyData['channel_options'] ?? null) ? $taxonomyData['channel_options'] : [];
         foreach ($channelOptions as &$channelOption) {
             if (!is_array($channelOption)) {
                 continue;
             }
 
-            $channelOption['text_editor_override'] = $this->normalizeChannelTextEditorOverride(
-                (string) ($channelOption['text_editor_override'] ?? 'inherit')
+            $channelOption['editor_override'] = $this->normalizeChannelEditorOverride(
+                (string) ($channelOption['editor_override'] ?? 'inherit')
             );
-            $channelOption['page_route_mode'] = $this->normalizeChannelPageRouteMode(
-                (string) ($channelOption['page_route_mode'] ?? 'inherit')
+            $channelOption['route_mode'] = $this->normalizeChannelRouteMode(
+                (string) ($channelOption['route_mode'] ?? 'inherit')
             );
-            $channelOption['page_url_separator'] = $this->normalizeChannelPageUrlSeparator(
-                (string) ($channelOption['page_url_separator'] ?? 'inherit')
+            $channelOption['route_separator'] = $this->normalizeChannelRouteSeparator(
+                (string) ($channelOption['route_separator'] ?? 'inherit')
             );
         }
         unset($channelOption);
-        if ($id === null && $pagesNavChannel !== '') {
+        if ($id === null && $pageNavChannel !== '') {
             $channelExists = false;
             foreach ($channelOptions as $channelOption) {
                 if (!is_array($channelOption)) {
                     continue;
                 }
 
-                if (strtolower(trim((string) ($channelOption['slug'] ?? ''))) === strtolower($pagesNavChannel)) {
+                if (strtolower(trim((string) ($channelOption['slug'] ?? ''))) === strtolower($pageNavChannel)) {
                     $channelExists = true;
                     break;
                 }
@@ -352,18 +352,18 @@ final class PanelController
                 if (!is_array($page)) {
                     $page = [];
                 }
-                $page['channel_slug'] = $pagesNavChannel;
+                $page['channel_slug'] = $pageNavChannel;
             } else {
-                $pagesNavChannel = '';
+                $pageNavChannel = '';
             }
         }
-        $categoryOptions = is_array($taxonomyData['categories'] ?? null) ? $taxonomyData['categories'] : [];
-        $tagOptions = is_array($taxonomyData['tags'] ?? null) ? $taxonomyData['tags'] : [];
-        $assignedCategories = is_array($taxonomyData['assigned_categories'] ?? null) ? $taxonomyData['assigned_categories'] : [];
-        $assignedTags = is_array($taxonomyData['assigned_tags'] ?? null) ? $taxonomyData['assigned_tags'] : [];
+        $categoryOptions = is_array($taxonomyData['category_options'] ?? null) ? $taxonomyData['category_options'] : [];
+        $tagOptions = is_array($taxonomyData['tag_options'] ?? null) ? $taxonomyData['tag_options'] : [];
+        $assignedCategoryOptions = is_array($taxonomyData['assigned_category_options'] ?? null) ? $taxonomyData['assigned_category_options'] : [];
+        $assignedTagOptions = is_array($taxonomyData['assigned_tag_options'] ?? null) ? $taxonomyData['assigned_tag_options'] : [];
         $currentUserId = $this->auth->userId();
 
-        $this->view->render('panel/pages/edit', [
+        $this->view->render('panel/page/edit', [
             'site' => $this->siteData(),
             'page' => $page,
             'currentUserId' => $currentUserId !== null ? $currentUserId : 0,
@@ -371,29 +371,29 @@ final class PanelController
             'channelOptions' => $channelOptions,
             'categoryOptions' => $categoryOptions,
             'tagOptions' => $tagOptions,
-            'assignedCategories' => $assignedCategories,
-            'assignedTags' => $assignedTags,
+            'assignedCategoryOptions' => $assignedCategoryOptions,
+            'assignedTagOptions' => $assignedTagOptions,
             'categoryEnabled' => $categoryEnabled,
             'tagEnabled' => $tagEnabled,
             'galleryImages' => $galleryImages,
             'imageUploadTarget' => (string) $this->config->get('media.images.upload_target', 'local'),
             'imageMaxFilesPerUpload' => max(0, (int) $this->config->get('media.images.max_files_per_upload', 10)),
-            'defaultTextEditor' => $this->normalizeBodyTextEditorOption(
-                (string) $this->config->get('content.default_editor', 'tinymce')
+            'editorDefault' => $this->normalizeBodyTextEditorOption(
+                (string) $this->config->get('content.editor_default', 'tinymce')
             ),
-            'defaultPageRouteMode' => $this->globalPageRouteMode(),
-            'defaultPageUrlSeparator' => $this->normalizeGlobalPageUrlSeparator(
-                (string) $this->config->get('content.separator', '-')
+            'routeModeDefault' => $this->globalPageRouteMode(),
+            'routeSeparatorDefault' => $this->normalizeGlobalRouteSeparator(
+                (string) $this->config->get('content.route_separator', '-')
             ),
             'bodyBlockTypeDefinitions' => $this->pageEditorBodyBlockTypeDefinitions(),
             'shortcodeInsertItems' => $this->pageEditorInsertableShortcodes(),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'error' => $this->pullFlash('error'),
-            'section' => 'pages',
+            'section' => 'page',
             // Highlight "Create Page" only when opening the new-page form.
-            'pagesNav' => $id === null ? 'create' : null,
-            'pagesNavChannel' => $id === null ? $pagesNavChannel : null,
+            'pageNav' => $id === null ? 'create' : null,
+            'pageNavChannel' => $id === null ? $pageNavChannel : null,
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -402,18 +402,18 @@ final class PanelController
     /**
      * Saves page form using CSRF + centralized input sanitizer.
      */
-    public function pagesSave(array $post): void
+    public function pageSave(array $post): void
     {
         $this->requirePanelLogin();
         $id = $this->input->int($post['id'] ?? null, 1);
         $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('pages', $requiredAction)) {
+        if (!$this->requireRoutePermissionOrForbidden('page', $requiredAction)) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/pages'));
+            redirect($this->panelUrl('/page'));
         }
 
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['content', 'meta', 'media'], 'content');
@@ -427,9 +427,9 @@ final class PanelController
         $galleryEnabled = $this->pageBodyBlocksIncludeGallery($extendedBlocks)
             || (isset($post['gallery_enabled']) && (string) $post['gallery_enabled'] === '1');
         $authorUserId = $this->input->int($post['author_user_id'] ?? null, 1);
-        if ($authorUserId !== null && $this->users->findById($authorUserId) === null) {
+        if ($authorUserId !== null && $this->userRepo->findById($authorUserId) === null) {
             $this->flash('error', 'Selected author account was not found.');
-            redirect($this->panelEditorUrlWithTab('/pages/edit', $id, $activeTab, 'meta'));
+            redirect($this->panelEditorUrlWithTab('/page/edit', $id, $activeTab, 'meta'));
         }
         if ($authorUserId === null) {
             $authorUserId = $this->auth->userId();
@@ -470,22 +470,22 @@ final class PanelController
         }
 
         // Only keep ids that currently exist, preventing stale/manual post values.
-        $categoryIds = $categoryEnabled ? $this->categories->existingIds($categoryIds) : [];
-        $tagIds = $tagEnabled ? $this->tags->existingIds($tagIds) : [];
+        $categoryIds = $categoryEnabled ? $this->categoryRepo->existingIds($categoryIds) : [];
+        $tagIds = $tagEnabled ? $this->tagRepo->existingIds($tagIds) : [];
 
         if ($title === '' || $slug === null) {
             $this->flash('error', 'Title and valid slug are required.');
-            redirect($this->panelEditorUrlWithTab('/pages/edit', $id, $activeTab, 'content'));
+            redirect($this->panelEditorUrlWithTab('/page/edit', $id, $activeTab, 'content'));
         }
 
         if (!in_array($status, ['published', 'draft'], true)) {
             $this->flash('error', 'Status must be Published or Draft.');
-            redirect($this->panelEditorUrlWithTab('/pages/edit', $id, $activeTab, 'content'));
+            redirect($this->panelEditorUrlWithTab('/page/edit', $id, $activeTab, 'content'));
         }
 
         // Normalize panel form input into repository payload shape.
         try {
-            $savedId = $this->pages->save([
+            $savedId = $this->pageRepo->save([
                 'id' => $id,
                 'title' => $title,
                 'slug' => $slug,
@@ -510,11 +510,11 @@ final class PanelController
             );
         } catch (\Throwable $exception) {
             $this->flash('error', $exception->getMessage() ?: 'Failed to save page.');
-            redirect($this->panelEditorUrlWithTab('/pages/edit', $id, $activeTab, 'content'));
+            redirect($this->panelEditorUrlWithTab('/page/edit', $id, $activeTab, 'content'));
         }
 
         $this->flash('success', 'Changes saved.');
-        redirect($this->panelEditorUrlWithTab('/pages/edit', $savedId, $activeTab, 'content'));
+        redirect($this->panelEditorUrlWithTab('/page/edit', $savedId, $activeTab, 'content'));
     }
 
     /**
@@ -525,7 +525,7 @@ final class PanelController
     private function pageAuthorOptions(): array
     {
         return $this->pageAuthorOptionBuilder()->build(
-            $this->users->listAll(),
+            $this->userRepo->listAll(),
             $this->input,
             fn (string $value): ?string => $this->normalizeUserIdentifierValue($value)
         );
@@ -587,9 +587,9 @@ final class PanelController
     }
 
     /**
-     * Normalizes one channel text-editor override value.
+     * Normalizes one channel editor-override value.
      */
-    private function normalizeChannelTextEditorOverride(string $value): string
+    private function normalizeChannelEditorOverride(string $value): string
     {
         $editor = strtolower(trim($value));
         return in_array($editor, ['inherit', 'tinymce', 'plaintext', 'autobr', 'markdown'], true)
@@ -598,25 +598,25 @@ final class PanelController
     }
 
     /**
-     * Normalizes one channel page-route mode value.
+     * Normalizes one channel route-mode value.
      */
-    private function normalizeChannelPageRouteMode(string $value): string
+    private function normalizeChannelRouteMode(string $value): string
     {
-        return $this->routeConfigService()->normalizeChannelPageRouteMode($value);
+        return $this->routeConfigService()->normalizeChannelRouteMode($value);
     }
 
     /**
-     * Normalizes one channel page-url separator option.
+     * Normalizes one channel route-separator option.
      */
-    private function normalizeChannelPageUrlSeparator(string $value): string
+    private function normalizeChannelRouteSeparator(string $value): string
     {
         return ChannelRoutePolicy::normalizeChannelSeparator($value);
     }
 
     /**
-     * Normalizes one global page-url separator option.
+     * Normalizes one global route-separator option.
      */
-    private function normalizeGlobalPageUrlSeparator(string $value): string
+    private function normalizeGlobalRouteSeparator(string $value): string
     {
         return ChannelRoutePolicy::normalizeGlobalSeparator($value);
     }
@@ -626,17 +626,17 @@ final class PanelController
         return $this->routeConfigService()->globalPageRouteMode();
     }
 
-    private function effectiveChannelPageRouteMode(string $channelValue): string
+    private function effectiveChannelRouteMode(string $channelValue): string
     {
-        return $this->routeConfigService()->effectiveChannelPageRouteMode($channelValue);
+        return $this->routeConfigService()->effectiveChannelRouteMode($channelValue);
     }
 
     /**
-     * Resolves channel page-url separator from channel option + global default.
+     * Resolves channel route-separator from channel option + global default.
      */
-    private function resolveChannelPageUrlSeparator(string $channelValue): string
+    private function resolveChannelRouteSeparator(string $channelValue): string
     {
-        return $this->routeConfigService()->resolveChannelPageUrlSeparator($channelValue);
+        return $this->routeConfigService()->resolveChannelRouteSeparator($channelValue);
     }
 
     /**
@@ -706,22 +706,22 @@ final class PanelController
      * @param array<string, mixed> $post
      * @param array<string, mixed> $files
      */
-    public function pagesGalleryUpload(array $post, array $files): void
+    public function pageGalleryUpload(array $post, array $files): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('pages', 'edit')) {
+        if (!$this->requireRoutePermissionOrForbidden('page', 'edit')) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/pages'));
+            redirect($this->panelUrl('/page'));
         }
 
         $pageId = $this->input->int($post['id'] ?? null, 1);
         if ($pageId === null || !$this->pageImages->pageExists($pageId)) {
             $this->flash('error', 'Save the page before uploading gallery images.');
-            redirect($this->panelUrl('/pages'));
+            redirect($this->panelUrl('/page'));
         }
 
         /** @var mixed $rawUploads */
@@ -730,7 +730,7 @@ final class PanelController
 
         if ($uploads === []) {
             $this->flash('error', 'Please select one or more images to upload.');
-            redirect($this->panelUrl('/pages/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
+            redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
         }
 
         $maxFilesPerUpload = max(0, (int) $this->config->get('media.images.max_files_per_upload', 10));
@@ -739,7 +739,7 @@ final class PanelController
                 'error',
                 'You selected ' . count($uploads) . ' image(s), but the max per upload is ' . $maxFilesPerUpload . '.'
             );
-            redirect($this->panelUrl('/pages/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
+            redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
         }
 
         $successCount = 0;
@@ -766,7 +766,7 @@ final class PanelController
             $this->flash('error', implode(' ', array_values(array_unique($errors))));
         }
 
-        redirect($this->panelUrl('/pages/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
+        redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
     }
 
     /**
@@ -774,16 +774,16 @@ final class PanelController
      *
      * @param array<string, mixed> $post
      */
-    public function pagesGalleryDelete(array $post): void
+    public function pageGalleryDelete(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('pages', 'edit')) {
+        if (!$this->requireRoutePermissionOrForbidden('page', 'edit')) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/pages'));
+            redirect($this->panelUrl('/page'));
         }
 
         $pageId = $this->input->int($post['id'] ?? null, 1);
@@ -792,24 +792,24 @@ final class PanelController
 
         if ($pageId === null) {
             $this->flash('error', 'Invalid image delete request.');
-            redirect($this->panelUrl('/pages'));
+            redirect($this->panelUrl('/page'));
         }
 
         // Single-row delete action has priority when explicit image id is posted.
         if ($imageId !== null) {
             if (!$this->pageImageManager->deleteImageForPage($pageId, $imageId)) {
                 $this->flash('error', 'Image not found or already deleted.');
-                redirect($this->panelUrl('/pages/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
+                redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
             }
 
             $this->flash('success', 'Image deleted.');
-            redirect($this->panelUrl('/pages/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
+            redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
         }
 
         // Bulk-delete path is used by Media-tab "Delete Selected" controls.
         if ($selectedImageIds === []) {
             $this->flash('error', 'No gallery images selected.');
-            redirect($this->panelUrl('/pages/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
+            redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
         }
 
         $deletedCount = 0;
@@ -833,7 +833,7 @@ final class PanelController
             $this->flash('error', 'Failed to delete selected images.');
         }
 
-        redirect($this->panelUrl('/pages/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
+        redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
     }
 
     /**
@@ -841,16 +841,16 @@ final class PanelController
      *
      * @param array<string, mixed> $post
      */
-    public function pagesDelete(array $post): void
+    public function pageDelete(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('pages', 'delete')) {
+        if (!$this->requireRoutePermissionOrForbidden('page', 'delete')) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/pages'));
+            redirect($this->panelUrl('/page'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
@@ -858,21 +858,21 @@ final class PanelController
             // Single-row delete path (row action button).
             try {
                 $this->pageImageManager->deleteAllForPage($id);
-                $this->pages->deleteById($id);
+                $this->pageRepo->deleteById($id);
             } catch (\Throwable) {
                 $this->flash('error', 'Failed to delete page.');
-                redirect($this->panelUrl('/pages'));
+                redirect($this->panelUrl('/page'));
             }
 
             $this->flash('success', 'Page deleted.');
-            redirect($this->panelUrl('/pages'));
+            redirect($this->panelUrl('/page'));
         }
 
         // Bulk-delete mode is used by the list-level "Delete" buttons.
         $selectedIds = $this->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->flash('error', 'No pages selected.');
-            redirect($this->panelUrl('/pages'));
+            redirect($this->panelUrl('/page'));
         }
 
         $deletedCount = 0;
@@ -882,7 +882,7 @@ final class PanelController
             try {
                 // Keep processing all selected ids even when one delete fails.
                 $this->pageImageManager->deleteAllForPage($selectedId);
-                $this->pages->deleteById($selectedId);
+                $this->pageRepo->deleteById($selectedId);
                 $deletedCount++;
             } catch (\Throwable) {
                 $failedCount++;
@@ -899,38 +899,38 @@ final class PanelController
             $this->flash('error', 'Failed to delete selected pages.');
         }
 
-        redirect($this->panelUrl('/pages'));
+        redirect($this->panelUrl('/page'));
     }
 
     /**
      * Lists channels for Channel management section.
      */
-    public function channelsList(): void
+    public function channelList(): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('channels', 'view')) {
+        if (!$this->requireRoutePermissionOrForbidden('channel', 'view')) {
             return;
         }
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->channels->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $pageResult = $this->channelRepo->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
         $totalItems = (int) ($pageResult['total'] ?? 0);
-        $channels = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $channelRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->channels->listPageForPanel($perPage, $pagination['offset']);
-            $channels = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+            $pageResult = $this->channelRepo->listPageForPanel($perPage, $pagination['offset']);
+            $channelRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
-        $this->view->render('panel/channels/list', [
+        $this->view->render('panel/channel/list', [
             'site' => $this->siteData(),
-            'channels' => $channels,
-            'pagination' => $this->panelPaginationViewData('/channels', $pagination),
+            'channelRows' => $channelRows,
+            'pagination' => $this->panelPaginationViewData('/channel', $pagination),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
-            'section' => 'channels',
+            'section' => 'channel',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -939,37 +939,37 @@ final class PanelController
     /**
      * Shows channel create/edit form.
      */
-    public function channelsEdit(?int $id = null): void
+    public function channelEdit(?int $id = null): void
     {
         $this->requirePanelLogin();
         $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('channels', $requiredAction)) {
+        if (!$this->requireRoutePermissionOrForbidden('channel', $requiredAction)) {
             return;
         }
 
         $channel = null;
         if ($id !== null) {
-            $channel = $this->channels->findById($id);
+            $channel = $this->channelRepo->findById($id);
 
             if ($channel === null) {
                 $this->flash('error', 'Channel not found.');
-                redirect($this->panelUrl('/channels'));
+                redirect($this->panelUrl('/channel'));
             }
         }
 
         if (is_array($channel)) {
-            $channel['text_editor_override'] = $this->normalizeChannelTextEditorOverride(
-                (string) ($channel['text_editor_override'] ?? 'inherit')
+            $channel['editor_override'] = $this->normalizeChannelEditorOverride(
+                (string) ($channel['editor_override'] ?? 'inherit')
             );
-            $channel['page_route_mode'] = $this->normalizeChannelPageRouteMode(
-                (string) ($channel['page_route_mode'] ?? 'inherit')
+            $channel['route_mode'] = $this->normalizeChannelRouteMode(
+                (string) ($channel['route_mode'] ?? 'inherit')
             );
-            $channel['page_url_separator'] = $this->normalizeChannelPageUrlSeparator(
-                (string) ($channel['page_url_separator'] ?? 'inherit')
+            $channel['route_separator'] = $this->normalizeChannelRouteSeparator(
+                (string) ($channel['route_separator'] ?? 'inherit')
             );
         }
 
-        $this->view->render('panel/channels/edit', [
+        $this->view->render('panel/channel/edit', [
             'site' => $this->siteData(),
             'channel' => $channel,
             'imageAllowedExtensions' => $this->taxonomyAllowedImageExtensionsLabel(),
@@ -978,7 +978,7 @@ final class PanelController
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'error' => $this->pullFlash('error'),
-            'section' => 'channels',
+            'section' => 'channel',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -990,58 +990,58 @@ final class PanelController
      * @param array<string, mixed> $post
      * @param array<string, mixed> $files
      */
-    public function channelsSave(array $post, array $files = []): void
+    public function channelSave(array $post, array $files = []): void
     {
         $this->requirePanelLogin();
         $id = $this->input->int($post['id'] ?? null, 1);
         $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('channels', $requiredAction)) {
+        if (!$this->requireRoutePermissionOrForbidden('channel', $requiredAction)) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/channels'));
+            redirect($this->panelUrl('/channel'));
         }
 
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'content', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
         $description = $this->input->text($post['description'] ?? null, 2000);
-        $textEditorOverride = $this->normalizeChannelTextEditorOverride(
-            (string) ($post['text_editor_override'] ?? 'inherit')
+        $editorOverride = $this->normalizeChannelEditorOverride(
+            (string) ($post['editor_override'] ?? 'inherit')
         );
-        $pageRouteMode = $this->normalizeChannelPageRouteMode(
-            (string) ($post['page_route_mode'] ?? 'inherit')
+        $routeMode = $this->normalizeChannelRouteMode(
+            (string) ($post['route_mode'] ?? 'inherit')
         );
-        $pageUrlSeparator = $this->normalizeChannelPageUrlSeparator(
-            (string) ($post['page_url_separator'] ?? 'inherit')
+        $routeSeparator = $this->normalizeChannelRouteSeparator(
+            (string) ($post['route_separator'] ?? 'inherit')
         );
 
         if ($name === '' || $slug === null) {
             $this->flash('error', 'Channel name and valid slug are required.');
-            redirect($this->panelEditorUrlWithTab('/channels/edit', $id, $activeTab, 'basic'));
+            redirect($this->panelEditorUrlWithTab('/channel/edit', $id, $activeTab, 'basic'));
         }
 
         // Persist one channel record; repository handles create vs update.
         try {
-            $savedId = $this->channels->save([
+            $savedId = $this->channelRepo->save([
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
                 'description' => $description,
-                'text_editor_override' => $textEditorOverride,
-                'page_route_mode' => $pageRouteMode,
-                'page_url_separator' => $pageUrlSeparator,
+                'editor_override' => $editorOverride,
+                'route_mode' => $routeMode,
+                'route_separator' => $routeSeparator,
             ]);
         } catch (\Throwable) {
             $this->flash('error', 'Failed to save channel. Slug may already exist.');
-            redirect($this->panelEditorUrlWithTab('/channels/edit', $id, $activeTab, 'basic'));
+            redirect($this->panelEditorUrlWithTab('/channel/edit', $id, $activeTab, 'basic'));
         }
 
-        $savedEditUrl = $this->panelEditorUrlWithTab('/channels/edit', $savedId, $activeTab, 'basic');
+        $savedEditUrl = $this->panelEditorUrlWithTab('/channel/edit', $savedId, $activeTab, 'basic');
 
-        $currentRecord = $this->channels->findById($savedId);
+        $currentRecord = $this->channelRepo->findById($savedId);
         $currentPaths = $this->taxonomyImagePathsFromRecord($currentRecord);
         $nextPaths = $currentPaths;
         $newPathSets = [];
@@ -1095,7 +1095,7 @@ final class PanelController
         }
 
         try {
-            $this->channels->updateImagePaths($savedId, $nextPaths);
+            $this->channelRepo->updateImagePaths($savedId, $nextPaths);
         } catch (\Throwable) {
             // Keep DB and filesystem in sync when image-path persistence fails.
             $this->cleanupTaxonomyImagePathSets('channels', $savedId, $newPathSets);
@@ -1115,27 +1115,27 @@ final class PanelController
      *
      * @param array<string, mixed> $post
      */
-    public function channelsDelete(array $post): void
+    public function channelDelete(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('channels', 'delete')) {
+        if (!$this->requireRoutePermissionOrForbidden('channel', 'delete')) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/channels'));
+            redirect($this->panelUrl('/channel'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id !== null) {
-            $record = $this->channels->findById($id);
+            $record = $this->channelRepo->findById($id);
             // Single-row delete path (row action button).
             try {
-                $this->channels->deleteById($id);
+                $this->channelRepo->deleteById($id);
             } catch (\Throwable) {
                 $this->flash('error', 'Failed to delete channel.');
-                redirect($this->panelUrl('/channels'));
+                redirect($this->panelUrl('/channel'));
             }
 
             if ($record !== null) {
@@ -1147,24 +1147,24 @@ final class PanelController
             }
 
             $this->flash('success', 'Channel deleted.');
-            redirect($this->panelUrl('/channels'));
+            redirect($this->panelUrl('/channel'));
         }
 
         // Bulk-delete mode is used by the list-level "Delete" buttons.
         $selectedIds = $this->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->flash('error', 'No channels selected.');
-            redirect($this->panelUrl('/channels'));
+            redirect($this->panelUrl('/channel'));
         }
 
         $deletedCount = 0;
         $failedCount = 0;
 
         foreach ($selectedIds as $selectedId) {
-            $record = $this->channels->findById($selectedId);
+            $record = $this->channelRepo->findById($selectedId);
             try {
                 // Continue deleting remaining ids even if one operation throws.
-                $this->channels->deleteById($selectedId);
+                $this->channelRepo->deleteById($selectedId);
                 if ($record !== null) {
                     $this->deleteTaxonomyStoredPaths(
                         'channels',
@@ -1188,42 +1188,42 @@ final class PanelController
             $this->flash('error', 'Failed to delete selected channels.');
         }
 
-        redirect($this->panelUrl('/channels'));
+        redirect($this->panelUrl('/channel'));
     }
 
     /**
      * Lists categories for Category management section.
      */
-    public function categoriesList(): void
+    public function categoryList(): void
     {
         $this->requirePanelLogin();
         if (!$this->categoryEnabled()) {
             $this->renderPublicNotFound();
             return;
         }
-        if (!$this->requireRoutePermissionOrForbidden('categories', 'view')) {
+        if (!$this->requireRoutePermissionOrForbidden('category', 'view')) {
             return;
         }
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->categories->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $pageResult = $this->categoryRepo->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
         $totalItems = (int) ($pageResult['total'] ?? 0);
-        $categories = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->categories->listPageForPanel($perPage, $pagination['offset']);
-            $categories = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+            $pageResult = $this->categoryRepo->listPageForPanel($perPage, $pagination['offset']);
+            $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
-        $this->view->render('panel/categories/list', [
+        $this->view->render('panel/category/list', [
             'site' => $this->siteData(),
-            'categories' => $categories,
-            'pagination' => $this->panelPaginationViewData('/categories', $pagination),
+            'categoryRows' => $categoryRows,
+            'pagination' => $this->panelPaginationViewData('/category', $pagination),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
-            'section' => 'categories',
+            'section' => 'category',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -1232,7 +1232,7 @@ final class PanelController
     /**
      * Shows category create/edit form.
      */
-    public function categoriesEdit(?int $id = null): void
+    public function categoryEdit(?int $id = null): void
     {
         $this->requirePanelLogin();
         if (!$this->categoryEnabled()) {
@@ -1240,21 +1240,21 @@ final class PanelController
             return;
         }
         $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('categories', $requiredAction)) {
+        if (!$this->requireRoutePermissionOrForbidden('category', $requiredAction)) {
             return;
         }
 
         $category = null;
         if ($id !== null) {
-            $category = $this->categories->findById($id);
+            $category = $this->categoryRepo->findById($id);
 
             if ($category === null) {
                 $this->flash('error', 'Category not found.');
-                redirect($this->panelUrl('/categories'));
+                redirect($this->panelUrl('/category'));
             }
         }
 
-        $this->view->render('panel/categories/edit', [
+        $this->view->render('panel/category/edit', [
             'site' => $this->siteData(),
             'category' => $category,
             'categoryRoutePrefix' => $this->categoryRoutePrefix(),
@@ -1264,7 +1264,7 @@ final class PanelController
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'error' => $this->pullFlash('error'),
-            'section' => 'categories',
+            'section' => 'category',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -1276,7 +1276,7 @@ final class PanelController
      * @param array<string, mixed> $post
      * @param array<string, mixed> $files
      */
-    public function categoriesSave(array $post, array $files = []): void
+    public function categorySave(array $post, array $files = []): void
     {
         $this->requirePanelLogin();
         if (!$this->categoryEnabled()) {
@@ -1285,13 +1285,13 @@ final class PanelController
         }
         $id = $this->input->int($post['id'] ?? null, 1);
         $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('categories', $requiredAction)) {
+        if (!$this->requireRoutePermissionOrForbidden('category', $requiredAction)) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/categories'));
+            redirect($this->panelUrl('/category'));
         }
 
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
@@ -1301,12 +1301,12 @@ final class PanelController
 
         if ($name === '' || $slug === null) {
             $this->flash('error', 'Category name and valid slug are required.');
-            redirect($this->panelEditorUrlWithTab('/categories/edit', $id, $activeTab, 'basic'));
+            redirect($this->panelEditorUrlWithTab('/category/edit', $id, $activeTab, 'basic'));
         }
 
         // Persist one category; uniqueness conflicts are surfaced by repository.
         try {
-            $savedId = $this->categories->save([
+            $savedId = $this->categoryRepo->save([
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
@@ -1314,12 +1314,12 @@ final class PanelController
             ]);
         } catch (\Throwable) {
             $this->flash('error', 'Failed to save category. Slug may already exist.');
-            redirect($this->panelEditorUrlWithTab('/categories/edit', $id, $activeTab, 'basic'));
+            redirect($this->panelEditorUrlWithTab('/category/edit', $id, $activeTab, 'basic'));
         }
 
-        $savedEditUrl = $this->panelEditorUrlWithTab('/categories/edit', $savedId, $activeTab, 'basic');
+        $savedEditUrl = $this->panelEditorUrlWithTab('/category/edit', $savedId, $activeTab, 'basic');
 
-        $currentRecord = $this->categories->findById($savedId);
+        $currentRecord = $this->categoryRepo->findById($savedId);
         $currentPaths = $this->taxonomyImagePathsFromRecord($currentRecord);
         $nextPaths = $currentPaths;
         $newPathSets = [];
@@ -1373,7 +1373,7 @@ final class PanelController
         }
 
         try {
-            $this->categories->updateImagePaths($savedId, $nextPaths);
+            $this->categoryRepo->updateImagePaths($savedId, $nextPaths);
         } catch (\Throwable) {
             // Keep DB and filesystem in sync when image-path persistence fails.
             $this->cleanupTaxonomyImagePathSets('categories', $savedId, $newPathSets);
@@ -1393,31 +1393,31 @@ final class PanelController
      *
      * @param array<string, mixed> $post
      */
-    public function categoriesDelete(array $post): void
+    public function categoryDelete(array $post): void
     {
         $this->requirePanelLogin();
         if (!$this->categoryEnabled()) {
             $this->renderPublicNotFound();
             return;
         }
-        if (!$this->requireRoutePermissionOrForbidden('categories', 'delete')) {
+        if (!$this->requireRoutePermissionOrForbidden('category', 'delete')) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/categories'));
+            redirect($this->panelUrl('/category'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id !== null) {
-            $record = $this->categories->findById($id);
+            $record = $this->categoryRepo->findById($id);
             // Single-row delete path (row action button).
             try {
-                $this->categories->deleteById($id);
+                $this->categoryRepo->deleteById($id);
             } catch (\Throwable) {
                 $this->flash('error', 'Failed to delete category.');
-                redirect($this->panelUrl('/categories'));
+                redirect($this->panelUrl('/category'));
             }
 
             if ($record !== null) {
@@ -1429,24 +1429,24 @@ final class PanelController
             }
 
             $this->flash('success', 'Category deleted.');
-            redirect($this->panelUrl('/categories'));
+            redirect($this->panelUrl('/category'));
         }
 
         // Bulk-delete mode is used by the list-level "Delete" buttons.
         $selectedIds = $this->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->flash('error', 'No categories selected.');
-            redirect($this->panelUrl('/categories'));
+            redirect($this->panelUrl('/category'));
         }
 
         $deletedCount = 0;
         $failedCount = 0;
 
         foreach ($selectedIds as $selectedId) {
-            $record = $this->categories->findById($selectedId);
+            $record = $this->categoryRepo->findById($selectedId);
             try {
                 // Continue deleting remaining ids even if one operation throws.
-                $this->categories->deleteById($selectedId);
+                $this->categoryRepo->deleteById($selectedId);
                 if ($record !== null) {
                     $this->deleteTaxonomyStoredPaths(
                         'categories',
@@ -1470,42 +1470,42 @@ final class PanelController
             $this->flash('error', 'Failed to delete selected categories.');
         }
 
-        redirect($this->panelUrl('/categories'));
+        redirect($this->panelUrl('/category'));
     }
 
     /**
      * Lists tags for Tag management section.
      */
-    public function tagsList(): void
+    public function tagList(): void
     {
         $this->requirePanelLogin();
         if (!$this->tagEnabled()) {
             $this->renderPublicNotFound();
             return;
         }
-        if (!$this->requireRoutePermissionOrForbidden('tags', 'view')) {
+        if (!$this->requireRoutePermissionOrForbidden('tag', 'view')) {
             return;
         }
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->tags->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $pageResult = $this->tagRepo->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
         $totalItems = (int) ($pageResult['total'] ?? 0);
-        $tags = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->tags->listPageForPanel($perPage, $pagination['offset']);
-            $tags = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+            $pageResult = $this->tagRepo->listPageForPanel($perPage, $pagination['offset']);
+            $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
-        $this->view->render('panel/tags/list', [
+        $this->view->render('panel/tag/list', [
             'site' => $this->siteData(),
-            'tags' => $tags,
-            'pagination' => $this->panelPaginationViewData('/tags', $pagination),
+            'tagRows' => $tagRows,
+            'pagination' => $this->panelPaginationViewData('/tag', $pagination),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
-            'section' => 'tags',
+            'section' => 'tag',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -1514,7 +1514,7 @@ final class PanelController
     /**
      * Shows tag create/edit form.
      */
-    public function tagsEdit(?int $id = null): void
+    public function tagEdit(?int $id = null): void
     {
         $this->requirePanelLogin();
         if (!$this->tagEnabled()) {
@@ -1522,21 +1522,21 @@ final class PanelController
             return;
         }
         $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('tags', $requiredAction)) {
+        if (!$this->requireRoutePermissionOrForbidden('tag', $requiredAction)) {
             return;
         }
 
         $tag = null;
         if ($id !== null) {
-            $tag = $this->tags->findById($id);
+            $tag = $this->tagRepo->findById($id);
 
             if ($tag === null) {
                 $this->flash('error', 'Tag not found.');
-                redirect($this->panelUrl('/tags'));
+                redirect($this->panelUrl('/tag'));
             }
         }
 
-        $this->view->render('panel/tags/edit', [
+        $this->view->render('panel/tag/edit', [
             'site' => $this->siteData(),
             'tag' => $tag,
             'tagRoutePrefix' => $this->tagRoutePrefix(),
@@ -1546,7 +1546,7 @@ final class PanelController
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'error' => $this->pullFlash('error'),
-            'section' => 'tags',
+            'section' => 'tag',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -1558,7 +1558,7 @@ final class PanelController
      * @param array<string, mixed> $post
      * @param array<string, mixed> $files
      */
-    public function tagsSave(array $post, array $files = []): void
+    public function tagSave(array $post, array $files = []): void
     {
         $this->requirePanelLogin();
         if (!$this->tagEnabled()) {
@@ -1567,13 +1567,13 @@ final class PanelController
         }
         $id = $this->input->int($post['id'] ?? null, 1);
         $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('tags', $requiredAction)) {
+        if (!$this->requireRoutePermissionOrForbidden('tag', $requiredAction)) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/tags'));
+            redirect($this->panelUrl('/tag'));
         }
 
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
@@ -1583,12 +1583,12 @@ final class PanelController
 
         if ($name === '' || $slug === null) {
             $this->flash('error', 'Tag name and valid slug are required.');
-            redirect($this->panelEditorUrlWithTab('/tags/edit', $id, $activeTab, 'basic'));
+            redirect($this->panelEditorUrlWithTab('/tag/edit', $id, $activeTab, 'basic'));
         }
 
         // Persist one tag; uniqueness conflicts are surfaced by repository.
         try {
-            $savedId = $this->tags->save([
+            $savedId = $this->tagRepo->save([
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
@@ -1596,12 +1596,12 @@ final class PanelController
             ]);
         } catch (\Throwable) {
             $this->flash('error', 'Failed to save tag. Slug may already exist.');
-            redirect($this->panelEditorUrlWithTab('/tags/edit', $id, $activeTab, 'basic'));
+            redirect($this->panelEditorUrlWithTab('/tag/edit', $id, $activeTab, 'basic'));
         }
 
-        $savedEditUrl = $this->panelEditorUrlWithTab('/tags/edit', $savedId, $activeTab, 'basic');
+        $savedEditUrl = $this->panelEditorUrlWithTab('/tag/edit', $savedId, $activeTab, 'basic');
 
-        $currentRecord = $this->tags->findById($savedId);
+        $currentRecord = $this->tagRepo->findById($savedId);
         $currentPaths = $this->taxonomyImagePathsFromRecord($currentRecord);
         $nextPaths = $currentPaths;
         $newPathSets = [];
@@ -1655,7 +1655,7 @@ final class PanelController
         }
 
         try {
-            $this->tags->updateImagePaths($savedId, $nextPaths);
+            $this->tagRepo->updateImagePaths($savedId, $nextPaths);
         } catch (\Throwable) {
             // Keep DB and filesystem in sync when image-path persistence fails.
             $this->cleanupTaxonomyImagePathSets('tags', $savedId, $newPathSets);
@@ -1675,31 +1675,31 @@ final class PanelController
      *
      * @param array<string, mixed> $post
      */
-    public function tagsDelete(array $post): void
+    public function tagDelete(array $post): void
     {
         $this->requirePanelLogin();
         if (!$this->tagEnabled()) {
             $this->renderPublicNotFound();
             return;
         }
-        if (!$this->requireRoutePermissionOrForbidden('tags', 'delete')) {
+        if (!$this->requireRoutePermissionOrForbidden('tag', 'delete')) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/tags'));
+            redirect($this->panelUrl('/tag'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id !== null) {
-            $record = $this->tags->findById($id);
+            $record = $this->tagRepo->findById($id);
             // Single-row delete path (row action button).
             try {
-                $this->tags->deleteById($id);
+                $this->tagRepo->deleteById($id);
             } catch (\Throwable) {
                 $this->flash('error', 'Failed to delete tag.');
-                redirect($this->panelUrl('/tags'));
+                redirect($this->panelUrl('/tag'));
             }
 
             if ($record !== null) {
@@ -1711,24 +1711,24 @@ final class PanelController
             }
 
             $this->flash('success', 'Tag deleted.');
-            redirect($this->panelUrl('/tags'));
+            redirect($this->panelUrl('/tag'));
         }
 
         // Bulk-delete mode is used by the list-level "Delete" buttons.
         $selectedIds = $this->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->flash('error', 'No tags selected.');
-            redirect($this->panelUrl('/tags'));
+            redirect($this->panelUrl('/tag'));
         }
 
         $deletedCount = 0;
         $failedCount = 0;
 
         foreach ($selectedIds as $selectedId) {
-            $record = $this->tags->findById($selectedId);
+            $record = $this->tagRepo->findById($selectedId);
             try {
                 // Continue deleting remaining ids even if one operation throws.
-                $this->tags->deleteById($selectedId);
+                $this->tagRepo->deleteById($selectedId);
                 if ($record !== null) {
                     $this->deleteTaxonomyStoredPaths(
                         'tags',
@@ -1752,38 +1752,38 @@ final class PanelController
             $this->flash('error', 'Failed to delete selected tags.');
         }
 
-        redirect($this->panelUrl('/tags'));
+        redirect($this->panelUrl('/tag'));
     }
 
     /**
      * Lists redirects for Redirect management section.
      */
-    public function redirectsList(): void
+    public function redirectList(): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('redirects', 'view')) {
+        if (!$this->requireRoutePermissionOrForbidden('redirect', 'view')) {
             return;
         }
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->redirects->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $pageResult = $this->redirectRepo->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
         $totalItems = (int) ($pageResult['total'] ?? 0);
-        $redirects = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $redirectRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->redirects->listPageForPanel($perPage, $pagination['offset']);
-            $redirects = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+            $pageResult = $this->redirectRepo->listPageForPanel($perPage, $pagination['offset']);
+            $redirectRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
-        $this->view->render('panel/redirects/list', [
+        $this->view->render('panel/redirect/list', [
             'site' => $this->siteData(),
-            'redirects' => $redirects,
-            'pagination' => $this->panelPaginationViewData('/redirects', $pagination),
+            'redirectRows' => $redirectRows,
+            'pagination' => $this->panelPaginationViewData('/redirect', $pagination),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
-            'section' => 'redirects',
+            'section' => 'redirect',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -1792,31 +1792,31 @@ final class PanelController
     /**
      * Shows redirect create/edit form.
      */
-    public function redirectsEdit(?int $id = null): void
+    public function redirectEdit(?int $id = null): void
     {
         $this->requirePanelLogin();
         $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('redirects', $requiredAction)) {
+        if (!$this->requireRoutePermissionOrForbidden('redirect', $requiredAction)) {
             return;
         }
 
-        $editorData = $this->redirects->editFormData($id);
+        $editorData = $this->redirectRepo->editFormData($id);
         $redirectRow = is_array($editorData['redirect'] ?? null) ? $editorData['redirect'] : null;
-        $channelOptions = is_array($editorData['channels'] ?? null) ? $editorData['channels'] : [];
+        $channelOptions = is_array($editorData['channel_options'] ?? null) ? $editorData['channel_options'] : [];
 
         if ($id !== null && $redirectRow === null) {
             $this->flash('error', 'Redirect not found.');
-            redirect($this->panelUrl('/redirects'));
+            redirect($this->panelUrl('/redirect'));
         }
 
-        $this->view->render('panel/redirects/edit', [
+        $this->view->render('panel/redirect/edit', [
             'site' => $this->siteData(),
             'redirectRow' => $redirectRow,
             'channelOptions' => $channelOptions,
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'error' => $this->pullFlash('error'),
-            'section' => 'redirects',
+            'section' => 'redirect',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -1827,18 +1827,18 @@ final class PanelController
      *
      * @param array<string, mixed> $post
      */
-    public function redirectsSave(array $post): void
+    public function redirectSave(array $post): void
     {
         $this->requirePanelLogin();
         $id = $this->input->int($post['id'] ?? null, 1);
         $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('redirects', $requiredAction)) {
+        if (!$this->requireRoutePermissionOrForbidden('redirect', $requiredAction)) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/redirects'));
+            redirect($this->panelUrl('/redirect'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
@@ -1851,33 +1851,33 @@ final class PanelController
 
         if ($title === '' || $slug === null) {
             $this->flash('error', 'Redirect title and valid slug are required.');
-            redirect($this->panelUrl('/redirects/edit' . ($id !== null ? '/' . $id : '')));
+            redirect($this->panelUrl('/redirect/edit' . ($id !== null ? '/' . $id : '')));
         }
 
         if (!in_array($status, ['active', 'inactive'], true)) {
             $this->flash('error', 'Status must be Active or Inactive.');
-            redirect($this->panelUrl('/redirects/edit' . ($id !== null ? '/' . $id : '')));
+            redirect($this->panelUrl('/redirect/edit' . ($id !== null ? '/' . $id : '')));
         }
 
         // Prevent root redirects from hijacking reserved public prefixes.
         if ($channelSlug === null && $this->isReservedPublicRootSlug($slug)) {
             $this->flash('error', 'This slug is reserved and cannot be used at root level.');
-            redirect($this->panelUrl('/redirects/edit' . ($id !== null ? '/' . $id : '')));
+            redirect($this->panelUrl('/redirect/edit' . ($id !== null ? '/' . $id : '')));
         }
 
         // Channel dropdown should only post known channel slugs.
-        if ($channelSlug !== null && !$this->channels->slugExists($channelSlug)) {
+        if ($channelSlug !== null && !$this->channelRepo->slugExists($channelSlug)) {
             $this->flash('error', 'Selected channel does not exist.');
-            redirect($this->panelUrl('/redirects/edit' . ($id !== null ? '/' . $id : '')));
+            redirect($this->panelUrl('/redirect/edit' . ($id !== null ? '/' . $id : '')));
         }
 
         if (!$this->isAllowedRedirectTargetUrl($targetUrl)) {
             $this->flash('error', 'Target URL must be an absolute http(s) URL or a root-relative path.');
-            redirect($this->panelUrl('/redirects/edit' . ($id !== null ? '/' . $id : '')));
+            redirect($this->panelUrl('/redirect/edit' . ($id !== null ? '/' . $id : '')));
         }
 
         try {
-            $savedId = $this->redirects->save([
+            $savedId = $this->redirectRepo->save([
                 'id' => $id,
                 'title' => $title,
                 'description' => $description,
@@ -1888,11 +1888,11 @@ final class PanelController
             ]);
         } catch (\Throwable $exception) {
             $this->flash('error', $exception->getMessage() !== '' ? $exception->getMessage() : 'Failed to save redirect.');
-            redirect($this->panelUrl('/redirects/edit' . ($id !== null ? '/' . $id : '')));
+            redirect($this->panelUrl('/redirect/edit' . ($id !== null ? '/' . $id : '')));
         }
 
         $this->flash('success', 'Changes saved.');
-        redirect($this->panelUrl('/redirects/edit/' . $savedId));
+        redirect($this->panelUrl('/redirect/edit/' . $savedId));
     }
 
     /**
@@ -1900,37 +1900,37 @@ final class PanelController
      *
      * @param array<string, mixed> $post
      */
-    public function redirectsDelete(array $post): void
+    public function redirectDelete(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('redirects', 'delete')) {
+        if (!$this->requireRoutePermissionOrForbidden('redirect', 'delete')) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/redirects'));
+            redirect($this->panelUrl('/redirect'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id !== null) {
             // Single-row delete path (row action button).
             try {
-                $this->redirects->deleteById($id);
+                $this->redirectRepo->deleteById($id);
             } catch (\Throwable) {
                 $this->flash('error', 'Failed to delete redirect.');
-                redirect($this->panelUrl('/redirects'));
+                redirect($this->panelUrl('/redirect'));
             }
 
             $this->flash('success', 'Redirect deleted.');
-            redirect($this->panelUrl('/redirects'));
+            redirect($this->panelUrl('/redirect'));
         }
 
         // Bulk-delete mode is used by list-level "Delete" actions.
         $selectedIds = $this->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->flash('error', 'No redirects selected.');
-            redirect($this->panelUrl('/redirects'));
+            redirect($this->panelUrl('/redirect'));
         }
 
         $deletedCount = 0;
@@ -1938,7 +1938,7 @@ final class PanelController
 
         foreach ($selectedIds as $selectedId) {
             try {
-                $this->redirects->deleteById($selectedId);
+                $this->redirectRepo->deleteById($selectedId);
                 $deletedCount++;
             } catch (\Throwable) {
                 $failedCount++;
@@ -1955,58 +1955,58 @@ final class PanelController
             $this->flash('error', 'Failed to delete selected redirects.');
         }
 
-        redirect($this->panelUrl('/redirects'));
+        redirect($this->panelUrl('/redirect'));
     }
 
     /**
      * Lists users for User management section.
      */
-    public function usersList(): void
+    public function userList(): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('users', 'view')) {
+        if (!$this->requireRoutePermissionOrForbidden('user', 'view')) {
             return;
         }
 
         $prefilterGroup = strtolower(trim((string) ($this->input->text($_GET['group'] ?? null, 120) ?? '')));
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->users->listPageForPanel(
+        $pageResult = $this->userRepo->listPageForPanel(
             $perPage,
             ($requestedPage - 1) * $perPage,
             $prefilterGroup !== '' ? $prefilterGroup : null
         );
         $totalItems = (int) ($pageResult['total'] ?? 0);
-        $users = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $userRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->users->listPageForPanel(
+            $pageResult = $this->userRepo->listPageForPanel(
                 $perPage,
                 $pagination['offset'],
                 $prefilterGroup !== '' ? $prefilterGroup : null
             );
-            $users = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+            $userRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
         $groupOptions = is_array($pageResult['group_options'] ?? null)
             ? $pageResult['group_options']
-            : $this->groups->listOptions();
+            : $this->groupRepo->listOptions();
 
-        $this->view->render('panel/users/list', [
+        $this->view->render('panel/user/list', [
             'site' => $this->siteData(),
-            'users' => $users,
+            'users' => $userRows,
             'prefilterGroup' => $prefilterGroup,
             'groupOptions' => $groupOptions,
             'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
             'pagination' => $this->panelPaginationViewData(
-                '/users',
+                '/user',
                 $pagination,
                 ['group' => $prefilterGroup]
             ),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
-            'section' => 'users',
+            'section' => 'user',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -2015,15 +2015,15 @@ final class PanelController
     /**
      * Shows user create/edit form.
      */
-    public function usersEdit(?int $id = null): void
+    public function userEdit(?int $id = null): void
     {
         $this->requirePanelLogin();
         $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('users', $requiredAction)) {
+        if (!$this->requireRoutePermissionOrForbidden('user', $requiredAction)) {
             return;
         }
 
-        $editData = $this->users->editFormData($id);
+        $editData = $this->userRepo->editFormData($id);
         $user = is_array($editData['user'] ?? null) ? $editData['user'] : null;
         if (is_array($user)) {
             $normalizedTheme = $this->normalizePanelThemeChoice((string) ($user['theme'] ?? 'default'), true);
@@ -2040,12 +2040,12 @@ final class PanelController
         }
         if ($id !== null && $user === null) {
             $this->flash('error', 'User not found.');
-            redirect($this->panelUrl('/users'));
+            redirect($this->panelUrl('/user'));
         }
         $groupOptions = is_array($editData['group_options'] ?? null) ? $editData['group_options'] : [];
         $actorIsSuperAdmin = $this->auth->isSuperAdmin();
 
-        $this->view->render('panel/users/edit', [
+        $this->view->render('panel/user/edit', [
             'site' => $this->siteData(),
             'userRow' => $user,
             'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
@@ -2063,7 +2063,7 @@ final class PanelController
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'error' => $this->pullFlash('error'),
-            'section' => 'users',
+            'section' => 'user',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -2075,23 +2075,23 @@ final class PanelController
      * @param array<string, mixed> $post
      * @param array<string, mixed> $files
      */
-    public function usersSave(array $post, array $files): void
+    public function userSave(array $post, array $files): void
     {
         $this->requirePanelLogin();
         $id = $this->input->int($post['id'] ?? null, 1);
         $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('users', $requiredAction)) {
+        if (!$this->requireRoutePermissionOrForbidden('user', $requiredAction)) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/users'));
+            redirect($this->panelUrl('/user'));
         }
 
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['account', 'permissions', 'profile', 'security'], 'account');
-        $editPath = '/users/edit' . ($id !== null ? '/' . $id : '');
-        $editUrl = $this->panelEditorUrlWithTab('/users/edit', $id, $activeTab, 'account');
+        $editPath = '/user/edit' . ($id !== null ? '/' . $id : '');
+        $editUrl = $this->panelEditorUrlWithTab('/user/edit', $id, $activeTab, 'account');
         $loginIdentifierMode = $this->panelLoginIdentifierMode();
         $usernameSubmitted = array_key_exists('username', $post);
         $rawUsername = $this->input->text($post['username'] ?? null, 254);
@@ -2114,10 +2114,10 @@ final class PanelController
         $existingTwoFactorMethods = [];
         $canUpdateTwoFactorMethods = false;
         if ($id !== null) {
-            $existingUser = $this->users->findById($id);
+            $existingUser = $this->userRepo->findById($id);
             if ($existingUser === null) {
                 $this->flash('error', 'User not found.');
-                redirect($this->panelUrl('/users'));
+                redirect($this->panelUrl('/user'));
             }
 
             $existingPreferences = $this->auth->userPreferences($id);
@@ -2147,7 +2147,7 @@ final class PanelController
         }
 
         // Keep only existing group ids to avoid invalid assignments.
-        $groupOptions = $this->groups->listOptions();
+        $groupOptions = $this->groupRepo->listOptions();
         $validGroupIds = array_map(
             static fn (array $g): int => (int) $g['id'],
             $groupOptions
@@ -2160,7 +2160,7 @@ final class PanelController
         }
 
         // Only Super Admin actors may assign users into Super Admin group.
-        $superAdminGroupId = $this->groups->idBySlug('super');
+        $superAdminGroupId = $this->groupRepo->idBySlug('super');
         $actorIsSuperAdmin = $this->auth->isSuperAdmin();
         if (!$actorIsSuperAdmin && $superAdminGroupId !== null) {
             $targetAlreadyHasSuperAdmin = false;
@@ -2234,7 +2234,7 @@ final class PanelController
 
         if ($id === null && !hash_equals($password, $passwordConfirm)) {
             $this->flash('error', 'Password confirmation does not match.');
-            redirect($this->panelEditorUrlWithTab('/users/edit', $id, $activeTab, 'security'));
+            redirect($this->panelEditorUrlWithTab('/user/edit', $id, $activeTab, 'security'));
         }
 
         if ($id !== null && $password !== '' && strlen($password) < 8) {
@@ -2244,12 +2244,12 @@ final class PanelController
 
         if ($id !== null && $password !== '' && !hash_equals($password, $passwordConfirm)) {
             $this->flash('error', 'Password confirmation does not match.');
-            redirect($this->panelEditorUrlWithTab('/users/edit', $id, $activeTab, 'security'));
+            redirect($this->panelEditorUrlWithTab('/user/edit', $id, $activeTab, 'security'));
         }
 
         // Ensure users always keep at least one group assignment.
         if ($groupIds === []) {
-            $fallbackGroupId = $this->groups->idBySlug('guest');
+            $fallbackGroupId = $this->groupRepo->idBySlug('guest');
             if ($fallbackGroupId !== null) {
                 $groupIds = [$fallbackGroupId];
             }
@@ -2323,7 +2323,7 @@ final class PanelController
         $createdUserId = null;
         try {
             // Repository enforces uniqueness and applies password hashing.
-            $savedId = $this->users->save([
+            $savedId = $this->userRepo->save([
                 'id' => $id,
                 'username' => is_string($username) ? $username : '',
                 'display_name' => $displayName,
@@ -2350,7 +2350,7 @@ final class PanelController
                 $avatarSet = true;
                 $uploadedAvatarFilename = $avatarFilename;
 
-                $this->users->save([
+                $this->userRepo->save([
                     'id' => $savedId,
                     'username' => is_string($username) ? $username : '',
                     'display_name' => $displayName,
@@ -2372,7 +2372,7 @@ final class PanelController
             // Keep create+upload flow atomic when avatar post-write fails.
             if ($id === null && $createdUserId !== null) {
                 try {
-                    $this->users->deleteById($createdUserId);
+                    $this->userRepo->deleteById($createdUserId);
                 } catch (\Throwable) {
                     // Suppress cleanup failures; original save error is shown to operator.
                 }
@@ -2415,11 +2415,11 @@ final class PanelController
 
         if ($twoFactorUpdateError !== null) {
             $this->flash('error', $twoFactorUpdateError);
-            redirect($this->panelEditorUrlWithTab('/users/edit', $savedId, $activeTab, 'security'));
+            redirect($this->panelEditorUrlWithTab('/user/edit', $savedId, $activeTab, 'security'));
         }
 
         $this->flash('success', 'Changes saved.');
-        redirect($this->panelEditorUrlWithTab('/users/edit', $savedId, $activeTab, 'account'));
+        redirect($this->panelEditorUrlWithTab('/user/edit', $savedId, $activeTab, 'account'));
     }
 
     /**
@@ -2427,16 +2427,16 @@ final class PanelController
      *
      * @param array<string, mixed> $post
      */
-    public function usersDelete(array $post): void
+    public function userDelete(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('users', 'delete')) {
+        if (!$this->requireRoutePermissionOrForbidden('user', 'delete')) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/users'));
+            redirect($this->panelUrl('/user'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
@@ -2446,25 +2446,25 @@ final class PanelController
             // Prevent deleting the currently authenticated account from this UI.
             if ($currentUserId === $id) {
                 $this->flash('error', 'You cannot delete your currently logged-in account.');
-                redirect($this->panelUrl('/users'));
+                redirect($this->panelUrl('/user'));
             }
 
             try {
-                $this->users->deleteById($id);
+                $this->userRepo->deleteById($id);
             } catch (\Throwable $exception) {
                 $this->flash('error', $exception->getMessage() ?: 'Failed to delete user.');
-                redirect($this->panelUrl('/users'));
+                redirect($this->panelUrl('/user'));
             }
 
             $this->flash('success', 'User deleted.');
-            redirect($this->panelUrl('/users'));
+            redirect($this->panelUrl('/user'));
         }
 
         // Bulk-delete mode is used by the list-level "Delete" buttons.
         $selectedIds = $this->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->flash('error', 'No users selected.');
-            redirect($this->panelUrl('/users'));
+            redirect($this->panelUrl('/user'));
         }
 
         $deletedCount = 0;
@@ -2480,7 +2480,7 @@ final class PanelController
 
             try {
                 // Continue processing remaining selections on individual failures.
-                $this->users->deleteById($selectedId);
+                $this->userRepo->deleteById($selectedId);
                 $deletedCount++;
             } catch (\Throwable) {
                 $failedCount++;
@@ -2504,7 +2504,7 @@ final class PanelController
             }
         }
 
-        redirect($this->panelUrl('/users'));
+        redirect($this->panelUrl('/user'));
     }
 
     /**
@@ -2513,14 +2513,14 @@ final class PanelController
     public function userInvites(): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('users', 'view')) {
+        if (!$this->requireRoutePermissionOrForbidden('user', 'view')) {
             return;
         }
         if (!$this->ensureInviteRegistrationMode()) {
             return;
         }
 
-        $this->view->render('panel/users/invites', [
+        $this->view->render('panel/user/invites', [
             'site' => $this->siteData(),
             'inviteRows' => $this->inviteTokens->listForPanel(),
             'inviteCreatorMap' => $this->inviteCreatorMap(),
@@ -2530,7 +2530,7 @@ final class PanelController
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
-            'section' => 'users',
+            'section' => 'user',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -2543,7 +2543,7 @@ final class PanelController
      */
     private function inviteCreatorMap(): array
     {
-        $rows = $this->users->listAll();
+        $rows = $this->userRepo->listAll();
         $map = [];
         foreach ($rows as $row) {
             $userId = (int) ($row['id'] ?? 0);
@@ -2560,7 +2560,7 @@ final class PanelController
 
             $map[$userId] = [
                 'label' => $label,
-                'edit_url' => $this->panelUrl('/users/edit/' . $userId),
+                'edit_url' => $this->panelUrl('/user/edit/' . $userId),
             ];
         }
 
@@ -2575,7 +2575,7 @@ final class PanelController
     public function userInvitesCreate(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('users', 'create')) {
+        if (!$this->requireRoutePermissionOrForbidden('user', 'create')) {
             return;
         }
         if (!$this->ensureInviteRegistrationMode()) {
@@ -2584,7 +2584,7 @@ final class PanelController
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/users/invites'));
+            redirect($this->panelUrl('/user/invites'));
         }
 
         $isReusable = $this->panelInvitePolicyService()->isReusableInviteType($post['invite_type'] ?? 'single');
@@ -2600,19 +2600,19 @@ final class PanelController
             $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
         } catch (\RuntimeException $exception) {
             $this->flash('error', $exception->getMessage());
-            redirect($this->panelUrl('/users/invites'));
+            redirect($this->panelUrl('/user/invites'));
         }
 
         try {
             $token = $this->inviteTokens->createToken($isReusable, $expiresAt, $this->auth->userId(), $manualToken);
         } catch (\Throwable $exception) {
             $this->flash('error', 'Failed to create invite token: ' . ($exception->getMessage() ?: 'Unknown error.'));
-            redirect($this->panelUrl('/users/invites'));
+            redirect($this->panelUrl('/user/invites'));
         }
 
         $this->flash('success', $isReusable ? 'Reusable invite token created.' : 'Single-use invite token created.');
         $this->flashList('generated_invites', [$token]);
-        redirect($this->panelUrl('/users/invites'));
+        redirect($this->panelUrl('/user/invites'));
     }
 
     /**
@@ -2623,7 +2623,7 @@ final class PanelController
     public function userInvitesGenerate(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('users', 'create')) {
+        if (!$this->requireRoutePermissionOrForbidden('user', 'create')) {
             return;
         }
         if (!$this->ensureInviteRegistrationMode()) {
@@ -2632,7 +2632,7 @@ final class PanelController
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/users/invites'));
+            redirect($this->panelUrl('/user/invites'));
         }
 
         $count = $this->panelInvitePolicyService()->normalizeBatchCount($post['count'] ?? null, 10, 1, 100);
@@ -2641,19 +2641,19 @@ final class PanelController
             $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
         } catch (\RuntimeException $exception) {
             $this->flash('error', $exception->getMessage());
-            redirect($this->panelUrl('/users/invites'));
+            redirect($this->panelUrl('/user/invites'));
         }
 
         try {
             $tokens = $this->inviteTokens->createSingleUseBatch($count, $expiresAt, $this->auth->userId());
         } catch (\Throwable $exception) {
             $this->flash('error', 'Failed to generate invite tokens: ' . ($exception->getMessage() ?: 'Unknown error.'));
-            redirect($this->panelUrl('/users/invites'));
+            redirect($this->panelUrl('/user/invites'));
         }
 
         $this->flash('success', 'Generated ' . count($tokens) . ' single-use invite token' . (count($tokens) === 1 ? '' : 's') . '.');
         $this->flashList('generated_invites', $tokens);
-        redirect($this->panelUrl('/users/invites'));
+        redirect($this->panelUrl('/user/invites'));
     }
 
     /**
@@ -2664,7 +2664,7 @@ final class PanelController
     public function userInvitesDelete(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('users', 'delete')) {
+        if (!$this->requireRoutePermissionOrForbidden('user', 'delete')) {
             return;
         }
         if (!$this->ensureInviteRegistrationMode()) {
@@ -2673,54 +2673,54 @@ final class PanelController
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/users/invites'));
+            redirect($this->panelUrl('/user/invites'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id === null) {
             $this->flash('error', 'Invite token id is required.');
-            redirect($this->panelUrl('/users/invites'));
+            redirect($this->panelUrl('/user/invites'));
         }
 
         if (!$this->inviteTokens->deleteById($id)) {
             $this->flash('error', 'Invite token was not found.');
-            redirect($this->panelUrl('/users/invites'));
+            redirect($this->panelUrl('/user/invites'));
         }
 
         $this->flash('success', 'Invite token deleted.');
-        redirect($this->panelUrl('/users/invites'));
+        redirect($this->panelUrl('/user/invites'));
     }
 
     /**
      * Lists groups for Usergroup management section.
      */
-    public function groupsList(): void
+    public function groupList(): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('groups', 'view')) {
+        if (!$this->requireRoutePermissionOrForbidden('group', 'view')) {
             return;
         }
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->groups->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $pageResult = $this->groupRepo->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
         $totalItems = (int) ($pageResult['total'] ?? 0);
-        $groups = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $groupRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->groups->listPageForPanel($perPage, $pagination['offset']);
-            $groups = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+            $pageResult = $this->groupRepo->listPageForPanel($perPage, $pagination['offset']);
+            $groupRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
-        $this->view->render('panel/groups/list', [
+        $this->view->render('panel/group/list', [
             'site' => $this->siteData(),
-            'groups' => $groups,
-            'pagination' => $this->panelPaginationViewData('/groups', $pagination),
+            'groups' => $groupRows,
+            'pagination' => $this->panelPaginationViewData('/group', $pagination),
             'groupRoutingEnabledSystemWide' => $this->groupRoutesEnabledForRoutingTable(),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
-            'section' => 'groups',
+            'section' => 'group',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -2729,25 +2729,25 @@ final class PanelController
     /**
      * Shows usergroup create/edit form.
      */
-    public function groupsEdit(?int $id = null): void
+    public function groupEdit(?int $id = null): void
     {
         $this->requirePanelLogin();
         $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('groups', $requiredAction)) {
+        if (!$this->requireRoutePermissionOrForbidden('group', $requiredAction)) {
             return;
         }
 
         $group = null;
         if ($id !== null) {
-            $group = $this->groups->findById($id);
+            $group = $this->groupRepo->findById($id);
 
             if ($group === null) {
                 $this->flash('error', 'Group not found.');
-                redirect($this->panelUrl('/groups'));
+                redirect($this->panelUrl('/group'));
             }
         }
 
-        $this->view->render('panel/groups/edit', [
+        $this->view->render('panel/group/edit', [
             'site' => $this->siteData(),
             'group' => $group,
             'groupRoutePrefix' => $this->groupRoutePrefix(),
@@ -2757,7 +2757,7 @@ final class PanelController
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'error' => $this->pullFlash('error'),
-            'section' => 'groups',
+            'section' => 'group',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
@@ -2768,25 +2768,25 @@ final class PanelController
      *
      * @param array<string, mixed> $post
      */
-    public function groupsSave(array $post): void
+    public function groupSave(array $post): void
     {
         $this->requirePanelLogin();
         $id = $this->input->int($post['id'] ?? null, 1);
         $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('groups', $requiredAction)) {
+        if (!$this->requireRoutePermissionOrForbidden('group', $requiredAction)) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/groups'));
+            redirect($this->panelUrl('/group'));
         }
 
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'permissions'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 100);
-        $editUrl = $this->panelEditorUrlWithTab('/groups/edit', $id, $activeTab, 'basic');
+        $editUrl = $this->panelEditorUrlWithTab('/group/edit', $id, $activeTab, 'basic');
         $actorIsSuperAdmin = $this->auth->isSuperAdmin();
-        $existingGroup = $id !== null ? $this->groups->findById($id) : null;
+        $existingGroup = $id !== null ? $this->groupRepo->findById($id) : null;
         $isExistingStockGroup = is_array($existingGroup) && (int) ($existingGroup['is_stock'] ?? 0) === 1;
         $slugRaw = trim($this->input->text($post['slug'] ?? null, 160));
         $slug = '';
@@ -2883,7 +2883,7 @@ final class PanelController
         }
 
         try {
-            $savedId = $this->groups->save([
+            $savedId = $this->groupRepo->save([
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
@@ -2896,7 +2896,7 @@ final class PanelController
         }
 
         $this->flash('success', 'Changes saved.');
-        redirect($this->panelEditorUrlWithTab('/groups/edit', $savedId, $activeTab, 'basic'));
+        redirect($this->panelEditorUrlWithTab('/group/edit', $savedId, $activeTab, 'basic'));
     }
 
     /**
@@ -2904,37 +2904,37 @@ final class PanelController
      *
      * @param array<string, mixed> $post
      */
-    public function groupsDelete(array $post): void
+    public function groupDelete(array $post): void
     {
         $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('groups', 'delete')) {
+        if (!$this->requireRoutePermissionOrForbidden('group', 'delete')) {
             return;
         }
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/groups'));
+            redirect($this->panelUrl('/group'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id !== null) {
             // Single-row delete path (row action button).
             try {
-                $this->groups->deleteById($id);
+                $this->groupRepo->deleteById($id);
             } catch (\Throwable $exception) {
                 $this->flash('error', $exception->getMessage() ?: 'Failed to delete group.');
-                redirect($this->panelUrl('/groups'));
+                redirect($this->panelUrl('/group'));
             }
 
             $this->flash('success', 'Group deleted.');
-            redirect($this->panelUrl('/groups'));
+            redirect($this->panelUrl('/group'));
         }
 
         // Bulk-delete mode is used by the list-level "Delete" buttons.
         $selectedIds = $this->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->flash('error', 'No groups selected.');
-            redirect($this->panelUrl('/groups'));
+            redirect($this->panelUrl('/group'));
         }
 
         $deletedCount = 0;
@@ -2943,7 +2943,7 @@ final class PanelController
         foreach ($selectedIds as $selectedId) {
             try {
                 // Repository enforces stock-group protections per selected id.
-                $this->groups->deleteById($selectedId);
+                $this->groupRepo->deleteById($selectedId);
                 $deletedCount++;
             } catch (\Throwable) {
                 $failedCount++;
@@ -2960,7 +2960,7 @@ final class PanelController
             $this->flash('error', 'Failed to delete selected groups.');
         }
 
-        redirect($this->panelUrl('/groups'));
+        redirect($this->panelUrl('/group'));
     }
 
     /**
@@ -3548,9 +3548,9 @@ final class PanelController
         $routeRows = $this->routingRowsForPanel();
         $summary = [
             'total' => count($routeRows),
-            'pages' => count(array_filter($routeRows, static fn (array $row): bool => (string) ($row['type_key'] ?? '') === 'page')),
-            'channels' => count(array_filter($routeRows, static fn (array $row): bool => (string) ($row['type_key'] ?? '') === 'channel')),
-            'redirects' => count(array_filter($routeRows, static fn (array $row): bool => (string) ($row['type_key'] ?? '') === 'redirect')),
+            'page' => count(array_filter($routeRows, static fn (array $row): bool => (string) ($row['type_key'] ?? '') === 'page')),
+            'channel' => count(array_filter($routeRows, static fn (array $row): bool => (string) ($row['type_key'] ?? '') === 'channel')),
+            'redirect' => count(array_filter($routeRows, static fn (array $row): bool => (string) ($row['type_key'] ?? '') === 'redirect')),
             'conflicts' => count(array_filter($routeRows, static fn (array $row): bool => !empty($row['is_conflict']))),
         ];
 
@@ -4688,7 +4688,7 @@ final class PanelController
             $rawValue,
             $workingConfig,
             fn (string $value): string => $this->normalizeBodyTextEditorOption($value),
-            fn (string $value): string => $this->normalizeGlobalPageUrlSeparator($value),
+            fn (string $value): string => $this->normalizeGlobalRouteSeparator($value),
             fn (string $theme, bool $allowDefault): ?string => $this->normalizePanelThemeChoice($theme, $allowDefault),
             $this->publicThemeOptions()
         );
@@ -5225,7 +5225,7 @@ final class PanelController
             $enabledMap,
             $this->extensionsBasePath(),
             fn (string $extensionPath): array => $this->readExtensionManifest($extensionPath),
-            fn (string $tableName): array => $this->taxonomy->listEnabledExtensionForms($tableName)
+            fn (string $tableName): array => $this->taxonomyRepo->listEnabledExtensionForms($tableName)
         );
     }
 
@@ -5254,7 +5254,7 @@ final class PanelController
     private function listExtensionsForPanel(): array
     {
         return $this->extensionCatalogService()->listForPanel(
-            fn (string $tableName): array => $this->taxonomy->listEnabledExtensionForms($tableName)
+            fn (string $tableName): array => $this->taxonomyRepo->listEnabledExtensionForms($tableName)
         );
     }
 
@@ -5280,7 +5280,7 @@ final class PanelController
     {
         return $this->extensionCatalogService()->readManifest(
             $extensionPath,
-            fn (string $tableName): array => $this->taxonomy->listEnabledExtensionForms($tableName)
+            fn (string $tableName): array => $this->taxonomyRepo->listEnabledExtensionForms($tableName)
         );
     }
 
@@ -5655,7 +5655,7 @@ final class PanelController
         }
 
         $this->flash('error', 'User invite tokens are available only when public registration mode is set to Invite.');
-        redirect($this->panelUrl('/users'));
+        redirect($this->panelUrl('/user'));
         return false;
     }
 
@@ -5678,7 +5678,7 @@ final class PanelController
     }
 
     /**
-     * Builds panel-visible routing inventory rows for pages/channels/categories/tags/redirects/users/groups.
+     * Builds panel-visible routing inventory rows for page/channel/category/tag/redirect/user/group.
      *
      * @return array<int, array{
      *   type_key: string,
@@ -5704,11 +5704,11 @@ final class PanelController
 
         $groupRoutingEnabled = $groupRoutesEnabled && $groupPrefix !== '';
         $userRoutingEnabled = $profileRoutesEnabled && $profilePrefix !== '';
-        $routingAuthData = $this->users->listRoutingData($groupRoutingEnabled, $userRoutingEnabled);
-        $routingGroups = is_array($routingAuthData['groups'] ?? null) ? $routingAuthData['groups'] : [];
-        $routingUsers = is_array($routingAuthData['users'] ?? null) ? $routingAuthData['users'] : [];
+        $routingAuthData = $this->userRepo->listRoutingData($groupRoutingEnabled, $userRoutingEnabled);
+        $routingGroups = is_array($routingAuthData['group_rows'] ?? null) ? $routingAuthData['group_rows'] : [];
+        $routingUsers = is_array($routingAuthData['user_rows'] ?? null) ? $routingAuthData['user_rows'] : [];
 
-        $taxonomyRoutingData = $this->taxonomy->listRoutingInventoryData(
+        $taxonomyRoutingData = $this->taxonomyRepo->listRoutingInventoryData(
             $categoryPrefix !== '',
             $tagPrefix !== '',
             true
@@ -5732,19 +5732,19 @@ final class PanelController
             'can_edit_groups' => $this->auth->hasPanelPermissionBit(PanelAccess::GROUPS_EDIT),
             'routing_groups' => $routingGroups,
             'routing_users' => $routingUsers,
-            'channel_routing_options' => is_array($taxonomyRoutingData['channels'] ?? null)
-                ? $taxonomyRoutingData['channels']
+            'channel_routing_options' => is_array($taxonomyRoutingData['channel_options'] ?? null)
+                ? $taxonomyRoutingData['channel_options']
                 : [],
-            'category_routing_options' => is_array($taxonomyRoutingData['categories'] ?? null)
-                ? $taxonomyRoutingData['categories']
+            'category_routing_options' => is_array($taxonomyRoutingData['category_options'] ?? null)
+                ? $taxonomyRoutingData['category_options']
                 : [],
-            'tag_routing_options' => is_array($taxonomyRoutingData['tags'] ?? null)
-                ? $taxonomyRoutingData['tags']
+            'tag_routing_options' => is_array($taxonomyRoutingData['tag_options'] ?? null)
+                ? $taxonomyRoutingData['tag_options']
                 : [],
-            'redirect_routing_rows' => is_array($taxonomyRoutingData['redirects'] ?? null)
-                ? $taxonomyRoutingData['redirects']
+            'redirect_routing_rows' => is_array($taxonomyRoutingData['redirect_rows'] ?? null)
+                ? $taxonomyRoutingData['redirect_rows']
                 : [],
-            'pages_for_routing' => $this->pages->listAllForRouting(),
+            'pages_for_routing' => $this->pageRepo->listAllForRouting(),
             'build_page_url' => fn (
                 string $pageSlug,
                 int $pageId,
@@ -5775,8 +5775,8 @@ final class PanelController
         int $pageId,
         string $channelSlug,
         string $publishedAt,
-        string $channelPageRouteMode,
-        string $channelPageUrlSeparator
+        string $routeModeEffective,
+        string $routeSeparatorEffective
     ): string {
         return $this->panelRoutingPreviewService()->routingPublicPathForPage(
             $pageSlug,
@@ -5785,9 +5785,9 @@ final class PanelController
             $publishedAt,
             $channelSlug === ''
                 ? $this->globalPageRouteMode()
-                : $this->effectiveChannelPageRouteMode($channelPageRouteMode),
-            $channelPageUrlSeparator,
-            (string) $this->config->get('content.separator', '-')
+                : $this->effectiveChannelRouteMode($routeModeEffective),
+            $routeSeparatorEffective,
+            (string) $this->config->get('content.route_separator', '-')
         );
     }
 

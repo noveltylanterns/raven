@@ -28,7 +28,7 @@ Last updated: 2026-03-14
 2. Create valid `theme.json` first.
 3. Add `css/style.css` (even if minimal).
 4. Add `tpl/wrapper.php` with render guard and `$content` output.
-5. Add only the view overrides you need (`tpl/pages/index.php`, `tpl/home.php`, etc.).
+5. Add only the view overrides you need (`tpl/page/index.php`, `tpl/home.php`, etc.).
 6. Enable the theme in Theme Manager or via `private/bin/rvn-theme enable --slug <theme_slug>`, then verify route/template rendering.
 
 ## Canonical Minimal Theme Scaffold
@@ -169,11 +169,11 @@ body { background: #fff; color: #212529; }
 - `GET /` -> homepage
 - `POST /signups/submit/{slug}` -> embedded signup submit
 - `POST /contact-form/submit/{slug}` -> embedded contact submit
-- `GET /{categories.prefix}/{slug}` and `GET /{categories.prefix}/{slug}/{page}` -> category listing
-- `GET /{tags.prefix}/{slug}` and `GET /{tags.prefix}/{slug}/{page}` -> tag listing
+- `GET /{category.prefix}/{slug}` and `GET /{category.prefix}/{slug}/{page}` -> category listing
+- `GET /{tag.prefix}/{slug}` and `GET /{tag.prefix}/{slug}/{page}` -> tag listing
 - `GET /{session.profile_prefix}/{username}` -> profile route (enabled when `session.profile_prefix` is configured)
 - `GET /{session.group_prefix}/{group_slug}` -> group route (enabled when `session.group_prefix` is configured)
-- When `categories.prefix` or `tags.prefix` is blank, that route family is disabled. Profile routes are disabled when `session.profile_prefix` is blank. Group routes are disabled when `session.group_prefix` is blank.
+- When `category.prefix` or `tag.prefix` is blank, that route family is disabled. Profile routes are disabled when `session.profile_prefix` is blank. Group routes are disabled when `session.group_prefix` is blank.
 - `GET /{slug}` -> channel landing first, then root page/redirect fallback behavior
 - `GET /{channel}/{slug}` -> channel-scoped page
 
@@ -189,8 +189,8 @@ body { background: #fff; color: #212529; }
 - `boot`
 - `mce`
 - `theme`
-- configured `categories.prefix`
-- configured `tags.prefix`
+- configured `category.prefix`
+- configured `tag.prefix`
 - configured `session.profile_prefix` (when profile prefix is configured)
 - configured `session.group_prefix` (when group prefix is configured)
 
@@ -235,8 +235,8 @@ body { background: #fff; color: #212529; }
 - file: `tpl/wrapper.php`
 - Standard page render:
 - priority:
-- `tpl/pages/{channel_slug}.php` (only when URL had channel segment)
-- `tpl/pages/index.php`
+- `tpl/page/{channel_slug}.php` (only when URL had channel segment)
+- `tpl/page/index.php`
 - Channel landing render:
 - priority:
 - `tpl/channels/{channel_slug}.php`
@@ -252,16 +252,16 @@ body { background: #fff; color: #212529; }
 - Profile render:
 - template key: dynamic by `session.profile_mode`
 - files:
-- `tpl/profiles/full.php` for `public_full`
-- `tpl/profiles/full.php` for logged-in users and `tpl/profiles/limited.php` for logged-out users in `public_limited`
-- `tpl/profiles/full.php` for logged-in users in `private`
-- `tpl/profiles/index.php` for disabled mode (delegates to `tpl/status/404.php`) and private-mode logged-out placeholder (`403`, delegates to `tpl/status/denied.php`)
+- `tpl/profile/full.php` for `public_full`
+- `tpl/profile/full.php` for logged-in users and `tpl/profile/limited.php` for logged-out users in `public_limited`
+- `tpl/profile/full.php` for logged-in users in `private`
+- `tpl/profile/index.php` for disabled mode (delegates to `tpl/status/404.php`) and private-mode logged-out placeholder (`403`, delegates to `tpl/status/denied.php`)
 - Group render:
 - template key: dynamic by `session.show_groups`
 - files:
-- `tpl/groups/list.php` for `public`
-- `tpl/groups/list.php` for logged-in users in `private`
-- `tpl/groups/index.php` for disabled mode (delegates to `tpl/status/404.php`) and private-mode logged-out placeholder (`403`, delegates to `tpl/status/denied.php`)
+- `tpl/group/list.php` for `public`
+- `tpl/group/list.php` for logged-in users in `private`
+- `tpl/group/index.php` for disabled mode (delegates to `tpl/status/404.php`) and private-mode logged-out placeholder (`403`, delegates to `tpl/status/denied.php`)
 - Public login helper:
 - template key: `auth/login`
 - file: `tpl/auth/login.php`
@@ -318,15 +318,15 @@ body { background: #fff; color: #212529; }
 - `tpl/status/404.php`
 - `tpl/status/denied.php`
 - `tpl/status/disabled.php`
-- `tpl/pages/index.php`
+- `tpl/page/index.php`
 - `tpl/channels/index.php`
 - `tpl/categories/index.php`
 - `tpl/tags/index.php`
-- `tpl/profiles/full.php`
-- `tpl/profiles/limited.php`
-- `tpl/profiles/index.php`
-- `tpl/groups/list.php`
-- `tpl/groups/index.php`
+- `tpl/profile/full.php`
+- `tpl/profile/limited.php`
+- `tpl/profile/index.php`
+- `tpl/group/list.php`
+- `tpl/group/index.php`
 - `tpl/auth/login.php`
 - `tpl/auth/login_2fa.php`
 - `tpl/auth/register.php`

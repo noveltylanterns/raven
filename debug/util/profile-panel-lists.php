@@ -146,7 +146,7 @@ final class PanelListProfilerRunner
      */
     private function createTempSuperUser(array $app): void
     {
-        $superGroupId = $app['groups']->idBySlug('super');
+        $superGroupId = $app['group']->idBySlug('super');
         if ($superGroupId === null) {
             throw new RuntimeException('Unable to resolve super group for profiling user.');
         }
@@ -154,7 +154,7 @@ final class PanelListProfilerRunner
         $this->tempUsername = 'codex_profile_' . $this->runId;
         $this->tempPassword = 'CodexProfile!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $app['users']->save([
+        $this->tempUserId = (int) $app['user']->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Profile ' . $this->runId,
@@ -179,7 +179,7 @@ final class PanelListProfilerRunner
         }
 
         $app = require $this->root . '/private/raven.php';
-        $app['users']->deleteById($this->tempUserId);
+        $app['user']->deleteById($this->tempUserId);
         $this->events[] = 'temp_user_deleted=' . $this->tempUserId;
     }
 
@@ -219,73 +219,73 @@ final class PanelListProfilerRunner
     {
         $routes = [
             'dashboard' => '/' . $this->panelPath,
-            'pages' => '/' . $this->panelPath . '/pages',
-            'pages_create' => '/' . $this->panelPath . '/pages/edit',
-            'channels' => '/' . $this->panelPath . '/channels',
-            'categories' => '/' . $this->panelPath . '/categories',
-            'tags' => '/' . $this->panelPath . '/tags',
-            'redirects' => '/' . $this->panelPath . '/redirects',
-            'groups' => '/' . $this->panelPath . '/groups',
-            'users' => '/' . $this->panelPath . '/users',
+            'page' => '/' . $this->panelPath . '/page',
+            'page_create' => '/' . $this->panelPath . '/page/edit',
+            'channel' => '/' . $this->panelPath . '/channel',
+            'category' => '/' . $this->panelPath . '/category',
+            'tag' => '/' . $this->panelPath . '/tag',
+            'redirect' => '/' . $this->panelPath . '/redirect',
+            'group' => '/' . $this->panelPath . '/group',
+            'user' => '/' . $this->panelPath . '/user',
             'routing' => '/' . $this->panelPath . '/routing',
             'configuration' => '/' . $this->panelPath . '/configuration',
             'extensions' => '/' . $this->panelPath . '/extensions',
             'updates' => '/' . $this->panelPath . '/updates',
         ];
 
-        $channelOptions = $app['channels']->listOptions();
+        $channelOptions = $app['channel']->listOptions();
         if ($channelOptions !== []) {
             $channelSlug = trim((string) ($channelOptions[0]['slug'] ?? ''));
             if ($channelSlug !== '') {
-                $routes['pages_prefilter_channel'] = '/' . $this->panelPath . '/pages?channel=' . rawurlencode($channelSlug);
+                $routes['page_prefilter_channel'] = '/' . $this->panelPath . '/page?channel=' . rawurlencode($channelSlug);
             }
         }
 
-        $categoryOptions = $app['categories']->listOptions();
+        $categoryOptions = $app['category']->listOptions();
         if ($categoryOptions !== []) {
             $categoryId = (int) ($categoryOptions[0]['id'] ?? 0);
             if ($categoryId > 0) {
-                $routes['pages_prefilter_category'] = '/' . $this->panelPath . '/pages?category=' . $categoryId;
+                $routes['page_prefilter_category'] = '/' . $this->panelPath . '/page?category=' . $categoryId;
             }
         }
 
-        $tagOptions = $app['tags']->listOptions();
+        $tagOptions = $app['tag']->listOptions();
         if ($tagOptions !== []) {
             $tagId = (int) ($tagOptions[0]['id'] ?? 0);
             if ($tagId > 0) {
-                $routes['pages_prefilter_tag'] = '/' . $this->panelPath . '/pages?tag=' . $tagId;
+                $routes['page_prefilter_tag'] = '/' . $this->panelPath . '/page?tag=' . $tagId;
             }
         }
 
-        $pageRows = $app['pages']->listForPanel(1, 0);
+        $pageRows = $app['page']->listForPanel(1, 0);
         if ($pageRows !== []) {
             $firstPageId = (int) ($pageRows[0]['id'] ?? 0);
             if ($firstPageId > 0) {
-                $routes['pages_edit'] = '/' . $this->panelPath . '/pages/edit/' . $firstPageId;
+                $routes['page_edit'] = '/' . $this->panelPath . '/page/edit/' . $firstPageId;
             }
         }
 
-        $redirectRows = $app['redirects']->listForPanel(1, 0);
+        $redirectRows = $app['redirect']->listForPanel(1, 0);
         if ($redirectRows !== []) {
             $firstRedirectId = (int) ($redirectRows[0]['id'] ?? 0);
             if ($firstRedirectId > 0) {
-                $routes['redirects_edit'] = '/' . $this->panelPath . '/redirects/edit/' . $firstRedirectId;
+                $routes['redirect_edit'] = '/' . $this->panelPath . '/redirect/edit/' . $firstRedirectId;
             }
         }
 
-        $groupOptions = $app['groups']->listOptions();
+        $groupOptions = $app['group']->listOptions();
         if ($groupOptions !== []) {
             $groupName = strtolower(trim((string) ($groupOptions[0]['name'] ?? '')));
             if ($groupName !== '') {
-                $routes['users_prefilter_group'] = '/' . $this->panelPath . '/users?group=' . rawurlencode($groupName);
+                $routes['user_prefilter_group'] = '/' . $this->panelPath . '/user?group=' . rawurlencode($groupName);
             }
         }
 
-        $userRows = $app['users']->listForPanel(1, 0, null);
+        $userRows = $app['user']->listForPanel(1, 0, null);
         if ($userRows !== []) {
             $firstUserId = (int) ($userRows[0]['id'] ?? 0);
             if ($firstUserId > 0) {
-                $routes['users_edit'] = '/' . $this->panelPath . '/users/edit/' . $firstUserId;
+                $routes['user_edit'] = '/' . $this->panelPath . '/user/edit/' . $firstUserId;
             }
         }
 
@@ -328,7 +328,7 @@ final class PanelListProfilerRunner
                 $metrics['sql_ms']
             );
 
-            if (in_array($name, ['dashboard', 'pages', 'pages_create', 'pages_edit', 'groups', 'users', 'users_edit', 'channels', 'categories', 'tags', 'redirects', 'redirects_edit', 'routing'], true)) {
+            if (in_array($name, ['dashboard', 'page', 'page_create', 'page_edit', 'group', 'user', 'user_edit', 'channel', 'category', 'tag', 'redirect', 'redirect_edit', 'routing'], true)) {
                 $dashboardSql = $this->extractToolbarSqlStatements($result['body']);
                 foreach ($dashboardSql as $index => $sql) {
                     $this->events[] = 'http.' . $name . '.sql.' . ($index + 1) . '=' . preg_replace('/\s+/', ' ', $sql);
@@ -347,28 +347,28 @@ final class PanelListProfilerRunner
         $tagId = null;
         $groupName = null;
 
-        $channelOptions = $app['channels']->listOptions();
+        $channelOptions = $app['channel']->listOptions();
         if ($channelOptions !== []) {
             $value = trim((string) ($channelOptions[0]['slug'] ?? ''));
             if ($value !== '') {
                 $channelSlug = $value;
             }
         }
-        $categoryOptions = $app['categories']->listOptions();
+        $categoryOptions = $app['category']->listOptions();
         if ($categoryOptions !== []) {
             $value = (int) ($categoryOptions[0]['id'] ?? 0);
             if ($value > 0) {
                 $categoryId = $value;
             }
         }
-        $tagOptions = $app['tags']->listOptions();
+        $tagOptions = $app['tag']->listOptions();
         if ($tagOptions !== []) {
             $value = (int) ($tagOptions[0]['id'] ?? 0);
             if ($value > 0) {
                 $tagId = $value;
             }
         }
-        $groupOptions = $app['groups']->listOptions();
+        $groupOptions = $app['group']->listOptions();
         if ($groupOptions !== []) {
             $value = strtolower(trim((string) ($groupOptions[0]['name'] ?? '')));
             if ($value !== '') {
@@ -378,74 +378,74 @@ final class PanelListProfilerRunner
 
         $legacyFlows = [
             'pages' => static function () use ($app): void {
-                $rows = $app['pages']->listForPanel(100, 0);
+                $rows = $app['page']->listForPanel(100, 0);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
-                $app['pages']->taxonomyAssignmentsForPages($pageIds);
+                $app['page']->taxonomyAssignmentsForPages($pageIds);
             },
-            'channels' => static fn () => $app['channels']->listAll(),
-            'categories' => static fn () => $app['categories']->listAll(),
-            'tags' => static fn () => $app['tags']->listAll(),
-            'redirects' => static fn () => $app['redirects']->listAll(),
-            'groups' => static fn () => $app['groups']->listAll(),
-            'users' => static fn () => $app['users']->listAll(),
+            'channel' => static fn () => $app['channel']->listAll(),
+            'category' => static fn () => $app['category']->listAll(),
+            'tag' => static fn () => $app['tag']->listAll(),
+            'redirect' => static fn () => $app['redirect']->listAll(),
+            'groups' => static fn () => $app['group']->listAll(),
+            'users' => static fn () => $app['user']->listAll(),
         ];
 
         if ($channelSlug !== null || $categoryId !== null || $tagId !== null) {
             $legacyFlows['pages_prefiltered'] = static function () use ($app): void {
-                $rows = $app['pages']->listForPanel(1000, 0);
+                $rows = $app['page']->listForPanel(1000, 0);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
-                $app['pages']->taxonomyAssignmentsForPages($pageIds);
+                $app['page']->taxonomyAssignmentsForPages($pageIds);
             };
         }
         if ($groupName !== null) {
-            $legacyFlows['users_prefiltered'] = static fn () => $app['users']->listAll();
+            $legacyFlows['users_prefiltered'] = static fn () => $app['user']->listAll();
         }
 
         $currentFlows = [
             'pages' => static function () use ($app): void {
-                $app['pages']->countForPanel();
-                $rows = $app['pages']->listForPanel(50, 0);
+                $app['page']->countForPanel();
+                $rows = $app['page']->listForPanel(50, 0);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
-                $app['pages']->taxonomyAssignmentsForPages($pageIds);
+                $app['page']->taxonomyAssignmentsForPages($pageIds);
             },
             'channels' => static function () use ($app): void {
-                $app['channels']->countForPanel();
-                $app['channels']->listForPanel(50, 0);
+                $app['channel']->countForPanel();
+                $app['channel']->listForPanel(50, 0);
             },
             'categories' => static function () use ($app): void {
-                $app['categories']->countForPanel();
-                $app['categories']->listForPanel(50, 0);
+                $app['category']->countForPanel();
+                $app['category']->listForPanel(50, 0);
             },
             'tags' => static function () use ($app): void {
-                $app['tags']->countForPanel();
-                $app['tags']->listForPanel(50, 0);
+                $app['tag']->countForPanel();
+                $app['tag']->listForPanel(50, 0);
             },
             'redirects' => static function () use ($app): void {
-                $app['redirects']->countForPanel();
-                $app['redirects']->listForPanel(50, 0);
+                $app['redirect']->countForPanel();
+                $app['redirect']->listForPanel(50, 0);
             },
             'groups' => static function () use ($app): void {
-                $app['groups']->countForPanel();
-                $app['groups']->listForPanel(50, 0);
+                $app['group']->countForPanel();
+                $app['group']->listForPanel(50, 0);
             },
             'users' => static function () use ($app): void {
-                $app['users']->countForPanel(null);
-                $app['users']->listForPanel(50, 0, null);
+                $app['user']->countForPanel(null);
+                $app['user']->listForPanel(50, 0, null);
             },
         ];
 
         if ($channelSlug !== null || $categoryId !== null || $tagId !== null) {
             $currentFlows['pages_prefiltered'] = static function () use ($app, $channelSlug, $categoryId, $tagId): void {
-                $app['pages']->countForPanel($channelSlug, $categoryId, $tagId);
-                $rows = $app['pages']->listForPanel(50, 0, $channelSlug, $categoryId, $tagId);
+                $app['page']->countForPanel($channelSlug, $categoryId, $tagId);
+                $rows = $app['page']->listForPanel(50, 0, $channelSlug, $categoryId, $tagId);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
-                $app['pages']->taxonomyAssignmentsForPages($pageIds);
+                $app['page']->taxonomyAssignmentsForPages($pageIds);
             };
         }
         if ($groupName !== null) {
             $currentFlows['users_prefiltered'] = static function () use ($app, $groupName): void {
-                $app['users']->countForPanel($groupName);
-                $app['users']->listForPanel(50, 0, $groupName);
+                $app['user']->countForPanel($groupName);
+                $app['user']->listForPanel(50, 0, $groupName);
             };
         }
 

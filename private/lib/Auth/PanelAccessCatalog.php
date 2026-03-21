@@ -17,49 +17,49 @@ final class PanelAccessCatalog
     public static function stockPanelRoutePermissions(): array
     {
         return [
-            'pages' => [
+            'page' => [
                 'label' => 'Pages',
                 'view' => PanelAccess::PAGES_VIEW,
                 'create' => PanelAccess::PAGES_CREATE,
                 'edit' => PanelAccess::PAGES_EDIT,
                 'delete' => PanelAccess::PAGES_DELETE,
             ],
-            'channels' => [
+            'channel' => [
                 'label' => 'Channels',
                 'view' => PanelAccess::CHANNELS_VIEW,
                 'create' => PanelAccess::CHANNELS_CREATE,
                 'edit' => PanelAccess::CHANNELS_EDIT,
                 'delete' => PanelAccess::CHANNELS_DELETE,
             ],
-            'categories' => [
+            'category' => [
                 'label' => 'Categories',
                 'view' => PanelAccess::CATEGORIES_VIEW,
                 'create' => PanelAccess::CATEGORIES_CREATE,
                 'edit' => PanelAccess::CATEGORIES_EDIT,
                 'delete' => PanelAccess::CATEGORIES_DELETE,
             ],
-            'tags' => [
+            'tag' => [
                 'label' => 'Tags',
                 'view' => PanelAccess::TAGS_VIEW,
                 'create' => PanelAccess::TAGS_CREATE,
                 'edit' => PanelAccess::TAGS_EDIT,
                 'delete' => PanelAccess::TAGS_DELETE,
             ],
-            'redirects' => [
+            'redirect' => [
                 'label' => 'Redirects',
                 'view' => PanelAccess::REDIRECTS_VIEW,
                 'create' => PanelAccess::REDIRECTS_CREATE,
                 'edit' => PanelAccess::REDIRECTS_EDIT,
                 'delete' => PanelAccess::REDIRECTS_DELETE,
             ],
-            'users' => [
+            'user' => [
                 'label' => 'Users',
                 'view' => PanelAccess::USERS_VIEW,
                 'create' => PanelAccess::USERS_CREATE,
                 'edit' => PanelAccess::USERS_EDIT,
                 'delete' => PanelAccess::USERS_DELETE,
             ],
-            'groups' => [
+            'group' => [
                 'label' => 'Groups',
                 'view' => PanelAccess::GROUPS_VIEW,
                 'create' => PanelAccess::GROUPS_CREATE,
@@ -128,7 +128,7 @@ final class PanelAccessCatalog
      */
     public static function contentPanelBits(): array
     {
-        return self::routeBits('pages');
+        return self::routeBits('page');
     }
 
     /**
@@ -136,7 +136,7 @@ final class PanelAccessCatalog
      */
     public static function taxonomyPanelBits(): array
     {
-        return self::routesBits(['channels', 'categories', 'tags', 'redirects', 'routing']);
+        return self::routesBits(['channel', 'category', 'tag', 'redirect', 'routing']);
     }
 
     /**
@@ -144,7 +144,7 @@ final class PanelAccessCatalog
      */
     public static function usersPanelBits(): array
     {
-        return self::routeBits('users');
+        return self::routeBits('user');
     }
 
     /**
@@ -152,7 +152,7 @@ final class PanelAccessCatalog
      */
     public static function groupsPanelBits(): array
     {
-        return self::routeBits('groups');
+        return self::routeBits('group');
     }
 
     /**
@@ -282,4 +282,3 @@ final class PanelAccessCatalog
         return $mask;
     }
 }
-
