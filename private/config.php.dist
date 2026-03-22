@@ -154,8 +154,8 @@ return array (
     'avatars' =>
     array (
       'max_filesize_kb' => 1024,
-      'max_width' => 500,
-      'max_height' => 500,
+      'max_width' => 800,
+      'max_height' => 800,
       'allowed_extensions' => 'gif,jpg,jpeg,png',
     ),
   ),
