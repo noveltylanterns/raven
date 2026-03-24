@@ -18,7 +18,7 @@ use Raven\Lib\Database\Connection\SqliteConnectionBootstrap;
 use Raven\Lib\Database\Connection\SqlitePathResolver;
 use Raven\Lib\Database\Profiling\ProfiledPDO;
 use Raven\Lib\Database\Profiling\QueryProfilerInterface;
-use Raven\Lib\Profiling\RequestQueryProfilerAdapter;
+use Raven\Lib\Diagnostics\RequestQueryProfilerAdapter;
 
 /**
  * Builds PDO connections for Raven backends.

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Profiling;
+namespace Raven\Lib\Diagnostics;
 
 interface ProfilerOutputInterface
 {
@@ -14,4 +14,3 @@ interface ProfilerOutputInterface
      */
     public function render(array $snapshot, array $context = []): string;
 }
-

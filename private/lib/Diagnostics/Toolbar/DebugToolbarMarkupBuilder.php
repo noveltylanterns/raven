@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Debug;
+namespace Raven\Lib\Diagnostics\Toolbar;
 
 /**
  * Builds debug toolbar HTML markup from normalized profiler payloads.

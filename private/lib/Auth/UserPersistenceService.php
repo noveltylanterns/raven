@@ -116,12 +116,7 @@ final class UserPersistenceService
             throw new RuntimeException('Password is required when creating a user.');
         }
 
-        $stmt = $authDb->prepare(
-            'INSERT INTO ' . $usersTable . '
-            (email, password, username, display_name, theme, avatar_path, contact_profiles, status, verified, resettable, roles_mask, registered, last_login, force_logout)
-            VALUES (:email, :password, :username, :display_name, :theme, :avatar_path, :contact_profiles, :status, :verified, :resettable, :roles_mask, :registered, :last_login, :force_logout)'
-        );
-        $stmt->execute([
+        $insertParams = [
             ':email' => $email,
             ':password' => password_hash($password, PASSWORD_DEFAULT),
             ':username' => $username,
@@ -136,9 +131,9 @@ final class UserPersistenceService
             ':registered' => time(),
             ':last_login' => null,
             ':force_logout' => 0,
-        ]);
+        ];
 
-        $newId = (int) $authDb->lastInsertId();
+        $newId = $this->insertUserAndReturnId($authDb, $usersTable, $insertParams);
         $this->setUserGroups($appDb, $userGroupsTable, $newId, $groupIds, $attachUserToGroup);
 
         return $newId;
@@ -274,5 +269,32 @@ final class UserPersistenceService
         }
 
         return array_values($normalized);
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     */
+    private function insertUserAndReturnId(PDO $authDb, string $usersTable, array $params): int
+    {
+        $sql = 'INSERT INTO ' . $usersTable . '
+            (email, password, username, display_name, theme, avatar_path, contact_profiles, status, verified, resettable, roles_mask, registered, last_login, force_logout)
+            VALUES (:email, :password, :username, :display_name, :theme, :avatar_path, :contact_profiles, :status, :verified, :resettable, :roles_mask, :registered, :last_login, :force_logout)';
+
+        $driver = strtolower((string) $authDb->getAttribute(PDO::ATTR_DRIVER_NAME));
+        if ($driver === 'pgsql') {
+            $stmt = $authDb->prepare($sql . ' RETURNING id');
+            $stmt->execute($params);
+            $newId = (int) $stmt->fetchColumn();
+        } else {
+            $stmt = $authDb->prepare($sql);
+            $stmt->execute($params);
+            $newId = (int) $authDb->lastInsertId();
+        }
+
+        if ($newId < 1) {
+            throw new RuntimeException('Failed to resolve inserted user id.');
+        }
+
+        return $newId;
     }
 }

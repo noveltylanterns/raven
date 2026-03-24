@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Debug;
+namespace Raven\Lib\Diagnostics\Toolbar;
 
 use Raven\Core\Config;
 use Raven\Lib\Config\ConfigValueParser;

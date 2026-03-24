@@ -10,7 +10,7 @@
 declare(strict_types=1);
 
 use Raven\Controller\PublicController;
-use Raven\Lib\Profiling\RequestProfiler;
+use Raven\Lib\Diagnostics\RequestProfiler;
 use Raven\Repository\GroupRepository;
 use Raven\Repository\PageRepository;
 use Raven\Repository\TaxonomyLookupRepository;

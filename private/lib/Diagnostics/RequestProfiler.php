@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Profiling;
+namespace Raven\Lib\Diagnostics;
 
 /**
  * In-memory request profiler collector with pluggable render outputs.

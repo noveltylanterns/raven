@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Debug;
+namespace Raven\Lib\Diagnostics\Toolbar;
 
 /**
  * Sanitizes request/environment payloads for debug toolbar rendering.
@@ -130,4 +130,3 @@ final class DebugToolbarDataSanitizer
         return $normalized;
     }
 }
-

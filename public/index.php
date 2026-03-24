@@ -10,10 +10,10 @@
 declare(strict_types=1);
 
 use Raven\Controller\PublicController;
-use Raven\Core\Debug\DebugToolbarRenderer;
+use Raven\Core\Diagnostics\DebugToolbarRenderer;
 use Raven\Lib\Config\ConfigValueParser;
-use Raven\Lib\Debug\DebugToolbarConfigResolver;
-use Raven\Lib\Profiling\RequestProfiler;
+use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
+use Raven\Lib\Diagnostics\RequestProfiler;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Routing\RouteRequest;
 use Raven\Lib\Routing\Router;

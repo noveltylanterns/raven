@@ -2,16 +2,16 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Core/Debug/DebugToolbarRenderer.php
+ * ~/private/sys/Core/Diagnostics/DebugToolbarRenderer.php
  * HTML renderer/injector for fixed-bottom debug toolbar output.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Debug;
+namespace Raven\Core\Diagnostics;
 
-use Raven\Lib\Debug\DebugToolbarMarkupBuilder;
+use Raven\Lib\Diagnostics\Toolbar\DebugToolbarMarkupBuilder;
 
 /**
  * Produces the debug-toolbar UI and appends it into HTML responses.
@@ -86,4 +86,3 @@ final class DebugToolbarRenderer
         return substr($body, 0, $offset) . $toolbarHtml . substr($body, $offset);
     }
 }
-

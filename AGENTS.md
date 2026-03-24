@@ -239,9 +239,9 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Database/Schema/SchemaManager.php` - Shared schema ensure entrypoint delegating to `SchemaEnsurePipeline` for bootstrap orchestration.
 - `/private/lib/Database/Schema/SeedInstaller.php` - Shared stock-group and starter-page seed installer/normalizer.
 - `/private/lib/Database/Schema/TableNameResolver.php` - Shared logical-to-physical SQL table-name resolver across sqlite attached schemas and prefixed server DBs.
-- `/private/lib/Debug/DebugToolbarConfigResolver.php` - Shared resolver that maps debug config keys into normalized debug-toolbar visibility flags.
-- `/private/lib/Debug/DebugToolbarDataSanitizer.php` - Shared debug-toolbar query/profile payload sanitizer and truncation helper.
-- `/private/lib/Debug/DebugToolbarMarkupBuilder.php` - Shared debug-toolbar HTML builder for profiler cards, toggles, and section rendering.
+- `/private/lib/Diagnostics/Toolbar/DebugToolbarConfigResolver.php` - Shared resolver that maps debug config keys into normalized debug-toolbar visibility flags.
+- `/private/lib/Diagnostics/Toolbar/DebugToolbarDataSanitizer.php` - Shared debug-toolbar query/profile payload sanitizer and truncation helper.
+- `/private/lib/Diagnostics/Toolbar/DebugToolbarMarkupBuilder.php` - Shared debug-toolbar HTML builder for profiler cards, toggles, and section rendering.
 - `/private/lib/Extension/ExtensionCatalogService.php` - Shared extension catalog + ext.json validation service for panel listing/install/delete safety flows.
 - `/private/lib/Extension/ExtensionEditorCatalogService.php` - Shared extension-provided editor catalog helper for body-block field and shortcode menu discovery.
 - `/private/lib/Extension/ExtensionPermissionCatalogService.php` - Shared extension permission-level catalog discovery and stable permission-bit allocation service for panel ACL mapping.
@@ -268,9 +268,9 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Media/TaxonomyImageService.php` - Shared taxonomy image upload pipeline for cover/preview storage, variant generation, and cleanup.
 - `/private/lib/Pagination/Pagination.php` - Shared pagination utility for state normalization and template link payload generation.
 - `/private/lib/Panel/PanelPageAuthorOptionBuilder.php` - Shared panel page-editor author-option builder for normalized/sorted author select payloads.
-- `/private/lib/Profiling/ProfilerOutputInterface.php` - Interface contract for pluggable request-profiler output renderers.
-- `/private/lib/Profiling/RequestProfiler.php` - Reusable in-memory request profiler collector and output registry.
-- `/private/lib/Profiling/RequestQueryProfilerAdapter.php` - Adapter that connects DB query-profiler interface calls to RequestProfiler.
+- `/private/lib/Diagnostics/ProfilerOutputInterface.php` - Interface contract for pluggable request-profiler output renderers.
+- `/private/lib/Diagnostics/RequestProfiler.php` - Reusable in-memory request profiler collector and output registry.
+- `/private/lib/Diagnostics/RequestQueryProfilerAdapter.php` - Adapter that connects DB query-profiler interface calls to RequestProfiler.
 - `/private/lib/Profile/ProfileContactService.php` - Shared profile-contact option/profile normalization, href resolution, and twitter creator extraction helpers.
 - `/private/lib/Routing/ChannelRoutePolicy.php` - Shared channel page-route mode/separator/slug policy helper for canonical URL segment generation and parsing.
 - `/private/lib/Routing/ChannelContextService.php` - Shared channel id lookup and row context hydration helper for page/redirect/taxonomy payloads.
@@ -333,7 +333,7 @@ Core system files:
 - `/private/sys/Core/Config.php` - Config loader/getter/setter service for Raven config keys, delegating underlying file load/save persistence to `/private/lib/Config/ConfigFileStore.php`.
 - `/private/sys/Core/Database/ConnectionFactory.php` - Database connection factory for SQLite/MySQL/PostgreSQL backends, delegating DSN/config/sqlite path/bootstrap concerns through `/private/lib/Database/Connection/`.
 - `/private/sys/Core/Database/SchemaManager.php` - Core compatibility shim delegating schema ensure/bootstrap behavior through `/private/lib/Database/Schema/SchemaManager.php`.
-- `/private/sys/Core/Debug/DebugToolbarRenderer.php` - Thin debug-toolbar adapter that delegates profiler payload sanitization/markup rendering to `/private/lib/Debug/`.
+- `/private/sys/Core/Diagnostics/DebugToolbarRenderer.php` - Thin debug-toolbar adapter that delegates profiler payload sanitization/markup rendering to `/private/lib/Diagnostics/Toolbar/`.
 - `/private/sys/Core/Extension/EmbeddedFormRuntimeInterface.php` - Contract interface for extension-provided embedded form runtimes.
 - `/private/sys/Core/Extension/ExtensionRegistry.php` - Extension discovery/registry logic, now delegating manifest/provider contract validation and state-file loading/normalization to `/private/lib/Extension/`.
 - `/private/sys/Core/Media/PageImageManager.php` - Page image lifecycle manager, now delegating upload policy, storage layout, and variant processing to `/private/lib/Media/`.
