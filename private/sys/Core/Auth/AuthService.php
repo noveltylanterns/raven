@@ -923,9 +923,9 @@ final class AuthService
         }
 
         try {
-            // Newer Delight versions accept table prefix as 4th argument.
+            // Bundled Delight Auth expects table prefix as the 3rd argument.
             if ($this->prefix !== '') {
-                $this->auth = new \Delight\Auth\Auth($this->authDb, null, null, $this->prefix);
+                $this->auth = new \Delight\Auth\Auth($this->authDb, null, $this->prefix);
             } else {
                 $this->auth = new \Delight\Auth\Auth($this->authDb);
             }
