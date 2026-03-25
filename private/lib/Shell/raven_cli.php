@@ -1504,7 +1504,7 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
             }
 
             $id = (int) ($row['id'] ?? 0);
-            if ($id < 1) {
+            if ($id < 0) {
                 throw new RuntimeException('Channel id is invalid.');
             }
 

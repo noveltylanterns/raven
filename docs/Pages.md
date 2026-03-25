@@ -31,7 +31,7 @@ Columns shown:
 - `ID`
 - `Title`
 - `Slug`
-- `Channel` (`<none>` when unchanneled)
+- `Channel` (`<none>` when using the stock root scope)
 - `Status` (`Published` or `Draft`)
 - `Actions`
 
@@ -165,6 +165,11 @@ Declared in `panel/index.php`:
 All state-changing routes use CSRF validation.
 
 ### Save Flow (Page + Taxonomy + Media)
+
+Root-scope note:
+
+- Pages no longer persist with `channel_id = NULL`.
+- Raven now maps root-level pages to the stock `<root>` channel id `0`, while the editor still exposes that as `<none>` so URLs remain rooted at `/slug`.
 
 `PanelController::pageSave()` pipeline:
 

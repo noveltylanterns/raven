@@ -54,6 +54,12 @@ final class ChannelRepository
         }
 
         usort($channels, static function (array $a, array $b): int {
+            $aIsRoot = ChannelRecordPolicy::isRootChannelId((int) ($a['id'] ?? -1));
+            $bIsRoot = ChannelRecordPolicy::isRootChannelId((int) ($b['id'] ?? -1));
+            if ($aIsRoot !== $bIsRoot) {
+                return $aIsRoot ? -1 : 1;
+            }
+
             $nameCompare = strcasecmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''));
             if ($nameCompare !== 0) {
                 return $nameCompare;
@@ -76,6 +82,7 @@ final class ChannelRepository
             return $this->channelsCache;
         }
 
+        $this->ensureRootChannelRecord();
         $paths = $this->channelFileStoreService->listChannelFilePaths();
         $records = [];
         $usedIds = [];
@@ -102,7 +109,9 @@ final class ChannelRepository
             if ($rawId !== null && !isset($usedIds[$rawId])) {
                 $record['id'] = $rawId;
                 $usedIds[$rawId] = true;
-                $maxId = max($maxId, $rawId);
+                if ($rawId > 0) {
+                    $maxId = max($maxId, $rawId);
+                }
                 $records[] = $record;
                 continue;
             }
@@ -209,6 +218,10 @@ final class ChannelRepository
     {
         $rows = [];
         foreach ($this->listRecords() as $channel) {
+            if (ChannelRecordPolicy::isRootChannelId((int) ($channel['id'] ?? -1))) {
+                continue;
+            }
+
             $rows[] = [
                 'id' => (int) ($channel['id'] ?? 0),
                 'name' => (string) ($channel['name'] ?? ''),
@@ -246,7 +259,7 @@ final class ChannelRepository
      */
     public function findById(int $id): ?array
     {
-        if ($id < 1) {
+        if ($id < ChannelRecordPolicy::ROOT_CHANNEL_ID) {
             return null;
         }
 
@@ -295,6 +308,7 @@ final class ChannelRepository
      */
     public function save(array $data): int
     {
+        $idProvided = array_key_exists('id', $data) && $data['id'] !== null;
         $id = isset($data['id']) ? (int) $data['id'] : 0;
         $name = trim((string) ($data['name'] ?? ''));
         $slug = strtolower(trim((string) ($data['slug'] ?? '')));
@@ -307,12 +321,16 @@ final class ChannelRepository
             throw new RuntimeException('Channel name and slug are required.');
         }
 
+        if (ChannelRecordPolicy::isRootChannelSlug($slug) || ($idProvided && ChannelRecordPolicy::isRootChannelId($id))) {
+            throw new RuntimeException('The stock <root> channel is reserved and cannot be edited.');
+        }
+
         $existingBySlug = $this->findBySlug($slug);
         if ($existingBySlug !== null && (int) ($existingBySlug['id'] ?? 0) !== $id) {
             throw new RuntimeException('A channel with that slug already exists.');
         }
 
-        $existingRecord = $id > 0 ? $this->findById($id) : null;
+        $existingRecord = $idProvided ? $this->findById($id) : null;
         $oldSlug = $existingRecord !== null ? (string) ($existingRecord['slug'] ?? '') : '';
         $channelId = $existingRecord !== null
             ? (int) ($existingRecord['id'] ?? 0)
@@ -420,6 +438,10 @@ final class ChannelRepository
      */
     public function deleteById(int $id): void
     {
+        if (ChannelRecordPolicy::isRootChannelId($id)) {
+            throw new RuntimeException('The stock <root> channel cannot be deleted.');
+        }
+
         $record = $this->findById($id);
         if ($record === null) {
             return;
@@ -434,18 +456,18 @@ final class ChannelRepository
         $this->db->beginTransaction();
         try {
             $detachPages = $this->db->prepare(
-                'UPDATE ' . $pages . ' SET channel_id = :null_channel WHERE channel_id = :channel_id'
+                'UPDATE ' . $pages . ' SET channel_id = :root_channel WHERE channel_id = :channel_id'
             );
             $detachPages->execute([
-                ':null_channel' => null,
+                ':root_channel' => ChannelRecordPolicy::ROOT_CHANNEL_ID,
                 ':channel_id' => $id,
             ]);
 
             $detachRedirects = $this->db->prepare(
-                'UPDATE ' . $redirects . ' SET channel_id = :null_channel WHERE channel_id = :channel_id'
+                'UPDATE ' . $redirects . ' SET channel_id = :root_channel WHERE channel_id = :channel_id'
             );
             $detachRedirects->execute([
-                ':null_channel' => null,
+                ':root_channel' => ChannelRecordPolicy::ROOT_CHANNEL_ID,
                 ':channel_id' => $id,
             ]);
 
@@ -472,20 +494,15 @@ final class ChannelRepository
     {
         $pages = $this->table('pages');
         $stmt = $this->db->prepare(
-            'SELECT channel_id, COUNT(*) AS page_count
+            'SELECT COALESCE(channel_id, 0) AS resolved_channel_id, COUNT(*) AS page_count
              FROM ' . $pages . '
-             WHERE channel_id IS NOT NULL
-             GROUP BY channel_id'
+             GROUP BY COALESCE(channel_id, 0)'
         );
         $stmt->execute();
 
         $counts = [];
         foreach ($stmt->fetchAll() ?: [] as $row) {
-            $channelId = (int) ($row['channel_id'] ?? 0);
-            if ($channelId < 1) {
-                continue;
-            }
-
+            $channelId = (int) ($row['resolved_channel_id'] ?? 0);
             $counts[$channelId] = (int) ($row['page_count'] ?? 0);
         }
 
@@ -548,6 +565,60 @@ final class ChannelRepository
     private function normalizeChannelId(mixed $value): ?int
     {
         return ChannelRecordPolicy::normalizeChannelId($value);
+    }
+
+    private function ensureRootChannelRecord(): void
+    {
+        $raw = $this->channelFileStoreService->loadRawBySlug(ChannelRecordPolicy::ROOT_CHANNEL_SLUG);
+        $createdAt = trim((string) ($raw['created_at'] ?? ''));
+        if ($createdAt === '') {
+            $createdAt = gmdate('Y-m-d H:i:s');
+        }
+
+        $record = [
+            'id' => ChannelRecordPolicy::ROOT_CHANNEL_ID,
+            'name' => ChannelRecordPolicy::ROOT_CHANNEL_NAME,
+            'slug' => ChannelRecordPolicy::ROOT_CHANNEL_SLUG,
+            'description' => trim((string) ($raw['description'] ?? '')),
+            'editor_override' => ChannelRecordPolicy::normalizeEditorOverride(
+                (string) ($raw['editor_override'] ?? 'inherit')
+            ),
+            'route_mode' => ChannelRecordPolicy::normalizeRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
+            'route_separator' => ChannelRecordPolicy::normalizeRouteSeparator(
+                (string) ($raw['route_separator'] ?? 'inherit')
+            ),
+            'cover_image_path' => ChannelRecordPolicy::normalizeNullablePath($raw['cover_image_path'] ?? null),
+            'cover_image_sm_path' => ChannelRecordPolicy::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
+            'cover_image_md_path' => ChannelRecordPolicy::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
+            'cover_image_lg_path' => ChannelRecordPolicy::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
+            'preview_image_path' => ChannelRecordPolicy::normalizeNullablePath($raw['preview_image_path'] ?? null),
+            'preview_image_sm_path' => ChannelRecordPolicy::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
+            'preview_image_md_path' => ChannelRecordPolicy::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
+            'preview_image_lg_path' => ChannelRecordPolicy::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
+            'custom_fields' => is_array($raw['custom_fields'] ?? null) ? $raw['custom_fields'] : [],
+            'overrides' => is_array($raw['overrides'] ?? null) ? $raw['overrides'] : [],
+            'created_at' => $createdAt,
+        ];
+
+        if ($raw === [] || $this->rootRecordNeedsRewrite($raw)) {
+            $this->channelFileStoreService->writeRecordBySlug(ChannelRecordPolicy::ROOT_CHANNEL_SLUG, $record);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $raw
+     */
+    private function rootRecordNeedsRewrite(array $raw): bool
+    {
+        if (ChannelRecordPolicy::normalizeChannelId($raw['id'] ?? null) !== ChannelRecordPolicy::ROOT_CHANNEL_ID) {
+            return true;
+        }
+
+        if (!ChannelRecordPolicy::isRootChannelSlug((string) ($raw['slug'] ?? ''))) {
+            return true;
+        }
+
+        return trim((string) ($raw['name'] ?? '')) !== ChannelRecordPolicy::ROOT_CHANNEL_NAME;
     }
 
     private function persistChannelId(string $slug, int $id): void

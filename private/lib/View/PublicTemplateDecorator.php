@@ -75,7 +75,7 @@ final class PublicTemplateDecorator
 
         if (array_key_exists('channel_id', $page)) {
             $channelId = (int) ($page['channel_id'] ?? 0);
-            $page['channel_id'] = $channelId > 0 ? $channelId : null;
+            $page['channel_id'] = max(0, $channelId);
         }
 
         $rawBlocks = is_array($page['extended_blocks'] ?? null) ? $page['extended_blocks'] : [];

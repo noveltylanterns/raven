@@ -15,6 +15,7 @@ namespace Raven\Repository;
 
 use PDO;
 use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Routing\ChannelRecordPolicy;
 use Raven\Lib\Routing\ChannelContextService;
 use Raven\Lib\Routing\PathScopeLookupService;
 use RuntimeException;
@@ -251,9 +252,12 @@ final class RedirectRepository
 
         // Root redirects match only channelless rows; channel routes must match channel slug.
         if ($channelSlug === null) {
-            $sql .= ' AND r.channel_id IS NULL';
+            $sql .= ' AND (r.channel_id = 0 OR r.channel_id IS NULL)';
         } else {
             $channelId = $this->channelIdBySlug($channelSlug);
+            if ($channelId === null || $channelId < 1) {
+                return null;
+            }
             $sql .= ' AND r.channel_id = :channel_id';
             $params[':channel_id'] = $channelId;
         }
@@ -295,7 +299,10 @@ final class RedirectRepository
         $channelSlug = $data['channel_slug'] ?? null;
         $isActive = (int) ($data['is_active'] ?? 0) === 1 ? 1 : 0;
         $targetUrl = trim((string) ($data['target_url'] ?? ''));
-        $channelId = $this->channelIdBySlug($channelSlug);
+        $channelId = $this->channelIdBySlug($channelSlug) ?? 0;
+        if (trim((string) ($channelSlug ?? '')) !== '' && $channelId < 1) {
+            throw new RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
+        }
         $now = gmdate('Y-m-d H:i:s');
 
         if ($title === '' || $slug === '' || $targetUrl === '') {
@@ -405,6 +412,10 @@ final class RedirectRepository
      */
     private function channelIdBySlug(?string $slug): ?int
     {
+        if (ChannelRecordPolicy::isRootChannelSlug((string) ($slug ?? ''))) {
+            return 0;
+        }
+
         return ChannelContextService::resolveChannelIdBySlug(
             $slug,
             fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),

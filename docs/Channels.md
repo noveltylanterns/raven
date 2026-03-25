@@ -19,10 +19,10 @@ What you can do:
 - `New Channel` (top and bottom action bars): opens create form.
 - `Delete Selected` (top and bottom action bars): deletes checked rows after confirmation.
 - `Search` filter: filters rows by `ID`, `Title`, or `Slug` as you type.
-- Row checkbox: marks a channel for bulk delete.
+- Row checkbox: marks a non-stock channel for bulk delete.
 - Clickable table headers (`ID`, `Title`, `Slug`, `Pages`): client-side sort.
-- Row `Edit` button (pencil icon): opens channel editor.
-- Row `Delete` button (trash icon): deletes one channel after confirmation.
+- Row `Edit` button (pencil icon): opens channel editor for custom channels.
+- Row `Delete` button (trash icon): deletes one custom channel after confirmation.
 
 Columns shown:
 
@@ -59,6 +59,7 @@ Image behavior notes:
 Delete behavior note:
 
 - Deleting a channel detaches linked pages and redirects to root scope; it does not delete pages/redirects.
+- Raven keeps one stock `<root>` channel with reserved id `0` and placeholder slug `root`; it is protected from edit/delete actions and is not used as a public route segment.
 
 ## 2) Developer And Agent Internals
 
@@ -98,12 +99,14 @@ All state-changing routes use CSRF validation.
   - Validates CSRF.
   - Sanitizes/normalizes `id`, `name`, `slug`, `description` via `InputSanitizer`.
   - Requires non-empty `name` and valid `slug`.
+  - Rejects attempts to create/edit the reserved stock `<root>` channel.
   - Saves text fields via `ChannelRepository::save(...)`.
   - Processes optional `cover_image` and `preview_image` uploads (single-file each), optional remove flags, and writes image-path columns via `ChannelRepository::updateImagePaths(...)`.
   - Upload files/variants are stored under `public/uploads/channels/{id}/` using configured `media.images.*` rules.
 - `channelDelete(array $post)`
   - Validates CSRF.
   - Supports single delete (`id`) and bulk delete (`selected_ids[]`).
+  - Refuses to delete the stock `<root>` channel.
   - Removes associated stored cover/preview image files for deleted channels.
   - Reports deleted/failed counts for bulk operations.
 
@@ -111,23 +114,26 @@ All state-changing routes use CSRF validation.
 
 `ChannelRepository` behavior:
 
-- `listAll()` returns channels with page counts.
+- `listAll()` returns channels with page counts and includes the stock `<root>` channel first.
+- `listOptions()` excludes the stock `<root>` channel because it is only an internal root-scope placeholder.
 - `save(...)` handles create/update in one method.
 - `updateImagePaths(...)` persists cover/preview source + variant paths.
 - `deleteById(...)` runs in a transaction:
-  - updates `pages.channel_id` to `NULL`
-  - updates `redirects.channel_id` to `NULL`
+  - updates `pages.channel_id` to `0`
+  - updates `redirects.channel_id` to `0`
   - deletes channel row
+- `listRecords()` ensures `private/dat/channel/root.php` exists with reserved id `0`, name `<root>`, and slug `root`.
 
 Storage detail:
 
-- SQLite mode uses attached database aliases (`channels.channels`, `main.pages`, `redirects.redirects`).
+- SQLite mode uses the shared `private/dat/db.sqlite` database.
 - Non-SQLite mode uses configured table prefix.
 
 ### Public Routing Touchpoints
 
 - Channel landing routes use single segment `/{channel_slug}` with page fallback rules.
 - Channel pages resolve at `/{channel_slug}/{segment}`, where `{segment}` depends on the channel's effective `route_mode`.
+- The stock `<root>` channel is not routable; root-scope pages/redirects stay at `/...` instead of `/root/...`.
 - When a channel is set to `inherit`, it uses the global `content.route_mode` default (`slug` or `id`).
 - Supported channel page-route segments:
 - `/{channel}/{page-slug}`

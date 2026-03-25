@@ -201,7 +201,7 @@ body { background: #fff; color: #212529; }
 - selects published page in that channel with slug `home`, fallback `index`
 - if not found, runtime falls back to root page/redirect behavior for the same single segment
 - Root page content:
-- path `/{slug}` resolves only pages with `channel_id IS NULL`
+- path `/{slug}` resolves root-scope pages (`channel_id = 0`, with legacy `NULL` reads still tolerated)
 - Channel page content:
 - path `/{channel}/{slug}` resolves only matching channel+slug published pages
 - Redirect fallback:
@@ -295,11 +295,11 @@ body { background: #fff; color: #212529; }
 - `{item:title}`, `{item:url}`, `{item:channel_slug}`
 
 ### Strict Template Redirects
-- A public template can delegate completely to one of the stock message views by rendering exactly one redirect tag as its only output:
+- A public template can force delegation to one of the stock message views by rendering one of these redirect tags anywhere in its output:
 - `{redirect:404}` -> `status/404`
 - `{redirect:denied}` -> `status/denied`
 - `{redirect:disabled}` -> `status/disabled`
-- These are strict redirects, not includes. If you mix other markup around them, Raven will not treat the template as redirected.
+- These are strict redirects, not includes. If one is present, Raven discards the surrounding markup and renders the matching stock status template instead.
 
 ### Path Resolution Rules
 - Paths are colon-delimited: `{root:child:leaf}`.

@@ -29,8 +29,8 @@ final class PathScopeLookupService
                 WHERE slug = :slug';
         $params = [':slug' => $slug];
 
-        if ($channelId === null) {
-            $sql .= ' AND channel_id IS NULL';
+        if ($channelId === null || $channelId <= 0) {
+            $sql .= ' AND (channel_id = 0 OR channel_id IS NULL)';
         } else {
             $sql .= ' AND channel_id = :channel_id';
             $params[':channel_id'] = $channelId;

@@ -159,12 +159,16 @@ final class PublicTemplatePipeline
 
     private function templateRedirectTarget(string $content): ?string
     {
-        $trimmed = trim($content);
-        if ($trimmed === '' || !str_starts_with($trimmed, self::TEMPLATE_REDIRECT_PREFIX)) {
+        if ($content === '') {
             return null;
         }
 
-        $target = trim(substr($trimmed, strlen(self::TEMPLATE_REDIRECT_PREFIX)));
+        $pattern = '/' . preg_quote(self::TEMPLATE_REDIRECT_PREFIX, '/') . '\s*([A-Za-z0-9_\/-]+)/';
+        if (preg_match($pattern, $content, $matches) !== 1) {
+            return null;
+        }
+
+        $target = trim((string) ($matches[1] ?? ''));
         return $target === '' ? null : $target;
     }
 

@@ -143,7 +143,7 @@ final class AppSchemaBuilder
             $db->exec(
                 'CREATE UNIQUE INDEX uniq_' . $prefix . 'pages_root_slug
                  ON ' . $this->introspector->quotePgIdentifier($pagesTable) . ' (slug)
-                 WHERE channel_id IS NULL'
+                 WHERE channel_id IS NULL OR channel_id = 0'
             );
         }
 
@@ -151,8 +151,30 @@ final class AppSchemaBuilder
             $db->exec(
                 'CREATE UNIQUE INDEX uniq_' . $prefix . 'pages_channel_slug
                  ON ' . $this->introspector->quotePgIdentifier($pagesTable) . ' (channel_id, slug)
-                 WHERE channel_id IS NOT NULL'
+                 WHERE channel_id IS NOT NULL AND channel_id <> 0'
             );
+        }
+    }
+
+    public function ensureRootChannelScope(PDO $db, string $driver, string $prefix): void
+    {
+        $pagesTable = $prefix . 'pages';
+        $redirectsTable = $prefix . 'redirects';
+
+        $db->exec('UPDATE ' . $pagesTable . ' SET channel_id = 0 WHERE channel_id IS NULL');
+        $db->exec('UPDATE ' . $redirectsTable . ' SET channel_id = 0 WHERE channel_id IS NULL');
+
+        if ($driver === 'sqlite') {
+            $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_root_slug_unique');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_channel_slug_unique');
+            $this->ensurePageSlugScopeUniquenessSqlite($db, $pagesTable);
+            return;
+        }
+
+        if ($driver === 'pgsql') {
+            $db->exec('DROP INDEX IF EXISTS ' . $this->introspector->quotePgIdentifier('uniq_' . $prefix . 'pages_root_slug'));
+            $db->exec('DROP INDEX IF EXISTS ' . $this->introspector->quotePgIdentifier('uniq_' . $prefix . 'pages_channel_slug'));
+            $this->ensurePageSlugScopeUniqueness($db, $driver, $prefix);
         }
     }
 
@@ -462,8 +484,8 @@ final class AppSchemaBuilder
     {
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_published_at ON ' . $pagesTable . ' (published_at DESC)');
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_id ON ' . $pagesTable . ' (channel_id)');
-        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_root_slug_unique ON ' . $pagesTable . ' (slug) WHERE channel_id IS NULL');
-        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_slug_unique ON ' . $pagesTable . ' (channel_id, slug) WHERE channel_id IS NOT NULL');
+        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_root_slug_unique ON ' . $pagesTable . ' (slug) WHERE channel_id IS NULL OR channel_id = 0');
+        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_slug_unique ON ' . $pagesTable . ' (channel_id, slug) WHERE channel_id IS NOT NULL AND channel_id <> 0');
     }
 
     private function slugifyGroupName(string $value): string

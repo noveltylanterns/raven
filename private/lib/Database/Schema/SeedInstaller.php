@@ -117,7 +117,7 @@ final class SeedInstaller
         }
 
         $check = $db->prepare(
-            'SELECT COUNT(*) FROM ' . $pagesTable . ' WHERE channel_id IS NULL AND slug IN (:home, :index)'
+            'SELECT COUNT(*) FROM ' . $pagesTable . ' WHERE (channel_id = 0 OR channel_id IS NULL) AND slug IN (:home, :index)'
         );
         $check->execute([
             ':home' => 'home',
@@ -142,7 +142,7 @@ final class SeedInstaller
             ':extended' => '',
             ':description' => 'Welcome to Raven CMS.',
             ':display_title' => 1,
-            ':channel_id' => null,
+            ':channel_id' => 0,
             ':is_published' => 1,
             ':published_at' => $now,
             ':author_user_id' => null,

@@ -299,7 +299,7 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
-| `page:channel_id` | page payload parent channel id when page belongs to a channel | integer id or empty |
+| `page:channel_id` | page payload parent channel id (`0` means root scope) | integer id |
 | `page:channel_slug` | page payload channel slug when page belongs to a channel | channel slug |
 | `page:content` | page payload rendered content block rows | array for `{each page:content}` |
 | `page:desc` | page payload description when present | page description text |
@@ -345,9 +345,9 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 
 | Key | What It Calls | Returns |
 | --- | --- | --- |
-| `redirect:denied` | strict template redirect to `status/denied` | internal redirect token; render it alone to delegate the view |
-| `redirect:disabled` | strict template redirect to `status/disabled` | internal redirect token; render it alone to delegate the view |
-| `redirect:404` | strict template redirect to `status/404` | internal redirect token; render it alone to delegate the view |
+| `redirect:denied` | strict template redirect to `status/denied` | internal redirect token; if present anywhere in rendered output, Raven redirects to that stock status template |
+| `redirect:disabled` | strict template redirect to `status/disabled` | internal redirect token; if present anywhere in rendered output, Raven redirects to that stock status template |
+| `redirect:404` | strict template redirect to `status/404` | internal redirect token; if present anywhere in rendered output, Raven redirects to that stock status template |
 
 #### 9.2.13 Site Tags
 
@@ -379,5 +379,5 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 Notes:
 
 - `item:*` depends on the active `{each ...}` loop target.
-- `redirect:*` is a strict template redirect, not an include. It only redirects when it is the template's sole rendered output.
+- `redirect:*` is a strict template redirect, not an include. If Raven sees one of these tokens anywhere in the rendered template output, it discards the surrounding markup and delegates to the matching stock status template.
 - Additional scalar children on `page`, `category`, `tag`, `profile`, `group`, `members`, and `pages` may also be readable when Raven includes them in the payload, but the table above is the stable contract themes should rely on.

@@ -14,6 +14,8 @@
 - Renamed theme/extension package-removal actions from `delete` to `uninstall` across the panel, CLI, and stock panel permission map (`themes.uninstall`, `extensions.uninstall`, `THEMES_UNINSTALL`, `EXTENSIONS_UNINSTALL`), while content-style resources such as pages/users/channels/groups/categories/tags/redirects still use `delete`.
 - Updated stock extension uninstall behavior so the Extension Manager now offers `Uninstall` for disabled stock extensions too, but that action only purges opted-in DB/local storage and keeps the bundled stock extension files on disk.
 - Moved the canonical runtime config files to `private/dat/config.php` and `private/dat/config.php.dist`, updated installer/bootstrap/CLI/debug tooling to load them from `private/dat/`, and tightened `.gitignore` so `private/dat/` stays local except for the committed `.dist` templates.
+- Formalized the stock `<root>` channel with reserved id `0` and placeholder slug `root`, normalized root-scope pages/redirects onto channel id `0`, kept that stock channel out of public routing/channel dropdowns, and protected it from delete/edit actions.
+- Relaxed strict template redirect detection so `{redirect:404}`, `{redirect:denied}`, and `{redirect:disabled}` now force the matching stock status template even when other markup is present in the rendered template output.
 
 ### March 21, 2026
 

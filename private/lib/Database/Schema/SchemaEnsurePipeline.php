@@ -27,6 +27,7 @@ final class SchemaEnsurePipeline
 
         // App schema first so auth/group seeding can rely on group tables.
         $components->appSchemaBootstrap()->ensureAppSchema($appDb, $driver, $prefix);
+        $appSchemaBuilder->ensureRootChannelScope($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePageExtendedColumn($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePageDescriptionColumn($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePageDisplayTitleColumn($appDb, $driver, $prefix);

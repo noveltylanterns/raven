@@ -19,6 +19,7 @@ use Raven\Lib\Content\PageTaxonomyAssignmentService;
 use Raven\Lib\Content\PageTaxonomyQueryService;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 use Raven\Lib\Media\PageEditorGalleryHydrator;
+use Raven\Lib\Routing\ChannelRecordPolicy;
 use Raven\Lib\Routing\ChannelContextService;
 use Raven\Lib\Routing\PathScopeLookupService;
 use RuntimeException;
@@ -77,7 +78,7 @@ final class PageRepository
 
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
-                WHERE p.channel_id IS NULL
+                WHERE (p.channel_id = 0 OR p.channel_id IS NULL)
                   AND p.is_published = :is_published
                   AND p.slug IN (:slug_home, :slug_index)
                 ORDER BY CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
@@ -170,7 +171,7 @@ final class PageRepository
         // Unchanneled pages resolve at root; channeled pages require explicit channel slug match.
         $channel = null;
         if ($channelSlug === null) {
-            $sql .= ' AND p.channel_id IS NULL';
+            $sql .= ' AND (p.channel_id = 0 OR p.channel_id IS NULL)';
         } else {
             $channel = $this->channelRepo->findBySlug($channelSlug);
             if ($channel === null) {
@@ -223,7 +224,7 @@ final class PageRepository
 
         $channel = null;
         if ($channelSlug === null) {
-            $sql .= ' AND p.channel_id IS NULL';
+            $sql .= ' AND (p.channel_id = 0 OR p.channel_id IS NULL)';
         } else {
             $channel = $this->channelRepo->findBySlug($channelSlug);
             if ($channel === null) {
@@ -500,6 +501,7 @@ final class PageRepository
             'SELECT p.channel_id, p.slug
              FROM ' . $pages . ' p
              WHERE p.channel_id IS NOT NULL
+               AND p.channel_id <> 0
                AND p.is_published = :is_published
                AND p.slug IN (:slug_home, :slug_index)
              ORDER BY p.channel_id ASC,
@@ -654,10 +656,13 @@ final class PageRepository
         $categoryIds = $this->categoryEnabled ? $this->normalizeIds($data['category_ids'] ?? []) : [];
         $tagIds = $this->tagEnabled ? $this->normalizeIds($data['tag_ids'] ?? []) : [];
 
-        // Optional channel binding by slug; null keeps page at root URLs.
-        $channelId = null;
+        // Optional channel binding by slug; channel id `0` is the stock root scope.
+        $channelId = 0;
         if (!empty($data['channel_slug'])) {
             $channelId = $this->channelIdBySlug((string) $data['channel_slug']);
+            if ($channelId !== null && $channelId < 1) {
+                throw new \RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
+            }
         }
 
         if ($slug === '') {
@@ -1139,6 +1144,10 @@ final class PageRepository
      */
     private function channelIdBySlug(string $slug): ?int
     {
+        if (ChannelRecordPolicy::isRootChannelSlug($slug)) {
+            throw new RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
+        }
+
         return ChannelContextService::resolveChannelIdBySlug(
             $slug,
             fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),

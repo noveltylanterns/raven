@@ -31,7 +31,7 @@ Columns shown:
 - `ID`
 - `Title`
 - `Slug`
-- `Channel` (`<none>` when root-level)
+- `Channel` (`<none>` when using the stock root scope)
 - `Target URL`
 - `Status` (`Active` or `Inactive`)
 - `Actions`
@@ -118,12 +118,12 @@ All state-changing routes use CSRF validation.
 
 Storage detail:
 
-- SQLite mode uses attached database aliases.
+- SQLite mode uses the shared `private/dat/db.sqlite` database.
 - Non-SQLite mode uses configured table prefix.
 
 ### Public Resolution Rules
 
-- Root redirect path: `/{slug}` (redirect row must have `channel_id IS NULL`).
+- Root redirect path: `/{slug}` (redirect row now stores `channel_id = 0`; legacy `NULL` rows are still treated as root scope during reads).
 - Channel redirect path: `/{channel_slug}/{slug}` (redirect row must match channel).
 - Only `is_active = 1` rows are eligible for public redirect resolution.
 

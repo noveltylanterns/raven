@@ -1038,8 +1038,9 @@ final class PanelController
                 'route_mode' => $routeMode,
                 'route_separator' => $routeSeparator,
             ]);
-        } catch (\Throwable) {
-            $this->flash('error', 'Failed to save channel. Slug may already exist.');
+        } catch (\Throwable $exception) {
+            $message = trim($exception->getMessage());
+            $this->flash('error', $message !== '' ? $message : 'Failed to save channel. Slug may already exist.');
             redirect($this->panelEditorUrlWithTab('/channel/edit', $id, $activeTab, 'basic'));
         }
 
@@ -1137,8 +1138,9 @@ final class PanelController
             // Single-row delete path (row action button).
             try {
                 $this->channelRepo->deleteById($id);
-            } catch (\Throwable) {
-                $this->flash('error', 'Failed to delete channel.');
+            } catch (\Throwable $exception) {
+                $message = trim($exception->getMessage());
+                $this->flash('error', $message !== '' ? $message : 'Failed to delete channel.');
                 redirect($this->panelUrl('/channel'));
             }
 

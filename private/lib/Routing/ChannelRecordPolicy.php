@@ -9,9 +9,23 @@ namespace Raven\Lib\Routing;
  */
 final class ChannelRecordPolicy
 {
+    public const ROOT_CHANNEL_ID = 0;
+    public const ROOT_CHANNEL_SLUG = 'root';
+    public const ROOT_CHANNEL_NAME = '<root>';
+
     public static function isValidSlug(string $slug): bool
     {
         return preg_match('/^[a-z0-9][a-z0-9-]*$/', strtolower(trim($slug))) === 1;
+    }
+
+    public static function isRootChannelId(int $id): bool
+    {
+        return $id === self::ROOT_CHANNEL_ID;
+    }
+
+    public static function isRootChannelSlug(string $slug): bool
+    {
+        return strtolower(trim($slug)) === self::ROOT_CHANNEL_SLUG;
     }
 
     public static function normalizeEditorOverride(string $value): string
@@ -48,7 +62,16 @@ final class ChannelRecordPolicy
             return null;
         }
 
-        $id = (int) trim((string) ($value ?? ''));
-        return $id > 0 ? $id : null;
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+        if ($normalized === '' || preg_match('/^-?\d+$/', $normalized) !== 1) {
+            return null;
+        }
+
+        $id = (int) $normalized;
+        return $id >= self::ROOT_CHANNEL_ID ? $id : null;
     }
 }

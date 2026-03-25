@@ -116,6 +116,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                         $channelSlug = (string) ($channel['slug'] ?? '');
                         $channelPageCount = (int) ($channel['page_count'] ?? 0);
                         $channelPagesUrl = $panelBase . '/page?channel=' . rawurlencode($channelSlug);
+                        $isStockRoot = $channelId === 0 && $channelSlug === 'root';
                         ?>
                         <tr
                             data-rvn-sort-row="1"
@@ -127,26 +128,33 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                             <?php // Row checkboxes post to dedicated bulk-delete form. ?>
                             <?php // `data-rvn-row-select` hooks into global layout row-highlighting script. ?>
                             <td>
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    name="selected_ids[]"
-                                    value="<?= $channelId ?>"
-                                    form="<?= e($bulkDeleteFormId) ?>"
-                                    data-rvn-row-select="1"
-                                    aria-label="Select channel <?= $channelId ?>"
-                                >
+                                <?php if (!$isStockRoot): ?>
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        name="selected_ids[]"
+                                        value="<?= $channelId ?>"
+                                        form="<?= e($bulkDeleteFormId) ?>"
+                                        data-rvn-row-select="1"
+                                        aria-label="Select channel <?= $channelId ?>"
+                                    >
+                                <?php endif; ?>
                             </td>
                             <td><?= $channelId ?></td>
                             <td>
-                                <?php // Name is primary affordance and links directly to edit screen. ?>
-                                <a href="<?= e($panelBase) ?>/channel/edit/<?= $channelId ?>">
+                                <?php if ($isStockRoot): ?>
                                     <?= e($channelName) ?>
-                                </a>
+                                    <span class="badge text-bg-secondary ms-2">Stock</span>
+                                <?php else: ?>
+                                    <?php // Name is primary affordance and links directly to edit screen. ?>
+                                    <a href="<?= e($panelBase) ?>/channel/edit/<?= $channelId ?>">
+                                        <?= e($channelName) ?>
+                                    </a>
+                                <?php endif; ?>
                             </td>
                             <td><?= e($channelSlug) ?></td>
                             <td>
-                                <?php if ($channelPageCount > 0 && $channelSlug !== ''): ?>
+                                <?php if ($channelPageCount > 0 && $channelSlug !== '' && !$isStockRoot): ?>
                                     <a href="<?= e($channelPagesUrl) ?>"><?= $channelPageCount ?></a>
                                 <?php else: ?>
                                     <?= $channelPageCount ?>
@@ -154,24 +162,28 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                             </td>
                             <td class="text-center">
                                 <div class="d-flex justify-content-center gap-2">
-                                    <a
-                                        class="btn btn-primary btn-sm"
-                                        href="<?= e($panelBase) ?>/channel/edit/<?= $channelId ?>"
-                                        title="Edit"
-                                        aria-label="Edit"
-                                    >
-                                        <i class="bi bi-pencil" aria-hidden="true"></i>
-                                        <span class="visually-hidden">Edit</span>
-                                    </a>
-                                    <form method="post" action="<?= e($panelBase) ?>/channel/delete" onsubmit="return confirm('Delete this channel? Linked pages will be detached.');">
-                                        <?= $csrfField ?>
-                                        <?php // Single-row delete path uses explicit id hidden field. ?>
-                                        <input type="hidden" name="id" value="<?= $channelId ?>">
-                                        <button type="submit" class="btn btn-danger btn-sm" title="Delete" aria-label="Delete">
-                                            <i class="bi bi-trash3" aria-hidden="true"></i>
-                                            <span class="visually-hidden">Delete</span>
-                                        </button>
-                                    </form>
+                                    <?php if ($isStockRoot): ?>
+                                        <span class="text-muted small">Protected</span>
+                                    <?php else: ?>
+                                        <a
+                                            class="btn btn-primary btn-sm"
+                                            href="<?= e($panelBase) ?>/channel/edit/<?= $channelId ?>"
+                                            title="Edit"
+                                            aria-label="Edit"
+                                        >
+                                            <i class="bi bi-pencil" aria-hidden="true"></i>
+                                            <span class="visually-hidden">Edit</span>
+                                        </a>
+                                        <form method="post" action="<?= e($panelBase) ?>/channel/delete" onsubmit="return confirm('Delete this channel? Linked pages will be detached.');">
+                                            <?= $csrfField ?>
+                                            <?php // Single-row delete path uses explicit id hidden field. ?>
+                                            <input type="hidden" name="id" value="<?= $channelId ?>">
+                                            <button type="submit" class="btn btn-danger btn-sm" title="Delete" aria-label="Delete">
+                                                <i class="bi bi-trash3" aria-hidden="true"></i>
+                                                <span class="visually-hidden">Delete</span>
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
                                 </div>
                             </td>
                         </tr>
