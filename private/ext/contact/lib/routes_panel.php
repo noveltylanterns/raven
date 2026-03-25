@@ -290,7 +290,7 @@ return static function (Router $router, array $context): void {
      *
      * @param array<string, mixed> $viewData
      */
-    $renderView = static function (array $viewData) use ($app, $currentUserTheme): void {
+    $renderView = static function (array $viewData) use ($app, $currentUserTheme, $panelSiteData): void {
         $viewFile = (string) ($viewData['_view'] ?? '');
         unset($viewData['_view']);
         if ($viewFile === '' || !is_file($viewFile)) {

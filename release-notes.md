@@ -4,6 +4,7 @@
 
 ### March 24, 2026
 
+- Fixed stock extension panel render closures after the `panel_site_data` refactor by capturing the shared site-payload callable correctly in Contact Forms, Signup Sheets, and Database Manager, which restores extension panel pages that were otherwise throwing `Value of type null is not callable`.
 - Tightened panel sidebar/mobile navigation so stock Content, Taxonomy, Accounts, and System links now render from exact route-view/create permission bits instead of broad section-level capability flags, which prevents low-permission users from seeing links such as `Create Page`, unrelated taxonomy routes, or unrelated system tools they cannot actually access.
 - Fixed installer/runtime path handling so first-run redirects and the installer form submit stay on the mounted app path instead of hard-coding `/install.php`, which prevents subdirectory installs from tripping a false `Invalid form token` failure on submit.
 - Scoped installer sessions by mounted app path so the install CSRF token no longer collides with other Raven installs or same-host apps sharing the old global `raven_install` cookie.

@@ -247,7 +247,7 @@ return static function (Router $router, array $context): void {
      *
      * @param array<string, mixed> $viewData
      */
-    $renderExtensionView = static function (array $viewData, ?string $viewFile = null) use ($app, $extensionViewFile, $currentUserTheme): void {
+    $renderExtensionView = static function (array $viewData, ?string $viewFile = null) use ($app, $extensionViewFile, $currentUserTheme, $panelSiteData): void {
         $resolvedViewFile = is_string($viewFile) && trim($viewFile) !== ''
             ? $viewFile
             : $extensionViewFile;
