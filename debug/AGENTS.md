@@ -42,6 +42,8 @@ Last updated: 2026-03-25
 - `php debug/smoke/docs.php`
 - Shared auth login/2FA smoke:
 - `php debug/smoke/auth-workflow.php`
+- Aggressive hostile-behavior security smoke:
+- `php debug/smoke/security-aggressive.php`
 - Routing smoke checks:
 - `php debug/smoke/routing.php`
 - Theme/template-tag smoke checks:
