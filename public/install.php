@@ -89,6 +89,57 @@ function installer_root_path(): string
     return $basePath !== '' ? ($basePath . '/') : '/';
 }
 
+/**
+ * Returns one install-session cookie path scoped to this mounted app root.
+ */
+function installer_session_cookie_path(): string
+{
+    return installer_root_path();
+}
+
+/**
+ * Returns one deterministic installer session name scoped to this mounted app.
+ */
+function installer_session_name(): string
+{
+    $seed = installer_path();
+    if ($seed === '') {
+        $seed = '/install.php';
+    }
+
+    return 'raven_install_' . substr(sha1($seed), 0, 12);
+}
+
+/**
+ * Starts the installer session with cookie-backed settings only.
+ */
+function installer_start_session(): void
+{
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        return;
+    }
+
+    @ini_set('session.use_cookies', '1');
+    @ini_set('session.use_only_cookies', '1');
+    @ini_set('session.use_trans_sid', '0');
+
+    session_name(installer_session_name());
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => installer_session_cookie_path(),
+        'domain' => '',
+        'secure' => (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off'),
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+
+    if (@session_start() !== true || session_status() !== PHP_SESSION_ACTIVE || session_id() === '') {
+        http_response_code(500);
+        echo 'Installer session could not be started. Check PHP session cookie settings and session storage.';
+        exit;
+    }
+}
+
 $root = dirname(__DIR__);
 $configPath = $root . '/private/dat/config.php';
 $configTemplatePath = $root . '/private/dat/config.php.dist';
@@ -168,23 +219,16 @@ spl_autoload_register(static function (string $class) use ($root): void {
 });
 
 // Session-backed CSRF token protects this high-impact setup endpoint.
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_name('raven_install');
-    session_set_cookie_params([
-        'lifetime' => 0,
-        'path' => '/',
-        'domain' => '',
-        'secure' => (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off'),
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
-    session_start();
-}
+installer_start_session();
 
 if (!isset($_SESSION['_raven_install_csrf']) || !is_string($_SESSION['_raven_install_csrf'])) {
     $_SESSION['_raven_install_csrf'] = bin2hex(random_bytes(32));
 }
 $csrfToken = (string) $_SESSION['_raven_install_csrf'];
+$sessionCookieName = session_name();
+$hasInstallerSessionCookie = isset($_COOKIE[$sessionCookieName])
+    && is_string($_COOKIE[$sessionCookieName])
+    && trim((string) $_COOKIE[$sessionCookieName]) !== '';
 
 /** @var mixed $rawTemplate */
 $rawTemplate = is_file($configTemplatePath) ? require $configTemplatePath : [];
@@ -270,7 +314,9 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         $form[$key] = trim((string) ($_POST[$key] ?? ''));
     }
 
-    if (!hash_equals($csrfToken, (string) ($_POST['_csrf'] ?? ''))) {
+    if (!$hasInstallerSessionCookie) {
+        $errors[] = 'Installer session cookie was not returned by the browser. Check PHP session cookie settings, proxy cookie rewriting, and session storage.';
+    } elseif (!hash_equals($csrfToken, (string) ($_POST['_csrf'] ?? ''))) {
         $errors[] = 'Invalid form token. Reload the page and try again.';
     }
 

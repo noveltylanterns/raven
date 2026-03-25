@@ -5,6 +5,8 @@
 ### March 24, 2026
 
 - Fixed installer/runtime path handling so first-run redirects and the installer form submit stay on the mounted app path instead of hard-coding `/install.php`, which prevents subdirectory installs from tripping a false `Invalid form token` failure on submit.
+- Scoped installer sessions by mounted app path so the install CSRF token no longer collides with other Raven installs or same-host apps sharing the old global `raven_install` cookie.
+- Forced the installer to use cookie-backed PHP sessions and added a specific error when the installer session cookie is missing on POST, so session misconfiguration no longer masquerades as a generic invalid form token.
 - Fixed PostgreSQL auth bootstrap regressions by passing the configured auth table prefix to Delight Auth in the correct constructor slot and by using `RETURNING id` for PostgreSQL user creation before assigning group memberships.
 - Consolidated Raven SQLite storage into `private/dat/db.sqlite`, moved extension tables into that same main database under the shared prefixed `ext_*` naming model, and reserved `private/dat/ext/{slug}/` for extension-owned local file storage.
 - Added manifest-gated extension storage flags: `local_storage` now provisions `private/dat/ext/{slug}/` only when explicitly set to `on`, and `db_storage` now gates `lib/schema.php` plus `{prefix}ext_{slug}` / `{prefix}ext_{slug}_*` table usage with a default of `off` when unset.
