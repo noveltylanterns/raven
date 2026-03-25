@@ -212,4 +212,13 @@ return array (
     'privacy' => 'disabled',
     'prefix' => 'group',
   ),
+  'update' =>
+  array (
+    'source' =>
+    array (
+      'mode' => 'github_mirror',
+      'github_repo' => 'noveltylanterns/raven',
+      'repo_url' => '',
+    ),
+  ),
 );

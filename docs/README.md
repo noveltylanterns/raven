@@ -6,6 +6,7 @@
 - [Configuration](./Configuration.md)
 - [Preferences](./Preferences.md)
 - [Routing Table](./Routing.md)
+- [Updates](./Updates.md)
 
 ### Content
 - [Pages](./Pages.md)

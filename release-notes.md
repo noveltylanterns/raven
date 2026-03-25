@@ -17,6 +17,13 @@
 - Formalized the stock `<root>` channel with reserved id `0` and placeholder slug `root`, normalized root-scope pages/redirects onto channel id `0`, kept that stock channel out of public routing/channel dropdowns, and protected it from delete/edit actions.
 - Relaxed strict template redirect detection so `{redirect:404}`, `{redirect:denied}`, and `{redirect:disabled}` now force the matching stock status template even when other markup is present in the rendered template output.
 - Added a top-of-installer pre-flight checklist in `public/install.php` that reports pass/warn/fail status for PHP version, Composer install completeness, required runtime modules, `private/dat/` writability, one aggregate `Database driver` capability row (`SQLite: yes/no, MySQL: yes/no, PostgreSQL: yes/no`), and one aggregate `Image processing` capability row (`GD: yes/no, ImageMagick: yes/no`), with PHP 8.5 treated as the target version but only a warning on other PHP 8.x releases, and with the install form defaulting to the first available driver while preferring SQLite when present.
+- Added a new System Administration updater page at `panel/update` with persisted source selection, automatic git-source checks on page load, side-by-side local/source revision and branch metadata, dry-run planning, and in-place managed-file overlay updates that preserve `.gitignore` paths plus custom themes/extensions while still updating stock package content.
+- Moved the updater scratch workspace off the system temp directory and into Raven-local `.tmp/update/`, so panel update checks no longer depend on host-level `/tmp` write permissions.
+- Tightened updater checks so `Check For Updates` now uses lightweight remote ref inspection instead of a temporary checkout, and dry-run planning excludes `.tmp/update/` from local-tree scans so the updater no longer walks its own scratch workspace.
+- Restored source-side commit timestamps in the updater by fetching only the remote HEAD commit metadata into temporary git state, without checking out a source work tree during `Check For Updates`.
+- Tightened updater dry-run planning again so the local side now uses git-managed file inventory instead of a blind recursive scan, which keeps ignored runtime trees out of the plan while still classifying tracked exceptions like `private/dat/config.php.dist` and `private/dat/ext/.state.php.dist` correctly.
+- Clarified the updater source selector so the default mirror option now renders as `Github Mirror (noveltylanterns/raven)`.
+- Simplified the updater repository-state card so revisions now render once as the full commit hash instead of duplicating short and long forms.
 
 ### March 21, 2026
 

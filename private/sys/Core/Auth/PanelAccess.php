@@ -234,7 +234,7 @@ final class PanelAccess
     /**
      * Returns one normalized panel route permission map.
      *
-     * @return array<string, array{label: string, view: int, create: int, edit: int, delete?: int, uninstall?: int}>
+     * @return array<string, array{label: string, view: int, create?: int, edit?: int, delete?: int, uninstall?: int}>
      */
     public static function stockPanelRoutePermissions(): array
     {
@@ -244,7 +244,7 @@ final class PanelAccess
     /**
      * Returns stock panel route permission row by route key.
      *
-     * @return array{label: string, view: int, create: int, edit: int, delete?: int, uninstall?: int}|null
+     * @return array{label: string, view: int, create?: int, edit?: int, delete?: int, uninstall?: int}|null
      */
     public static function stockPanelRoutePermission(string $routeKey): ?array
     {

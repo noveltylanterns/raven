@@ -12,7 +12,7 @@ use Raven\Core\Auth\PanelAccess;
 final class PanelAccessCatalog
 {
     /**
-     * @return array<string, array{label: string, view: int, create: int, edit: int, delete?: int, uninstall?: int}>
+     * @return array<string, array{label: string, view: int, create?: int, edit?: int, delete?: int, uninstall?: int}>
      */
     public static function stockPanelRoutePermissions(): array
     {
@@ -94,11 +94,15 @@ final class PanelAccessCatalog
                 'edit' => PanelAccess::CONFIGURATION_EDIT,
                 'delete' => PanelAccess::CONFIGURATION_DELETE,
             ],
+            'update' => [
+                'label' => 'Update System',
+                'view' => PanelAccess::MANAGE_CONFIGURATION,
+            ],
         ];
     }
 
     /**
-     * @return array{label: string, view: int, create: int, edit: int, delete?: int, uninstall?: int}|null
+     * @return array{label: string, view: int, create?: int, edit?: int, delete?: int, uninstall?: int}|null
      */
     public static function stockPanelRoutePermission(string $routeKey): ?array
     {
@@ -162,7 +166,10 @@ final class PanelAccessCatalog
      */
     public static function systemPanelBits(): array
     {
-        return self::routesBits(['configuration', 'themes', 'extensions']);
+        return array_merge(
+            [PanelAccess::MANAGE_CONFIGURATION],
+            self::routesBits(['configuration', 'themes', 'extensions'])
+        );
     }
 
     /**

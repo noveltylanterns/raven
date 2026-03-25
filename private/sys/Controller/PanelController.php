@@ -70,6 +70,9 @@ use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\QrCodeService;
 use Raven\Lib\Security\WebAuthnService;
 use Raven\Lib\Site\SiteContextBuilder;
+use Raven\Lib\Update\GitCommandRunner;
+use Raven\Lib\Update\UpdateSourceResolver;
+use Raven\Lib\Update\UpdateWorkflowService;
 use Raven\Lib\View\ThemeFallbackRenderer;
 use Raven\Core\View;
 use Raven\Repository\ChannelRepository;
@@ -148,6 +151,9 @@ final class PanelController
     private ?PackageInstallWorkflowService $packageInstallWorkflowService = null;
     private ?DirectoryTreeService $directoryTreeService = null;
     private ?PanelMediaConfigService $panelMediaConfigService = null;
+    private ?GitCommandRunner $gitCommandRunner = null;
+    private ?UpdateSourceResolver $updateSourceResolver = null;
+    private ?UpdateWorkflowService $updateWorkflowService = null;
 
     public function __construct(
         View $view,
@@ -3465,6 +3471,85 @@ final class PanelController
     }
 
     /**
+     * Update system page with automatic source check on load.
+     */
+    public function update(): void
+    {
+        $this->requirePanelLogin();
+
+        if (!$this->requireRoutePermissionOrForbidden('update', 'view')) {
+            return;
+        }
+
+        $source = $this->updateSourceResolver()->fromConfig($this->config->all());
+        $result = $this->updateWorkflowService()->compare($source);
+
+        $this->renderUpdatePage($source, $result, null, null, false);
+    }
+
+    /**
+     * Handles update-system actions and persists selected source config.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function updateAction(array $post): void
+    {
+        $this->requirePanelLogin();
+
+        if (!$this->requireRoutePermissionOrForbidden('update', 'view')) {
+            return;
+        }
+
+        $source = $this->updateSourceResolver()->fromPost($post, $this->updateSourceResolver()->fromConfig($this->config->all()));
+        $allowOverwrite = ((string) ($post['allow_overwrite'] ?? '')) === '1';
+        $error = null;
+        $success = null;
+
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $error = 'Invalid CSRF token.';
+            $result = $this->updateWorkflowService()->compare($source);
+            $this->renderUpdatePage($source, $result, $success, $error, $allowOverwrite);
+            return;
+        }
+
+        $sourceErrors = $this->updateSourceResolver()->validationErrors($source);
+        if ($sourceErrors !== []) {
+            $error = implode(' ', $sourceErrors);
+            $result = $this->updateWorkflowService()->compare($source);
+            $this->renderUpdatePage($source, $result, $success, $error, $allowOverwrite);
+            return;
+        }
+
+        try {
+            $this->persistUpdateSourceConfig($source);
+        } catch (\RuntimeException $exception) {
+            $error = 'Failed to save updater source settings: ' . $exception->getMessage();
+            $result = $this->updateWorkflowService()->compare($source);
+            $this->renderUpdatePage($source, $result, $success, $error, $allowOverwrite);
+            return;
+        }
+
+        $action = strtolower(trim((string) ($post['update_action'] ?? 'check')));
+        if (!in_array($action, ['check', 'dry_run', 'update_now'], true)) {
+            $action = 'check';
+        }
+
+        $result = match ($action) {
+            'dry_run' => $this->updateWorkflowService()->dryRun($source, $allowOverwrite),
+            'update_now' => $this->updateWorkflowService()->update($source, $allowOverwrite),
+            default => $this->updateWorkflowService()->compare($source),
+        };
+
+        if ((bool) ($result['ok'] ?? false)) {
+            $success = trim((string) ($result['message'] ?? ''));
+        } else {
+            $error = trim((string) ($result['message'] ?? 'Update action failed.'));
+        }
+
+        $this->renderUpdatePage($source, $result, $success, $error, $allowOverwrite);
+    }
+
+    /**
      * Saves configuration values from per-key text inputs.
      */
     public function configurationSave(array $post): void
@@ -6760,6 +6845,38 @@ final class PanelController
         return $this->themeCatalogService;
     }
 
+    private function gitCommandRunner(): GitCommandRunner
+    {
+        if (!$this->gitCommandRunner instanceof GitCommandRunner) {
+            $this->gitCommandRunner = new GitCommandRunner();
+        }
+
+        return $this->gitCommandRunner;
+    }
+
+    private function updateSourceResolver(): UpdateSourceResolver
+    {
+        if (!$this->updateSourceResolver instanceof UpdateSourceResolver) {
+            $this->updateSourceResolver = new UpdateSourceResolver($this->input);
+        }
+
+        return $this->updateSourceResolver;
+    }
+
+    private function updateWorkflowService(): UpdateWorkflowService
+    {
+        if (!$this->updateWorkflowService instanceof UpdateWorkflowService) {
+            $this->updateWorkflowService = new UpdateWorkflowService(
+                dirname(__DIR__, 3),
+                $this->gitCommandRunner(),
+                $this->stockPublicThemeSlugs(),
+                $this->stockExtensionDirectories()
+            );
+        }
+
+        return $this->updateWorkflowService;
+    }
+
     private function avatarUploadService(): AvatarUploadService
     {
         if (!$this->avatarUploadService instanceof AvatarUploadService) {
@@ -6829,5 +6946,54 @@ final class PanelController
             $this->tagEnabled(),
             true
         );
+    }
+
+    /**
+     * @param array<string, mixed> $source
+     * @param array<string, mixed> $result
+     */
+    private function renderUpdatePage(
+        array $source,
+        array $result,
+        ?string $flashSuccess,
+        ?string $flashError,
+        bool $allowOverwrite
+    ): void {
+        $this->view->render('panel/update', [
+            'site' => $this->siteData(),
+            'canManageConfiguration' => $this->auth->canManageConfiguration(),
+            'csrfField' => $this->csrf->field(),
+            'flashSuccess' => $flashSuccess,
+            'flashError' => $flashError,
+            'section' => 'update',
+            'pageTitle' => 'Update System',
+            'showSidebar' => true,
+            'userTheme' => $this->currentUserTheme(),
+            'updateSource' => $source,
+            'updateResult' => $result,
+            'allowOverwrite' => $allowOverwrite,
+            'updateSourceModes' => [
+                'github_mirror' => 'Github Mirror (noveltylanterns/raven)',
+                'github_custom' => 'Custom Github',
+                'repo_custom' => 'Custom Repo',
+            ],
+        ], 'panel/wrapper');
+    }
+
+    /**
+     * @param array<string, mixed> $source
+     */
+    private function persistUpdateSourceConfig(array $source): void
+    {
+        $nextConfig = $this->config->all();
+        $nextConfig['update'] = is_array($nextConfig['update'] ?? null) ? $nextConfig['update'] : [];
+        $nextConfig['update']['source'] = [
+            'mode' => (string) ($source['mode'] ?? 'github_mirror'),
+            'github_repo' => (string) ($source['github_repo'] ?? 'noveltylanterns/raven'),
+            'repo_url' => (string) ($source['repo_url'] ?? ''),
+        ];
+
+        $this->config->replace($nextConfig);
+        $this->config->save();
     }
 }

@@ -832,6 +832,14 @@ $router->add('GET', '/configuration', static function () use ($panelController):
     $panelController->configuration();
 });
 
+$router->add('GET', '/update', static function () use ($panelController): void {
+    $panelController->update();
+});
+
+$router->add('POST', '/update/action', static function () use ($panelController): void {
+    $panelController->updateAction($_POST);
+});
+
 $router->add('POST', '/configuration/save', static function () use ($panelController): void {
     $panelController->configurationSave($_POST);
 });

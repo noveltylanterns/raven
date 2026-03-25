@@ -1,6 +1,6 @@
 # Raven CMS Agent Guide
 
-Last updated: 2026-03-19
+Last updated: 2026-03-25
 
 ## Upon Opening
 - Hello, this your Captain speaking. I am the original developer of this software I have placed you guardian over.
@@ -304,6 +304,9 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Session/SessionCookiePolicy.php` - Shared session cookie policy resolver/bootstrap helper for name/domain/prefix/host-matching.
 - `/private/lib/Site/PublicMetaService.php` - Shared public `site` meta payload builder for canonical URL, social image, and taxonomy/page meta overrides.
 - `/private/lib/Site/SiteContextBuilder.php` - Shared site-context payload builder for panel/public template data maps.
+- `/private/lib/Update/GitCommandRunner.php` - Shared shell-free git command runner for updater compare/fetch/clone operations.
+- `/private/lib/Update/UpdateSourceResolver.php` - Shared updater source normalization/validation helper for persisted GitHub/custom repo selection.
+- `/private/lib/Update/UpdateWorkflowService.php` - Shared updater compare, dry-run, and managed-tree overlay workflow with protected path preservation rules.
 - `/private/lib/View/ThemeCatalogService.php` - Shared public-theme catalog, inheritance, active-slug, and slug-policy helper for panel/public theme flows.
 - `/private/lib/View/ThemeCloneService.php` - Shared recursive directory clone service for local public-theme duplication workflows.
 - `/private/lib/View/ThemeDiscoveryService.php` - Shared theme-directory manifest discovery service for `theme.json` normalization and deterministic listing.

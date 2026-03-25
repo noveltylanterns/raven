@@ -192,6 +192,7 @@ $systemNavItems = [
     ['label' => 'Configuration', 'path' => $panelBase . '/configuration', 'section' => 'configuration'],
     ['label' => 'Theme Manager', 'path' => $panelBase . '/themes', 'section' => 'themes'],
     ['label' => 'Extension Manager', 'path' => $panelBase . '/extensions', 'section' => 'extensions'],
+    ['label' => 'Update System', 'path' => $panelBase . '/update', 'section' => 'update'],
 ];
 foreach ($systemExtensionNavItems as $item) {
     $systemNavItems[] = $item;
