@@ -425,6 +425,31 @@ $hasPanelPermissionBit = static function (int $bit) use ($app): bool {
     return $app['auth']->hasPanelPermissionBit($bit);
 };
 
+$_SESSION['_raven_nav_stock'] = [
+    'content' => [
+        'create_page' => $hasPanelPermissionBit(PanelAccess::PAGES_CREATE),
+        'list_pages' => $hasPanelPermissionBit(PanelAccess::PAGES_VIEW),
+    ],
+    'accounts' => [
+        'groups' => $hasPanelPermissionBit(PanelAccess::GROUPS_VIEW),
+        'users' => $hasPanelPermissionBit(PanelAccess::USERS_VIEW),
+    ],
+    'taxonomy' => [
+        'categories' => $categoryEnabled && $hasPanelPermissionBit(PanelAccess::CATEGORIES_VIEW),
+        'channels' => $hasPanelPermissionBit(PanelAccess::CHANNELS_VIEW),
+        'redirects' => $hasPanelPermissionBit(PanelAccess::REDIRECTS_VIEW),
+        'routing' => $hasPanelPermissionBit(PanelAccess::ROUTING_VIEW),
+        'tags' => $tagEnabled && $hasPanelPermissionBit(PanelAccess::TAGS_VIEW),
+    ],
+    'system' => [
+        'configuration' => $hasPanelPermissionBit(PanelAccess::CONFIGURATION_VIEW),
+        'themes' => $hasPanelPermissionBit(PanelAccess::THEMES_VIEW),
+        'extensions' => $hasPanelPermissionBit(PanelAccess::EXTENSIONS_VIEW),
+        'update' => $hasPanelPermissionBit(PanelAccess::MANAGE_CONFIGURATION),
+        'system_extensions' => $hasPanelPermissionBit(PanelAccess::CONFIGURATION_VIEW),
+    ],
+];
+
 // Resolve extension permission levels/bit assignments from controller-managed state.
 $extensionPermissionCatalog = $panelController->extensionPanelPermissionMapForDirectories(array_keys($enabledExtensionManifests));
 
@@ -435,6 +460,7 @@ $_SESSION['_raven_enabled_extensions'] = array_keys($enabledExtensions);
 $extensionNavItems = [];
 $moduleNavItems = [];
 $systemExtensionNavItems = [];
+$canViewSystemExtensions = !empty(($_SESSION['_raven_nav_stock']['system']['system_extensions'] ?? false));
 foreach ($enabledExtensionManifests as $directoryName => $manifest) {
     $type = strtolower(trim((string) ($manifest['type'] ?? 'plugin')));
     if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
@@ -475,7 +501,9 @@ foreach ($enabledExtensionManifests as $directoryName => $manifest) {
     ];
 
     if ($isSystemType) {
-        $systemExtensionNavItems[] = $item;
+        if ($canViewSystemExtensions) {
+            $systemExtensionNavItems[] = $item;
+        }
         continue;
     }
 

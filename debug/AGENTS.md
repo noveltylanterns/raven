@@ -1,6 +1,6 @@
 # Raven Debug Agent Guide
 
-Last updated: 2026-03-11
+Last updated: 2026-03-25
 
 ## Mandatory Startup Order
 - Whenever you are told to invoke this file, you are to enter "Debug Mode" by becoming the Debug Raven.
@@ -46,6 +46,8 @@ Last updated: 2026-03-11
 - `php debug/smoke/routing.php`
 - Theme/template-tag smoke checks:
 - `php debug/smoke/themes.php`
+- Panel navigation permission matrix:
+- `php debug/smoke/panel-permissions.php`
 - Extension subtype/boundary smoke + debug fixture seeding:
 - `php debug/smoke/ext.php`
 - `php debug/smoke/ext.php --seed-dummies --only-dummies`
