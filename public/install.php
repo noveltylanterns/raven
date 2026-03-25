@@ -111,6 +111,260 @@ function installer_session_name(): string
 }
 
 /**
+ * Returns true when one directory is writable or can be created by its parent.
+ *
+ * @return array{ok: bool, detail: string}
+ */
+function installer_directory_writable_status(string $path): array
+{
+    if (is_dir($path)) {
+        return [
+            'ok' => is_writable($path),
+            'detail' => is_writable($path)
+                ? 'Writable.'
+                : 'Directory exists but is not writable by PHP.',
+        ];
+    }
+
+    $parent = dirname($path);
+    if (!is_dir($parent)) {
+        return [
+            'ok' => false,
+            'detail' => 'Parent directory does not exist.',
+        ];
+    }
+
+    return [
+        'ok' => is_writable($parent),
+        'detail' => is_writable($parent)
+            ? 'Directory does not exist yet, but PHP can create it.'
+            : 'Directory does not exist and parent directory is not writable.',
+    ];
+}
+
+/**
+ * Returns true when Composer dependencies appear fully installed.
+ *
+ * @return array{ok: bool, detail: string}
+ */
+function installer_composer_install_status(string $root): array
+{
+    $requiredPaths = [
+        $root . '/composer/autoload.php',
+        $root . '/composer/composer/installed.php',
+        $root . '/composer/delight-im/auth/src/Auth.php',
+    ];
+
+    $missing = [];
+    foreach ($requiredPaths as $path) {
+        if (!is_file($path)) {
+            $missing[] = str_replace($root . '/', '', $path);
+        }
+    }
+
+    if ($missing !== []) {
+        return [
+            'ok' => false,
+            'detail' => 'Missing ' . implode(', ', $missing) . '. Run `composer install`.',
+        ];
+    }
+
+    return [
+        'ok' => true,
+        'detail' => 'Composer autoload and installed packages are present.',
+    ];
+}
+
+/**
+ * Builds installer pre-flight checklist rows.
+ *
+ * @return array{
+ *   rows: array<int, array{
+ *     key: string,
+ *     label: string,
+ *     status: string,
+ *     detail: string,
+ *     error: string
+ *   }>,
+ *   has_fail: bool,
+ *   fail_count: int,
+ *   warn_count: int,
+ *   pass_count: int,
+ *   summary_label: string,
+ *   summary_class: string
+ * }
+ */
+function installer_preflight_checklist(
+    string $root,
+    string $selectedDriver,
+    string $configTemplatePath,
+    string $extensionStateTemplatePath
+): array {
+    $selectedDriver = strtolower(trim($selectedDriver));
+    if (!in_array($selectedDriver, ['sqlite', 'mysql', 'pgsql'], true)) {
+        $selectedDriver = 'sqlite';
+    }
+
+    $rows = [];
+
+    $phpVersion = PHP_VERSION;
+    if (version_compare($phpVersion, '8.5.0', '>=')) {
+        $rows[] = [
+            'key' => 'php_version',
+            'label' => 'PHP 8.5 target',
+            'status' => 'pass',
+            'detail' => 'Running PHP ' . $phpVersion . ' (known-good target met).',
+            'error' => '',
+        ];
+    } elseif (version_compare($phpVersion, '8.0.0', '>=')) {
+        $rows[] = [
+            'key' => 'php_version',
+            'label' => 'PHP 8.5 target',
+            'status' => 'warn',
+            'detail' => 'Running PHP ' . $phpVersion . ' (unverified 8.x; may still work).',
+            'error' => '',
+        ];
+    } else {
+        $rows[] = [
+            'key' => 'php_version',
+            'label' => 'PHP 8.5 target',
+            'status' => 'fail',
+            'detail' => 'Running PHP ' . $phpVersion . ' (Raven needs PHP 8.x).',
+            'error' => 'PHP 8.x is required to run Raven.',
+        ];
+    }
+
+    $composerStatus = installer_composer_install_status($root);
+    $rows[] = [
+        'key' => 'composer_install',
+        'label' => 'Composer install run?',
+        'status' => $composerStatus['ok'] ? 'pass' : 'fail',
+        'detail' => $composerStatus['detail'],
+        'error' => $composerStatus['ok'] ? '' : 'Composer dependencies are incomplete. Run `composer install` first.',
+    ];
+
+    $pdoLoaded = extension_loaded('pdo');
+    $rows[] = [
+        'key' => 'pdo',
+        'label' => 'PDO available',
+        'status' => $pdoLoaded ? 'pass' : 'fail',
+        'detail' => $pdoLoaded ? 'PDO extension is loaded.' : 'PDO extension is missing.',
+        'error' => $pdoLoaded ? '' : 'PHP PDO support is required.',
+    ];
+
+    $sessionLoaded = extension_loaded('session');
+    $rows[] = [
+        'key' => 'session',
+        'label' => 'Session support',
+        'status' => $sessionLoaded ? 'pass' : 'fail',
+        'detail' => $sessionLoaded ? 'Session extension is loaded.' : 'Session extension is missing.',
+        'error' => $sessionLoaded ? '' : 'PHP session support is required.',
+    ];
+
+    $datStatus = installer_directory_writable_status($root . '/private/dat');
+    $rows[] = [
+        'key' => 'private_dat',
+        'label' => 'private/dat/ writable?',
+        'status' => $datStatus['ok'] ? 'pass' : 'fail',
+        'detail' => $datStatus['detail'],
+        'error' => $datStatus['ok'] ? '' : 'private/dat/ must be writable before install can continue.',
+    ];
+
+    $configTemplateExists = is_file($configTemplatePath);
+    $rows[] = [
+        'key' => 'config_template',
+        'label' => 'Config template present',
+        'status' => $configTemplateExists ? 'pass' : 'fail',
+        'detail' => $configTemplateExists ? 'Found private/dat/config.php.dist.' : 'Missing private/dat/config.php.dist.',
+        'error' => $configTemplateExists ? '' : 'Installer requires private/dat/config.php.dist.',
+    ];
+
+    $extensionTemplateExists = is_file($extensionStateTemplatePath);
+    $rows[] = [
+        'key' => 'extension_state_template',
+        'label' => 'Extension state template present',
+        'status' => $extensionTemplateExists ? 'pass' : 'fail',
+        'detail' => $extensionTemplateExists ? 'Found private/dat/ext/.state.php.dist.' : 'Missing private/dat/ext/.state.php.dist.',
+        'error' => $extensionTemplateExists ? '' : 'Installer requires private/dat/ext/.state.php.dist.',
+    ];
+
+    $pdoDrivers = $pdoLoaded && class_exists(PDO::class) ? PDO::getAvailableDrivers() : [];
+    $driverMap = [
+        'sqlite' => ['label' => 'SQLite driver', 'extension' => 'pdo_sqlite', 'name' => 'SQLite'],
+        'mysql' => ['label' => 'MySQL driver', 'extension' => 'pdo_mysql', 'name' => 'MySQL / MariaDB'],
+        'pgsql' => ['label' => 'PostgreSQL driver', 'extension' => 'pdo_pgsql', 'name' => 'PostgreSQL'],
+    ];
+    foreach ($driverMap as $driverKey => $driverMeta) {
+        $available = $pdoLoaded && in_array($driverKey, $pdoDrivers, true) && extension_loaded((string) $driverMeta['extension']);
+        $isSelected = $selectedDriver === $driverKey;
+        $status = $available ? 'pass' : ($isSelected ? 'fail' : 'warn');
+        $detail = $available
+            ? ((string) $driverMeta['name'] . ' support is available.')
+            : ($isSelected
+                ? ((string) $driverMeta['name'] . ' is selected but ' . (string) $driverMeta['extension'] . ' is not loaded.')
+                : ((string) $driverMeta['name'] . ' support is not available on this PHP build.'));
+        $error = (!$available && $isSelected)
+            ? ((string) $driverMeta['name'] . ' support is required for the selected install mode.')
+            : '';
+
+        $rows[] = [
+            'key' => 'driver_' . $driverKey,
+            'label' => (string) $driverMeta['label'],
+            'status' => $status,
+            'detail' => $detail,
+            'error' => $error,
+        ];
+    }
+
+    $gdLoaded = extension_loaded('gd');
+    $imagickLoaded = extension_loaded('imagick');
+    $imageStatus = $gdLoaded || $imagickLoaded;
+    $imageDetail = $imageStatus
+        ? ('Image processing available via ' . ($gdLoaded ? 'GD' : 'Imagick') . '.')
+        : 'Neither GD nor Imagick is loaded; image upload/variant features will not work until one is installed.';
+    $rows[] = [
+        'key' => 'image_processing',
+        'label' => 'Image processing',
+        'status' => $imageStatus ? 'pass' : 'warn',
+        'detail' => $imageDetail,
+        'error' => '',
+    ];
+
+    $failCount = 0;
+    $warnCount = 0;
+    $passCount = 0;
+    foreach ($rows as $row) {
+        if ($row['status'] === 'fail') {
+            $failCount++;
+        } elseif ($row['status'] === 'warn') {
+            $warnCount++;
+        } else {
+            $passCount++;
+        }
+    }
+
+    $summaryLabel = 'Ready';
+    $summaryClass = 'pass';
+    if ($failCount > 0) {
+        $summaryLabel = 'Blocked';
+        $summaryClass = 'fail';
+    } elseif ($warnCount > 0) {
+        $summaryLabel = 'Warnings';
+        $summaryClass = 'warn';
+    }
+
+    return [
+        'rows' => $rows,
+        'has_fail' => $failCount > 0,
+        'fail_count' => $failCount,
+        'warn_count' => $warnCount,
+        'pass_count' => $passCount,
+        'summary_label' => $summaryLabel,
+        'summary_class' => $summaryClass,
+    ];
+}
+
+/**
  * Starts the installer session with cookie-backed settings only.
  */
 function installer_start_session(): void
@@ -308,10 +562,36 @@ $formPlaceholders = [
 ];
 
 $errors = [];
+$isPost = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST';
 
-if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
+if ($isPost) {
     foreach ($form as $key => $_) {
         $form[$key] = trim((string) ($_POST[$key] ?? ''));
+    }
+}
+
+$selectedPreflightDriver = strtolower(trim((string) ($form['db_driver'] ?? $defaultDriver)));
+if (!in_array($selectedPreflightDriver, ['sqlite', 'mysql', 'pgsql'], true)) {
+    $selectedPreflightDriver = $defaultDriver;
+}
+
+$preflight = installer_preflight_checklist(
+    $root,
+    $selectedPreflightDriver,
+    $configTemplatePath,
+    $extensionStateTemplatePath
+);
+
+if ($isPost) {
+    foreach ($preflight['rows'] as $preflightRow) {
+        if (($preflightRow['status'] ?? '') !== 'fail') {
+            continue;
+        }
+
+        $message = trim((string) ($preflightRow['error'] ?? ''));
+        if ($message !== '') {
+            $errors[] = $message;
+        }
     }
 
     if (!$hasInstallerSessionCookie) {
@@ -562,17 +842,94 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         .note { font-size: 0.86rem; color: #4d5b6b; margin-top: 0.25rem; }
         .alert { border-radius: 6px; padding: 0.8rem 0.9rem; margin-bottom: 1rem; }
         .alert.error { background: #fcebec; border: 1px solid #f3b4b8; color: #7a1f26; }
+        .preflight-summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .preflight-summary-meta { font-size: 0.86rem; color: #4d5b6b; }
+        .preflight-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.7rem; }
+        .preflight-item { border: 1px solid #d7dde5; border-radius: 6px; padding: 0.8rem 0.9rem; }
+        .preflight-item.is-pass { border-color: #bfdcc4; background: #f4fbf5; }
+        .preflight-item.is-warn { border-color: #eed9a2; background: #fff9e8; }
+        .preflight-item.is-fail { border-color: #f0b7bc; background: #fff2f3; }
+        .preflight-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+        .preflight-label { font-weight: 600; font-size: 0.95rem; }
+        .preflight-detail { color: #4d5b6b; font-size: 0.86rem; margin-top: 0.2rem; }
+        .status-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 0.18rem 0.58rem; font-size: 0.76rem; font-weight: 700; white-space: nowrap; }
+        .status-badge.pass { background: #d8f0dc; color: #1f6a2b; }
+        .status-badge.warn { background: #f9ebbb; color: #7a5a00; }
+        .status-badge.fail { background: #f8d7da; color: #8a1f2d; }
         .actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
         button { background: #154f95; color: #fff; border: 0; border-radius: 6px; padding: 0.62rem 1rem; font-size: 0.95rem; cursor: pointer; }
         button:hover { background: #123f77; }
         [data-driver-section] { display: none; }
-        @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+        @media (max-width: 800px) {
+            .grid { grid-template-columns: 1fr; }
+            .preflight-row { flex-direction: column; align-items: flex-start; }
+        }
     </style>
 </head>
 <body>
 <div class="wrap">
     <div class="card">
         <h1>Raven CMS Installer</h1>
+    </div>
+
+    <div class="card">
+        <h2>Pre-Flight Checklist</h2>
+        <div class="preflight-summary">
+            <div>
+                <span
+                    class="status-badge <?= installer_e((string) $preflight['summary_class']) ?>"
+                    id="preflight-summary-badge"
+                ><?= installer_e((string) $preflight['summary_label']) ?></span>
+            </div>
+            <div class="preflight-summary-meta" id="preflight-summary-meta">
+                <?= installer_e((string) $preflight['pass_count']) ?> pass,
+                <?= installer_e((string) $preflight['warn_count']) ?> warning<?= (int) $preflight['warn_count'] === 1 ? '' : 's' ?>,
+                <?= installer_e((string) $preflight['fail_count']) ?> blocking issue<?= (int) $preflight['fail_count'] === 1 ? '' : 's' ?>
+            </div>
+        </div>
+        <ul class="preflight-list" id="preflight-list">
+            <?php foreach ($preflight['rows'] as $row): ?>
+                <?php
+                $rowKey = (string) ($row['key'] ?? '');
+                $rowStatus = (string) ($row['status'] ?? 'warn');
+                $rowLabel = (string) ($row['label'] ?? $rowKey);
+                $rowDetail = (string) ($row['detail'] ?? '');
+                $driverCheck = '';
+                $driverName = '';
+                if (str_starts_with($rowKey, 'driver_')) {
+                    $driverCheck = substr($rowKey, strlen('driver_'));
+                    $driverName = match ($driverCheck) {
+                        'sqlite' => 'SQLite',
+                        'mysql' => 'MySQL / MariaDB',
+                        'pgsql' => 'PostgreSQL',
+                        default => $driverCheck,
+                    };
+                }
+                ?>
+                <li
+                    class="preflight-item is-<?= installer_e($rowStatus) ?>"
+                    data-preflight-item="1"
+                    data-preflight-status="<?= installer_e($rowStatus) ?>"
+                    <?= $driverCheck !== '' ? 'data-driver-check="' . installer_e($driverCheck) . '"' : '' ?>
+                    <?= $driverCheck !== '' ? 'data-driver-name="' . installer_e($driverName) . '"' : '' ?>
+                    <?= $driverCheck !== '' ? 'data-driver-available="' . (in_array($rowStatus, ['pass'], true) ? '1' : (str_contains($rowDetail, 'not available') || str_contains($rowDetail, 'not loaded') ? '0' : '1')) . '"' : '' ?>
+                >
+                    <div class="preflight-row">
+                        <div>
+                            <div class="preflight-label"><?= installer_e($rowLabel) ?></div>
+                            <div class="preflight-detail" data-preflight-detail="1"><?= installer_e($rowDetail) ?></div>
+                        </div>
+                        <span class="status-badge <?= installer_e($rowStatus) ?>" data-preflight-badge="1">
+                            <?= installer_e(match ($rowStatus) {
+                                'pass' => 'Pass',
+                                'warn' => 'Warn',
+                                default => 'Fail',
+                            }) ?>
+                        </span>
+                    </div>
+                </li>
+            <?php endforeach; ?>
+        </ul>
     </div>
 
     <?php if ($errors !== []): ?>
@@ -695,6 +1052,84 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
     var enableUsernamesInput = document.getElementById('enable_usernames');
     var adminUsernameField = document.getElementById('admin_username_field');
     var adminUsernameInput = document.getElementById('admin_username');
+    var preflightSummaryBadge = document.getElementById('preflight-summary-badge');
+    var preflightSummaryMeta = document.getElementById('preflight-summary-meta');
+
+    function setPreflightItemStatus(item, status, detail) {
+      if (!(item instanceof HTMLElement)) {
+        return;
+      }
+
+      item.dataset.preflightStatus = status;
+      item.classList.remove('is-pass', 'is-warn', 'is-fail');
+      item.classList.add('is-' + status);
+
+      var badge = item.querySelector('[data-preflight-badge="1"]');
+      if (badge instanceof HTMLElement) {
+        badge.classList.remove('pass', 'warn', 'fail');
+        badge.classList.add(status);
+        badge.textContent = status === 'pass' ? 'Pass' : (status === 'warn' ? 'Warn' : 'Fail');
+      }
+
+      var detailNode = item.querySelector('[data-preflight-detail="1"]');
+      if (detailNode instanceof HTMLElement) {
+        detailNode.textContent = detail;
+      }
+    }
+
+    function syncPreflightChecklist() {
+      var items = document.querySelectorAll('[data-preflight-item="1"]');
+      var selected = driverSelect.value;
+      var counts = { pass: 0, warn: 0, fail: 0 };
+
+      items.forEach(function (item) {
+        if (!(item instanceof HTMLElement)) {
+          return;
+        }
+
+        var driverKey = item.getAttribute('data-driver-check');
+        if (driverKey) {
+          var driverName = item.getAttribute('data-driver-name') || driverKey;
+          var available = item.getAttribute('data-driver-available') === '1';
+          if (available) {
+            setPreflightItemStatus(item, 'pass', driverName + ' support is available.');
+          } else if (selected === driverKey) {
+            var extensionName = driverKey === 'sqlite' ? 'pdo_sqlite' : (driverKey === 'mysql' ? 'pdo_mysql' : 'pdo_pgsql');
+            setPreflightItemStatus(item, 'fail', driverName + ' is selected but ' + extensionName + ' is not loaded.');
+          } else {
+            setPreflightItemStatus(item, 'warn', driverName + ' support is not available on this PHP build.');
+          }
+        }
+
+        var status = item.dataset.preflightStatus || 'warn';
+        if (!counts.hasOwnProperty(status)) {
+          status = 'warn';
+        }
+        counts[status] += 1;
+      });
+
+      var summaryStatus = 'pass';
+      var summaryLabel = 'Ready';
+      if (counts.fail > 0) {
+        summaryStatus = 'fail';
+        summaryLabel = 'Blocked';
+      } else if (counts.warn > 0) {
+        summaryStatus = 'warn';
+        summaryLabel = 'Warnings';
+      }
+
+      if (preflightSummaryBadge instanceof HTMLElement) {
+        preflightSummaryBadge.classList.remove('pass', 'warn', 'fail');
+        preflightSummaryBadge.classList.add(summaryStatus);
+        preflightSummaryBadge.textContent = summaryLabel;
+      }
+
+      if (preflightSummaryMeta instanceof HTMLElement) {
+        preflightSummaryMeta.textContent = String(counts.pass) + ' pass, '
+          + String(counts.warn) + ' warning' + (counts.warn === 1 ? '' : 's') + ', '
+          + String(counts.fail) + ' blocking issue' + (counts.fail === 1 ? '' : 's');
+      }
+    }
 
     function syncDriverSections() {
       var selected = driverSelect.value;
@@ -713,6 +1148,8 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
       if (tablePrefixInput instanceof HTMLInputElement) {
         tablePrefixInput.disabled = selected === 'sqlite';
       }
+
+      syncPreflightChecklist();
     }
 
     driverSelect.addEventListener('change', syncDriverSections);
