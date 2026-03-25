@@ -245,6 +245,43 @@ final class ChannelRepository
     }
 
     /**
+     * Returns channel options for routing diagnostics, including the stock root channel.
+     *
+     * @return array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>
+     */
+    public function listRoutingOptions(): array
+    {
+        $rows = [];
+        foreach ($this->listRecords() as $channel) {
+            $rows[] = [
+                'id' => (int) ($channel['id'] ?? 0),
+                'name' => (string) ($channel['name'] ?? ''),
+                'slug' => (string) ($channel['slug'] ?? ''),
+                'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
+                'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
+                'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),
+            ];
+        }
+
+        usort($rows, static function (array $a, array $b): int {
+            $aIsRoot = ChannelRecordPolicy::isRootChannelId((int) ($a['id'] ?? -1));
+            $bIsRoot = ChannelRecordPolicy::isRootChannelId((int) ($b['id'] ?? -1));
+            if ($aIsRoot !== $bIsRoot) {
+                return $aIsRoot ? -1 : 1;
+            }
+
+            $nameCompare = strcasecmp($a['name'], $b['name']);
+            if ($nameCompare !== 0) {
+                return $nameCompare;
+            }
+
+            return $a['id'] <=> $b['id'];
+        });
+
+        return $rows;
+    }
+
+    /**
      * Returns true when one channel exists by slug.
      */
     public function slugExists(string $slug): bool

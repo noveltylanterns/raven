@@ -142,7 +142,7 @@ final class TaxonomyLookupRepository
 
         $rows = $stmt->fetchAll() ?: [];
         $result = [
-            'channel_options' => $this->channelRepo->listOptions(),
+            'channel_options' => $this->channelRepo->listRoutingOptions(),
             'category_options_all' => [],
             'tag_options_all' => [],
         ];
@@ -198,7 +198,7 @@ final class TaxonomyLookupRepository
         $redirects = $this->table('redirects');
 
         $result = [
-            'channel_options' => $this->channelRepo->listOptions(),
+            'channel_options' => $this->channelRepo->listRoutingOptions(),
             'category_options_all' => [],
             'tag_options_all' => [],
             'redirect_rows' => [],

@@ -146,24 +146,30 @@ final class RoutingInventoryBuilder
         foreach ($channelRoutingOptions as $channel) {
             $channelId = (int) ($channel['id'] ?? 0);
             $channelSlug = trim((string) ($channel['slug'] ?? ''));
-            if ($channelId <= 0 || $channelSlug === '') {
+            if ($channelId < 0 || $channelSlug === '') {
                 continue;
             }
 
-            $landingSlug = trim((string) ($channelLandingMap[$channelSlug] ?? ''));
+            $isRootChannel = ChannelRecordPolicy::isRootChannelId($channelId)
+                || ChannelRecordPolicy::isRootChannelSlug($channelSlug);
+            $landingSlug = $isRootChannel
+                ? $this->rootLandingSlug($pagesForRouting)
+                : trim((string) ($channelLandingMap[$channelSlug] ?? ''));
             $hasLanding = $landingSlug !== '';
             $statusKey = $hasLanding ? 'active' : 'missing';
             $statusLabel = $hasLanding
                 ? 'Active'
                 : ($channelIndexTemplateExists ? 'Missing Index' : 'Missing Template');
             $notes = $hasLanding
-                ? ('Channel landing resolves using slug "' . $landingSlug . '".')
+                ? ($isRootChannel
+                    ? ('Root landing resolves using slug "' . $landingSlug . '".')
+                    : ('Channel landing resolves using slug "' . $landingSlug . '".'))
                 : 'No published channel landing page found (requires slug home or index).';
-            if (in_array($channelSlug, $reservedPrefixes, true)) {
+            if (!$isRootChannel && in_array($channelSlug, $reservedPrefixes, true)) {
                 $notes = 'Reserved prefix; this channel route is not publicly reachable.';
             }
 
-            $publicUrl = '/' . $channelSlug;
+            $publicUrl = $isRootChannel ? '/' : ('/' . $channelSlug);
             $conflictKey = strtolower($publicUrl);
             $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
 
@@ -446,5 +452,55 @@ final class RoutingInventoryBuilder
         });
 
         return $rows;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $pagesForRouting
+     */
+    private function rootLandingSlug(array $pagesForRouting): string
+    {
+        $bestSlug = '';
+        $bestPriority = PHP_INT_MAX;
+        $bestPublishedTs = -1;
+
+        foreach ($pagesForRouting as $page) {
+            $channelId = (int) ($page['channel_id'] ?? 0);
+            $channelSlug = trim((string) ($page['channel_slug'] ?? ''));
+            if ($channelId !== ChannelRecordPolicy::ROOT_CHANNEL_ID && $channelSlug !== '') {
+                continue;
+            }
+
+            if ((int) ($page['is_published'] ?? 0) !== 1) {
+                continue;
+            }
+
+            $pageSlug = trim((string) ($page['slug'] ?? ''));
+            $priority = match ($pageSlug) {
+                'home' => 0,
+                'index' => 1,
+                default => null,
+            };
+            if ($priority === null) {
+                continue;
+            }
+
+            $publishedAt = trim((string) ($page['published_at'] ?? ''));
+            $publishedTs = $publishedAt !== '' ? (int) strtotime($publishedAt) : 0;
+            if ($publishedTs < 0) {
+                $publishedTs = 0;
+            }
+
+            if (
+                $bestSlug === ''
+                || $priority < $bestPriority
+                || ($priority === $bestPriority && $publishedTs > $bestPublishedTs)
+            ) {
+                $bestSlug = $pageSlug;
+                $bestPriority = $priority;
+                $bestPublishedTs = $publishedTs;
+            }
+        }
+
+        return $bestSlug;
     }
 }
