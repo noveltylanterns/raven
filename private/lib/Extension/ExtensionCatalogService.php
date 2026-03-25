@@ -82,11 +82,9 @@ final class ExtensionCatalogService
             $isEnabled = $isValid && !empty($enabledMap[$entry]);
             $hasPanelRoutes = is_file($extensionPath . '/lib/routes_panel.php');
             $isStock = $this->isStockExtensionDirectory($entry);
-            $canUninstall = !$isStock && !$isEnabled;
+            $canUninstall = !$isEnabled;
             $uninstallBlockReason = '';
-            if ($isStock) {
-                $uninstallBlockReason = 'Stock extension cannot be uninstalled.';
-            } elseif ($isEnabled) {
+            if ($isEnabled) {
                 $uninstallBlockReason = 'Disable extension before uninstalling.';
             }
 

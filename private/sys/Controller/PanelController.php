@@ -4210,11 +4210,11 @@ final class PanelController
     }
 
     /**
-     * Uninstalls one extension directory from `private/ext/{name}/`.
+     * Uninstalls one extension package or purges one stock extension's data.
      *
      * Rules:
-     * - Stock extensions can never be uninstalled.
      * - Enabled extensions must be disabled before uninstall.
+     * - Stock extensions keep their bundled files and only purge opted-in data.
      *
      * @param array<string, mixed> $post
      */
@@ -4237,11 +4237,6 @@ final class PanelController
             redirect($this->panelUrl('/extensions'));
         }
 
-        if ($this->isStockExtensionDirectory($extensionName)) {
-            $this->flash('error', 'Stock extensions cannot be uninstalled.');
-            redirect($this->panelUrl('/extensions'));
-        }
-
         $extensionPath = $this->extensionsBasePath() . '/' . $extensionName;
         if (!is_dir($extensionPath)) {
             $this->flash('error', 'Extension directory was not found on disk.');
@@ -4249,6 +4244,7 @@ final class PanelController
         }
 
         $manifest = $this->readExtensionManifest($extensionPath);
+        $isStockExtension = $this->isStockExtensionDirectory($extensionName);
 
         // Prevent uninstalling active extensions so runtime behavior changes are deliberate.
         $enabledMap = $this->loadExtensionStateMap();
@@ -4263,6 +4259,11 @@ final class PanelController
             $this->deleteExtensionStorage($extensionName, $manifest);
         } catch (\RuntimeException $exception) {
             $this->flash('error', 'Failed to uninstall extension storage: ' . $exception->getMessage());
+            redirect($this->panelUrl('/extensions'));
+        }
+
+        if ($isStockExtension) {
+            $this->flash('success', 'Stock extension "' . $extensionName . '" data purged. Bundled extension files were kept.');
             redirect($this->panelUrl('/extensions'));
         }
 

@@ -12,6 +12,7 @@
 - Added manifest-gated extension storage flags: `local_storage` now provisions `private/dat/ext/{slug}/` only when explicitly set to `on`, and `db_storage` now gates `lib/schema.php` plus `{prefix}ext_{slug}` / `{prefix}ext_{slug}_*` table usage with a default of `off` when unset.
 - Updated extension uninstall so remove/uninstall operations now clean up opted-in local/db storage, while disable operations leave extension data untouched.
 - Renamed theme/extension package-removal actions from `delete` to `uninstall` across the panel, CLI, and stock panel permission map (`themes.uninstall`, `extensions.uninstall`, `THEMES_UNINSTALL`, `EXTENSIONS_UNINSTALL`), while content-style resources such as pages/users/channels/groups/categories/tags/redirects still use `delete`.
+- Updated stock extension uninstall behavior so the Extension Manager now offers `Uninstall` for disabled stock extensions too, but that action only purges opted-in DB/local storage and keeps the bundled stock extension files on disk.
 - Moved the canonical runtime config files to `private/dat/config.php` and `private/dat/config.php.dist`, updated installer/bootstrap/CLI/debug tooling to load them from `private/dat/`, and tightened `.gitignore` so `private/dat/` stays local except for the committed `.dist` templates.
 
 ### March 21, 2026

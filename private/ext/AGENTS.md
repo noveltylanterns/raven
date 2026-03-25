@@ -463,7 +463,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - New uploads always start disabled.
 
 ## Deletion/Protection Rules
-- Stock extension directories are protected from uninstall.
+- Stock extension directories are protected from file removal during uninstall.
 - Current stock list: `contact`, `database`, `phpinfo`, `signups`.
 - Enabled extensions must be disabled before uninstall.
 
@@ -472,7 +472,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - Extension-owned local storage may also live under `private/dat/ext/{slug}/` when files belong to that extension alone.
 - `local_storage: "on"` allows Raven to provision `private/dat/ext/{slug}/` when the extension is enabled.
 - DB-backed state for extensions is also supported and preferred for panel-managed structured data; `db_storage: "on"` allows Raven to run `lib/schema.php` and extension tables should follow the shared `{prefix}ext_{slug}` / `{prefix}ext_{slug}_*` naming model.
-- Disabling an extension should leave both local/db storage intact; uninstalling the extension should remove its opted-in local storage and opted-in DB tables.
+- Disabling an extension should leave both local/db storage intact; uninstalling a non-stock extension should remove its opted-in local storage and opted-in DB tables plus its package files, while stock extension uninstall only purges opted-in local/db storage and keeps the bundled extension files.
 
 ## Public Runtime Integration (Current Reality)
 - Public routes can now be registered by enabled `module` extensions via `lib/routes_public.php`.

@@ -80,7 +80,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
         <h5>Notes:</h5>
         <p class="text-muted mb-0">
           - Enabled extensions must be disabled before uninstall.<br>
-          - Stock extensions cannot be uninstalled, only disabled.<br>
+          - Uninstalling stock extensions only purges their opted-in data; bundled files stay in place.<br>
           - Disable unused extensions for performance!
         </p>
     </div>
@@ -126,6 +126,9 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                         $isStock = (bool) ($extension['is_stock'] ?? false);
                         $canUninstall = (bool) ($extension['can_uninstall'] ?? false);
                         $uninstallBlockReason = (string) ($extension['uninstall_block_reason'] ?? '');
+                        $uninstallConfirmText = $isStock
+                            ? "Uninstall this stock extension's opted-in data? Bundled extension files will be kept."
+                            : 'Uninstall this extension and remove its opted-in data? This cannot be undone.';
                         $nameLabel = $name !== '' ? $name : $directory;
                         $panelTarget = $extensionPanelPath !== '' ? ($panelBase . '/' . ltrim($extensionPanelPath, '/')) : '';
                         $canOpenSettings = $enabled && $panelTarget !== '';
@@ -209,7 +212,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                                 aria-label="Uninstall"
                                                 title="Uninstall"
                                                 <?= $uninstallBlockReason !== '' ? 'data-rvn-uninstall-block-reason="' . e($uninstallBlockReason) . '"' : '' ?>
-                                                onclick="return confirm('Uninstall this extension and remove its opted-in data? This cannot be undone.');"
+                                                onclick="return confirm('<?= e($uninstallConfirmText) ?>');"
                                             >
                                                 <i class="bi bi-trash3" aria-hidden="true"></i>
                                             </button>
