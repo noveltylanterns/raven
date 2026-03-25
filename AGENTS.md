@@ -21,11 +21,16 @@ Last updated: 2026-03-25
 - `panel/theme/AGENTS.md`
 
 ## Documentation Map
+- System file tree and ownership map: `docs/Filetree.md`
 - Project summary: `README.md`
 - Project docs index: `docs/README.md`
 - Core behavior docs: `docs/*.md` (Pages, Users, Routing, Configuration, Extensions, etc.)
 - CLI command docs: `docs/CLI.md`
 - Release change history: `docs/release-notes/{version}.md`
+
+## First Orientation
+- If you need the fastest whole-system map, read `docs/Filetree.md` immediately after this file.
+- It is the quickest way to understand Raven's component boundaries and how the main directories relate to one another.
 
 ## Runtime Summary
 - PHP version target: `8.5`
