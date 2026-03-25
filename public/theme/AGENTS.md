@@ -12,7 +12,7 @@ Last updated: 2026-03-14
 - Use `private/bin/rvn-theme list` to inventory valid installed public themes.
 - Use `private/bin/rvn-theme enable --slug <theme_slug>` to switch active site theme.
 - Use `private/bin/rvn-theme create --slug <theme_slug> --name <Theme Name> [--clone <source_slug>] [--parent <parent_slug>] [--set-default 1]` to scaffold a new public theme (or clone an existing one as the scaffold base).
-- Use `private/bin/rvn-theme uninstall --slug <theme_slug>` when removing a non-stock, non-active theme from local environments.
+- Use `private/bin/rvn-theme uninstall --slug <theme_slug>` when removing a non-stock, non-active theme from local environments. Legacy `delete` remains accepted as an alias for `uninstall`.
 - Use `private/bin/rvn-conf get --key site.default_theme` for read-only config-key checks.
 - Use `private/bin/rvn-sys info` to confirm active runtime domain/path context while testing theme behavior.
 

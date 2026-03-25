@@ -57,6 +57,11 @@ Tab behavior notes:
   - `mail.agent`
   - `mail.sender_address` (`Mail Sender Address`, optional explicit sender email; blank uses auto no-reply fallback)
   - `mail.sender_name` (`Mail Sender Name`, display name used in outgoing `From` header)
+- `Update` section:
+  - `update.source.mode`
+  - `update.source.github_repo`
+  - `update.source.repo_url`
+  - database password fields render as password inputs in the editor so saved credentials are masked on screen
 
 #### Content Tab
 
@@ -270,6 +275,9 @@ The following config keys are expected to appear in this document and in runtime
 - `database.pgsql.password`
 - `database.pgsql.port`
 - `database.pgsql.user`
+- `update.source.mode`
+- `update.source.github_repo`
+- `update.source.repo_url`
 - `debug.show_public`
 - `debug.show_private`
 - `debug.show_benchmarks`

@@ -3644,6 +3644,7 @@ final class PanelController
             'redirect' => count(array_filter($routeRows, static fn (array $row): bool => (string) ($row['type_key'] ?? '') === 'redirect')),
             'conflicts' => count(array_filter($routeRows, static fn (array $row): bool => !empty($row['is_conflict']))),
         ];
+        $initialSearch = $this->input->text(is_string($_GET['search'] ?? null) ? $_GET['search'] : null, 200);
 
         $this->view->render('panel/routing', [
             'site' => $this->siteData(),
@@ -3656,6 +3657,7 @@ final class PanelController
             'userTheme' => $this->currentUserTheme(),
             'routeRows' => $routeRows,
             'routeSummary' => $summary,
+            'initialSearch' => $initialSearch,
         ], 'panel/wrapper');
     }
 

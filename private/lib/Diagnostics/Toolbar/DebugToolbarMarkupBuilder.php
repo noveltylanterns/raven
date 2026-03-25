@@ -86,7 +86,7 @@ final class DebugToolbarMarkupBuilder
 #rvnd .rvnd-right > span + span::before{content:"|";display:inline-block;margin-right:5px;color:#fff}
 #rvnd .rvnd-right > span + span{margin-left:5px}
 #rvnd .rvnd-expand{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;border:1px solid #484848;background:#111;color:#fff;border-radius:4px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer}
-#rvnd .rvnd-expand .rvnd-caret{width:10px;height:10px;display:inline-block;vertical-align:middle}
+#rvnd .rvnd-expand .rvnd-caret{display:inline-block;min-width:10px;text-align:center;vertical-align:middle;font-size:10px;line-height:1}
 #rvnd .rvnd-expand:hover{background:#1c1c1c}
 #rvnd #rvnd-inside{display:none;height:max(25vh,333px);overflow:auto;background:#050505;border-top:1px solid #242424;padding:10px}
 #rvnd.rvnd-open #rvnd-inside{display:block}
@@ -116,7 +116,7 @@ final class DebugToolbarMarkupBuilder
     <div id="rvnd-bar">
         <div class="rvnd-left">
             <strong class="rvnd-title">Output Profiler</strong>
-            <button type="button" class="rvnd-expand" data-rvn-debug-toggle="1" aria-expanded="false"><span class="rvnd-expand-label">Expand</span><svg class="rvnd-caret" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 5l4 6H4z"/></svg></button>
+            <button type="button" class="rvnd-expand" data-rvn-debug-toggle="1" aria-expanded="false"><span class="rvnd-expand-label">Expand</span><span class="rvnd-caret" aria-hidden="true">^</span></button>
         </div>
         <div class="rvnd-right">
             <span class="rvnd-summary-queries">' . self::e($summaryQueries) . '</span>
@@ -141,8 +141,8 @@ final class DebugToolbarMarkupBuilder
     var toggle=root.querySelector("[data-rvn-debug-toggle=\"1\"]");
     if(!(toggle instanceof HTMLButtonElement)){return;}
     var panel=root.querySelector("#rvnd-inside");
-    var expandLabel="<span class=\"rvnd-expand-label\">Expand</span><svg class=\"rvnd-caret\" viewBox=\"0 0 16 16\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M8 5l4 6H4z\"></path></svg>";
-    var collapseLabel="<span class=\"rvnd-expand-label\">Collapse</span><svg class=\"rvnd-caret\" viewBox=\"0 0 16 16\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M8 11L4 5h8z\"></path></svg>";
+    var expandLabel="<span class=\"rvnd-expand-label\">Expand</span><span class=\"rvnd-caret\" aria-hidden=\"true\">^</span>";
+    var collapseLabel="<span class=\"rvnd-expand-label\">Collapse</span><span class=\"rvnd-caret\" aria-hidden=\"true\">v</span>";
     function setOpen(next){
         root.classList.toggle("rvnd-open",next);
         toggle.setAttribute("aria-expanded",next?"true":"false");

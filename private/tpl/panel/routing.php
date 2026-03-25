@@ -14,6 +14,7 @@ declare(strict_types=1);
 /** @var array<string, string> $site */
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
+/** @var string $initialSearch */
 /** @var array{total: int, page: int, channel: int, redirect: int, conflicts: int} $routeSummary */
 /** @var array<int, array{
  *   type_key: string,
@@ -31,6 +32,7 @@ declare(strict_types=1);
 use function Raven\Core\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
+$initialSearch = trim((string) ($initialSearch ?? ''));
 $conflictCount = max(0, (int) ($routeSummary['conflicts'] ?? 0));
 
 $statusBadgeClass = [
@@ -140,6 +142,7 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
                         id="routing-filter-search"
                         type="search"
                         class="form-control form-control-sm"
+                        value="<?= e($initialSearch) ?>"
                         placeholder="Filter by title, URL, type, or status..."
                     >
                 </div>

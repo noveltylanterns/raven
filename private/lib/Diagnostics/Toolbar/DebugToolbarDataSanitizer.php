@@ -46,11 +46,7 @@ final class DebugToolbarDataSanitizer
             }
 
             if (is_string($item)) {
-                $item = trim($item);
-                if (strlen($item) > 500) {
-                    $item = substr($item, 0, 500) . '...';
-                }
-                $output[$key] = $item;
+                $output[$key] = self::sanitizeStringValue($item);
                 continue;
             }
 
@@ -99,7 +95,7 @@ final class DebugToolbarDataSanitizer
 
             $value = $server[$key];
             if (is_string($value)) {
-                $value = trim($value);
+                $value = self::sanitizeStringValue($value);
             }
             $filtered[$key] = $value;
         }
@@ -128,5 +124,28 @@ final class DebugToolbarDataSanitizer
         }
 
         return $normalized;
+    }
+
+    private static function sanitizeStringValue(string $value): string
+    {
+        $value = trim($value);
+        if (strlen($value) > 500) {
+            $value = substr($value, 0, 500) . '...';
+        }
+
+        $lower = strtolower($value);
+        $looksHostile = str_contains($value, '<')
+            || str_contains($value, '>')
+            || str_contains($lower, 'javascript:')
+            || str_contains($lower, 'data:text/html')
+            || preg_match('/\bon[a-z0-9_-]+\s*=/i', $value) === 1
+            || preg_match('/\bor\s+1\s*=\s*1\b/i', $value) === 1
+            || preg_match('/\bunion\s+select\b/i', $value) === 1;
+
+        if ($looksHostile) {
+            return '[filtered potentially hostile input]';
+        }
+
+        return $value;
     }
 }

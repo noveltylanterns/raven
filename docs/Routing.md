@@ -36,6 +36,7 @@ Top and bottom action bars:
 Filter controls:
 
 - `Search` box (title/URL/type/status text)
+  - query-string prefill via `?search=...` is supported and rendered as escaped plain text
 - `Status` dropdown
 - `Types` checkbox filters (all enabled by default)
 
@@ -91,7 +92,8 @@ Declared in `panel/index.php`:
 1. Requires panel login.
 2. Requires `Manage Taxonomy`.
 3. Builds row inventory via `routingRowsForPanel()`.
-4. Computes summary counters and renders routing view.
+4. Normalizes optional `search` query prefill for the filter UI.
+5. Computes summary counters and renders routing view.
 
 `PanelController::routingExport()`:
 

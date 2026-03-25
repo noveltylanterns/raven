@@ -17,6 +17,7 @@ declare(strict_types=1);
 /** @var string|null $flashError */
 /** @var array<int, array{
  *   directory: string,
+ *   type: string,
  *   panel_path: string,
  *   has_panel_routes: bool,
  *   name: string,
@@ -105,6 +106,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                     <thead>
                     <tr>
                         <th scope="col" data-sort-key="name" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Name</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+                        <th scope="col" data-sort-key="type" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Type</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="author" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Author</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="description" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Description</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" class="text-center">Actions</th>
@@ -114,6 +116,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                     <?php foreach ($extensions as $extension): ?>
                         <?php
                         $directory = (string) ($extension['directory'] ?? '');
+                        $type = strtolower(trim((string) ($extension['type'] ?? 'plugin')));
                         $extensionPanelPath = trim((string) ($extension['panel_path'] ?? ''), '/');
                         $name = (string) ($extension['name'] ?? $directory);
                         $description = (string) ($extension['description'] ?? '');
@@ -130,6 +133,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                             ? "Uninstall this stock extension's opted-in data? Bundled extension files will be kept."
                             : 'Uninstall this extension and remove its opted-in data? This cannot be undone.';
                         $nameLabel = $name !== '' ? $name : $directory;
+                        $typeLabel = $type !== '' ? $type : 'plugin';
                         $panelTarget = $extensionPanelPath !== '' ? ($panelBase . '/' . ltrim($extensionPanelPath, '/')) : '';
                         $canOpenSettings = $enabled && $panelTarget !== '';
                         $authorLabel = $author !== '' ? $author : '<none>';
@@ -138,6 +142,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                         <tr
                             data-extensions-row="1"
                             data-sort-name="<?= e($nameLabel) ?>"
+                            data-sort-type="<?= e($typeLabel) ?>"
                             data-sort-author="<?= e($authorLabel) ?>"
                             data-sort-description="<?= e($descriptionLabel) ?>"
                         >
@@ -148,6 +153,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                     <?= e($nameLabel) ?>
                                 <?php endif; ?>
                             </td>
+                            <td><span class="fw-normal"><?= e($typeLabel) ?></span></td>
                             <td>
                                 <?php if ($author !== '' && $authorUrl !== ''): ?>
                                     <a href="<?= e($authorUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e($author) ?></a>
@@ -443,6 +449,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
         };
         var sortAttrByKey = {
             name: 'data-sort-name',
+            type: 'data-sort-type',
             author: 'data-sort-author',
             description: 'data-sort-description'
         };

@@ -9,7 +9,7 @@ Last updated: 2026-03-25
 - Keep this file thorough and self-sufficient for extension work; do not assume agents can fall back to root-level guidance.
 
 ## CLI Command References
-- Use `private/bin/rvn-ext` for extension lifecycle tasks (list/enable/disable/create/import/uninstall).
+- Use `private/bin/rvn-ext` for extension lifecycle tasks (list/enable/disable/create/import/uninstall). Legacy `delete` remains accepted as an alias for `uninstall`.
 - Use `private/bin/rvn-sys extensions` for enabled-extension status snapshots.
 - Use `private/bin/rvn-theme list` / `enable` when validating extension-provided public views against active public-theme selection.
 

@@ -2303,6 +2303,9 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
     }
 
     $action = strtolower(trim((string) array_shift($tokens)));
+    if ($action === 'delete') {
+        $action = 'uninstall';
+    }
     $parsed = raven_cli_parse_tokens($tokens);
     $options = $parsed['options'];
 
@@ -2787,6 +2790,9 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
     }
 
     $action = strtolower(trim((string) array_shift($tokens)));
+    if ($action === 'delete') {
+        $action = 'uninstall';
+    }
     $parsed = raven_cli_parse_tokens($tokens);
     $options = $parsed['options'];
 

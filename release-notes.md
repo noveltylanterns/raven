@@ -5,6 +5,9 @@
 ### March 25, 2026
 
 - Simplified page-editor media selection to a single `Use as cover image` flag, removed page-level `is_preview` handling from the page editor/backend flow, and made page social/meta image overrides read from the cover image instead.
+- Added an Extension Manager `Type` column, masked database password fields in the configuration editor, and documented the updater source config keys in the configuration docs so docs smoke covers `update.source.mode`, `update.source.github_repo`, and `update.source.repo_url`.
+- Hardened panel hostile-query handling by sanitizing debug-toolbar request payload rendering, removing raw inline SVG from the toolbar toggle markup, and safely pre-filling the Routing Table search box from escaped `?search=` input.
+- Restored legacy `delete` aliases for `rvn-ext` and `rvn-theme` so destructive guard coverage still routes through the current uninstall protections, including stock package removal blocks.
 
 ### March 24, 2026
 

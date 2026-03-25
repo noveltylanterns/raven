@@ -1,6 +1,6 @@
 # Raven Filetree
 
-This file is the fast system map for Raven CMS. Use it to quickly understand the ownership boundaries between core runtime code, reusable core modules, persistent data, themes, extensions, and debug tooling.
+This file is the fast system map for Raven CMS. Use it to quickly understand the ownership boundaries between core runtime code, reusable core modules, persistent data, themes, extensions, and local-only diagnostics tooling.
 
 ## Top Level
 
@@ -18,8 +18,6 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Administration-panel web entrypoint and panel theme assets.
 - `private/`
   - Core application internals, CLI tools, reusable modules, extensions, templates, and persistent data.
-- `debug/`
-  - Local-only smoke tools, profiling helpers, and release/debug notes.
 - `.tmp/`
   - Disposable runtime state such as sessions, cache, exports, and updater scratch space.
 
@@ -102,15 +100,6 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Public/panel/auth controllers and request flow coordination.
 - `private/sys/Repository/`
   - Core content/taxonomy/auth-facing persistence repositories.
-
-## Debug Workspace
-
-- `debug/smoke/`
-  - Smoke scripts for auth, routing, themes, CLI, extension boundaries, contact workflows, and panel permissions.
-- `debug/util/`
-  - Request runner, profiling helpers, config sync checks, and local debug assets.
-- `debug/release/`
-  - Local backlog, maintenance notes, and release execution context.
 
 ## Reading Order
 

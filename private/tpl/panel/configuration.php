@@ -436,6 +436,7 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
     $isShowGroupsField = $path === 'group.privacy';
     $isUserLoginIdentifierField = $path === 'user.auth.login';
     $isUserRegistrationModeField = $path === 'user.auth.registration';
+    $isDatabasePasswordField = in_array($path, ['database.mysql.password', 'database.pgsql.password'], true);
     $isBooleanCheckboxField = $type === 'bool';
     $isDebugCheckboxField = str_starts_with($path, 'debug.');
     $isImageUploadTargetField = $path === 'media.images.upload_target';
@@ -697,6 +698,17 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
                     <?= $isRequired ? 'required' : '' ?>
                 >
             </div>
+        <?php elseif ($isDatabasePasswordField): ?>
+            <input
+                type="password"
+                class="form-control font-monospace"
+                id="<?= e($inputId) ?>"
+                name="<?= e($fieldName) ?>"
+                value="<?= e($inputValue) ?>"
+                autocomplete="off"
+                spellcheck="false"
+                <?= $isRequired ? 'required' : '' ?>
+            >
         <?php else: ?>
             <input
                 type="text"

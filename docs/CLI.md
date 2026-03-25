@@ -149,6 +149,7 @@ Extension management:
 
 `create` writes extension scaffolds under `private/ext/{slug}/` using current route/view conventions (`ext.php`, `ext.json`, `lib/*.php`, `tpl/*.php`), and sets `ext.json.slug` to the directory slug.
 `import` uses `ext.json.slug` when `--slug` is omitted.
+Legacy compatibility note: `rvn-ext delete --slug <slug>` is accepted as an alias for `uninstall`.
 ### `rvn-theme`
 
 Public-theme management:
@@ -163,6 +164,8 @@ Uninstall rules:
 - active themes cannot be uninstalled (enable a different theme first)
 - stock themes (for example `raven`) cannot be uninstalled
 - `--force` is not supported for `rvn-theme uninstall`
+
+Legacy compatibility note: `rvn-theme delete --slug <slug>` is accepted as an alias for `uninstall`.
 
 `create` writes theme scaffolds under `public/theme/{slug}/` with:
 
