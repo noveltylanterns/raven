@@ -187,6 +187,9 @@ Public routes (declared in `public/index.php`):
   - Requires invite token when mode is `invite`.
   - Keeps duplicate-account and persistence failures user-generic instead of reflecting raw repository exception text.
   - Creates user via `UserRepository::save(...)` and consumes invite token atomically where possible.
+- `PublicController::profile(string $username)` / `PublicController::group(string $groupSlug)`
+  - Email-login installs resolve public profile routes by numeric user id.
+  - Guest-facing profile/group payloads suppress username output entirely when the install is configured for email login.
 
 ### Data Model And Repository Behavior
 
@@ -214,6 +217,7 @@ Storage detail:
 - Permission gate: `Manage Users`.
 - CSRF on POST actions.
 - Public registration uses the shared captcha provider config and shared brute-force window/lock settings.
+- Guest-facing public profile/group views suppress username-derived output when `user.auth.login=email`.
 - Sanitization via centralized `InputSanitizer`.
 - Avatar checks are centralized in `AvatarValidator`; uploads are re-encoded/sanitized before final storage.
 - Repository operations use prepared statements.

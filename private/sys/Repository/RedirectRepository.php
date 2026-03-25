@@ -254,7 +254,11 @@ final class RedirectRepository
         if ($channelSlug === null) {
             $sql .= ' AND (r.channel_id = 0 OR r.channel_id IS NULL)';
         } else {
-            $channelId = $this->channelIdBySlug($channelSlug);
+            try {
+                $channelId = $this->channelIdBySlug($channelSlug);
+            } catch (RuntimeException) {
+                return null;
+            }
             if ($channelId === null || $channelId < 1) {
                 return null;
             }

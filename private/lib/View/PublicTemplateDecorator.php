@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\View;
 
+use Raven\Core\Config;
 use Raven\Lib\Pagination\Pagination;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -12,10 +13,12 @@ use Raven\Lib\Security\InputSanitizer;
  */
 final class PublicTemplateDecorator
 {
+    private Config $config;
     private InputSanitizer $input;
 
-    public function __construct(InputSanitizer $input)
+    public function __construct(Config $config, InputSanitizer $input)
     {
+        $this->config = $config;
         $this->input = $input;
     }
 
@@ -150,8 +153,9 @@ final class PublicTemplateDecorator
     public function decorateProfileForTemplate(array $profile): array
     {
         $displayName = trim((string) ($profile['display_name'] ?? ''));
-        $username = trim((string) ($profile['username'] ?? ''));
+        $username = $this->publicTemplateUsername((string) ($profile['username'] ?? ''));
         $profile['name'] = $displayName !== '' ? $displayName : $username;
+        $profile['username'] = $username;
 
         $avatar = $this->avatarTemplateDataFromPath((string) ($profile['avatar_path'] ?? ''));
         $profile['avatar_filename'] = $avatar['filename'];
@@ -200,8 +204,9 @@ final class PublicTemplateDecorator
             }
 
             $displayName = trim((string) ($member['display_name'] ?? ''));
-            $username = trim((string) ($member['username'] ?? ''));
+            $username = $this->publicTemplateUsername((string) ($member['username'] ?? ''));
             $members[$index]['name'] = $displayName !== '' ? $displayName : $username;
+            $members[$index]['username'] = $username;
 
             $avatar = $this->avatarTemplateDataFromPath((string) ($member['avatar_path'] ?? ''));
             $members[$index]['avatar_filename'] = $avatar['filename'];
@@ -467,5 +472,21 @@ final class PublicTemplateDecorator
             'url' => '/uploads/avatars/' . rawurlencode($avatarFilename),
             'thumb_url' => '/uploads/avatars/' . rawurlencode($avatarThumbFilename),
         ];
+    }
+
+    private function publicTemplateUsername(string $username): string
+    {
+        $normalized = trim($username);
+        if ($normalized === '') {
+            return '';
+        }
+
+        return $this->publicUsernamesEnabled() ? $normalized : '';
+    }
+
+    private function publicUsernamesEnabled(): bool
+    {
+        $mode = strtolower(trim((string) $this->config->get('user.auth.login', 'email')));
+        return $mode !== 'email';
     }
 }

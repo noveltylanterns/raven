@@ -267,10 +267,10 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `item:is_current` | current loop item current-page flag, when iterating `pagination:links` | boolean-like truthy/falsey flag |
 | `item:is_external` | current loop item external-link flag, when iterating `profile:contacts` | boolean-like truthy/falsey flag |
 | `item:label` | current loop item label, when iterating pagination or contact rows | label text |
-| `item:name` | current loop item display name, when iterating `members` | display name or username fallback |
+| `item:name` | current loop item display name, when iterating `members` | display name or username fallback when public usernames are enabled |
 | `item:title` | current loop item title, when iterating `pages` | page title |
 | `item:url` | current loop item public URL, when iterating `pages` | root-relative page URL |
-| `item:username` | current loop item username, when iterating `members` | username |
+| `item:username` | current loop item username, when iterating `members` | username, blank when `user.auth.login=email` |
 | `item:value` | current loop item value, when iterating `profile:contacts` | contact value text |
 
 #### 9.2.6 Meta Tags
@@ -337,8 +337,8 @@ This appendix documents the stable public-theme tag contract. Brace tags can rea
 | `profile:contact:{type}` | profile payload contact value by type such as `profile:contact:x` | contact value text |
 | `profile:contacts` | profile payload normalized contact rows | array for `{each profile:contacts}` |
 | `profile:id` | profile payload id | integer id |
-| `profile:name` | profile payload resolved display name | display name or username fallback |
-| `profile:username` | profile payload username | username |
+| `profile:name` | profile payload resolved display name | display name or username fallback when public usernames are enabled |
+| `profile:username` | profile payload username | username, blank when `user.auth.login=email` |
 | `profile_denied` | profile placeholder payload flag for private-mode denial | boolean-like truthy/falsey flag |
 
 #### 9.2.12 Redirect Tags

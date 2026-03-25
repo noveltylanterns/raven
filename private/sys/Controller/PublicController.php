@@ -2156,7 +2156,7 @@ final class PublicController
     private function publicTemplateDecorator(): PublicTemplateDecorator
     {
         if (!$this->publicTemplateDecorator instanceof PublicTemplateDecorator) {
-            $this->publicTemplateDecorator = new PublicTemplateDecorator($this->input);
+            $this->publicTemplateDecorator = new PublicTemplateDecorator($this->config, $this->input);
         }
 
         return $this->publicTemplateDecorator;
