@@ -330,15 +330,13 @@ function installer_preflight_checklist(
     $gdLoaded = extension_loaded('gd');
     $imagickLoaded = extension_loaded('imagick');
     $imageStatus = $gdLoaded || $imagickLoaded;
-    $imageDetail = $imageStatus
-        ? ('Image processing available via ' . ($gdLoaded ? 'GD' : 'Imagick') . '.')
-        : 'Neither GD nor Imagick is loaded; image upload/variant features will not work until one is installed.';
     $rows[] = [
         'key' => 'image_processing',
         'label' => 'Image processing',
-        'status' => $imageStatus ? 'pass' : 'warn',
-        'detail' => $imageDetail,
-        'error' => '',
+        'status' => $imageStatus ? 'pass' : 'fail',
+        'detail' => 'GD: ' . ($gdLoaded ? 'yes' : 'no')
+            . ', ImageMagick: ' . ($imagickLoaded ? 'yes' : 'no') . '.',
+        'error' => $imageStatus ? '' : 'At least one image processing library must be available.',
     ];
 
     $failCount = 0;
