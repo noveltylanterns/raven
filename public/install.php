@@ -222,11 +222,8 @@ function installer_default_database_driver(array $driverSupport, string $fallbac
  *   summary_class: string
  * }
  */
-function installer_preflight_checklist(
-    string $root,
-    string $configTemplatePath,
-    string $extensionStateTemplatePath
-): array {
+function installer_preflight_checklist(string $root): array
+{
     $rows = [];
 
     $phpVersion = PHP_VERSION;
@@ -290,24 +287,6 @@ function installer_preflight_checklist(
         'status' => $datStatus['ok'] ? 'pass' : 'fail',
         'detail' => $datStatus['detail'],
         'error' => $datStatus['ok'] ? '' : 'private/dat/ must be writable before install can continue.',
-    ];
-
-    $configTemplateExists = is_file($configTemplatePath);
-    $rows[] = [
-        'key' => 'config_template',
-        'label' => 'Config template present',
-        'status' => $configTemplateExists ? 'pass' : 'fail',
-        'detail' => $configTemplateExists ? 'Found private/dat/config.php.dist.' : 'Missing private/dat/config.php.dist.',
-        'error' => $configTemplateExists ? '' : 'Installer requires private/dat/config.php.dist.',
-    ];
-
-    $extensionTemplateExists = is_file($extensionStateTemplatePath);
-    $rows[] = [
-        'key' => 'extension_state_template',
-        'label' => 'Extension state template present',
-        'status' => $extensionTemplateExists ? 'pass' : 'fail',
-        'detail' => $extensionTemplateExists ? 'Found private/dat/ext/.state.php.dist.' : 'Missing private/dat/ext/.state.php.dist.',
-        'error' => $extensionTemplateExists ? '' : 'Installer requires private/dat/ext/.state.php.dist.',
     ];
 
     $driverSupport = installer_database_driver_support();
@@ -586,11 +565,7 @@ if ($isPost) {
     }
 }
 
-$preflight = installer_preflight_checklist(
-    $root,
-    $configTemplatePath,
-    $extensionStateTemplatePath
-);
+$preflight = installer_preflight_checklist($root);
 
 if ($isPost) {
     foreach ($preflight['rows'] as $preflightRow) {
