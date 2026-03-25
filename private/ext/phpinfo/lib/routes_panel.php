@@ -102,7 +102,8 @@ return static function (Router $router, array $context): void {
         $viewFile,
         $currentUserTheme,
         $section,
-        $extensionMeta
+        $extensionMeta,
+        $panelSiteData
     ): void {
         if (!is_file($viewFile)) {
             http_response_code(500);
