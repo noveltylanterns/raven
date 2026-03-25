@@ -1124,7 +1124,7 @@ final class PublicController
         return $this->publicMetaService()->siteDataWithPageMeta(
             $page,
             $this->siteData(),
-            fn (int $pageId): ?string => $this->pageImages->previewImageUrlForPage($pageId),
+            fn (int $pageId): ?string => $this->pageImages->coverImageUrlForPage($pageId),
             fn (int $authorUserId): ?array => $this->userRepo->findById($authorUserId),
             $profileContactOptions
         );

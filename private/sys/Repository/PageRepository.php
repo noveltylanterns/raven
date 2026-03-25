@@ -591,7 +591,6 @@ final class PageRepository
                 i.status AS image_status,
                 i.sort_order AS image_sort_order,
                 i.is_cover AS image_is_cover,
-                i.is_preview AS image_is_preview,
                 i.include_in_gallery AS image_include_in_gallery,
                 i.alt_text AS image_alt_text,
                 i.title_text AS image_title_text,

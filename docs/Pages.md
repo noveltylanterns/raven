@@ -123,13 +123,12 @@ Per-image controls:
   - `Focal Y (%)`
 - flags:
   - `Use as cover image` (single-select across page)
-  - `Use as preview image` (single-select across page)
   - `Include in gallery`
 - `Delete Image` button
 
 Behavior notes:
 
-- Cover/preview are single-choice groups in the UI.
+- Cover selection is single-choice in the UI.
 - If older data has duplicates, UI normalizes to a single checked value.
 
 ## 2) Developer And Agent Internals
@@ -183,7 +182,7 @@ Root-scope note:
 
 Important media-flag behavior:
 
-- Cover/preview flags are canonicalized so only one cover and one preview remain.
+- Cover flags are canonicalized so only one cover remains.
 - Repository performs an additional integrity pass over all page images to enforce this even when posted payload is partial or malformed.
 
 ### Page Data Model
@@ -244,8 +243,8 @@ Meta image behavior:
 
 - the wrapper emits both `og:image` and `twitter:image` from shared `meta:image`
 - site defaults come from config, collapsed to one effective runtime meta image
-- page views override only when one ready page image is marked `is_preview`
-- page-level override uses that preview image's `lg` variant URL
+- page views override only when one ready page image is marked `is_cover`
+- page-level override uses that cover image's `lg` variant URL
 - runtime normalizes the final shared meta image URL to safe absolute HTTP(S) form
 
 ### Security/Validation Expectations
@@ -263,7 +262,7 @@ When page behavior changes, update this document in the same task. That includes
 - Page list/editor UI controls or tab structure
 - page routes and save/delete semantics
 - taxonomy assignment behavior
-- gallery upload/metadata/preview-cover behavior
+- gallery upload/metadata/cover-image behavior
 - page public rendering or page-driven meta tag behavior
 
 ### UI Labels Reference

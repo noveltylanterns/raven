@@ -122,12 +122,12 @@ final class PageImageRepository
                     'INSERT INTO ' . $images . ' (
                         page_id, storage_target, original_filename, stored_filename, stored_path,
                         mime_type, extension, byte_size, width, height, hash_sha256,
-                        status, sort_order, is_cover, is_preview, include_in_gallery, alt_text, title_text, caption, credit, license,
+                        status, sort_order, is_cover, include_in_gallery, alt_text, title_text, caption, credit, license,
                         focal_x, focal_y, created_at, updated_at
                     ) VALUES (
                         :page_id, :storage_target, :original_filename, :stored_filename, :stored_path,
                         :mime_type, :extension, :byte_size, :width, :height, :hash_sha256,
-                        :status, :sort_order, :is_cover, :is_preview, :include_in_gallery, :alt_text, :title_text, :caption, :credit, :license,
+                        :status, :sort_order, :is_cover, :include_in_gallery, :alt_text, :title_text, :caption, :credit, :license,
                         :focal_x, :focal_y, :created_at, :updated_at
                     )
                     RETURNING id'
@@ -147,7 +147,6 @@ final class PageImageRepository
                     ':status' => (string) ($image['status'] ?? 'ready'),
                     ':sort_order' => (int) ($image['sort_order'] ?? 1),
                     ':is_cover' => !empty($image['is_cover']) ? 1 : 0,
-                    ':is_preview' => !empty($image['is_preview']) ? 1 : 0,
                     ':include_in_gallery' => array_key_exists('include_in_gallery', $image) && empty($image['include_in_gallery']) ? 0 : 1,
                     ':alt_text' => (string) ($image['alt_text'] ?? ''),
                     ':title_text' => (string) ($image['title_text'] ?? ''),
@@ -166,12 +165,12 @@ final class PageImageRepository
                     'INSERT INTO ' . $images . ' (
                         page_id, storage_target, original_filename, stored_filename, stored_path,
                         mime_type, extension, byte_size, width, height, hash_sha256,
-                        status, sort_order, is_cover, is_preview, include_in_gallery, alt_text, title_text, caption, credit, license,
+                        status, sort_order, is_cover, include_in_gallery, alt_text, title_text, caption, credit, license,
                         focal_x, focal_y, created_at, updated_at
                     ) VALUES (
                         :page_id, :storage_target, :original_filename, :stored_filename, :stored_path,
                         :mime_type, :extension, :byte_size, :width, :height, :hash_sha256,
-                        :status, :sort_order, :is_cover, :is_preview, :include_in_gallery, :alt_text, :title_text, :caption, :credit, :license,
+                        :status, :sort_order, :is_cover, :include_in_gallery, :alt_text, :title_text, :caption, :credit, :license,
                         :focal_x, :focal_y, :created_at, :updated_at
                     )'
                 );
@@ -190,7 +189,6 @@ final class PageImageRepository
                     ':status' => (string) ($image['status'] ?? 'ready'),
                     ':sort_order' => (int) ($image['sort_order'] ?? 1),
                     ':is_cover' => !empty($image['is_cover']) ? 1 : 0,
-                    ':is_preview' => !empty($image['is_preview']) ? 1 : 0,
                     ':include_in_gallery' => array_key_exists('include_in_gallery', $image) && empty($image['include_in_gallery']) ? 0 : 1,
                     ':alt_text' => (string) ($image['alt_text'] ?? ''),
                     ':title_text' => (string) ($image['title_text'] ?? ''),
@@ -270,7 +268,6 @@ final class PageImageRepository
                 i.status,
                 i.sort_order,
                 i.is_cover,
-                i.is_preview,
                 i.include_in_gallery,
                 i.alt_text,
                 i.title_text,
@@ -328,7 +325,6 @@ final class PageImageRepository
                     'status' => (string) ($row['status'] ?? ''),
                     'sort_order' => (int) ($row['sort_order'] ?? 0),
                     'is_cover' => (int) ($row['is_cover'] ?? 0) === 1,
-                    'is_preview' => (int) ($row['is_preview'] ?? 0) === 1,
                     'include_in_gallery' => (int) ($row['include_in_gallery'] ?? 1) === 1,
                     'alt_text' => (string) ($row['alt_text'] ?? ''),
                     'title_text' => (string) ($row['title_text'] ?? ''),
@@ -418,11 +414,11 @@ final class PageImageRepository
     /**
      * Returns one best-fit public image URL for page-level meta tags.
      *
-     * Only an explicit ready preview image can override site-level meta image config.
+     * Only an explicit ready cover image can override site-level meta image config.
      * When present, the public wrapper uses that image's large variant for both
      * OpenGraph and X/Twitter tags via the shared `meta:image` template value.
      */
-    public function previewImageUrlForPage(int $pageId): ?string
+    public function coverImageUrlForPage(int $pageId): ?string
     {
         $images = $this->listForPage($pageId);
         if ($images === []) {
@@ -433,7 +429,7 @@ final class PageImageRepository
             if ((string) ($image['status'] ?? '') !== 'ready') {
                 continue;
             }
-            if (!empty($image['is_preview'])) {
+            if (!empty($image['is_cover'])) {
                 $variants = is_array($image['variants'] ?? null) ? $image['variants'] : [];
                 $largeVariant = $variants['lg'] ?? null;
                 $url = trim((string) (is_array($largeVariant) ? ($largeVariant['url'] ?? '') : ''));
@@ -480,7 +476,6 @@ final class PageImageRepository
                          focal_y = :focal_y,
                          sort_order = :sort_order,
                          is_cover = :is_cover,
-                         is_preview = :is_preview,
                          include_in_gallery = :include_in_gallery,
                          updated_at = :updated_at
                      WHERE id = :id
@@ -498,7 +493,6 @@ final class PageImageRepository
                         ':focal_y' => $update['focal_y'],
                         ':sort_order' => (int) ($update['sort_order'] ?? 1),
                         ':is_cover' => !empty($update['is_cover']) ? 1 : 0,
-                        ':is_preview' => !empty($update['is_preview']) ? 1 : 0,
                         ':include_in_gallery' => array_key_exists('include_in_gallery', $update) && empty($update['include_in_gallery']) ? 0 : 1,
                         ':updated_at' => $now,
                         ':id' => (int) $imageId,
@@ -507,7 +501,7 @@ final class PageImageRepository
                 }
             }
 
-            // Final integrity pass ensures at most one cover + one preview across all rows for the page.
+            // Final integrity pass ensures at most one cover row across all page images.
             $this->enforceSinglePrimarySelectionsForPage($pageId, $now);
 
             $this->db->commit();
@@ -521,7 +515,7 @@ final class PageImageRepository
     }
 
     /**
-     * Enforces one cover and one preview selection across a page update payload.
+     * Enforces one cover selection across a page update payload.
      *
      * @param array<int, array<string, scalar|null>> $imageUpdates
      * @return array<int, array<string, scalar|null>>
@@ -532,7 +526,7 @@ final class PageImageRepository
     }
 
     /**
-     * Enforces one cover and one preview row per page after metadata updates.
+     * Enforces one cover row per page after metadata updates.
      */
     private function enforceSinglePrimarySelectionsForPage(int $pageId, string $updatedAt): void
     {

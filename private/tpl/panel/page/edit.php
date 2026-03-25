@@ -794,7 +794,6 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                     $previewUrl = (string) (($variants['sm']['url'] ?? '') ?: ($galleryImage['url'] ?? ''));
                                     $caption = (string) ($galleryImage['caption'] ?? '');
                                     $isCover = !empty($galleryImage['is_cover']);
-                                    $isPreview = !empty($galleryImage['is_preview']);
                                     $includeInGallery = array_key_exists('include_in_gallery', $galleryImage)
                                         ? !empty($galleryImage['include_in_gallery'])
                                         : true;
@@ -879,18 +878,6 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                                                 <?= $isCover ? 'checked' : '' ?>
                                                             >
                                                             <label class="form-check-label" for="gallery_cover_<?= $imageId ?>">Use as cover image</label>
-                                                        </div>
-                                                        <div class="form-check mb-0">
-                                                            <input
-                                                                class="form-check-input"
-                                                                type="checkbox"
-                                                                name="gallery_images[<?= $imageId ?>][is_preview]"
-                                                                id="gallery_preview_<?= $imageId ?>"
-                                                                data-rvn-gallery-single="preview"
-                                                                value="1"
-                                                                <?= $isPreview ? 'checked' : '' ?>
-                                                            >
-                                                            <label class="form-check-label" for="gallery_preview_<?= $imageId ?>">Use as preview image</label>
                                                         </div>
                                                         <div class="form-check mb-0">
                                                             <input
@@ -1588,7 +1575,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
     }
   })();
 
-  // Cover/preview flags are single-choice; selecting one clears other rows in that group.
+  // Cover selection is single-choice; selecting it clears other rows in that group.
   (function () {
     var groupCheckboxes = Array.from(document.querySelectorAll('input[data-rvn-gallery-single]'));
     if (groupCheckboxes.length === 0) {
@@ -1613,7 +1600,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
     }
 
     // Normalize stale multi-checked states when older data has duplicates.
-    ['cover', 'preview'].forEach(function (groupName) {
+    ['cover'].forEach(function (groupName) {
       var selected = checkboxesForGroup(groupName).filter(function (checkbox) {
         return checkbox instanceof HTMLInputElement && checkbox.checked;
       });

@@ -5276,7 +5276,6 @@ final class PanelController
      *   focal_y: float|null,
      *   sort_order: int,
      *   is_cover: bool,
-     *   is_preview: bool,
      *   include_in_gallery: bool
      * }>
      */

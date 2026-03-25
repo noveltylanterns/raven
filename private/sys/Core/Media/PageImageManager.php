@@ -270,7 +270,6 @@ final class PageImageManager
                 'status' => 'ready',
                 'sort_order' => $this->images->nextSortOrderForPage($pageId),
                 'is_cover' => false,
-                'is_preview' => false,
                 'include_in_gallery' => true,
                 'alt_text' => $imageTitle,
                 'title_text' => $imageTitle,

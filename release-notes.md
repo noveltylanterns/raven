@@ -2,6 +2,10 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### March 25, 2026
+
+- Simplified page-editor media selection to a single `Use as cover image` flag, removed page-level `is_preview` handling from the page editor/backend flow, and made page social/meta image overrides read from the cover image instead.
+
 ### March 24, 2026
 
 - Fixed stock extension panel render closures after the `panel_site_data` refactor by capturing the shared site-payload callable correctly in Contact Forms, Signup Sheets, Database Manager, and PHP Info, which restores extension panel pages that were otherwise throwing `Value of type null is not callable`.

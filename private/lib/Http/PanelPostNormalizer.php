@@ -56,7 +56,6 @@ final class PanelPostNormalizer
      *   focal_y: float|null,
      *   sort_order: int,
      *   is_cover: bool,
-     *   is_preview: bool,
      *   include_in_gallery: bool
      * }>
      */
@@ -87,7 +86,6 @@ final class PanelPostNormalizer
                 'focal_y' => $this->normalizeNullableFloat($rawData['focal_y'] ?? null, 0.0, 100.0),
                 'sort_order' => $sortOrder,
                 'is_cover' => isset($rawData['is_cover']) && (string) $rawData['is_cover'] === '1',
-                'is_preview' => isset($rawData['is_preview']) && (string) $rawData['is_preview'] === '1',
                 'include_in_gallery' => isset($rawData['include_in_gallery']) && (string) $rawData['include_in_gallery'] === '1',
             ];
         }
@@ -110,21 +108,12 @@ final class PanelPostNormalizer
         });
 
         $coverWinner = null;
-        $previewWinner = null;
         foreach ($orderedImageIds as $imageId) {
             if (!empty($updates[$imageId]['is_cover'])) {
                 if ($coverWinner === null) {
                     $coverWinner = $imageId;
                 } else {
                     $updates[$imageId]['is_cover'] = false;
-                }
-            }
-
-            if (!empty($updates[$imageId]['is_preview'])) {
-                if ($previewWinner === null) {
-                    $previewWinner = $imageId;
-                } else {
-                    $updates[$imageId]['is_preview'] = false;
                 }
             }
         }

@@ -65,7 +65,6 @@ final class PageEditorGalleryHydrator
                     'status' => (string) ($row['image_status'] ?? ''),
                     'sort_order' => (int) ($row['image_sort_order'] ?? 0),
                     'is_cover' => (int) ($row['image_is_cover'] ?? 0) === 1,
-                    'is_preview' => (int) ($row['image_is_preview'] ?? 0) === 1,
                     'include_in_gallery' => (int) ($row['image_include_in_gallery'] ?? 1) === 1,
                     'alt_text' => (string) ($row['image_alt_text'] ?? ''),
                     'title_text' => (string) ($row['image_title_text'] ?? ''),
@@ -108,4 +107,3 @@ final class PageEditorGalleryHydrator
         return $result;
     }
 }
-

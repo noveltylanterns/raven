@@ -7,7 +7,7 @@ namespace Raven\Lib\Media;
 use PDO;
 
 /**
- * Shared page-image cover/preview single-selection normalization policy.
+ * Shared page-image cover single-selection normalization policy.
  */
 final class PageImagePrimarySelectionService
 {
@@ -33,21 +33,12 @@ final class PageImagePrimarySelectionService
         });
 
         $coverWinner = null;
-        $previewWinner = null;
         foreach ($orderedImageIds as $imageId) {
             if (!empty($imageUpdates[$imageId]['is_cover'])) {
                 if ($coverWinner === null) {
                     $coverWinner = $imageId;
                 } else {
                     $imageUpdates[$imageId]['is_cover'] = false;
-                }
-            }
-
-            if (!empty($imageUpdates[$imageId]['is_preview'])) {
-                if ($previewWinner === null) {
-                    $previewWinner = $imageId;
-                } else {
-                    $imageUpdates[$imageId]['is_preview'] = false;
                 }
             }
         }
@@ -58,7 +49,7 @@ final class PageImagePrimarySelectionService
     public function enforcePersistedSelections(PDO $db, string $imagesTable, int $pageId, string $updatedAt): void
     {
         $read = $db->prepare(
-            'SELECT id, sort_order, is_cover, is_preview
+            'SELECT id, sort_order, is_cover
              FROM ' . $imagesTable . '
              WHERE page_id = :page_id
              ORDER BY sort_order ASC, id ASC'
@@ -71,7 +62,6 @@ final class PageImagePrimarySelectionService
         }
 
         $coverWinner = null;
-        $previewWinner = null;
         $updatesById = [];
 
         foreach ($rows as $row) {
@@ -89,14 +79,6 @@ final class PageImagePrimarySelectionService
                 }
             }
 
-            $isPreview = (int) ($row['is_preview'] ?? 0) === 1;
-            if ($isPreview) {
-                if ($previewWinner === null) {
-                    $previewWinner = $imageId;
-                } else {
-                    $updatesById[$imageId]['is_preview'] = 0;
-                }
-            }
         }
 
         if ($updatesById === []) {
@@ -110,27 +92,10 @@ final class PageImagePrimarySelectionService
              WHERE id = :id
                AND page_id = :page_id'
         );
-        $updatePreview = $db->prepare(
-            'UPDATE ' . $imagesTable . '
-             SET is_preview = :value,
-                 updated_at = :updated_at
-             WHERE id = :id
-               AND page_id = :page_id'
-        );
-
         foreach ($updatesById as $imageId => $flags) {
             if (array_key_exists('is_cover', $flags)) {
                 $updateCover->execute([
                     ':value' => (int) $flags['is_cover'],
-                    ':updated_at' => $updatedAt,
-                    ':id' => (int) $imageId,
-                    ':page_id' => $pageId,
-                ]);
-            }
-
-            if (array_key_exists('is_preview', $flags)) {
-                $updatePreview->execute([
-                    ':value' => (int) $flags['is_preview'],
                     ':updated_at' => $updatedAt,
                     ':id' => (int) $imageId,
                     ':page_id' => $pageId,

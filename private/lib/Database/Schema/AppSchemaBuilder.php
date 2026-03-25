@@ -276,14 +276,10 @@ final class AppSchemaBuilder
     {
         if ($driver === 'sqlite') {
             $imagesTable = $this->tables->resolve($driver, $prefix, 'page_images');
-            if (!$this->introspector->appColumnExistsSqlite($db, $imagesTable, 'is_preview')) {
-                $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN is_preview INTEGER NOT NULL DEFAULT 0');
-            }
             if (!$this->introspector->appColumnExistsSqlite($db, $imagesTable, 'include_in_gallery')) {
                 $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN include_in_gallery INTEGER NOT NULL DEFAULT 1');
             }
 
-            $db->exec('UPDATE ' . $imagesTable . ' SET is_preview = 0 WHERE is_preview IS NULL');
             $db->exec('UPDATE ' . $imagesTable . ' SET include_in_gallery = 1 WHERE include_in_gallery IS NULL');
             return;
         }
@@ -291,26 +287,18 @@ final class AppSchemaBuilder
         $imagesTable = $prefix . 'page_images';
 
         if ($driver === 'mysql') {
-            if (!$this->introspector->appColumnExistsMySql($db, $imagesTable, 'is_preview')) {
-                $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN is_preview TINYINT(1) NOT NULL DEFAULT 0');
-            }
             if (!$this->introspector->appColumnExistsMySql($db, $imagesTable, 'include_in_gallery')) {
                 $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN include_in_gallery TINYINT(1) NOT NULL DEFAULT 1');
             }
 
-            $db->exec('UPDATE ' . $imagesTable . ' SET is_preview = 0 WHERE is_preview IS NULL');
             $db->exec('UPDATE ' . $imagesTable . ' SET include_in_gallery = 1 WHERE include_in_gallery IS NULL');
             return;
         }
 
-        if (!$this->introspector->appColumnExistsPgSql($db, $imagesTable, 'is_preview')) {
-            $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN is_preview SMALLINT NOT NULL DEFAULT 0');
-        }
         if (!$this->introspector->appColumnExistsPgSql($db, $imagesTable, 'include_in_gallery')) {
             $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN include_in_gallery SMALLINT NOT NULL DEFAULT 1');
         }
 
-        $db->exec('UPDATE ' . $imagesTable . ' SET is_preview = 0 WHERE is_preview IS NULL');
         $db->exec('UPDATE ' . $imagesTable . ' SET include_in_gallery = 1 WHERE include_in_gallery IS NULL');
     }
 
