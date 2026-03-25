@@ -233,7 +233,7 @@ function installer_preflight_checklist(
     if (version_compare($phpVersion, '8.5.0', '>=')) {
         $rows[] = [
             'key' => 'php_version',
-            'label' => 'PHP 8.5 target',
+            'label' => 'PHP 8.x',
             'status' => 'pass',
             'detail' => 'Running PHP ' . $phpVersion . ' (known-good target met).',
             'error' => '',
@@ -241,7 +241,7 @@ function installer_preflight_checklist(
     } elseif (version_compare($phpVersion, '8.0.0', '>=')) {
         $rows[] = [
             'key' => 'php_version',
-            'label' => 'PHP 8.5 target',
+            'label' => 'PHP 8.x',
             'status' => 'warn',
             'detail' => 'Running PHP ' . $phpVersion . ' (unverified 8.x; may still work).',
             'error' => '',
@@ -249,9 +249,9 @@ function installer_preflight_checklist(
     } else {
         $rows[] = [
             'key' => 'php_version',
-            'label' => 'PHP 8.5 target',
+            'label' => 'PHP 8.x',
             'status' => 'fail',
-            'detail' => 'Running PHP ' . $phpVersion . ' (Raven needs PHP 8.x).',
+            'detail' => 'Running PHP ' . $phpVersion . ' (Raven requires PHP 8.x).',
             'error' => 'PHP 8.x is required to run Raven.',
         ];
     }
@@ -259,7 +259,7 @@ function installer_preflight_checklist(
     $composerStatus = installer_composer_install_status($root);
     $rows[] = [
         'key' => 'composer_install',
-        'label' => 'Composer install run?',
+        'label' => 'Composer Setup?',
         'status' => $composerStatus['ok'] ? 'pass' : 'fail',
         'detail' => $composerStatus['detail'],
         'error' => $composerStatus['ok'] ? '' : 'Composer dependencies are incomplete. Run `composer install` first.',
@@ -268,7 +268,7 @@ function installer_preflight_checklist(
     $pdoLoaded = extension_loaded('pdo');
     $rows[] = [
         'key' => 'pdo',
-        'label' => 'PDO available',
+        'label' => 'PDO Available',
         'status' => $pdoLoaded ? 'pass' : 'fail',
         'detail' => $pdoLoaded ? 'PDO extension is loaded.' : 'PDO extension is missing.',
         'error' => $pdoLoaded ? '' : 'PHP PDO support is required.',
@@ -277,7 +277,7 @@ function installer_preflight_checklist(
     $sessionLoaded = extension_loaded('session');
     $rows[] = [
         'key' => 'session',
-        'label' => 'Session support',
+        'label' => 'Session Support',
         'status' => $sessionLoaded ? 'pass' : 'fail',
         'detail' => $sessionLoaded ? 'Session extension is loaded.' : 'Session extension is missing.',
         'error' => $sessionLoaded ? '' : 'PHP session support is required.',
@@ -286,7 +286,7 @@ function installer_preflight_checklist(
     $datStatus = installer_directory_writable_status($root . '/private/dat');
     $rows[] = [
         'key' => 'private_dat',
-        'label' => 'private/dat/ writable?',
+        'label' => 'Data Directory Writable?',
         'status' => $datStatus['ok'] ? 'pass' : 'fail',
         'detail' => $datStatus['detail'],
         'error' => $datStatus['ok'] ? '' : 'private/dat/ must be writable before install can continue.',
@@ -319,7 +319,7 @@ function installer_preflight_checklist(
     }
     $rows[] = [
         'key' => 'database_driver',
-        'label' => 'Database driver',
+        'label' => 'Database Driver',
         'status' => $availableDriverCount > 0 ? 'pass' : 'fail',
         'detail' => 'SQLite: ' . ($driverSupport['sqlite'] ? 'yes' : 'no')
             . ', MySQL: ' . ($driverSupport['mysql'] ? 'yes' : 'no')
@@ -332,7 +332,7 @@ function installer_preflight_checklist(
     $imageStatus = $gdLoaded || $imagickLoaded;
     $rows[] = [
         'key' => 'image_processing',
-        'label' => 'Image processing',
+        'label' => 'Image Processing',
         'status' => $imageStatus ? 'pass' : 'fail',
         'detail' => 'GD: ' . ($gdLoaded ? 'yes' : 'no')
             . ', ImageMagick: ' . ($imagickLoaded ? 'yes' : 'no') . '.',
