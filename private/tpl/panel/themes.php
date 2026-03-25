@@ -68,7 +68,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
 <section class="card">
     <div class="card-body">
         <h2>Installed Themes</h2>
-        <p class="text-muted">Active themes and stock themes cannot be deleted.</p>
+        <p class="text-muted">Active themes and stock themes cannot be uninstalled.</p>
         <?php if ($themes === []): ?>
             <p class="text-muted mb-0">No valid themes were discovered in <code>public/theme/</code>.</p>
         <?php else: ?>
@@ -145,15 +145,15 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                         </button>
                                     </form>
                                     <?php if (!$isActive && !$isStock): ?>
-                                        <form method="post" action="<?= e($panelBase) ?>/themes/delete" class="d-inline m-0">
+                                        <form method="post" action="<?= e($panelBase) ?>/themes/uninstall" class="d-inline m-0">
                                             <?= $csrfField ?>
                                             <input type="hidden" name="theme" value="<?= e($slug) ?>">
                                             <button
                                                 type="submit"
                                                 class="btn btn-sm btn-danger"
-                                                title="Delete"
-                                                aria-label="Delete"
-                                                onclick="return confirm('Delete theme <?= e($slug) ?> from disk?');"
+                                                title="Uninstall"
+                                                aria-label="Uninstall"
+                                                onclick="return confirm('Uninstall theme <?= e($slug) ?> from disk?');"
                                             >
                                                 <i class="bi bi-trash3" aria-hidden="true"></i>
                                             </button>

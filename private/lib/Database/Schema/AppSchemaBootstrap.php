@@ -14,9 +14,19 @@ final class AppSchemaBootstrap
     public function ensureAppSchema(PDO $db, string $driver, string $prefix): void
     {
         if ($driver === 'sqlite') {
-            // SQLite mode: logical modules use attached DB files, while cross-module
-            // relation tables stay in `main` for simpler join access.
-            $db->exec('CREATE TABLE IF NOT EXISTS main.pages (
+            $pagesTable = $prefix . 'pages';
+            $categoriesTable = $prefix . 'categories';
+            $tagsTable = $prefix . 'tags';
+            $redirectsTable = $prefix . 'redirects';
+            $pageCategoriesTable = $prefix . 'page_categories';
+            $pageTagsTable = $prefix . 'page_tags';
+            $pageImagesTable = $prefix . 'page_images';
+            $pageImageVariantsTable = $prefix . 'page_image_variants';
+            $groupsTable = $prefix . 'groups';
+            $userGroupsTable = $prefix . 'user_groups';
+            $loginFailuresTable = $prefix . 'login_failures';
+
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $pagesTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 slug TEXT NOT NULL,
@@ -33,7 +43,7 @@ final class AppSchemaBootstrap
                 updated_at TEXT NOT NULL
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS taxonomy.categories (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $categoriesTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 slug TEXT NOT NULL UNIQUE,
@@ -49,7 +59,7 @@ final class AppSchemaBootstrap
                 created_at TEXT NOT NULL
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS taxonomy.tags (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $tagsTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 slug TEXT NOT NULL UNIQUE,
@@ -65,7 +75,7 @@ final class AppSchemaBootstrap
                 created_at TEXT NOT NULL
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS taxonomy.redirects (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $redirectsTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 description TEXT NULL,
@@ -77,19 +87,19 @@ final class AppSchemaBootstrap
                 updated_at TEXT NOT NULL
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS main.page_categories (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $pageCategoriesTable . ' (
                 page_id INTEGER NOT NULL,
                 category_id INTEGER NOT NULL,
                 PRIMARY KEY (page_id, category_id)
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS main.page_tags (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $pageTagsTable . ' (
                 page_id INTEGER NOT NULL,
                 tag_id INTEGER NOT NULL,
                 PRIMARY KEY (page_id, tag_id)
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS main.page_images (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $pageImagesTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 page_id INTEGER NOT NULL,
                 storage_target TEXT NOT NULL DEFAULT \'local\',
@@ -118,7 +128,7 @@ final class AppSchemaBootstrap
                 updated_at TEXT NOT NULL
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS main.page_image_variants (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $pageImageVariantsTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 image_id INTEGER NOT NULL,
                 variant_key TEXT NOT NULL,
@@ -133,7 +143,7 @@ final class AppSchemaBootstrap
                 UNIQUE (image_id, variant_key)
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS auth.groups (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $groupsTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
                 slug TEXT NOT NULL,
@@ -143,13 +153,13 @@ final class AppSchemaBootstrap
                 created_at TEXT NOT NULL
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS auth.user_groups (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $userGroupsTable . ' (
                 user_id INTEGER NOT NULL,
                 group_id INTEGER NOT NULL,
                 PRIMARY KEY (user_id, group_id)
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS auth.login_failures (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $loginFailuresTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 bucket_hash TEXT NOT NULL UNIQUE,
                 username_normalized TEXT NOT NULL,
@@ -162,21 +172,19 @@ final class AppSchemaBootstrap
                 updated_at TEXT NOT NULL
             )');
 
-            // SQLite index DDL must target table name without schema prefix.
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_pages_published_at ON pages (published_at DESC)');
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_pages_channel_id ON pages (channel_id)');
-            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_pages_root_slug_unique ON pages (slug) WHERE channel_id IS NULL');
-            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_pages_channel_slug_unique ON pages (channel_id, slug) WHERE channel_id IS NOT NULL');
-            // For attached DBs, qualify index name with schema alias and keep table unqualified.
-            $db->exec('CREATE INDEX IF NOT EXISTS taxonomy.idx_redirects_slug ON redirects (slug)');
-            $db->exec('CREATE INDEX IF NOT EXISTS taxonomy.idx_redirects_channel_id ON redirects (channel_id)');
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_page_images_page_id ON page_images (page_id)');
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_page_images_sort_order ON page_images (page_id, sort_order)');
-            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS auth.uniq_login_failures_bucket_hash ON login_failures (bucket_hash)');
-            $db->exec('CREATE INDEX IF NOT EXISTS auth.idx_login_failures_locked_until ON login_failures (locked_until)');
-            $db->exec('CREATE INDEX IF NOT EXISTS auth.idx_login_failures_last_failed_at ON login_failures (last_failed_at)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_published_at ON ' . $pagesTable . ' (published_at DESC)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_id ON ' . $pagesTable . ' (channel_id)');
+            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_root_slug_unique ON ' . $pagesTable . ' (slug) WHERE channel_id IS NULL');
+            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_slug_unique ON ' . $pagesTable . ' (channel_id, slug) WHERE channel_id IS NOT NULL');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $redirectsTable . '_slug ON ' . $redirectsTable . ' (slug)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $redirectsTable . '_channel_id ON ' . $redirectsTable . ' (channel_id)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pageImagesTable . '_page_id ON ' . $pageImagesTable . ' (page_id)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pageImagesTable . '_sort_order ON ' . $pageImagesTable . ' (page_id, sort_order)');
+            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $loginFailuresTable . '_bucket_hash ON ' . $loginFailuresTable . ' (bucket_hash)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $loginFailuresTable . '_locked_until ON ' . $loginFailuresTable . ' (locked_until)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $loginFailuresTable . '_last_failed_at ON ' . $loginFailuresTable . ' (last_failed_at)');
             // Shortcode registry is extension-owned via `{slug}/lib/shortcodes.php`; drop deprecated table when present.
-            $db->exec('DROP TABLE IF EXISTS taxonomy.shortcodes');
+            $db->exec('DROP TABLE IF EXISTS ' . $prefix . 'shortcodes');
             return;
         }
 

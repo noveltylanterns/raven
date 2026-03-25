@@ -33,7 +33,7 @@ final class PanelPermissionDefinitionCatalog
 
         foreach (PanelAccess::stockPanelRoutePermissions() as $routeKey => $routeDefinition) {
             $groupLabel = (string) ($routeDefinition['label'] ?? ucfirst((string) $routeKey));
-            foreach (['view', 'create', 'edit', 'delete'] as $action) {
+            foreach (['view', 'create', 'edit', 'delete', 'uninstall'] as $action) {
                 $bit = (int) ($routeDefinition[$action] ?? 0);
                 if ($bit <= 0) {
                     continue;

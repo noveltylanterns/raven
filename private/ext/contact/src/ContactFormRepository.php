@@ -28,8 +28,7 @@ final class ContactFormRepository
     {
         $this->db = $db;
         $this->driver = $driver;
-        // Prefix is ignored for SQLite because attached database aliases are used instead.
-        $this->prefix = $driver === 'sqlite' ? '' : (preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '');
+        $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
     }
 
     /**
@@ -360,14 +359,7 @@ final class ContactFormRepository
      */
     private function table(string $table): string
     {
-        if ($this->driver !== 'sqlite') {
-            return $this->prefix . $table;
-        }
-
-        return match ($table) {
-            'ext_contact' => 'extensions.ext_contact',
-            default => 'main.' . $table,
-        };
+        return $this->prefix . $table;
     }
 
     /**

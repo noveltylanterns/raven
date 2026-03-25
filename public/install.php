@@ -25,7 +25,7 @@ function installer_e(string $value): string
 }
 
 /**
- * Persists runtime config to private/config.php with the standard header block.
+ * Persists runtime config to private/dat/config.php with the standard header block.
  *
  * @param array<string, mixed> $config
  */
@@ -36,7 +36,7 @@ function installer_write_config(string $path, array $config): void
     $content = "<?php\n\n";
     $content .= "/**\n";
     $content .= " * RAVEN CMS\n";
-    $content .= " * ~/private/config.php\n";
+    $content .= " * ~/private/dat/config.php\n";
     $content .= " * Runtime configuration values for Raven CMS.\n";
     $content .= " * Docs: https://raven.lanterns.io\n";
     $content .= " */\n\n";
@@ -49,17 +49,55 @@ function installer_write_config(string $path, array $config): void
 
     $written = file_put_contents($path, $content, LOCK_EX);
     if ($written === false) {
-        throw new RuntimeException('Failed to write private/config.php');
+        throw new RuntimeException('Failed to write private/dat/config.php');
     }
 }
 
+/**
+ * Returns the mounted base path that contains this installer script.
+ */
+function installer_base_path(): string
+{
+    $scriptName = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? '/install.php'));
+    if ($scriptName === '' || $scriptName[0] !== '/') {
+        $scriptName = '/' . ltrim($scriptName, '/');
+    }
+
+    $basePath = dirname($scriptName);
+    if ($basePath === '.' || $basePath === '/' || $basePath === '\\') {
+        return '';
+    }
+
+    return rtrim($basePath, '/');
+}
+
+/**
+ * Returns the install.php path relative to the current mounted base path.
+ */
+function installer_path(): string
+{
+    $basePath = installer_base_path();
+    return ($basePath !== '' ? $basePath : '') . '/install.php';
+}
+
+/**
+ * Returns the public root path for the current mounted base path.
+ */
+function installer_root_path(): string
+{
+    $basePath = installer_base_path();
+    return $basePath !== '' ? ($basePath . '/') : '/';
+}
+
 $root = dirname(__DIR__);
-$configPath = $root . '/private/config.php';
-$configTemplatePath = $root . '/private/config.php.dist';
+$configPath = $root . '/private/dat/config.php';
+$configTemplatePath = $root . '/private/dat/config.php.dist';
 $extensionStatePath = $root . '/private/dat/ext/.state.php';
 $extensionStateTemplatePath = $root . '/private/dat/ext/.state.php.dist';
 $lockPath = $root . '/private/dat/install.lock';
-$sqliteDefaultBasePath = rtrim($root, '/') . '/private/dat/db';
+$sqliteDefaultBasePath = rtrim($root, '/') . '/private/dat/db.sqlite';
+$installerPath = installer_path();
+$installerRootPath = installer_root_path();
 
 $detectedDomain = strtolower(trim((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '')));
 if ($detectedDomain !== '') {
@@ -87,7 +125,7 @@ if ($detectedDomain !== '') {
 
 // Installer lock is checked first to keep re-entry behavior deterministic.
 if (is_file($lockPath)) {
-    header('Location: /', true, 302);
+    header('Location: ' . $installerRootPath, true, 302);
     exit;
 }
 
@@ -380,7 +418,8 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         try {
             // Create SQLite storage directory only when SQLite is selected during install.
             if ($driver === 'sqlite') {
-                if (!is_dir($sqliteBasePath) && !mkdir($sqliteBasePath, 0775, true) && !is_dir($sqliteBasePath)) {
+                $sqliteDirectory = dirname($sqliteBasePath);
+                if (!is_dir($sqliteDirectory) && !mkdir($sqliteDirectory, 0775, true) && !is_dir($sqliteDirectory)) {
                     throw new RuntimeException('Failed to create SQLite base path directory.');
                 }
             }
@@ -447,7 +486,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
                 throw new RuntimeException('Failed to write installer lock file.');
             }
 
-            header('Location: /', true, 302);
+            header('Location: ' . $installerRootPath, true, 302);
             exit;
         } catch (\Throwable $exception) {
             $errors[] = 'Installation failed: ' . $exception->getMessage();
@@ -501,7 +540,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         </div>
     <?php endif; ?>
 
-    <form method="post" action="/install.php" novalidate>
+    <form method="post" action="<?= installer_e($installerPath) ?>" novalidate>
         <input type="hidden" name="_csrf" value="<?= installer_e($csrfToken) ?>">
 
         <div class="card">
@@ -544,7 +583,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
             <div class="grid" data-driver-section="sqlite">
                 <div class="field full">
                     <label>SQLite Storage</label>
-                    <div class="note">SQLite files are stored automatically in <code>private/dat/db/</code>.</div>
+                    <div class="note">SQLite core data is stored automatically in <code>private/dat/db.sqlite</code>.</div>
                 </div>
             </div>
 

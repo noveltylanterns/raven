@@ -19,7 +19,7 @@ final class LoginThrottleService
     {
         $this->appDb = $appDb;
         $this->driver = $driver;
-        $this->prefix = $driver === 'sqlite' ? '' : $prefix;
+        $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
     }
 
     public function isTemporarilyLocked(string $identifier, string $ipAddress, int $windowSeconds): bool
@@ -226,6 +226,6 @@ final class LoginThrottleService
 
     private function tableName(): string
     {
-        return $this->driver === 'sqlite' ? 'auth.login_failures' : ($this->prefix . 'login_failures');
+        return $this->prefix . 'login_failures';
     }
 }

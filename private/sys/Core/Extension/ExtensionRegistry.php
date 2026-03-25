@@ -127,7 +127,9 @@ final class ExtensionRegistry
      *   type: string,
      *   panel_path: string,
      *   panel_section: string,
-     *   system_extension: bool
+     *   system_extension: bool,
+     *   local_storage: bool,
+     *   db_storage: bool
      * }|null
      */
     public static function readManifest(string $root, string $directoryName): ?array

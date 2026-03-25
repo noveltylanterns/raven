@@ -9,7 +9,7 @@ Last updated: 2026-03-18
 - Keep this file thorough and self-sufficient for extension work; do not assume agents can fall back to root-level guidance.
 
 ## CLI Command References
-- Use `private/bin/rvn-ext` for extension lifecycle tasks (list/enable/disable/create/import/delete).
+- Use `private/bin/rvn-ext` for extension lifecycle tasks (list/enable/disable/create/import/uninstall).
 - Use `private/bin/rvn-sys extensions` for enabled-extension status snapshots.
 - Use `private/bin/rvn-theme list` / `enable` when validating extension-provided public views against active public-theme selection.
 
@@ -41,6 +41,8 @@ Last updated: 2026-03-18
   "version": "0.8.0",
   "description": "Example plugin extension.",
   "type": "plugin",
+  "local_storage": "off",
+  "db_storage": "off",
   "author": "Your Name",
   "homepage": ""
 }
@@ -53,6 +55,8 @@ Last updated: 2026-03-18
   "version": "0.8.0",
   "description": "Example module extension.",
   "type": "module",
+  "local_storage": "off",
+  "db_storage": "off",
   "author": "Your Name",
   "homepage": ""
 }
@@ -65,6 +69,8 @@ Last updated: 2026-03-18
   "version": "0.8.0",
   "description": "Example system extension.",
   "type": "system",
+  "local_storage": "off",
+  "db_storage": "off",
   "author": "Your Name",
   "homepage": ""
 }
@@ -77,6 +83,8 @@ Last updated: 2026-03-18
   "version": "0.8.0",
   "description": "Panel helper extension.",
   "type": "helper",
+  "local_storage": "off",
+  "db_storage": "off",
   "author": "Your Name",
   "homepage": ""
 }
@@ -89,6 +97,8 @@ Last updated: 2026-03-18
   "version": "0.8.0",
   "description": "Panel content extension.",
   "type": "content",
+  "local_storage": "off",
+  "db_storage": "off",
   "author": "Your Name",
   "homepage": ""
 }
@@ -201,6 +211,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - `ext.json` parses as JSON object and includes non-empty `name`.
 - `ext.json` includes valid `slug` (`[a-z0-9][a-z0-9_-]{0,119}`).
 - `type` is exactly one of: `helper`, `content`, `plugin`, `module`, `system`.
+- `local_storage` and `db_storage` are either omitted or set to exactly `on`/`off`.
 - `lib/routes_public.php` is used only by `module` extensions.
 - `lib/shortcodes.php` is used only by `helper`, `plugin`, or `module` extensions.
 - `lib/fields.php` is used only by `content`, `plugin`, or `module` extensions.
@@ -452,20 +463,23 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - New uploads always start disabled.
 
 ## Deletion/Protection Rules
-- Stock extension directories are protected from deletion.
+- Stock extension directories are protected from uninstall.
 - Current stock list: `contact`, `database`, `phpinfo`, `signups`.
-- Enabled extensions must be disabled before deletion.
+- Enabled extensions must be disabled before uninstall.
 
 ## Extension-Local State Pattern
 - Extensions may persist their own state under their directory when appropriate.
-- DB-backed state for extensions is also supported and preferred for panel-managed structured data.
+- Extension-owned local storage may also live under `private/dat/ext/{slug}/` when files belong to that extension alone.
+- `local_storage: "on"` allows Raven to provision `private/dat/ext/{slug}/` when the extension is enabled.
+- DB-backed state for extensions is also supported and preferred for panel-managed structured data; `db_storage: "on"` allows Raven to run `lib/schema.php` and extension tables should follow the shared `{prefix}ext_{slug}` / `{prefix}ext_{slug}_*` naming model.
+- Disabling an extension should leave both local/db storage intact; uninstalling the extension should remove its opted-in local storage and opted-in DB tables.
 
 ## Public Runtime Integration (Current Reality)
 - Public routes can now be registered by enabled `module` extensions via `lib/routes_public.php`.
 - Embedded form submit behavior is extension-agnostic:
 - Core public submit endpoint is `POST /forms/submit` and dispatches by runtime type + slug.
 - `contact` and `signups` do not require extension-owned public route files for form submit handling.
-- Contact/Signup configuration remains DB-backed in extension tables (`ext_contact`, `ext_signups`).
+- Contact/Signup configuration remains DB-backed in shared prefixed extension tables (`{prefix}ext_contact`, `{prefix}ext_signups`).
 - Core public runtime still owns shortcode rendering and site-wide access/routing fallback policy.
 - Do not hard-patch core for one-off extension behavior unless explicitly planned and accepted as a core change.
 

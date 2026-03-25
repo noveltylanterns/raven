@@ -31,6 +31,7 @@ Core panel bootstrap (`panel/index.php`) does this:
 2. Validates extension directory names and manifests.
 3. Builds nav items from extension directory slug and manifest type/name.
 4. Loads optional extension providers (`ext.php`, `lib/schema.php`, route registrars) for enabled, valid extensions.
+   `lib/schema.php` only runs when the manifest opts into `db_storage: "on"`.
 5. Injects a context object (`app`, `panelUrl`, `requirePanelLogin`, etc.) for route registration.
 
 ## 3) Enablement And Permission Model
@@ -67,6 +68,7 @@ Shared/core-managed data examples:
 So the correct model is:
 
 - Extension configuration can be local to the extension folder.
+- Extension-local persistent files may live under `private/dat/ext/{slug}/` when the extension sets `local_storage: "on"`.
 - Runtime/system state and persistent records can still live in shared core state/DB.
 
 ## 5) Public Runtime Reality (Current)
@@ -148,7 +150,7 @@ Create modal (`Create New Extension`):
 
 Installed list actions:
 
-- Per extension: `Settings` (when extension is enabled and has a panel route), `Enable/Disable`, and `Delete` (when allowed).
+- Per extension: `Settings` (when extension is enabled and has a panel route), `Enable/Disable`, and `Uninstall` (when allowed).
 
 ## 8) Manifest Basics
 
@@ -159,6 +161,8 @@ Common manifest fields:
 - `version`
 - `description`
 - `type` (`helper`, `content`, `plugin`, `module`, or `system`)
+- `local_storage` (`on` or `off`; optional, defaults to `off`)
+- `db_storage` (`on` or `off`; optional, defaults to `off`)
 - `author`
 - `homepage`
 - `system_extension` (optional behavior flag)
@@ -167,6 +171,9 @@ Notes:
 
 - `panel_path` and `panel_section` are legacy manifest keys and are ignored.
 - Panel route/nav identity comes from the extension directory slug.
+- `local_storage: "on"` provisions `private/dat/ext/{slug}/` when the extension is enabled.
+- `db_storage: "on"` allows Raven to run `lib/schema.php` and use `{prefix}ext_{slug}` / `{prefix}ext_{slug}_*` tables.
+- Disabling an extension leaves storage intact; uninstalling the extension removes the storage it explicitly opted into.
 
 ## 9) Agent Guidance
 

@@ -77,8 +77,8 @@ function printBlock(string $title, array $lines): void
 }
 
 $projectRoot = dirname(__DIR__, 2);
-$configPath = $argv[1] ?? ($projectRoot . '/private/config.php');
-$distPath = $argv[2] ?? ($projectRoot . '/private/config.php.dist');
+$configPath = $argv[1] ?? ($projectRoot . '/private/dat/config.php');
+$distPath = $argv[2] ?? ($projectRoot . '/private/dat/config.php.dist');
 
 try {
     $config = loadConfigFile($configPath);
@@ -108,23 +108,23 @@ sort($onlyInDist);
 sort($kindMismatches);
 
 if ($onlyInConfig === [] && $onlyInDist === [] && $kindMismatches === []) {
-    echo 'Config sync OK: key tree matches between private/config.php and private/config.php.dist.' . PHP_EOL;
+    echo 'Config sync OK: key tree matches between private/dat/config.php and private/dat/config.php.dist.' . PHP_EOL;
     exit(0);
 }
 
 fwrite(STDERR, 'Config sync check failed: config structures are out of sync.' . PHP_EOL);
 
 if ($onlyInConfig !== []) {
-    printBlock('Paths present only in private/config.php:', $onlyInConfig);
+    printBlock('Paths present only in private/dat/config.php:', $onlyInConfig);
 }
 
 if ($onlyInDist !== []) {
-    printBlock('Paths present only in private/config.php.dist:', $onlyInDist);
+    printBlock('Paths present only in private/dat/config.php.dist:', $onlyInDist);
 }
 
 if ($kindMismatches !== []) {
     printBlock('Paths with array/scalar shape mismatches:', $kindMismatches);
 }
 
-fwrite(STDERR, 'Update private/config.php.dist to mirror private/config.php key structure.' . PHP_EOL);
+fwrite(STDERR, 'Update private/dat/config.php.dist to mirror private/dat/config.php key structure.' . PHP_EOL);
 exit(1);

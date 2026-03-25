@@ -177,6 +177,8 @@ final class ExtensionScaffoldService
             'name' => $meta['name'],
             'description' => $meta['description'],
             'type' => $meta['type'],
+            'local_storage' => 'off',
+            'db_storage' => 'off',
         ];
 
         $version = trim((string) ($meta['version'] ?? ''));
@@ -574,7 +576,8 @@ return static function (array $context): void {
     $driver = (string) $context['driver'];
     $tableResolver = $context['table'];
 
-    // Resolve one logical table to the active backend:
+    // Resolve one logical table to the active backend.
+    // Extension-owned SQL tables should follow the shared `{prefix}ext_*` naming model:
     // $table = $tableResolver('ext___DIRECTORY__');
     //
     // Keep schema operations idempotent. This provider runs on bootstrap/install.

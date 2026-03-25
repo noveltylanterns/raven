@@ -2,12 +2,12 @@
 
 /**
  * RAVEN CMS
- * ~/private/config.php.dist
+ * ~/private/dat/config.php.dist
  * Distribution template for runtime configuration values.
  * Docs: https://raven.lanterns.io
  */
 
-// Inline note: Copy this file to `private/config.php` and replace placeholder values.
+// Inline note: Copy this file to `private/dat/config.php` and replace placeholder values.
 
 declare(strict_types=1);
 

@@ -79,7 +79,7 @@ final class AuthService
         $this->authDb = $authDb;
         $this->appDb = $appDb;
         $this->driver = $driver;
-        $this->prefix = $driver === 'sqlite' ? '' : $prefix;
+        $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->loginThrottle = new LoginThrottleService($appDb, $driver, $prefix);
         $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
         $this->permissionMaskService = new PermissionMaskService($appDb, $driver, $prefix);

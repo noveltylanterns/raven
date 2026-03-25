@@ -24,6 +24,34 @@ final class ManifestContractValidator
         return $type;
     }
 
+    public function normalizeStorageFlag(mixed $value): ?string
+    {
+        if ($value === null) {
+            return 'off';
+        }
+
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim($value));
+        if (!in_array($normalized, ['on', 'off'], true)) {
+            return null;
+        }
+
+        return $normalized;
+    }
+
+    public function storageEnabled(mixed $value): ?bool
+    {
+        $normalized = $this->normalizeStorageFlag($value);
+        if ($normalized === null) {
+            return null;
+        }
+
+        return $normalized === 'on';
+    }
+
     public function typeContractError(string $extensionRoot, string $type): ?string
     {
         $hasPublicRoutes = is_file($extensionRoot . '/lib/routes_public.php');
@@ -51,7 +79,9 @@ final class ManifestContractValidator
      *   type: string,
      *   panel_path: string,
      *   panel_section: string,
-     *   system_extension: bool
+     *   system_extension: bool,
+     *   local_storage: bool,
+     *   db_storage: bool
      * }|null
      */
     public function readManifest(string $root, string $directoryName): ?array
@@ -87,6 +117,12 @@ final class ManifestContractValidator
         }
 
         $type = $this->normalizeType((string) ($decoded['type'] ?? 'plugin'));
+        $localStorage = $this->storageEnabled($decoded['local_storage'] ?? null);
+        $dbStorage = $this->storageEnabled($decoded['db_storage'] ?? null);
+        if ($localStorage === null || $dbStorage === null) {
+            return null;
+        }
+
         $extensionRoot = rtrim($root, '/') . '/private/ext/' . $directoryName;
         if ($this->typeContractError($extensionRoot, $type) !== null) {
             return null;
@@ -99,6 +135,8 @@ final class ManifestContractValidator
             'panel_path' => $directoryName,
             'panel_section' => $directoryName,
             'system_extension' => (bool) ($decoded['system_extension'] ?? false),
+            'local_storage' => $localStorage,
+            'db_storage' => $dbStorage,
         ];
     }
 }

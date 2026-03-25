@@ -36,7 +36,7 @@ final class ConfigFileStore
 
 /**
  * RAVEN CMS
- * ~/private/config.php
+ * ~/private/dat/config.php
  * Runtime configuration values for Raven CMS.
  * Docs: https://raven.lanterns.io
  */

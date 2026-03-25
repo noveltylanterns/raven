@@ -99,13 +99,13 @@ final class PanelAccess
     public const THEMES_VIEW = 4398046511104;
     public const THEMES_CREATE = 8796093022208;
     public const THEMES_EDIT = 17592186044416;
-    public const THEMES_DELETE = 35184372088832;
+    public const THEMES_UNINSTALL = 35184372088832;
 
     /** Extensions route permissions (`/extensions*`). */
     public const EXTENSIONS_VIEW = 70368744177664;
     public const EXTENSIONS_CREATE = 140737488355328;
     public const EXTENSIONS_EDIT = 281474976710656;
-    public const EXTENSIONS_DELETE = 562949953421312;
+    public const EXTENSIONS_UNINSTALL = 562949953421312;
 
     /** Configuration route permissions (`/configuration*`). */
     public const CONFIGURATION_VIEW = 1125899906842624;
@@ -234,7 +234,7 @@ final class PanelAccess
     /**
      * Returns one normalized panel route permission map.
      *
-     * @return array<string, array{label: string, view: int, create: int, edit: int, delete: int}>
+     * @return array<string, array{label: string, view: int, create: int, edit: int, delete?: int, uninstall?: int}>
      */
     public static function stockPanelRoutePermissions(): array
     {
@@ -244,7 +244,7 @@ final class PanelAccess
     /**
      * Returns stock panel route permission row by route key.
      *
-     * @return array{label: string, view: int, create: int, edit: int, delete: int}|null
+     * @return array{label: string, view: int, create: int, edit: int, delete?: int, uninstall?: int}|null
      */
     public static function stockPanelRoutePermission(string $routeKey): ?array
     {

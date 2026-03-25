@@ -2,6 +2,16 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### March 24, 2026
+
+- Fixed installer/runtime path handling so first-run redirects and the installer form submit stay on the mounted app path instead of hard-coding `/install.php`, which prevents subdirectory installs from tripping a false `Invalid form token` failure on submit.
+- Fixed PostgreSQL auth bootstrap regressions by passing the configured auth table prefix to Delight Auth in the correct constructor slot and by using `RETURNING id` for PostgreSQL user creation before assigning group memberships.
+- Consolidated Raven SQLite storage into `private/dat/db.sqlite`, moved extension tables into that same main database under the shared prefixed `ext_*` naming model, and reserved `private/dat/ext/{slug}/` for extension-owned local file storage.
+- Added manifest-gated extension storage flags: `local_storage` now provisions `private/dat/ext/{slug}/` only when explicitly set to `on`, and `db_storage` now gates `lib/schema.php` plus `{prefix}ext_{slug}` / `{prefix}ext_{slug}_*` table usage with a default of `off` when unset.
+- Updated extension uninstall so remove/uninstall operations now clean up opted-in local/db storage, while disable operations leave extension data untouched.
+- Renamed theme/extension package-removal actions from `delete` to `uninstall` across the panel, CLI, and stock panel permission map (`themes.uninstall`, `extensions.uninstall`, `THEMES_UNINSTALL`, `EXTENSIONS_UNINSTALL`), while content-style resources such as pages/users/channels/groups/categories/tags/redirects still use `delete`.
+- Moved the canonical runtime config files to `private/dat/config.php` and `private/dat/config.php.dist`, updated installer/bootstrap/CLI/debug tooling to load them from `private/dat/`, and tightened `.gitignore` so `private/dat/` stays local except for the committed `.dist` templates.
+
 ### March 21, 2026
 
 - Renamed the generic request instrumentation namespace/path from `private/lib/Profiling` to `private/lib/Diagnostics`, and nested the debug-toolbar helpers under `private/lib/Diagnostics/Toolbar` plus `private/sys/Core/Diagnostics`, so the collector layer and the diagnostics UI now live in one clear domain without colliding semantically with `private/lib/Profile` or the local `debug/` workspace.

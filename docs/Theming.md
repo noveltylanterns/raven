@@ -125,13 +125,13 @@ Use `private/bin/rvn-theme` for theme lifecycle commands:
 - `list`
 - `enable --slug <slug>`
 - `create --slug <slug> --name <name> [--clone <source_slug>] [--parent <slug>] [--set-default <1|0>]`
-- `delete --slug <slug>`
+- `uninstall --slug <slug>`
 
-Delete constraints:
+Uninstall constraints:
 
-- active themes cannot be deleted (activate another theme first)
-- stock themes such as `raven` cannot be deleted
-- `--force` is rejected for theme deletion
+- active themes cannot be uninstalled (activate another theme first)
+- stock themes such as `raven` cannot be uninstalled
+- `--force` is rejected for theme uninstall
 
 Related helpers:
 
@@ -148,7 +148,7 @@ Panel counterpart:
 
 - `GET /{panel.path}/themes` provides Theme Manager UI for list/enable/scaffold.
 - `POST /{panel.path}/themes/upload` uploads one `.zip` archive into `public/theme/{slug}/`.
-- `POST /{panel.path}/themes/delete` deletes one non-active, non-stock theme.
+- `POST /{panel.path}/themes/uninstall` uninstalls one non-active, non-stock theme.
 
 Theme upload notes:
 

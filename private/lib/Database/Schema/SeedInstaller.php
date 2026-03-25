@@ -104,7 +104,7 @@ final class SeedInstaller
     public function ensureSeedPages(PDO $db, string $driver, string $prefix): void
     {
         $pagesTable = $this->tables->resolve($driver, $prefix, 'pages');
-        $usersTable = $driver === 'sqlite' ? 'auth.users' : ($prefix . 'users');
+        $usersTable = $prefix . 'users';
 
         try {
             $userCountStmt = $db->query('SELECT COUNT(*) FROM ' . $usersTable);

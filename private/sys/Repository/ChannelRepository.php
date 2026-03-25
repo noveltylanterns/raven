@@ -34,7 +34,7 @@ final class ChannelRepository
     {
         $this->db = $db;
         $this->driver = $driver;
-        $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
+        $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->channelDirectory = $channelDirectory ?? (dirname(__DIR__, 3) . '/dat/channel');
         $this->channelFileStoreService = new ChannelFileStoreService($this->channelDirectory);
     }

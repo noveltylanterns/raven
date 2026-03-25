@@ -47,7 +47,7 @@ Tab behavior notes:
 - `Site` section:
   - core `site.*` fields
   - `site.protocol` controls whether Raven emits generated absolute URLs as `http://` or `https://`
-  - `site.default_theme` remains stored in `private/config.php` but is managed via Theme Manager / `rvn-theme` (not editable in Configuration)
+  - `site.default_theme` remains stored in `private/dat/config.php` but is managed via Theme Manager / `rvn-theme` (not editable in Configuration)
 - `Panel` section:
   - `panel.path`
   - `panel.default_theme` (`Corporate`, `Ice`, `Midnight`)
@@ -76,7 +76,7 @@ Notable options:
   - `database.table_prefix` (shown first for MySQL/PostgreSQL; hidden for SQLite)
   - `database.driver`
   - selected-driver fields (`sqlite`/`mysql`/`pgsql`)
-- SQLite DB filenames are auto-managed by Raven, are not editable in installer/panel UI, and are not stored in `private/config.php`.
+- SQLite storage is managed through `database.sqlite.base_path`; Raven keeps core, auth, taxonomy, and extension DB tables in one `db.sqlite` file and leaves `private/dat/ext/{slug}/` available for extension-local non-table storage.
 
 #### Debug Tab
 
@@ -167,8 +167,8 @@ Depending on field key/type, the editor renders:
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
 - Runtime config files:
-  - `private/config.php`
-  - `private/config.php.dist`
+  - `private/dat/config.php`
+  - `private/dat/config.php.dist`
 - Documentation coverage is verified by internal validation tooling.
 
 ### Panel Routes

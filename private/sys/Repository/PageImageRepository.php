@@ -31,8 +31,7 @@ final class PageImageRepository
     {
         $this->db = $db;
         $this->driver = $driver;
-        // Prefix is only used in shared-db modes; SQLite uses attached DB names instead.
-        $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
+        $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->pageImagePrimarySelectionService = new PageImagePrimarySelectionService();
         $this->pageImageDeletionService = new PageImageDeletionService();
     }

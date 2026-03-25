@@ -118,8 +118,8 @@ return static function (array $context): void {
             created_at TEXT NOT NULL
         )');
 
-        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS extensions.uniq_ext_contact_slug ON ext_contact (slug)');
-        $db->exec('CREATE INDEX IF NOT EXISTS extensions.idx_ext_contact_submissions_form_slug_created_at ON ext_contact_submissions (form_slug, created_at DESC)');
+        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $contactTable . '_slug ON ' . $contactTable . ' (slug)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $submissionsTable . '_form_slug_created_at ON ' . $submissionsTable . ' (form_slug, created_at DESC)');
 
         if (!$columnExists($db, $driver, $contactTable, 'save_mail_locally')) {
             $db->exec('ALTER TABLE ' . $contactTable . ' ADD COLUMN save_mail_locally INTEGER NOT NULL DEFAULT 1');

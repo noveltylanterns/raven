@@ -19,7 +19,7 @@ use Raven\Lib\Config\ConfigFileStore;
  * Loads and saves Raven configuration from a PHP array file.
  *
  * The panel uses this class to safely edit config values while keeping the
- * canonical config format in `private/config.php`.
+ * canonical config format in `private/dat/config.php`.
  */
 final class Config
 {
@@ -31,7 +31,7 @@ final class Config
     private ConfigFileStore $store;
 
     /**
-     * @param string $path Absolute path to `private/config.php`.
+     * @param string $path Absolute path to `private/dat/config.php`.
      */
     public function __construct(string $path)
     {

@@ -37,8 +37,7 @@ final class GroupRepository
     {
         $this->db = $db;
         $this->driver = $driver;
-        // Prefix is ignored for SQLite because attached database aliases are used instead.
-        $this->prefix = $driver === 'sqlite' ? '' : preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
+        $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->rolePolicy = new GroupRolePolicy();
         $this->groupMembershipWriteService = new GroupMembershipWriteService();
         $this->groupPublicRouteService = new GroupPublicRouteService();

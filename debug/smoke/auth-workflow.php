@@ -48,7 +48,7 @@ final class AuthWorkflowSmokeRunner
         $this->runId = time();
 
         /** @var array<string, mixed> $config */
-        $config = require $this->root . '/private/config.php';
+        $config = require $this->root . '/private/dat/config.php';
 
         $panelPath = trim((string) (($config['panel']['path'] ?? 'panel')));
         $this->panelPath = $panelPath !== '' ? $panelPath : 'panel';

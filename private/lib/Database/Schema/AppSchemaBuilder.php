@@ -22,15 +22,14 @@ final class AppSchemaBuilder
 
     public function ensurePageExtendedColumn(PDO $db, string $driver, string $prefix): void
     {
+        $pagesTable = $prefix . 'pages';
         if ($driver === 'sqlite') {
-            if (!$this->introspector->appColumnExistsSqlite($db, 'pages', 'extended')) {
-                $db->exec('ALTER TABLE pages ADD COLUMN extended TEXT NULL');
+            if (!$this->introspector->appColumnExistsSqlite($db, $pagesTable, 'extended')) {
+                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN extended TEXT NULL');
             }
 
             return;
         }
-
-        $pagesTable = $prefix . 'pages';
 
         if ($driver === 'mysql') {
             if (!$this->introspector->appColumnExistsMySql($db, $pagesTable, 'extended')) {
@@ -47,15 +46,14 @@ final class AppSchemaBuilder
 
     public function ensurePageDescriptionColumn(PDO $db, string $driver, string $prefix): void
     {
+        $pagesTable = $prefix . 'pages';
         if ($driver === 'sqlite') {
-            if (!$this->introspector->appColumnExistsSqlite($db, 'pages', 'description')) {
-                $db->exec('ALTER TABLE pages ADD COLUMN description TEXT NULL');
+            if (!$this->introspector->appColumnExistsSqlite($db, $pagesTable, 'description')) {
+                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN description TEXT NULL');
             }
 
             return;
         }
-
-        $pagesTable = $prefix . 'pages';
 
         if ($driver === 'mysql') {
             if (!$this->introspector->appColumnExistsMySql($db, $pagesTable, 'description')) {
@@ -72,15 +70,14 @@ final class AppSchemaBuilder
 
     public function ensurePageDisplayTitleColumn(PDO $db, string $driver, string $prefix): void
     {
+        $pagesTable = $prefix . 'pages';
         if ($driver === 'sqlite') {
-            if (!$this->introspector->appColumnExistsSqlite($db, 'pages', 'display_title')) {
-                $db->exec('ALTER TABLE pages ADD COLUMN display_title INTEGER NOT NULL DEFAULT 1');
+            if (!$this->introspector->appColumnExistsSqlite($db, $pagesTable, 'display_title')) {
+                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN display_title INTEGER NOT NULL DEFAULT 1');
             }
 
             return;
         }
-
-        $pagesTable = $prefix . 'pages';
 
         if ($driver === 'mysql') {
             if (!$this->introspector->appColumnExistsMySql($db, $pagesTable, 'display_title')) {
@@ -97,16 +94,15 @@ final class AppSchemaBuilder
 
     public function ensurePageGalleryEnabledColumn(PDO $db, string $driver, string $prefix): void
     {
+        $pagesTable = $prefix . 'pages';
         if ($driver === 'sqlite') {
-            if (!$this->introspector->appColumnExistsSqlite($db, 'pages', 'gallery_enabled')) {
-                $db->exec('ALTER TABLE pages ADD COLUMN gallery_enabled INTEGER NOT NULL DEFAULT 0');
+            if (!$this->introspector->appColumnExistsSqlite($db, $pagesTable, 'gallery_enabled')) {
+                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN gallery_enabled INTEGER NOT NULL DEFAULT 0');
             }
 
-            $db->exec('UPDATE pages SET gallery_enabled = 0 WHERE gallery_enabled IS NULL');
+            $db->exec('UPDATE ' . $pagesTable . ' SET gallery_enabled = 0 WHERE gallery_enabled IS NULL');
             return;
         }
-
-        $pagesTable = $prefix . 'pages';
 
         if ($driver === 'mysql') {
             if (!$this->introspector->appColumnExistsMySql($db, $pagesTable, 'gallery_enabled')) {
@@ -126,12 +122,11 @@ final class AppSchemaBuilder
 
     public function ensurePageSlugScopeUniqueness(PDO $db, string $driver, string $prefix): void
     {
+        $pagesTable = $prefix . 'pages';
         if ($driver === 'sqlite') {
-            $this->ensurePageSlugScopeUniquenessSqlite($db);
+            $this->ensurePageSlugScopeUniquenessSqlite($db, $pagesTable);
             return;
         }
-
-        $pagesTable = $prefix . 'pages';
 
         if ($driver === 'mysql') {
             if (!$this->introspector->mySqlIndexExists($db, $pagesTable, 'uniq_' . $prefix . 'pages_channel_slug')) {
@@ -166,13 +161,13 @@ final class AppSchemaBuilder
         $groupsTable = $this->tables->resolve($driver, $prefix, 'groups');
 
         if ($driver === 'sqlite') {
-            if (!$this->introspector->appColumnExistsSqlite($db, 'auth.groups', 'slug')) {
-                $db->exec('ALTER TABLE auth.groups ADD COLUMN slug TEXT NULL');
+            if (!$this->introspector->appColumnExistsSqlite($db, $groupsTable, 'slug')) {
+                $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN slug TEXT NULL');
             }
-            if (!$this->introspector->appColumnExistsSqlite($db, 'auth.groups', 'route_enabled')) {
-                $db->exec('ALTER TABLE auth.groups ADD COLUMN route_enabled INTEGER NOT NULL DEFAULT 0');
+            if (!$this->introspector->appColumnExistsSqlite($db, $groupsTable, 'route_enabled')) {
+                $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN route_enabled INTEGER NOT NULL DEFAULT 0');
             }
-            $db->exec('CREATE INDEX IF NOT EXISTS auth.idx_groups_slug ON groups (slug)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $groupsTable . '_slug ON ' . $groupsTable . ' (slug)');
         } elseif ($driver === 'mysql') {
             if (!$this->introspector->appColumnExistsMySql($db, $groupsTable, 'slug')) {
                 $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN slug VARCHAR(160) NULL AFTER name');
@@ -258,15 +253,16 @@ final class AppSchemaBuilder
     public function ensurePageImageDisplayColumns(PDO $db, string $driver, string $prefix): void
     {
         if ($driver === 'sqlite') {
-            if (!$this->introspector->appColumnExistsSqlite($db, 'main.page_images', 'is_preview')) {
-                $db->exec('ALTER TABLE main.page_images ADD COLUMN is_preview INTEGER NOT NULL DEFAULT 0');
+            $imagesTable = $this->tables->resolve($driver, $prefix, 'page_images');
+            if (!$this->introspector->appColumnExistsSqlite($db, $imagesTable, 'is_preview')) {
+                $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN is_preview INTEGER NOT NULL DEFAULT 0');
             }
-            if (!$this->introspector->appColumnExistsSqlite($db, 'main.page_images', 'include_in_gallery')) {
-                $db->exec('ALTER TABLE main.page_images ADD COLUMN include_in_gallery INTEGER NOT NULL DEFAULT 1');
+            if (!$this->introspector->appColumnExistsSqlite($db, $imagesTable, 'include_in_gallery')) {
+                $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN include_in_gallery INTEGER NOT NULL DEFAULT 1');
             }
 
-            $db->exec('UPDATE main.page_images SET is_preview = 0 WHERE is_preview IS NULL');
-            $db->exec('UPDATE main.page_images SET include_in_gallery = 1 WHERE include_in_gallery IS NULL');
+            $db->exec('UPDATE ' . $imagesTable . ' SET is_preview = 0 WHERE is_preview IS NULL');
+            $db->exec('UPDATE ' . $imagesTable . ' SET include_in_gallery = 1 WHERE include_in_gallery IS NULL');
             return;
         }
 
@@ -355,7 +351,7 @@ final class AppSchemaBuilder
     public function dropLegacyChannelTable(PDO $db, string $driver, string $prefix): void
     {
         if ($driver === 'sqlite') {
-            $db->exec('DROP TABLE IF EXISTS taxonomy.channels');
+            $db->exec('DROP TABLE IF EXISTS ' . $prefix . 'channels');
             return;
         }
 
@@ -365,10 +361,14 @@ final class AppSchemaBuilder
     public function ensurePanelPerformanceIndexes(PDO $db, string $driver, string $prefix): void
     {
         if ($driver === 'sqlite') {
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_page_categories_category_id ON page_categories (category_id, page_id)');
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_page_tags_tag_id ON page_tags (tag_id, page_id)');
-            $db->exec('CREATE INDEX IF NOT EXISTS auth.idx_user_groups_group_id ON user_groups (group_id, user_id)');
-            $db->exec('CREATE INDEX IF NOT EXISTS taxonomy.idx_redirects_lookup ON redirects (slug, channel_id, is_active)');
+            $pageCategoriesTable = $this->tables->resolve($driver, $prefix, 'page_categories');
+            $pageTagsTable = $this->tables->resolve($driver, $prefix, 'page_tags');
+            $userGroupsTable = $this->tables->resolve($driver, $prefix, 'user_groups');
+            $redirectsTable = $this->tables->resolve($driver, $prefix, 'redirects');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pageCategoriesTable . '_category_id ON ' . $pageCategoriesTable . ' (category_id, page_id)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pageTagsTable . '_tag_id ON ' . $pageTagsTable . ' (tag_id, page_id)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $userGroupsTable . '_group_id ON ' . $userGroupsTable . ' (group_id, user_id)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $redirectsTable . '_lookup ON ' . $redirectsTable . ' (slug, channel_id, is_active)');
             return;
         }
 
@@ -458,12 +458,12 @@ final class AppSchemaBuilder
         }
     }
 
-    private function ensurePageSlugScopeUniquenessSqlite(PDO $db): void
+    private function ensurePageSlugScopeUniquenessSqlite(PDO $db, string $pagesTable): void
     {
-        $db->exec('CREATE INDEX IF NOT EXISTS idx_pages_published_at ON pages (published_at DESC)');
-        $db->exec('CREATE INDEX IF NOT EXISTS idx_pages_channel_id ON pages (channel_id)');
-        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_pages_root_slug_unique ON pages (slug) WHERE channel_id IS NULL');
-        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_pages_channel_slug_unique ON pages (channel_id, slug) WHERE channel_id IS NOT NULL');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_published_at ON ' . $pagesTable . ' (published_at DESC)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_id ON ' . $pagesTable . ' (channel_id)');
+        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_root_slug_unique ON ' . $pagesTable . ' (slug) WHERE channel_id IS NULL');
+        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_slug_unique ON ' . $pagesTable . ' (channel_id, slug) WHERE channel_id IS NOT NULL');
     }
 
     private function slugifyGroupName(string $value): string

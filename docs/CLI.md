@@ -132,7 +132,7 @@ Config key management:
 - `list [--prefix <dot.path.prefix>]`
 - `get --key <dot.path>`
 - `set --key <dot.path> --value <value> [--type <auto|string|int|float|bool|null|json>]`
-- `sync-defaults` (adds missing keys from `private/config.php.dist` without overwriting existing keys)
+- `sync-defaults` (adds missing keys from `private/dat/config.php.dist` without overwriting existing keys)
 
 `rvn-conf set` does not allow `site.default_theme`; use `rvn-theme enable --slug <slug>` instead.
 
@@ -145,11 +145,10 @@ Extension management:
 - `disable --slug <slug>`
 - `create --slug <slug> --name <name> [--type <helper|content|plugin|module|system>] [--version <semver>] [--description <text>] [--author <name>] [--homepage <url>] [--author-url <url>] [--with-shortcodes <1|0>] [--with-fields <1|0>] [--with-public-routes <1|0>] [--with-agents <1|0>] [--with-composer <1|0>]`
 - `import --archive <zip_path> [--slug <slug>]`
-- `delete --slug <slug> [--force]`
+- `uninstall --slug <slug> [--force]`
 
 `create` writes extension scaffolds under `private/ext/{slug}/` using current route/view conventions (`ext.php`, `ext.json`, `lib/*.php`, `tpl/*.php`), and sets `ext.json.slug` to the directory slug.
 `import` uses `ext.json.slug` when `--slug` is omitted.
-
 ### `rvn-theme`
 
 Public-theme management:
@@ -157,13 +156,13 @@ Public-theme management:
 - `list`
 - `enable --slug <slug>`
 - `create --slug <slug> --name <name> [--clone <source_slug>] [--parent <slug>] [--set-default <1|0>]`
-- `delete --slug <slug>`
+- `uninstall --slug <slug>`
 
-Delete rules:
+Uninstall rules:
 
-- active themes cannot be deleted (enable a different theme first)
-- stock themes (for example `raven`) cannot be deleted
-- `--force` is not supported for `rvn-theme delete`
+- active themes cannot be uninstalled (enable a different theme first)
+- stock themes (for example `raven`) cannot be uninstalled
+- `--force` is not supported for `rvn-theme uninstall`
 
 `create` writes theme scaffolds under `public/theme/{slug}/` with:
 
@@ -220,7 +219,7 @@ Use your local validation workflow to verify CLI basics:
 - system/info command output
 - category/channel/tag/redirect create-delete flow
 - config set/get/restore behavior
-- extension list/create/delete behavior
-- destructive-guard behavior (stock group/extension/theme delete blocked, active-theme delete blocked)
+- extension list/create/uninstall behavior
+- destructive-guard behavior (stock group delete blocked, stock extension/theme uninstall blocked, active-theme uninstall blocked)
 - unsafe-input behavior (path-traversal slugs rejected, unsafe ZIP entry paths rejected on import)
 - dedicated web-security smoke runner for CSRF/auth/XSS-escape/SQLi-baseline checks

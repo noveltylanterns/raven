@@ -23,6 +23,11 @@ final class ExtensionSchemaRunner
     {
         $root = dirname(__DIR__, 4);
         foreach (ExtensionRegistry::enabledDirectories($root, true) as $directory) {
+            $manifest = ExtensionRegistry::readManifest($root, $directory);
+            if (!is_array($manifest) || empty($manifest['db_storage'])) {
+                continue;
+            }
+
             $schemaPath = $root . '/private/ext/' . $directory . '/lib/schema.php';
             if (!is_file($schemaPath)) {
                 continue;

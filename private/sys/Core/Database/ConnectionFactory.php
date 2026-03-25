@@ -64,20 +64,14 @@ final class ConnectionFactory
     /**
      * Returns the app-data connection.
      *
-     * SQLite mode opens `pages.db` and attaches required side databases.
+     * SQLite mode opens the consolidated core DB.
      */
     public function createAppConnection(): PDO
     {
         $driver = $this->getDriver();
 
         if ($driver === 'sqlite') {
-            $pdo = $this->newSqliteConnection($this->sqlitePath('pages'), 'app');
-            $this->attachSqliteDatabases($pdo, [
-                'auth',
-                'taxonomy',
-                'extensions',
-            ]);
-            return $pdo;
+            return $this->newSqliteConnection($this->sqlitePath('core'), 'app');
         }
 
         return $this->newServerConnection($driver);
@@ -91,7 +85,7 @@ final class ConnectionFactory
         $driver = $this->getDriver();
 
         if ($driver === 'sqlite') {
-            return $this->newSqliteConnection($this->sqlitePath('auth'), 'auth');
+            return $this->newSqliteConnection($this->sqlitePath('core'), 'auth');
         }
 
         return $this->newServerConnection($driver, 'auth');
@@ -146,25 +140,6 @@ final class ConnectionFactory
     private function sqlitePath(string $key): string
     {
         return $this->sqlitePaths()->path($key);
-    }
-
-    /**
-     * Attaches side SQLite files as named schemas.
-     *
-     * @param array<int, string> $aliases
-     */
-    private function attachSqliteDatabases(PDO $pdo, array $aliases): void
-    {
-        foreach ($aliases as $alias) {
-            if (!preg_match('/^[a-z_][a-z0-9_]*$/', $alias)) {
-                continue;
-            }
-
-            $path = $this->sqlitePath($alias);
-            $safePath = str_replace("'", "''", $path);
-
-            $pdo->exec("ATTACH DATABASE '{$safePath}' AS {$alias}");
-        }
     }
 
     /**

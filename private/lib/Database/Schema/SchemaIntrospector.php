@@ -13,7 +13,7 @@ final class SchemaIntrospector
 {
     public function authUsersTableExists(PDO $db, string $driver, string $prefix): bool
     {
-        $table = $driver === 'sqlite' ? 'users' : $prefix . 'users';
+        $table = $prefix . 'users';
 
         if ($driver === 'sqlite') {
             $stmt = $db->prepare(
@@ -241,4 +241,3 @@ final class SchemaIntrospector
             || str_contains($message, 'relation') && str_contains($message, 'exists');
     }
 }
-

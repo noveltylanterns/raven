@@ -40,8 +40,8 @@ Last updated: 2026-03-19
 - Use prepared statements for SQL access through repositories/services.
 - Do not hand-edit dependencies under `composer/`.
 - Keep config key trees synchronized between:
-- `private/config.php`
-- `private/config.php.dist`
+- `private/dat/config.php`
+- `private/dat/config.php.dist`
 - Keep customizations update-safe by placing:
 - site/frontend behavior in themes (`public/theme/{slug}/`)
 - feature behavior in extensions (`private/ext/{slug}/`)
@@ -81,7 +81,7 @@ Last updated: 2026-03-19
 
 ## Update Survivability
 - Keep end-user custom code in theme/extension directories only.
-- Keep runtime state/data in local/private paths (`private/config.php`, `private/dat/`, `.tmp/`, uploads).
+- Keep runtime state/data in local/private paths (`private/dat/config.php`, `private/dat/`, `.tmp/`, uploads).
 - Never require operators to patch core files to preserve customization across updates.
 - Document new extension/theme capabilities in subsystem AGENTS + `docs/` in the same task.
 
@@ -141,14 +141,10 @@ The bulk of Raven's source code & configuration, kept in a folder outside the we
 #### /private/bin/
 Shared CLI tooling. (See CLI Appendix above)
 
-#### /private/config.php
-Environment-local runtime configuration (generated during install from config.php.dist)
-
-#### /private/config.php.dist
-Factory config.php defaults, for installation runtime and future reference.
-
 #### /private/dat/
 Where private site content (sqlite databases, other data stores that don't need to be accessible by the web process) is stashed. Much of it is sorted by type.
+- `/private/dat/config.php` - Environment-local runtime configuration (generated during install from config.php.dist)
+- `/private/dat/config.php.dist` - Factory config.php defaults, for installation runtime and future reference.
 - `/private/dat/ext/.state.php` - Environment-local extension enablement and permission state map. (runtime-managed, update-safe location)
 - `/private/dat/ext/.state.php.dist` - Factory extension-state template used by installer/bootstrap fallback workflows.
 
@@ -223,7 +219,7 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Database/Connection/DriverConfigNormalizer.php` - Shared database driver/prefix and per-driver config normalization helper for connection bootstrapping.
 - `/private/lib/Database/Connection/DsnBuilder.php` - Shared MySQL/PostgreSQL DSN builder for profiled PDO connection wiring.
 - `/private/lib/Database/Connection/SqliteConnectionBootstrap.php` - Shared SQLite filesystem/bootstrap helper for directory creation and pragma initialization.
-- `/private/lib/Database/Connection/SqlitePathResolver.php` - Shared canonical SQLite database-path resolver (`pages/auth/taxonomy/extensions`).
+- `/private/lib/Database/Connection/SqlitePathResolver.php` - Shared canonical SQLite database-path resolver for Raven's consolidated core/auth/taxonomy storage file.
 - `/private/lib/Database/Runtime/TableNameResolver.php` - Shared runtime table resolver for app-db/auth-db logical names across sqlite attached schemas and prefixed server DBs.
 - `/private/lib/Database/SqlUpsertPolicy.php` - Shared backend-aware SQL builder for duplicate-safe idempotent insert/upsert statements.
 - `/private/lib/Database/Profiling/ProfiledPDO.php` - PDO subclass that records query timings through an injected profiler contract.
@@ -247,6 +243,8 @@ Reusable library modules decoupled from Raven core runtime assumptions:
 - `/private/lib/Extension/ExtensionPermissionCatalogService.php` - Shared extension permission-level catalog discovery and stable permission-bit allocation service for panel ACL mapping.
 - `/private/lib/Extension/EmbeddedFormRuntimeService.php` - Shared embedded-form shortcode parser/runtime resolver with enabled-extension filtering and per-type form-definition caches.
 - `/private/lib/Extension/ExtensionProviderValidator.php` - Shared validator for extension provider contracts (shortcodes/fields/schema bind checks).
+- `/private/lib/Extension/ExtensionStorageCleaner.php` - Shared extension storage cleanup helper that removes opted-in local storage directories and prefixed extension tables on delete.
+- `/private/lib/Extension/ExtensionStorageProvisioner.php` - Shared extension local-storage directory provisioner for `private/dat/ext/{slug}/` opt-in storage.
 - `/private/lib/Extension/ExtensionScaffoldService.php` - Shared extension scaffold generator for panel extension-create workflows.
 - `/private/lib/Extension/ExtensionStateLoader.php` - Shared loader/normalizer for extension `.state.php` enablement + permission maps with opcache-safe reload behavior.
 - `/private/lib/Extension/ExtensionStateStore.php` - Shared persistence service for extension enablement and permission state maps.

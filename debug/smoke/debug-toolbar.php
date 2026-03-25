@@ -42,7 +42,7 @@ final class DebugToolbarSmokeRunner
     {
         $this->root = rtrim($root, '/');
         $this->runnerPath = $this->root . '/debug/util/request-runner.php';
-        $this->configPath = $this->root . '/private/config.php';
+        $this->configPath = $this->root . '/private/dat/config.php';
         $this->phpCommand = $this->resolvePhpCommand();
         $this->runId = time();
 
@@ -203,7 +203,7 @@ final class DebugToolbarSmokeRunner
     {
         $raw = file_get_contents($this->configPath);
         if (!is_string($raw) || trim($raw) === '') {
-            throw new RuntimeException('Unable to read private/config.php.');
+            throw new RuntimeException('Unable to read private/dat/config.php.');
         }
 
         $this->originalConfigRaw = $raw;
@@ -221,7 +221,7 @@ final class DebugToolbarSmokeRunner
 
         $encoded = "<?php\n\nreturn " . var_export($config, true) . ";\n";
         if (file_put_contents($this->configPath, $encoded) === false) {
-            throw new RuntimeException('Unable to write debug-toolbar smoke settings to private/config.php.');
+            throw new RuntimeException('Unable to write debug-toolbar smoke settings to private/dat/config.php.');
         }
 
         $this->restoreConfig = true;

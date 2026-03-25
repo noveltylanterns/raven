@@ -51,10 +51,10 @@ final class RavenCliContext
             return $this->app;
         }
 
-        $configPath = $this->root . '/private/config.php';
+        $configPath = $this->root . '/private/dat/config.php';
         if (!is_file($configPath)) {
             throw new RuntimeException(
-                'Missing private/config.php. Run installer first before using repository-backed CLI commands.'
+                'Missing private/dat/config.php. Run installer first before using repository-backed CLI commands.'
             );
         }
 
@@ -990,8 +990,8 @@ function raven_cli_print_main_help(RavenCliContext $context): void
     $context->info('  tag        Tag CRUD (text-only)');
     $context->info('  redirect   Redirect CRUD (text-only)');
     $context->info('  config     Read/update config keys');
-    $context->info('  theme      List/enable/create/delete public themes');
-    $context->info('  ext        Enable/disable/import/create/delete extensions');
+    $context->info('  theme      List/enable/create/uninstall public themes');
+    $context->info('  ext        Enable/disable/import/create/uninstall extensions');
     $context->info('  system     Query basic system/version/env details');
     $context->info('  update     Check/run/rollback Git-based updates');
     $context->info('');
@@ -2077,15 +2077,15 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
         }
 
         if ($action === 'sync-defaults') {
-            $distPath = $context->root . '/private/config.php.dist';
+            $distPath = $context->root . '/private/dat/config.php.dist';
             if (!is_file($distPath)) {
-                throw new RuntimeException('Missing private/config.php.dist.');
+                throw new RuntimeException('Missing private/dat/config.php.dist.');
             }
 
             /** @var mixed $dist */
             $dist = require $distPath;
             if (!is_array($dist)) {
-                throw new RuntimeException('private/config.php.dist must return an array.');
+                throw new RuntimeException('private/dat/config.php.dist must return an array.');
             }
 
             $added = [];
@@ -2134,6 +2134,8 @@ function raven_cli_extension_scaffold_files(string $extensionPath, array $meta, 
         'name' => $name,
         'description' => $description,
         'type' => $type,
+        'local_storage' => 'off',
+        'db_storage' => 'off',
         'author' => $author,
         'homepage' => $homepage,
     ];
@@ -2276,13 +2278,13 @@ function raven_cli_extension_scaffold_files(string $extensionPath, array $meta, 
 function raven_cli_command_extension(RavenCliContext $context, array $tokens): int
 {
     if ($tokens === [] && $context->interactive) {
-        $tokens[] = strtolower(trim($context->prompt('Extension action (list/enable/disable/create/import/delete)', 'list')));
+        $tokens[] = strtolower(trim($context->prompt('Extension action (list/enable/disable/create/import/uninstall)', 'list')));
     }
 
     if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
         $context->renderHelpHeader('ext');
         $context->info('Usage: private/bin/rvn-ext <action> [options]');
-        $context->info('Actions: list, enable, disable, create, import, delete');
+        $context->info('Actions: list, enable, disable, create, import, uninstall');
         $context->info('Options: --slug, --archive, --type, --name, --version (optional), --description, --author, --homepage');
         $context->info('Import uses ext.json "slug" when --slug is omitted.');
         return 0;
@@ -2356,6 +2358,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
 
         if ($action === 'enable' || $action === 'disable') {
             require_once $root . '/private/sys/Core/Extension/ExtensionRegistry.php';
+            require_once $root . '/private/lib/Extension/ExtensionStorageProvisioner.php';
             $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
             if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
                 throw new RuntimeException('Extension slug is invalid.');
@@ -2366,12 +2369,18 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 throw new RuntimeException('Extension directory not found: ' . $slug);
             }
 
-            if ($action === 'enable' && ExtensionRegistry::readManifest($root, $slug) === null) {
+            $manifest = ExtensionRegistry::readManifest($root, $slug);
+            if ($action === 'enable' && $manifest === null) {
                 throw new RuntimeException('Extension manifest is invalid; refusing to enable.');
             }
 
             $state = raven_cli_extension_state_load($root);
             if ($action === 'enable') {
+                if (!empty($manifest['local_storage'])) {
+                    $provisioner = new \Raven\Lib\Extension\ExtensionStorageProvisioner($root);
+                    $provisioner->ensureLocalStorageDirectory($slug);
+                }
+
                 $state['enabled'][$slug] = true;
             } else {
                 unset($state['enabled'][$slug]);
@@ -2386,14 +2395,16 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
             return 0;
         }
 
-        if ($action === 'delete') {
+        if ($action === 'uninstall') {
+            require_once $root . '/private/sys/Core/Extension/ExtensionRegistry.php';
+            require_once $root . '/private/lib/Extension/ExtensionStorageCleaner.php';
             $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
             if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
                 throw new RuntimeException('Extension slug is invalid.');
             }
 
             if (in_array($slug, ['contact', 'database', 'phpinfo', 'signups'], true)) {
-                throw new RuntimeException('Stock extension cannot be deleted: ' . $slug);
+                throw new RuntimeException('Stock extension cannot be uninstalled: ' . $slug);
             }
 
             $path = $extBase . '/' . $slug;
@@ -2408,17 +2419,33 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 throw new RuntimeException('Disable extension first or pass --force.');
             }
 
+            $manifest = ExtensionRegistry::readManifest($root, $slug);
+            if ($manifest !== null) {
+                $app = $context->app();
+                $db = $app['db'] ?? null;
+                $driver = $app['driver'] ?? null;
+                $prefix = $app['prefix'] ?? null;
+                if ($db instanceof PDO && is_string($driver) && is_string($prefix)) {
+                    $cleaner = new \Raven\Lib\Extension\ExtensionStorageCleaner($root, $db, $driver, $prefix);
+                    $cleaner->deleteStorage(
+                        $slug,
+                        !empty($manifest['local_storage']),
+                        !empty($manifest['db_storage'])
+                    );
+                }
+            }
+
             unset($state['enabled'][$slug], $state['permissions'][$slug]);
             raven_cli_extension_state_save($root, $state['enabled'], $state['permissions']);
             raven_cli_remove_directory_recursive($path);
             if (is_dir($path)) {
-                throw new RuntimeException('Failed to delete extension directory.');
+                throw new RuntimeException('Failed to uninstall extension directory.');
             }
 
             if ($context->json) {
-                $context->printJson(['ok' => true, 'slug' => $slug, 'deleted' => true]);
+                $context->printJson(['ok' => true, 'slug' => $slug, 'uninstalled' => true]);
             } else {
-                $context->ok('Extension deleted: ' . $slug);
+                $context->ok('Extension uninstalled: ' . $slug);
             }
             return 0;
         }
@@ -2736,13 +2763,13 @@ function raven_cli_theme_scaffold_files(array $meta): array
 function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
 {
     if ($tokens === [] && $context->interactive) {
-        $tokens[] = strtolower(trim($context->prompt('Theme action (list/enable/create/delete)', 'list')));
+        $tokens[] = strtolower(trim($context->prompt('Theme action (list/enable/create/uninstall)', 'list')));
     }
 
     if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
         $context->renderHelpHeader('theme');
         $context->info('Usage: private/bin/rvn-theme <action> [options]');
-        $context->info('Actions: list, enable, create, delete');
+        $context->info('Actions: list, enable, create, uninstall');
         $context->info('Options: --slug, --name, --parent, --clone, --set-default');
         return 0;
     }
@@ -2762,7 +2789,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
 
         if ($action === 'list') {
             $activeTheme = '';
-            $configPath = $root . '/private/config.php';
+            $configPath = $root . '/private/dat/config.php';
             if (is_file($configPath)) {
                 /** @var mixed $loadedConfig */
                 $loadedConfig = require $configPath;
@@ -2963,18 +2990,18 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
             return 0;
         }
 
-        if ($action === 'delete') {
+        if ($action === 'uninstall') {
             $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
             if (!raven_cli_theme_slug_is_valid($slug)) {
                 throw new RuntimeException('Theme slug is invalid.');
             }
 
             if (raven_cli_bool_option($options, 'force', false, 'f')) {
-                throw new RuntimeException('Theme delete does not support --force. Activate another theme first.');
+                throw new RuntimeException('Theme uninstall does not support --force. Activate another theme first.');
             }
 
             if (raven_cli_theme_is_stock_slug($slug)) {
-                throw new RuntimeException('Stock theme cannot be deleted: ' . $slug);
+                throw new RuntimeException('Stock theme cannot be uninstalled: ' . $slug);
             }
 
             $target = $themesRoot . '/' . $slug;
@@ -2989,18 +3016,18 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
 
             $current = strtolower(trim((string) $app['config']->get('site.default_theme', 'raven')));
             if ($current === $slug) {
-                throw new RuntimeException('Active theme cannot be deleted. Activate another theme first.');
+                throw new RuntimeException('Active theme cannot be uninstalled. Activate another theme first.');
             }
 
             raven_cli_remove_directory_recursive($target);
             if (is_dir($target)) {
-                throw new RuntimeException('Failed to delete theme directory.');
+                throw new RuntimeException('Failed to uninstall theme directory.');
             }
 
             if ($context->json) {
-                $context->printJson(['ok' => true, 'slug' => $slug, 'deleted' => true]);
+                $context->printJson(['ok' => true, 'slug' => $slug, 'uninstalled' => true]);
             } else {
-                $context->ok('Deleted theme: ' . $slug);
+                $context->ok('Uninstalled theme: ' . $slug);
             }
             return 0;
         }

@@ -26,18 +26,27 @@ use function Raven\Core\Support\request_path;
  */
 $requestPath = (string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $requestPath = $requestPath === '' ? '/' : $requestPath;
+$scriptName = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? '/index.php'));
+if ($scriptName === '' || $scriptName[0] !== '/') {
+    $scriptName = '/' . ltrim($scriptName, '/');
+}
+$mountBasePath = dirname($scriptName);
+if ($mountBasePath === '.' || $mountBasePath === '/' || $mountBasePath === '\\') {
+    $mountBasePath = '';
+}
+$installPath = ($mountBasePath !== '' ? $mountBasePath : '') . '/install.php';
 
 /**
  * Installer handoff:
  * - If runtime config is missing and install lock is absent, redirect to installer.
  * - If request explicitly targets installer, run installer script directly.
  */
-$configPath = dirname(__DIR__) . '/private/config.php';
+$configPath = dirname(__DIR__) . '/private/dat/config.php';
 $installLockPath = dirname(__DIR__) . '/private/dat/install.lock';
 
 if (!is_file($configPath)) {
     if (!is_file($installLockPath)) {
-        header('Location: /install.php', true, 302);
+        header('Location: ' . $installPath, true, 302);
         exit;
     }
 
@@ -46,7 +55,7 @@ if (!is_file($configPath)) {
     exit;
 }
 
-if ($requestPath === '/install.php') {
+if ($requestPath === $installPath) {
     require __DIR__ . '/install.php';
     exit;
 }

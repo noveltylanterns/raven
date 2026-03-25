@@ -129,7 +129,7 @@ final class ContactWorkflowSmokeRunner
     private function resolveSessionName(): string
     {
         /** @var array<string, mixed> $config */
-        $config = require $this->root . '/private/config.php';
+        $config = require $this->root . '/private/dat/config.php';
 
         /** @var array<string, mixed> $cookie */
         $cookie = [];
@@ -178,10 +178,10 @@ final class ContactWorkflowSmokeRunner
      */
     private function prepareCaptchaOverride(): void
     {
-        $configPath = $this->root . '/private/config.php';
+        $configPath = $this->root . '/private/dat/config.php';
         $raw = file_get_contents($configPath);
         if (!is_string($raw) || $raw === '') {
-            throw new RuntimeException('Unable to read private/config.php.');
+            throw new RuntimeException('Unable to read private/dat/config.php.');
         }
 
         $this->originalConfigRaw = $raw;
@@ -207,7 +207,7 @@ final class ContactWorkflowSmokeRunner
 
         $encoded = "<?php\n\nreturn " . var_export($config, true) . ";\n";
         if (file_put_contents($configPath, $encoded) === false) {
-            throw new RuntimeException('Unable to write temporary captcha override to private/config.php.');
+            throw new RuntimeException('Unable to write temporary captcha override to private/dat/config.php.');
         }
 
         $this->restoreConfig = true;
@@ -215,7 +215,7 @@ final class ContactWorkflowSmokeRunner
     }
 
     /**
-     * Restores original `private/config.php` contents after run.
+     * Restores original `private/dat/config.php` contents after run.
      */
     private function restoreOriginalConfig(): void
     {
@@ -223,7 +223,7 @@ final class ContactWorkflowSmokeRunner
             return;
         }
 
-        $configPath = $this->root . '/private/config.php';
+        $configPath = $this->root . '/private/dat/config.php';
         file_put_contents($configPath, $this->originalConfigRaw);
         $this->events[] = 'captcha_provider_restored=1';
     }
@@ -494,12 +494,12 @@ final class ContactWorkflowSmokeRunner
     }
 
     /**
-     * Reads one dotted config value from private/config.php.
+     * Reads one dotted config value from private/dat/config.php.
      */
     private function readConfigValue(string $path, mixed $default = null): mixed
     {
         /** @var mixed $config */
-        $config = require $this->root . '/private/config.php';
+        $config = require $this->root . '/private/dat/config.php';
         if (!is_array($config)) {
             return $default;
         }

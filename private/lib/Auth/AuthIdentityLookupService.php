@@ -20,7 +20,7 @@ final class AuthIdentityLookupService
     {
         $this->authDb = $authDb;
         $this->driver = $driver;
-        $this->prefix = $driver === 'sqlite' ? '' : $prefix;
+        $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
     }
 
     public function emailByUsername(string $username): ?string

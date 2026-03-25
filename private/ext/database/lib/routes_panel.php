@@ -107,27 +107,13 @@ return static function (Router $router, array $context): void {
     };
 
     /**
-     * Returns Raven canonical SQLite filename map used by core services.
-     *
-     * @return array<string, string>
-     */
-    $sqliteCanonicalFiles = static function (): array {
-        return [
-            'pages' => 'pages.db',
-            'auth' => 'auth.db',
-            'taxonomy' => 'taxonomy.db',
-            'extensions' => 'extensions.db',
-        ];
-    };
-
-    /**
      * Resolves SQLite base path from config, allowing relative-to-root values.
      */
     $resolveSqliteBasePath = static function (array $databaseConfig) use ($app): string {
         $sqlite = (array) ($databaseConfig['sqlite'] ?? []);
         $basePath = trim((string) ($sqlite['base_path'] ?? ''));
         if ($basePath === '') {
-            return rtrim((string) $app['root'], '/') . '/private/dat/db';
+            return rtrim((string) $app['root'], '/') . '/private/dat/db.sqlite';
         }
 
         $isAbsolute = str_starts_with($basePath, '/')
@@ -137,6 +123,18 @@ return static function (Router $router, array $context): void {
         }
 
         return rtrim((string) $app['root'], '/') . '/' . ltrim($basePath, '/');
+    };
+
+    /**
+     * Resolves the active SQLite database file path from config.
+     */
+    $resolveSqliteDatabasePath = static function (array $databaseConfig) use ($resolveSqliteBasePath): string {
+        $basePath = $resolveSqliteBasePath($databaseConfig);
+        if (preg_match('/\.(?:db|sqlite)$/i', $basePath) === 1) {
+            return $basePath;
+        }
+
+        return rtrim($basePath, '/') . '/db.sqlite';
     };
 
     /**
@@ -152,57 +150,22 @@ return static function (Router $router, array $context): void {
     $buildAdminerLaunchTargets = static function (array $databaseConfig) use (
         $app,
         $panelUrl,
-        $resolveSqliteBasePath,
-        $sqliteCanonicalFiles
+        $resolveSqliteDatabasePath
     ): array {
         $driver = strtolower((string) ($databaseConfig['driver'] ?? 'sqlite'));
         $targets = [];
         $selectorError = null;
 
         if ($driver === 'sqlite') {
-            $basePath = $resolveSqliteBasePath($databaseConfig);
-            $canonicalByFile = [];
-            foreach ($sqliteCanonicalFiles() as $canonicalName => $canonicalFile) {
-                $canonicalByFile[strtolower((string) $canonicalFile)] = (string) $canonicalName;
-            }
-
-            if (!is_dir($basePath)) {
-                $selectorError = 'SQLite base path does not exist: ' . $basePath;
+            $databasePath = $resolveSqliteDatabasePath($databaseConfig);
+            if (!is_file($databasePath)) {
+                $selectorError = 'SQLite database file does not exist: ' . $databasePath;
             } else {
-                $entries = scandir($basePath);
-                if (is_array($entries)) {
-                    foreach ($entries as $entry) {
-                        $filename = trim((string) $entry);
-                        if ($filename === '' || $filename === '.' || $filename === '..') {
-                            continue;
-                        }
-
-                        if (!str_ends_with(strtolower($filename), '.db')) {
-                            continue;
-                        }
-
-                        $absolutePath = rtrim($basePath, '/') . '/' . $filename;
-                        if (!is_file($absolutePath)) {
-                            continue;
-                        }
-
-                        $canonicalKey = $canonicalByFile[strtolower($filename)] ?? '';
-                        if ($canonicalKey === '') {
-                            // Selector should only expose configured canonical SQLite files.
-                            continue;
-                        }
-
-                        $canonicalLabel = $canonicalKey !== ''
-                            ? ucwords(str_replace(['_', '-'], ' ', $canonicalKey))
-                            : '';
-
-                        $targets[] = [
-                            'name' => $filename,
-                            'detail' => $canonicalLabel,
-                            'launch_path' => $panelUrl('/database/adminer') . '?db=' . rawurlencode($absolutePath),
-                        ];
-                    }
-                }
+                $targets[] = [
+                    'name' => basename($databasePath),
+                    'detail' => 'Core + extension tables',
+                    'launch_path' => $panelUrl('/database/adminer') . '?db=' . rawurlencode($databasePath),
+                ];
             }
         } elseif (in_array($driver, ['mysql', 'pgsql'], true)) {
             try {
@@ -526,7 +489,6 @@ return static function (Router $router, array $context): void {
         $renderExtensionView,
         $renderPublicNotFound,
         $extensionMeta,
-        $sqliteCanonicalFiles,
         $buildAdminerLaunchTargets
     ): void {
         $requirePanelLogin();
@@ -545,18 +507,15 @@ return static function (Router $router, array $context): void {
             'driver' => $driver,
             'table_prefix' => (string) ($databaseConfig['table_prefix'] ?? ''),
             'sqlite_base_path' => '',
-            'sqlite_files' => [],
+            'sqlite_file' => '',
             'mysql' => [],
             'pgsql' => [],
         ];
 
         if ($isSqlite) {
             $sqlite = (array) ($databaseConfig['sqlite'] ?? []);
-            $sqliteFiles = $sqliteCanonicalFiles();
-            asort($sqliteFiles, SORT_NATURAL | SORT_FLAG_CASE);
-
             $summary['sqlite_base_path'] = (string) ($sqlite['base_path'] ?? '');
-            $summary['sqlite_files'] = $sqliteFiles;
+            $summary['sqlite_file'] = 'db.sqlite';
         } else {
             $mysql = (array) ($databaseConfig['mysql'] ?? []);
             $pgsql = (array) ($databaseConfig['pgsql'] ?? []);

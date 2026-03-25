@@ -11,28 +11,37 @@ use RuntimeException;
  */
 final class SqlitePathResolver
 {
-    private string $basePath;
-
-    /** @var array<string, string> */
-    private array $canonicalFiles = [
-        'pages' => 'pages.db',
-        'auth' => 'auth.db',
-        'taxonomy' => 'taxonomy.db',
-        'extensions' => 'extensions.db',
-    ];
+    private string $configuredPath;
 
     public function __construct(string $basePath)
     {
-        $this->basePath = rtrim($basePath, '/');
+        $this->configuredPath = rtrim($basePath, '/');
     }
 
     public function path(string $key): string
     {
-        if (!isset($this->canonicalFiles[$key])) {
-            throw new RuntimeException("Missing SQLite path configuration for '{$key}'.");
+        return match ($key) {
+            'core', 'pages', 'auth', 'taxonomy' => $this->corePath(),
+            default => throw new RuntimeException("Missing SQLite path configuration for '{$key}'."),
+        };
+    }
+
+    private function corePath(): string
+    {
+        if ($this->looksLikeFilePath($this->configuredPath)) {
+            return $this->configuredPath;
         }
 
-        return $this->basePath . '/' . $this->canonicalFiles[$key];
+        $directory = $this->configuredPath;
+        if (basename($directory) === 'db') {
+            return dirname($directory) . '/db.sqlite';
+        }
+
+        return $directory . '/db.sqlite';
+    }
+    private function looksLikeFilePath(string $path): bool
+    {
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        return in_array($extension, ['db', 'sqlite'], true);
     }
 }
-

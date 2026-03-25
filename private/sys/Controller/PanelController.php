@@ -17,6 +17,7 @@ use lbuchs\WebAuthn\WebAuthnException;
 use Raven\Core\Auth\AuthService;
 use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Config;
+use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Media\PageImageManager;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Lib\Archive\ArchivePackageService;
@@ -38,6 +39,8 @@ use Raven\Lib\Content\PageBodyBlockCodec;
 use Raven\Lib\Extension\ExtensionCatalogService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\ExtensionPermissionCatalogService;
+use Raven\Lib\Extension\ExtensionStorageCleaner;
+use Raven\Lib\Extension\ExtensionStorageProvisioner;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\ExtensionScaffoldService;
 use Raven\Lib\Filesystem\DirectoryTreeService;
@@ -118,6 +121,7 @@ final class PanelController
     private ?PanelConfigDefaultsService $panelConfigDefaultsService = null;
     private ?RoutingInventoryBuilder $routingInventoryBuilder = null;
     private ?ExtensionPermissionCatalogService $extensionPermissionCatalogService = null;
+    private ?ExtensionStorageProvisioner $extensionStorageProvisioner = null;
     private ?AvatarUploadService $avatarUploadService = null;
     private ?ConfigSnapshotSanitizer $configSnapshotSanitizer = null;
     private ?ThemeCloneService $themeCloneService = null;
@@ -4030,15 +4034,15 @@ final class PanelController
     }
 
     /**
-     * Deletes one non-active, non-stock public theme.
+     * Uninstalls one non-active, non-stock public theme.
      *
      * @param array<string, mixed> $post
      */
-    public function themesDelete(array $post): void
+    public function themesUninstall(array $post): void
     {
         $this->requirePanelLogin();
 
-        if (!$this->requireRoutePermissionOrForbidden('themes', 'delete')) {
+        if (!$this->requireRoutePermissionOrForbidden('themes', 'uninstall')) {
             return;
         }
 
@@ -4054,7 +4058,7 @@ final class PanelController
         }
 
         if ($this->isStockPublicThemeSlug($themeSlug)) {
-            $this->flash('error', 'Stock themes cannot be deleted.');
+            $this->flash('error', 'Stock themes cannot be uninstalled.');
             redirect($this->panelUrl('/themes'));
         }
 
@@ -4065,17 +4069,17 @@ final class PanelController
         }
 
         if ($this->activePublicThemeSlug() === $themeSlug) {
-            $this->flash('error', 'Active theme cannot be deleted. Enable another theme first.');
+            $this->flash('error', 'Active theme cannot be uninstalled. Enable another theme first.');
             redirect($this->panelUrl('/themes'));
         }
 
         $this->directoryTreeService()->removeDirectoryRecursively($themePath);
         if (is_dir($themePath)) {
-            $this->flash('error', 'Failed to delete theme directory from disk.');
+            $this->flash('error', 'Failed to uninstall theme directory from disk.');
             redirect($this->panelUrl('/themes'));
         }
 
-        $this->flash('success', 'Theme "' . $themeSlug . '" deleted.');
+        $this->flash('success', 'Theme "' . $themeSlug . '" uninstalled.');
         redirect($this->panelUrl('/themes'));
     }
 
@@ -4163,6 +4167,10 @@ final class PanelController
         $enable = in_array($enabledRaw, ['1', 'true', 'yes', 'on'], true);
 
         try {
+            if ($enable) {
+                $this->provisionEnabledExtensionStorage($extensionName, $manifest);
+            }
+
             $enabledMap = $this->loadExtensionStateMap();
             if ($enable) {
                 $enabledMap[$extensionName] = true;
@@ -4202,19 +4210,19 @@ final class PanelController
     }
 
     /**
-     * Deletes one extension directory from `private/ext/{name}/`.
+     * Uninstalls one extension directory from `private/ext/{name}/`.
      *
      * Rules:
-     * - Stock extensions can never be deleted.
-     * - Enabled extensions must be disabled before deletion.
+     * - Stock extensions can never be uninstalled.
+     * - Enabled extensions must be disabled before uninstall.
      *
      * @param array<string, mixed> $post
      */
-    public function extensionsDelete(array $post): void
+    public function extensionsUninstall(array $post): void
     {
         $this->requirePanelLogin();
 
-        if (!$this->requireRoutePermissionOrForbidden('extensions', 'delete')) {
+        if (!$this->requireRoutePermissionOrForbidden('extensions', 'uninstall')) {
             return;
         }
 
@@ -4230,7 +4238,7 @@ final class PanelController
         }
 
         if ($this->isStockExtensionDirectory($extensionName)) {
-            $this->flash('error', 'Stock extensions cannot be deleted.');
+            $this->flash('error', 'Stock extensions cannot be uninstalled.');
             redirect($this->panelUrl('/extensions'));
         }
 
@@ -4240,18 +4248,27 @@ final class PanelController
             redirect($this->panelUrl('/extensions'));
         }
 
-        // Prevent deleting active extensions so runtime behavior changes are deliberate.
+        $manifest = $this->readExtensionManifest($extensionPath);
+
+        // Prevent uninstalling active extensions so runtime behavior changes are deliberate.
         $enabledMap = $this->loadExtensionStateMap();
         $permissionMap = $this->loadExtensionPermissionMap();
         $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
         if (!empty($enabledMap[$extensionName])) {
-            $this->flash('error', 'Disable the extension before deleting it.');
+            $this->flash('error', 'Disable the extension before uninstalling it.');
+            redirect($this->panelUrl('/extensions'));
+        }
+
+        try {
+            $this->deleteExtensionStorage($extensionName, $manifest);
+        } catch (\RuntimeException $exception) {
+            $this->flash('error', 'Failed to uninstall extension storage: ' . $exception->getMessage());
             redirect($this->panelUrl('/extensions'));
         }
 
         $this->directoryTreeService()->removeDirectoryRecursively($extensionPath);
         if (is_dir($extensionPath)) {
-            $this->flash('error', 'Failed to delete extension directory from disk.');
+            $this->flash('error', 'Failed to uninstall extension directory from disk.');
             redirect($this->panelUrl('/extensions'));
         }
 
@@ -4265,12 +4282,12 @@ final class PanelController
             try {
                 $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
             } catch (\RuntimeException $exception) {
-                $this->flash('error', 'Extension deleted, but state cleanup failed: ' . $exception->getMessage());
+                $this->flash('error', 'Extension uninstalled, but state cleanup failed: ' . $exception->getMessage());
                 redirect($this->panelUrl('/extensions'));
             }
         }
 
-        $this->flash('success', 'Extension "' . $extensionName . '" deleted.');
+        $this->flash('success', 'Extension "' . $extensionName . '" uninstalled.');
         redirect($this->panelUrl('/extensions'));
     }
 
@@ -4730,7 +4747,7 @@ final class PanelController
      * Removes SQLite file map from user-managed config payload.
      *
      * SQLite filenames are core-managed and intentionally not stored in
-     * `private/config.php` to prevent drift across installs.
+     * `private/dat/config.php` to prevent drift across installs.
      *
      * @param array<string, mixed> $config
      * @return array<string, mixed>
@@ -4987,7 +5004,7 @@ final class PanelController
         }
 
         $normalizedAction = strtolower(trim($action));
-        if (!in_array($normalizedAction, ['view', 'create', 'edit', 'delete'], true)) {
+        if (!in_array($normalizedAction, ['view', 'create', 'edit', 'delete', 'uninstall'], true)) {
             $this->forbidden('Unknown panel route permission action.');
             return false;
         }
@@ -5247,8 +5264,8 @@ final class PanelController
      *   invalid_reason: string,
      *   enabled: bool,
      *   is_stock: bool,
-     *   can_delete: bool,
-     *   delete_block_reason: string
+     *   can_uninstall: bool,
+     *   uninstall_block_reason: string
      * }>
      */
     private function listExtensionsForPanel(): array
@@ -5290,6 +5307,48 @@ final class PanelController
     private function extensionsBasePath(): string
     {
         return $this->extensionStateStore()->basePath();
+    }
+
+    private function extensionStorageProvisioner(): ExtensionStorageProvisioner
+    {
+        if (!$this->extensionStorageProvisioner instanceof ExtensionStorageProvisioner) {
+            $this->extensionStorageProvisioner = new ExtensionStorageProvisioner(dirname(__DIR__, 3));
+        }
+
+        return $this->extensionStorageProvisioner;
+    }
+
+    /**
+     * @param array<string, mixed> $manifest
+     */
+    private function provisionEnabledExtensionStorage(string $extensionName, array $manifest): void
+    {
+        if (empty($manifest['local_storage'])) {
+            return;
+        }
+
+        $this->extensionStorageProvisioner()->ensureLocalStorageDirectory($extensionName);
+    }
+
+    /**
+     * @param array<string, mixed> $manifest
+     */
+    private function deleteExtensionStorage(string $extensionName, array $manifest): void
+    {
+        $databaseConfig = (array) $this->config->get('database', []);
+        $connectionFactory = new ConnectionFactory($databaseConfig);
+        $cleaner = new ExtensionStorageCleaner(
+            dirname(__DIR__, 3),
+            $connectionFactory->createAppConnection(),
+            $connectionFactory->getDriver(),
+            $connectionFactory->getPrefix()
+        );
+
+        $cleaner->deleteStorage(
+            $extensionName,
+            !empty($manifest['local_storage']),
+            !empty($manifest['db_storage'])
+        );
     }
 
     /**

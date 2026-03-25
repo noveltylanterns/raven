@@ -29,8 +29,8 @@ declare(strict_types=1);
  *   invalid_reason: string,
  *   enabled: bool,
  *   is_stock: bool,
- *   can_delete: bool,
- *   delete_block_reason: string
+ *   can_uninstall: bool,
+ *   uninstall_block_reason: string
  * }> $extensions */
 
 use function Raven\Core\Support\e;
@@ -79,8 +79,8 @@ $panelBase = '/' . trim($site['panel_path'], '/');
         <p class="text-muted mb-2">Use this page to create, upload, enable, and disable Raven extensions.</p>
         <h5>Notes:</h5>
         <p class="text-muted mb-0">
-          - Enabled extensions must be disabled before deletion.<br>
-          - Stock extensions cannot be deleted, only disabled.<br>
+          - Enabled extensions must be disabled before uninstall.<br>
+          - Stock extensions cannot be uninstalled, only disabled.<br>
           - Disable unused extensions for performance!
         </p>
     </div>
@@ -124,8 +124,8 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                         $invalidReason = (string) ($extension['invalid_reason'] ?? '');
                         $enabled = (bool) ($extension['enabled'] ?? false);
                         $isStock = (bool) ($extension['is_stock'] ?? false);
-                        $canDelete = (bool) ($extension['can_delete'] ?? false);
-                        $deleteBlockReason = (string) ($extension['delete_block_reason'] ?? '');
+                        $canUninstall = (bool) ($extension['can_uninstall'] ?? false);
+                        $uninstallBlockReason = (string) ($extension['uninstall_block_reason'] ?? '');
                         $nameLabel = $name !== '' ? $name : $directory;
                         $panelTarget = $extensionPanelPath !== '' ? ($panelBase . '/' . ltrim($extensionPanelPath, '/')) : '';
                         $canOpenSettings = $enabled && $panelTarget !== '';
@@ -199,16 +199,17 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                             <i class="bi bi-download" aria-hidden="true"></i>
                                         </button>
                                     </form>
-                                    <?php if ($canDelete): ?>
-                                        <form method="post" action="<?= e($panelBase) ?>/extensions/delete" class="d-inline m-0">
+                                    <?php if ($canUninstall): ?>
+                                        <form method="post" action="<?= e($panelBase) ?>/extensions/uninstall" class="d-inline m-0">
                                             <?= $csrfField ?>
                                             <input type="hidden" name="extension" value="<?= e($directory) ?>">
                                             <button
                                                 type="submit"
                                                 class="btn btn-danger btn-sm"
-                                                aria-label="Delete"
-                                                title="Delete"
-                                                onclick="return confirm('Delete this extension from disk? This cannot be undone.');"
+                                                aria-label="Uninstall"
+                                                title="Uninstall"
+                                                <?= $uninstallBlockReason !== '' ? 'data-rvn-uninstall-block-reason="' . e($uninstallBlockReason) . '"' : '' ?>
+                                                onclick="return confirm('Uninstall this extension and remove its opted-in data? This cannot be undone.');"
                                             >
                                                 <i class="bi bi-trash3" aria-hidden="true"></i>
                                             </button>

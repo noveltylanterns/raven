@@ -13,7 +13,7 @@ final class ConfigSnapshotSanitizer
      * Removes SQLite file map from user-managed config payload.
      *
      * SQLite filenames are core-managed and intentionally not stored in
-     * `private/config.php` to prevent drift across installs.
+     * `private/dat/config.php` to prevent drift across installs.
      *
      * @param array<string, mixed> $config
      * @return array<string, mixed>

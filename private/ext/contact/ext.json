@@ -3,6 +3,7 @@
     "name": "Contact Forms",
     "description": "Quickly build contact forms to embed in your pages.",
     "type": "plugin",
+    "db_storage": "on",
     "author": "Novelty Lanterns",
     "author_url": "https://raven.lanterns.io",
     "docs_url": "https://raven.lanterns.io",

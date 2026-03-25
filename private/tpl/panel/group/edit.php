@@ -137,6 +137,7 @@ $panelActionColumns = [
     'create' => 'Create',
     'edit' => 'Edit',
     'delete' => 'Delete',
+    'uninstall' => 'Uninstall',
 ];
 $panelLoginPermission = null;
 $panelPermissionMatrix = [];

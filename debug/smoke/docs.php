@@ -41,7 +41,7 @@ final class ConfigurationDocsSmokeRunner
         $this->runId = time();
 
         /** @var array<string, mixed> $config */
-        $config = require $this->root . '/private/config.php';
+        $config = require $this->root . '/private/dat/config.php';
         $panelPath = trim((string) (($config['panel']['path'] ?? 'panel')));
         $this->panelPath = $panelPath !== '' ? $panelPath : 'panel';
         $loginMode = strtolower(trim((string) (($config['user']['auth']['login'] ?? 'email'))));
@@ -93,9 +93,9 @@ final class ConfigurationDocsSmokeRunner
                 throw new RuntimeException('Unable to read docs/Configuration.md.');
             }
 
-            $config = require $this->root . '/private/config.php';
+            $config = require $this->root . '/private/dat/config.php';
             if (!is_array($config)) {
-                throw new RuntimeException('private/config.php did not return an array.');
+                throw new RuntimeException('private/dat/config.php did not return an array.');
             }
 
             $configPaths = $this->flattenConfigPaths($config);

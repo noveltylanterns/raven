@@ -114,9 +114,9 @@ return static function (array $context): void {
             created_at TEXT NOT NULL
         )');
 
-        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS extensions.uniq_ext_signups_slug ON ext_signups (slug)');
-        $db->exec('CREATE INDEX IF NOT EXISTS extensions.idx_ext_signups_submissions_form_slug_created_at ON ext_signups_submissions (form_slug, created_at DESC)');
-        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS extensions.uniq_ext_signups_submissions_form_slug_email ON ext_signups_submissions (form_slug, email)');
+        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $formsTable . '_slug ON ' . $formsTable . ' (slug)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $submissionsTable . '_form_slug_created_at ON ' . $submissionsTable . ' (form_slug, created_at DESC)');
+        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $submissionsTable . '_form_slug_email ON ' . $submissionsTable . ' (form_slug, email)');
 
         if (!$columnExists($db, $driver, $submissionsTable, 'additional_fields_json')) {
             $db->exec('ALTER TABLE ' . $submissionsTable . ' ADD COLUMN additional_fields_json TEXT NOT NULL DEFAULT \'[]\'');

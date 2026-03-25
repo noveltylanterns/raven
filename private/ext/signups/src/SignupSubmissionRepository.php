@@ -32,8 +32,7 @@ final class SignupSubmissionRepository
     {
         $this->db = $db;
         $this->driver = $driver;
-        // Prefix is ignored in SQLite mode because attached aliases are used.
-        $this->prefix = $driver === 'sqlite' ? '' : (preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '');
+        $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
     }
 
     /**
@@ -417,14 +416,7 @@ final class SignupSubmissionRepository
      */
     private function table(string $table): string
     {
-        if ($this->driver !== 'sqlite') {
-            return $this->prefix . $table;
-        }
-
-        return match ($table) {
-            'ext_signups_submissions' => 'extensions.ext_signups_submissions',
-            default => 'main.' . $table,
-        };
+        return $this->prefix . $table;
     }
 
     /**

@@ -16,17 +16,20 @@ final class ExtensionCatalogService
     private ExtensionStateStore $stateStore;
     private ExtensionPermissionCatalogService $permissionCatalog;
     private InputSanitizer $input;
+    private ManifestContractValidator $manifestValidator;
 
     public function __construct(
         string $projectRoot,
         ExtensionStateStore $stateStore,
         ExtensionPermissionCatalogService $permissionCatalog,
-        InputSanitizer $input
+        InputSanitizer $input,
+        ?ManifestContractValidator $manifestValidator = null
     ) {
         $this->projectRoot = rtrim($projectRoot, '/\\');
         $this->stateStore = $stateStore;
         $this->permissionCatalog = $permissionCatalog;
         $this->input = $input;
+        $this->manifestValidator = $manifestValidator ?? new ManifestContractValidator();
     }
 
     /**
@@ -46,8 +49,8 @@ final class ExtensionCatalogService
      *   invalid_reason: string,
      *   enabled: bool,
      *   is_stock: bool,
-     *   can_delete: bool,
-     *   delete_block_reason: string
+     *   can_uninstall: bool,
+     *   uninstall_block_reason: string
      * }>
      */
     public function listForPanel(callable $formsProvider): array
@@ -79,12 +82,12 @@ final class ExtensionCatalogService
             $isEnabled = $isValid && !empty($enabledMap[$entry]);
             $hasPanelRoutes = is_file($extensionPath . '/lib/routes_panel.php');
             $isStock = $this->isStockExtensionDirectory($entry);
-            $canDelete = !$isStock && !$isEnabled;
-            $deleteBlockReason = '';
+            $canUninstall = !$isStock && !$isEnabled;
+            $uninstallBlockReason = '';
             if ($isStock) {
-                $deleteBlockReason = 'Stock extension cannot be deleted.';
+                $uninstallBlockReason = 'Stock extension cannot be uninstalled.';
             } elseif ($isEnabled) {
-                $deleteBlockReason = 'Disable extension before deleting.';
+                $uninstallBlockReason = 'Disable extension before uninstalling.';
             }
 
             $extensions[] = [
@@ -102,8 +105,8 @@ final class ExtensionCatalogService
                 'invalid_reason' => (string) ($manifest['invalid_reason'] ?? ''),
                 'enabled' => $isEnabled,
                 'is_stock' => $isStock,
-                'can_delete' => $canDelete,
-                'delete_block_reason' => $deleteBlockReason,
+                'can_uninstall' => $canUninstall,
+                'uninstall_block_reason' => $uninstallBlockReason,
             ];
         }
 
@@ -144,6 +147,8 @@ final class ExtensionCatalogService
      *   author: string,
      *   author_url: string,
      *   homepage: string,
+     *   local_storage: bool,
+     *   db_storage: bool,
      *   permission_levels: array<int, array{key: string, label: string}>,
      *   default_permission_level: string
      * }
@@ -170,6 +175,8 @@ final class ExtensionCatalogService
                 'author' => '',
                 'author_url' => '',
                 'homepage' => '',
+                'local_storage' => false,
+                'db_storage' => false,
                 'permission_levels' => $defaultPermissionLevels,
                 'default_permission_level' => $defaultPermissionLevel,
             ];
@@ -188,6 +195,8 @@ final class ExtensionCatalogService
                 'author' => '',
                 'author_url' => '',
                 'homepage' => '',
+                'local_storage' => false,
+                'db_storage' => false,
                 'permission_levels' => $defaultPermissionLevels,
                 'default_permission_level' => $defaultPermissionLevel,
             ];
@@ -207,6 +216,8 @@ final class ExtensionCatalogService
                 'author' => '',
                 'author_url' => '',
                 'homepage' => '',
+                'local_storage' => false,
+                'db_storage' => false,
                 'permission_levels' => $defaultPermissionLevels,
                 'default_permission_level' => $defaultPermissionLevel,
             ];
@@ -225,6 +236,8 @@ final class ExtensionCatalogService
                 'author' => '',
                 'author_url' => '',
                 'homepage' => '',
+                'local_storage' => false,
+                'db_storage' => false,
                 'permission_levels' => $defaultPermissionLevels,
                 'default_permission_level' => $defaultPermissionLevel,
             ];
@@ -243,6 +256,8 @@ final class ExtensionCatalogService
                 'author' => '',
                 'author_url' => '',
                 'homepage' => '',
+                'local_storage' => false,
+                'db_storage' => false,
                 'permission_levels' => $defaultPermissionLevels,
                 'default_permission_level' => $defaultPermissionLevel,
             ];
@@ -251,6 +266,44 @@ final class ExtensionCatalogService
         $type = strtolower(trim((string) ($decoded['type'] ?? 'plugin')));
         if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
             $type = 'plugin';
+        }
+        $localStorage = $this->manifestValidator->storageEnabled($decoded['local_storage'] ?? null);
+        if ($localStorage === null) {
+            return [
+                'valid' => false,
+                'invalid_reason' => 'ext.json "local_storage" must be "on" or "off" when present.',
+                'type' => $type,
+                'panel_path' => '',
+                'name' => $name,
+                'version' => $this->input->text((string) ($decoded['version'] ?? ''), 80),
+                'description' => $this->input->text((string) ($decoded['description'] ?? ''), 1000),
+                'author' => '',
+                'author_url' => '',
+                'homepage' => '',
+                'local_storage' => false,
+                'db_storage' => false,
+                'permission_levels' => $defaultPermissionLevels,
+                'default_permission_level' => $defaultPermissionLevel,
+            ];
+        }
+        $dbStorage = $this->manifestValidator->storageEnabled($decoded['db_storage'] ?? null);
+        if ($dbStorage === null) {
+            return [
+                'valid' => false,
+                'invalid_reason' => 'ext.json "db_storage" must be "on" or "off" when present.',
+                'type' => $type,
+                'panel_path' => '',
+                'name' => $name,
+                'version' => $this->input->text((string) ($decoded['version'] ?? ''), 80),
+                'description' => $this->input->text((string) ($decoded['description'] ?? ''), 1000),
+                'author' => '',
+                'author_url' => '',
+                'homepage' => '',
+                'local_storage' => false,
+                'db_storage' => false,
+                'permission_levels' => $defaultPermissionLevels,
+                'default_permission_level' => $defaultPermissionLevel,
+            ];
         }
         $permissionLevels = $this->normalizePermissionLevels($decoded['panel_permissions'] ?? null, $name);
         $defaultPermissionLevel = (string) ($permissionLevels[0]['key'] ?? 'access');
@@ -286,6 +339,8 @@ final class ExtensionCatalogService
                 'author' => $author,
                 'author_url' => $authorUrl,
                 'homepage' => $homepage,
+                'local_storage' => $localStorage,
+                'db_storage' => $dbStorage,
                 'permission_levels' => $permissionLevels,
                 'default_permission_level' => $defaultPermissionLevel,
             ];
@@ -312,6 +367,8 @@ final class ExtensionCatalogService
                     'author' => $author,
                     'author_url' => $authorUrl,
                     'homepage' => $homepage,
+                    'local_storage' => $localStorage,
+                    'db_storage' => $dbStorage,
                     'permission_levels' => $permissionLevels,
                     'default_permission_level' => $defaultPermissionLevel,
                 ];
@@ -336,6 +393,8 @@ final class ExtensionCatalogService
                     'author' => $author,
                     'author_url' => $authorUrl,
                     'homepage' => $homepage,
+                    'local_storage' => $localStorage,
+                    'db_storage' => $dbStorage,
                     'permission_levels' => $permissionLevels,
                     'default_permission_level' => $defaultPermissionLevel,
                 ];
@@ -353,6 +412,8 @@ final class ExtensionCatalogService
             'author' => $author,
             'author_url' => $authorUrl,
             'homepage' => $homepage,
+            'local_storage' => $localStorage,
+            'db_storage' => $dbStorage,
             'permission_levels' => $permissionLevels,
             'default_permission_level' => $defaultPermissionLevel,
         ];

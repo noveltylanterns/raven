@@ -1,14 +1,9 @@
 # Local runtime configuration
-/private/config.php
-!/private/config.php.dist
-/private/dat/*
-!/private/dat/
-!/private/dat/.gitkeep
+/private/dat/**
+!/private/dat/config.php.dist
 !/private/dat/ext/
-/private/dat/ext/.state.php
+/private/dat/ext/*
 !/private/dat/ext/.state.php.dist
-/private/ext/.state.php
-/private/ext/debug-*/
 
 # Uploaded media files (keep directory, ignore contents)
 /public/uploads/*
@@ -26,6 +21,7 @@
 
 # Local dev tools
 /debug/release/
+/private/ext/debug-*/
 
 # Editor swap/backup artifacts
 *.swp

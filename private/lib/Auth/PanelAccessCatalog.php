@@ -12,7 +12,7 @@ use Raven\Core\Auth\PanelAccess;
 final class PanelAccessCatalog
 {
     /**
-     * @return array<string, array{label: string, view: int, create: int, edit: int, delete: int}>
+     * @return array<string, array{label: string, view: int, create: int, edit: int, delete?: int, uninstall?: int}>
      */
     public static function stockPanelRoutePermissions(): array
     {
@@ -78,14 +78,14 @@ final class PanelAccessCatalog
                 'view' => PanelAccess::THEMES_VIEW,
                 'create' => PanelAccess::THEMES_CREATE,
                 'edit' => PanelAccess::THEMES_EDIT,
-                'delete' => PanelAccess::THEMES_DELETE,
+                'uninstall' => PanelAccess::THEMES_UNINSTALL,
             ],
             'extensions' => [
                 'label' => 'Extensions',
                 'view' => PanelAccess::EXTENSIONS_VIEW,
                 'create' => PanelAccess::EXTENSIONS_CREATE,
                 'edit' => PanelAccess::EXTENSIONS_EDIT,
-                'delete' => PanelAccess::EXTENSIONS_DELETE,
+                'uninstall' => PanelAccess::EXTENSIONS_UNINSTALL,
             ],
             'configuration' => [
                 'label' => 'Configuration',
@@ -98,7 +98,7 @@ final class PanelAccessCatalog
     }
 
     /**
-     * @return array{label: string, view: int, create: int, edit: int, delete: int}|null
+     * @return array{label: string, view: int, create: int, edit: int, delete?: int, uninstall?: int}|null
      */
     public static function stockPanelRoutePermission(string $routeKey): ?array
     {
@@ -114,10 +114,12 @@ final class PanelAccessCatalog
     {
         $bits = [];
         foreach (self::stockPanelRoutePermissions() as $permissionRow) {
-            $bits[] = (int) $permissionRow['view'];
-            $bits[] = (int) $permissionRow['create'];
-            $bits[] = (int) $permissionRow['edit'];
-            $bits[] = (int) $permissionRow['delete'];
+            foreach (['view', 'create', 'edit', 'delete', 'uninstall'] as $action) {
+                $bit = (int) ($permissionRow[$action] ?? 0);
+                if ($bit > 0) {
+                    $bits[] = $bit;
+                }
+            }
         }
 
         return $bits;
@@ -252,7 +254,15 @@ final class PanelAccessCatalog
             return [];
         }
 
-        return [(int) $row['view'], (int) $row['create'], (int) $row['edit'], (int) $row['delete']];
+        $bits = [];
+        foreach (['view', 'create', 'edit', 'delete', 'uninstall'] as $action) {
+            $bit = (int) ($row[$action] ?? 0);
+            if ($bit > 0) {
+                $bits[] = $bit;
+            }
+        }
+
+        return $bits;
     }
 
     /**

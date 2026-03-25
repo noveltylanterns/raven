@@ -25,7 +25,7 @@ final class AuthGroupMembershipService
     {
         $this->appDb = $appDb;
         $this->driver = $driver;
-        $this->prefix = $driver === 'sqlite' ? '' : $prefix;
+        $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
     }
 
     /**

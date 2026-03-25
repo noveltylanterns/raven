@@ -117,7 +117,7 @@ return (static function (): array {
     // Load global helper functions.
     require_once $root . '/private/sys/Core/Support/Helpers.php';
 
-    $config = new Config($root . '/private/config.php');
+    $config = new Config($root . '/private/dat/config.php');
 
     // Initialize session early for auth, CSRF, and flash messaging.
     $sessionCookiePolicy = new SessionCookiePolicy();

@@ -29,7 +29,7 @@ final class AuthSchemaBuilder
             }
 
             // Prefix auth tables in shared-DB modes for namespace isolation.
-            if ($driver !== 'sqlite' && $prefix !== '') {
+            if ($prefix !== '') {
                 $schema = $this->applyAuthPrefix($schema, $prefix);
             }
 
@@ -38,15 +38,15 @@ final class AuthSchemaBuilder
 
         // Profile columns are required by User Preferences and may be missing
         // in previously created Delight tables, so always ensure them.
-        $this->ensureAuthUserPreferenceColumns($authDb, $driver, $driver === 'sqlite' ? '' : $prefix);
+        $this->ensureAuthUserPreferenceColumns($authDb, $driver, $prefix);
     }
 
     public function ensureInviteTokenSchema(PDO $authDb, string $driver, string $prefix): void
     {
-        $table = $driver === 'sqlite' ? 'invite_tokens' : ($prefix . 'invite_tokens');
+        $table = $prefix . 'invite_tokens';
 
         if ($driver === 'sqlite') {
-            $authDb->exec('CREATE TABLE IF NOT EXISTS invite_tokens (
+            $authDb->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 token_hash TEXT NOT NULL UNIQUE,
                 token_value TEXT NULL,
@@ -58,11 +58,11 @@ final class AuthSchemaBuilder
                 created_at TEXT NOT NULL,
                 created_by_user_id INTEGER NULL
             )');
-            if (!$this->introspector->authColumnExistsSqlite($authDb, 'invite_tokens', 'token_value')) {
-                $authDb->exec('ALTER TABLE invite_tokens ADD COLUMN token_value TEXT NULL');
+            if (!$this->introspector->authColumnExistsSqlite($authDb, $table, 'token_value')) {
+                $authDb->exec('ALTER TABLE ' . $table . ' ADD COLUMN token_value TEXT NULL');
             }
-            $authDb->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_invite_tokens_token_hash ON invite_tokens (token_hash)');
-            $authDb->exec('CREATE INDEX IF NOT EXISTS idx_invite_tokens_expires_at ON invite_tokens (expires_at)');
+            $authDb->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $table . '_token_hash ON ' . $table . ' (token_hash)');
+            $authDb->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_expires_at ON ' . $table . ' (expires_at)');
             return;
         }
 
@@ -110,30 +110,30 @@ final class AuthSchemaBuilder
      */
     public function ensureAuthUserPreferenceColumns(PDO $db, string $driver, string $prefix): void
     {
-        $usersTable = $driver === 'sqlite' ? 'users' : $prefix . 'users';
+        $usersTable = $prefix . 'users';
 
         if ($driver === 'sqlite') {
             if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'display_name')) {
-                $db->exec('ALTER TABLE users ADD COLUMN display_name TEXT NULL');
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN display_name TEXT NULL');
             }
 
             if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'theme')) {
-                $db->exec('ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT \'default\'');
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN theme TEXT NOT NULL DEFAULT \'default\'');
             }
 
             if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'avatar_path')) {
-                $db->exec('ALTER TABLE users ADD COLUMN avatar_path TEXT NULL');
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN avatar_path TEXT NULL');
             }
 
             if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'contact_profiles')) {
-                $db->exec('ALTER TABLE users ADD COLUMN contact_profiles TEXT NULL');
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN contact_profiles TEXT NULL');
             }
 
             if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'two_factor_methods')) {
-                $db->exec('ALTER TABLE users ADD COLUMN two_factor_methods TEXT NULL');
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN two_factor_methods TEXT NULL');
             }
 
-            $db->exec("UPDATE users SET theme = 'default' WHERE theme IS NULL OR theme = ''");
+            $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
             return;
         }
 

@@ -38,19 +38,27 @@ function raven_database_manager_is_absolute_path(string $path): bool
         || preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) === 1;
 }
 
-/**
- * Returns Raven canonical SQLite filename map.
- *
- * @return array<string, string>
- */
-function raven_database_manager_sqlite_files_map(): array
+function raven_database_manager_sqlite_configured_path(array $databaseConfig, string $root): string
 {
-    return [
-        'pages' => 'pages.db',
-        'auth' => 'auth.db',
-        'taxonomy' => 'taxonomy.db',
-        'extensions' => 'extensions.db',
-    ];
+    $sqlite = (array) ($databaseConfig['sqlite'] ?? []);
+    $path = trim((string) ($sqlite['base_path'] ?? ''));
+    if ($path === '') {
+        return rtrim($root, '/') . '/private/dat/db.sqlite';
+    }
+    if (!raven_database_manager_is_absolute_path($path)) {
+        return rtrim($root, '/') . '/' . ltrim($path, '/');
+    }
+
+    return $path;
+}
+
+function raven_database_manager_sqlite_file_path(string $configuredPath): string
+{
+    if (preg_match('/\.(?:db|sqlite)$/i', $configuredPath) === 1) {
+        return $configuredPath;
+    }
+
+    return rtrim($configuredPath, '/') . '/db.sqlite';
 }
 
 /**
@@ -65,28 +73,14 @@ function raven_database_manager_auth_payload(array $databaseConfig, string $root
     $driver = strtolower(trim((string) ($databaseConfig['driver'] ?? 'sqlite')));
 
     if ($driver === 'sqlite') {
-        $sqlite = (array) ($databaseConfig['sqlite'] ?? []);
-        $files = raven_database_manager_sqlite_files_map();
-
-        // The app data connection in SQLite mode uses pages.db as the primary file.
-        $basePath = trim((string) ($sqlite['base_path'] ?? ''));
-        if ($basePath === '') {
-            $basePath = rtrim($root, '/') . '/private/dat/db';
-        } elseif (!raven_database_manager_is_absolute_path($basePath)) {
-            $basePath = rtrim($root, '/') . '/' . ltrim($basePath, '/');
-        }
-
-        $pagesFile = trim((string) ($files['pages'] ?? 'pages.db'));
-        if ($pagesFile === '') {
-            $pagesFile = 'pages.db';
-        }
+        $configuredPath = raven_database_manager_sqlite_configured_path($databaseConfig, $root);
 
         return [
             'driver' => 'sqlite',
             'server' => '',
             'username' => 'raven',
             'password' => '',
-            'db' => rtrim($basePath, '/') . '/' . ltrim($pagesFile, '/'),
+            'db' => raven_database_manager_sqlite_file_path($configuredPath),
         ];
     }
 
@@ -134,7 +128,7 @@ function raven_database_manager_auth_payload(array $databaseConfig, string $root
 }
 
 /**
- * Builds absolute SQLite file list from Raven canonical filename map.
+ * Builds the SQLite DB allow-list for Adminer.
  *
  * @param array<string, mixed> $databaseConfig
  *
@@ -147,38 +141,12 @@ function raven_database_manager_sqlite_database_list(array $databaseConfig, stri
         return [];
     }
 
-    $sqlite = (array) ($databaseConfig['sqlite'] ?? []);
-    $files = raven_database_manager_sqlite_files_map();
-
-    $basePath = trim((string) ($sqlite['base_path'] ?? ''));
-    if ($basePath === '') {
-        $basePath = rtrim($root, '/') . '/private/dat/db';
-    } elseif (!raven_database_manager_is_absolute_path($basePath)) {
-        $basePath = rtrim($root, '/') . '/' . ltrim($basePath, '/');
-    }
-
-    $resolved = [];
-    foreach ($files as $fileName) {
-        $candidate = trim((string) $fileName);
-        if ($candidate === '') {
-            continue;
-        }
-
-        $absolute = rtrim($basePath, '/') . '/' . ltrim($candidate, '/');
-        // Keep duplicates out while preserving source order.
-        if (!in_array($absolute, $resolved, true)) {
-            $resolved[] = $absolute;
-        }
-    }
-
-    return $resolved;
+    $configuredPath = raven_database_manager_sqlite_configured_path($databaseConfig, $root);
+    return [raven_database_manager_sqlite_file_path($configuredPath)];
 }
 
 /**
  * Builds SQLite DB label map keyed by absolute path.
- *
- * Example:
- * - `/.../pages.db` => `Pages (pages.db)`
  *
  * @param array<string, mixed> $databaseConfig
  *
@@ -191,34 +159,11 @@ function raven_database_manager_sqlite_label_map(array $databaseConfig, string $
         return [];
     }
 
-    $sqlite = (array) ($databaseConfig['sqlite'] ?? []);
-    $files = raven_database_manager_sqlite_files_map();
-
-    $basePath = trim((string) ($sqlite['base_path'] ?? ''));
-    if ($basePath === '') {
-        $basePath = rtrim($root, '/') . '/private/dat/db';
-    } elseif (!raven_database_manager_is_absolute_path($basePath)) {
-        $basePath = rtrim($root, '/') . '/' . ltrim($basePath, '/');
-    }
-
-    $labels = [];
-    foreach ($files as $key => $fileName) {
-        $candidate = trim((string) $fileName);
-        if ($candidate === '') {
-            continue;
-        }
-
-        $absolute = rtrim($basePath, '/') . '/' . ltrim($candidate, '/');
-        $prettyName = trim((string) $key);
-        if ($prettyName === '' || is_int($key)) {
-            $prettyName = pathinfo($candidate, PATHINFO_FILENAME);
-        }
-
-        $prettyName = ucwords(str_replace(['_', '-'], ' ', $prettyName));
-        $labels[$absolute] = $prettyName . ' (' . basename($candidate) . ')';
-    }
-
-    return $labels;
+    $configuredPath = raven_database_manager_sqlite_configured_path($databaseConfig, $root);
+    $databasePath = raven_database_manager_sqlite_file_path($configuredPath);
+    return [
+        $databasePath => 'Core + Extensions (' . basename($databasePath) . ')',
+    ];
 }
 
 /**

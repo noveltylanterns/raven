@@ -866,8 +866,8 @@ $router->add('GET', '/themes/export', static function () use ($panelController):
     $panelController->themesExport($_GET);
 });
 
-$router->add('POST', '/themes/delete', static function () use ($panelController): void {
-    $panelController->themesDelete($_POST);
+$router->add('POST', '/themes/uninstall', static function () use ($panelController): void {
+    $panelController->themesUninstall($_POST);
 });
 
 // Extensions management routes (placeholder system foundation for future plugin runtime wiring).
@@ -891,8 +891,8 @@ $router->add('POST', '/extensions/create', static function () use ($panelControl
     $panelController->extensionsCreate($_POST);
 });
 
-$router->add('POST', '/extensions/delete', static function () use ($panelController): void {
-    $panelController->extensionsDelete($_POST);
+$router->add('POST', '/extensions/uninstall', static function () use ($panelController): void {
+    $panelController->extensionsUninstall($_POST);
 });
 
 $router->add('POST', '/extensions/permission', static function () use ($panelController): void {

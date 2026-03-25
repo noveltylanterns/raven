@@ -21,7 +21,7 @@ declare(strict_types=1);
  *   driver: string,
  *   table_prefix: string,
  *   sqlite_base_path: string,
- *   sqlite_files: array<string, string>,
+ *   sqlite_file: string,
  *   mysql: array<string, string>,
  *   pgsql: array<string, string>
  * } $databaseSummary */
@@ -107,19 +107,17 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
 
                     <?php if ($driver === 'sqlite'): ?>
                         <tr>
-                            <th scope="row">SQLite Base Path</th>
+                            <th scope="row">SQLite Path</th>
                             <td><code><?= e((string) ($databaseSummary['sqlite_base_path'] ?? '')) ?></code></td>
                         </tr>
                         <tr>
-                            <th scope="row">SQLite Files</th>
+                            <th scope="row">SQLite Database</th>
                             <td>
-                                <?php $sqliteFiles = (array) ($databaseSummary['sqlite_files'] ?? []); ?>
-                                <?php if ($sqliteFiles === []): ?>
+                                <?php $sqliteFile = trim((string) ($databaseSummary['sqlite_file'] ?? '')); ?>
+                                <?php if ($sqliteFile === ''): ?>
                                     <span class="text-muted">&lt;none&gt;</span>
                                 <?php else: ?>
-                                    <?php foreach ($sqliteFiles as $key => $filename): ?>
-                                        <div><code><?= e((string) $key) ?></code>: <code><?= e((string) $filename) ?></code></div>
-                                    <?php endforeach; ?>
+                                    <div><code><?= e($sqliteFile) ?></code> <span class="text-muted">(core + extension tables)</span></div>
                                 <?php endif; ?>
                             </td>
                         </tr>
