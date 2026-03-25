@@ -16,6 +16,7 @@ namespace Raven\Controller;
 use Raven\Core\Auth\AuthService;
 use Raven\Core\Config;
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
+use Raven\Lib\Auth\LoginAttemptPolicy;
 use Raven\Lib\Auth\LoginAttemptWorkflowService;
 use Raven\Lib\Auth\LoginChallengeWorkflowService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
@@ -80,6 +81,7 @@ final class PublicController
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
     private ?LoginUiStateService $loginUiState = null;
+    private ?LoginAttemptPolicy $loginAttemptPolicy = null;
     private ?LoginAttemptWorkflowService $loginAttemptWorkflowService = null;
     private ?LoginChallengeWorkflowService $loginChallengeWorkflowService = null;
     private ?MarkdownRenderer $markdownRenderer = null;
@@ -881,7 +883,7 @@ final class PublicController
     }
 
     /**
-     * Renders one public profile route `/{profile_prefix}/{username}`.
+     * Renders one public profile route `/{profile_prefix}/{username_or_id}`.
      */
     public function profile(string $username): void
     {
@@ -902,16 +904,7 @@ final class PublicController
             return;
         }
 
-        $normalizedUsername = $this->identifierResolver->normalizeUsernameOrEmail(
-            $this->input,
-            rawurldecode($username)
-        );
-        if ($normalizedUsername === null) {
-            $this->notFound();
-            return;
-        }
-
-        $profile = $this->userRepo->findPublicProfileByUsername($normalizedUsername);
+        $profile = $this->findPublicProfileByRouteSegment(rawurldecode($username));
         if ($profile === null) {
             $this->notFound();
             return;
@@ -1225,6 +1218,7 @@ final class PublicController
         $this->renderPublic('auth/register', [
             'site' => $this->siteData(),
             'csrfField' => $this->csrf->field(),
+            'captchaMarkup' => $this->publicCaptchaMarkup(),
             'flashSuccess' => $this->pullPublicFlash('success'),
             'flashError' => $this->pullPublicFlash('error'),
             'registrationMode' => $registrationMode,
@@ -1254,6 +1248,11 @@ final class PublicController
             \Raven\Core\Support\redirect('/register');
         }
 
+        if ($this->isRegistrationTemporarilyLocked()) {
+            $this->flashPublic('error', 'Too many registration attempts. Please wait a few minutes and try again.');
+            \Raven\Core\Support\redirect('/register');
+        }
+
         $loginIdentifierMode = $this->identifierResolver->modeFromConfig($this->config);
         $rawUsername = $this->input->text($post['username'] ?? null, 254);
         $normalizedUsername = $this->identifierResolver->normalizeUsernameOrEmail($this->input, $rawUsername);
@@ -1280,6 +1279,10 @@ final class PublicController
         if (!hash_equals($password, $passwordConfirm)) {
             $errors[] = 'Password confirmation does not match.';
         }
+        $captchaError = $this->validatePublicCaptcha();
+        if ($captchaError !== null) {
+            $errors[] = $captchaError;
+        }
 
         $usableInvite = null;
         $now = time();
@@ -1300,6 +1303,7 @@ final class PublicController
         }
 
         if ($errors !== []) {
+            $this->recordRegistrationFailure();
             $this->flashPublic('error', implode(' ', $errors));
             \Raven\Core\Support\redirect('/register');
         }
@@ -1331,15 +1335,24 @@ final class PublicController
                         }
                     }
 
+                    $this->recordRegistrationFailure();
                     $this->flashPublic('error', 'Invite token is no longer available. Please request a new token.');
                     \Raven\Core\Support\redirect('/register');
                 }
             }
         } catch (\Throwable $exception) {
-            $this->flashPublic('error', $exception->getMessage() ?: 'Failed to create account.');
+            $this->recordRegistrationFailure();
+            error_log(
+                'Raven public registration failed: '
+                . $exception::class
+                . ' - '
+                . $exception->getMessage()
+            );
+            $this->flashPublic('error', 'Unable to create account with the provided details. Please review your submission and try again.');
             \Raven\Core\Support\redirect('/register');
         }
 
+        $this->clearRegistrationFailures();
         $this->flashPublic('success', 'Account created. You can sign in if your account has dashboard access.');
         \Raven\Core\Support\redirect('/login');
     }
@@ -1971,6 +1984,15 @@ final class PublicController
         return $this->loginUiState;
     }
 
+    private function loginAttemptPolicy(): LoginAttemptPolicy
+    {
+        if (!$this->loginAttemptPolicy instanceof LoginAttemptPolicy) {
+            $this->loginAttemptPolicy = new LoginAttemptPolicy($this->config, $this->requestContextResolver());
+        }
+
+        return $this->loginAttemptPolicy;
+    }
+
     private function loginAttemptWorkflowService(): LoginAttemptWorkflowService
     {
         if (!$this->loginAttemptWorkflowService instanceof LoginAttemptWorkflowService) {
@@ -1978,7 +2000,7 @@ final class PublicController
                 $this->config,
                 $this->input,
                 $this->identifierResolver,
-                new \Raven\Lib\Auth\LoginAttemptPolicy($this->config, $this->requestContextResolver()),
+                $this->loginAttemptPolicy(),
                 new \Raven\Lib\Security\LoginTwoFactorFlowService()
             );
         }
@@ -2276,6 +2298,69 @@ final class PublicController
         $markup = $this->captchaService()->publicMarkup($this->captchaScriptIncluded);
         $this->captchaScriptIncluded = (bool) ($markup['script_included'] ?? $this->captchaScriptIncluded);
         return (string) ($markup['markup'] ?? '');
+    }
+
+    /**
+     * Resolves one public profile using the configured public route identifier strategy.
+     *
+     * Username-login installs keep username routes; email-login installs use numeric user ids.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function findPublicProfileByRouteSegment(string $routeSegment): ?array
+    {
+        $loginIdentifierMode = $this->identifierResolver->modeFromConfig($this->config);
+        if ($loginIdentifierMode === 'email') {
+            $userId = $this->input->int($routeSegment, 1);
+            if ($userId === null) {
+                return null;
+            }
+
+            return $this->userRepo->findPublicProfileById($userId);
+        }
+
+        $normalizedUsername = $this->identifierResolver->normalizeUsernameOrEmail($this->input, $routeSegment);
+        if ($normalizedUsername === null) {
+            return null;
+        }
+
+        return $this->userRepo->findPublicProfileByUsername($normalizedUsername);
+    }
+
+    private function registrationThrottleIdentifier(): string
+    {
+        return 'register-public';
+    }
+
+    private function isRegistrationTemporarilyLocked(): bool
+    {
+        $policy = $this->loginAttemptPolicy();
+        return $this->auth->isLoginTemporarilyLocked(
+            $this->registrationThrottleIdentifier(),
+            $policy->clientIpAddress($_SERVER),
+            $policy->windowSeconds()
+        );
+    }
+
+    private function recordRegistrationFailure(): void
+    {
+        $policy = $this->loginAttemptPolicy();
+        $this->auth->recordFailedLoginAttempt(
+            $this->registrationThrottleIdentifier(),
+            $policy->clientIpAddress($_SERVER),
+            $policy->maxAttempts(),
+            $policy->windowSeconds(),
+            $policy->lockSeconds()
+        );
+    }
+
+    private function clearRegistrationFailures(): void
+    {
+        $policy = $this->loginAttemptPolicy();
+        $this->auth->clearFailedLoginAttempts(
+            $this->registrationThrottleIdentifier(),
+            $policy->clientIpAddress($_SERVER)
+        );
     }
 
     /**

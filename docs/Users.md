@@ -182,7 +182,10 @@ Public routes (declared in `public/index.php`):
   - Validate CSRF and mutate invite-token rows through `InviteTokenRepository`.
 - `PublicController::registerSubmit(array $post)`
   - Enforces `user.auth.registration` mode (`open|invite|closed`).
+  - Applies configured public captcha validation before user creation when `captcha.provider` is enabled.
+  - Reuses the shared brute-force policy window/lock settings to temporarily lock repeated failed registration attempts per client IP.
   - Requires invite token when mode is `invite`.
+  - Keeps duplicate-account and persistence failures user-generic instead of reflecting raw repository exception text.
   - Creates user via `UserRepository::save(...)` and consumes invite token atomically where possible.
 
 ### Data Model And Repository Behavior
@@ -210,6 +213,7 @@ Storage detail:
 
 - Permission gate: `Manage Users`.
 - CSRF on POST actions.
+- Public registration uses the shared captcha provider config and shared brute-force window/lock settings.
 - Sanitization via centralized `InputSanitizer`.
 - Avatar checks are centralized in `AvatarValidator`; uploads are re-encoded/sanitized before final storage.
 - Repository operations use prepared statements.

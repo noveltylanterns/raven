@@ -273,22 +273,22 @@ final class ProfileContactService
         }
 
         if (preg_match('/^[a-z][a-z0-9+.-]*:/i', $value) === 1) {
-            return $value;
+            return $this->allowlistedAbsoluteHref($value);
         }
 
         if ($urlPrefix === '') {
             if (preg_match('#^https?://#i', $value) === 1) {
-                return $value;
+                return $this->allowlistedAbsoluteHref($value);
             }
 
             return null;
         }
 
         if (str_ends_with($urlPrefix, '/')) {
-            return $urlPrefix . ltrim($value, '@/');
+            return $this->allowlistedAbsoluteHref($urlPrefix . ltrim($value, '@/'));
         }
 
-        return $urlPrefix . $value;
+        return $this->allowlistedAbsoluteHref($urlPrefix . $value);
     }
 
     /**
@@ -366,5 +366,20 @@ final class ProfileContactService
         }
 
         return '@' . $raw;
+    }
+
+    private function allowlistedAbsoluteHref(string $href): ?string
+    {
+        $candidate = trim(str_replace(["\r", "\n", "\0"], '', $href));
+        if ($candidate === '') {
+            return null;
+        }
+
+        $scheme = strtolower((string) parse_url($candidate, PHP_URL_SCHEME));
+        if (!in_array($scheme, ['http', 'https', 'mailto', 'tel', 'finger', 'fingers', 'gopher', 'gemini'], true)) {
+            return null;
+        }
+
+        return $candidate;
     }
 }

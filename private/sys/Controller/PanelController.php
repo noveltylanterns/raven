@@ -5839,6 +5839,27 @@ final class PanelController
     }
 
     /**
+     * Returns one public profile route segment for a user row.
+     *
+     * Username-login installs route by username; email-login installs route by numeric user id.
+     *
+     * @param array<string, mixed> $user
+     */
+    private function publicProfileRouteSegmentForUser(array $user): ?string
+    {
+        $userId = (int) ($user['id'] ?? 0);
+        if ($userId <= 0) {
+            return null;
+        }
+
+        if ($this->panelLoginIdentifierMode() !== 'email') {
+            return $this->normalizeUserIdentifierValue((string) ($user['username'] ?? ''));
+        }
+
+        return (string) $userId;
+    }
+
+    /**
      * Builds panel-visible routing inventory rows for page/channel/category/tag/redirect/user/group.
      *
      * @return array<int, array{
@@ -5923,7 +5944,7 @@ final class PanelController
             ),
             'channel_landing_map_builder' => fn (array $pagesForRouting): array => $this->channelLandingMapFromPagesForRouting($pagesForRouting),
             'panel_url' => fn (string $suffix): string => $this->panelUrl($suffix),
-            'normalize_user_identifier' => fn (string $raw): ?string => $this->normalizeUserIdentifierValue($raw),
+            'build_user_route_segment' => fn (array $user): ?string => $this->publicProfileRouteSegmentForUser($user),
             'slugify_group_name' => fn (string $name): string => $this->slugifyGroupName($name),
         ]);
     }

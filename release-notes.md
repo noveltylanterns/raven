@@ -10,6 +10,7 @@
 - Added an Extension Manager `Type` column, masked database password fields in the configuration editor, and documented the updater source config keys in the configuration docs so docs smoke covers `update.source.mode`, `update.source.github_repo`, and `update.source.repo_url`.
 - Hardened panel hostile-query handling by sanitizing debug-toolbar request payload rendering, removing raw inline SVG from the toolbar toggle markup, and safely pre-filling the Routing Table search box from escaped `?search=` input.
 - Restored legacy `delete` aliases for `rvn-ext` and `rvn-theme` so destructive guard coverage still routes through the current uninstall protections, including stock package removal blocks.
+- Hardened public registration and profile surfaces by adding configured captcha support to `/register`, applying shared brute-force lock windows to repeated failed registration attempts, hiding duplicate-account internals behind generic registration errors, switching email-login profile routes to numeric user ids, and allowlisting public profile contact href schemes.
 
 ### March 24, 2026
 

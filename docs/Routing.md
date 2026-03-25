@@ -137,6 +137,7 @@ Each row includes:
 ### Inclusion/Visibility Rules
 
 - Profile rows require enabled profile routing config.
+- Public profile routes use `/{user.prefix}/{username}` when `user.auth.login=username`, and `/{user.prefix}/{user_id}` when usernames are disabled (`user.auth.login=email`).
 - Group rows require enabled group routing config + per-group route toggle + non-guest/validating/banned group role.
 - Feed routes are public runtime routes only; they are not emitted as Routing Table inventory rows.
 - `GET /{feed.rss}` is active only when `feed.enabled` is on and `feed.rss` is non-blank.

@@ -42,7 +42,9 @@ $hasPersistedUser = $userId > 0;
 $deleteFormId = 'delete-user-form';
 $profileRoutePrefix = trim((string) ($profileRoutePrefix ?? ''), '/');
 $profileRoutesEnabled = (bool) ($profileRoutesEnabled ?? false);
-$usernameRouteSegment = trim((string) ($userRow['username'] ?? ''));
+$profileRouteSegment = $usernameRequiredForAuth
+    ? trim((string) ($userRow['username'] ?? ''))
+    : ($hasPersistedUser ? (string) $userId : '');
 // Multi-select group inputs are compared against normalized integer ids.
 $selectedGroupIds = array_map('intval', (array) ($userRow['group_ids'] ?? []));
 $avatarPath = isset($userRow['avatar_path']) && is_string($userRow['avatar_path'])
@@ -172,8 +174,8 @@ if ($publicBase !== '' && !preg_match('#^https?://#i', $publicBase)) {
 }
 $publicBase = rtrim($publicBase, '/');
 $userPublicUrl = null;
-if ($userRow !== null && $publicBase !== '' && $profileRoutesEnabled && $profileRoutePrefix !== '' && $usernameRouteSegment !== '') {
-    $userPublicUrl = $publicBase . '/' . rawurlencode($profileRoutePrefix) . '/' . rawurlencode($usernameRouteSegment);
+if ($userRow !== null && $publicBase !== '' && $profileRoutesEnabled && $profileRoutePrefix !== '' && $profileRouteSegment !== '') {
+    $userPublicUrl = $publicBase . '/' . rawurlencode($profileRoutePrefix) . '/' . rawurlencode($profileRouteSegment);
 }
 $requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
 $activeTab = in_array($requestedTab, ['account', 'permissions', 'profile', 'security'], true) ? $requestedTab : 'account';

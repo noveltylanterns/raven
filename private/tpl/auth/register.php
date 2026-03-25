@@ -20,6 +20,7 @@ $registrationInvite = (bool) ($registrationInvite ?? ($registrationMode === 'inv
 $loginIdentifierMode = strtolower(trim((string) ($loginIdentifierMode ?? 'email')));
 $usernameRequired = (bool) ($usernameRequired ?? ($loginIdentifierMode === 'username'));
 $loginPath = trim((string) ($loginPath ?? '/login'));
+$captchaMarkup = is_string($captchaMarkup ?? null) ? $captchaMarkup : '';
 $flashSuccess = is_string($flashSuccess ?? null) ? $flashSuccess : null;
 $flashError = is_string($flashError ?? null) ? $flashError : null;
 ?>
@@ -66,6 +67,7 @@ $flashError = is_string($flashError ?? null) ? $flashError : null;
         <input id="register_invite_token" name="invite_token" type="text" class="form-control" required>
     </div>
     <?php endif; ?>
+    <?= $captchaMarkup ?>
     <button type="submit" class="btn btn-primary">Create Account</button>
 </form>
 <?php endif; ?>

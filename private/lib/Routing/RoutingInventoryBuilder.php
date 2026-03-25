@@ -45,7 +45,7 @@ final class RoutingInventoryBuilder
      *   build_page_url?: callable(string, int, string, string, string, string): string,
      *   channel_landing_map_builder?: callable(array): array,
      *   panel_url?: callable(string): string,
-     *   normalize_user_identifier?: callable(string): ?string,
+     *   build_user_route_segment?: callable(array): ?string,
      *   slugify_group_name?: callable(string): string
      * } $context
      * @return array<int, array{
@@ -66,14 +66,14 @@ final class RoutingInventoryBuilder
         $buildPageUrl = $context['build_page_url'] ?? null;
         $buildChannelLandingMap = $context['channel_landing_map_builder'] ?? null;
         $panelUrl = $context['panel_url'] ?? null;
-        $normalizeUserIdentifier = $context['normalize_user_identifier'] ?? null;
+        $buildUserRouteSegment = $context['build_user_route_segment'] ?? null;
         $slugifyGroupName = $context['slugify_group_name'] ?? null;
 
         if (
             !is_callable($buildPageUrl)
             || !is_callable($buildChannelLandingMap)
             || !is_callable($panelUrl)
-            || !is_callable($normalizeUserIdentifier)
+            || !is_callable($buildUserRouteSegment)
             || !is_callable($slugifyGroupName)
         ) {
             throw new \RuntimeException('RoutingInventoryBuilder requires callable page/url/identity resolvers.');
@@ -342,14 +342,19 @@ final class RoutingInventoryBuilder
         if ($userRoutingEnabled) {
             foreach ($routingUsers as $user) {
                 $userId = (int) ($user['id'] ?? 0);
-                $username = $normalizeUserIdentifier((string) ($user['username'] ?? ''));
-                if ($userId <= 0 || $username === null) {
+                $routeSegment = $buildUserRouteSegment($user);
+                if ($userId <= 0 || !is_string($routeSegment) || $routeSegment === '') {
                     continue;
                 }
 
-                $publicUrl = '/' . $profilePrefix . '/' . rawurlencode($username);
+                $publicUrl = '/' . $profilePrefix . '/' . rawurlencode($routeSegment);
                 $conflictKey = strtolower($publicUrl);
                 $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
+
+                $sourceLabel = trim((string) ($user['username'] ?? ''));
+                if ($sourceLabel === '') {
+                    $sourceLabel = 'User #' . $userId;
+                }
 
                 $groupStatusLabel = trim((string) ($user['groups_text'] ?? ''));
                 if ($groupStatusLabel === '') {
@@ -365,7 +370,7 @@ final class RoutingInventoryBuilder
                 $rows[] = [
                     'type_key' => 'user',
                     'type_label' => 'User',
-                    'source_label' => $username,
+                    'source_label' => $sourceLabel,
                     'edit_url' => $canEditUsers ? (string) $panelUrl('/user/edit/' . $userId) : '',
                     'public_url' => $publicUrl,
                     'target_url' => $publicUrl,

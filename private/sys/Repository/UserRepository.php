@@ -415,6 +415,49 @@ final class UserRepository
     }
 
     /**
+     * Returns one public-safe user profile by numeric user id.
+     *
+     * @return array{
+     *   id: int,
+     *   username: string,
+     *   display_name: string,
+     *   avatar_path: string|null,
+     *   contact_profiles: array<int, array{type: string, value: string}>
+     * }|null
+     */
+    public function findPublicProfileById(int $userId): ?array
+    {
+        if ($userId <= 0) {
+            return null;
+        }
+
+        $usersTable = $this->authTable('users');
+
+        $stmt = $this->authDb->prepare(
+            'SELECT id, username, display_name, avatar_path, contact_profiles
+             FROM ' . $usersTable . '
+             WHERE id = :id
+             LIMIT 1'
+        );
+        $stmt->execute([':id' => $userId]);
+
+        $row = $stmt->fetch();
+        if ($row === false) {
+            return null;
+        }
+
+        return [
+            'id' => (int) ($row['id'] ?? 0),
+            'username' => (string) ($row['username'] ?? ''),
+            'display_name' => (string) ($row['display_name'] ?? ''),
+            'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
+                ? (string) $row['avatar_path']
+                : null,
+            'contact_profiles' => $this->decodeContactProfiles($row['contact_profiles'] ?? null),
+        ];
+    }
+
+    /**
      * Returns public-safe user profiles assigned to one group id.
      *
      * @return array<int, array{
