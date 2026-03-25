@@ -137,7 +137,7 @@ $revisionRows = [
             <span class="badge text-bg-<?= e($statusClass) ?>"><?= e($comparisonLabel) ?></span>
         </div>
         <div class="table-responsive">
-            <table class="table align-middle mb-0">
+            <table class="table rvnp-table-static align-middle mb-0">
                 <thead>
                     <tr>
                         <th scope="col">Field</th>
@@ -201,7 +201,7 @@ $revisionRows = [
             <p class="text-muted mb-0">No file-level changes to show for this action.</p>
         <?php else: ?>
             <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
+                <table class="table table-sm rvnp-table-static align-middle mb-0">
                     <thead>
                         <tr>
                             <th scope="col">Path</th>

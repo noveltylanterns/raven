@@ -616,7 +616,7 @@ body#rvnp .table > thead th {
   text-transform: uppercase;
 }
 
-body#rvnp .table > tbody > tr:hover > td {
+body#rvnp .table:not(.rvnp-table-static) > tbody > tr:hover > td {
   background-color: var(--raven-accent-soft);
 }
 
