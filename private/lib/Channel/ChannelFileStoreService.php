@@ -100,6 +100,7 @@ final class ChannelFileStoreService
             'name' => $name,
             'slug' => $slug,
             'description' => trim((string) ($raw['description'] ?? '')),
+            'feed_enabled' => ChannelRecordPolicy::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
             'editor_override' => ChannelRecordPolicy::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),
@@ -193,6 +194,7 @@ final class ChannelFileStoreService
             'name' => $name,
             'slug' => $slug,
             'description' => trim((string) ($raw['description'] ?? '')),
+            'feed_enabled' => ChannelRecordPolicy::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
             'editor_override' => ChannelRecordPolicy::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),

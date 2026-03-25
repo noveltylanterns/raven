@@ -968,6 +968,7 @@ final class PanelController
         }
 
         if (is_array($channel)) {
+            $channel['feed_enabled'] = (bool) ($channel['feed_enabled'] ?? false);
             $channel['editor_override'] = $this->normalizeChannelEditorOverride(
                 (string) ($channel['editor_override'] ?? 'inherit')
             );
@@ -982,6 +983,9 @@ final class PanelController
         $this->view->render('panel/channel/edit', [
             'site' => $this->siteData(),
             'channel' => $channel,
+            'feedsEnabled' => $this->routeConfigService()->feedEnabled(),
+            'rssFeedRoute' => $this->routeConfigService()->rssFeedRoute(),
+            'atomFeedRoute' => $this->routeConfigService()->atomFeedRoute(),
             'imageAllowedExtensions' => $this->taxonomyAllowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyMaxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageVariantSpecs(),
@@ -1027,6 +1031,7 @@ final class PanelController
         $routeSeparator = $this->normalizeChannelRouteSeparator(
             (string) ($post['route_separator'] ?? 'inherit')
         );
+        $feedsEnabled = $this->routeConfigService()->feedEnabled();
 
         if ($name === '' || $slug === null) {
             $this->flash('error', 'Channel name and valid slug are required.');
@@ -1035,7 +1040,7 @@ final class PanelController
 
         // Persist one channel record; repository handles create vs update.
         try {
-            $savedId = $this->channelRepo->save([
+            $saveData = [
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
@@ -1043,7 +1048,12 @@ final class PanelController
                 'editor_override' => $editorOverride,
                 'route_mode' => $routeMode,
                 'route_separator' => $routeSeparator,
-            ]);
+            ];
+            if ($feedsEnabled) {
+                $saveData['feed_enabled'] = isset($post['feed_enabled']) && (string) ($post['feed_enabled'] ?? '') === '1';
+            }
+
+            $savedId = $this->channelRepo->save($saveData);
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->flash('error', $message !== '' ? $message : 'Failed to save channel. Slug may already exist.');
@@ -3454,6 +3464,7 @@ final class PanelController
         $configSnapshot = $this->removeSqliteDatabaseFilesConfig($configSnapshot);
         $configSnapshot = $this->applyConfigEditorDefaults($configSnapshot);
         $activeConfigTab = $this->normalizeConfigEditorTab($_GET['tab'] ?? 'basic');
+        $channelOptions = $this->channelRepo->listRoutingOptions();
 
         $this->view->render('panel/configuration', [
             'site' => $this->siteData(),
@@ -3466,6 +3477,7 @@ final class PanelController
             'userTheme' => $this->currentUserTheme(),
             'configSnapshot' => $configSnapshot,
             'configFields' => $this->flattenConfigFields($configSnapshot),
+            'channelOptions' => $channelOptions,
             'activeConfigTab' => $activeConfigTab,
         ], 'panel/wrapper');
     }
@@ -4797,7 +4809,8 @@ final class PanelController
             fn (string $value): string => $this->normalizeBodyTextEditorOption($value),
             fn (string $value): string => $this->normalizeGlobalRouteSeparator($value),
             fn (string $theme, bool $allowDefault): ?string => $this->normalizePanelThemeChoice($theme, $allowDefault),
-            $this->publicThemeOptions()
+            $this->publicThemeOptions(),
+            $this->channelRepo->listRoutingOptions()
         );
     }
 

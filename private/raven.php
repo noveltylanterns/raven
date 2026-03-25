@@ -142,8 +142,8 @@ return (static function (): array {
     $input = new InputSanitizer();
     $pageImages = new PageImageRepository($appDb, $driver, $prefix);
     $channelRepo = new ChannelRepository($appDb, $driver, $prefix, $root . '/private/dat/channel');
-    $categoryEnabled = ConfigValueParser::bool($config->get('category.enabled', true), true);
-    $tagEnabled = ConfigValueParser::bool($config->get('tag.enabled', true), true);
+    $categoryEnabled = ConfigValueParser::bool($config->get('category.enabled', false), false);
+    $tagEnabled = ConfigValueParser::bool($config->get('tag.enabled', false), false);
     $siteContextBuilder = new SiteContextBuilder();
     $app = [
         'root' => $root,

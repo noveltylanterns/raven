@@ -37,6 +37,7 @@ final class PanelConfigFieldPolicyService
      * @param callable(string): string $normalizeGlobalRouteSeparator
      * @param callable(string, bool): ?string $normalizePanelThemeChoice
      * @param array<string, string> $publicThemeOptions
+     * @param array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}> $feedChannelOptions
      */
     public function normalizeFieldValue(
         string $path,
@@ -46,7 +47,8 @@ final class PanelConfigFieldPolicyService
         callable $normalizeBodyTextEditorOption,
         callable $normalizeGlobalRouteSeparator,
         callable $normalizePanelThemeChoice,
-        array $publicThemeOptions
+        array $publicThemeOptions,
+        array $feedChannelOptions
     ): mixed {
         $value = $this->input->text($rawValue, 1000);
 
@@ -94,6 +96,38 @@ final class PanelConfigFieldPolicyService
             return $driver;
         }
 
+        if ($path === 'feed.channel') {
+            $channelSlug = $this->input->slug($value);
+            if ($channelSlug === null || $channelSlug === '') {
+                return '';
+            }
+
+            $allowed = [];
+            foreach ($feedChannelOptions as $channelOption) {
+                $optionSlug = $this->input->slug((string) ($channelOption['slug'] ?? ''));
+                if ($optionSlug === null || $optionSlug === '') {
+                    continue;
+                }
+
+                $allowed[$optionSlug] = true;
+            }
+
+            if (!isset($allowed[$channelSlug])) {
+                throw new \RuntimeException('feed.channel must be ALL CHANNELS or one of the existing channel slugs.');
+            }
+
+            return $channelSlug;
+        }
+
+        if ($path === 'feed.items') {
+            $items = $this->defaults->normalizeInt($path, $value);
+            if ($items < 1) {
+                throw new \RuntimeException($path . ' must be greater than 0.');
+            }
+
+            return $items;
+        }
+
         if ($path === 'category.enabled' || $path === 'tag.enabled') {
             return $this->defaults->normalizeBool($path, $value);
         }
@@ -112,12 +146,12 @@ final class PanelConfigFieldPolicyService
             $isCategoryPath = $path === 'category.prefix';
             $thisEnabled = $isCategoryPath
                 ? ConfigValueParser::bool(
-                    $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', true),
-                    true
+                    $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', false),
+                    false
                 )
                 : ConfigValueParser::bool(
-                    $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', true),
-                    true
+                    $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', false),
+                    false
                 );
             if (!$thisEnabled) {
                 return $prefix;
@@ -137,12 +171,12 @@ final class PanelConfigFieldPolicyService
             $otherDefault = $path === 'category.prefix' ? 'tag' : 'cat';
             $otherEnabled = $isCategoryPath
                 ? ConfigValueParser::bool(
-                    $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', true),
-                    true
+                    $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', false),
+                    false
                 )
                 : ConfigValueParser::bool(
-                    $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', true),
-                    true
+                    $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', false),
+                    false
                 );
             $otherRaw = $otherPath === 'category.prefix'
                 ? (string) ($workingConfig['category']['prefix'] ?? $this->config->get('category.prefix', $otherDefault))
@@ -150,6 +184,84 @@ final class PanelConfigFieldPolicyService
             $otherPrefix = $this->input->slug($otherRaw);
             if ($otherEnabled && $otherPrefix !== null && $otherPrefix !== '' && $otherPrefix === $prefix) {
                 throw new \RuntimeException('category.prefix and tag.prefix must be different values.');
+            }
+
+            return $prefix;
+        }
+
+        if ($path === 'feed.rss' || $path === 'feed.atom') {
+            $trimmedValue = trim($value);
+            if ($trimmedValue === '') {
+                return '';
+            }
+
+            $prefix = $this->input->slug($trimmedValue);
+            if ($prefix === null) {
+                throw new \RuntimeException($path . ' must be a valid slug.');
+            }
+
+            $feedEnabled = ConfigValueParser::bool(
+                $workingConfig['feed']['enabled'] ?? $this->config->get('feed.enabled', false),
+                false
+            );
+            if (!$feedEnabled) {
+                return $prefix;
+            }
+
+            $panelPathValue = (string) ($workingConfig['panel']['path'] ?? $this->config->get('panel.path', 'panel'));
+            $panelPrefix = $this->input->slug($panelPathValue);
+            if ($panelPrefix !== null && $prefix === $panelPrefix) {
+                throw new \RuntimeException($path . ' cannot match panel.path.');
+            }
+
+            if (in_array($prefix, ['panel', 'boot', 'mce', 'theme'], true)) {
+                throw new \RuntimeException($path . ' uses a reserved public prefix.');
+            }
+
+            $categoryPrefix = $this->input->slug(
+                (string) ($workingConfig['category']['prefix'] ?? $this->config->get('category.prefix', 'cat'))
+            );
+            $categoryEnabled = ConfigValueParser::bool(
+                $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', false),
+                false
+            );
+            if ($categoryEnabled && $categoryPrefix !== null && $categoryPrefix !== '' && $prefix === $categoryPrefix) {
+                throw new \RuntimeException($path . ' cannot match category.prefix while categories are enabled.');
+            }
+
+            $tagPrefix = $this->input->slug(
+                (string) ($workingConfig['tag']['prefix'] ?? $this->config->get('tag.prefix', 'tag'))
+            );
+            $tagEnabled = ConfigValueParser::bool(
+                $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', false),
+                false
+            );
+            if ($tagEnabled && $tagPrefix !== null && $tagPrefix !== '' && $prefix === $tagPrefix) {
+                throw new \RuntimeException($path . ' cannot match tag.prefix while tags are enabled.');
+            }
+
+            $userPrefix = $this->input->slug(
+                (string) ($workingConfig['user']['prefix'] ?? $this->config->get('user.prefix', 'user'))
+            );
+            if ($userPrefix !== null && $userPrefix !== '' && $prefix === $userPrefix) {
+                throw new \RuntimeException($path . ' cannot match user.prefix.');
+            }
+
+            $groupPrefix = $this->input->slug(
+                (string) ($workingConfig['group']['prefix'] ?? $this->config->get('group.prefix', 'group'))
+            );
+            if ($groupPrefix !== null && $groupPrefix !== '' && $prefix === $groupPrefix) {
+                throw new \RuntimeException($path . ' cannot match group.prefix.');
+            }
+
+            $otherPath = $path === 'feed.rss' ? 'feed.atom' : 'feed.rss';
+            $otherDefault = $path === 'feed.rss' ? 'atom' : 'rss';
+            $otherRaw = $otherPath === 'feed.rss'
+                ? (string) ($workingConfig['feed']['rss'] ?? $this->config->get('feed.rss', $otherDefault))
+                : (string) ($workingConfig['feed']['atom'] ?? $this->config->get('feed.atom', $otherDefault));
+            $otherPrefix = $this->input->slug($otherRaw);
+            if ($otherPrefix !== null && $otherPrefix !== '' && $otherPrefix === $prefix) {
+                throw new \RuntimeException('feed.rss and feed.atom must be different values.');
             }
 
             return $prefix;
@@ -203,8 +315,8 @@ final class PanelConfigFieldPolicyService
                 (string) ($workingConfig['category']['prefix'] ?? $this->config->get('category.prefix', 'cat'))
             );
             $categoryEnabled = ConfigValueParser::bool(
-                $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', true),
-                true
+                $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', false),
+                false
             );
             if ($categoryEnabled && $categoryPrefix !== null && $prefix === $categoryPrefix) {
                 throw new \RuntimeException('user.prefix cannot match category.prefix.');
@@ -214,8 +326,8 @@ final class PanelConfigFieldPolicyService
                 (string) ($workingConfig['tag']['prefix'] ?? $this->config->get('tag.prefix', 'tag'))
             );
             $tagEnabled = ConfigValueParser::bool(
-                $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', true),
-                true
+                $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', false),
+                false
             );
             if ($tagEnabled && $tagPrefix !== null && $prefix === $tagPrefix) {
                 throw new \RuntimeException('user.prefix cannot match tag.prefix.');
@@ -270,8 +382,8 @@ final class PanelConfigFieldPolicyService
                 (string) ($workingConfig['category']['prefix'] ?? $this->config->get('category.prefix', 'cat'))
             );
             $categoryEnabled = ConfigValueParser::bool(
-                $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', true),
-                true
+                $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', false),
+                false
             );
             if ($categoryEnabled && $categoryPrefix !== null && $prefix === $categoryPrefix) {
                 throw new \RuntimeException('group.prefix cannot match category.prefix.');
@@ -281,8 +393,8 @@ final class PanelConfigFieldPolicyService
                 (string) ($workingConfig['tag']['prefix'] ?? $this->config->get('tag.prefix', 'tag'))
             );
             $tagEnabled = ConfigValueParser::bool(
-                $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', true),
-                true
+                $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', false),
+                false
             );
             if ($tagEnabled && $tagPrefix !== null && $prefix === $tagPrefix) {
                 throw new \RuntimeException('group.prefix cannot match tag.prefix.');

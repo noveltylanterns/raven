@@ -379,6 +379,330 @@ final class PublicController
     }
 
     /**
+     * Renders one configured feed response as XML without the HTML wrapper.
+     */
+    private function renderFeed(string $format, ?string $channelSlug = null): void
+    {
+        $routeConfig = $this->routeConfigService();
+        if (!$routeConfig->feedEnabled()) {
+            $this->notFound();
+            return;
+        }
+
+        $routeSegment = $format === 'atom' ? $routeConfig->atomFeedRoute() : $routeConfig->rssFeedRoute();
+        if ($routeSegment === '') {
+            $this->notFound();
+            return;
+        }
+
+        $site = $this->siteData();
+        $feedChannelSlug = '';
+        $scopeLabel = '';
+        $scopeType = 'global';
+        if ($channelSlug !== null) {
+            $normalizedChannelSlug = strtolower(trim($channelSlug));
+            if ($normalizedChannelSlug === '') {
+                $this->notFound();
+                return;
+            }
+
+            $channel = $this->taxonomyLookupRepo->findChannelBySlug($normalizedChannelSlug);
+            if (!is_array($channel) || !$this->channelFeedEnabled($channel)) {
+                $this->notFound();
+                return;
+            }
+
+            $feedChannelSlug = $normalizedChannelSlug;
+            $scopeLabel = $this->feedChannelLabel($feedChannelSlug);
+            $scopeType = 'channel';
+        } else {
+            $feedChannelSlug = $routeConfig->feedChannel();
+            if ($feedChannelSlug !== '') {
+                $scopeLabel = $this->feedChannelLabel($feedChannelSlug);
+                $scopeType = 'channel';
+            }
+        }
+
+        $pages = $this->pageRepo->listRecentPublished(
+            $routeConfig->feedItems(),
+            $feedChannelSlug !== '' ? $feedChannelSlug : null
+        );
+        $feedPayload = $this->buildFeedPayload(
+            $format,
+            $this->buildFeedRoutePath($routeSegment, $feedChannelSlug !== '' ? [$feedChannelSlug] : []),
+            $scopeLabel,
+            $site,
+            $pages,
+            $scopeType,
+            $feedChannelSlug
+        );
+
+        header(
+            'Content-Type: ' . ($format === 'atom' ? 'application/atom+xml' : 'application/rss+xml') . '; charset=UTF-8'
+        );
+        $this->renderPublic('feeds/' . $format, [
+            'site' => $site,
+            'feed' => $feedPayload,
+            'pages' => $feedPayload['items'],
+        ], null);
+    }
+
+    private function renderTaxonomyFeed(string $format, string $taxonomyType, string $taxonomySlug): void
+    {
+        $routeConfig = $this->routeConfigService();
+        if (!$routeConfig->feedEnabled()) {
+            $this->notFound();
+            return;
+        }
+
+        $routeSegment = $format === 'atom' ? $routeConfig->atomFeedRoute() : $routeConfig->rssFeedRoute();
+        if ($routeSegment === '') {
+            $this->notFound();
+            return;
+        }
+
+        $normalizedSlug = strtolower(trim($taxonomySlug));
+        if ($normalizedSlug === '') {
+            $this->notFound();
+            return;
+        }
+
+        $site = $this->siteData();
+        $scopeLabel = '';
+        $routeSuffix = [];
+        $pages = [];
+
+        if ($taxonomyType === 'category') {
+            $categoryPrefix = $routeConfig->categoryRoutePrefix();
+            if ($categoryPrefix === '') {
+                $this->notFound();
+                return;
+            }
+
+            $category = $this->taxonomyLookupRepo->findCategoryBySlug($normalizedSlug);
+            if (!is_array($category)) {
+                $this->notFound();
+                return;
+            }
+
+            $pageResult = $this->pageRepo->listPageByCategorySlug($normalizedSlug, $routeConfig->feedItems(), 0);
+            $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+            $scopeLabel = $this->taxonomyFeedLabel($category, $normalizedSlug);
+            $routeSuffix = [$categoryPrefix, $normalizedSlug];
+        } elseif ($taxonomyType === 'tag') {
+            $tagPrefix = $routeConfig->tagRoutePrefix();
+            if ($tagPrefix === '') {
+                $this->notFound();
+                return;
+            }
+
+            $tag = $this->taxonomyLookupRepo->findTagBySlug($normalizedSlug);
+            if (!is_array($tag)) {
+                $this->notFound();
+                return;
+            }
+
+            $pageResult = $this->pageRepo->listPageByTagSlug($normalizedSlug, $routeConfig->feedItems(), 0);
+            $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+            $scopeLabel = $this->taxonomyFeedLabel($tag, $normalizedSlug);
+            $routeSuffix = [$tagPrefix, $normalizedSlug];
+        } else {
+            $this->notFound();
+            return;
+        }
+
+        $feedPayload = $this->buildFeedPayload(
+            $format,
+            $this->buildFeedRoutePath($routeSegment, $routeSuffix),
+            $scopeLabel,
+            $site,
+            $pages,
+            $taxonomyType,
+            $normalizedSlug
+        );
+
+        header(
+            'Content-Type: ' . ($format === 'atom' ? 'application/atom+xml' : 'application/rss+xml') . '; charset=UTF-8'
+        );
+        $this->renderPublic('feeds/' . $format, [
+            'site' => $site,
+            'feed' => $feedPayload,
+            'pages' => $feedPayload['items'],
+        ], null);
+    }
+
+    /**
+     * @param array<string, string> $site
+     * @param array<int, array<string, mixed>> $pages
+     * @return array<string, mixed>
+     */
+    private function buildFeedPayload(
+        string $format,
+        string $routePath,
+        string $scopeLabel,
+        array $site,
+        array $pages,
+        string $scopeType = 'global',
+        string $scopeSlug = ''
+    ): array {
+        $feedUrl = trim((string) ($site['current_url'] ?? ''));
+        if ($feedUrl === '') {
+            $feedUrl = rtrim((string) ($site['url'] ?? ''), '/') . '/' . ltrim($routePath, '/');
+        }
+
+        $siteName = trim((string) ($site['name'] ?? 'Raven CMS'));
+        if ($siteName === '') {
+            $siteName = 'Raven CMS';
+        }
+
+        $formatLabel = strtoupper($format);
+        $title = $siteName . ' ' . $formatLabel . ' Feed';
+        $description = 'Latest pages from ' . $siteName . '.';
+        if ($scopeLabel !== '') {
+            $title = $siteName . ' ' . $scopeLabel . ' ' . $formatLabel . ' Feed';
+            $description = 'Latest pages from ' . $scopeLabel . ' on ' . $siteName . '.';
+        }
+
+        $items = $this->decorateFeedPages($pages, $site);
+        $updatedTimestamp = time();
+        if ($items !== []) {
+            $updatedTimestamp = (int) ($items[0]['timestamp'] ?? $updatedTimestamp);
+        }
+
+        return [
+            'format' => $format,
+            'title' => $title,
+            'description' => $description,
+            'url' => $feedUrl,
+            'site_url' => (string) ($site['url'] ?? ''),
+            'channel_slug' => $scopeType === 'channel' ? $scopeSlug : '',
+            'channel_label' => $scopeType === 'channel' ? $scopeLabel : '',
+            'scope_type' => $scopeType,
+            'scope_slug' => $scopeSlug,
+            'scope_label' => $scopeLabel,
+            'updated_rss' => gmdate(DATE_RSS, $updatedTimestamp),
+            'updated_atom' => gmdate(DATE_ATOM, $updatedTimestamp),
+            'items' => $items,
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $pages
+     * @param array<string, string> $site
+     * @return array<int, array<string, mixed>>
+     */
+    private function decorateFeedPages(array $pages, array $site): array
+    {
+        $pages = $this->decoratePageListPublicPaths($pages);
+        $siteUrl = rtrim((string) ($site['url'] ?? ''), '/');
+        $result = [];
+
+        foreach ($pages as $page) {
+            if (!is_array($page)) {
+                continue;
+            }
+
+            $path = trim((string) ($page['url'] ?? ''));
+            if ($path === '') {
+                $path = '/';
+            }
+            if (!str_starts_with($path, '/')) {
+                $path = '/' . ltrim($path, '/');
+            }
+
+            $absoluteUrl = $siteUrl !== '' ? $siteUrl . $path : $path;
+            $title = trim((string) ($page['title'] ?? ''));
+            if ($title === '') {
+                $title = trim((string) ($page['slug'] ?? ''));
+            }
+            if ($title === '') {
+                $title = 'Untitled';
+            }
+
+            $description = trim((string) ($page['description'] ?? ''));
+            $publishedAt = trim((string) ($page['published_at'] ?? ''));
+            if ($publishedAt === '') {
+                $publishedAt = trim((string) ($page['created_at'] ?? ''));
+            }
+
+            $timestamp = strtotime($publishedAt);
+            if ($timestamp === false || $timestamp < 1) {
+                $timestamp = time();
+            }
+
+            $page['feed_title'] = $title;
+            $page['feed_description'] = $description;
+            $page['absolute_url'] = $absoluteUrl;
+            $page['rss_published_at'] = gmdate(DATE_RSS, $timestamp);
+            $page['atom_published_at'] = gmdate(DATE_ATOM, $timestamp);
+            $page['timestamp'] = $timestamp;
+            $result[] = $page;
+        }
+
+        return $result;
+    }
+
+    private function feedChannelLabel(string $channelSlug): string
+    {
+        $normalized = strtolower(trim($channelSlug));
+        if ($normalized === '') {
+            return 'All Channels';
+        }
+
+        if ($normalized === 'root') {
+            return 'Root';
+        }
+
+        $channel = $this->taxonomyLookupRepo->findChannelBySlug($normalized);
+        if (!is_array($channel)) {
+            return $normalized;
+        }
+
+        $name = trim((string) ($channel['name'] ?? ''));
+        return $name !== '' ? $name : $normalized;
+    }
+
+    /**
+     * Returns true when one channel explicitly allows channel-specific feed routes.
+     *
+     * @param array<string, mixed> $channel
+     */
+    private function channelFeedEnabled(array $channel): bool
+    {
+        return (bool) ($channel['feed_enabled'] ?? false);
+    }
+
+    /**
+     * @param array<string, mixed> $taxonomy
+     */
+    private function taxonomyFeedLabel(array $taxonomy, string $fallbackSlug): string
+    {
+        $name = trim((string) ($taxonomy['name'] ?? ''));
+        return $name !== '' ? $name : $fallbackSlug;
+    }
+
+    /**
+     * @param array<int, string> $extraSegments
+     */
+    private function buildFeedRoutePath(string $routeSegment, array $extraSegments = []): string
+    {
+        $segments = [trim($routeSegment, '/')];
+        foreach ($extraSegments as $extraSegment) {
+            $trimmed = trim($extraSegment, '/');
+            if ($trimmed === '') {
+                continue;
+            }
+
+            $segments[] = $trimmed;
+        }
+
+        return implode('/', array_map(
+            static fn (string $segment): string => rawurlencode($segment),
+            $segments
+        ));
+    }
+
+    /**
      * Attempts active redirect lookup for a URL path and emits HTTP redirect when found.
      */
     private function tryRedirect(string $pageSlug, ?string $channelSlug = null): bool
@@ -506,6 +830,54 @@ final class PublicController
             'pages' => $pages,
             'pagination' => $pagination,
         ], 'wrapper');
+    }
+
+    /**
+     * Renders RSS feed route `/{feed.rss}` when feeds are enabled.
+     */
+    public function rssFeed(?string $channelSlug = null): void
+    {
+        $this->renderFeed('rss', $channelSlug);
+    }
+
+    /**
+     * Renders RSS category feed route `/{feed.rss}/{category.prefix}/{category_slug}` when enabled.
+     */
+    public function rssCategoryFeed(string $categorySlug): void
+    {
+        $this->renderTaxonomyFeed('rss', 'category', $categorySlug);
+    }
+
+    /**
+     * Renders RSS tag feed route `/{feed.rss}/{tag.prefix}/{tag_slug}` when enabled.
+     */
+    public function rssTagFeed(string $tagSlug): void
+    {
+        $this->renderTaxonomyFeed('rss', 'tag', $tagSlug);
+    }
+
+    /**
+     * Renders Atom feed route `/{feed.atom}` when feeds are enabled.
+     */
+    public function atomFeed(?string $channelSlug = null): void
+    {
+        $this->renderFeed('atom', $channelSlug);
+    }
+
+    /**
+     * Renders Atom category feed route `/{feed.atom}/{category.prefix}/{category_slug}` when enabled.
+     */
+    public function atomCategoryFeed(string $categorySlug): void
+    {
+        $this->renderTaxonomyFeed('atom', 'category', $categorySlug);
+    }
+
+    /**
+     * Renders Atom tag feed route `/{feed.atom}/{tag.prefix}/{tag_slug}` when enabled.
+     */
+    public function atomTagFeed(string $tagSlug): void
+    {
+        $this->renderTaxonomyFeed('atom', 'tag', $tagSlug);
     }
 
     /**

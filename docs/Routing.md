@@ -6,6 +6,8 @@ This document explains Raven's Routing Table screen for both panel users and dev
 
 Maintenance note: keep this file updated whenever Routing Table routes, row-building/conflict logic, export behavior, or Routing Table panel views change (`private/tpl/panel/routing.php`, `PanelController::routing*`, or routing inventory composition helpers).
 
+Public-routing note: public route bootstrap lives in `public/index.php`, and public route handlers live in `private/sys/Controller/PublicController.php`. Keep those files and `public/theme/AGENTS.md` in sync when public route families such as feeds are added or changed.
+
 ## 1) Panel Guide (Routing Table)
 
 ### Where To Go
@@ -77,6 +79,10 @@ Export fields include:
   - `private/tpl/panel/routing.php`
 - Panel controller:
   - `private/sys/Controller/PanelController.php`
+- Public route bootstrap:
+  - `public/index.php`
+- Public route controller:
+  - `private/sys/Controller/PublicController.php`
 
 ### Panel Routes
 
@@ -132,6 +138,12 @@ Each row includes:
 
 - Profile rows require enabled profile routing config.
 - Group rows require enabled group routing config + per-group route toggle + non-guest/validating/banned group role.
+- Feed routes are public runtime routes only; they are not emitted as Routing Table inventory rows.
+- `GET /{feed.rss}` is active only when `feed.enabled` is on and `feed.rss` is non-blank.
+- `GET /{feed.atom}` is active only when `feed.enabled` is on and `feed.atom` is non-blank.
+- `GET /{feed.rss}/{channel_slug}` and `GET /{feed.atom}/{channel_slug}` are active only when feeds are enabled globally and the addressed channel has its per-channel feed toggle enabled.
+- `GET /{feed.rss}/{category.prefix}/{category_slug}` and `GET /{feed.atom}/{category.prefix}/{category_slug}` are active only when both feeds and category routes are enabled.
+- `GET /{feed.rss}/{tag.prefix}/{tag_slug}` and `GET /{feed.atom}/{tag.prefix}/{tag_slug}` are active only when both feeds and tag routes are enabled.
 - Edit links are emitted only when current user has the relevant management permission.
 
 ### Security/Validation Expectations

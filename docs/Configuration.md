@@ -67,11 +67,16 @@ Tab behavior notes:
 
 Grouped sections:
 
+- `Feeds`
 - `Categories`
 - `Tags`
 
 Notable options:
 
+- `feed.enabled`, `category.enabled`, and `tag.enabled` default to disabled on new installs.
+- `feed.channel` defaults to `ALL CHANNELS` and offers `Root` plus the existing named channel slugs from the system channel list.
+- `feed.items` defaults to `10` and accepts whole numeric integers only.
+- `feed.rss` and `feed.atom` default to `rss` and `atom`, and either field can be left blank to disable that specific feed route.
 - `category.enabled` and `tag.enabled` toggle taxonomy availability in both panel and public runtime.
 - Category/tag URL prefix fields support blank values to disable those route families.
 
@@ -255,6 +260,11 @@ The following config keys are expected to appear in this document and in runtime
 - `content.editor_default`
 - `content.route_mode`
 - `content.route_separator`
+- `feed.enabled`
+- `feed.channel`
+- `feed.items`
+- `feed.rss`
+- `feed.atom`
 - `category.enabled`
 - `tag.enabled`
 - `category.pagination`

@@ -11,13 +11,12 @@ declare(strict_types=1);
 
 use Raven\Controller\PublicController;
 use Raven\Core\Diagnostics\DebugToolbarRenderer;
-use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
 use Raven\Lib\Diagnostics\RequestProfiler;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Routing\RouteRequest;
 use Raven\Lib\Routing\Router;
-use Raven\Lib\Routing\PanelUrl;
+use Raven\Lib\Routing\RouteConfigService;
 
 use function Raven\Core\Support\request_path;
 
@@ -174,18 +173,26 @@ $controller = new PublicController(
 );
 
 $input = $app['input'];
+$routeConfig = new RouteConfigService($app['config'], $input);
 
 $panelPath = (string) $app['config']->get('panel.path', 'panel');
-$categoryEnabled = ConfigValueParser::bool($app['config']->get('category.enabled', true), true);
-$tagEnabled = ConfigValueParser::bool($app['config']->get('tag.enabled', true), true);
-$categoryPrefix = $categoryEnabled
-    ? PanelUrl::normalizeRoutePrefix($input, (string) $app['config']->get('category.prefix', 'cat'), 'cat', true)
-    : '';
-$tagPrefix = $tagEnabled
-    ? PanelUrl::normalizeRoutePrefix($input, (string) $app['config']->get('tag.prefix', 'tag'), 'tag', true)
-    : '';
-$profilePrefix = PanelUrl::normalizeRoutePrefix($input, (string) $app['config']->get('user.prefix', 'user'), 'user', true);
-$groupPrefix = PanelUrl::normalizeRoutePrefix($input, (string) $app['config']->get('group.prefix', 'group'), 'group', true);
+$categoryPrefix = $routeConfig->categoryRoutePrefix();
+$tagPrefix = $routeConfig->tagRoutePrefix();
+$profilePrefix = $routeConfig->profileRoutePrefix();
+$groupPrefix = $routeConfig->groupRoutePrefix();
+$feedsEnabled = $routeConfig->feedEnabled();
+$rssFeedRoute = $routeConfig->rssFeedRoute();
+$atomFeedRoute = $routeConfig->atomFeedRoute();
+
+if ($rssFeedRoute !== '' && $atomFeedRoute !== '' && $rssFeedRoute === $atomFeedRoute) {
+    if ($rssFeedRoute !== 'rss') {
+        $rssFeedRoute = 'rss';
+    } elseif ($atomFeedRoute !== 'atom') {
+        $atomFeedRoute = 'atom';
+    } else {
+        $atomFeedRoute = '';
+    }
+}
 
 // Keep category/tag prefixes distinct even if config is manually edited to collide.
 if ($categoryPrefix !== '' && $tagPrefix !== '' && $categoryPrefix === $tagPrefix) {
@@ -224,10 +231,13 @@ $reservedPrefixes = array_values(array_unique(array_filter([
     'theme',
     'login',
     'register',
+    'forms',
     $categoryPrefix,
     $tagPrefix,
     $profilePrefix,
     $groupPrefix,
+    $feedsEnabled ? $rssFeedRoute : '',
+    $feedsEnabled ? $atomFeedRoute : '',
 ], static fn (string $value): bool => trim($value) !== '')));
 
 $router = new Router();
@@ -326,6 +336,92 @@ foreach ($enabledPublicExtensions as $extensionName) {
         'input' => $input,
         'extensionDirectory' => $extensionName,
     ]);
+}
+
+if ($feedsEnabled && $rssFeedRoute !== '') {
+    $router->add('GET', '/' . $rssFeedRoute, static function () use ($controller): void {
+        $controller->rssFeed();
+    });
+
+    $router->add('GET', '/' . $rssFeedRoute . '/{channel}', static function (array $params) use ($controller, $input, $reservedPrefixes): void {
+        $channel = $input->slug($params['channel'] ?? null);
+
+        if ($channel === null || in_array($channel, $reservedPrefixes, true)) {
+            $controller->notFound();
+            return;
+        }
+
+        $controller->rssFeed($channel);
+    });
+
+    if ($categoryPrefix !== '') {
+        $router->add('GET', '/' . $rssFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($controller, $input): void {
+            $slug = $input->slug($params['slug'] ?? null);
+
+            if ($slug === null) {
+                $controller->notFound();
+                return;
+            }
+
+            $controller->rssCategoryFeed($slug);
+        });
+    }
+
+    if ($tagPrefix !== '') {
+        $router->add('GET', '/' . $rssFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($controller, $input): void {
+            $slug = $input->slug($params['slug'] ?? null);
+
+            if ($slug === null) {
+                $controller->notFound();
+                return;
+            }
+
+            $controller->rssTagFeed($slug);
+        });
+    }
+}
+
+if ($feedsEnabled && $atomFeedRoute !== '') {
+    $router->add('GET', '/' . $atomFeedRoute, static function () use ($controller): void {
+        $controller->atomFeed();
+    });
+
+    $router->add('GET', '/' . $atomFeedRoute . '/{channel}', static function (array $params) use ($controller, $input, $reservedPrefixes): void {
+        $channel = $input->slug($params['channel'] ?? null);
+
+        if ($channel === null || in_array($channel, $reservedPrefixes, true)) {
+            $controller->notFound();
+            return;
+        }
+
+        $controller->atomFeed($channel);
+    });
+
+    if ($categoryPrefix !== '') {
+        $router->add('GET', '/' . $atomFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($controller, $input): void {
+            $slug = $input->slug($params['slug'] ?? null);
+
+            if ($slug === null) {
+                $controller->notFound();
+                return;
+            }
+
+            $controller->atomCategoryFeed($slug);
+        });
+    }
+
+    if ($tagPrefix !== '') {
+        $router->add('GET', '/' . $atomFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($controller, $input): void {
+            $slug = $input->slug($params['slug'] ?? null);
+
+            if ($slug === null) {
+                $controller->notFound();
+                return;
+            }
+
+            $controller->atomTagFeed($slug);
+        });
+    }
 }
 
 // Category routes with optional page number path segment.

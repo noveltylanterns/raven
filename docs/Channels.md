@@ -45,6 +45,7 @@ Fields/options:
 - `Name` (required)
 - `Slug` (required)
 - `Description` (optional)
+- `Enable Feed?` (shown only when global feeds are enabled)
 - `Cover Image` (optional, single file)
 - `Preview Image` (optional, single file)
 - `Remove current cover image` checkbox (shown when a cover image exists)
@@ -55,6 +56,13 @@ Image behavior notes:
 - Upload limits/extensions/variant sizes follow `media.images.*` config (same as Page Editor image rules).
 - Channel media is stored under `public/uploads/channels/{id}/`.
 - Only one cover image and one preview image can be attached at a time.
+
+Feed behavior notes:
+
+- `Enable Feed?` opts that channel into channel-specific public feeds.
+- When `feed.rss` is configured globally, enabled channels expose `/{feed.rss}/{channel-slug}`.
+- When `feed.atom` is configured globally, enabled channels expose `/{feed.atom}/{channel-slug}`.
+- When global `feed.enabled` is off, channel feed routes are disabled and the editor hides the toggle.
 
 Delete behavior note:
 
@@ -100,6 +108,7 @@ All state-changing routes use CSRF validation.
   - Sanitizes/normalizes `id`, `name`, `slug`, `description` via `InputSanitizer`.
   - Requires non-empty `name` and valid `slug`.
   - Rejects attempts to create/edit the reserved stock `<root>` channel.
+  - Persists optional `feed_enabled` when global feeds are enabled; existing channel feed flags are preserved when global feeds are disabled.
   - Saves text fields via `ChannelRepository::save(...)`.
   - Processes optional `cover_image` and `preview_image` uploads (single-file each), optional remove flags, and writes image-path columns via `ChannelRepository::updateImagePaths(...)`.
   - Upload files/variants are stored under `public/uploads/channels/{id}/` using configured `media.images.*` rules.
@@ -117,6 +126,7 @@ All state-changing routes use CSRF validation.
 - `listAll()` returns channels with page counts and includes the stock `<root>` channel first.
 - `listOptions()` excludes the stock `<root>` channel because it is only an internal root-scope placeholder.
 - `save(...)` handles create/update in one method.
+- Channel records include one file-backed `feed_enabled` flag for channel-specific feed routes.
 - `updateImagePaths(...)` persists cover/preview source + variant paths.
 - `deleteById(...)` runs in a transaction:
   - updates `pages.channel_id` to `0`
@@ -133,6 +143,7 @@ Storage detail:
 
 - Channel landing routes use single segment `/{channel_slug}` with page fallback rules.
 - Channel pages resolve at `/{channel_slug}/{segment}`, where `{segment}` depends on the channel's effective `route_mode`.
+- When global feeds are enabled and a channel has `feed_enabled = true`, that channel also exposes `/{feed.rss}/{channel_slug}` and/or `/{feed.atom}/{channel_slug}`.
 - The stock `<root>` channel is not routable; root-scope pages/redirects stay at `/...` instead of `/root/...`.
 - When a channel is set to `inherit`, it uses the global `content.route_mode` default (`slug` or `id`).
 - Supported channel page-route segments:

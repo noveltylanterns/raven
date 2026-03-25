@@ -169,11 +169,19 @@ body { background: #fff; color: #212529; }
 - `GET /` -> homepage
 - `POST /signups/submit/{slug}` -> embedded signup submit
 - `POST /contact-form/submit/{slug}` -> embedded contact submit
+- `GET /{feed.rss}` -> RSS feed when `feed.enabled` is on and `feed.rss` is non-blank
+- `GET /{feed.rss}/{channel_slug}` -> channel-scoped RSS feed when that channel has feeds enabled
+- `GET /{feed.rss}/{category.prefix}/{category_slug}` -> category-scoped RSS feed when category routes are enabled
+- `GET /{feed.rss}/{tag.prefix}/{tag_slug}` -> tag-scoped RSS feed when tag routes are enabled
+- `GET /{feed.atom}` -> Atom feed when `feed.enabled` is on and `feed.atom` is non-blank
+- `GET /{feed.atom}/{channel_slug}` -> channel-scoped Atom feed when that channel has feeds enabled
+- `GET /{feed.atom}/{category.prefix}/{category_slug}` -> category-scoped Atom feed when category routes are enabled
+- `GET /{feed.atom}/{tag.prefix}/{tag_slug}` -> tag-scoped Atom feed when tag routes are enabled
 - `GET /{category.prefix}/{slug}` and `GET /{category.prefix}/{slug}/{page}` -> category listing
 - `GET /{tag.prefix}/{slug}` and `GET /{tag.prefix}/{slug}/{page}` -> tag listing
 - `GET /{session.profile_prefix}/{username}` -> profile route (enabled when `session.profile_prefix` is configured)
 - `GET /{session.group_prefix}/{group_slug}` -> group route (enabled when `session.group_prefix` is configured)
-- When `category.prefix` or `tag.prefix` is blank, that route family is disabled. Profile routes are disabled when `session.profile_prefix` is blank. Group routes are disabled when `session.group_prefix` is blank.
+- When `feed.enabled` is off, all feed routes are disabled. When `feed.rss` or `feed.atom` is blank, that individual feed family is disabled. Channel-scoped feed URLs additionally require the target channel's `Enable Feed?` flag. Category- and tag-scoped feed URLs additionally require their taxonomy route families to be enabled. Profile routes are disabled when `session.profile_prefix` is blank. Group routes are disabled when `session.group_prefix` is blank.
 - `GET /{slug}` -> channel landing first, then root page/redirect fallback behavior
 - `GET /{channel}/{slug}` -> channel-scoped page
 
@@ -191,6 +199,8 @@ body { background: #fff; color: #212529; }
 - `theme`
 - configured `category.prefix`
 - configured `tag.prefix`
+- configured `feed.rss` (when feeds are enabled and RSS route is configured)
+- configured `feed.atom` (when feeds are enabled and Atom route is configured)
 - configured `session.profile_prefix` (when profile prefix is configured)
 - configured `session.group_prefix` (when group prefix is configured)
 
@@ -241,6 +251,12 @@ body { background: #fff; color: #212529; }
 - priority:
 - `tpl/channel/{channel_slug}.php`
 - `tpl/channel/index.php`
+- RSS feed render:
+- template key: `feeds/rss`
+- file: `tpl/feeds/rss.php`
+- Atom feed render:
+- template key: `feeds/atom`
+- file: `tpl/feeds/atom.php`
 - Category listing render:
 - priority:
 - `tpl/category/{category_slug}.php`
@@ -322,6 +338,8 @@ body { background: #fff; color: #212529; }
 - `tpl/status/disabled.php`
 - `tpl/page/index.php`
 - `tpl/channel/index.php`
+- `tpl/feeds/rss.php`
+- `tpl/feeds/atom.php`
 - `tpl/category/index.php`
 - `tpl/tag/index.php`
 - `tpl/profile/full.php`
@@ -341,7 +359,7 @@ body { background: #fff; color: #212529; }
 - `$meta` with keys including `title`, `desc`, `image`, `url`, `apple_touch_icon`, `robots`, `og_locale`, `og_type`, `x_card`, `x_creator`, and `x_site`
 - `$meta['image']` is the single shared image value used by the wrapper's `og:image` and `twitter:image` tags
 - `$meta['image']` defaults to global meta config values, but runtime may override it by route context:
-- page/home routes: `lg` variant of the page image marked as preview
+- page/home routes: `lg` variant of the page image marked as cover
 - category/tag routes: taxonomy preview/cover image
 - channel landing routes: channel preview/cover image
 - `$content` rendered body HTML
@@ -365,6 +383,12 @@ body { background: #fff; color: #212529; }
 - `$pages`
 - `$pagination`
 - `$pagination['links'][]` rows with `label`, `href`, `is_current`
+- Feed templates receive:
+- `$site`
+- `$feed`
+- `$feed['format']`, `title`, `description`, `url`, `site_url`, `channel_slug`, `channel_label`, `scope_type`, `scope_slug`, `scope_label`, `updated_rss`, `updated_atom`
+- `$pages` / `$feed['items']` rows with `feed_title`, `feed_description`, `absolute_url`, `rss_published_at`, `atom_published_at`
+- Feed templates render raw XML and are called with no HTML wrapper layout.
 - Tag template receives:
 - `$site`
 - `$tag`

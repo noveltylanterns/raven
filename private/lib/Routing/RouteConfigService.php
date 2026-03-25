@@ -42,12 +42,52 @@ final class RouteConfigService
 
     public function categoryEnabled(): bool
     {
-        return $this->configBool($this->config->get('category.enabled', true), true);
+        return $this->configBool($this->config->get('category.enabled', false), false);
     }
 
     public function tagEnabled(): bool
     {
-        return $this->configBool($this->config->get('tag.enabled', true), true);
+        return $this->configBool($this->config->get('tag.enabled', false), false);
+    }
+
+    public function feedEnabled(): bool
+    {
+        return $this->configBool($this->config->get('feed.enabled', false), false);
+    }
+
+    public function rssFeedRoute(): string
+    {
+        if (!$this->feedEnabled()) {
+            return '';
+        }
+
+        return $this->normalizeRoutePrefix((string) $this->config->get('feed.rss', 'rss'), 'rss', true);
+    }
+
+    public function atomFeedRoute(): string
+    {
+        if (!$this->feedEnabled()) {
+            return '';
+        }
+
+        return $this->normalizeRoutePrefix((string) $this->config->get('feed.atom', 'atom'), 'atom', true);
+    }
+
+    public function feedChannel(): string
+    {
+        $channel = trim((string) $this->config->get('feed.channel', ''));
+        if ($channel === '') {
+            return '';
+        }
+
+        $normalized = $this->input->slug($channel);
+        return $normalized ?? '';
+    }
+
+    public function feedItems(): int
+    {
+        $items = (int) $this->config->get('feed.items', 10);
+        return max(1, $items);
     }
 
     public function configBool(mixed $value, bool $default = false): bool

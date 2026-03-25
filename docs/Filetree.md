@@ -42,6 +42,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Domain helpers, policies, validators, codecs, render helpers, schema helpers, and other reusable units live here.
 - `private/tpl/`
   - Core fallback templates only.
+  - Includes feed XML fallbacks such as `private/tpl/feeds/rss.php` and `private/tpl/feeds/atom.php`.
   - Business logic should not accumulate here.
 
 ## Customization Boundaries

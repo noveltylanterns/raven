@@ -22,6 +22,7 @@
  *   type: string,
  *   value: string
  * }>|null $configFields */
+/** @var array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>|null $channelOptions */
 /** @var string|null $activeConfigTab */
 
 use function Raven\Core\Support\e;
@@ -29,6 +30,7 @@ use function Raven\Core\Support\e;
 $panelBase = '/' . trim($site['panel_path'], '/');
 $configSnapshot = $configSnapshot ?? null;
 $configFields = $configFields ?? [];
+$channelOptions = is_array($channelOptions ?? null) ? $channelOptions : [];
 $activeConfigTab = strtolower(trim((string) ($activeConfigTab ?? 'basic')));
 if (!in_array($activeConfigTab, ['basic', 'content', 'database', 'debug', 'media', 'meta', 'security', 'users'], true)) {
     $activeConfigTab = 'basic';
@@ -59,6 +61,7 @@ $basicOtherConfigFields = [];
 $captchaConfigFields = [];
 $metaConfigFields = [];
 $contentGeneralConfigFields = [];
+$contentFeedsConfigFields = [];
 $contentCategoriesConfigFields = [];
 $contentTagsConfigFields = [];
 $databaseConfigFields = [];
@@ -100,6 +103,11 @@ foreach ($configFields as $field) {
 
     if (str_starts_with($path, 'content.')) {
         $contentGeneralConfigFields[] = $field;
+        continue;
+    }
+
+    if (str_starts_with($path, 'feed.')) {
+        $contentFeedsConfigFields[] = $field;
         continue;
     }
 
@@ -414,7 +422,7 @@ $isActiveConfigTab = static function (string $tabKey) use ($activeConfigTab): bo
  *   value: string
  * } $field
  */
-$renderConfigField = static function (array $field) use ($metaUrlPathPrefix): void {
+$renderConfigField = static function (array $field) use ($metaUrlPathPrefix, $channelOptions): void {
     $path = (string) $field['path'];
     $segments = (array) $field['segments'];
     $type = (string) $field['type'];
@@ -429,6 +437,7 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
     $isEditorDefaultField = $path === 'content.editor_default';
     $isRouteModeDefaultField = $path === 'content.route_mode';
     $isRouteSeparatorDefaultField = $path === 'content.route_separator';
+    $isFeedsChannelField = $path === 'feed.channel';
     $isSiteEnabledField = $path === 'site.enabled';
     $isSiteProtocolField = $path === 'site.protocol';
     $isPanelDefaultThemeField = $path === 'panel.default_theme';
@@ -486,6 +495,8 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
     }
     $isRequired = in_array($path, ['site.domain', 'site.protocol', 'panel.path', 'site.enabled', 'database.driver', 'captcha.provider', 'mail.agent', 'content.editor_default', 'content.route_mode', 'content.route_separator', 'panel.default_theme', 'session.cookie.name', 'user.privacy', 'group.privacy', 'user.auth.login', 'user.auth.registration'], true);
     $disableUriNote = match ($path) {
+        'feed.rss' => ' (leave blank to disable RSS feeds)',
+        'feed.atom' => ' (leave blank to disable Atom feeds)',
         'category.prefix' => ' (leave blank to disable category URLs)',
         'tag.prefix' => ' (leave blank to disable tag URLs)',
         'user.prefix' => ' (leave blank to disable profile URLs)',
@@ -586,6 +597,27 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix): vo
             >
                 <option value="-"<?= (string) $field['value'] === '-' ? ' selected' : '' ?>>- (hyphen)</option>
                 <option value="_"<?= (string) $field['value'] === '_' ? ' selected' : '' ?>>_ (underscore)</option>
+            </select>
+        <?php elseif ($isFeedsChannelField): ?>
+            <select
+                class="form-select font-monospace"
+                id="<?= e($inputId) ?>"
+                name="<?= e($fieldName) ?>"
+            >
+                <option value=""<?= $inputValue === '' ? ' selected' : '' ?>>ALL CHANNELS</option>
+                <?php foreach ($channelOptions as $channelOption): ?>
+                    <?php $channelSlug = trim((string) ($channelOption['slug'] ?? '')); ?>
+                    <?php if ($channelSlug === ''): ?>
+                        <?php continue; ?>
+                    <?php endif; ?>
+                    <?php $channelName = trim((string) ($channelOption['name'] ?? '')); ?>
+                    <?php if (strtolower($channelSlug) === 'root'): ?>
+                        <?php $channelName = 'Root'; ?>
+                    <?php endif; ?>
+                    <option value="<?= e($channelSlug) ?>"<?= $inputValue === $channelSlug ? ' selected' : '' ?>>
+                        <?= e($channelName !== '' ? $channelName : $channelSlug) ?> (<?= e($channelSlug) ?>)
+                    </option>
+                <?php endforeach; ?>
             </select>
         <?php elseif ($isSiteEnabledField): ?>
             <select
@@ -941,28 +973,43 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             aria-labelledby="config-content-tab"
                             tabindex="0"
                         >
-                            <?php if ($contentGeneralConfigFields === [] && $contentCategoriesConfigFields === [] && $contentTagsConfigFields === []): ?>
+                            <?php if ($contentGeneralConfigFields === [] && $contentFeedsConfigFields === [] && $contentCategoriesConfigFields === [] && $contentTagsConfigFields === []): ?>
                                 <p class="text-muted mb-0">No configuration fields available.</p>
                             <?php else: ?>
+                                <?php $hasContentSections = false; ?>
+
                                 <?php if ($contentGeneralConfigFields !== []): ?>
                                     <h3>Pages</h3>
                                     <?php foreach ($contentGeneralConfigFields as $contentField): ?>
                                         <?php $renderConfigField($contentField); ?>
                                     <?php endforeach; ?>
+                                    <?php $hasContentSections = true; ?>
+                                <?php endif; ?>
+
+                                <?php if ($contentFeedsConfigFields !== []): ?>
+                                    <?php if ($hasContentSections): ?>
+                                        <hr class="my-4">
+                                    <?php endif; ?>
+                                    <h3>Feeds</h3>
+                                    <?php foreach ($contentFeedsConfigFields as $contentField): ?>
+                                        <?php $renderConfigField($contentField); ?>
+                                    <?php endforeach; ?>
+                                    <?php $hasContentSections = true; ?>
                                 <?php endif; ?>
 
                                 <?php if ($contentCategoriesConfigFields !== []): ?>
-                                    <?php if ($contentGeneralConfigFields !== []): ?>
+                                    <?php if ($hasContentSections): ?>
                                         <hr class="my-4">
                                     <?php endif; ?>
                                     <h3>Categories</h3>
                                     <?php foreach ($contentCategoriesConfigFields as $contentField): ?>
                                         <?php $renderConfigField($contentField); ?>
                                     <?php endforeach; ?>
+                                    <?php $hasContentSections = true; ?>
                                 <?php endif; ?>
 
                                 <?php if ($contentTagsConfigFields !== []): ?>
-                                    <?php if ($contentGeneralConfigFields !== [] || $contentCategoriesConfigFields !== []): ?>
+                                    <?php if ($hasContentSections): ?>
                                         <hr class="my-4">
                                     <?php endif; ?>
                                     <h3>Tags</h3>
@@ -1353,6 +1400,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
   (function () {
     var driverSelect = document.querySelector('[data-rvn-db-driver-select="1"]');
     var captchaProviderSelect = document.querySelector('[data-rvn-captcha-provider-select="1"]');
+    var feedsEnabledToggle = document.querySelector('[data-rvn-config-path="feed.enabled"] input.form-check-input[type="checkbox"]');
     var categoryEnabledToggle = document.querySelector('[data-rvn-config-path="category.enabled"] input.form-check-input[type="checkbox"]');
     var tagEnabledToggle = document.querySelector('[data-rvn-config-path="tag.enabled"] input.form-check-input[type="checkbox"]');
     var activeTabInput = document.getElementById('config-active-tab');
@@ -1391,6 +1439,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
       });
     }
     function syncTaxonomyRows() {
+      var feedsEnabled = !(feedsEnabledToggle instanceof HTMLInputElement) || feedsEnabledToggle.checked;
       var categoriesEnabled = !(categoryEnabledToggle instanceof HTMLInputElement) || categoryEnabledToggle.checked;
       var tagsEnabled = !(tagEnabledToggle instanceof HTMLInputElement) || tagEnabledToggle.checked;
       document.querySelectorAll('[data-rvn-config-path]').forEach(function (row) {
@@ -1398,7 +1447,11 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
           return;
         }
         var path = String(row.getAttribute('data-rvn-config-path') || '').toLowerCase();
-        if (path === 'category.enabled' || path === 'tag.enabled') {
+        if (path === 'feed.enabled' || path === 'category.enabled' || path === 'tag.enabled') {
+          return;
+        }
+        if (path.indexOf('feed.') === 0) {
+          row.classList.toggle('d-none', !feedsEnabled);
           return;
         }
         if (path.indexOf('category.') === 0) {

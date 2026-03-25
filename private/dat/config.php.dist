@@ -85,13 +85,13 @@ return array (
   ),
   'category' =>
   array (
-    'enabled' => true,
+    'enabled' => false,
     'prefix' => 'cat',
     'pagination' => 10,
   ),
   'tag' =>
   array (
-    'enabled' => true,
+    'enabled' => false,
     'prefix' => 'tag',
     'pagination' => 10,
   ),
@@ -100,6 +100,14 @@ return array (
     'editor_default' => 'tinymce',
     'route_mode' => 'slug',
     'route_separator' => '-',
+  ),
+  'feed' =>
+  array (
+    'enabled' => false,
+    'channel' => '',
+    'items' => 10,
+    'rss' => 'rss',
+    'atom' => 'atom',
   ),
   'captcha' =>
   array (

@@ -11,6 +11,9 @@
 
 /** @var array<string, string> $site */
 /** @var array<string, mixed>|null $channel */
+/** @var bool $feedsEnabled */
+/** @var string $rssFeedRoute */
+/** @var string $atomFeedRoute */
 /** @var string $imageAllowedExtensions */
 /** @var int|null $imageMaxFilesizeKb */
 /** @var array<string, array{width: int, height: int}> $imageVariantSpecs */
@@ -26,6 +29,7 @@ $channelName = trim((string) ($channel['name'] ?? ''));
 $channelId = (int) ($channel['id'] ?? 0);
 $hasPersistedChannel = $channelId > 0;
 $channelSlug = trim((string) ($channel['slug'] ?? ''));
+$feedEnabled = (bool) ($channel['feed_enabled'] ?? false);
 $editorOverride = strtolower(trim((string) ($channel['editor_override'] ?? 'inherit')));
 if (!in_array($editorOverride, ['inherit', 'tinymce', 'plaintext', 'autobr', 'markdown'], true)) {
     $editorOverride = 'inherit';
@@ -68,6 +72,16 @@ if ($previewCopyUrl !== '' && $publicBase !== '') {
 $channelPublicUrl = null;
 if ($channel !== null && $publicBase !== '' && $channelSlug !== '') {
     $channelPublicUrl = $publicBase . '/' . rawurlencode($channelSlug);
+}
+$rssFeedRoute = trim((string) ($rssFeedRoute ?? ''));
+$atomFeedRoute = trim((string) ($atomFeedRoute ?? ''));
+$channelFeedRoutes = [];
+$channelFeedSlug = $channelSlug !== '' ? $channelSlug : '{channel-slug}';
+if ($rssFeedRoute !== '') {
+    $channelFeedRoutes[] = '/' . $rssFeedRoute . '/' . $channelFeedSlug;
+}
+if ($atomFeedRoute !== '') {
+    $channelFeedRoutes[] = '/' . $atomFeedRoute . '/' . $channelFeedSlug;
 }
 ?>
 <header class="card">
@@ -267,6 +281,34 @@ if ($channel !== null && $publicBase !== '' && $channelSlug !== '') {
                     <label class="form-check-label" for="route_separator_underscore">_ (Underscore)</label>
                 </div>
             </div>
+
+            <?php if ($feedsEnabled): ?>
+                <div class="form-group mb-0 mt-3">
+                    <div class="form-check">
+                        <input
+                            class="form-check-input"
+                            type="checkbox"
+                            name="feed_enabled"
+                            id="feed_enabled"
+                            value="1"
+                            <?= $feedEnabled ? 'checked' : '' ?>
+                        >
+                        <label class="form-check-label" for="feed_enabled">Enable Feed?</label>
+                    </div>
+                    <div class="form-text">
+                        Enables channel-specific feeds for this channel.
+                        <?php if ($channelFeedRoutes !== []): ?>
+                            Routes:
+                            <?php foreach ($channelFeedRoutes as $index => $channelFeedRoute): ?>
+                                <?php if ($index > 0): ?>,<?php endif; ?>
+                                <code><?= e($channelFeedRoute) ?></code>
+                            <?php endforeach; ?>.
+                        <?php else: ?>
+                            Configure `feed.rss` and/or `feed.atom` globally to activate channel feed URLs.
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
 
         <div

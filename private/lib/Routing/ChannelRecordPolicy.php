@@ -56,6 +56,24 @@ final class ChannelRecordPolicy
         return $path === '' ? null : $path;
     }
 
+    public static function normalizeFeedEnabled(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (int) $value === 1;
+        }
+
+        if (!is_scalar($value) && $value !== null) {
+            return false;
+        }
+
+        $normalized = strtolower(trim((string) ($value ?? '')));
+        return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
+    }
+
     public static function normalizeChannelId(mixed $value): ?int
     {
         if (!is_scalar($value) && $value !== null) {

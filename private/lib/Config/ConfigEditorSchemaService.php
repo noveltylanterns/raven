@@ -41,6 +41,10 @@ final class ConfigEditorSchemaService
         'content.editor_default' => 'Default Text Editor',
         'content.route_mode' => 'Default Routing Mode',
         'content.route_separator' => 'Default Routing Separator',
+        'feed.channel' => 'Feed Channel',
+        'feed.items' => 'Feed Items',
+        'feed.rss' => 'RSS Feed Route',
+        'feed.atom' => 'Atom Feed Route',
         'category.prefix' => 'Category URL Prefix',
         'category.pagination' => 'Pagination',
         'tag.prefix' => 'Tag URL Prefix',
@@ -233,7 +237,58 @@ final class ConfigEditorSchemaService
             (string) ($content['route_separator'] ?? '-')
         );
 
+        $feed = $config['feed'] ?? null;
+        if (!is_array($feed)) {
+            $feed = [];
+        }
+        if (!array_key_exists('enabled', $feed)) {
+            $feed['enabled'] = false;
+        } else {
+            $feed['enabled'] = ConfigValueParser::bool($feed['enabled'], false);
+        }
+        if (!array_key_exists('channel', $feed)) {
+            $feed['channel'] = '';
+        } else {
+            $rawChannel = trim((string) ($feed['channel'] ?? ''));
+            if ($rawChannel === '') {
+                $feed['channel'] = '';
+            } else {
+                $feed['channel'] = $this->input->slug($rawChannel) ?? '';
+            }
+        }
+        if (!array_key_exists('items', $feed)) {
+            $feed['items'] = 10;
+        } else {
+            $rawItems = trim((string) ($feed['items'] ?? ''));
+            if ($rawItems === '' || preg_match('/^-?\d+$/', $rawItems) !== 1) {
+                $feed['items'] = 10;
+            } else {
+                $feed['items'] = max(1, (int) $rawItems);
+            }
+        }
+        if (!array_key_exists('rss', $feed)) {
+            $feed['rss'] = 'rss';
+        } else {
+            $rawRss = trim((string) ($feed['rss'] ?? ''));
+            if ($rawRss === '') {
+                $feed['rss'] = '';
+            } else {
+                $feed['rss'] = $this->input->slug($rawRss) ?? 'rss';
+            }
+        }
+        if (!array_key_exists('atom', $feed)) {
+            $feed['atom'] = 'atom';
+        } else {
+            $rawAtom = trim((string) ($feed['atom'] ?? ''));
+            if ($rawAtom === '') {
+                $feed['atom'] = '';
+            } else {
+                $feed['atom'] = $this->input->slug($rawAtom) ?? 'atom';
+            }
+        }
+
         $config['content'] = $content;
+        $config['feed'] = $feed;
         return $config;
     }
 
@@ -254,9 +309,9 @@ final class ConfigEditorSchemaService
         }
 
         if (!array_key_exists('enabled', $category)) {
-            $category['enabled'] = true;
+            $category['enabled'] = false;
         } else {
-            $category['enabled'] = ConfigValueParser::bool($category['enabled'], true);
+            $category['enabled'] = ConfigValueParser::bool($category['enabled'], false);
         }
 
         if (!array_key_exists('prefix', $category)) {
@@ -278,9 +333,9 @@ final class ConfigEditorSchemaService
         }
 
         if (!array_key_exists('enabled', $tag)) {
-            $tag['enabled'] = true;
+            $tag['enabled'] = false;
         } else {
-            $tag['enabled'] = ConfigValueParser::bool($tag['enabled'], true);
+            $tag['enabled'] = ConfigValueParser::bool($tag['enabled'], false);
         }
 
         if (!array_key_exists('prefix', $tag)) {

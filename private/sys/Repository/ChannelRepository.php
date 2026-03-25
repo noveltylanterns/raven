@@ -338,6 +338,7 @@ final class ChannelRepository
      *   name: string,
      *   slug: string,
      *   description: string,
+     *   feed_enabled?: bool,
      *   editor_override?: string,
      *   route_mode?: string,
      *   route_separator?: string
@@ -376,6 +377,9 @@ final class ChannelRepository
         $currentRaw = $oldSlug !== '' ? $this->channelFileStoreService->loadRawBySlug($oldSlug) : [];
         $customFields = is_array($currentRaw['custom_fields'] ?? null) ? $currentRaw['custom_fields'] : [];
         $overrides = is_array($currentRaw['overrides'] ?? null) ? $currentRaw['overrides'] : [];
+        $feedEnabled = array_key_exists('feed_enabled', $data)
+            ? ChannelRecordPolicy::normalizeFeedEnabled($data['feed_enabled'])
+            : ChannelRecordPolicy::normalizeFeedEnabled($currentRaw['feed_enabled'] ?? false);
         $createdAt = trim((string) ($currentRaw['created_at'] ?? ''));
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
@@ -386,6 +390,7 @@ final class ChannelRepository
             'name' => $name,
             'slug' => $slug,
             'description' => $description,
+            'feed_enabled' => $feedEnabled,
             'editor_override' => $editorOverride,
             'route_mode' => $routeMode,
             'route_separator' => $routeSeparator,
@@ -448,6 +453,9 @@ final class ChannelRepository
             'name' => (string) ($record['name'] ?? ''),
             'slug' => $slug,
             'description' => (string) ($record['description'] ?? ''),
+            'feed_enabled' => ChannelRecordPolicy::normalizeFeedEnabled(
+                $currentRaw['feed_enabled'] ?? ($record['feed_enabled'] ?? false)
+            ),
             'editor_override' => (string) ($record['editor_override'] ?? 'inherit'),
             'route_mode' => (string) ($record['route_mode'] ?? 'inherit'),
             'route_separator' => (string) ($record['route_separator'] ?? 'inherit'),
@@ -617,6 +625,7 @@ final class ChannelRepository
             'name' => ChannelRecordPolicy::ROOT_CHANNEL_NAME,
             'slug' => ChannelRecordPolicy::ROOT_CHANNEL_SLUG,
             'description' => trim((string) ($raw['description'] ?? '')),
+            'feed_enabled' => false,
             'editor_override' => ChannelRecordPolicy::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),

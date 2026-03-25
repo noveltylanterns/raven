@@ -254,6 +254,74 @@ final class PageRepository
     }
 
     /**
+     * Returns newest published pages, optionally scoped to one channel slug.
+     *
+     * Channel scope values:
+     * - `null` / `''`: all channels
+     * - `root`: root-scope pages only
+     * - any other slug: only that channel
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listRecentPublished(int $limit, ?string $channelSlug = null): array
+    {
+        $safeLimit = max(1, $limit);
+        $normalizedChannelSlug = strtolower(trim((string) ($channelSlug ?? '')));
+        $pages = $this->table('pages');
+        $sql = 'SELECT p.*
+                FROM ' . $pages . ' p
+                WHERE p.is_published = :is_published';
+        $params = [
+            ':is_published' => 1,
+        ];
+
+        $channel = null;
+        if ($normalizedChannelSlug === ChannelRecordPolicy::ROOT_CHANNEL_SLUG) {
+            $sql .= ' AND (p.channel_id = 0 OR p.channel_id IS NULL)';
+        } elseif ($normalizedChannelSlug !== '') {
+            $channel = $this->channelRepo->findBySlug($normalizedChannelSlug);
+            if ($channel === null) {
+                return [];
+            }
+
+            $channelId = (int) ($channel['id'] ?? 0);
+            if ($channelId < 1) {
+                return [];
+            }
+
+            $sql .= ' AND p.channel_id = :channel_id';
+            $params[':channel_id'] = $channelId;
+        }
+
+        $sql .= '
+                ORDER BY COALESCE(p.published_at, p.created_at) DESC, p.id DESC
+                LIMIT :limit';
+
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $channelsById = $normalizedChannelSlug === '' ? $this->channelsByIdMap() : null;
+        foreach ($rows as $index => $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $rows[$index] = $this->withChannelContext(
+                $this->hydratePageRow($row),
+                is_array($channel) ? $channel : null,
+                $channelsById
+            );
+        }
+
+        return $rows;
+    }
+
+    /**
      * Returns one total-count for panel page index with optional prefilters.
      */
     public function countForPanel(?string $channelSlug = null, ?int $categoryId = null, ?int $tagId = null): int
