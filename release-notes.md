@@ -16,7 +16,7 @@
 - Moved the canonical runtime config files to `private/dat/config.php` and `private/dat/config.php.dist`, updated installer/bootstrap/CLI/debug tooling to load them from `private/dat/`, and tightened `.gitignore` so `private/dat/` stays local except for the committed `.dist` templates.
 - Formalized the stock `<root>` channel with reserved id `0` and placeholder slug `root`, normalized root-scope pages/redirects onto channel id `0`, kept that stock channel out of public routing/channel dropdowns, and protected it from delete/edit actions.
 - Relaxed strict template redirect detection so `{redirect:404}`, `{redirect:denied}`, and `{redirect:disabled}` now force the matching stock status template even when other markup is present in the rendered template output.
-- Added a top-of-installer pre-flight checklist in `public/install.php` that reports pass/warn/fail status for PHP version, Composer install completeness, required runtime modules, `private/dat/` writability, template prerequisites, and available PDO database drivers, with PHP 8.5 treated as the target version but only a warning on other PHP 8.x releases.
+- Added a top-of-installer pre-flight checklist in `public/install.php` that reports pass/warn/fail status for PHP version, Composer install completeness, required runtime modules, `private/dat/` writability, template prerequisites, and one aggregate `Database driver` capability row (`SQLite: yes/no, MySQL: yes/no, PostgreSQL: yes/no`), with PHP 8.5 treated as the target version but only a warning on other PHP 8.x releases, and with the install form defaulting to the first available driver while preferring SQLite when present.
 
 ### March 21, 2026
 

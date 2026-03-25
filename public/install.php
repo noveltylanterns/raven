@@ -176,6 +176,34 @@ function installer_composer_install_status(string $root): array
 }
 
 /**
+ * Returns database driver support flags for installer choices.
+ *
+ * @return array{sqlite: bool, mysql: bool, pgsql: bool}
+ */
+function installer_database_driver_support(): array
+{
+    $pdoLoaded = extension_loaded('pdo');
+    $pdoDrivers = $pdoLoaded && class_exists(PDO::class) ? PDO::getAvailableDrivers() : [];
+
+    return [
+        'sqlite' => $pdoLoaded && in_array('sqlite', $pdoDrivers, true) && extension_loaded('pdo_sqlite'),
+        'mysql' => $pdoLoaded && in_array('mysql', $pdoDrivers, true) && extension_loaded('pdo_mysql'),
+        'pgsql' => $pdoLoaded && in_array('pgsql', $pdoDrivers, true) && extension_loaded('pdo_pgsql'),
+    ];
+}
+
+function installer_default_database_driver(array $driverSupport, string $fallback = 'sqlite'): string
+{
+    foreach (['sqlite', 'mysql', 'pgsql'] as $driverKey) {
+        if (!empty($driverSupport[$driverKey])) {
+            return $driverKey;
+        }
+    }
+
+    return in_array($fallback, ['sqlite', 'mysql', 'pgsql'], true) ? $fallback : 'sqlite';
+}
+
+/**
  * Builds installer pre-flight checklist rows.
  *
  * @return array{
@@ -196,15 +224,9 @@ function installer_composer_install_status(string $root): array
  */
 function installer_preflight_checklist(
     string $root,
-    string $selectedDriver,
     string $configTemplatePath,
     string $extensionStateTemplatePath
 ): array {
-    $selectedDriver = strtolower(trim($selectedDriver));
-    if (!in_array($selectedDriver, ['sqlite', 'mysql', 'pgsql'], true)) {
-        $selectedDriver = 'sqlite';
-    }
-
     $rows = [];
 
     $phpVersion = PHP_VERSION;
@@ -288,33 +310,22 @@ function installer_preflight_checklist(
         'error' => $extensionTemplateExists ? '' : 'Installer requires private/dat/ext/.state.php.dist.',
     ];
 
-    $pdoDrivers = $pdoLoaded && class_exists(PDO::class) ? PDO::getAvailableDrivers() : [];
-    $driverMap = [
-        'sqlite' => ['label' => 'SQLite driver', 'extension' => 'pdo_sqlite', 'name' => 'SQLite'],
-        'mysql' => ['label' => 'MySQL driver', 'extension' => 'pdo_mysql', 'name' => 'MySQL / MariaDB'],
-        'pgsql' => ['label' => 'PostgreSQL driver', 'extension' => 'pdo_pgsql', 'name' => 'PostgreSQL'],
-    ];
-    foreach ($driverMap as $driverKey => $driverMeta) {
-        $available = $pdoLoaded && in_array($driverKey, $pdoDrivers, true) && extension_loaded((string) $driverMeta['extension']);
-        $isSelected = $selectedDriver === $driverKey;
-        $status = $available ? 'pass' : ($isSelected ? 'fail' : 'warn');
-        $detail = $available
-            ? ((string) $driverMeta['name'] . ' support is available.')
-            : ($isSelected
-                ? ((string) $driverMeta['name'] . ' is selected but ' . (string) $driverMeta['extension'] . ' is not loaded.')
-                : ((string) $driverMeta['name'] . ' support is not available on this PHP build.'));
-        $error = (!$available && $isSelected)
-            ? ((string) $driverMeta['name'] . ' support is required for the selected install mode.')
-            : '';
-
-        $rows[] = [
-            'key' => 'driver_' . $driverKey,
-            'label' => (string) $driverMeta['label'],
-            'status' => $status,
-            'detail' => $detail,
-            'error' => $error,
-        ];
+    $driverSupport = installer_database_driver_support();
+    $availableDriverCount = 0;
+    foreach ($driverSupport as $isAvailable) {
+        if ($isAvailable) {
+            $availableDriverCount++;
+        }
     }
+    $rows[] = [
+        'key' => 'database_driver',
+        'label' => 'Database driver',
+        'status' => $availableDriverCount > 0 ? 'pass' : 'fail',
+        'detail' => 'SQLite: ' . ($driverSupport['sqlite'] ? 'yes' : 'no')
+            . ', MySQL: ' . ($driverSupport['mysql'] ? 'yes' : 'no')
+            . ', PostgreSQL: ' . ($driverSupport['pgsql'] ? 'yes' : 'no') . '.',
+        'error' => $availableDriverCount > 0 ? '' : 'At least one supported database driver must be available.',
+    ];
 
     $gdLoaded = extension_loaded('gd');
     $imagickLoaded = extension_loaded('imagick');
@@ -504,10 +515,17 @@ if ($defaultTablePrefix === '') {
 if ($existing === [] && strtolower($defaultTablePrefix) === 'raven_') {
     $defaultTablePrefix = 'rvn_';
 }
-$defaultDriver = strtolower(trim((string) ($defaultConfig['database']['driver'] ?? 'sqlite')));
-if (!in_array($defaultDriver, ['sqlite', 'mysql', 'pgsql'], true)) {
-    $defaultDriver = 'sqlite';
+$configuredDefaultDriver = strtolower(trim((string) ($defaultConfig['database']['driver'] ?? 'sqlite')));
+if (!in_array($configuredDefaultDriver, ['sqlite', 'mysql', 'pgsql'], true)) {
+    $configuredDefaultDriver = 'sqlite';
 }
+$driverSupport = installer_database_driver_support();
+$defaultDriver = installer_default_database_driver($driverSupport, $configuredDefaultDriver);
+$driverLabels = [
+    'sqlite' => 'SQLite',
+    'mysql' => 'MySQL / MariaDB',
+    'pgsql' => 'PostgreSQL',
+];
 $defaultSiteName = trim((string) ($defaultConfig['site']['name'] ?? 'Raven CMS'));
 if ($defaultSiteName === '') {
     $defaultSiteName = 'Raven CMS';
@@ -570,14 +588,8 @@ if ($isPost) {
     }
 }
 
-$selectedPreflightDriver = strtolower(trim((string) ($form['db_driver'] ?? $defaultDriver)));
-if (!in_array($selectedPreflightDriver, ['sqlite', 'mysql', 'pgsql'], true)) {
-    $selectedPreflightDriver = $defaultDriver;
-}
-
 $preflight = installer_preflight_checklist(
     $root,
-    $selectedPreflightDriver,
     $configTemplatePath,
     $extensionStateTemplatePath
 );
@@ -603,6 +615,8 @@ if ($isPost) {
     $driver = strtolower($form['db_driver']);
     if (!in_array($driver, ['sqlite', 'mysql', 'pgsql'], true)) {
         $errors[] = 'Database driver must be sqlite, mysql, or pgsql.';
+    } elseif (empty($driverSupport[$driver])) {
+        $errors[] = ($driverLabels[$driver] ?? ucfirst($driver)) . ' support is not available on this PHP build.';
     }
 
     $siteDomain = $form['site_domain'] !== '' ? $form['site_domain'] : $formPlaceholders['site_domain'];
@@ -894,25 +908,11 @@ if ($isPost) {
                 $rowStatus = (string) ($row['status'] ?? 'warn');
                 $rowLabel = (string) ($row['label'] ?? $rowKey);
                 $rowDetail = (string) ($row['detail'] ?? '');
-                $driverCheck = '';
-                $driverName = '';
-                if (str_starts_with($rowKey, 'driver_')) {
-                    $driverCheck = substr($rowKey, strlen('driver_'));
-                    $driverName = match ($driverCheck) {
-                        'sqlite' => 'SQLite',
-                        'mysql' => 'MySQL / MariaDB',
-                        'pgsql' => 'PostgreSQL',
-                        default => $driverCheck,
-                    };
-                }
                 ?>
                 <li
                     class="preflight-item is-<?= installer_e($rowStatus) ?>"
                     data-preflight-item="1"
                     data-preflight-status="<?= installer_e($rowStatus) ?>"
-                    <?= $driverCheck !== '' ? 'data-driver-check="' . installer_e($driverCheck) . '"' : '' ?>
-                    <?= $driverCheck !== '' ? 'data-driver-name="' . installer_e($driverName) . '"' : '' ?>
-                    <?= $driverCheck !== '' ? 'data-driver-available="' . (in_array($rowStatus, ['pass'], true) ? '1' : (str_contains($rowDetail, 'not available') || str_contains($rowDetail, 'not loaded') ? '0' : '1')) . '"' : '' ?>
                 >
                     <div class="preflight-row">
                         <div>
@@ -972,9 +972,13 @@ if ($isPost) {
                 <div class="field">
                     <label for="db_driver">Driver</label>
                     <select id="db_driver" name="db_driver" required>
-                        <option value="sqlite"<?= $form['db_driver'] === 'sqlite' ? ' selected' : '' ?>>SQLite</option>
-                        <option value="mysql"<?= $form['db_driver'] === 'mysql' ? ' selected' : '' ?>>MySQL / MariaDB</option>
-                        <option value="pgsql"<?= $form['db_driver'] === 'pgsql' ? ' selected' : '' ?>>PostgreSQL</option>
+                        <?php foreach ($driverLabels as $driverKey => $driverLabel): ?>
+                            <option
+                                value="<?= installer_e($driverKey) ?>"
+                                <?= $form['db_driver'] === $driverKey ? ' selected' : '' ?>
+                                <?= !($driverSupport[$driverKey] ?? false) ? ' disabled' : '' ?>
+                            ><?= installer_e($driverLabel) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="field" id="db_table_prefix_field">
@@ -1052,84 +1056,6 @@ if ($isPost) {
     var enableUsernamesInput = document.getElementById('enable_usernames');
     var adminUsernameField = document.getElementById('admin_username_field');
     var adminUsernameInput = document.getElementById('admin_username');
-    var preflightSummaryBadge = document.getElementById('preflight-summary-badge');
-    var preflightSummaryMeta = document.getElementById('preflight-summary-meta');
-
-    function setPreflightItemStatus(item, status, detail) {
-      if (!(item instanceof HTMLElement)) {
-        return;
-      }
-
-      item.dataset.preflightStatus = status;
-      item.classList.remove('is-pass', 'is-warn', 'is-fail');
-      item.classList.add('is-' + status);
-
-      var badge = item.querySelector('[data-preflight-badge="1"]');
-      if (badge instanceof HTMLElement) {
-        badge.classList.remove('pass', 'warn', 'fail');
-        badge.classList.add(status);
-        badge.textContent = status === 'pass' ? 'Pass' : (status === 'warn' ? 'Warn' : 'Fail');
-      }
-
-      var detailNode = item.querySelector('[data-preflight-detail="1"]');
-      if (detailNode instanceof HTMLElement) {
-        detailNode.textContent = detail;
-      }
-    }
-
-    function syncPreflightChecklist() {
-      var items = document.querySelectorAll('[data-preflight-item="1"]');
-      var selected = driverSelect.value;
-      var counts = { pass: 0, warn: 0, fail: 0 };
-
-      items.forEach(function (item) {
-        if (!(item instanceof HTMLElement)) {
-          return;
-        }
-
-        var driverKey = item.getAttribute('data-driver-check');
-        if (driverKey) {
-          var driverName = item.getAttribute('data-driver-name') || driverKey;
-          var available = item.getAttribute('data-driver-available') === '1';
-          if (available) {
-            setPreflightItemStatus(item, 'pass', driverName + ' support is available.');
-          } else if (selected === driverKey) {
-            var extensionName = driverKey === 'sqlite' ? 'pdo_sqlite' : (driverKey === 'mysql' ? 'pdo_mysql' : 'pdo_pgsql');
-            setPreflightItemStatus(item, 'fail', driverName + ' is selected but ' + extensionName + ' is not loaded.');
-          } else {
-            setPreflightItemStatus(item, 'warn', driverName + ' support is not available on this PHP build.');
-          }
-        }
-
-        var status = item.dataset.preflightStatus || 'warn';
-        if (!counts.hasOwnProperty(status)) {
-          status = 'warn';
-        }
-        counts[status] += 1;
-      });
-
-      var summaryStatus = 'pass';
-      var summaryLabel = 'Ready';
-      if (counts.fail > 0) {
-        summaryStatus = 'fail';
-        summaryLabel = 'Blocked';
-      } else if (counts.warn > 0) {
-        summaryStatus = 'warn';
-        summaryLabel = 'Warnings';
-      }
-
-      if (preflightSummaryBadge instanceof HTMLElement) {
-        preflightSummaryBadge.classList.remove('pass', 'warn', 'fail');
-        preflightSummaryBadge.classList.add(summaryStatus);
-        preflightSummaryBadge.textContent = summaryLabel;
-      }
-
-      if (preflightSummaryMeta instanceof HTMLElement) {
-        preflightSummaryMeta.textContent = String(counts.pass) + ' pass, '
-          + String(counts.warn) + ' warning' + (counts.warn === 1 ? '' : 's') + ', '
-          + String(counts.fail) + ' blocking issue' + (counts.fail === 1 ? '' : 's');
-      }
-    }
 
     function syncDriverSections() {
       var selected = driverSelect.value;
@@ -1148,8 +1074,6 @@ if ($isPost) {
       if (tablePrefixInput instanceof HTMLInputElement) {
         tablePrefixInput.disabled = selected === 'sqlite';
       }
-
-      syncPreflightChecklist();
     }
 
     driverSelect.addEventListener('change', syncDriverSections);
