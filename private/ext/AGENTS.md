@@ -1,6 +1,6 @@
 # Raven Extension Agent Guide
 
-Last updated: 2026-03-18
+Last updated: 2026-03-25
 
 ## Scope
 - This file defines the extension-authoring contract for `private/ext/`.
@@ -13,24 +13,35 @@ Last updated: 2026-03-18
 - Use `private/bin/rvn-sys extensions` for enabled-extension status snapshots.
 - Use `private/bin/rvn-theme list` / `enable` when validating extension-provided public views against active public-theme selection.
 
+## Mandatory First Step: Scaffold, Do Not Hand-Roll
+- Do not start a new extension by manually copying folders, mimicking stock extensions, or inventing a directory layout from memory.
+- Start with Raven's scaffold generator first:
+- `php private/bin/rvn-ext create --slug <slug> --name "<Name>" --type <helper|content|plugin|module|system>`
+- If you prefer the panel UI, use Extension Manager -> `Create New Extension`, which generates the same contract-compliant starter files.
+- After scaffold generation, edit the generated files in place.
+- Treat the scaffold as authoritative for current file/layout conventions.
+- If the scaffold output and older examples disagree, follow the scaffold.
+
 ## Agent Safe Mode (Mandatory)
 - If your model is unsure, do not improvise. Follow only the explicit contracts in this file.
 - Do not invent extra files, extra manifest keys, or custom bootstrap flows outside this contract.
 - Do not rename required files (`ext.json`, `ext.php`, `lib/schema.php`, route providers) unless requested by the operator.
+- Do not hand-build a fresh extension directory from scratch when Raven CLI scaffolding is available.
 - Build the smallest valid extension first, then add features in small steps.
 - After each step, run validation checks (JSON parse and `php -l`) before continuing.
 - If a requested behavior requires core edits, stop and report that it is a core change (not an extension-local change).
 
 ## Deterministic Build Recipe (Use This Order)
-1. Create folder: `private/ext/{slug}/` using a safe slug.
-2. Create `ext.json` first and validate JSON syntax.
-3. Add `ext.php` and `lib/schema.php` as no-op valid callables.
-4. Add `lib/routes_panel.php` and `tpl/panel_index.php` for panel-facing extension pages.
-5. Add `lib/routes_public.php` and `tpl/public_index.php` only for `module` extensions.
-6. Add `lib/shortcodes.php` for `helper`, `plugin`, or `module` types.
-7. Add `lib/fields.php` for `content`, `plugin`, or `module` types.
-8. If `lib/shortcodes.php` and/or `lib/fields.php` exist, ensure they match the universal contracts below.
-9. Only after files are valid, enable the extension from Extension Manager.
+1. Run `php private/bin/rvn-ext create --slug <slug> --name "<Name>" --type <type>` or generate the extension from Extension Manager.
+2. Inspect the generated scaffold and keep its file layout intact.
+3. Fill in `ext.json` metadata and validate JSON syntax.
+4. Implement `ext.php` service registration only when the extension actually needs services.
+5. Implement `lib/routes_panel.php` and `tpl/panel_*.php` for panel-facing pages.
+6. Implement `lib/routes_public.php` and `tpl/public_*.php` only for `module` extensions.
+7. Implement `lib/shortcodes.php` only for `helper`, `plugin`, or `module` types.
+8. Implement `lib/fields.php` only for `content`, `plugin`, or `module` types.
+9. Run validation checks (`php -l`, manifest validation) before enabling the extension.
+10. Only after files are valid, enable the extension from Extension Manager or `rvn-ext enable`.
 
 ## Canonical Minimal `ext.json` Templates
 - `plugin`:
@@ -194,11 +205,6 @@ return static function (): array {
  * docs: /private/ext/AGENTS.md
  */
 declare(strict_types=1);
-
-if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
-    http_response_code(404);
-    exit;
-}
 ?>
 <div class="card shadow-sm border-0">
   <div class="card-body">
@@ -249,6 +255,15 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - Optional page-editor shortcode provider: `private/ext/{directory_name}/lib/shortcodes.php`
 - Optional extension-local state file(s) when needed by your extension
 - Optional extension-owned panel templates: `private/ext/{directory_name}/tpl/*.php`
+
+## Extension Autoloading
+- Enabled extensions may autoload PHP classes from `private/ext/{slug}/src/`.
+- Namespace-to-path mapping is PSR-4-like from that `src/` root.
+- Example:
+- class `Raven\Smallweb\SmallwebService` must live at `private/ext/smallweb/src/Smallweb/SmallwebService.php`
+- class `Raven\Acme\Admin\Controller` must live at `private/ext/acme/src/Acme/Admin/Controller.php`
+- Do not flatten namespaced classes directly into `src/` unless the namespace path is also flat.
+- If an extension service class is not loading, check the namespace/path match first.
 
 ## Extension Enablement State
 - Runtime enablement state file: `private/dat/ext/.state.php`
@@ -388,6 +403,9 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - render extension body template to buffer
 - pass buffered HTML as `content` into panel layout render
 - pass `site`, `csrfField`, `section`, `showSidebar`, `userTheme`
+- Extension panel templates that are included directly via `ob_start()` + `require` must NOT use the `RAVEN_VIEW_RENDER_CONTEXT` guard.
+- That guard is only appropriate for templates loaded through the core View renderer (`$app['view']->render(...)`).
+- If you add the guard to a directly-required extension panel template, the template can exit with a raw 404 before the wrapper renders.
 - For extension sidebar/mobile nav category links:
 - extension must be enabled and manifest-valid
 - route path and nav section are derived from extension directory slug
@@ -433,6 +451,9 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 ## Permission And Security Requirements
 - All extension routes must enforce login/access by calling `requirePanelLogin`.
 - For non-system extensions, `requirePanelLogin` is wrapped by core to enforce the extension's configured panel permission bit.
+- Non-system extension permission bits are auto-allocated by Raven when the extension is enabled and stored in `private/dat/ext/.state.php`.
+- Extension authors do not manage these bits manually, but must understand that an enabled extension returning 404 can be a permission failure rather than a routing failure.
+- Super admins bypass extension permission-bit checks.
 - For system-level pages, enforce `canManageConfiguration()` explicitly.
 - For state-changing requests, validate CSRF with `$app['csrf']->validate(...)`.
 - Sanitize all user input through `$app['input']` (InputSanitizer).
@@ -482,6 +503,16 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 - Contact/Signup configuration remains DB-backed in shared prefixed extension tables (`{prefix}ext_contact`, `{prefix}ext_signups`).
 - Core public runtime still owns shortcode rendering and site-wide access/routing fallback policy.
 - Do not hard-patch core for one-off extension behavior unless explicitly planned and accepted as a core change.
+
+## Debugging Extension Issues
+- First check the PHP error log when an enabled extension page 404s or silently disappears.
+- If `ext.php` fails to bootstrap a service, route providers may have nothing usable to register and the extension can appear enabled while still returning 404.
+- A nav link appearing while the page 404s often means one of three things:
+- the extension service failed to bootstrap
+- the route file returned early because an expected service/container entry was missing
+- the current user lacks the extension permission bit
+- If an extension class is not found, verify the `src/` namespace-to-path mapping before changing route logic.
+- If a panel template returns a raw 404 immediately, remove any `RAVEN_VIEW_RENDER_CONTEXT` guard from directly-required extension panel templates.
 
 ## Coexistence Goal
 - This extension model is intended to let human-authored and AI-authored extensions run side-by-side.
