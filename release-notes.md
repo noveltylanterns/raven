@@ -24,6 +24,7 @@
 - Tightened updater dry-run planning again so the local side now uses git-managed file inventory instead of a blind recursive scan, which keeps ignored runtime trees out of the plan while still classifying tracked exceptions like `private/dat/config.php.dist` and `private/dat/ext/.state.php.dist` correctly.
 - Clarified the updater source selector so the default mirror option now renders as `Github Mirror (noveltylanterns/raven)`.
 - Simplified the updater repository-state card so revisions now render once as the full commit hash instead of duplicating short and long forms.
+- Updated the installer success redirect so a finished install now lands on the configured panel path instead of the public root, which is the more useful first destination before any frontend site content exists.
 
 ### March 21, 2026
 

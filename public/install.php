@@ -799,7 +799,8 @@ if ($isPost) {
                 throw new RuntimeException('Failed to write installer lock file.');
             }
 
-            header('Location: ' . $installerRootPath, true, 302);
+            $panelRedirectPath = ($installerRootPath !== '/' ? rtrim($installerRootPath, '/') : '') . '/' . ltrim($panelPath, '/');
+            header('Location: ' . $panelRedirectPath, true, 302);
             exit;
         } catch (\Throwable $exception) {
             $errors[] = 'Installation failed: ' . $exception->getMessage();
