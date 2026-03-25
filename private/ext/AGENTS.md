@@ -365,6 +365,7 @@ declare(strict_types=1);
 - `view`
 - `input`
 - `csrf`
+- `panel_site_data` => callable `fn(bool $includeDomain = true): array<string, mixed>` returning the canonical core-managed panel `site` payload for `panel/wrapper`
 - `categories`
 - `channels`
 - `groups`
@@ -401,8 +402,10 @@ declare(strict_types=1);
 - Extensions generally render via shared panel layout: `private/tpl/panel/wrapper.php`.
 - Typical render flow:
 - render extension body template to buffer
+- fetch canonical panel `site` payload from `$app['panel_site_data'](...)`
 - pass buffered HTML as `content` into panel layout render
 - pass `site`, `csrfField`, `section`, `showSidebar`, `userTheme`
+- Do not hand-build global wrapper navigation state inside extension routes. Global panel nav visibility belongs to core.
 - Extension panel templates that are included directly via `ob_start()` + `require` must NOT use the `RAVEN_VIEW_RENDER_CONTEXT` guard.
 - That guard is only appropriate for templates loaded through the core View renderer (`$app['view']->render(...)`).
 - If you add the guard to a directly-required extension panel template, the template can exit with a raw 404 before the wrapper renders.

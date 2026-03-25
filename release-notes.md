@@ -25,6 +25,8 @@
 - Clarified the updater source selector so the default mirror option now renders as `Github Mirror (noveltylanterns/raven)`.
 - Simplified the updater repository-state card so revisions now render once as the full commit hash instead of duplicating short and long forms.
 - Updated the installer success redirect so a finished install now lands on the configured panel path instead of the public root, which is the more useful first destination before any frontend site content exists.
+- Fixed panel taxonomy-nav visibility so category/tag menu items now derive from core bootstrap state on every panel request, instead of depending on whether individual extension views passed taxonomy flags into the shared wrapper.
+- Added a shared bootstrap `panel_site_data` helper for extension panel routes and updated both stock extension wrappers and extension scaffolds to use that core-managed site payload instead of assembling isolated `site` arrays by hand.
 
 ### March 21, 2026
 

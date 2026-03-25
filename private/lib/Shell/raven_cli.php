@@ -2165,6 +2165,20 @@ function raven_cli_extension_scaffold_files(string $extensionPath, array $meta, 
         "    \$slug = '" . addslashes($slug) . "';\n" .
         "    \$router->get('/' . \$slug, static function () use (\$context): void {\n" .
         "        \$view = \$context['app']['view'] ?? null;\n" .
+        "        \$panelSiteData = is_callable(\$context['app']['panel_site_data'] ?? null)\n" .
+        "            ? \$context['app']['panel_site_data']\n" .
+        "            : static function (bool \$includeDomain = true) use (\$context): array {\n" .
+        "                \$site = [\n" .
+        "                    'name' => (string) ((\$context['app']['config']->get('site.name', 'Raven CMS'))),\n" .
+        "                    'panel_path' => (string) ((\$context['app']['config']->get('panel.path', 'panel'))),\n" .
+        "                    'panel_brand_name' => (string) ((\$context['app']['config']->get('panel.brand_name', ''))),\n" .
+        "                    'panel_brand_logo' => (string) ((\$context['app']['config']->get('panel.brand_logo', ''))),\n" .
+        "                ];\n" .
+        "                if (\$includeDomain) {\n" .
+        "                    \$site['domain'] = (string) ((\$context['app']['config']->get('site.domain', 'localhost')));\n" .
+        "                }\n" .
+        "                return \$site;\n" .
+        "            };\n" .
         "        if (!\$view instanceof \\Raven\\Core\\View) {\n" .
         "            http_response_code(500);\n" .
         "            echo 'View service missing.';\n" .
@@ -2172,9 +2186,7 @@ function raven_cli_extension_scaffold_files(string $extensionPath, array $meta, 
         "        }\n" .
         "\n" .
         "        \$renderData = [\n" .
-        "            'site' => [\n" .
-        "                'name' => (string) ((\$context['app']['config']->get('site.name', 'Raven CMS'))),\n" .
-        "            ],\n" .
+        "            'site' => \$panelSiteData(false),\n" .
         "            'section' => \$slug,\n" .
         "            'showSidebar' => true,\n" .
         "            'userTheme' => is_callable(\$context['currentUserTheme'] ?? null) ? (\$context['currentUserTheme'])() : 'default',\n" .

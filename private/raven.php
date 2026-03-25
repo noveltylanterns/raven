@@ -16,6 +16,7 @@ use Raven\Core\Database\SchemaManager;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Media\PageImageManager;
 use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Session\SessionCookiePolicy;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
@@ -143,6 +144,7 @@ return (static function (): array {
     $channelRepo = new ChannelRepository($appDb, $driver, $prefix, $root . '/private/dat/channel');
     $categoryEnabled = ConfigValueParser::bool($config->get('category.enabled', true), true);
     $tagEnabled = ConfigValueParser::bool($config->get('tag.enabled', true), true);
+    $siteContextBuilder = new SiteContextBuilder();
     $app = [
         'root' => $root,
         'config' => $config,
@@ -154,6 +156,9 @@ return (static function (): array {
         'view' => new View($root . '/private/tpl'),
         'input' => $input,
         'csrf' => new Csrf(),
+        'panel_site_data' => static function (bool $includeDomain = true) use ($siteContextBuilder, $config, $categoryEnabled, $tagEnabled): array {
+            return $siteContextBuilder->panel($config, $categoryEnabled, $tagEnabled, $includeDomain);
+        },
         'category' => new CategoryRepository($appDb, $driver, $prefix),
         'channel' => $channelRepo,
         'group' => new GroupRepository($appDb, $driver, $prefix),

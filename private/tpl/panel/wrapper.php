@@ -59,8 +59,18 @@ $canManageTaxonomy = (bool) ($canManageTaxonomy ?? false);
 $canManageUsers = (bool) ($canManageUsers ?? false);
 $canManageGroups = (bool) ($canManageGroups ?? false);
 $canManageConfiguration = (bool) ($canManageConfiguration ?? false);
-$categoryEnabled = filter_var($site['category_enabled'] ?? true, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
-$tagEnabled = filter_var($site['tag_enabled'] ?? true, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+$sessionCategoryEnabled = $_SESSION['_raven_category_enabled'] ?? null;
+$sessionTagEnabled = $_SESSION['_raven_tag_enabled'] ?? null;
+$categoryEnabled = filter_var(
+    array_key_exists('category_enabled', $site) ? $site['category_enabled'] : $sessionCategoryEnabled,
+    FILTER_VALIDATE_BOOL,
+    FILTER_NULL_ON_FAILURE
+);
+$tagEnabled = filter_var(
+    array_key_exists('tag_enabled', $site) ? $site['tag_enabled'] : $sessionTagEnabled,
+    FILTER_VALIDATE_BOOL,
+    FILTER_NULL_ON_FAILURE
+);
 if (!is_bool($categoryEnabled)) {
     $categoryEnabled = true;
 }

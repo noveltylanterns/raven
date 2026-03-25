@@ -58,6 +58,8 @@ $panelController = new PanelController(
 
 $categoryEnabled = ConfigValueParser::bool($app['config']->get('category.enabled', true), true);
 $tagEnabled = ConfigValueParser::bool($app['config']->get('tag.enabled', true), true);
+$_SESSION['_raven_category_enabled'] = $categoryEnabled;
+$_SESSION['_raven_tag_enabled'] = $tagEnabled;
 
 /**
  * Normalizes request path into panel-internal path.

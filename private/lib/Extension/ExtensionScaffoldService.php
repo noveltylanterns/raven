@@ -431,12 +431,21 @@ return static function (Router $router, array $context): void {
             return;
         }
 
-        $site = [
-            'name' => (string) $app['config']->get('site.name', 'Raven CMS'),
-            'panel_path' => (string) $app['config']->get('panel.path', 'panel'),
-            'panel_brand_name' => (string) $app['config']->get('panel.brand_name', ''),
-            'panel_brand_logo' => (string) $app['config']->get('panel.brand_logo', ''),
-        ];
+        $panelSiteData = is_callable($app['panel_site_data'] ?? null)
+            ? $app['panel_site_data']
+            : static function (bool $includeDomain = true) use ($app): array {
+                $site = [
+                    'name' => (string) $app['config']->get('site.name', 'Raven CMS'),
+                    'panel_path' => (string) $app['config']->get('panel.path', 'panel'),
+                    'panel_brand_name' => (string) $app['config']->get('panel.brand_name', ''),
+                    'panel_brand_logo' => (string) $app['config']->get('panel.brand_logo', ''),
+                ];
+                if ($includeDomain) {
+                    $site['domain'] = (string) $app['config']->get('site.domain', 'localhost');
+                }
+                return $site;
+            };
+        $site = $panelSiteData();
         $csrfField = $app['csrf']->field();
 
         ob_start();
