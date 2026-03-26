@@ -227,7 +227,7 @@ if ($showExtensionsManagerLink) {
     $systemNavItems[] = ['label' => 'Extension Manager', 'path' => $panelBase . '/extensions', 'section' => 'extensions'];
 }
 if ($showUpdateSystemLink) {
-    $systemNavItems[] = ['label' => 'Update System', 'path' => $panelBase . '/update', 'section' => 'update'];
+    $systemNavItems[] = ['label' => 'Update Raven', 'path' => $panelBase . '/update', 'section' => 'update'];
 }
 foreach ($systemExtensionNavItems as $item) {
     $systemNavItems[] = $item;

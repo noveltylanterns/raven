@@ -64,7 +64,7 @@ $revisionRows = [
         <form id="update-system-form" method="post" action="<?= e($panelBase) ?>/update/action" class="mb-0">
             <?= $csrfField ?>
             <div>
-                <h1>Update System</h1>
+                <h1>Update Raven</h1>
                 <p class="text-muted mb-0">Compare this Raven install against a git source, dry run the overlay, or update the managed package files in place.</p>
             </div>
 

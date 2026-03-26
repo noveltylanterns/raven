@@ -95,7 +95,7 @@ final class PanelAccessCatalog
                 'delete' => PanelAccess::CONFIGURATION_DELETE,
             ],
             'update' => [
-                'label' => 'Update System',
+                'label' => 'Update Raven',
                 'view' => PanelAccess::MANAGE_CONFIGURATION,
             ],
         ];

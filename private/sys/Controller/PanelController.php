@@ -7003,7 +7003,7 @@ final class PanelController
             'flashSuccess' => $flashSuccess,
             'flashError' => $flashError,
             'section' => 'update',
-            'pageTitle' => 'Update System',
+            'pageTitle' => 'Update Raven',
             'showSidebar' => true,
             'userTheme' => $this->currentUserTheme(),
             'updateSource' => $source,
