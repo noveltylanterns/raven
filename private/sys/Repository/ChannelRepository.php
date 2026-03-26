@@ -257,6 +257,7 @@ final class ChannelRepository
                 'id' => (int) ($channel['id'] ?? 0),
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
+                'feed_enabled' => (bool) ($channel['feed_enabled'] ?? false),
                 'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
                 'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
                 'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),

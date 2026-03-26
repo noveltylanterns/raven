@@ -22,12 +22,16 @@ final class RoutingInventoryBuilder
      * @param array{
      *   reserved_prefixes?: array<int, string>,
      *   channel_index_template_exists?: bool,
+     *   feed_enabled?: bool,
+     *   rss_feed_route?: string,
+     *   atom_feed_route?: string,
      *   category_prefix?: string,
      *   tag_prefix?: string,
      *   profile_prefix?: string,
      *   profile_routes_enabled?: bool,
      *   group_prefix?: string,
      *   group_routes_enabled?: bool,
+     *   can_edit_configuration?: bool,
      *   can_edit_pages?: bool,
      *   can_edit_channels?: bool,
      *   can_edit_categories?: bool,
@@ -91,6 +95,10 @@ final class RoutingInventoryBuilder
         $profileRoutesEnabled = !empty($context['profile_routes_enabled']);
         $groupPrefix = trim((string) ($context['group_prefix'] ?? ''));
         $groupRoutesEnabled = !empty($context['group_routes_enabled']);
+        $feedEnabled = !empty($context['feed_enabled']);
+        $rssFeedRoute = trim((string) ($context['rss_feed_route'] ?? ''));
+        $atomFeedRoute = trim((string) ($context['atom_feed_route'] ?? ''));
+        $canEditConfiguration = !empty($context['can_edit_configuration']);
         $canEditPages = !empty($context['can_edit_pages']);
         $canEditChannels = !empty($context['can_edit_channels']);
         $canEditCategories = !empty($context['can_edit_categories']);
@@ -143,6 +151,46 @@ final class RoutingInventoryBuilder
             $channelLandingMap = [];
         }
 
+        if ($feedEnabled && $rssFeedRoute !== '') {
+            $publicUrl = '/' . $rssFeedRoute;
+            $conflictKey = strtolower($publicUrl);
+            $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
+
+            $rows[] = [
+                'type_key' => 'feed',
+                'type_label' => 'Feed',
+                'source_label' => 'RSS Feed',
+                'edit_url' => $canEditConfiguration ? (string) $panelUrl('/configuration?tab=content') : '',
+                'public_url' => $publicUrl,
+                'target_url' => $publicUrl,
+                'status_key' => 'active',
+                'status_label' => 'Active',
+                'notes' => '',
+                'is_conflict' => false,
+                '_conflict_key' => $conflictKey,
+            ];
+        }
+
+        if ($feedEnabled && $atomFeedRoute !== '') {
+            $publicUrl = '/' . $atomFeedRoute;
+            $conflictKey = strtolower($publicUrl);
+            $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
+
+            $rows[] = [
+                'type_key' => 'feed',
+                'type_label' => 'Feed',
+                'source_label' => 'Atom Feed',
+                'edit_url' => $canEditConfiguration ? (string) $panelUrl('/configuration?tab=content') : '',
+                'public_url' => $publicUrl,
+                'target_url' => $publicUrl,
+                'status_key' => 'active',
+                'status_label' => 'Active',
+                'notes' => '',
+                'is_conflict' => false,
+                '_conflict_key' => $conflictKey,
+            ];
+        }
+
         foreach ($channelRoutingOptions as $channel) {
             $channelId = (int) ($channel['id'] ?? 0);
             $channelSlug = trim((string) ($channel['slug'] ?? ''));
@@ -186,6 +234,52 @@ final class RoutingInventoryBuilder
                 'is_conflict' => false,
                 '_conflict_key' => $conflictKey,
             ];
+
+            if (!$feedEnabled || $isRootChannel || !(bool) ($channel['feed_enabled'] ?? false)) {
+                continue;
+            }
+
+            $channelLabel = trim((string) ($channel['name'] ?? '')) !== '' ? (string) $channel['name'] : $channelSlug;
+
+            if ($rssFeedRoute !== '') {
+                $feedUrl = '/' . $rssFeedRoute . '/' . $channelSlug;
+                $feedConflictKey = strtolower($feedUrl);
+                $pathUsage[$feedConflictKey] = (int) ($pathUsage[$feedConflictKey] ?? 0) + 1;
+
+                $rows[] = [
+                    'type_key' => 'feed',
+                    'type_label' => 'Feed',
+                    'source_label' => 'RSS Feed (' . $channelLabel . ')',
+                    'edit_url' => $canEditChannels ? (string) $panelUrl('/channel/edit/' . $channelId) : '',
+                    'public_url' => $feedUrl,
+                    'target_url' => $feedUrl,
+                    'status_key' => 'active',
+                    'status_label' => 'Active',
+                    'notes' => '',
+                    'is_conflict' => false,
+                    '_conflict_key' => $feedConflictKey,
+                ];
+            }
+
+            if ($atomFeedRoute !== '') {
+                $feedUrl = '/' . $atomFeedRoute . '/' . $channelSlug;
+                $feedConflictKey = strtolower($feedUrl);
+                $pathUsage[$feedConflictKey] = (int) ($pathUsage[$feedConflictKey] ?? 0) + 1;
+
+                $rows[] = [
+                    'type_key' => 'feed',
+                    'type_label' => 'Feed',
+                    'source_label' => 'Atom Feed (' . $channelLabel . ')',
+                    'edit_url' => $canEditChannels ? (string) $panelUrl('/channel/edit/' . $channelId) : '',
+                    'public_url' => $feedUrl,
+                    'target_url' => $feedUrl,
+                    'status_key' => 'active',
+                    'status_label' => 'Active',
+                    'notes' => '',
+                    'is_conflict' => false,
+                    '_conflict_key' => $feedConflictKey,
+                ];
+            }
         }
 
         foreach ($pagesForRouting as $page) {

@@ -111,6 +111,7 @@ Declared in `panel/index.php`:
 
 `routingRowsForPanel()` composes read-only inventory rows for:
 
+- Feeds (when root feed routes and channel-specific sub-feeds are active)
 - Channels
 - Pages
 - Categories (when category routes are enabled)
@@ -139,12 +140,13 @@ Each row includes:
 - Profile rows require enabled profile routing config.
 - Public profile routes use `/{user.prefix}/{username}` when `user.auth.login=username`, and `/{user.prefix}/{user_id}` when usernames are disabled (`user.auth.login=email`).
 - Group rows require enabled group routing config + per-group route toggle + non-guest/validating/banned group role.
-- Feed routes are public runtime routes only; they are not emitted as Routing Table inventory rows.
-- `GET /{feed.rss}` is active only when `feed.enabled` is on and `feed.rss` is non-blank.
-- `GET /{feed.atom}` is active only when `feed.enabled` is on and `feed.atom` is non-blank.
-- `GET /{feed.rss}/{channel_slug}` and `GET /{feed.atom}/{channel_slug}` are active only when feeds are enabled globally and the addressed channel has its per-channel feed toggle enabled.
+- Feed rows use the single Routing Table type label `Feed`.
+- `GET /{feed.rss}` is emitted when `feed.enabled` is on and `feed.rss` is non-blank.
+- `GET /{feed.atom}` is emitted when `feed.enabled` is on and `feed.atom` is non-blank.
+- `GET /{feed.rss}/{channel_slug}` and `GET /{feed.atom}/{channel_slug}` are emitted only when feeds are enabled globally and the addressed non-root channel has its per-channel feed toggle enabled.
 - `GET /{feed.rss}/{category.prefix}/{category_slug}` and `GET /{feed.atom}/{category.prefix}/{category_slug}` are active only when both feeds and category routes are enabled.
 - `GET /{feed.rss}/{tag.prefix}/{tag_slug}` and `GET /{feed.atom}/{tag.prefix}/{tag_slug}` are active only when both feeds and tag routes are enabled.
+- Category/tag feed routes remain public runtime routes for now and are not emitted as Routing Table inventory rows.
 - Edit links are emitted only when current user has the relevant management permission.
 
 ### Security/Validation Expectations

@@ -5872,7 +5872,7 @@ final class PanelController
     }
 
     /**
-     * Builds panel-visible routing inventory rows for page/channel/category/tag/redirect/user/group.
+     * Builds panel-visible routing inventory rows for feed/page/channel/category/tag/redirect/user/group.
      *
      * @return array<int, array{
      *   type_key: string,
@@ -5911,12 +5911,16 @@ final class PanelController
         return $this->routingInventoryBuilder()->buildRows([
             'reserved_prefixes' => $this->reservedPublicPrefixes(),
             'channel_index_template_exists' => $this->channelIndexTemplateExistsForRouting(),
+            'feed_enabled' => $this->routeConfigService()->feedEnabled(),
+            'rss_feed_route' => $this->routeConfigService()->rssFeedRoute(),
+            'atom_feed_route' => $this->routeConfigService()->atomFeedRoute(),
             'category_prefix' => $categoryPrefix,
             'tag_prefix' => $tagPrefix,
             'profile_prefix' => $profilePrefix,
             'profile_routes_enabled' => $profileRoutesEnabled,
             'group_prefix' => $groupPrefix,
             'group_routes_enabled' => $groupRoutesEnabled,
+            'can_edit_configuration' => $this->auth->canManageConfiguration(),
             'can_edit_pages' => $this->auth->hasPanelPermissionBit(PanelAccess::PAGES_EDIT),
             'can_edit_channels' => $this->auth->hasPanelPermissionBit(PanelAccess::CHANNELS_EDIT),
             'can_edit_categories' => $this->auth->hasPanelPermissionBit(PanelAccess::CATEGORIES_EDIT),

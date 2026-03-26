@@ -182,7 +182,7 @@ final class TaxonomyLookupRepository
      * Returns routing inventory taxonomy data in one query.
      *
      * @return array{
-     *   channel_options: array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>,
+     *   channel_options: array<int, array{id: int, name: string, slug: string, feed_enabled: bool, editor_override: string, route_mode: string, route_separator: string}>,
      *   category_options_all: array<int, array{id: int, name: string, slug: string}>,
      *   tag_options_all: array<int, array{id: int, name: string, slug: string}>,
      *   redirect_rows: array<int, array<string, mixed>>

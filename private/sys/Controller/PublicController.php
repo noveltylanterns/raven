@@ -583,7 +583,7 @@ final class PublicController
         $title = $siteName . ' ' . $formatLabel . ' Feed';
         $description = 'Latest pages from ' . $siteName . '.';
         if ($scopeLabel !== '') {
-            $title = $siteName . ' ' . $scopeLabel . ' ' . $formatLabel . ' Feed';
+            $title = $siteName . ' ' . $formatLabel . ' Feed (' . $scopeLabel . ')';
             $description = 'Latest pages from ' . $scopeLabel . ' on ' . $siteName . '.';
         }
 
