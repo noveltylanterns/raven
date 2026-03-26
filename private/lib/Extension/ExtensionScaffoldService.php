@@ -631,9 +631,19 @@ declare(strict_types=1);
 /**
  * Returns editor-insertable shortcode entries.
  *
+ * Supported context keys:
+ * - extension: current extension directory
+ * - forms: optional enabled-form loader
+ * - config: Raven config object
+ *
+ * @param array{
+ *   extension?: string,
+ *   forms?: callable(string): array<int, array{name: string, slug: string}>,
+ *   config?: \Raven\Core\Config
+ * } $context
  * @return array<int, array{label: string, shortcode: string}>
  */
-return static function (): array {
+return static function (array $context = []): array {
     return [];
 };
 PHP;

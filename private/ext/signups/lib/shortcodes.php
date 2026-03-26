@@ -14,7 +14,8 @@ declare(strict_types=1);
  *
  * @param array{
  *   extension?: string,
- *   forms?: callable(string): array<int, array{name: string, slug: string}>
+ *   forms?: callable(string): array<int, array{name: string, slug: string}>,
+ *   config?: \Raven\Core\Config
  * } $context
  * @return array<int, array{label: string, shortcode: string}>
  */

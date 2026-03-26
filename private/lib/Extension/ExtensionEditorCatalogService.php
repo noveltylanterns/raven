@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
 
+use Raven\Core\Config;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Content\BodyBlockPolicy;
 use Raven\Lib\Security\InputSanitizer;
@@ -128,7 +129,8 @@ final class ExtensionEditorCatalogService
         array $enabledMap,
         string $extensionsBasePath,
         callable $manifestReader,
-        callable $formsProvider
+        callable $formsProvider,
+        Config $config
     ): array {
         $items = [];
         foreach ($enabledMap as $extensionName => $enabled) {
@@ -154,6 +156,7 @@ final class ExtensionEditorCatalogService
                 [
                     'extension' => (string) $extensionName,
                     'forms' => $formsProvider,
+                    'config' => $config,
                 ]
             );
             if ($shortcodes === null) {

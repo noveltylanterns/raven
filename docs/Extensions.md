@@ -84,6 +84,10 @@ Page Editor shortcode insertion is generic for enabled extensions:
 
 - Extensions may optionally provide `private/ext/{slug}/lib/shortcodes.php`.
 - That provider can return shortcode items (`label` + literal `shortcode`) for the editor's `Extensions` button dropdown.
+- When the provider is callable, Raven passes a small context array including:
+  - `extension` => current extension directory slug
+  - `forms` => optional enabled-form loader for stock form-style extensions
+  - `config` => shared Raven config object
 
 If a feature needs generic public routing/hooks, treat it as a core platform change request.
 
@@ -110,6 +114,7 @@ Also:
 4. Add `lib/routes_panel.php` + `tpl/` only when panel pages are needed.
 5. Add `lib/routes_public.php` only for `module` extensions that need public endpoints.
 6. Add `lib/shortcodes.php` only when editor shortcode insertion is needed.
+   It may accept a context array so shortcode options can react to config without manually bootstrapping `ext.php`.
 7. Add extension-local state files only when necessary.
 8. Enable extension in Extension Manager.
 9. Verify permission masks, nav placement, CSRF-protected actions, and failure behavior.

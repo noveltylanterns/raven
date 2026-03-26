@@ -5332,7 +5332,7 @@ final class PanelController
      * and return either:
      * - array<int, array{label: string, shortcode: string}>
      * - callable(): array<int, array{label: string, shortcode: string}>
-     * - callable(array{extension: string, forms: callable(string): array<int, array{name: string, slug: string}>}):
+     * - callable(array{extension: string, forms: callable(string): array<int, array{name: string, slug: string}>, config: \Raven\Core\Config}):
      *   array<int, array{label: string, shortcode: string}>
      *
      * @param array<string, bool> $enabledMap
@@ -5344,7 +5344,8 @@ final class PanelController
             $enabledMap,
             $this->extensionsBasePath(),
             fn (string $extensionPath): array => $this->readExtensionManifest($extensionPath),
-            fn (string $tableName): array => $this->taxonomyLookupRepo->listEnabledExtensionForms($tableName)
+            fn (string $tableName): array => $this->taxonomyLookupRepo->listEnabledExtensionForms($tableName),
+            $this->config
         );
     }
 
@@ -6838,6 +6839,7 @@ final class PanelController
                 dirname(__DIR__, 3),
                 $this->extensionStateStore(),
                 $this->extensionPermissionCatalogService(),
+                $this->config,
                 $this->input
             );
         }

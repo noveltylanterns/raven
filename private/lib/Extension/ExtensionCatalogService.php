@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
 
+use Raven\Core\Config;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -15,6 +16,7 @@ final class ExtensionCatalogService
     private string $projectRoot;
     private ExtensionStateStore $stateStore;
     private ExtensionPermissionCatalogService $permissionCatalog;
+    private Config $config;
     private InputSanitizer $input;
     private ManifestContractValidator $manifestValidator;
 
@@ -22,12 +24,14 @@ final class ExtensionCatalogService
         string $projectRoot,
         ExtensionStateStore $stateStore,
         ExtensionPermissionCatalogService $permissionCatalog,
+        Config $config,
         InputSanitizer $input,
         ?ManifestContractValidator $manifestValidator = null
     ) {
         $this->projectRoot = rtrim($projectRoot, '/\\');
         $this->stateStore = $stateStore;
         $this->permissionCatalog = $permissionCatalog;
+        $this->config = $config;
         $this->input = $input;
         $this->manifestValidator = $manifestValidator ?? new ManifestContractValidator();
     }
@@ -351,6 +355,7 @@ final class ExtensionCatalogService
                 [
                     'extension' => $directorySlug,
                     'forms' => $formsProvider,
+                    'config' => $this->config,
                 ]
             );
             if ($shortcodesError !== null) {
