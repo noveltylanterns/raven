@@ -458,7 +458,7 @@ final class ExtensionCatalogService
      */
     public function stockExtensionDirectories(): array
     {
-        return ['contact', 'database', 'phpinfo', 'signups'];
+        return ['contact', 'database', 'phpinfo', 'signups', 'smallweb'];
     }
 
     public function isStockExtensionDirectory(string $directoryName): bool

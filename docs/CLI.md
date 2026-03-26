@@ -223,6 +223,6 @@ Use your local validation workflow to verify CLI basics:
 - category/channel/tag/redirect create-delete flow
 - config set/get/restore behavior
 - extension list/create/uninstall behavior
-- destructive-guard behavior (stock group delete blocked, stock extension/theme uninstall blocked, active-theme uninstall blocked)
+- destructive-guard behavior (stock group delete blocked, stock extensions such as `contact`, `database`, `phpinfo`, `signups`, and `smallweb` blocked from uninstall, active-theme uninstall blocked)
 - unsafe-input behavior (path-traversal slugs rejected, unsafe ZIP entry paths rejected on import)
 - dedicated web-security smoke runner for CSRF/auth/XSS-escape/SQLi-baseline checks

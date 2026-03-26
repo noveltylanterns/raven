@@ -177,6 +177,7 @@ Notes:
 
 - `panel_path` and `panel_section` are legacy manifest keys and are ignored.
 - Panel route/nav identity comes from the extension directory slug.
+- Current bundled stock extensions are `contact`, `database`, `phpinfo`, `signups`, and `smallweb`.
 - `local_storage: "on"` provisions `private/dat/ext/{slug}/` when the extension is enabled.
 - `db_storage: "on"` allows Raven to run `lib/schema.php` and use `{prefix}ext_{slug}` / `{prefix}ext_{slug}_*` tables.
 - Disabling an extension leaves storage intact; uninstalling a non-stock extension removes the storage it explicitly opted into and removes the package files, while stock extension uninstall only purges the opted-in storage and keeps the bundled extension files.
