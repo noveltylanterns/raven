@@ -353,7 +353,7 @@ body { background: #fff; color: #212529; }
 
 ## Template Data Contract
 - Wrapper receives:
-- `$site` with keys including `name`, `protocol`, `url`, `domain`, `current_url`
+- `$site` with keys including `name`, `protocol`, `url`, `domain`, `current_url`, `feed_rss_url`, and `feed_atom_url`
 - `$theme` with keys including `slug`, `active`, `url`
 - `$panel` with keys including `slug`, `url`
 - `$meta` with keys including `title`, `desc`, `image`, `url`, `apple_touch_icon`, `robots`, `og_locale`, `og_type`, `x_card`, `x_creator`, and `x_site`
@@ -362,6 +362,7 @@ body { background: #fff; color: #212529; }
 - page/home routes: `lg` variant of the page image marked as cover
 - category/tag routes: taxonomy preview/cover image
 - channel landing routes: channel preview/cover image
+- stock/core wrappers emit root-feed discovery tags from `site:feed_rss_url` and `site:feed_atom_url` when those URLs are non-empty
 - `$content` rendered body HTML
 - optionally one of: `$page`, `$channel`, `$category`, `$tag`, `$profile`, `$group`
 - optionally `$pagination`

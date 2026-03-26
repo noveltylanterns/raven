@@ -7,6 +7,7 @@ namespace Raven\Lib\Site;
 use Raven\Core\Config;
 use Raven\Lib\Http\RequestContextResolver;
 use Raven\Lib\Profile\ProfileContactService;
+use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\View\ThemeCatalogService;
 
 /**
@@ -18,17 +19,20 @@ final class PublicMetaService
     private SiteContextBuilder $siteContextBuilder;
     private ThemeCatalogService $themeCatalogService;
     private ProfileContactService $profileContactService;
+    private RouteConfigService $routeConfigService;
 
     public function __construct(
         RequestContextResolver $requestContextResolver,
         SiteContextBuilder $siteContextBuilder,
         ThemeCatalogService $themeCatalogService,
-        ProfileContactService $profileContactService
+        ProfileContactService $profileContactService,
+        RouteConfigService $routeConfigService
     ) {
         $this->requestContextResolver = $requestContextResolver;
         $this->siteContextBuilder = $siteContextBuilder;
         $this->themeCatalogService = $themeCatalogService;
         $this->profileContactService = $profileContactService;
+        $this->routeConfigService = $routeConfigService;
     }
 
     /**
@@ -41,7 +45,7 @@ final class PublicMetaService
         $configuredDomain = (string) $config->get('site.domain', 'localhost');
         $publicThemeActive = $this->themeCatalogService->cssSlug($publicTheme);
 
-        return $this->siteContextBuilder->publicBase(
+        $site = $this->siteContextBuilder->publicBase(
             $config,
             $this->requestContextResolver->siteBaseUrl($configuredDomain, $configuredProtocol),
             $this->requestContextResolver->currentRequestUrl($configuredDomain, $configuredProtocol),
@@ -49,6 +53,8 @@ final class PublicMetaService
             $publicThemeActive,
             $this->resolvedConfiguredMetaImageUrl($config, $configuredDomain, $configuredProtocol)
         );
+
+        return $this->withRootFeedUrls($site);
     }
 
     /**
@@ -164,6 +170,33 @@ final class PublicMetaService
         $configured = trim((string) $config->get('meta.image', ''));
 
         return $this->absoluteMetaImageUrl($configured, $configuredDomain, $configuredProtocol);
+    }
+
+    /**
+     * @param array<string, string> $site
+     * @return array<string, string>
+     */
+    private function withRootFeedUrls(array $site): array
+    {
+        $siteUrl = rtrim((string) ($site['url'] ?? ''), '/');
+        $site['feed_rss_url'] = '';
+        $site['feed_atom_url'] = '';
+
+        if ($siteUrl === '' || !$this->routeConfigService->feedEnabled()) {
+            return $site;
+        }
+
+        $rssRoute = $this->routeConfigService->rssFeedRoute();
+        if ($rssRoute !== '') {
+            $site['feed_rss_url'] = $siteUrl . '/' . ltrim($rssRoute, '/');
+        }
+
+        $atomRoute = $this->routeConfigService->atomFeedRoute();
+        if ($atomRoute !== '') {
+            $site['feed_atom_url'] = $siteUrl . '/' . ltrim($atomRoute, '/');
+        }
+
+        return $site;
     }
 
     /**

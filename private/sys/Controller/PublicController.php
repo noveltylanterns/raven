@@ -2168,7 +2168,8 @@ final class PublicController
                 $this->requestContextResolver(),
                 $this->siteContextBuilder(),
                 $this->themeCatalogService(),
-                $this->profileContactService()
+                $this->profileContactService(),
+                $this->routeConfigService()
             );
         }
 

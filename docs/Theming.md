@@ -18,6 +18,7 @@ Theme wrappers are expected at:
 
 - `public/theme/{slug}/tpl/wrapper.php`
 - Core fallback wrapper is `private/tpl/wrapper.php` and loads `/theme/fallback.css` (compiled from `public/theme/fallback.scss`).
+- Stock/core wrappers advertise configured root feeds in `<head>` using `{if site:feed_rss_url}<link rel="alternate" ...>{/if}` and `{if site:feed_atom_url}<link rel="alternate" ...>{/if}`.
 
 ## 2) Complete Brace-Tag Directive Inventory
 
@@ -101,6 +102,8 @@ Common shared keys:
 - `site:domain`
 - `site:protocol`
 - `site:current_url`
+- `site:feed_rss_url`
+- `site:feed_atom_url`
 - `theme:slug`
 - `theme:active`
 - `theme:url`

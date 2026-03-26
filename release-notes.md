@@ -14,6 +14,7 @@
 - Fixed unknown two-segment guest paths such as `/{channel}/{slug}` to fail closed with `404` when the channel slug does not exist instead of bubbling a redirect-channel exception into `500`, and suppressed guest-facing public profile/group username output entirely on email-login installs so email-derived identifiers no longer leak through profile headings or group member lists.
 - Extended the page-editor shortcode provider context so `private/ext/{slug}/lib/shortcodes.php` callables now receive Raven `config` alongside the existing extension/form helpers, and updated the extension scaffold/docs to advertise that supported contract.
 - Promoted `smallweb` into the bundled stock-extension set so panel/update/CLI stock-extension rules now treat it like the shipped core packages and protect it from uninstalling bundled files.
+- Added `site:feed_rss_url` and `site:feed_atom_url` to the public wrapper payload so stock/scaffold wrappers can emit `<link rel="alternate">` discovery tags for the configured root RSS and Atom feeds.
 
 ### March 24, 2026
 

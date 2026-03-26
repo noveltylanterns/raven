@@ -46,6 +46,8 @@ $documentTitle = $metaTitle === '' ? $siteName : ($metaTitle . ' [' . $siteName 
 <meta property="twitter:title" content="{meta:title} [{site:name}]">
 <meta property="twitter:url" content="{meta:url}">
 <link rel="apple-touch-icon" href="{meta:apple_touch_icon}">
+{if site:feed_rss_url}<link rel="alternate" type="application/rss+xml" title="RSS Feed" href="{site:feed_rss_url}">{/if}
+{if site:feed_atom_url}<link rel="alternate" type="application/atom+xml" title="Atom Feed" href="{site:feed_atom_url}">{/if}
 <link rel="stylesheet" href="{site:url}/theme/fallback.css">
 
 </head>

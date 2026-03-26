@@ -2720,6 +2720,8 @@ function raven_cli_theme_scaffold_files(array $meta): array
         . "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
         . "  <title><?= htmlspecialchars(\$documentTitle, ENT_QUOTES, 'UTF-8') ?></title>\n"
         . "  <meta name=\"description\" content=\"{meta:desc}\">\n"
+        . "  {if site:feed_rss_url}<link rel=\"alternate\" type=\"application/rss+xml\" title=\"RSS Feed\" href=\"{site:feed_rss_url}\">{/if}\n"
+        . "  {if site:feed_atom_url}<link rel=\"alternate\" type=\"application/atom+xml\" title=\"Atom Feed\" href=\"{site:feed_atom_url}\">{/if}\n"
         . "  <link rel=\"stylesheet\" href=\"{theme:url}/css/style.css\">\n"
         . "</head>\n"
         . "<body>\n"
