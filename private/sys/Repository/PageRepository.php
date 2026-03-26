@@ -322,6 +322,102 @@ final class PageRepository
     }
 
     /**
+     * Returns newest published pages scoped to an explicit list of channels.
+     *
+     * @param array<int, string> $channelSlugs
+     * @return array<int, array<string, mixed>>
+     */
+    public function listRecentPublishedForChannels(int $limit, array $channelSlugs): array
+    {
+        $safeLimit = max(1, $limit);
+        $normalizedSlugs = [];
+        foreach ($channelSlugs as $channelSlug) {
+            $normalized = strtolower(trim((string) $channelSlug));
+            if ($normalized === '') {
+                continue;
+            }
+
+            $normalizedSlugs[$normalized] = $normalized;
+        }
+
+        if ($normalizedSlugs === []) {
+            return [];
+        }
+
+        $pages = $this->table('pages');
+        $sql = 'SELECT p.*
+                FROM ' . $pages . ' p
+                WHERE p.is_published = :is_published';
+        $params = [
+            ':is_published' => 1,
+        ];
+
+        $clauses = [];
+        $includeRoot = isset($normalizedSlugs[ChannelRecordPolicy::ROOT_CHANNEL_SLUG]);
+        unset($normalizedSlugs[ChannelRecordPolicy::ROOT_CHANNEL_SLUG]);
+
+        if ($includeRoot) {
+            $clauses[] = '(p.channel_id = 0 OR p.channel_id IS NULL)';
+        }
+
+        $channelIds = [];
+        foreach ($normalizedSlugs as $normalizedSlug) {
+            $channel = $this->channelRepo->findBySlug($normalizedSlug);
+            if (!is_array($channel)) {
+                continue;
+            }
+
+            $channelId = (int) ($channel['id'] ?? 0);
+            if ($channelId < 1) {
+                continue;
+            }
+
+            $channelIds[$channelId] = $channelId;
+        }
+
+        if ($channelIds !== []) {
+            $placeholders = [];
+            $index = 0;
+            foreach ($channelIds as $channelId) {
+                $placeholder = ':channel_id_' . $index;
+                $placeholders[] = $placeholder;
+                $params[$placeholder] = $channelId;
+                $index++;
+            }
+
+            $clauses[] = 'p.channel_id IN (' . implode(', ', $placeholders) . ')';
+        }
+
+        if ($clauses === []) {
+            return [];
+        }
+
+        $sql .= ' AND (' . implode(' OR ', $clauses) . ')';
+        $sql .= '
+                ORDER BY COALESCE(p.published_at, p.created_at) DESC, p.id DESC
+                LIMIT :limit';
+
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $channelsById = $this->channelsByIdMap();
+        foreach ($rows as $index => $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $rows[$index] = $this->withChannelContext($this->hydratePageRow($row), null, $channelsById);
+        }
+
+        return $rows;
+    }
+
+    /**
      * Returns one total-count for panel page index with optional prefilters.
      */
     public function countForPanel(?string $channelSlug = null, ?int $categoryId = null, ?int $tagId = null): int

@@ -104,7 +104,10 @@ return array (
   'feed' =>
   array (
     'enabled' => false,
-    'channel' => '',
+    'channels' =>
+    array (
+      0 => 'all',
+    ),
     'items' => 10,
     'rss' => 'rss',
     'atom' => 'atom',

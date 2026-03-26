@@ -96,29 +96,6 @@ final class PanelConfigFieldPolicyService
             return $driver;
         }
 
-        if ($path === 'feed.channel') {
-            $channelSlug = $this->input->slug($value);
-            if ($channelSlug === null || $channelSlug === '') {
-                return '';
-            }
-
-            $allowed = [];
-            foreach ($feedChannelOptions as $channelOption) {
-                $optionSlug = $this->input->slug((string) ($channelOption['slug'] ?? ''));
-                if ($optionSlug === null || $optionSlug === '') {
-                    continue;
-                }
-
-                $allowed[$optionSlug] = true;
-            }
-
-            if (!isset($allowed[$channelSlug])) {
-                throw new \RuntimeException('feed.channel must be ALL CHANNELS or one of the existing channel slugs.');
-            }
-
-            return $channelSlug;
-        }
-
         if ($path === 'feed.items') {
             $items = $this->defaults->normalizeInt($path, $value);
             if ($items < 1) {
@@ -590,5 +567,53 @@ final class PanelConfigFieldPolicyService
             'null' => $value === '' ? null : $value,
             default => $value,
         };
+    }
+
+    /**
+     * @param mixed $rawValue
+     * @param array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}> $feedChannelOptions
+     * @return array<int, string>
+     */
+    public function normalizeFeedChannelsValue(mixed $rawValue, array $feedChannelOptions): array
+    {
+        $submitted = is_array($rawValue) ? $rawValue : [];
+        $allowed = [];
+        foreach ($feedChannelOptions as $channelOption) {
+            $optionSlug = $this->input->slug((string) ($channelOption['slug'] ?? ''));
+            if ($optionSlug === null || $optionSlug === '') {
+                continue;
+            }
+
+            $allowed[$optionSlug] = true;
+        }
+
+        $normalized = [];
+        foreach ($submitted as $candidate) {
+            $value = strtolower(trim((string) $candidate));
+            if ($value === '') {
+                continue;
+            }
+
+            if ($value === 'all') {
+                return ['all'];
+            }
+
+            $channelSlug = $this->input->slug($value);
+            if ($channelSlug === null || $channelSlug === '' || !isset($allowed[$channelSlug])) {
+                continue;
+            }
+
+            $normalized[$channelSlug] = $channelSlug;
+        }
+
+        if ($normalized === []) {
+            return [];
+        }
+
+        if ($allowed !== [] && count($normalized) === count($allowed)) {
+            return ['all'];
+        }
+
+        return array_values($normalized);
     }
 }

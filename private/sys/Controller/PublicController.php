@@ -399,8 +399,11 @@ final class PublicController
 
         $site = $this->siteData();
         $feedChannelSlug = '';
+        $configuredFeedChannels = $routeConfig->feedChannels();
         $scopeLabel = '';
         $scopeType = 'global';
+        $scopeSlug = '';
+        $pages = [];
         if ($channelSlug !== null) {
             $normalizedChannelSlug = strtolower(trim($channelSlug));
             if ($normalizedChannelSlug === '') {
@@ -417,26 +420,45 @@ final class PublicController
             $feedChannelSlug = $normalizedChannelSlug;
             $scopeLabel = $this->feedChannelLabel($feedChannelSlug);
             $scopeType = 'channel';
+            $scopeSlug = $feedChannelSlug;
+            $pages = $this->pageRepo->listRecentPublished($routeConfig->feedItems(), $feedChannelSlug);
         } else {
-            $feedChannelSlug = $routeConfig->feedChannel();
+            if (in_array('all', $configuredFeedChannels, true)) {
+                $pages = $this->pageRepo->listRecentPublished($routeConfig->feedItems(), null);
+            } else {
+                $selectedFeedChannels = array_values(array_filter(
+                    $configuredFeedChannels,
+                    static fn (string $configuredChannel): bool => $configuredChannel !== ''
+                ));
+                if (count($selectedFeedChannels) === 1) {
+                    $feedChannelSlug = $selectedFeedChannels[0];
+                    $scopeLabel = $this->feedChannelLabel($feedChannelSlug);
+                    $scopeType = 'channel';
+                    $scopeSlug = $feedChannelSlug;
+                } elseif ($selectedFeedChannels !== []) {
+                    $scopeLabel = 'Selected Channels';
+                    $scopeType = 'channels';
+                }
+
+                $pages = $this->pageRepo->listRecentPublishedForChannels(
+                    $routeConfig->feedItems(),
+                    $selectedFeedChannels
+                );
+            }
+
             if ($feedChannelSlug !== '') {
-                $scopeLabel = $this->feedChannelLabel($feedChannelSlug);
                 $scopeType = 'channel';
             }
         }
 
-        $pages = $this->pageRepo->listRecentPublished(
-            $routeConfig->feedItems(),
-            $feedChannelSlug !== '' ? $feedChannelSlug : null
-        );
         $feedPayload = $this->buildFeedPayload(
             $format,
-            $this->buildFeedRoutePath($routeSegment, $feedChannelSlug !== '' ? [$feedChannelSlug] : []),
+            $this->buildFeedRoutePath($routeSegment, $channelSlug !== null && $feedChannelSlug !== '' ? [$feedChannelSlug] : []),
             $scopeLabel,
             $site,
             $pages,
             $scopeType,
-            $feedChannelSlug
+            $scopeSlug
         );
 
         header(

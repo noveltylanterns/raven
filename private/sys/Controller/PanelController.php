@@ -3600,6 +3600,17 @@ final class PanelController
                     continue;
                 }
                 $type = (string) $field['type'];
+                if ($path === 'feed.channels') {
+                    $rawValue = is_array($rawConfigValues['feed']['channels'] ?? null)
+                        ? $rawConfigValues['feed']['channels']
+                        : [];
+                    $normalized = $this->panelConfigFieldPolicyService()->normalizeFeedChannelsValue(
+                        $rawValue,
+                        $this->channelRepo->listRoutingOptions()
+                    );
+                    $this->setNestedConfigValue($nextConfig, $segments, $normalized);
+                    continue;
+                }
                 $rawValue = $this->readNestedConfigValue($rawConfigValues, $segments);
                 $normalized = $this->normalizeConfigFieldValue($path, $type, $rawValue, $nextConfig);
                 $this->setNestedConfigValue($nextConfig, $segments, $normalized);

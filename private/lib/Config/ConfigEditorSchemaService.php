@@ -41,7 +41,7 @@ final class ConfigEditorSchemaService
         'content.editor_default' => 'Default Text Editor',
         'content.route_mode' => 'Default Routing Mode',
         'content.route_separator' => 'Default Routing Separator',
-        'feed.channel' => 'Feed Channel',
+        'feed.channels' => 'Feed Channels',
         'feed.items' => 'Feed Items',
         'feed.rss' => 'RSS Feed Route',
         'feed.atom' => 'Atom Feed Route',
@@ -103,14 +103,24 @@ final class ConfigEditorSchemaService
 
         foreach ($config as $key => $value) {
             $pathSegments = [...$segments, (string) $key];
+            $path = implode('.', $pathSegments);
+
+            if ($path === 'feed.channels') {
+                $fields[] = [
+                    'path' => $path,
+                    'segments' => $pathSegments,
+                    'label' => $this->labelFromPath($path),
+                    'type' => 'channels',
+                    'value' => '',
+                ];
+                continue;
+            }
 
             if (is_array($value)) {
                 // Continue walking nested config sections until leaf scalar values.
                 $fields = array_merge($fields, $this->flattenFields($value, $pathSegments));
                 continue;
             }
-
-            $path = implode('.', $pathSegments);
             // SQLite DB filenames are core-managed and intentionally hidden
             // from the configuration editor to keep installs consistent.
             // Public default theme is managed by Theme Manager / rvn-theme only.
@@ -246,16 +256,41 @@ final class ConfigEditorSchemaService
         } else {
             $feed['enabled'] = ConfigValueParser::bool($feed['enabled'], false);
         }
-        if (!array_key_exists('channel', $feed)) {
-            $feed['channel'] = '';
-        } else {
-            $rawChannel = trim((string) ($feed['channel'] ?? ''));
-            if ($rawChannel === '') {
-                $feed['channel'] = '';
-            } else {
-                $feed['channel'] = $this->input->slug($rawChannel) ?? '';
-            }
+        $channelsWereExplicit = array_key_exists('channels', $feed);
+        $rawChannels = $feed['channels'] ?? null;
+        if (!$channelsWereExplicit && array_key_exists('channel', $feed)) {
+            $legacyChannel = trim((string) ($feed['channel'] ?? ''));
+            $rawChannels = $legacyChannel === '' ? ['all'] : [$legacyChannel];
+            $channelsWereExplicit = true;
         }
+        if (!$channelsWereExplicit) {
+            $rawChannels = ['all'];
+        } elseif (!is_array($rawChannels)) {
+            $rawChannels = [];
+        }
+        $normalizedChannels = [];
+        foreach ($rawChannels as $rawChannel) {
+            $candidate = strtolower(trim((string) $rawChannel));
+            if ($candidate === '') {
+                continue;
+            }
+            if ($candidate === 'all') {
+                $normalizedChannels = ['all'];
+                break;
+            }
+
+            $channelSlug = $this->input->slug($candidate);
+            if ($channelSlug === null || $channelSlug === '') {
+                continue;
+            }
+
+            $normalizedChannels[$channelSlug] = $channelSlug;
+        }
+        $feed['channels'] = array_values($normalizedChannels);
+        if ($feed['channels'] === [] && !$channelsWereExplicit) {
+            $feed['channels'] = ['all'];
+        }
+        unset($feed['channel']);
         if (!array_key_exists('items', $feed)) {
             $feed['items'] = 10;
         } else {

@@ -35,6 +35,17 @@ $activeConfigTab = strtolower(trim((string) ($activeConfigTab ?? 'basic')));
 if (!in_array($activeConfigTab, ['basic', 'content', 'database', 'debug', 'media', 'meta', 'security', 'users'], true)) {
     $activeConfigTab = 'basic';
 }
+$selectedFeedChannels = $configSnapshot['feed']['channels'] ?? null;
+if (!is_array($selectedFeedChannels)) {
+    $selectedFeedChannels = ['all'];
+}
+$selectedFeedChannels = array_values(array_filter(
+    array_map(
+        static fn (mixed $channel): string => strtolower(trim((string) $channel)),
+        $selectedFeedChannels
+    ),
+    static fn (string $channel): bool => $channel !== ''
+));
 $siteDomainRaw = trim((string) (($configSnapshot['site']['domain'] ?? $site['domain'] ?? 'localhost')));
 if (str_contains($siteDomainRaw, '://')) {
     $parsedHost = trim((string) parse_url($siteDomainRaw, PHP_URL_HOST));
@@ -422,7 +433,7 @@ $isActiveConfigTab = static function (string $tabKey) use ($activeConfigTab): bo
  *   value: string
  * } $field
  */
-$renderConfigField = static function (array $field) use ($metaUrlPathPrefix, $channelOptions): void {
+$renderConfigField = static function (array $field) use ($metaUrlPathPrefix, $channelOptions, $selectedFeedChannels): void {
     $path = (string) $field['path'];
     $segments = (array) $field['segments'];
     $type = (string) $field['type'];
@@ -437,7 +448,7 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix, $ch
     $isEditorDefaultField = $path === 'content.editor_default';
     $isRouteModeDefaultField = $path === 'content.route_mode';
     $isRouteSeparatorDefaultField = $path === 'content.route_separator';
-    $isFeedsChannelField = $path === 'feed.channel';
+    $isFeedsChannelField = $path === 'feed.channels';
     $isSiteEnabledField = $path === 'site.enabled';
     $isSiteProtocolField = $path === 'site.protocol';
     $isPanelDefaultThemeField = $path === 'panel.default_theme';
@@ -512,7 +523,7 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix, $ch
         <?= $isCaptchaSpecificField ? 'data-rvn-captcha-section="' . e($captchaSection) . '"' : '' ?>
     >
         <?php if (!$isBooleanCheckboxField): ?>
-            <label class="form-label" for="<?= e($inputId) ?>"><?= e((string) $field['label']) ?></label>
+            <label class="form-label" for="<?= e($isFeedsChannelField ? $inputId . '_all' : $inputId) ?>"><?= e((string) $field['label']) ?></label>
         <?php endif; ?>
         <?php if ($isBooleanCheckboxField): ?>
             <input type="hidden" name="<?= e($fieldName) ?>" value="false">
@@ -599,26 +610,47 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix, $ch
                 <option value="_"<?= (string) $field['value'] === '_' ? ' selected' : '' ?>>_ (underscore)</option>
             </select>
         <?php elseif ($isFeedsChannelField): ?>
-            <select
-                class="form-select font-monospace"
-                id="<?= e($inputId) ?>"
-                name="<?= e($fieldName) ?>"
-            >
-                <option value=""<?= $inputValue === '' ? ' selected' : '' ?>>ALL CHANNELS</option>
+            <?php $feedChannelFieldName = $fieldName . '[]'; ?>
+            <?php $allChannelsSelected = in_array('all', $selectedFeedChannels, true); ?>
+            <div class="border rounded p-3" id="<?= e($inputId) ?>" data-rvn-feed-channels="1">
+                <div class="form-check mb-2">
+                    <input
+                        type="checkbox"
+                        class="form-check-input"
+                        id="<?= e($inputId) ?>_all"
+                        name="<?= e($feedChannelFieldName) ?>"
+                        value="all"
+                        data-rvn-feed-channel-all="1"
+                        <?= $allChannelsSelected ? 'checked' : '' ?>
+                    >
+                    <label class="form-check-label" for="<?= e($inputId) ?>_all">All Channels</label>
+                </div>
                 <?php foreach ($channelOptions as $channelOption): ?>
-                    <?php $channelSlug = trim((string) ($channelOption['slug'] ?? '')); ?>
+                    <?php $channelSlug = strtolower(trim((string) ($channelOption['slug'] ?? ''))); ?>
                     <?php if ($channelSlug === ''): ?>
                         <?php continue; ?>
                     <?php endif; ?>
                     <?php $channelName = trim((string) ($channelOption['name'] ?? '')); ?>
-                    <?php if (strtolower($channelSlug) === 'root'): ?>
+                    <?php if ($channelSlug === 'root'): ?>
                         <?php $channelName = 'Root'; ?>
                     <?php endif; ?>
-                    <option value="<?= e($channelSlug) ?>"<?= $inputValue === $channelSlug ? ' selected' : '' ?>>
-                        <?= e($channelName !== '' ? $channelName : $channelSlug) ?> (<?= e($channelSlug) ?>)
-                    </option>
+                    <?php $channelChecked = $allChannelsSelected || in_array($channelSlug, $selectedFeedChannels, true); ?>
+                    <div class="form-check">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="<?= e($inputId) ?>_<?= e($channelSlug) ?>"
+                            name="<?= e($feedChannelFieldName) ?>"
+                            value="<?= e($channelSlug) ?>"
+                            data-rvn-feed-channel-item="1"
+                            <?= $channelChecked ? 'checked' : '' ?>
+                        >
+                        <label class="form-check-label" for="<?= e($inputId) ?>_<?= e($channelSlug) ?>">
+                            <?= e($channelName !== '' ? $channelName : $channelSlug) ?> (<?= e($channelSlug) ?>)
+                        </label>
+                    </div>
                 <?php endforeach; ?>
-            </select>
+            </div>
         <?php elseif ($isSiteEnabledField): ?>
             <select
                 class="form-select font-monospace"
@@ -1401,6 +1433,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
     var driverSelect = document.querySelector('[data-rvn-db-driver-select="1"]');
     var captchaProviderSelect = document.querySelector('[data-rvn-captcha-provider-select="1"]');
     var feedsEnabledToggle = document.querySelector('[data-rvn-config-path="feed.enabled"] input.form-check-input[type="checkbox"]');
+    var feedChannelsContainer = document.querySelector('[data-rvn-config-path="feed.channels"] [data-rvn-feed-channels="1"]');
     var categoryEnabledToggle = document.querySelector('[data-rvn-config-path="category.enabled"] input.form-check-input[type="checkbox"]');
     var tagEnabledToggle = document.querySelector('[data-rvn-config-path="tag.enabled"] input.form-check-input[type="checkbox"]');
     var activeTabInput = document.getElementById('config-active-tab');
@@ -1463,6 +1496,45 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
         }
       });
     }
+    function syncFeedChannelSelectionFromAll() {
+      if (!(feedChannelsContainer instanceof HTMLElement)) {
+        return;
+      }
+      var allToggle = feedChannelsContainer.querySelector('[data-rvn-feed-channel-all="1"]');
+      if (!(allToggle instanceof HTMLInputElement)) {
+        return;
+      }
+      feedChannelsContainer.querySelectorAll('[data-rvn-feed-channel-item="1"]').forEach(function (checkbox) {
+        if (!(checkbox instanceof HTMLInputElement)) {
+          return;
+        }
+        checkbox.checked = allToggle.checked;
+      });
+      allToggle.indeterminate = false;
+    }
+    function syncFeedChannelAllState() {
+      if (!(feedChannelsContainer instanceof HTMLElement)) {
+        return;
+      }
+      var allToggle = feedChannelsContainer.querySelector('[data-rvn-feed-channel-all="1"]');
+      if (!(allToggle instanceof HTMLInputElement)) {
+        return;
+      }
+      var items = Array.prototype.slice.call(
+        feedChannelsContainer.querySelectorAll('[data-rvn-feed-channel-item="1"]')
+      ).filter(function (checkbox) {
+        return checkbox instanceof HTMLInputElement;
+      });
+      if (items.length === 0) {
+        allToggle.indeterminate = false;
+        return;
+      }
+      var checkedCount = items.filter(function (checkbox) {
+        return checkbox.checked;
+      }).length;
+      allToggle.checked = checkedCount === items.length;
+      allToggle.indeterminate = checkedCount > 0 && checkedCount < items.length;
+    }
     function tabKeyFromButton(button) {
       if (!(button instanceof HTMLElement)) {
         return 'basic';
@@ -1492,6 +1564,25 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
       captchaProviderSelect.addEventListener('change', syncCaptchaRows);
     }
     syncCaptchaRows();
+    if (feedsEnabledToggle instanceof HTMLInputElement) {
+      feedsEnabledToggle.addEventListener('change', syncTaxonomyRows);
+    }
+    if (feedChannelsContainer instanceof HTMLElement) {
+      var feedChannelsAllToggle = feedChannelsContainer.querySelector('[data-rvn-feed-channel-all="1"]');
+      if (feedChannelsAllToggle instanceof HTMLInputElement) {
+        feedChannelsAllToggle.addEventListener('change', syncFeedChannelSelectionFromAll);
+      }
+      feedChannelsContainer.querySelectorAll('[data-rvn-feed-channel-item="1"]').forEach(function (checkbox) {
+        if (!(checkbox instanceof HTMLInputElement)) {
+          return;
+        }
+        checkbox.addEventListener('change', syncFeedChannelAllState);
+      });
+      syncFeedChannelAllState();
+      if (feedChannelsAllToggle instanceof HTMLInputElement && feedChannelsAllToggle.checked) {
+        syncFeedChannelSelectionFromAll();
+      }
+    }
     if (categoryEnabledToggle instanceof HTMLInputElement) {
       categoryEnabledToggle.addEventListener('change', syncTaxonomyRows);
     }

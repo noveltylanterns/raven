@@ -73,15 +73,37 @@ final class RouteConfigService
         return $this->normalizeRoutePrefix((string) $this->config->get('feed.atom', 'atom'), 'atom', true);
     }
 
-    public function feedChannel(): string
+    /**
+     * @return array<int, string>
+     */
+    public function feedChannels(): array
     {
-        $channel = trim((string) $this->config->get('feed.channel', ''));
-        if ($channel === '') {
-            return '';
+        $rawChannels = $this->config->get('feed.channels', null);
+        if (!is_array($rawChannels)) {
+            $legacyChannel = trim((string) $this->config->get('feed.channel', ''));
+            $rawChannels = $legacyChannel === '' ? ['all'] : [$legacyChannel];
         }
 
-        $normalized = $this->input->slug($channel);
-        return $normalized ?? '';
+        $normalizedChannels = [];
+        foreach ($rawChannels as $rawChannel) {
+            $channel = strtolower(trim((string) $rawChannel));
+            if ($channel === '') {
+                continue;
+            }
+
+            if ($channel === 'all') {
+                return ['all'];
+            }
+
+            $normalized = $channel === 'root' ? 'root' : $this->input->slug($channel);
+            if ($normalized === null || $normalized === '') {
+                continue;
+            }
+
+            $normalizedChannels[$normalized] = $normalized;
+        }
+
+        return array_values($normalizedChannels);
     }
 
     public function feedItems(): int

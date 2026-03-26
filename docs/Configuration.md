@@ -74,7 +74,10 @@ Grouped sections:
 Notable options:
 
 - `feed.enabled`, `category.enabled`, and `tag.enabled` default to disabled on new installs.
-- `feed.channel` defaults to `ALL CHANNELS` and offers `Root` plus the existing named channel slugs from the system channel list.
+- `feed.channels` defaults to `All Channels` and renders as checkbox items for `All Channels`, `Root`, and the existing named channel slugs from the system channel list.
+- checking `All Channels` auto-checks every channel box; clearing individual boxes automatically clears the top-level all-channels state
+- `feed.channels` filters the root feed routes at `/{feed.rss}` and `/{feed.atom}` only; channel sub-feeds stay controlled by each channel's own `Enable Feed?` setting
+- new installs seed `feed.channels.0` to `all` in `private/dat/config.php`, which is the stored sentinel behind the `All Channels` default
 - `feed.items` defaults to `10` and accepts whole numeric integers only.
 - `feed.rss` and `feed.atom` default to `rss` and `atom`, and either field can be left blank to disable that specific feed route.
 - `category.enabled` and `tag.enabled` toggle taxonomy availability in both panel and public runtime.
@@ -261,7 +264,8 @@ The following config keys are expected to appear in this document and in runtime
 - `content.route_mode`
 - `content.route_separator`
 - `feed.enabled`
-- `feed.channel`
+- `feed.channels`
+- `feed.channels.0`
 - `feed.items`
 - `feed.rss`
 - `feed.atom`
