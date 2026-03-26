@@ -1,9 +1,14 @@
-# Local runtime configuration
+# Local runtime data & configuration
 /private/dat/**
 !/private/dat/config.php.dist
 !/private/dat/ext/
 /private/dat/ext/*
 !/private/dat/ext/.state.php.dist
+/finger/
+/fingers/
+/gemini/
+/gopher/
+/spartan/
 
 # Uploaded media files (keep directory, ignore contents)
 /public/uploads/*
