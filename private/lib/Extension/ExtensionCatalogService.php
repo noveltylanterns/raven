@@ -19,6 +19,7 @@ final class ExtensionCatalogService
     private Config $config;
     private InputSanitizer $input;
     private ManifestContractValidator $manifestValidator;
+    private ExtensionBootstrapContractResolver $bootstrapContractResolver;
 
     public function __construct(
         string $projectRoot,
@@ -26,7 +27,8 @@ final class ExtensionCatalogService
         ExtensionPermissionCatalogService $permissionCatalog,
         Config $config,
         InputSanitizer $input,
-        ?ManifestContractValidator $manifestValidator = null
+        ?ManifestContractValidator $manifestValidator = null,
+        ?ExtensionBootstrapContractResolver $bootstrapContractResolver = null
     ) {
         $this->projectRoot = rtrim($projectRoot, '/\\');
         $this->stateStore = $stateStore;
@@ -34,6 +36,7 @@ final class ExtensionCatalogService
         $this->config = $config;
         $this->input = $input;
         $this->manifestValidator = $manifestValidator ?? new ManifestContractValidator();
+        $this->bootstrapContractResolver = $bootstrapContractResolver ?? new ExtensionBootstrapContractResolver($this->manifestValidator);
     }
 
     /**
@@ -94,7 +97,7 @@ final class ExtensionCatalogService
 
             $extensions[] = [
                 'directory' => $entry,
-                'type' => (string) ($manifest['type'] ?? 'plugin'),
+                'type' => (string) ($manifest['type'] ?? 'content'),
                 'panel_path' => $hasPanelRoutes ? $entry : '',
                 'has_panel_routes' => $hasPanelRoutes,
                 'name' => $manifest['name'] !== '' ? $manifest['name'] : $entry,
@@ -169,7 +172,7 @@ final class ExtensionCatalogService
             return [
                 'valid' => false,
                 'invalid_reason' => 'Missing required ext.json manifest.',
-                'type' => 'plugin',
+                'type' => 'content',
                 'panel_path' => '',
                 'name' => '',
                 'version' => '',
@@ -189,7 +192,7 @@ final class ExtensionCatalogService
             return [
                 'valid' => false,
                 'invalid_reason' => 'ext.json is empty or unreadable.',
-                'type' => 'plugin',
+                'type' => 'content',
                 'panel_path' => '',
                 'name' => '',
                 'version' => '',
@@ -210,7 +213,7 @@ final class ExtensionCatalogService
             return [
                 'valid' => false,
                 'invalid_reason' => 'ext.json must contain a JSON object.',
-                'type' => 'plugin',
+                'type' => 'content',
                 'panel_path' => '',
                 'name' => '',
                 'version' => '',
@@ -230,7 +233,7 @@ final class ExtensionCatalogService
             return [
                 'valid' => false,
                 'invalid_reason' => 'ext.json must include a non-empty "name" value.',
-                'type' => 'plugin',
+                'type' => 'content',
                 'panel_path' => '',
                 'name' => '',
                 'version' => '',
@@ -250,7 +253,7 @@ final class ExtensionCatalogService
             return [
                 'valid' => false,
                 'invalid_reason' => 'ext.json must include a valid "slug" value.',
-                'type' => 'plugin',
+                'type' => 'content',
                 'panel_path' => '',
                 'name' => '',
                 'version' => '',
@@ -265,10 +268,7 @@ final class ExtensionCatalogService
             ];
         }
 
-        $type = strtolower(trim((string) ($decoded['type'] ?? 'plugin')));
-        if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
-            $type = 'plugin';
-        }
+        $type = $this->manifestValidator->normalizeType((string) ($decoded['type'] ?? 'content'));
         $localStorage = $this->manifestValidator->storageEnabled($decoded['local_storage'] ?? null);
         if ($localStorage === null) {
             return [
@@ -346,6 +346,32 @@ final class ExtensionCatalogService
                 'permission_levels' => $permissionLevels,
                 'default_permission_level' => $defaultPermissionLevel,
             ];
+        }
+
+        if ($directorySlug !== '') {
+            $bootstrapContract = $this->bootstrapContractResolver->resolve($this->projectRoot, $directorySlug, [
+                'type' => $type,
+                'local_storage' => $localStorage,
+                'db_storage' => $dbStorage,
+            ]);
+            if (!$bootstrapContract['valid']) {
+                return [
+                    'valid' => false,
+                    'invalid_reason' => 'Invalid ext.php: ' . (string) ($bootstrapContract['error'] ?? 'Invalid extension bootstrap contract.'),
+                    'type' => $type,
+                    'panel_path' => $panelPath,
+                    'name' => $name,
+                    'version' => $this->input->text((string) ($decoded['version'] ?? ''), 80),
+                    'description' => $this->input->text((string) ($decoded['description'] ?? ''), 1000),
+                    'author' => $author,
+                    'author_url' => $authorUrl,
+                    'homepage' => $homepage,
+                    'local_storage' => $localStorage,
+                    'db_storage' => $dbStorage,
+                    'permission_levels' => $permissionLevels,
+                    'default_permission_level' => $defaultPermissionLevel,
+                ];
+            }
         }
 
         if ($directorySlug !== '') {
@@ -487,20 +513,6 @@ final class ExtensionCatalogService
 
     private function extensionTypeContractError(string $extensionPath, string $type): ?string
     {
-        $hasPublicRoutes = is_file(rtrim($extensionPath, '/') . '/lib/routes_public.php');
-        $hasShortcodes = is_file(rtrim($extensionPath, '/') . '/lib/shortcodes.php');
-        $hasFields = is_file(rtrim($extensionPath, '/') . '/lib/fields.php');
-
-        if ($hasPublicRoutes && $type !== 'module') {
-            return 'Only module extensions may define lib/routes_public.php.';
-        }
-        if ($hasShortcodes && !in_array($type, ['helper', 'plugin', 'module'], true)) {
-            return 'Only helper/plugin/module extensions may define lib/shortcodes.php.';
-        }
-        if ($hasFields && !in_array($type, ['content', 'plugin', 'module'], true)) {
-            return 'Only content/plugin/module extensions may define lib/fields.php.';
-        }
-
-        return null;
+        return $this->manifestValidator->typeContractError($extensionPath, $type);
     }
 }

@@ -14,8 +14,8 @@ declare(strict_types=1);
 /** @var bool $canManageConfiguration */
 /** @var bool $adminerInstalled */
 /** @var bool $extensionEntrypointExists */
+/** @var string $adminerPath */
 /** @var string $extensionsPath */
-/** @var array<int, array{name: string, detail: string, launch_path: string}> $targets */
 /** @var string|null $selectorError */
 /** @var array{
  *   driver: string,
@@ -35,8 +35,8 @@ $extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
 $extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.lanterns.io'));
-$modeLabel = $driver === 'sqlite' ? '.db Files' : 'SQL Tables';
 $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
+$adminerPath = trim((string) ($adminerPath ?? ''));
 ?>
 <header class="card">
     <div class="card-body">
@@ -78,14 +78,15 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
     </div>
     <?php endif; ?>
 
-    <?php if ($canLaunchAdminer): ?>
+    <?php if (is_string($selectorError) && trim($selectorError) !== ''): ?>
+    <div class="alert alert-warning mb-3" role="alert">
+        <?= e($selectorError) ?>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($canLaunchAdminer && $adminerPath !== ''): ?>
     <nav>
-        <button
-            type="button"
-            class="btn btn-success"
-            data-bs-toggle="modal"
-            data-bs-target="#ravenAdminerLaunchModal"
-        >Open Adminer<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i></button>
+        <a class="btn btn-success" href="<?= e($adminerPath) ?>">Open Adminer<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i></a>
     </nav>
     <?php endif; ?>
 
@@ -164,76 +165,9 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
         </div>
     </section>
 
-    <?php if ($canLaunchAdminer): ?>
-        <div class="modal fade" id="ravenAdminerLaunchModal" tabindex="-1" aria-labelledby="ravenAdminerLaunchModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-xl modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3 class="modal-title fs-5" id="ravenAdminerLaunchModalLabel">Launch Targets (<?= e($modeLabel) ?>)</h3>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <?php if (is_string($selectorError) && trim($selectorError) !== ''): ?>
-                            <div class="alert alert-warning mb-0" role="alert">
-                                <?= e($selectorError) ?>
-                            </div>
-                        <?php elseif ($targets === []): ?>
-                            <p class="text-muted mb-0">No launch targets were found for this driver.</p>
-                        <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-sm align-middle mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th scope="col">Target</th>
-                                            <th scope="col">Details</th>
-                                            <th scope="col" class="text-end">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($targets as $target): ?>
-                                            <tr>
-                                                <td><code><?= e((string) ($target['name'] ?? '')) ?></code></td>
-                                                <td>
-                                                    <?php $detail = trim((string) ($target['detail'] ?? '')); ?>
-                                                    <?php if ($detail === ''): ?>
-                                                        <span class="text-muted">&ndash;</span>
-                                                    <?php else: ?>
-                                                        <?= e($detail) ?>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td class="text-end">
-                                                    <a
-                                                        class="btn btn-success btn-sm"
-                                                        href="<?= e((string) ($target['launch_path'] ?? '')) ?>"
-                                                        target="_blank"
-                                                        rel="noreferrer noopener"
-                                                    >
-                                                        Open in Adminer
-                                                    </a>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
-
-    <?php if ($canLaunchAdminer): ?>
+    <?php if ($canLaunchAdminer && $adminerPath !== ''): ?>
     <nav>
-        <button
-            type="button"
-            class="btn btn-success"
-            data-bs-toggle="modal"
-            data-bs-target="#ravenAdminerLaunchModal"
-        >Open Adminer<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i></button>
+        <a class="btn btn-success" href="<?= e($adminerPath) ?>">Open Adminer<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i></a>
     </nav>
     <?php endif; ?>
 

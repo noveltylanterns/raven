@@ -2,6 +2,14 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### March 27, 2026
+
+- Finished the extension-contract sweep by replacing the old `plugin` type with `content`, adding a background-only `framework` type, letting `content` extensions expose both shortcodes and custom fields, and removing shortcode support from `helper` extensions across manifest validation, scaffolding, the Extension Manager UI, CLI scaffolds, and bundled authoring docs.
+- Moved extension storage requests out of `ext.json` and into `ext.php`, where extensions can now request multiple predefined storage options (`local`, `table`, `tables`, `panel`, `public`) without deciding their own paths; Raven provisions those roots from core lifecycle code, passes the resolved storage map back through the runtime app container, and keeps root bootstrap limited to loading enabled extension boot providers instead of doing storage provisioning work.
+- Expanded extension lifecycle cleanup so install/enable now provisions requested panel/public asset roots from `private/ext/{slug}/assets/(panel|public)/`, while uninstall removes all opted-in storage for non-stock packages and purges only opted-in storage for bundled stock extensions without deleting the shipped package directories.
+- Migrated stock extensions onto the new contract: `contact` and `signups` are now `content` extensions with file-backed form definitions under `private/dat/ext/{slug}/forms.php`; `smallweb` now requests local storage through `ext.php`; and `database` now declares panel asset storage through `ext.php`, with its bundled Adminer assets shipped inside `private/ext/database/assets/panel/`.
+- Simplified Database Manager launch flow so `Open Adminer` now links straight to the routed `/panel/database/adminer` surface, and converted the old direct `panel/ext/database/adminer/index.php` entrypoint into a redirect shim so legacy links still land on the single routed Adminer path instead of booting a second parallel web entry.
+
 ### March 25, 2026
 
 - Finished the broad schema-shortening sweep across Raven-owned tables: users now store `name` / `avatar` / `contact` / `two_factor` plus plaintext `bio`; invites now live in `auth_invites`; login-throttle buckets now live in `auth_failures`; groups now use `description` / `route` / `permissions` / `created`; pages now use `channel` / `content` / `status` / `author` / `cover_image` / `preview_image` / `created` / `updated`; page-image rows now use `page` / `hash` / `created` / `updated`; and page taxonomy pivots now use `page` + `category` / `tag`.

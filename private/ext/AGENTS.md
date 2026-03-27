@@ -16,7 +16,7 @@ Last updated: 2026-03-25
 ## Mandatory First Step: Scaffold, Do Not Hand-Roll
 - Do not start a new extension by manually copying folders, mimicking stock extensions, or inventing a directory layout from memory.
 - Start with Raven's scaffold generator first:
-- `php private/bin/rvn-ext create --slug <slug> --name "<Name>" --type <helper|content|plugin|module|system>`
+- `php private/bin/rvn-ext create --slug <slug> --name "<Name>" --type <helper|content|framework|module|system>`
 - If you prefer the panel UI, use Extension Manager -> `Create New Extension`, which generates the same contract-compliant starter files.
 - After scaffold generation, edit the generated files in place.
 - Treat the scaffold as authoritative for current file/layout conventions.
@@ -38,22 +38,20 @@ Last updated: 2026-03-25
 4. Implement `ext.php` service registration only when the extension actually needs services.
 5. Implement `lib/routes_panel.php` and `tpl/panel_*.php` for panel-facing pages.
 6. Implement `lib/routes_public.php` and `tpl/public_*.php` only for `module` extensions.
-7. Implement `lib/shortcodes.php` only for `helper`, `plugin`, or `module` types.
-8. Implement `lib/fields.php` only for `content`, `plugin`, or `module` types.
+7. Implement `lib/shortcodes.php` only for `content` or `module` types.
+8. Implement `lib/fields.php` only for `content` or `module` types.
 9. Run validation checks (`php -l`, manifest validation) before enabling the extension.
 10. Only after files are valid, enable the extension from Extension Manager or `rvn-ext enable`.
 
 ## Canonical Minimal `ext.json` Templates
-- `plugin`:
+- `framework`:
 ```json
 {
-  "slug": "example-extension",
-  "name": "Example Extension",
+  "slug": "example-framework",
+  "name": "Example Framework",
   "version": "0.8.0",
-  "description": "Example plugin extension.",
-  "type": "plugin",
-  "local_storage": "off",
-  "db_storage": "off",
+  "description": "Background-only framework extension.",
+  "type": "framework",
   "author": "Your Name",
   "homepage": ""
 }
@@ -66,8 +64,6 @@ Last updated: 2026-03-25
   "version": "0.8.0",
   "description": "Example module extension.",
   "type": "module",
-  "local_storage": "off",
-  "db_storage": "off",
   "author": "Your Name",
   "homepage": ""
 }
@@ -80,8 +76,6 @@ Last updated: 2026-03-25
   "version": "0.8.0",
   "description": "Example system extension.",
   "type": "system",
-  "local_storage": "off",
-  "db_storage": "off",
   "author": "Your Name",
   "homepage": ""
 }
@@ -94,8 +88,6 @@ Last updated: 2026-03-25
   "version": "0.8.0",
   "description": "Panel helper extension.",
   "type": "helper",
-  "local_storage": "off",
-  "db_storage": "off",
   "author": "Your Name",
   "homepage": ""
 }
@@ -108,8 +100,6 @@ Last updated: 2026-03-25
   "version": "0.8.0",
   "description": "Panel content extension.",
   "type": "content",
-  "local_storage": "off",
-  "db_storage": "off",
   "author": "Your Name",
   "homepage": ""
 }
@@ -127,9 +117,20 @@ Last updated: 2026-03-25
  */
 declare(strict_types=1);
 
-return static function (array &$app): void {
-    // Register extension services into $app['extension_services'] when needed.
-};
+return [
+    'storage' => [
+        // Supported options:
+        // 'local' => true,
+        // 'table' => true,
+        // 'tables' => ['items'],
+        // 'panel' => true,
+        // 'public' => true,
+    ],
+    'boot' => static function (array &$app): void {
+        // Use $app['extension_storage']['{slug}'] for resolved storage roots.
+        // Register extension services into $app['extension_services'] when needed.
+    },
+];
 ```
 - `lib/schema.php`:
 ```php
@@ -216,11 +217,11 @@ declare(strict_types=1);
 ## Hard-Fail Validation Checklist (Before Hand-Off)
 - `ext.json` parses as JSON object and includes non-empty `name`.
 - `ext.json` includes valid `slug` (`[a-z0-9][a-z0-9_-]{0,119}`).
-- `type` is exactly one of: `helper`, `content`, `plugin`, `module`, `system`.
-- `local_storage` and `db_storage` are either omitted or set to exactly `on`/`off`.
+- `type` is exactly one of: `helper`, `content`, `framework`, `module`, `system`.
 - `lib/routes_public.php` is used only by `module` extensions.
-- `lib/shortcodes.php` is used only by `helper`, `plugin`, or `module` extensions.
-- `lib/fields.php` is used only by `content`, `plugin`, or `module` extensions.
+- `lib/routes_panel.php` is not used by `framework` extensions.
+- `lib/shortcodes.php` is used only by `content` or `module` extensions.
+- `lib/fields.php` is used only by `content` or `module` extensions.
 - `lib/shortcodes.php` (when present) returns valid universal rows: `array<int, array{label: string, shortcode: string}>` or callable returning that shape.
 - `lib/fields.php` (when present) returns valid universal rows: `array<int, array{slug: string, label: string, editor: string}>` or callable returning that shape.
 - `lib/fields.php` `editor` values are only: `tinymce`, `plaintext`, `autobr`, `markdown`, `markdown_file`.
@@ -288,7 +289,7 @@ declare(strict_types=1);
 - Optional fields commonly used:
 - `version` (string)
 - `description` (string)
-- `type` (`helper`, `content`, `plugin`, `module`, or `system`)
+- `type` (`helper`, `content`, `framework`, `module`, or `system`)
 - `author` (string; displayed in Extension Manager)
 - `homepage` (URL; used for Extension Manager author links)
 - `panel_path` and `panel_section` are legacy keys and are ignored in current routing/nav behavior.
@@ -297,10 +298,11 @@ declare(strict_types=1);
 - `entrypoint` (extension-specific optional metadata; currently used by Database Manager)
 
 ## Extension Type And Nav Placement
-- `type: "helper"`, `type: "content"`, and `type: "plugin"` are listed alphabetically in the panel `Extensions` category.
+- `type: "helper"`, `type: "content"`, and `type: "framework"` are listed alphabetically in the panel `Extensions` category.
 - `type: "module"` is listed alphabetically in the panel `Modules` category.
 - `type: "system"` is listed alphabetically in panel `System` and is restricted to `Manage System Configuration` users.
-- `helper`, `content`, `plugin`, `module`, and `system` may expose panel routes/views.
+- `helper`, `content`, `module`, and `system` may expose panel routes/views.
+- `framework` is background-only and may not expose panel/public routes, shortcodes, or fields.
 - Only `module` may expose public routes/views.
 - System-category extension links require `Manage System Configuration`; unauthorized users must not see or access them.
 - Non-system extension panel pages enforce the extension's configured permission mask from `private/dat/ext/.state.php` (`permissions` map).
@@ -470,9 +472,9 @@ declare(strict_types=1);
 
 ## Extension Upload/Packaging Rules
 - Extension Manager can generate a new extension scaffold directly in `private/ext/{name}/`:
-- helper scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
-- content scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/fields.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
-- plugin scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
+- helper scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
+- content scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
+- framework scaffold: `ext.json`, `ext.php`, `lib/schema.php`
 - module scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `lib/routes_public.php`, `tpl/panel_index.php`, `tpl/public_index.php`
 - system scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
 - generated header card pulls version/author/description/docs URL from `ext.json`.
@@ -491,19 +493,30 @@ declare(strict_types=1);
 - Current stock list: `contact`, `database`, `phpinfo`, `signups`.
 - Enabled extensions must be disabled before uninstall.
 
-## Extension-Local State Pattern
-- Extensions may persist their own state under their directory when appropriate.
-- Extension-owned local storage may also live under `private/dat/ext/{slug}/` when files belong to that extension alone.
-- `local_storage: "on"` allows Raven to provision `private/dat/ext/{slug}/` when the extension is enabled.
-- DB-backed state for extensions is also supported and preferred for panel-managed structured data; `db_storage: "on"` allows Raven to run `lib/schema.php` and extension tables should follow the shared `{prefix}ext_{slug}` / `{prefix}ext_{slug}_*` naming model.
-- Disabling an extension should leave both local/db storage intact; uninstalling a non-stock extension should remove its opted-in local storage and opted-in DB tables plus its package files, while stock extension uninstall only purges opted-in local/db storage and keeps the bundled extension files.
+## Extension Storage Contract
+- By default, persistent extension data should not be written into `private/ext/{slug}/`.
+- Extra storage must be explicitly requested from `ext.php` under the `storage` key, or Raven will not provision it.
+- Supported storage options are:
+- `local` => `private/dat/ext/{slug}/`
+- `table` => one DB table at `{prefix}ext_{slug}`
+- `tables` => one or more DB tables at `{prefix}ext_{slug}_{suffix}`
+- `panel` => panel-served assets at `panel/ext/{slug}/`
+- `public` => public-served assets at `public/upload/ext/{slug}/` (`module` only)
+- `framework` may not request `panel` or `public`.
+- `lib/schema.php` receives resolved storage roots in `$context['storage']`, plus:
+- `$context['table']()` for the primary `{prefix}ext_{slug}` table
+- `$context['tables']('suffix')` for declared suffix tables
+- Raven provisions and cleans these locations; extensions should consume the resolved paths, not hardcode them.
+- Disabling an extension leaves opted-in storage intact.
+- Uninstalling a stock extension purges opted-in storage but keeps bundled package files.
+- Uninstalling a non-stock extension purges opted-in storage and removes the package directory.
 
 ## Public Runtime Integration (Current Reality)
 - Public routes can now be registered by enabled `module` extensions via `lib/routes_public.php`.
 - Embedded form submit behavior is extension-agnostic:
 - Core public submit endpoint is `POST /forms/submit` and dispatches by runtime type + slug.
 - `contact` and `signups` do not require extension-owned public route files for form submit handling.
-- Contact/Signup configuration remains DB-backed in shared prefixed extension tables (`{prefix}ext_contact`, `{prefix}ext_signups`).
+- Contact/Signup configuration is file-backed under `private/dat/ext/{slug}/forms.php`.
 - Core public runtime still owns shortcode rendering and site-wide access/routing fallback policy.
 - Do not hard-patch core for one-off extension behavior unless explicitly planned and accepted as a core change.
 

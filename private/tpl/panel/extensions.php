@@ -116,7 +116,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                     <?php foreach ($extensions as $extension): ?>
                         <?php
                         $directory = (string) ($extension['directory'] ?? '');
-                        $type = strtolower(trim((string) ($extension['type'] ?? 'plugin')));
+                        $type = strtolower(trim((string) ($extension['type'] ?? 'content')));
                         $extensionPanelPath = trim((string) ($extension['panel_path'] ?? ''), '/');
                         $name = (string) ($extension['name'] ?? $directory);
                         $description = (string) ($extension['description'] ?? '');
@@ -133,7 +133,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                             ? "Uninstall this stock extension's opted-in data? Bundled extension files will be kept."
                             : 'Uninstall this extension and remove its opted-in data? This cannot be undone.';
                         $nameLabel = $name !== '' ? $name : $directory;
-                        $typeLabel = $type !== '' ? $type : 'plugin';
+                        $typeLabel = $type !== '' ? $type : 'content';
                         $panelTarget = $extensionPanelPath !== '' ? ($panelBase . '/' . ltrim($extensionPanelPath, '/')) : '';
                         $canOpenSettings = $enabled && $panelTarget !== '';
                         $authorLabel = $author !== '' ? $author : '<none>';
@@ -377,11 +377,11 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                         <div class="col-12">
                             <label for="extension_type" class="form-label">Type</label>
                             <select id="extension_type" name="type" class="form-select" required>
-                                <option value="" selected disabled>Select plugin type...</option>
+                                <option value="" selected disabled>Select extension type...</option>
                                 <option value="content">content</option>
+                                <option value="framework">framework</option>
                                 <option value="helper">helper</option>
                                 <option value="module">module</option>
-                                <option value="plugin">plugin</option>
                                 <option value="system">system</option>
                             </select>
                         </div>
@@ -566,13 +566,15 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                 return;
             }
             var files = ['ext.json', 'ext.php', 'lib/schema.php'];
-            if (type === 'helper' || type === 'plugin' || type === 'module') {
+            if (type === 'content' || type === 'module') {
                 files.push('lib/shortcodes.php');
             }
-            if (type === 'content' || type === 'plugin' || type === 'module') {
+            if (type === 'content' || type === 'module') {
                 files.push('lib/fields.php');
             }
-            files.push('lib/routes_panel.php', 'tpl/panel_index.php');
+            if (type !== 'framework') {
+                files.push('lib/routes_panel.php', 'tpl/panel_index.php');
+            }
             if (type === 'module') {
                 files.push('lib/routes_public.php');
                 files.push('tpl/public_index.php');

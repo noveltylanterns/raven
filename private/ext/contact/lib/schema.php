@@ -16,20 +16,25 @@ declare(strict_types=1);
  */
 return static function (array $context): void {
     if (
-        !isset($context['db'], $context['driver'], $context['table'])
+        !isset($context['db'], $context['driver'], $context['storage'])
         || !$context['db'] instanceof \PDO
-        || !is_callable($context['table'])
     ) {
         return;
     }
 
     $db = $context['db'];
     $driver = (string) $context['driver'];
-    $tableResolver = $context['table'];
-    $formsTable = $tableResolver('ext_contact');
-    $legacySubmissionsTable = $tableResolver('ext_contact_submissions');
-    $submissionsTable = $tableResolver('contact');
-    $dataFile = dirname(__DIR__, 4) . '/private/dat/ext/contact/forms.php';
+    $tableResolver = is_callable($context['table'] ?? null) ? $context['table'] : static fn (?string $legacyTable = null): string => (string) $legacyTable;
+    $legacyTableResolver = is_callable($context['legacy_table'] ?? null) ? $context['legacy_table'] : $tableResolver;
+    $formsTable = $legacyTableResolver('ext_contact');
+    $legacySubmissionsTable = $legacyTableResolver('ext_contact_submissions');
+    $submissionsTable = $legacyTableResolver('contact');
+    $storage = is_array($context['storage']) ? $context['storage'] : [];
+    $localRoot = rtrim((string) ($storage['local'] ?? ''), '/');
+    if ($localRoot === '') {
+        return;
+    }
+    $dataFile = $localRoot . '/forms.php';
 
     $tableExists = static function (\PDO $pdo, string $dbDriver, string $table): bool {
         if ($dbDriver === 'sqlite') {

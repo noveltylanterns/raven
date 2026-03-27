@@ -15,12 +15,14 @@ use Raven\ContactPublicFormRuntime;
 
 /**
  * Registers Contact extension services into the shared app container.
- *
- * @param array<string, mixed> $app
  */
-return static function (array &$app): void {
+return [
+    'storage' => [
+        'local' => true,
+    ],
+    'boot' => static function (array &$app): void {
     if (
-        !isset($app['db'], $app['driver'], $app['prefix'])
+        !isset($app['db'], $app['driver'], $app['prefix'], $app['extension_storage'])
         || !$app['db'] instanceof PDO
     ) {
         return;
@@ -28,7 +30,14 @@ return static function (array &$app): void {
 
     $driver = (string) $app['driver'];
     $prefix = (string) $app['prefix'];
-    $formsRepository = new ContactFormRepository($app['db'], $driver, $prefix);
+    $storageMap = is_array($app['extension_storage']) ? $app['extension_storage'] : [];
+    $storage = is_array($storageMap['contact'] ?? null) ? $storageMap['contact'] : [];
+    $formsPath = rtrim((string) ($storage['local'] ?? ''), '/');
+    if ($formsPath === '') {
+        return;
+    }
+
+    $formsRepository = new ContactFormRepository($app['db'], $driver, $prefix, $formsPath . '/forms.php');
     $submissionsRepository = new ContactSubmissionRepository($app['db'], $driver, $prefix);
     $publicFormRuntime = new ContactPublicFormRuntime(
         $app['input'],
@@ -61,4 +70,5 @@ return static function (array &$app): void {
     $rawContactServices['embedded_form_runtimes'] = $rawEmbeddedRuntimes;
     $rawExtensionServices['contact'] = $rawContactServices;
     $app['extension_services'] = $rawExtensionServices;
-};
+    },
+];

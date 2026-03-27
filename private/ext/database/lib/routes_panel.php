@@ -551,6 +551,7 @@ return static function (Router $router, array $context): void {
             'canManageConfiguration' => $canManageConfiguration,
             'adminerInstalled' => $resolveAdminerEntrypoint() !== null,
             'extensionEntrypointExists' => is_file($extensionEntrypoint),
+            'adminerPath' => $panelUrl('/database/adminer'),
             'extensionsPath' => $panelUrl('/extensions'),
             'databaseSummary' => $summary,
             'targets' => is_array($targetData['targets'] ?? null) ? (array) $targetData['targets'] : [],

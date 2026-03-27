@@ -22,12 +22,16 @@ final class SignupFormRepository
     private PDO $db;
     private string $driver;
     private string $prefix;
+    private string $formsFilePath;
 
-    public function __construct(PDO $db, string $driver, string $prefix)
+    public function __construct(PDO $db, string $driver, string $prefix, ?string $formsFilePath = null)
     {
         $this->db = $db;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
+        $this->formsFilePath = $formsFilePath !== null && trim($formsFilePath) !== ''
+            ? trim($formsFilePath)
+            : dirname(__DIR__, 4) . '/private/dat/ext/signups/forms.php';
     }
 
     /**
@@ -279,7 +283,7 @@ final class SignupFormRepository
 
     private function formsFilePath(): string
     {
-        return dirname(__DIR__, 4) . '/private/dat/ext/signups/forms.php';
+        return $this->formsFilePath;
     }
 
     /**

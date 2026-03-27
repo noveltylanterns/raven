@@ -10,7 +10,7 @@
 declare(strict_types=1);
 
 /**
- * Returns editor-insertable shortcode entries sourced from enabled `ext_signups` rows.
+ * Returns editor-insertable shortcode entries sourced from enabled signup sheets.
  *
  * @param array{
  *   extension?: string,
@@ -28,7 +28,7 @@ return static function (array $context = []): array {
 
     try {
         /** @var array<int, array{name?: string, slug?: string}> $forms */
-        $forms = $rawLoader('ext_signups');
+        $forms = $rawLoader('signups');
     } catch (\Throwable) {
         return [];
     }

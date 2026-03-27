@@ -6,6 +6,7 @@ namespace Raven\Lib\Database\Schema;
 
 use PDO;
 use Raven\Core\Extension\ExtensionRegistry;
+use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
 
 /**
  * Executes extension-owned schema providers during bootstrap.
@@ -13,10 +14,15 @@ use Raven\Core\Extension\ExtensionRegistry;
 final class ExtensionSchemaRunner
 {
     private TableNameResolver $tables;
+    private ExtensionBootstrapContractResolver $bootstrapResolver;
 
-    public function __construct(?TableNameResolver $tables = null)
+    public function __construct(
+        ?TableNameResolver $tables = null,
+        ?ExtensionBootstrapContractResolver $bootstrapResolver = null
+    )
     {
         $this->tables = $tables ?? new TableNameResolver();
+        $this->bootstrapResolver = $bootstrapResolver ?? new ExtensionBootstrapContractResolver();
     }
 
     public function ensureEnabledExtensionSchemas(PDO $db, string $driver, string $prefix): void
@@ -24,7 +30,23 @@ final class ExtensionSchemaRunner
         $root = dirname(__DIR__, 4);
         foreach (ExtensionRegistry::enabledDirectories($root, true) as $directory) {
             $manifest = ExtensionRegistry::readManifest($root, $directory);
-            if (!is_array($manifest) || empty($manifest['db_storage'])) {
+            if (!is_array($manifest)) {
+                continue;
+            }
+
+            $bootstrap = $this->bootstrapResolver->resolve($root, $directory, $manifest);
+            if (!$bootstrap['valid']) {
+                continue;
+            }
+
+            $storage = (array) ($bootstrap['storage'] ?? []);
+            if (
+                empty($storage['local'])
+                && empty($storage['table'])
+                && empty($storage['tables'])
+                && empty($storage['panel'])
+                && empty($storage['public'])
+            ) {
                 continue;
             }
 
@@ -41,12 +63,44 @@ final class ExtensionSchemaRunner
             }
 
             try {
+                $tableStem = $this->tables->resolve($driver, $prefix, 'ext_' . $directory);
+                $storageLocalPath = $root . '/private/dat/ext/' . $directory;
+                $storagePanelPath = $root . '/panel/ext/' . $directory;
+                $storagePublicPath = $root . '/public/upload/ext/' . $directory;
+                $tableResolver = function (?string $legacyTable = null) use ($driver, $prefix, $tableStem): string {
+                    $legacyTable = strtolower(trim((string) $legacyTable));
+                    if ($legacyTable !== '') {
+                        return $this->tables->resolve($driver, $prefix, $legacyTable);
+                    }
+
+                    return $tableStem;
+                };
+                $tablesResolver = function (string $suffix) use ($driver, $prefix, $directory, $storage): string {
+                    $normalized = strtolower(trim($suffix));
+                    if (preg_match('/^[a-z0-9][a-z0-9_]{0,63}$/', $normalized) !== 1) {
+                        throw new \RuntimeException('Invalid extension table suffix requested.');
+                    }
+
+                    if (!in_array($normalized, (array) ($storage['tables'] ?? []), true)) {
+                        throw new \RuntimeException('Extension table suffix was not provisioned: ' . $normalized);
+                    }
+
+                    return $this->tables->resolve($driver, $prefix, 'ext_' . $directory . '_' . $normalized);
+                };
                 $provider([
                     'db' => $db,
                     'driver' => $driver,
                     'prefix' => $prefix,
                     'extension' => $directory,
-                    'table' => function (string $table) use ($driver, $prefix): string {
+                    'storage' => [
+                        'local' => $storageLocalPath,
+                        'panel' => $storagePanelPath,
+                        'public' => $storagePublicPath,
+                    ],
+                    'table' => $tableResolver,
+                    'tables' => $tablesResolver,
+                    // Legacy schema fallback for older providers that still pass explicit table names.
+                    'legacy_table' => function (string $table) use ($driver, $prefix): string {
                         return $this->tables->resolve($driver, $prefix, $table);
                     },
                 ]);

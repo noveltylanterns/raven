@@ -143,7 +143,7 @@ Extension management:
 - `list`
 - `enable --slug <slug>`
 - `disable --slug <slug>`
-- `create --slug <slug> --name <name> [--type <helper|content|plugin|module|system>] [--version <semver>] [--description <text>] [--author <name>] [--homepage <url>] [--author-url <url>] [--with-shortcodes <1|0>] [--with-fields <1|0>] [--with-public-routes <1|0>] [--with-agents <1|0>] [--with-composer <1|0>]`
+- `create --slug <slug> --name <name> [--type <helper|content|framework|module|system>] [--version <semver>] [--description <text>] [--author <name>] [--homepage <url>] [--author-url <url>] [--with-agents <1|0>] [--with-composer <1|0>]`
 - `import --archive <zip_path> [--slug <slug>]`
 - `uninstall --slug <slug> [--force]`
 

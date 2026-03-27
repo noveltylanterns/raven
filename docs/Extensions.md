@@ -31,7 +31,7 @@ Core panel bootstrap (`panel/index.php`) does this:
 2. Validates extension directory names and manifests.
 3. Builds nav items from extension directory slug and manifest type/name.
 4. Loads optional extension providers (`ext.php`, `lib/schema.php`, route registrars) for enabled, valid extensions.
-   `lib/schema.php` only runs when the manifest opts into `db_storage: "on"`.
+   `lib/schema.php` runs when the extension requests storage in `ext.php`.
 5. Injects a context object (`app`, `panelUrl`, `requirePanelLogin`, etc.) for route registration.
 
 ## 3) Enablement And Permission Model
@@ -47,7 +47,7 @@ State keys:
 
 Types:
 
-- `helper`, `content`, `plugin`: appear in the Extensions nav (when authorized)
+- `helper`, `content`, `framework`: appear in the Extensions nav (when authorized)
 - `module`: appears in the Modules nav (when authorized)
 - `system`: appears under System nav and requires system configuration access
 
@@ -55,20 +55,21 @@ Types:
 
 The extension system is isolated by code location, but data may be split between extension-local assets and shared core storage.
 
-DB-backed extension data examples:
+File-backed extension data examples:
 
-- Contact form definitions in `ext_contact` (or `{prefix}ext_contact`)
-- Signup form definitions in `ext_signups` (or `{prefix}ext_signups`)
+- Contact form definitions in `private/dat/ext/contact/forms.php`
+- Signup form definitions in `private/dat/ext/signups/forms.php`
 
 Shared/core-managed data examples:
 
 - Enablement and permission masks in `private/dat/ext/.state.php`
-- Signup submissions in DB table `ext_signups_submissions` via `SignupSubmissionRepository`
+- Contact submissions in DB table `rvn_contact` via `ContactSubmissionRepository`
+- Signup submissions in DB table `rvn_signups` via `SignupSubmissionRepository`
 
 So the correct model is:
 
 - Extension configuration can be local to the extension folder.
-- Extension-local persistent files may live under `private/dat/ext/{slug}/` when the extension sets `local_storage: "on"`.
+- Extension-local persistent files may live under `private/dat/ext/{slug}/` when the extension requests `storage.local` in `ext.php`.
 - Runtime/system state and persistent records can still live in shared core state/DB.
 
 ## 5) Public Runtime Reality (Current)
@@ -122,9 +123,9 @@ Also:
 Alternative bootstrap path:
 
 - Use Extension Manager -> **Create New Extension** to generate a starter scaffold.
-- `helper`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
-- `content`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/fields.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
-- `plugin`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
+- `helper`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
+- `content`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
+- `framework`: `ext.json`, `ext.php`, `lib/schema.php`
 - `module`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `lib/routes_public.php`, `tpl/panel_index.php`, `tpl/public_index.php`
 - `system`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
 - Optional in that same modal: `Generate AGENTS.md?` to create `private/ext/{slug}/AGENTS.md` with extension-local guidance that points back to [private/ext/AGENTS.md](../private/ext/AGENTS.md) for missing context.
@@ -166,9 +167,7 @@ Common manifest fields:
 - `name` (required)
 - `version`
 - `description`
-- `type` (`helper`, `content`, `plugin`, `module`, or `system`)
-- `local_storage` (`on` or `off`; optional, defaults to `off`)
-- `db_storage` (`on` or `off`; optional, defaults to `off`)
+- `type` (`helper`, `content`, `framework`, `module`, or `system`)
 - `author`
 - `homepage`
 - `system_extension` (optional behavior flag)
@@ -178,8 +177,11 @@ Notes:
 - `panel_path` and `panel_section` are legacy manifest keys and are ignored.
 - Panel route/nav identity comes from the extension directory slug.
 - Current bundled stock extensions are `contact`, `database`, `phpinfo`, `signups`, and `smallweb`.
-- `local_storage: "on"` provisions `private/dat/ext/{slug}/` when the extension is enabled.
-- `db_storage: "on"` allows Raven to run `lib/schema.php` and use `{prefix}ext_{slug}` / `{prefix}ext_{slug}_*` tables.
+- `ext.php` may request storage with an array contract:
+  `local`, `table`, `tables`, `panel`, `public`.
+- `local` provisions `private/dat/ext/{slug}/`.
+- `table` and `tables` allow `lib/schema.php` to manage `{prefix}ext_{slug}` / `{prefix}ext_{slug}_*`.
+- `panel` provisions `panel/ext/{slug}/`; `public` provisions `public/upload/ext/{slug}/` (`module` only).
 - Disabling an extension leaves storage intact; uninstalling a non-stock extension removes the storage it explicitly opted into and removes the package files, while stock extension uninstall only purges the opted-in storage and keeps the bundled extension files.
 
 ## 9) Agent Guidance
@@ -192,9 +194,9 @@ If this document and [private/ext/AGENTS.md](../private/ext/AGENTS.md) ever dive
 
 ### UI Labels Reference
 
-- `Select plugin type...`
-- `plugin`
+- `Select extension type...`
 - `content`
+- `framework`
 - `helper`
 - `module`
 - `system`

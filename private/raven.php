@@ -16,6 +16,7 @@ use Raven\Core\Database\SchemaManager;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Media\PageImageManager;
 use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Session\SessionCookiePolicy;
 use Raven\Lib\Security\Csrf;
@@ -177,19 +178,39 @@ return (static function (): array {
         'user' => new UserRepository($authDb, $appDb, $driver, $prefix),
     ];
 
+    $extensionBootstrapResolver = new ExtensionBootstrapContractResolver();
+
     // Load service providers from enabled extensions.
     foreach ($enabledExtensionDirectories as $directory) {
-        $extensionBootstrapPath = $root . '/private/ext/' . $directory . '/ext.php';
-        if (!is_file($extensionBootstrapPath)) {
+        $manifest = ExtensionRegistry::readManifest($root, $directory);
+        if (!is_array($manifest)) {
             continue;
         }
 
-        /** @var mixed $provider */
-        $provider = require $extensionBootstrapPath;
-        if (!is_callable($provider)) {
-            error_log('Raven extension bootstrap is invalid for extension "' . $directory . '".');
+        $bootstrap = $extensionBootstrapResolver->resolve($root, $directory, $manifest);
+        if (!$bootstrap['valid']) {
+            error_log('Raven extension bootstrap is invalid for extension "' . $directory . '": ' . (string) ($bootstrap['error'] ?? 'Unknown error.'));
             continue;
         }
+
+        $provider = $bootstrap['boot'] ?? null;
+        if (!is_callable($provider)) {
+            continue;
+        }
+
+        /** @var mixed $rawExtensionStorage */
+        $rawExtensionStorage = $app['extension_storage'] ?? [];
+        if (!is_array($rawExtensionStorage)) {
+            $rawExtensionStorage = [];
+        }
+
+        $storage = is_array($bootstrap['storage'] ?? null) ? (array) $bootstrap['storage'] : [];
+        $rawExtensionStorage[$directory] = [
+            'local' => !empty($storage['local']) ? ($root . '/private/dat/ext/' . $directory) : '',
+            'panel' => !empty($storage['panel']) ? ($root . '/panel/ext/' . $directory) : '',
+            'public' => !empty($storage['public']) ? ($root . '/public/upload/ext/' . $directory) : '',
+        ];
+        $app['extension_storage'] = $rawExtensionStorage;
 
         try {
             $provider($app);

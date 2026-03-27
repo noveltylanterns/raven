@@ -38,29 +38,56 @@ final class ExtensionStorageCleaner
 
     public function deleteStorage(string $directoryName, bool $deleteLocalStorage, bool $deleteDbStorage): void
     {
+        $this->deleteStorageByContract($directoryName, [
+            'local' => $deleteLocalStorage,
+            'table' => $deleteDbStorage,
+            'tables' => [],
+            'panel' => false,
+            'public' => false,
+        ]);
+    }
+
+    /**
+     * @param array{
+     *   local?: bool,
+     *   table?: bool,
+     *   tables?: array<int, string>,
+     *   panel?: bool,
+     *   public?: bool
+     * } $storage
+     */
+    public function deleteStorageByContract(string $directoryName, array $storage): void
+    {
         if (!$this->manifestValidator->isSafeDirectoryName($directoryName)) {
             throw new RuntimeException('Invalid extension directory name for storage cleanup.');
         }
 
-        if ($deleteLocalStorage) {
-            $this->deleteLocalStorageDirectory($directoryName);
+        if (!empty($storage['local'])) {
+            $this->deleteDirectory($this->projectRoot . '/private/dat/ext/' . $directoryName, 'private/dat/ext/' . $directoryName);
         }
 
-        if ($deleteDbStorage) {
+        if (!empty($storage['panel'])) {
+            $this->deleteDirectory($this->projectRoot . '/panel/ext/' . $directoryName, 'panel/ext/' . $directoryName);
+        }
+
+        if (!empty($storage['public'])) {
+            $this->deleteDirectory($this->projectRoot . '/public/upload/ext/' . $directoryName, 'public/upload/ext/' . $directoryName);
+        }
+
+        if (!empty($storage['table']) || !empty($storage['tables'])) {
             $this->dropDatabaseTables($directoryName);
         }
     }
 
-    private function deleteLocalStorageDirectory(string $directoryName): void
+    private function deleteDirectory(string $path, string $label): void
     {
-        $path = $this->projectRoot . '/private/dat/ext/' . $directoryName;
         if (!is_dir($path)) {
             return;
         }
 
         $this->directoryTreeService->removeDirectoryRecursively($path);
         if (is_dir($path)) {
-            throw new RuntimeException('Failed to delete private/dat/ext/' . $directoryName . ' directory.');
+            throw new RuntimeException('Failed to delete ' . $label . ' directory.');
         }
     }
 

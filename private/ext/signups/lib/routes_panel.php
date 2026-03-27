@@ -146,7 +146,7 @@ return static function (Router $router, array $context): void {
     };
 
     /**
-     * Reads configured forms from DB-backed extension storage.
+     * Reads configured forms from file-backed extension storage.
      *
      * @return array<int, array{
      *   name: string,
@@ -166,7 +166,7 @@ return static function (Router $router, array $context): void {
     };
 
     /**
-     * Persists signup-sheet form definitions into DB-backed extension storage.
+     * Persists signup-sheet form definitions into file-backed extension storage.
      *
      * @param array<int, array{
      *   name: string,

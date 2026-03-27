@@ -2118,175 +2118,6 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
     }
 }
 
-function raven_cli_extension_scaffold_files(string $extensionPath, array $meta, bool $withShortcodes, bool $withFields, bool $withPublicRoutes, bool $withAgents, bool $withComposer): array
-{
-    $slug = (string) ($meta['slug'] ?? 'extension');
-    $name = (string) ($meta['name'] ?? $slug);
-    $version = trim((string) ($meta['version'] ?? ''));
-    $description = (string) ($meta['description'] ?? '');
-    $type = (string) ($meta['type'] ?? 'plugin');
-    $author = (string) ($meta['author'] ?? '');
-    $homepage = (string) ($meta['homepage'] ?? '');
-    $authorUrl = (string) ($meta['author_url'] ?? '');
-
-    $manifest = [
-        'slug' => $slug,
-        'name' => $name,
-        'description' => $description,
-        'type' => $type,
-        'local_storage' => 'off',
-        'db_storage' => 'off',
-        'author' => $author,
-        'homepage' => $homepage,
-    ];
-    if ($version !== '') {
-        $manifest['version'] = $version;
-    }
-
-    $files = [];
-    $files['ext.json'] = json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n";
-    $files['ext.php'] = "<?php\n\n" .
-        "declare(strict_types=1);\n\n" .
-        "return static function (array &\$app): void {\n" .
-        "    // Register extension services into \$app['extension_services'] when needed.\n" .
-        "};\n";
-
-    $files['lib/schema.php'] = "<?php\n\n" .
-        "declare(strict_types=1);\n\n" .
-        "return static function (array \$context): void {\n" .
-        "    // Keep schema work idempotent for extension storage.\n" .
-        "};\n";
-
-    $files['lib/routes_panel.php'] = "<?php\n\n" .
-        "declare(strict_types=1);\n\n" .
-        "use Raven\\Core\\Routing\\Router;\n\n" .
-        "return static function (Router \$router, array \$context): void {\n" .
-        "    \$panelUrl = is_callable(\$context['panelUrl'] ?? null) ? \$context['panelUrl'] : static fn (string \$suffix): string => '/panel' . \$suffix;\n" .
-        "    \$slug = '" . addslashes($slug) . "';\n" .
-        "    \$router->get('/' . \$slug, static function () use (\$context): void {\n" .
-        "        \$view = \$context['app']['view'] ?? null;\n" .
-        "        \$panelSiteData = is_callable(\$context['app']['panel_site_data'] ?? null)\n" .
-        "            ? \$context['app']['panel_site_data']\n" .
-        "            : static function (bool \$includeDomain = true) use (\$context): array {\n" .
-        "                \$site = [\n" .
-        "                    'name' => (string) ((\$context['app']['config']->get('site.name', 'Raven CMS'))),\n" .
-        "                    'panel_path' => (string) ((\$context['app']['config']->get('panel.path', 'panel'))),\n" .
-        "                    'panel_brand_name' => (string) ((\$context['app']['config']->get('panel.brand_name', ''))),\n" .
-        "                    'panel_brand_logo' => (string) ((\$context['app']['config']->get('panel.brand_logo', ''))),\n" .
-        "                ];\n" .
-        "                if (\$includeDomain) {\n" .
-        "                    \$site['domain'] = (string) ((\$context['app']['config']->get('site.domain', 'localhost')));\n" .
-        "                }\n" .
-        "                return \$site;\n" .
-        "            };\n" .
-        "        if (!\$view instanceof \\Raven\\Core\\View) {\n" .
-        "            http_response_code(500);\n" .
-        "            echo 'View service missing.';\n" .
-        "            return;\n" .
-        "        }\n" .
-        "\n" .
-        "        \$renderData = [\n" .
-        "            'site' => \$panelSiteData(false),\n" .
-        "            'section' => \$slug,\n" .
-        "            'showSidebar' => true,\n" .
-        "            'userTheme' => is_callable(\$context['currentUserTheme'] ?? null) ? (\$context['currentUserTheme'])() : 'default',\n" .
-        "        ];\n" .
-        "\n" .
-        "        \$view->render('ext/" . addslashes($slug) . "/panel_index', \$renderData, 'panel/wrapper');\n" .
-        "    });\n" .
-        "};\n";
-
-    $files['tpl/panel_index.php'] = "<?php\n\n" .
-        "declare(strict_types=1);\n\n" .
-        "if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {\n" .
-        "    http_response_code(404);\n" .
-        "    exit;\n" .
-        "}\n" .
-        "?>\n" .
-        "<div class=\"card shadow-sm border-0\">\n" .
-        "  <div class=\"card-body\">\n" .
-        "    <h1 class=\"h4 mb-0\">" . htmlspecialchars($name, ENT_QUOTES) . "</h1>\n" .
-        "  </div>\n" .
-        "</div>\n";
-
-    if ($withPublicRoutes) {
-        $files['lib/routes_public.php'] = "<?php\n\n" .
-            "declare(strict_types=1);\n\n" .
-            "use Raven\\Core\\Routing\\Router;\n\n" .
-            "return static function (Router \$router, array \$context): void {\n" .
-            "    \$slug = '" . addslashes($slug) . "';\n" .
-            "    \$router->get('/' . \$slug, static function () use (\$context): void {\n" .
-            "        \$view = \$context['app']['view'] ?? null;\n" .
-            "        if (!\$view instanceof \\Raven\\Core\\View) {\n" .
-            "            http_response_code(500);\n" .
-            "            echo 'View service missing.';\n" .
-            "            return;\n" .
-            "        }\n" .
-            "\n" .
-            "        \$view->render('ext/" . addslashes($slug) . "/public_index', [\n" .
-            "            'site' => [\n" .
-            "                'name' => (string) ((\$context['app']['config']->get('site.name', 'Raven CMS'))),\n" .
-            "            ],\n" .
-            "        ], 'wrapper');\n" .
-            "    });\n" .
-            "};\n";
-
-        $files['tpl/public_index.php'] = "<?php\n\n" .
-            "declare(strict_types=1);\n\n" .
-            "if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {\n" .
-            "    http_response_code(404);\n" .
-            "    exit;\n" .
-            "}\n" .
-            "?>\n" .
-            "<article class=\"container py-4\">\n" .
-            "  <h1>" . htmlspecialchars($name, ENT_QUOTES) . "</h1>\n" .
-            "  <p>This is the public view scaffold for <strong>" . htmlspecialchars($slug, ENT_QUOTES) . "</strong>.</p>\n" .
-            "</article>\n";
-    }
-
-    if ($withShortcodes) {
-        $files['lib/shortcodes.php'] = "<?php\n\n" .
-            "declare(strict_types=1);\n\n" .
-            "return static function (): array {\n" .
-            "    return [];\n" .
-            "};\n";
-    }
-
-    if ($withFields) {
-        $files['lib/fields.php'] = "<?php\n\n" .
-            "declare(strict_types=1);\n\n" .
-            "return static function (): array {\n" .
-            "    return [];\n" .
-            "};\n";
-    }
-
-    if ($withComposer) {
-        $files['composer.json'] = json_encode([
-            'name' => 'rvn-ext/' . $slug,
-            'description' => $description !== '' ? $description : ('Raven extension: ' . $name),
-            'type' => 'library',
-            'require' => new stdClass(),
-            'autoload' => [
-                'psr-4' => [
-                    'Raven\\Ext\\' . ucfirst(str_replace(['-', '_'], '', $slug)) . '\\' => 'src/',
-                ],
-            ],
-        ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n";
-    }
-
-    if ($withAgents) {
-        $files['AGENTS.md'] = "# " . $name . " Extension Agent Guide\n\n" .
-            "This extension follows Raven's extension contract in `private/ext/AGENTS.md`.\n" .
-            "\n" .
-            "## Notes\n" .
-            "- Type: `" . $type . "`\n" .
-            "- Slug: `" . $slug . "`\n" .
-            "- Author URL: `" . $authorUrl . "`\n";
-    }
-
-    return $files;
-}
-
 function raven_cli_command_extension(RavenCliContext $context, array $tokens): int
 {
     if ($tokens === [] && $context->interactive) {
@@ -2297,7 +2128,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         $context->renderHelpHeader('ext');
         $context->info('Usage: private/bin/rvn-ext <action> [options]');
         $context->info('Actions: list, enable, disable, create, import, uninstall');
-        $context->info('Options: --slug, --archive, --type, --name, --version (optional), --description, --author, --homepage');
+        $context->info('Options: --slug, --archive, --type <helper|content|framework|module|system>, --name, --version (optional), --description, --author, --homepage');
         $context->info('Import uses ext.json "slug" when --slug is omitted.');
         return 0;
     }
@@ -2373,6 +2204,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
 
         if ($action === 'enable' || $action === 'disable') {
             require_once $root . '/private/sys/Core/Extension/ExtensionRegistry.php';
+            require_once $root . '/private/lib/Extension/ExtensionBootstrapContractResolver.php';
             require_once $root . '/private/lib/Extension/ExtensionStorageProvisioner.php';
             $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
             if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
@@ -2391,9 +2223,15 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
 
             $state = raven_cli_extension_state_load($root);
             if ($action === 'enable') {
-                if (!empty($manifest['local_storage'])) {
+                $resolver = new \Raven\Lib\Extension\ExtensionBootstrapContractResolver();
+                $contract = $resolver->resolve($root, $slug, $manifest);
+                if (!$contract['valid']) {
+                    throw new RuntimeException((string) ($contract['error'] ?? 'Invalid extension bootstrap contract.'));
+                }
+
+                if (!empty($contract['storage'])) {
                     $provisioner = new \Raven\Lib\Extension\ExtensionStorageProvisioner($root);
-                    $provisioner->ensureLocalStorageDirectory($slug);
+                    $provisioner->provision($slug, (array) $contract['storage']);
                 }
 
                 $state['enabled'][$slug] = true;
@@ -2412,6 +2250,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
 
         if ($action === 'uninstall') {
             require_once $root . '/private/sys/Core/Extension/ExtensionRegistry.php';
+            require_once $root . '/private/lib/Extension/ExtensionBootstrapContractResolver.php';
             require_once $root . '/private/lib/Extension/ExtensionStorageCleaner.php';
             $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
             if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
@@ -2436,17 +2275,19 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
 
             $manifest = ExtensionRegistry::readManifest($root, $slug);
             if ($manifest !== null) {
+                $resolver = new \Raven\Lib\Extension\ExtensionBootstrapContractResolver();
+                $contract = $resolver->resolve($root, $slug, $manifest);
+                if (!$contract['valid']) {
+                    throw new RuntimeException((string) ($contract['error'] ?? 'Invalid extension bootstrap contract.'));
+                }
+
                 $app = $context->app();
                 $db = $app['db'] ?? null;
                 $driver = $app['driver'] ?? null;
                 $prefix = $app['prefix'] ?? null;
                 if ($db instanceof PDO && is_string($driver) && is_string($prefix)) {
                     $cleaner = new \Raven\Lib\Extension\ExtensionStorageCleaner($root, $db, $driver, $prefix);
-                    $cleaner->deleteStorage(
-                        $slug,
-                        !empty($manifest['local_storage']),
-                        !empty($manifest['db_storage'])
-                    );
+                    $cleaner->deleteStorageByContract($slug, (array) ($contract['storage'] ?? []));
                 }
             }
 
@@ -2541,6 +2382,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         }
 
         if ($action === 'create') {
+            require_once $root . '/private/lib/Extension/ExtensionScaffoldService.php';
             $slug = strtolower(trim((string) raven_cli_option($options, 'slug', '')));
             if ($slug === '' && $context->interactive) {
                 $slug = strtolower(trim($context->prompt('Extension slug')));
@@ -2558,8 +2400,11 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 throw new RuntimeException('Extension name is required.');
             }
 
-            $type = strtolower(trim((string) raven_cli_option($options, 'type', 'plugin')));
-            if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
+            $type = strtolower(trim((string) raven_cli_option($options, 'type', 'content')));
+            if ($type === 'plugin') {
+                $type = 'content';
+            }
+            if (!in_array($type, ['helper', 'content', 'framework', 'module', 'system'], true)) {
                 throw new RuntimeException('Invalid extension type.');
             }
 
@@ -2569,61 +2414,49 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
             $homepage = trim((string) raven_cli_option($options, 'homepage', ''));
             $authorUrl = trim((string) raven_cli_option($options, 'author-url', ''));
 
-            $defaultShortcodes = in_array($type, ['helper', 'plugin', 'module'], true);
-            $defaultFields = in_array($type, ['content', 'plugin', 'module'], true);
-            $defaultPublic = $type === 'module';
-
-            $withShortcodes = raven_cli_bool_option($options, 'with-shortcodes', $defaultShortcodes);
-            $withFields = raven_cli_bool_option($options, 'with-fields', $defaultFields);
-            $withPublicRoutes = raven_cli_bool_option($options, 'with-public-routes', $defaultPublic);
             $withAgents = raven_cli_bool_option($options, 'with-agents', false);
             $withComposer = raven_cli_bool_option($options, 'with-composer', true);
-
-            if ($withPublicRoutes && $type !== 'module') {
-                throw new RuntimeException('Only module type extensions can include public routes.');
-            }
-            if ($withShortcodes && !in_array($type, ['helper', 'plugin', 'module'], true)) {
-                throw new RuntimeException('Only helper/plugin/module can include lib/shortcodes.php.');
-            }
-            if ($withFields && !in_array($type, ['content', 'plugin', 'module'], true)) {
-                throw new RuntimeException('Only content/plugin/module can include lib/fields.php.');
-            }
 
             $path = $extBase . '/' . $slug;
             if (file_exists($path)) {
                 throw new RuntimeException('Extension directory already exists: ' . $slug);
             }
-            if (!mkdir($path, 0770, true) && !is_dir($path)) {
-                throw new RuntimeException('Failed to create extension directory.');
-            }
-
-            $files = raven_cli_extension_scaffold_files($path, [
-                'slug' => $slug,
-                'name' => $name,
-                'version' => $version,
-                'description' => $description,
-                'type' => $type,
-                'author' => $author,
-                'homepage' => $homepage,
-                'author_url' => $authorUrl,
-            ], $withShortcodes, $withFields, $withPublicRoutes, $withAgents, $withComposer);
 
             try {
-                foreach ($files as $relativePath => $content) {
-                    $target = $path . '/' . $relativePath;
-                    $dir = dirname($target);
-                    if (!is_dir($dir) && !mkdir($dir, 0770, true) && !is_dir($dir)) {
-                        throw new RuntimeException('Failed to create directory: ' . $dir);
-                    }
-
-                    if (file_put_contents($target, $content, LOCK_EX) === false) {
-                        throw new RuntimeException('Failed to write file: ' . $relativePath);
-                    }
-                    @chmod($target, 0600);
-                }
+                $scaffold = new \Raven\Lib\Extension\ExtensionScaffoldService();
+                $scaffold->createSkeleton($path, [
+                    'directory' => $slug,
+                    'name' => $name,
+                    'version' => $version,
+                    'description' => $description,
+                    'type' => $type,
+                    'author' => $author,
+                    'homepage' => $homepage,
+                    'author_url' => $authorUrl,
+                ], $withAgents, $withComposer);
             } catch (Throwable $exception) {
                 raven_cli_remove_directory_recursive($path);
                 throw $exception;
+            }
+
+            $createdFiles = ['ext.json', 'ext.php', 'lib/schema.php'];
+            if (in_array($type, ['content', 'module'], true)) {
+                $createdFiles[] = 'lib/shortcodes.php';
+                $createdFiles[] = 'lib/fields.php';
+            }
+            if ($type !== 'framework') {
+                $createdFiles[] = 'lib/routes_panel.php';
+                $createdFiles[] = 'tpl/panel_index.php';
+            }
+            if ($type === 'module') {
+                $createdFiles[] = 'lib/routes_public.php';
+                $createdFiles[] = 'tpl/public_index.php';
+            }
+            if ($withAgents) {
+                $createdFiles[] = 'AGENTS.md';
+            }
+            if ($withComposer) {
+                $createdFiles[] = 'composer.json';
             }
 
             require_once $root . '/private/sys/Core/Extension/ExtensionRegistry.php';
@@ -2640,11 +2473,11 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 $context->printJson([
                     'ok' => true,
                     'slug' => $slug,
-                    'created_files' => array_keys($files),
+                    'created_files' => $createdFiles,
                 ]);
             } else {
                 $context->ok('Created extension scaffold: ' . $slug);
-                foreach (array_keys($files) as $file) {
+                foreach ($createdFiles as $file) {
                     $context->line('  + ' . $file);
                 }
             }

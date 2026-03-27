@@ -17,8 +17,12 @@ final class ManifestContractValidator
     public function normalizeType(string $type): string
     {
         $type = strtolower(trim($type));
-        if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
-            return 'plugin';
+        if ($type === 'plugin') {
+            return 'content';
+        }
+
+        if (!in_array($type, ['helper', 'content', 'framework', 'module', 'system'], true)) {
+            return 'content';
         }
 
         return $type;
@@ -54,20 +58,25 @@ final class ManifestContractValidator
 
     public function typeContractError(string $extensionRoot, string $type): ?string
     {
+        $hasPanelRoutes = is_file($extensionRoot . '/lib/routes_panel.php');
         $hasPublicRoutes = is_file($extensionRoot . '/lib/routes_public.php');
         $hasShortcodes = is_file($extensionRoot . '/lib/shortcodes.php');
         $hasFields = is_file($extensionRoot . '/lib/fields.php');
+
+        if ($hasPanelRoutes && $type === 'framework') {
+            return 'Framework extensions may not define lib/routes_panel.php.';
+        }
 
         if ($hasPublicRoutes && $type !== 'module') {
             return 'Only module extensions may define lib/routes_public.php.';
         }
 
-        if ($hasShortcodes && !in_array($type, ['helper', 'plugin', 'module'], true)) {
-            return 'Only helper/plugin/module extensions may define lib/shortcodes.php.';
+        if ($hasShortcodes && !in_array($type, ['content', 'module'], true)) {
+            return 'Only content/module extensions may define lib/shortcodes.php.';
         }
 
-        if ($hasFields && !in_array($type, ['content', 'plugin', 'module'], true)) {
-            return 'Only content/plugin/module extensions may define lib/fields.php.';
+        if ($hasFields && !in_array($type, ['content', 'module'], true)) {
+            return 'Only content/module extensions may define lib/fields.php.';
         }
 
         return null;

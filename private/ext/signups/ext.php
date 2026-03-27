@@ -15,12 +15,14 @@ use Raven\SignupPublicFormRuntime;
 
 /**
  * Registers Signup Sheets extension services into the shared app container.
- *
- * @param array<string, mixed> $app
  */
-return static function (array &$app): void {
+return [
+    'storage' => [
+        'local' => true,
+    ],
+    'boot' => static function (array &$app): void {
     if (
-        !isset($app['db'], $app['driver'], $app['prefix'])
+        !isset($app['db'], $app['driver'], $app['prefix'], $app['extension_storage'])
         || !$app['db'] instanceof PDO
     ) {
         return;
@@ -28,7 +30,14 @@ return static function (array &$app): void {
 
     $driver = (string) $app['driver'];
     $prefix = (string) $app['prefix'];
-    $formsRepository = new SignupFormRepository($app['db'], $driver, $prefix);
+    $storageMap = is_array($app['extension_storage']) ? $app['extension_storage'] : [];
+    $storage = is_array($storageMap['signups'] ?? null) ? $storageMap['signups'] : [];
+    $formsPath = rtrim((string) ($storage['local'] ?? ''), '/');
+    if ($formsPath === '') {
+        return;
+    }
+
+    $formsRepository = new SignupFormRepository($app['db'], $driver, $prefix, $formsPath . '/forms.php');
     $submissionsRepository = new SignupSubmissionRepository($app['db'], $driver, $prefix);
     $publicFormRuntime = new SignupPublicFormRuntime(
         $app['input'],
@@ -60,4 +69,5 @@ return static function (array &$app): void {
     $rawSignupServices['embedded_form_runtimes'] = $rawEmbeddedRuntimes;
     $rawExtensionServices['signups'] = $rawSignupServices;
     $app['extension_services'] = $rawExtensionServices;
-};
+    },
+];

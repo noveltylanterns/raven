@@ -125,7 +125,7 @@ final class ExtensionPermissionCatalogService
 
             $result[$directory] = [
                 'name' => (string) ($meta['name'] ?? $directory),
-                'type' => (string) ($meta['type'] ?? 'plugin'),
+                'type' => (string) ($meta['type'] ?? 'content'),
                 'default_level' => (string) ($meta['default_level'] ?? ($levels[0]['key'] ?? 'access')),
                 'levels' => $levels,
             ];
@@ -179,9 +179,9 @@ final class ExtensionPermissionCatalogService
                 continue;
             }
 
-            $type = strtolower(trim((string) ($manifest['type'] ?? 'plugin')));
+            $type = strtolower(trim((string) ($manifest['type'] ?? 'content')));
             $isSystemType = $type === 'system' || !empty($manifest['system_extension']);
-            if ($isSystemType || !in_array($type, ['helper', 'content', 'plugin', 'module'], true)) {
+            if ($isSystemType || !in_array($type, ['helper', 'content', 'module'], true)) {
                 continue;
             }
 

@@ -49,7 +49,7 @@ final class ExtensionEditorCatalogService
             $manifest = $manifestReader($extensionPath);
             if (
                 !($manifest['valid'] ?? false)
-                || !in_array((string) ($manifest['type'] ?? ''), ['content', 'plugin', 'module'], true)
+                || !in_array((string) ($manifest['type'] ?? ''), ['content', 'module'], true)
             ) {
                 continue;
             }
@@ -89,7 +89,7 @@ final class ExtensionEditorCatalogService
             $manifest = ExtensionRegistry::readManifest($this->projectRoot, $extensionName);
             if (
                 !is_array($manifest)
-                || !in_array((string) ($manifest['type'] ?? ''), ['content', 'plugin', 'module'], true)
+                || !in_array((string) ($manifest['type'] ?? ''), ['content', 'module'], true)
             ) {
                 continue;
             }
@@ -140,12 +140,12 @@ final class ExtensionEditorCatalogService
 
             $extensionPath = rtrim($extensionsBasePath, '/\\') . '/' . $extensionName;
             $manifest = $manifestReader($extensionPath);
-            $type = strtolower(trim((string) ($manifest['type'] ?? 'plugin')));
+            $type = strtolower(trim((string) ($manifest['type'] ?? 'content')));
             $isSystemType = $type === 'system' || !empty($manifest['system_extension']);
             if (
                 !($manifest['valid'] ?? false)
                 || $isSystemType
-                || !in_array($type, ['helper', 'plugin', 'module'], true)
+                || !in_array($type, ['content', 'module'], true)
             ) {
                 continue;
             }

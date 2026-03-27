@@ -37,6 +37,7 @@ use Raven\Lib\Config\PanelMediaConfigService;
 use Raven\Lib\Content\BodyBlockPolicy;
 use Raven\Lib\Content\PageBodyBlockCodec;
 use Raven\Lib\Extension\ExtensionCatalogService;
+use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStorageCleaner;
@@ -131,6 +132,7 @@ final class PanelController
     private ?RoutingInventoryBuilder $routingInventoryBuilder = null;
     private ?ExtensionPermissionCatalogService $extensionPermissionCatalogService = null;
     private ?ExtensionStorageProvisioner $extensionStorageProvisioner = null;
+    private ?ExtensionBootstrapContractResolver $extensionBootstrapContractResolver = null;
     private ?AvatarUploadService $avatarUploadService = null;
     private ?UserMediaPathService $userMediaPathService = null;
     private ?ConfigSnapshotSanitizer $configSnapshotSanitizer = null;
@@ -829,7 +831,7 @@ final class PanelController
     /**
      * Loads extension-provided body-block definitions for page editor menus.
      *
-     * Each enabled `content`/`plugin`/`module` extension may optionally define `lib/fields.php`
+     * Each enabled `content`/`module` extension may optionally define `lib/fields.php`
      * returning either:
      * - array<int, array{slug: string, label: string, editor: string}>
      * - callable(array{extension?: string}): array<int, array{slug: string, label: string, editor: string}>
@@ -5369,8 +5371,8 @@ final class PanelController
         }
 
         $type = strtolower(trim($this->input->text($post['type'] ?? null, 20)));
-        if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
-            $type = 'plugin';
+        if (!in_array($type, ['helper', 'content', 'framework', 'module', 'system'], true)) {
+            $type = 'content';
         }
 
         $version = $this->input->text($post['version'] ?? null, 80);
@@ -5466,13 +5468,15 @@ final class PanelController
         }
 
         $createdFiles = ['ext.json', 'ext.php', 'lib/schema.php'];
-        if (in_array($type, ['helper', 'plugin', 'module'], true)) {
+        if (in_array($type, ['content', 'module'], true)) {
             $createdFiles[] = 'lib/shortcodes.php';
         }
-        if (in_array($type, ['content', 'plugin', 'module'], true)) {
+        if (in_array($type, ['content', 'module'], true)) {
             $createdFiles[] = 'lib/fields.php';
         }
-        $createdFiles = array_merge($createdFiles, ['lib/routes_panel.php', 'tpl/panel_index.php']);
+        if ($type !== 'framework') {
+            $createdFiles = array_merge($createdFiles, ['lib/routes_panel.php', 'tpl/panel_index.php']);
+        }
         if ($type === 'module') {
             $createdFiles[] = 'lib/routes_public.php';
             $createdFiles[] = 'tpl/public_index.php';
@@ -6130,9 +6134,61 @@ final class PanelController
             $enabledMap,
             $this->extensionsBasePath(),
             fn (string $extensionPath): array => $this->readExtensionManifest($extensionPath),
-            fn (string $tableName): array => $this->taxonomyLookupRepo->listEnabledExtensionForms($tableName),
+            fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey),
             $this->config
         );
+    }
+
+    /**
+     * @return array<int, array{name: string, slug: string}>
+     */
+    private function listEnabledExtensionForms(string $extensionKey): array
+    {
+        $normalized = strtolower(trim($extensionKey));
+        if ($normalized === 'ext_contact') {
+            $normalized = 'contact';
+        } elseif ($normalized === 'ext_signups') {
+            $normalized = 'signups';
+        }
+
+        $services = $this->app['extension_services'] ?? [];
+        if (is_array($services)) {
+            $extensionServices = $services[$normalized] ?? null;
+            if (is_array($extensionServices)) {
+                $formsRepository = $extensionServices['forms'] ?? null;
+                if (is_object($formsRepository) && method_exists($formsRepository, 'listAll')) {
+                    /** @var mixed $rows */
+                    $rows = $formsRepository->listAll();
+                    if (is_array($rows)) {
+                        $items = [];
+                        foreach ($rows as $row) {
+                            if (!is_array($row) || empty($row['enabled'])) {
+                                continue;
+                            }
+
+                            $slug = strtolower(trim((string) ($row['slug'] ?? '')));
+                            if ($slug === '' || preg_match('/^[a-z0-9][a-z0-9_-]*$/', $slug) !== 1) {
+                                continue;
+                            }
+
+                            $name = trim((string) ($row['name'] ?? ''));
+                            if ($name === '') {
+                                $name = $slug;
+                            }
+
+                            $items[] = [
+                                'name' => $name,
+                                'slug' => $slug,
+                            ];
+                        }
+
+                        return $items;
+                    }
+                }
+            }
+        }
+
+        return $this->taxonomyLookupRepo->listEnabledExtensionForms($extensionKey);
     }
 
     /**
@@ -6160,7 +6216,7 @@ final class PanelController
     private function listExtensionsForPanel(): array
     {
         return $this->extensionCatalogService()->listForPanel(
-            fn (string $tableName): array => $this->taxonomyLookupRepo->listEnabledExtensionForms($tableName)
+            fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
         );
     }
 
@@ -6186,7 +6242,7 @@ final class PanelController
     {
         return $this->extensionCatalogService()->readManifest(
             $extensionPath,
-            fn (string $tableName): array => $this->taxonomyLookupRepo->listEnabledExtensionForms($tableName)
+            fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
         );
     }
 
@@ -6207,16 +6263,29 @@ final class PanelController
         return $this->extensionStorageProvisioner;
     }
 
+    private function extensionBootstrapContractResolver(): ExtensionBootstrapContractResolver
+    {
+        if (!$this->extensionBootstrapContractResolver instanceof ExtensionBootstrapContractResolver) {
+            $this->extensionBootstrapContractResolver = new ExtensionBootstrapContractResolver();
+        }
+
+        return $this->extensionBootstrapContractResolver;
+    }
+
     /**
      * @param array<string, mixed> $manifest
      */
     private function provisionEnabledExtensionStorage(string $extensionName, array $manifest): void
     {
-        if (empty($manifest['local_storage'])) {
-            return;
+        $contract = $this->extensionBootstrapContractResolver()->resolve(dirname(__DIR__, 3), $extensionName, $manifest);
+        if (!$contract['valid']) {
+            throw new \RuntimeException((string) ($contract['error'] ?? 'Invalid extension bootstrap contract.'));
         }
 
-        $this->extensionStorageProvisioner()->ensureLocalStorageDirectory($extensionName);
+        $this->extensionStorageProvisioner()->provision(
+            $extensionName,
+            (array) ($contract['storage'] ?? [])
+        );
     }
 
     /**
@@ -6224,6 +6293,11 @@ final class PanelController
      */
     private function deleteExtensionStorage(string $extensionName, array $manifest): void
     {
+        $contract = $this->extensionBootstrapContractResolver()->resolve(dirname(__DIR__, 3), $extensionName, $manifest);
+        if (!$contract['valid']) {
+            throw new \RuntimeException((string) ($contract['error'] ?? 'Invalid extension bootstrap contract.'));
+        }
+
         $databaseConfig = (array) $this->config->get('database', []);
         $connectionFactory = new ConnectionFactory($databaseConfig);
         $cleaner = new ExtensionStorageCleaner(
@@ -6233,11 +6307,7 @@ final class PanelController
             $connectionFactory->getPrefix()
         );
 
-        $cleaner->deleteStorage(
-            $extensionName,
-            !empty($manifest['local_storage']),
-            !empty($manifest['db_storage'])
-        );
+        $cleaner->deleteStorageByContract($extensionName, (array) ($contract['storage'] ?? []));
     }
 
     /**

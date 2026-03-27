@@ -13,16 +13,23 @@ use Raven\Smallweb\SmallwebService;
 
 /**
  * Registers Smallweb extension services into the shared app container.
- *
- * @param array<string, mixed> $app
  */
-return static function (array &$app): void {
-    if (!isset($app['root'], $app['config'])) {
+return [
+    'storage' => [
+        'local' => true,
+    ],
+    'boot' => static function (array &$app): void {
+    if (!isset($app['root'], $app['config'], $app['extension_storage'])) {
         return;
     }
 
     $root = rtrim((string) $app['root'], '/');
-    $storageDir = $root . '/private/dat/ext/smallweb';
+    $storageMap = is_array($app['extension_storage']) ? $app['extension_storage'] : [];
+    $storage = is_array($storageMap['smallweb'] ?? null) ? $storageMap['smallweb'] : [];
+    $storageDir = rtrim((string) ($storage['local'] ?? ''), '/');
+    if ($storageDir === '') {
+        return;
+    }
     $service = new SmallwebService($root, $storageDir, $app['config']);
 
     /** @var mixed $rawExtensionServices */
@@ -40,4 +47,5 @@ return static function (array &$app): void {
     $rawSmallwebServices['service'] = $service;
     $rawExtensionServices['smallweb'] = $rawSmallwebServices;
     $app['extension_services'] = $rawExtensionServices;
-};
+    },
+];

@@ -30,14 +30,17 @@ final class ExtensionScaffoldService
         bool $generateComposerFile = false
     ): void
     {
-        $type = strtolower(trim((string) ($meta['type'] ?? 'plugin')));
-        if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
-            $type = 'plugin';
+        $type = strtolower(trim((string) ($meta['type'] ?? 'content')));
+        if ($type === 'plugin') {
+            $type = 'content';
         }
-        $generatesPanelRoutes = true;
+        if (!in_array($type, ['helper', 'content', 'framework', 'module', 'system'], true)) {
+            $type = 'content';
+        }
+        $generatesPanelRoutes = $type !== 'framework';
         $generatesPublicRoutes = $type === 'module';
-        $generatesShortcodes = in_array($type, ['helper', 'plugin', 'module'], true);
-        $generatesContentBlocks = in_array($type, ['content', 'plugin', 'module'], true);
+        $generatesShortcodes = in_array($type, ['content', 'module'], true);
+        $generatesContentBlocks = in_array($type, ['content', 'module'], true);
         if (!mkdir($extensionPath, 0700, true) && !is_dir($extensionPath)) {
             throw new \RuntimeException('Failed to create extension directory.');
         }
@@ -177,8 +180,6 @@ final class ExtensionScaffoldService
             'name' => $meta['name'],
             'description' => $meta['description'],
             'type' => $meta['type'],
-            'local_storage' => 'off',
-            'db_storage' => 'off',
         ];
 
         $version = trim((string) ($meta['version'] ?? ''));
@@ -281,11 +282,18 @@ final class ExtensionScaffoldService
 declare(strict_types=1);
 
 /**
- * Registers extension-owned services into shared app container.
- *
- * @param array<string, mixed> $app
+ * Registers extension-owned services and declares optional storage requests.
  */
-return static function (array &$app): void {
+return [
+    'storage' => [
+        // Supported options:
+        // 'local' => true,
+        // 'table' => true,
+        // 'tables' => ['items'],
+        // 'panel' => true,
+        // 'public' => true,
+    ],
+    'boot' => static function (array &$app): void {
     $extensionKey = __DIRECTORY_LITERAL__;
 
     /** @var mixed $rawExtensionServices */
@@ -300,12 +308,19 @@ return static function (array &$app): void {
         $rawServices = [];
     }
 
+    // Resolved storage roots, when requested by this extension:
+    // $storage = is_array($app['extension_storage'][$extensionKey] ?? null) ? $app['extension_storage'][$extensionKey] : [];
+    // $localRoot = (string) ($storage['local'] ?? '');
+    // $panelRoot = (string) ($storage['panel'] ?? '');
+    // $publicRoot = (string) ($storage['public'] ?? '');
+
     // Register extension services here, for example:
     // $rawServices['repository'] = new MyRepository(...);
 
     $rawExtensionServices[$extensionKey] = $rawServices;
     $app['extension_services'] = $rawExtensionServices;
-};
+    },
+];
 PHP;
 
         return str_replace(
@@ -574,27 +589,30 @@ declare(strict_types=1);
  */
 return static function (array $context): void {
     if (
-        !isset($context['db'], $context['driver'], $context['table'])
+        !isset($context['db'], $context['driver'], $context['table'], $context['tables'], $context['storage'])
         || !$context['db'] instanceof \PDO
         || !is_callable($context['table'])
+        || !is_callable($context['tables'])
     ) {
         return;
     }
 
     $db = $context['db'];
     $driver = (string) $context['driver'];
-    $tableResolver = $context['table'];
+    $tableResolver = $context['table'];   // returns `{prefix}ext___DIRECTORY__`
+    $tablesResolver = $context['tables']; // returns `{prefix}ext___DIRECTORY___{suffix}`
+    $storage = is_array($context['storage']) ? $context['storage'] : [];
 
-    // Resolve one logical table to the active backend.
-    // Extension-owned SQL tables should follow the shared `{prefix}ext_*` naming model:
-    // $table = $tableResolver('ext___DIRECTORY__');
+    // Resolved storage roots, when requested by ext.php:
+    // $localRoot = (string) ($storage['local'] ?? '');
+    // $panelRoot = (string) ($storage['panel'] ?? '');
+    // $publicRoot = (string) ($storage['public'] ?? '');
+    //
+    // SQL table helpers:
+    // $table = $tableResolver();
+    // $childTable = $tablesResolver('items');
     //
     // Keep schema operations idempotent. This provider runs on bootstrap/install.
-    //
-    // Example:
-    // if ($driver === 'sqlite') {
-    //     $db->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (...)');
-    // }
 };
 PHP;
 
@@ -656,7 +674,7 @@ PHP;
     }
 
     /**
-     * Returns generated `lib/fields.php` scaffold content for content/plugin/module extensions.
+     * Returns generated `lib/fields.php` scaffold content for content/module extensions.
      *
      * @param array{
      *   directory: string,
@@ -761,18 +779,25 @@ PHP;
     private function renderExtensionPanelViewSkeleton(array $meta): string
     {
         $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
-        $type = strtolower(trim((string) ($meta['type'] ?? 'plugin')));
-        if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
-            $type = 'plugin';
+        $type = strtolower(trim((string) ($meta['type'] ?? 'content')));
+        if ($type === 'plugin') {
+            $type = 'content';
         }
+        if (!in_array($type, ['helper', 'content', 'framework', 'module', 'system'], true)) {
+            $type = 'content';
+        }
+        $generatesPanelRoutes = $type !== 'framework';
         $generatesPublicRoutes = $type === 'module';
-        $generatesShortcodes = in_array($type, ['helper', 'plugin', 'module'], true);
-        $generatesContentBlocks = in_array($type, ['content', 'plugin', 'module'], true);
+        $generatesShortcodes = in_array($type, ['content', 'module'], true);
+        $generatesContentBlocks = in_array($type, ['content', 'module'], true);
         $starterFiles = [
             'private/ext/__DIRECTORY__/ext.php',
-            'private/ext/__DIRECTORY__/lib/routes_panel.php',
             'private/ext/__DIRECTORY__/lib/schema.php',
         ];
+        if ($generatesPanelRoutes) {
+            $starterFiles[] = 'private/ext/__DIRECTORY__/lib/routes_panel.php';
+            $starterFiles[] = 'private/ext/__DIRECTORY__/tpl/panel_index.php';
+        }
         if ($generatesPublicRoutes) {
             $starterFiles[] = 'private/ext/__DIRECTORY__/lib/routes_public.php';
             $starterFiles[] = 'private/ext/__DIRECTORY__/tpl/public_index.php';
@@ -783,7 +808,6 @@ PHP;
         if ($generatesContentBlocks) {
             $starterFiles[] = 'private/ext/__DIRECTORY__/lib/fields.php';
         }
-        $starterFiles[] = 'private/ext/__DIRECTORY__/tpl/panel_index.php';
         $starterFilesListHtml = '';
         foreach ($starterFiles as $starterFile) {
             $starterFilesListHtml .= "\n            <li><code>" . $starterFile . "</code></li>";
@@ -874,20 +898,26 @@ PHP;
 
         $directory = trim((string) ($meta['directory'] ?? ''));
         $directory = $directory !== '' ? $directory : 'example_extension';
-        $type = strtolower(trim((string) ($meta['type'] ?? 'plugin')));
-        if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
-            $type = 'plugin';
+        $type = strtolower(trim((string) ($meta['type'] ?? 'content')));
+        if ($type === 'plugin') {
+            $type = 'content';
         }
+        if (!in_array($type, ['helper', 'content', 'framework', 'module', 'system'], true)) {
+            $type = 'content';
+        }
+        $generatesPanelRoutes = $type !== 'framework';
         $generatesPublicRoutes = $type === 'module';
-        $generatesShortcodes = in_array($type, ['helper', 'plugin', 'module'], true);
-        $generatesContentBlocks = in_array($type, ['content', 'plugin', 'module'], true);
+        $generatesShortcodes = in_array($type, ['content', 'module'], true);
+        $generatesContentBlocks = in_array($type, ['content', 'module'], true);
         $starterFiles = [
             '- `ext.json`',
             '- `ext.php`',
             '- `lib/schema.php`',
-            '- `lib/routes_panel.php`',
-            '- `tpl/panel_index.php`',
         ];
+        if ($generatesPanelRoutes) {
+            $starterFiles[] = '- `lib/routes_panel.php`';
+            $starterFiles[] = '- `tpl/panel_index.php`';
+        }
         if ($generatesPublicRoutes) {
             $starterFiles[] = '- `lib/routes_public.php`';
             $starterFiles[] = '- `tpl/public_index.php`';
