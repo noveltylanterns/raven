@@ -37,13 +37,13 @@ final class PageImageDeletionService
             }
 
             $readVariants = $db->prepare(
-                'SELECT stored_path FROM ' . $variantsTable . ' WHERE image_id = :image_id'
+                'SELECT stored_path FROM ' . $variantsTable . ' WHERE image = :image_id'
             );
             $readVariants->execute([':image_id' => $imageId]);
             $variantRows = $readVariants->fetchAll() ?: [];
 
             $deleteVariants = $db->prepare(
-                'DELETE FROM ' . $variantsTable . ' WHERE image_id = :image_id'
+                'DELETE FROM ' . $variantsTable . ' WHERE image = :image_id'
             );
             $deleteVariants->execute([':image_id' => $imageId]);
 
@@ -98,7 +98,7 @@ final class PageImageDeletionService
             $readPaths = $db->prepare(
                 'SELECT i.stored_path AS image_path, v.stored_path AS variant_path
                  FROM ' . $imagesTable . ' i
-                 LEFT JOIN ' . $variantsTable . ' v ON v.image_id = i.id
+                 LEFT JOIN ' . $variantsTable . ' v ON v.image = i.id
                  WHERE i.page = :page'
             );
             $readPaths->execute([':page' => $pageId]);
@@ -113,7 +113,7 @@ final class PageImageDeletionService
             if ($imageIds !== []) {
                 $placeholders = implode(', ', array_fill(0, count($imageIds), '?'));
                 $deleteVariants = $db->prepare(
-                    'DELETE FROM ' . $variantsTable . ' WHERE image_id IN (' . $placeholders . ')'
+                    'DELETE FROM ' . $variantsTable . ' WHERE image IN (' . $placeholders . ')'
                 );
                 $deleteVariants->execute($imageIds);
             }

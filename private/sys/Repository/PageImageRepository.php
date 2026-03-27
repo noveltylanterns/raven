@@ -197,7 +197,7 @@ final class PageImageRepository
 
             $insertVariant = $this->db->prepare(
                 'INSERT INTO ' . $imageVariants . ' (
-                    image_id, variant_key, stored_filename, stored_path,
+                    image, variant_key, stored_filename, stored_path,
                     mime_type, extension, byte_size, width, height, created
                 ) VALUES (
                     :image_id, :variant_key, :stored_filename, :stored_path,

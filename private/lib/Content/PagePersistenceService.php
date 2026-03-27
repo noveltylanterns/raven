@@ -134,7 +134,7 @@ final class PagePersistenceService
 
             $detachImageVariants = $db->prepare(
                 'DELETE FROM ' . $pageImageVariantsTable . '
-                 WHERE image_id IN (
+                 WHERE image IN (
                     SELECT id FROM ' . $pageImagesTable . ' WHERE page = :page
                  )'
             );
