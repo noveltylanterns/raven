@@ -4,6 +4,8 @@
 
 ### March 25, 2026
 
+- Finished the broad schema-shortening sweep across Raven-owned tables: users now store `name` / `avatar` / `contact` / `two_factor` plus plaintext `bio`; invites now live in `users_invites`; login-throttle buckets now live in `users_failures`; groups now use `description` / `route` / `permissions` / `created`; pages now use `channel` / `content` / `published` / `author` / `cover_image` / `preview_image` / `created` / `updated`; page-image rows now use `page` / `hash` / `created` / `updated`; and page taxonomy pivots now use `page` + `category` / `tag`.
+- Moved Contact Forms and Signup Sheets form definitions out of SQL and into flat PHP files at `private/dat/ext/contact/forms.php` and `private/dat/ext/signups/forms.php`, while collapsing their submission storage down to one table each (`rvn_contact` and `rvn_signups`).
 - Simplified page storage to one `pages.content` JSON body-block column by folding the old `extended` payload into `content`, removing the redundant `published_at` column, renaming internal page-editor/repository payloads from `extended_blocks` to `content_blocks`, and standardizing page ordering/feed dates on `created_at`.
 - Simplified page-editor media selection to a single `Use as cover image` flag, removed page-level `is_preview` handling from the page editor/backend flow, and made page social/meta image overrides read from the cover image instead.
 - Simplified category/tag taxonomy storage by renaming `set_id` to `set`, `created_at` to `created`, and collapsing the eight stored image-path columns down to just `cover_image` and `preview_image`, with the original plus `sm`/`md`/`lg` public paths derived at runtime from the deterministic upload naming scheme.

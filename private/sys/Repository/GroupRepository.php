@@ -52,7 +52,7 @@ final class GroupRepository
     {
         $groups = $this->table('groups');
         $userGroups = $this->table('user_groups');
-        $stockCase = $this->stockRoleSql();
+        $stockCase = $this->stockRoleSql('g');
 
         $stmt = $this->db->prepare(
             'SELECT g.id,
@@ -107,7 +107,7 @@ final class GroupRepository
     {
         $groups = $this->table('groups');
         $userGroups = $this->table('user_groups');
-        $stockCase = $this->stockRoleSql();
+        $stockCase = $this->stockRoleSql('g');
 
         $stmt = $this->db->prepare(
             'SELECT g.id,
@@ -154,7 +154,7 @@ final class GroupRepository
         $userGroups = $this->table('user_groups');
         $safeLimit = max(1, $limit);
         $safeOffset = max(0, $offset);
-        $stockCase = $this->stockRoleSql();
+        $stockCase = $this->stockRoleSql('g');
 
         $stmt = $this->db->prepare(
             'SELECT page_rows.id,
@@ -656,8 +656,12 @@ final class GroupRepository
         return $row;
     }
 
-    private function stockRoleSql(): string
+    private function stockRoleSql(string $tableAlias = ''): string
     {
-        return "CASE WHEN LOWER(g.slug) IN ('super', 'admin', 'editor', 'user', 'guest', 'validating', 'banned') THEN 1 ELSE 0 END";
+        $slugColumn = $tableAlias !== ''
+            ? $tableAlias . '.slug'
+            : 'slug';
+
+        return "CASE WHEN LOWER(" . $slugColumn . ") IN ('super', 'admin', 'editor', 'user', 'guest', 'validating', 'banned') THEN 1 ELSE 0 END";
     }
 }
