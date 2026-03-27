@@ -35,14 +35,10 @@ $viewPrivateSiteBit = PanelAccess::VIEW_PRIVATE_SITE;
 $viewDisabledSiteBit = PanelAccess::VIEW_DISABLED_SITE;
 $groupSlug = trim((string) ($group['slug'] ?? ''));
 if ($groupSlug === '' && $groupName !== '') {
-    if (strtolower($groupName) === 'super admin') {
-        $groupSlug = 'super';
-    } else {
-        $groupSlug = strtolower($groupName);
-        $groupSlug = preg_replace('/[^a-z0-9]+/', '-', $groupSlug) ?? '';
-        $groupSlug = trim($groupSlug, '-');
-        $groupSlug = preg_replace('/-+/', '-', $groupSlug) ?? '';
-    }
+    $groupSlug = strtolower($groupName);
+    $groupSlug = preg_replace('/[^a-z0-9]+/', '-', $groupSlug) ?? '';
+    $groupSlug = trim($groupSlug, '-');
+    $groupSlug = preg_replace('/-+/', '-', $groupSlug) ?? '';
 }
 $routeEnabledChecked = (int) ($group['route_enabled'] ?? 0) === 1;
 if (!$groupRoutingEnabledSystemWide) {
@@ -57,17 +53,12 @@ $isGuestGroup = $groupRoleSlug === 'guest';
 $isValidatingGroup = $groupRoleSlug === 'validating';
 $isGuestLikeGroup = $isGuestGroup || $isValidatingGroup;
 $isUserGroup = $groupRoleSlug === 'user';
-$isEditorGroup = $groupRoleSlug === 'editor';
 $isAdminGroup = $groupRoleSlug === 'admin';
-$isSuperAdminGroup = $groupRoleSlug === 'super';
+$isSuperAdminGroup = $groupRoleSlug === 'super'; // legacy slug still present on unmigrated installs
 $allDefinedBitsMask = 0;
 foreach ($permissionDefinitions as $permissionDefinitionRow) {
     $allDefinedBitsMask |= (int) ($permissionDefinitionRow['bit'] ?? 0);
 }
-$editorStockMask = PanelAccess::PANEL_LOGIN
-    | $viewPublicSiteBit
-    | $viewPrivateSiteBit
-    | PanelAccess::maskFromBits(PanelAccess::contentPanelBits());
 $adminStockMask = PanelAccess::PANEL_LOGIN
     | $viewPublicSiteBit
     | $viewPrivateSiteBit
@@ -86,11 +77,7 @@ if ($isBannedGroup) {
     $permissionMask &= $viewPublicSiteBit;
 } elseif ($isUserGroup) {
     $permissionMask &= ($viewPublicSiteBit | $viewPrivateSiteBit);
-} elseif ($isEditorGroup) {
-    $permissionMask = $editorStockMask;
-} elseif ($isAdminGroup) {
-    $permissionMask = $adminStockMask;
-} elseif ($isSuperAdminGroup) {
+} elseif ($isAdminGroup || $isSuperAdminGroup) {
     $permissionMask = $allDefinedBitsMask;
 }
 if (($permissionMask & PanelAccess::PANEL_LOGIN) !== PanelAccess::PANEL_LOGIN) {
@@ -171,33 +158,21 @@ foreach ($panelPermissionDefinitions as $permission) {
 
     $panelPermissionMatrix[$groupLabel]['actions'][$actionKey] = $permission;
 }
-$editorAllowedBits = array_merge([PanelAccess::PANEL_LOGIN], PanelAccess::contentPanelBits());
-$adminAllowedBits = array_merge(
-    [PanelAccess::PANEL_LOGIN],
-    PanelAccess::contentPanelBits(),
-    PanelAccess::taxonomyPanelBits(),
-    PanelAccess::usersPanelBits()
-);
+$adminAllowedBits = []; // Admin/Super groups get all bits; no restriction needed here.
 $panelPermissionState = static function (int $bit) use (
     $permissionMask,
     $isBannedGroup,
     $isGuestLikeGroup,
     $isUserGroup,
-    $isEditorGroup,
     $isAdminGroup,
     $isSuperAdminGroup,
-    $editorAllowedBits,
-    $adminAllowedBits,
     $canEditConfigurationBit,
     $systemPanelBits
 ): array {
     $checked = ($permissionMask & $bit) === $bit;
-    $allowedForEditor = $isEditorGroup && in_array($bit, $editorAllowedBits, true);
-    $allowedForAdmin = $isAdminGroup && in_array($bit, $adminAllowedBits, true);
-    $allowedForSuper = $isSuperAdminGroup;
+    $isFullAdminGroup = $isAdminGroup || $isSuperAdminGroup;
     $configurationPermissionLocked = !$canEditConfigurationBit && in_array($bit, $systemPanelBits, true);
-    $lockedPermission = (($isBannedGroup || $isGuestLikeGroup || $isUserGroup || $isEditorGroup || $isAdminGroup || $isSuperAdminGroup)
-        && !($allowedForEditor || $allowedForAdmin || $allowedForSuper));
+    $lockedPermission = (($isBannedGroup || $isGuestLikeGroup || $isUserGroup) && !$isFullAdminGroup);
     $requiresPanelAccess = $bit !== PanelAccess::PANEL_LOGIN;
     $panelAccessEnabled = ($permissionMask & PanelAccess::PANEL_LOGIN) === PanelAccess::PANEL_LOGIN;
     if (!$lockedPermission && $requiresPanelAccess && !$panelAccessEnabled) {
@@ -268,7 +243,7 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
                 type="submit"
                 class="btn btn-danger"
                 form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this group? Users left without groups will be reassigned to User.');"
+                onclick="return confirm('Delete this group? This cannot be undone.');"
             ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Group</button>
         <?php endif; ?>
     </nav>
@@ -386,204 +361,194 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
                     <div class="form-text mb-2">Banned group permissions and URI routing are permanently disabled.</div>
                 <?php endif; ?>
 
-                <div class="row g-3">
-                    <div class="col-12 col-lg-6">
-                        <h5>Public Permissions</h5>
-                        <p class="mb-2">
-                            <code
-                                id="group_public_index_url"
-                                role="button"
-                                tabindex="0"
-                                title="Click to copy URL"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                            ><?= e($publicIndexUrl) ?></code>
-                        </p>
+                <h3>Site Permissions</h3>
+                <p class="mb-2">
+                    <code
+                        id="group_public_index_url"
+                        role="button"
+                        tabindex="0"
+                        title="Click to copy URL"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                    ><?= e($publicIndexUrl) ?></code>
+                </p>
 
-                        <?php foreach ($publicPermissionDefinitions as $permission): ?>
+                <?php foreach ($publicPermissionDefinitions as $permission): ?>
+                    <?php
+                    $bit = (int) $permission['bit'];
+                    $checked = ($permissionMask & $bit) === $bit;
+                    $isFullAdminGroup = $isAdminGroup || $isSuperAdminGroup;
+                    $allowedForGuestLike = $isGuestLikeGroup && $bit === $viewPublicSiteBit;
+                    $allowedForUser = $isUserGroup && in_array($bit, [$viewPublicSiteBit, $viewPrivateSiteBit], true);
+                    $requiresPanelAccess = $bit === $viewDisabledSiteBit;
+                    $panelAccessEnabled = ($permissionMask & PanelAccess::PANEL_LOGIN) === PanelAccess::PANEL_LOGIN;
+                    $lockedPermission = !$isFullAdminGroup
+                        && ($isBannedGroup || $isGuestLikeGroup || $isUserGroup)
+                        && !($allowedForGuestLike || $allowedForUser);
+                    if (!$lockedPermission && $requiresPanelAccess && !$panelAccessEnabled) {
+                        $lockedPermission = true;
+                        $checked = false;
+                    }
+                    ?>
+                    <div class="form-check">
+                        <input
+                            class="form-check-input"
+                            type="checkbox"
+                            name="permission_bits[]"
+                            id="perm_<?= $bit ?>"
+                            value="<?= $bit ?>"
+                            <?= $checked ? 'checked' : '' ?>
+                            <?= $lockedPermission ? 'disabled' : '' ?>
+                            <?= $lockedPermission ? 'data-rvn-group-hard-disabled="1"' : '' ?>
+                            <?= $bit === $viewDisabledSiteBit ? 'data-rvn-group-view-disabled="1"' : '' ?>
+                        >
+                        <label class="form-check-label<?= $lockedPermission ? ' text-muted' : '' ?>" for="perm_<?= $bit ?>">
+                            <?= e($permission['label']) ?>
+                        </label>
+                    </div>
+                <?php endforeach; ?>
+
+                <h3 class="mt-4">Panel Permissions</h3>
+                <p class="mb-2">
+                    <code
+                        id="group_panel_index_url"
+                        role="button"
+                        tabindex="0"
+                        title="Click to copy URL"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                    ><?= e($panelIndexUrl) ?></code>
+                </p>
+                <?php if (!$canEditConfigurationBit): ?>
+                    <div class="form-text mb-2">Only Admin users can change system administration permissions.</div>
+                <?php endif; ?>
+                <?php if (is_array($panelLoginPermission)): ?>
+                    <?php
+                    $panelLoginBit = (int) ($panelLoginPermission['bit'] ?? PanelAccess::PANEL_LOGIN);
+                    $panelLoginState = $panelPermissionState($panelLoginBit);
+                    ?>
+                    <div class="form-check mb-3">
+                        <input
+                            class="form-check-input"
+                            type="checkbox"
+                            name="permission_bits[]"
+                            id="perm_<?= $panelLoginBit ?>"
+                            value="<?= $panelLoginBit ?>"
+                            <?= !empty($panelLoginState['checked']) ? 'checked' : '' ?>
+                            <?= !empty($panelLoginState['locked']) ? 'disabled' : '' ?>
+                            <?= !empty($panelLoginState['locked']) ? 'data-rvn-group-hard-disabled="1"' : '' ?>
+                            data-rvn-group-panel-login="1"
+                        >
+                        <label class="form-check-label<?= !empty($panelLoginState['locked']) ? ' text-muted' : '' ?>" for="perm_<?= $panelLoginBit ?>">
+                            <?= e((string) ($panelLoginPermission['label'] ?? 'Access Dashboard')) ?>
+                        </label>
+                        <?php if (!empty($panelLoginState['configuration_locked']) && !empty($panelLoginState['checked'])): ?>
+                            <input type="hidden" name="permission_bits[]" value="<?= $panelLoginBit ?>">
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($panelPermissionMatrix !== []): ?>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Panel Section</th>
+                                    <?php foreach ($panelActionColumns as $actionLabel): ?>
+                                        <th scope="col" class="text-center"><?= e($actionLabel) ?></th>
+                                    <?php endforeach; ?>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($panelPermissionMatrix as $matrixRow): ?>
+                                    <?php
+                                    $rowLabel = (string) ($matrixRow['label'] ?? 'Panel');
+                                    $rowActions = is_array($matrixRow['actions'] ?? null) ? $matrixRow['actions'] : [];
+                                    ?>
+                                    <tr>
+                                        <th scope="row"><?= e($rowLabel) ?></th>
+                                        <?php foreach ($panelActionColumns as $actionKey => $actionLabel): ?>
+                                            <?php $permission = $rowActions[$actionKey] ?? null; ?>
+                                            <td class="text-center">
+                                                <?php if (!is_array($permission)): ?>
+                                                    <span class="text-muted">-</span>
+                                                <?php else: ?>
+                                                    <?php
+                                                    $bit = (int) ($permission['bit'] ?? 0);
+                                                    $state = $panelPermissionState($bit);
+                                                    ?>
+                                                    <div class="form-check d-inline-flex align-items-center justify-content-center m-0">
+                                                        <input
+                                                            class="form-check-input"
+                                                            type="checkbox"
+                                                            name="permission_bits[]"
+                                                            id="perm_<?= $bit ?>"
+                                                            value="<?= $bit ?>"
+                                                            <?= !empty($state['checked']) ? 'checked' : '' ?>
+                                                            <?= !empty($state['locked']) ? 'disabled' : '' ?>
+                                                            <?= !empty($state['locked']) ? 'data-rvn-group-hard-disabled="1"' : '' ?>
+                                                            <?= !empty($state['requires_panel_access']) ? 'data-rvn-group-requires-panel-login="1"' : '' ?>
+                                                        >
+                                                        <label
+                                                            class="visually-hidden<?= !empty($state['locked']) ? ' text-muted' : '' ?>"
+                                                            for="perm_<?= $bit ?>"
+                                                        >
+                                                            <?= e($rowLabel . ': ' . (string) ($permission['label'] ?? $actionLabel)) ?>
+                                                        </label>
+                                                    </div>
+                                                    <?php if (!empty($state['configuration_locked']) && !empty($state['checked'])): ?>
+                                                        <input type="hidden" name="permission_bits[]" value="<?= $bit ?>">
+                                                    <?php endif; ?>
+                                                <?php endif; ?>
+                                            </td>
+                                        <?php endforeach; ?>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($extensionPermissionDefinitions !== []): ?>
+                    <h3 class="mt-4">Extension Permissions</h3>
+                    <div class="form-text mb-2">Assign extension access levels per group.</div>
+                    <div class="row g-2">
+                        <?php foreach ($extensionPermissionDefinitions as $permission): ?>
                             <?php
-                            $bit = (int) $permission['bit'];
+                            $bit = (int) ($permission['bit'] ?? 0);
+                            if ($bit <= 0) {
+                                continue;
+                            }
+
                             $checked = ($permissionMask & $bit) === $bit;
-                            $allowedForGuestLike = $isGuestLikeGroup && $bit === $viewPublicSiteBit;
-                            $allowedForUser = $isUserGroup && in_array($bit, [$viewPublicSiteBit, $viewPrivateSiteBit], true);
-                            $allowedForEditor = $isEditorGroup
-                                && in_array($bit, [$viewPublicSiteBit, $viewPrivateSiteBit], true);
-                            $allowedForAdmin = $isAdminGroup
-                                && in_array($bit, [$viewPublicSiteBit, $viewPrivateSiteBit, $viewDisabledSiteBit], true);
-                            $requiresPanelAccess = $bit === $viewDisabledSiteBit;
+                            $lockedPermission = $isBannedGroup || $isGuestLikeGroup || $isUserGroup;
                             $panelAccessEnabled = ($permissionMask & PanelAccess::PANEL_LOGIN) === PanelAccess::PANEL_LOGIN;
-                            $lockedPermission = ($isBannedGroup || $isGuestLikeGroup || $isUserGroup || $isEditorGroup || $isAdminGroup || $isSuperAdminGroup)
-                                && !($allowedForGuestLike || $allowedForUser || $allowedForEditor || $allowedForAdmin);
-                            if (!$lockedPermission && $requiresPanelAccess && !$panelAccessEnabled) {
+                            if (!$lockedPermission && !$panelAccessEnabled) {
                                 $lockedPermission = true;
                                 $checked = false;
                             }
                             ?>
-                            <div class="form-check">
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    name="permission_bits[]"
-                                    id="perm_<?= $bit ?>"
-                                    value="<?= $bit ?>"
-                                    <?= $checked ? 'checked' : '' ?>
-                                    <?= $lockedPermission ? 'disabled' : '' ?>
-                                    <?= $lockedPermission ? 'data-rvn-group-hard-disabled="1"' : '' ?>
-                                    <?= $bit === $viewDisabledSiteBit ? 'data-rvn-group-view-disabled="1"' : '' ?>
-                                >
-                                <label class="form-check-label<?= $lockedPermission ? ' text-muted' : '' ?>" for="perm_<?= $bit ?>">
-                                    <?= e($permission['label']) ?>
-                                </label>
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="form-check">
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        name="permission_bits[]"
+                                        id="perm_<?= $bit ?>"
+                                        value="<?= $bit ?>"
+                                        <?= $checked ? 'checked' : '' ?>
+                                        <?= $lockedPermission ? 'disabled' : '' ?>
+                                        <?= $lockedPermission ? 'data-rvn-group-hard-disabled="1"' : '' ?>
+                                        data-rvn-group-requires-panel-login="1"
+                                    >
+                                    <label class="form-check-label<?= $lockedPermission ? ' text-muted' : '' ?>" for="perm_<?= $bit ?>">
+                                        <?= e((string) ($permission['label'] ?? 'Extension Access')) ?>
+                                    </label>
+                                </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
-
-                    <div class="col-12 col-lg-6">
-                        <h5>Panel Permissions</h5>
-                        <p class="mb-2">
-                            <code
-                                id="group_panel_index_url"
-                                role="button"
-                                tabindex="0"
-                                title="Click to copy URL"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                            ><?= e($panelIndexUrl) ?></code>
-                        </p>
-                        <?php if (!$canEditConfigurationBit): ?>
-                            <div class="form-text mb-2">Only Super Admin users can change system administration permissions.</div>
-                        <?php endif; ?>
-                        <?php if (is_array($panelLoginPermission)): ?>
-                            <?php
-                            $panelLoginBit = (int) ($panelLoginPermission['bit'] ?? PanelAccess::PANEL_LOGIN);
-                            $panelLoginState = $panelPermissionState($panelLoginBit);
-                            ?>
-                            <div class="form-check mb-3">
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    name="permission_bits[]"
-                                    id="perm_<?= $panelLoginBit ?>"
-                                    value="<?= $panelLoginBit ?>"
-                                    <?= !empty($panelLoginState['checked']) ? 'checked' : '' ?>
-                                    <?= !empty($panelLoginState['locked']) ? 'disabled' : '' ?>
-                                    <?= !empty($panelLoginState['locked']) ? 'data-rvn-group-hard-disabled="1"' : '' ?>
-                                    data-rvn-group-panel-login="1"
-                                >
-                                <label class="form-check-label<?= !empty($panelLoginState['locked']) ? ' text-muted' : '' ?>" for="perm_<?= $panelLoginBit ?>">
-                                    <?= e((string) ($panelLoginPermission['label'] ?? 'Access Dashboard')) ?>
-                                </label>
-                                <?php if (!empty($panelLoginState['configuration_locked']) && !empty($panelLoginState['checked'])): ?>
-                                    <input type="hidden" name="permission_bits[]" value="<?= $panelLoginBit ?>">
-                                <?php endif; ?>
-                            </div>
-                        <?php endif; ?>
-
-                        <?php if ($panelPermissionMatrix !== []): ?>
-                            <div class="table-responsive">
-                                <table class="table table-sm align-middle mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th scope="col">Panel Section</th>
-                                            <?php foreach ($panelActionColumns as $actionLabel): ?>
-                                                <th scope="col" class="text-center"><?= e($actionLabel) ?></th>
-                                            <?php endforeach; ?>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($panelPermissionMatrix as $matrixRow): ?>
-                                            <?php
-                                            $rowLabel = (string) ($matrixRow['label'] ?? 'Panel');
-                                            $rowActions = is_array($matrixRow['actions'] ?? null) ? $matrixRow['actions'] : [];
-                                            ?>
-                                            <tr>
-                                                <th scope="row"><?= e($rowLabel) ?></th>
-                                                <?php foreach ($panelActionColumns as $actionKey => $actionLabel): ?>
-                                                    <?php $permission = $rowActions[$actionKey] ?? null; ?>
-                                                    <td class="text-center">
-                                                        <?php if (!is_array($permission)): ?>
-                                                            <span class="text-muted">-</span>
-                                                        <?php else: ?>
-                                                            <?php
-                                                            $bit = (int) ($permission['bit'] ?? 0);
-                                                            $state = $panelPermissionState($bit);
-                                                            ?>
-                                                            <div class="form-check d-inline-flex align-items-center justify-content-center m-0">
-                                                                <input
-                                                                    class="form-check-input"
-                                                                    type="checkbox"
-                                                                    name="permission_bits[]"
-                                                                    id="perm_<?= $bit ?>"
-                                                                    value="<?= $bit ?>"
-                                                                    <?= !empty($state['checked']) ? 'checked' : '' ?>
-                                                                    <?= !empty($state['locked']) ? 'disabled' : '' ?>
-                                                                    <?= !empty($state['locked']) ? 'data-rvn-group-hard-disabled="1"' : '' ?>
-                                                                    <?= !empty($state['requires_panel_access']) ? 'data-rvn-group-requires-panel-login="1"' : '' ?>
-                                                                >
-                                                                <label
-                                                                    class="visually-hidden<?= !empty($state['locked']) ? ' text-muted' : '' ?>"
-                                                                    for="perm_<?= $bit ?>"
-                                                                >
-                                                                    <?= e($rowLabel . ': ' . (string) ($permission['label'] ?? $actionLabel)) ?>
-                                                                </label>
-                                                            </div>
-                                                            <?php if (!empty($state['configuration_locked']) && !empty($state['checked'])): ?>
-                                                                <input type="hidden" name="permission_bits[]" value="<?= $bit ?>">
-                                                            <?php endif; ?>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                <?php endforeach; ?>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-
-                    <?php if ($extensionPermissionDefinitions !== []): ?>
-                        <div class="col-12">
-                            <h5>Extension Permissions</h5>
-                            <div class="form-text mb-2">Assign extension access levels per group.</div>
-                            <div class="row g-2">
-                                <?php foreach ($extensionPermissionDefinitions as $permission): ?>
-                                    <?php
-                                    $bit = (int) ($permission['bit'] ?? 0);
-                                    if ($bit <= 0) {
-                                        continue;
-                                    }
-
-                                    $checked = ($permissionMask & $bit) === $bit;
-                                    $lockedPermission = $isBannedGroup || $isGuestLikeGroup || $isUserGroup || $isEditorGroup || $isAdminGroup;
-                                    $panelAccessEnabled = ($permissionMask & PanelAccess::PANEL_LOGIN) === PanelAccess::PANEL_LOGIN;
-                                    if (!$lockedPermission && !$panelAccessEnabled) {
-                                        $lockedPermission = true;
-                                        $checked = false;
-                                    }
-                                    ?>
-                                    <div class="col-12 col-md-6 col-lg-4">
-                                        <div class="form-check">
-                                            <input
-                                                class="form-check-input"
-                                                type="checkbox"
-                                                name="permission_bits[]"
-                                                id="perm_<?= $bit ?>"
-                                                value="<?= $bit ?>"
-                                                <?= $checked ? 'checked' : '' ?>
-                                                <?= $lockedPermission ? 'disabled' : '' ?>
-                                                <?= $lockedPermission ? 'data-rvn-group-hard-disabled="1"' : '' ?>
-                                                data-rvn-group-requires-panel-login="1"
-                                            >
-                                            <label class="form-check-label<?= $lockedPermission ? ' text-muted' : '' ?>" for="perm_<?= $bit ?>">
-                                                <?= e((string) ($permission['label'] ?? 'Extension Access')) ?>
-                                            </label>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-                </div>
+                <?php endif; ?>
             </fieldset>
         </div>
     </div>
@@ -597,7 +562,7 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
                 type="submit"
                 class="btn btn-danger"
                 form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this group? Users left without groups will be reassigned to User.');"
+                onclick="return confirm('Delete this group? This cannot be undone.');"
             ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Group</button>
         <?php endif; ?>
     </nav>

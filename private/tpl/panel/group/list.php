@@ -191,7 +191,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                                         <span class="visually-hidden">Edit</span>
                                     </a>
                                     <?php if (!$isStock): ?>
-                                        <form method="post" action="<?= e($panelBase) ?>/group/delete" onsubmit="return confirm('Delete this group? Users left without groups will be reassigned to User.');">
+                                        <form method="post" action="<?= e($panelBase) ?>/group/delete" onsubmit="return confirm('Delete this group? This cannot be undone.');">
                                             <?= $csrfField ?>
                                             <?php // Single-row delete path uses explicit id hidden field. ?>
                                             <input type="hidden" name="id" value="<?= $groupId ?>">

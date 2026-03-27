@@ -23,7 +23,7 @@ $loginIdentifierMode = in_array(strtolower((string) ($loginIdentifierMode ?? 'em
     : 'email';
 $loginIdentifierLabel = trim((string) ($loginIdentifierLabel ?? ''));
 if ($loginIdentifierLabel === '') {
-    $loginIdentifierLabel = $loginIdentifierMode === 'email' ? 'Email' : 'Username';
+    $loginIdentifierLabel = $loginIdentifierMode === 'email' ? 'Email' : 'Username or Email';
 }
 $loginIdentifierInputType = $loginIdentifierMode === 'email' ? 'email' : 'text';
 ?>

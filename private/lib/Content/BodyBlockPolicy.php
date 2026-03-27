@@ -25,8 +25,8 @@ final class BodyBlockPolicy
     {
         return [
             'tinymce' => ['label' => 'Rich Text', 'editor' => 'tinymce'],
-            'plaintext' => ['label' => 'Plaintext', 'editor' => 'plaintext'],
-            'autobr' => ['label' => 'Auto <br>', 'editor' => 'autobr'],
+            'plaintext' => ['label' => 'Code', 'editor' => 'plaintext'],
+            'autobr' => ['label' => 'Plaintext', 'editor' => 'autobr'],
             'markdown' => ['label' => 'Markdown', 'editor' => 'markdown'],
             'markdown_file' => ['label' => 'Markdown File', 'editor' => 'markdown_file'],
             'image_gallery' => ['label' => 'Image Gallery', 'editor' => 'gallery'],

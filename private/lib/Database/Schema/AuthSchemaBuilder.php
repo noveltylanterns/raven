@@ -114,6 +114,9 @@ final class AuthSchemaBuilder
             if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'string')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN string TEXT NULL');
             }
+            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'group')) {
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN "group" INTEGER NULL');
+            }
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $usersTable . '_string ON ' . $usersTable . ' (string)');
             $this->ensureAuthUserStrings($db, $usersTable);
             $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
@@ -170,6 +173,9 @@ final class AuthSchemaBuilder
             if (!$this->introspector->mySqlIndexExists($db, $usersTable, 'uniq_' . $usersTable . '_string')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD UNIQUE INDEX uniq_' . $usersTable . '_string (string)');
             }
+            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'group')) {
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN `group` BIGINT UNSIGNED NULL');
+            }
 
             $this->ensureAuthUserStrings($db, $usersTable);
             $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
@@ -224,6 +230,9 @@ final class AuthSchemaBuilder
         }
         if (!$this->introspector->pgSqlIndexExists($db, $usersTable, 'uniq_' . $usersTable . '_string')) {
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS ' . $this->introspector->quotePgIdentifier('uniq_' . $usersTable . '_string') . ' ON ' . $this->introspector->quotePgIdentifier($usersTable) . ' (string)');
+        }
+        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'group')) {
+            $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN "group" BIGINT NULL');
         }
 
         $this->ensureAuthUserStrings($db, $usersTable);
@@ -373,12 +382,13 @@ final class AuthSchemaBuilder
                 cover_image TEXT NULL,
                 string TEXT NULL,
                 contact TEXT NULL,
-                two_factor TEXT NULL
+                two_factor TEXT NULL,
+                "group" INTEGER NULL
             )');
             $db->exec(
                 'INSERT INTO ' . $tmpTable . ' (
                     id, email, password, username, status, verified, resettable, roles_mask, registered, last_login, force_logout,
-                    name, bio, theme, avatar, cover_image, string, contact, two_factor
+                    name, bio, theme, avatar, cover_image, string, contact, two_factor, "group"
                  )
                  SELECT
                     id,
@@ -399,7 +409,8 @@ final class AuthSchemaBuilder
                     ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'cover_image') ? 'cover_image' : 'NULL') . ',
                     ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'string') ? 'string' : 'NULL') . ',
                     ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'contact') ? 'contact' : 'contact_profiles') . ',
-                    ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'two_factor') ? 'two_factor' : 'two_factor_methods') . '
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'two_factor') ? 'two_factor' : 'two_factor_methods') . ',
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'group') ? '"group"' : 'NULL') . '
                  FROM ' . $usersTable
             );
             $db->exec('DROP TABLE ' . $usersTable);

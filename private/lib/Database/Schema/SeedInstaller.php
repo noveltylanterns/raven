@@ -60,8 +60,11 @@ final class SeedInstaller
             }
         }
 
-        $this->ensureStockGroupId($db, $driver, $prefix, 'banned', 6);
-        $this->ensureStockGroupId($db, $driver, $prefix, 'validating', 7);
+        $this->ensureStockGroupId($db, $driver, $prefix, 'admin', 1);
+        $this->ensureStockGroupId($db, $driver, $prefix, 'guest', 2);
+        $this->ensureStockGroupId($db, $driver, $prefix, 'validating', 3);
+        $this->ensureStockGroupId($db, $driver, $prefix, 'user', 4);
+        $this->ensureStockGroupId($db, $driver, $prefix, 'banned', 5);
 
         $stockMaskBySlug = [];
         foreach ($stockGroups as $stockGroup) {
@@ -182,6 +185,8 @@ final class SeedInstaller
         $maxId = (int) (($maxIdStmt?->fetchColumn()) ?: 0);
         $temporaryId = max($maxId + 1, $targetId + 1, $currentId + 1);
 
+        $usersTable = $prefix . 'users';
+
         $moveGroupId = $db->prepare(
             'UPDATE ' . $groupsTable . '
              SET id = :to_id
@@ -204,6 +209,13 @@ final class SeedInstaller
                     ':to_id' => $temporaryId,
                     ':from_id' => $targetId,
                 ]);
+                try {
+                    $db->exec(
+                        'UPDATE ' . $usersTable . ' SET "group" = ' . $temporaryId . ' WHERE "group" = ' . $targetId
+                    );
+                } catch (\Throwable) {
+                    // users.group column may not exist yet on first migration run; safe to skip.
+                }
             }
 
             $moveGroupId->execute([
@@ -214,6 +226,13 @@ final class SeedInstaller
                 ':to_id' => $targetId,
                 ':from_id' => $currentId,
             ]);
+            try {
+                $db->exec(
+                    'UPDATE ' . $usersTable . ' SET "group" = ' . $targetId . ' WHERE "group" = ' . $currentId
+                );
+            } catch (\Throwable) {
+                // users.group column may not exist yet on first migration run; safe to skip.
+            }
 
             $db->commit();
         } catch (\Throwable $exception) {
@@ -225,15 +244,80 @@ final class SeedInstaller
         }
     }
 
+    /**
+     * Migrates legacy 'super' slug → 'admin' and removes deprecated 'editor'/'admin' (old)
+     * stock groups on installs that pre-date the group consolidation.
+     */
+    public function migrateStockGroups(PDO $db, string $driver, string $prefix): void
+    {
+        $groupsTable = $this->tables->resolve($driver, $prefix, 'groups');
+        $userGroupsTable = $this->tables->resolve($driver, $prefix, 'user_groups');
+        $now = gmdate('Y-m-d H:i:s');
+
+        // Step 1: If 'admin' slug already exists and 'super' also exists, remove the old lesser 'admin'
+        // by reassigning its members to 'user', then delete it.
+        $findBySlug = $db->prepare('SELECT id FROM ' . $groupsTable . ' WHERE LOWER(slug) = :slug LIMIT 1');
+        $findBySlug->execute([':slug' => 'super']);
+        $superId = $findBySlug->fetchColumn();
+
+        if ($superId !== false) {
+            $findBySlug->execute([':slug' => 'admin']);
+            $oldAdminId = $findBySlug->fetchColumn();
+
+            $findBySlug->execute([':slug' => 'user']);
+            $userGroupId = $findBySlug->fetchColumn();
+
+            if ($oldAdminId !== false) {
+                // Reassign members of old 'admin' group to 'user' group then delete old 'admin'.
+                $db->beginTransaction();
+                try {
+                    if ($userGroupId !== false) {
+                        $reAssign = $db->prepare(
+                            'UPDATE ' . $userGroupsTable . ' SET "group" = :user_id WHERE "group" = :old_id'
+                        );
+                        $reAssign->execute([':user_id' => (int) $userGroupId, ':old_id' => (int) $oldAdminId]);
+                    }
+                    $db->prepare('DELETE FROM ' . $userGroupsTable . ' WHERE "group" = :id')
+                        ->execute([':id' => (int) $oldAdminId]);
+                    $db->prepare('DELETE FROM ' . $groupsTable . ' WHERE id = :id')
+                        ->execute([':id' => (int) $oldAdminId]);
+                    $db->commit();
+                } catch (\Throwable $exception) {
+                    if ($db->inTransaction()) {
+                        $db->rollBack();
+                    }
+                }
+            }
+
+            // Step 2: Rename 'super' → 'admin', update name to 'Admin'.
+            $db->prepare(
+                'UPDATE ' . $groupsTable . ' SET slug = :slug, name = :name, updated = :updated WHERE id = :id'
+            )->execute([
+                ':slug' => 'admin',
+                ':name' => 'Admin',
+                ':updated' => $now,
+                ':id' => (int) $superId,
+            ]);
+        }
+
+        // Step 3: Remove legacy 'editor' group if it has no members.
+        $findBySlug->execute([':slug' => 'editor']);
+        $editorId = $findBySlug->fetchColumn();
+        if ($editorId !== false) {
+            $countStmt = $db->prepare('SELECT COUNT(*) FROM ' . $userGroupsTable . ' WHERE "group" = :id');
+            $countStmt->execute([':id' => (int) $editorId]);
+            if ((int) $countStmt->fetchColumn() === 0) {
+                $db->prepare('DELETE FROM ' . $groupsTable . ' WHERE id = :id')
+                    ->execute([':id' => (int) $editorId]);
+            }
+        }
+    }
+
     private function slugifyGroupName(string $value): string
     {
         $value = strtolower(trim($value));
         if ($value === '') {
             return '';
-        }
-
-        if (in_array($value, ['super admin', 'super-admin', 'super'], true)) {
-            return 'super';
         }
 
         $value = preg_replace('/[^a-z0-9]+/', '-', $value) ?? '';

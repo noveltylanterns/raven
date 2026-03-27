@@ -83,7 +83,7 @@ final class AuthController
             'csrfField' => $this->csrf->field(),
             'error' => $this->pullFlash('error'),
             'loginIdentifierMode' => $loginIdentifierMode,
-            'loginIdentifierLabel' => $loginIdentifierMode === 'email' ? 'Email' : 'Username',
+            'loginIdentifierLabel' => $loginIdentifierMode === 'email' ? 'Email' : 'Username or Email',
             // Login screen must not expose authenticated panel navigation.
             'showSidebar' => false,
             'section' => 'login',

@@ -29,6 +29,7 @@ final class UserPersistenceService
      *   bio: string,
      *   theme: string,
      *   password: string|null,
+     *   primary_group_id: int,
      *   group_ids: array<int>,
      *   contact_profiles: string|null,
      *   set_avatar: bool,
@@ -52,6 +53,9 @@ final class UserPersistenceService
         $bio = trim((string) ($data['bio'] ?? ''));
         $theme = trim((string) ($data['theme'] ?? ''));
         $password = is_string($data['password'] ?? null) ? $data['password'] : null;
+        $primaryGroupId = isset($data['primary_group_id']) && (int) $data['primary_group_id'] > 0
+            ? (int) $data['primary_group_id']
+            : null;
         $groupIds = $this->normalizeGroupIds(is_array($data['group_ids'] ?? null) ? $data['group_ids'] : []);
         $contactProfilesEncoded = isset($data['contact_profiles']) && is_string($data['contact_profiles'])
             ? $data['contact_profiles']
@@ -93,6 +97,7 @@ final class UserPersistenceService
                 'string = :string',
                 'cover_image = :cover_image',
                 'contact = :contact_profiles',
+                '"group" = :primary_group_id',
             ];
 
             $params = [
@@ -105,6 +110,7 @@ final class UserPersistenceService
                 ':string' => $userString,
                 ':cover_image' => $coverImage,
                 ':contact_profiles' => $contactProfilesEncoded,
+                ':primary_group_id' => $primaryGroupId,
             ];
 
             if ($password !== null && $password !== '') {
@@ -154,6 +160,7 @@ final class UserPersistenceService
             ':cover_image' => $coverImage,
             ':string' => $userString,
             ':contact_profiles' => $contactProfilesEncoded,
+            ':primary_group_id' => $primaryGroupId,
             ':status' => 0,
             ':verified' => 1,
             ':resettable' => 1,
@@ -356,8 +363,8 @@ final class UserPersistenceService
     private function insertUserAndReturnId(PDO $authDb, string $usersTable, array $params): int
     {
         $sql = 'INSERT INTO ' . $usersTable . '
-            (email, password, username, name, bio, theme, avatar, cover_image, string, contact, status, verified, resettable, roles_mask, registered, last_login, force_logout)
-            VALUES (:email, :password, :username, :display_name, :bio, :theme, :avatar_path, :cover_image, :string, :contact_profiles, :status, :verified, :resettable, :roles_mask, :registered, :last_login, :force_logout)';
+            (email, password, username, name, bio, theme, avatar, cover_image, string, contact, "group", status, verified, resettable, roles_mask, registered, last_login, force_logout)
+            VALUES (:email, :password, :username, :display_name, :bio, :theme, :avatar_path, :cover_image, :string, :contact_profiles, :primary_group_id, :status, :verified, :resettable, :roles_mask, :registered, :last_login, :force_logout)';
 
         $driver = strtolower((string) $authDb->getAttribute(PDO::ATTR_DRIVER_NAME));
         if ($driver === 'pgsql') {

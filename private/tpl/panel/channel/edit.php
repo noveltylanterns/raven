@@ -414,8 +414,8 @@ if ($atomFeedRoute !== '') {
                 <select id="editor_override" name="editor_override" class="form-select">
                     <option value="inherit"<?= $editorOverride === 'inherit' ? ' selected' : '' ?>>Use Global Default</option>
                     <option value="tinymce"<?= $editorOverride === 'tinymce' ? ' selected' : '' ?>>Rich Text (TinyMCE)</option>
-                    <option value="plaintext"<?= $editorOverride === 'plaintext' ? ' selected' : '' ?>>Plaintext</option>
-                    <option value="autobr"<?= $editorOverride === 'autobr' ? ' selected' : '' ?>>Auto &lt;br&gt;</option>
+                    <option value="plaintext"<?= $editorOverride === 'plaintext' ? ' selected' : '' ?>>Code</option>
+                    <option value="autobr"<?= $editorOverride === 'autobr' ? ' selected' : '' ?>>Plaintext</option>
                     <option value="markdown"<?= $editorOverride === 'markdown' ? ' selected' : '' ?>>Markdown</option>
                 </select>
                 <div class="form-text">

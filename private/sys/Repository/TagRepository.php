@@ -374,6 +374,24 @@ final class TagRepository
     }
 
     /**
+     * Moves all tags in the given set to the default set.
+     */
+    public function reassignSetToDefault(int $fromSetId, int $defaultSetId): void
+    {
+        if ($fromSetId === $defaultSetId) {
+            return;
+        }
+
+        $tags = $this->table('tags');
+        $stmt = $this->db->prepare(
+            'UPDATE ' . $tags . '
+             SET ' . $this->setColumn() . ' = :default_set
+             WHERE ' . $this->setColumn() . ' = :from_set'
+        );
+        $stmt->execute([':default_set' => $defaultSetId, ':from_set' => $fromSetId]);
+    }
+
+    /**
      * Deletes one tag and removes page-tag links.
      */
     public function deleteById(int $id): void

@@ -374,6 +374,24 @@ final class CategoryRepository
     }
 
     /**
+     * Moves all categories in the given set to the default set.
+     */
+    public function reassignSetToDefault(int $fromSetId, int $defaultSetId): void
+    {
+        if ($fromSetId === $defaultSetId) {
+            return;
+        }
+
+        $categories = $this->table('categories');
+        $stmt = $this->db->prepare(
+            'UPDATE ' . $categories . '
+             SET ' . $this->setColumn() . ' = :default_set
+             WHERE ' . $this->setColumn() . ' = :from_set'
+        );
+        $stmt->execute([':default_set' => $defaultSetId, ':from_set' => $fromSetId]);
+    }
+
+    /**
      * Deletes one category and removes category assignments from pages.
      */
     public function deleteById(int $id): void

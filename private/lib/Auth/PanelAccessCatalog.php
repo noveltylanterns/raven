@@ -178,17 +178,11 @@ final class PanelAccessCatalog
     public static function stockGroups(): array
     {
         $allStockPanelBitsMask = self::maskFromBits(self::allStockPanelBits());
-        $editorPanelBitsMask = self::maskFromBits(self::contentPanelBits());
-        $adminPanelBitsMask = self::maskFromBits(array_merge(
-            self::contentPanelBits(),
-            self::taxonomyPanelBits(),
-            self::usersPanelBits()
-        ));
 
         return [
             [
-                'name' => 'Super Admin',
-                'slug' => 'super',
+                'name' => 'Admin',
+                'slug' => 'admin',
                 'permission_mask' => PanelAccess::PANEL_LOGIN
                     | PanelAccess::VIEW_PUBLIC_SITE
                     | PanelAccess::VIEW_PRIVATE_SITE
@@ -202,35 +196,6 @@ final class PanelAccessCatalog
                 'is_stock' => 1,
             ],
             [
-                'name' => 'Admin',
-                'slug' => 'admin',
-                'permission_mask' => PanelAccess::PANEL_LOGIN
-                    | PanelAccess::VIEW_PUBLIC_SITE
-                    | PanelAccess::VIEW_PRIVATE_SITE
-                    | PanelAccess::VIEW_DISABLED_SITE
-                    | PanelAccess::MANAGE_CONTENT
-                    | PanelAccess::MANAGE_TAXONOMY
-                    | PanelAccess::MANAGE_USERS
-                    | $adminPanelBitsMask,
-                'is_stock' => 1,
-            ],
-            [
-                'name' => 'Editor',
-                'slug' => 'editor',
-                'permission_mask' => PanelAccess::PANEL_LOGIN
-                    | PanelAccess::VIEW_PUBLIC_SITE
-                    | PanelAccess::VIEW_PRIVATE_SITE
-                    | PanelAccess::MANAGE_CONTENT
-                    | $editorPanelBitsMask,
-                'is_stock' => 1,
-            ],
-            [
-                'name' => 'User',
-                'slug' => 'user',
-                'permission_mask' => PanelAccess::VIEW_PUBLIC_SITE | PanelAccess::VIEW_PRIVATE_SITE,
-                'is_stock' => 1,
-            ],
-            [
                 'name' => 'Guest',
                 'slug' => 'guest',
                 'permission_mask' => PanelAccess::VIEW_PUBLIC_SITE,
@@ -240,6 +205,12 @@ final class PanelAccessCatalog
                 'name' => 'Validating',
                 'slug' => 'validating',
                 'permission_mask' => PanelAccess::VIEW_PUBLIC_SITE,
+                'is_stock' => 1,
+            ],
+            [
+                'name' => 'User',
+                'slug' => 'user',
+                'permission_mask' => PanelAccess::VIEW_PUBLIC_SITE | PanelAccess::VIEW_PRIVATE_SITE,
                 'is_stock' => 1,
             ],
             [

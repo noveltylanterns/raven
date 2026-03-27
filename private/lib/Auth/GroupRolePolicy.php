@@ -13,13 +13,13 @@ final class GroupRolePolicy
 {
     /** @var array<int, string> */
     private const STOCK_SLUGS = [
-        'super',
         'admin',
-        'editor',
         'user',
         'guest',
         'validating',
         'banned',
+        'super',   // legacy slug — kept as stock to prevent deletion on unmigrated installs
+        'editor',  // legacy slug — kept as stock to prevent deletion on unmigrated installs
     ];
 
     public function normalizeSlug(string $value): string
@@ -63,19 +63,27 @@ final class GroupRolePolicy
         return strtolower(trim($slug)) === 'user';
     }
 
-    public function isEditorRoleSlug(string $slug): bool
-    {
-        return strtolower(trim($slug)) === 'editor';
-    }
-
     public function isAdminRoleSlug(string $slug): bool
     {
-        return strtolower(trim($slug)) === 'admin';
+        $normalized = strtolower(trim($slug));
+        // 'super' is the legacy slug for the Admin group; treat it the same.
+        return $normalized === 'admin' || $normalized === 'super';
     }
 
+    /**
+     * @deprecated Legacy alias — use isAdminRoleSlug() instead.
+     */
     public function isSuperAdminRoleSlug(string $slug): bool
     {
         return strtolower(trim($slug)) === 'super';
+    }
+
+    /**
+     * @deprecated Legacy alias — 'editor' group is being removed.
+     */
+    public function isEditorRoleSlug(string $slug): bool
+    {
+        return strtolower(trim($slug)) === 'editor';
     }
 
     /**
@@ -87,20 +95,6 @@ final class GroupRolePolicy
         $resolvedRouteEnabled = $routeEnabled > 0 ? 1 : 0;
         $resolvedMask = $mask;
 
-        $editorStockMask = PanelAccess::PANEL_LOGIN
-            | PanelAccess::VIEW_PUBLIC_SITE
-            | PanelAccess::VIEW_PRIVATE_SITE
-            | PanelAccess::maskFromBits(PanelAccess::contentPanelBits());
-        $adminStockMask = PanelAccess::PANEL_LOGIN
-            | PanelAccess::VIEW_PUBLIC_SITE
-            | PanelAccess::VIEW_PRIVATE_SITE
-            | PanelAccess::VIEW_DISABLED_SITE
-            | PanelAccess::maskFromBits(array_merge(
-                PanelAccess::contentPanelBits(),
-                PanelAccess::taxonomyPanelBits(),
-                PanelAccess::usersPanelBits()
-            ));
-
         if ($this->isBannedRoleSlug($normalizedSlug)) {
             $resolvedRouteEnabled = 0;
             $resolvedMask = 0;
@@ -109,11 +103,8 @@ final class GroupRolePolicy
             $resolvedMask &= PanelAccess::VIEW_PUBLIC_SITE;
         } elseif ($this->isUserRoleSlug($normalizedSlug)) {
             $resolvedMask &= (PanelAccess::VIEW_PUBLIC_SITE | PanelAccess::VIEW_PRIVATE_SITE);
-        } elseif ($this->isEditorRoleSlug($normalizedSlug)) {
-            $resolvedMask = $editorStockMask;
         } elseif ($this->isAdminRoleSlug($normalizedSlug)) {
-            $resolvedMask = $adminStockMask;
-        } elseif ($this->isSuperAdminRoleSlug($normalizedSlug)) {
+            // Admin (and legacy 'super') always get the full permission mask.
             $resolvedMask = (
                 PanelAccess::VIEW_PUBLIC_SITE
                 | PanelAccess::VIEW_PRIVATE_SITE
@@ -126,6 +117,8 @@ final class GroupRolePolicy
                 | PanelAccess::MANAGE_CONFIGURATION
                 | PanelAccess::allStockPanelBitsMask()
             );
+        } elseif ($this->isEditorRoleSlug($normalizedSlug)) {
+            // Legacy 'editor' group: preserve existing mask unchanged on save (no longer seeded).
         }
 
         return [

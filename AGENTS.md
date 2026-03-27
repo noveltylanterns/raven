@@ -26,7 +26,7 @@ Last updated: 2026-03-25
 - Project docs index: `docs/README.md`
 - Core behavior docs: `docs/*.md` (Pages, Users, Routing, Configuration, Extensions, etc.)
 - CLI command docs: `docs/CLI.md`
-- Release change history: `docs/release-notes/{version}.md`
+- Release change history: `release-notes.md`
 
 ## First Orientation
 - If you need the fastest whole-system map, read `docs/Filetree.md` immediately after this file.

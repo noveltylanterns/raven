@@ -707,8 +707,8 @@ $renderConfigField = static function (array $field) use (
                 required
             >
                 <option value="tinymce"<?= (string) $field['value'] === 'tinymce' ? ' selected' : '' ?>>tinymce</option>
-                <option value="plaintext"<?= (string) $field['value'] === 'plaintext' ? ' selected' : '' ?>>plaintext</option>
-                <option value="autobr"<?= (string) $field['value'] === 'autobr' ? ' selected' : '' ?>>auto &lt;br&gt;</option>
+                <option value="plaintext"<?= (string) $field['value'] === 'plaintext' ? ' selected' : '' ?>>code</option>
+                <option value="autobr"<?= (string) $field['value'] === 'autobr' ? ' selected' : '' ?>>plaintext</option>
                 <option value="markdown"<?= (string) $field['value'] === 'markdown' ? ' selected' : '' ?>>markdown</option>
             </select>
         <?php elseif ($isRouteModeDefaultField): ?>

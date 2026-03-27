@@ -499,7 +499,7 @@ final class ChannelRepository
     }
 
     /**
-     * Deletes one channel and detaches linked pages/redirects.
+     * Deletes one channel. Throws if the channel still has pages or redirects assigned.
      */
     public function deleteById(int $id): void
     {
@@ -510,6 +510,11 @@ final class ChannelRepository
         $record = $this->findById($id);
         if ($record === null) {
             return;
+        }
+
+        $pageCounts = $this->pageCountsByChannelId();
+        if (($pageCounts[$id] ?? 0) > 0) {
+            throw new RuntimeException('Cannot delete a channel that has pages assigned to it.');
         }
 
         $pages = $this->table('pages');

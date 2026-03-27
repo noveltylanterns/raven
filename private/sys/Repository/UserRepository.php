@@ -270,7 +270,8 @@ final class UserRepository
                     theme,
                     avatar AS avatar_path,
                     cover_image,
-                    contact AS contact_profiles
+                    contact AS contact_profiles,
+                    "group" AS primary_group_id
              FROM ' . $usersTable . '
              WHERE id = :id
              LIMIT 1'
@@ -283,6 +284,11 @@ final class UserRepository
         }
 
         $groupIds = $this->groupIdsForUser($id);
+        $primaryGroupId = (int) ($row['primary_group_id'] ?? 0);
+        if ($primaryGroupId < 1 || !in_array($primaryGroupId, $groupIds, true)) {
+            $primaryGroupId = $groupIds[0] ?? 0;
+        }
+        $secondaryGroupIds = array_values(array_filter($groupIds, static fn (int $gid): bool => $gid !== $primaryGroupId));
 
         return [
             'id' => (int) $row['id'],
@@ -300,6 +306,8 @@ final class UserRepository
                 : null,
             'contact_profiles' => $this->decodeContactProfiles($row['contact_profiles'] ?? null),
             'group_ids' => $groupIds,
+            'primary_group_id' => $primaryGroupId,
+            'secondary_group_ids' => $secondaryGroupIds,
         ];
     }
 
@@ -336,6 +344,7 @@ final class UserRepository
                     u.avatar AS avatar_path,
                     u.cover_image,
                     u.contact AS contact_profiles,
+                    u."group" AS primary_group_id,
                     g.id AS group_id,
                     g.name AS group_name,
                     g.slug AS group_slug,
@@ -362,6 +371,7 @@ final class UserRepository
         }
 
         $first = $rows[0];
+        $rawPrimaryGroupId = (int) ($first['primary_group_id'] ?? 0);
         $selectedGroupIds = [];
         $groupOptions = [];
         foreach ($rows as $row) {
@@ -383,6 +393,13 @@ final class UserRepository
             }
         }
 
+        // Derive primary/secondary split: primary = users.group, secondary = remaining memberships.
+        $allGroupIds = array_values($selectedGroupIds);
+        $primaryGroupId = $rawPrimaryGroupId > 0 && isset($selectedGroupIds[$rawPrimaryGroupId])
+            ? $rawPrimaryGroupId
+            : ($allGroupIds[0] ?? 0);
+        $secondaryGroupIds = array_values(array_filter($allGroupIds, static fn (int $id): bool => $id !== $primaryGroupId));
+
         return [
             'user' => [
                 'id' => (int) ($first['user_id'] ?? 0),
@@ -399,7 +416,9 @@ final class UserRepository
                     ? (string) $first['cover_image']
                     : null,
                 'contact_profiles' => $this->decodeContactProfiles($first['contact_profiles'] ?? null),
-                'group_ids' => array_values($selectedGroupIds),
+                'group_ids' => $allGroupIds,
+                'primary_group_id' => $primaryGroupId,
+                'secondary_group_ids' => $secondaryGroupIds,
             ],
             'group_options' => $groupOptions,
         ];
@@ -620,6 +639,7 @@ final class UserRepository
      *   bio?: string,
      *   theme: string,
      *   password: string|null,
+     *   primary_group_id: int,
      *   group_ids: array<int>,
      *   contact_profiles?: array<int, array{type: string, value: string}>,
      *   set_avatar?: bool,
@@ -637,6 +657,7 @@ final class UserRepository
         $bio = trim((string) ($data['bio'] ?? ''));
         $theme = trim((string) ($data['theme'] ?? ''));
         $password = isset($data['password']) && is_string($data['password']) ? $data['password'] : null;
+        $primaryGroupId = isset($data['primary_group_id']) ? (int) $data['primary_group_id'] : 0;
         $groupIds = $this->normalizeGroupIds(is_array($data['group_ids'] ?? null) ? $data['group_ids'] : []);
         $contactProfiles = $this->normalizeContactProfiles((array) ($data['contact_profiles'] ?? []));
         $contactProfilesEncoded = $this->encodeContactProfiles($contactProfiles);
@@ -659,6 +680,7 @@ final class UserRepository
                 'bio' => $bio,
                 'theme' => $theme,
                 'password' => $password,
+                'primary_group_id' => $primaryGroupId > 0 ? $primaryGroupId : null,
                 'group_ids' => $groupIds,
                 'contact_profiles' => $contactProfilesEncoded,
                 'set_avatar' => $setAvatar,

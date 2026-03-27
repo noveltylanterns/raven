@@ -67,8 +67,8 @@ $routeSeparatorDefault = in_array($routeSeparatorDefault ?? '-', ['-', '_'], tru
     : '-';
 $coreBodyBlockTypeDefinitions = [
     'tinymce' => ['label' => 'Rich Text', 'editor' => 'tinymce'],
-    'plaintext' => ['label' => 'Plaintext', 'editor' => 'plaintext'],
-    'autobr' => ['label' => 'Auto <br>', 'editor' => 'autobr'],
+    'plaintext' => ['label' => 'Code', 'editor' => 'plaintext'],
+    'autobr' => ['label' => 'Plaintext', 'editor' => 'autobr'],
     'markdown' => ['label' => 'Markdown', 'editor' => 'markdown'],
     'markdown_file' => ['label' => 'Markdown File', 'editor' => 'markdown_file'],
     'image_gallery' => ['label' => 'Image Gallery', 'editor' => 'gallery'],
@@ -436,8 +436,8 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                         <li><button type="button" class="dropdown-item" data-rvn-add-body-type="image_gallery">Image Gallery</button></li>
                                         <li><button type="button" class="dropdown-item" data-rvn-add-body-type="markdown">Markdown Field</button></li>
                                         <li><button type="button" class="dropdown-item" data-rvn-add-body-type="markdown_file">Markdown File</button></li>
-                                        <li><button type="button" class="dropdown-item" data-rvn-add-body-type="plaintext">Plain Text Field</button></li>
-                                        <li><button type="button" class="dropdown-item" data-rvn-add-body-type="autobr">Plain Text Auto &lt;br&gt;</button></li>
+                                        <li><button type="button" class="dropdown-item" data-rvn-add-body-type="autobr">Plaintext Field</button></li>
+                                        <li><button type="button" class="dropdown-item" data-rvn-add-body-type="plaintext">Code Field</button></li>
                                         <li><button type="button" class="dropdown-item" data-rvn-add-body-type="tinymce">Rich Text Area</button></li>
                                         <?php if ($customAddBodyItems !== []): ?>
                                             <li><hr class="dropdown-divider"></li>

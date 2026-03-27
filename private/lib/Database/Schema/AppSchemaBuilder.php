@@ -499,6 +499,69 @@ final class AppSchemaBuilder
         $db->exec('DROP TABLE IF EXISTS ' . $prefix . 'channels');
     }
 
+    /**
+     * Populates users.group (primary group) from user_groups for existing users where it is not yet set.
+     * Runs once per install after the group column is added; safe to call repeatedly.
+     */
+    public function migrateUserPrimaryGroup(PDO $db, string $driver, string $prefix): void
+    {
+        $usersTable    = $prefix . 'users';
+        $userGroupsTable = $prefix . 'user_groups';
+
+        // Resolve guest group id as fallback (canonical id 2).
+        $groupsTable = $prefix . 'groups';
+        $guestStmt = $db->prepare('SELECT id FROM ' . $groupsTable . " WHERE LOWER(slug) = 'guest' LIMIT 1");
+        $guestStmt->execute();
+        $guestIdRaw = $guestStmt->fetchColumn();
+        $guestId = $guestIdRaw !== false ? (int) $guestIdRaw : 2;
+
+        if ($driver === 'sqlite') {
+            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'group')) {
+                return;
+            }
+            $db->exec(
+                'UPDATE ' . $usersTable . '
+                 SET "group" = COALESCE(
+                     (SELECT MIN("group") FROM ' . $userGroupsTable . ' WHERE user = ' . $usersTable . '.id),
+                     ' . $guestId . '
+                 )
+                 WHERE "group" IS NULL'
+            );
+            return;
+        }
+
+        if ($driver === 'mysql') {
+            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'group')) {
+                return;
+            }
+            $db->exec(
+                'UPDATE ' . $usersTable . ' u
+                 LEFT JOIN (
+                     SELECT user, MIN(`group`) AS min_group
+                     FROM ' . $userGroupsTable . '
+                     GROUP BY user
+                 ) ug ON ug.user = u.id
+                 SET u.`group` = COALESCE(ug.min_group, ' . $guestId . ')
+                 WHERE u.`group` IS NULL'
+            );
+            return;
+        }
+
+        // PostgreSQL
+        $quoted = $this->introspector->quotePgIdentifier($usersTable);
+        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'group')) {
+            return;
+        }
+        $db->exec(
+            'UPDATE ' . $quoted . '
+             SET "group" = COALESCE(
+                 (SELECT MIN("group") FROM ' . $userGroupsTable . ' WHERE "user" = ' . $quoted . '.id),
+                 ' . $guestId . '
+             )
+             WHERE "group" IS NULL'
+        );
+    }
+
     public function ensurePanelPerformanceIndexes(PDO $db, string $driver, string $prefix): void
     {
         if ($driver === 'sqlite') {

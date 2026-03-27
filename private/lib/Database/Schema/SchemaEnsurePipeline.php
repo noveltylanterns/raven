@@ -49,7 +49,9 @@ final class SchemaEnsurePipeline
         $authSchemaBuilder->ensureAuthSchema($authDb, $driver, $prefix);
         $authSchemaBuilder->ensureInviteTokenSchema($authDb, $driver, $prefix);
 
+        $seedInstaller->migrateStockGroups($appDb, $driver, $prefix);
         $seedInstaller->ensureStockGroups($appDb, $driver, $prefix);
+        $appSchemaBuilder->migrateUserPrimaryGroup($appDb, $driver, $prefix);
         $seedInstaller->ensureSeedPages($appDb, $driver, $prefix);
     }
 }

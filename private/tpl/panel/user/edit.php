@@ -16,6 +16,8 @@
 /** @var bool $profileRoutesEnabled */
 /** @var string $profileRouteSegment */
 /** @var array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}> $groupOptions */
+/** @var int $primaryGroupId */
+/** @var array<int> $secondaryGroupIds */
 /** @var bool $canAssignSuperAdmin */
 /** @var bool $canAssignConfigurationGroups */
 /** @var array<string, array{label: string, prefix: string}> $profileContactOptions */
@@ -47,8 +49,8 @@ $deleteFormId = 'delete-user-form';
 $profileRoutePrefix = trim((string) ($profileRoutePrefix ?? ''), '/');
 $profileRoutesEnabled = (bool) ($profileRoutesEnabled ?? false);
 $profileRouteSegment = trim((string) ($profileRouteSegment ?? ''));
-// Multi-select group inputs are compared against normalized integer ids.
-$selectedGroupIds = array_map('intval', (array) ($userRow['group_ids'] ?? []));
+$primaryGroupId = (int) ($primaryGroupId ?? ($userRow['primary_group_id'] ?? 0));
+$secondaryGroupIds = array_map('intval', (array) ($secondaryGroupIds ?? ($userRow['secondary_group_ids'] ?? [])));
 $avatarPath = isset($userRow['avatar_path']) && is_string($userRow['avatar_path'])
     ? $userRow['avatar_path']
     : null;
@@ -356,44 +358,70 @@ $themeLabels = [
             aria-labelledby="user-permissions-tab"
             tabindex="0"
         >
-            <fieldset class="mb-0">
-                <legend class="h5">Group Memberships</legend>
-                <?php $systemPanelBitsMask = PanelAccess::maskFromBits(PanelAccess::systemPanelBits()); ?>
+            <?php $systemPanelBitsMask = PanelAccess::maskFromBits(PanelAccess::systemPanelBits()); ?>
+            <div class="form-group">
+                <label class="form-label h5 mb-1" for="primary_group_id">Primary Group</label>
+                <select id="primary_group_id" name="primary_group_id" class="form-select" required>
+                    <?php foreach ($groupOptions as $group): ?>
+                        <?php
+                        $groupId = (int) $group['id'];
+                        $groupSlug = strtolower(trim((string) ($group['slug'] ?? '')));
+                        $isAdminGroup = $groupSlug === 'admin' || $groupSlug === 'super';
+                        $isConfigurationGroup = (((int) ($group['permission_mask'] ?? 0)) & $systemPanelBitsMask) !== 0;
+                        $lockAdminAssignment = $isAdminGroup && !$canAssignSuperAdmin;
+                        $lockConfigurationPromotion = !$canAssignConfigurationGroups && $isConfigurationGroup && !$isAdminGroup;
+                        $optionDisabled = $lockAdminAssignment || $lockConfigurationPromotion;
+                        // Default to Guest on the new-user form (primaryGroupId = 0).
+                        $optionSelected = $primaryGroupId === $groupId
+                            || ($primaryGroupId === 0 && $groupSlug === 'guest');
+                        ?>
+                        <option
+                            value="<?= $groupId ?>"
+                            <?= $optionSelected ? 'selected' : '' ?>
+                            <?= $optionDisabled ? 'disabled' : '' ?>
+                        ><?= e($group['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="form-text">Defaults to <code>Guest</code> if not selected.</div>
+                <?php if (!$canAssignSuperAdmin): ?>
+                    <div class="form-text text-muted">Only Admin users can assign the <code>Admin</code> group.</div>
+                <?php endif; ?>
+            </div>
+
+            <fieldset class="mb-0 mt-3">
+                <legend class="h5">Secondary Groups</legend>
                 <?php foreach ($groupOptions as $group): ?>
                     <?php
                     $groupId = (int) $group['id'];
-                    $isSuperAdminGroup = strtolower(trim((string) ($group['slug'] ?? ''))) === 'super';
+                    $isAdminGroup = strtolower(trim((string) ($group['slug'] ?? ''))) === 'admin'
+                        || strtolower(trim((string) ($group['slug'] ?? ''))) === 'super';
                     $isConfigurationGroup = (((int) ($group['permission_mask'] ?? 0)) & $systemPanelBitsMask) !== 0;
-                    $isSelected = in_array($groupId, $selectedGroupIds, true);
-                    $lockSuperAdminAssignment = $isSuperAdminGroup && !$canAssignSuperAdmin;
-                    $lockConfigurationPromotion = !$canAssignConfigurationGroups && $isConfigurationGroup && !$isSelected && !$isSuperAdminGroup;
-                    $groupCheckboxDisabled = $lockSuperAdminAssignment || $lockConfigurationPromotion;
+                    $isSelected = in_array($groupId, $secondaryGroupIds, true);
+                    $lockAdminAssignment = $isAdminGroup && !$canAssignSuperAdmin;
+                    $lockConfigurationPromotion = !$canAssignConfigurationGroups && $isConfigurationGroup && !$isSelected && !$isAdminGroup;
+                    $checkboxDisabled = $lockAdminAssignment || $lockConfigurationPromotion;
                     ?>
                     <div class="form-check">
                         <input
                             class="form-check-input"
                             type="checkbox"
-                            name="group_ids[]"
-                            id="group_<?= $groupId ?>"
+                            name="secondary_group_ids[]"
+                            id="secondary_group_<?= $groupId ?>"
                             value="<?= $groupId ?>"
                             <?= $isSelected ? 'checked' : '' ?>
-                            <?= $groupCheckboxDisabled ? 'disabled' : '' ?>
+                            <?= $checkboxDisabled ? 'disabled' : '' ?>
                         >
-                        <?php if ($lockSuperAdminAssignment && $isSelected): ?>
-                            <!-- Disabled checkboxes are not submitted, so preserve existing assignment with hidden input. -->
-                            <input type="hidden" name="group_ids[]" value="<?= $groupId ?>">
+                        <?php if ($lockAdminAssignment && $isSelected): ?>
+                            <input type="hidden" name="secondary_group_ids[]" value="<?= $groupId ?>">
                         <?php endif; ?>
-                        <label class="form-check-label" for="group_<?= $groupId ?>">
+                        <label class="form-check-label" for="secondary_group_<?= $groupId ?>">
                             <?= e($group['name']) ?>
                         </label>
                     </div>
                 <?php endforeach; ?>
-                <div class="form-text">If none selected, user is assigned to <code>Guest</code> automatically.</div>
-                <?php if (!$canAssignSuperAdmin): ?>
-                    <div class="form-text text-muted">Only Super Admin users can assign the <code>Super Admin</code> group.</div>
-                <?php endif; ?>
+                <div class="form-text">Optional additional groups layered on top of the primary group.</div>
                 <?php if (!$canAssignConfigurationGroups): ?>
-                    <div class="form-text text-muted">Only Super Admin users can assign groups with system administration access.</div>
+                    <div class="form-text text-muted">Only Admin users can assign groups with system administration access.</div>
                 <?php endif; ?>
             </fieldset>
         </div>

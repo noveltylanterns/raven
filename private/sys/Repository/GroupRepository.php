@@ -504,18 +504,11 @@ final class GroupRepository
             throw new RuntimeException('Stock groups cannot be deleted.');
         }
 
-        // Track only users affected by this deletion.
-        $affectedStmt = $this->db->prepare(
-            'SELECT DISTINCT user AS user_id
-             FROM ' . $userGroups . '
-             WHERE "group" = :group_id'
-        );
-        $affectedStmt->execute([':group_id' => $id]);
-
-        $affectedUsers = array_map(
-            static fn (array $row): int => (int) $row['user_id'],
-            $affectedStmt->fetchAll() ?: []
-        );
+        // Non-empty groups cannot be deleted; users must be moved first.
+        $memberCount = $this->membershipCountForGroup($id);
+        if ($memberCount > 0) {
+            throw new RuntimeException('Cannot delete a group that still has members. Move or remove members first.');
+        }
 
         $this->db->beginTransaction();
 
@@ -528,18 +521,7 @@ final class GroupRepository
             $deleteGroup = $this->db->prepare('DELETE FROM ' . $groups . ' WHERE id = :id');
             $deleteGroup->execute([':id' => $id]);
 
-            $userGroupId = $this->idBySlug('user');
-
-            if ($userGroupId !== null) {
-                // Guarantee each affected user keeps at least one membership after delete.
-                foreach ($affectedUsers as $userId) {
-                    if ($this->membershipCountForUser($userId) === 0) {
-                        $this->attachUserToGroup($userId, $userGroupId);
-                    }
-                }
-            }
-
-            // Commit only after deletion and fallback reassignment both succeed.
+            // Commit only after cleanup and deletion both succeed.
             $this->db->commit();
         } catch (\Throwable $exception) {
             if ($this->db->inTransaction()) {
@@ -592,6 +574,19 @@ final class GroupRepository
         ]);
 
         return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * Returns the number of members in one group.
+     */
+    private function membershipCountForGroup(int $groupId): int
+    {
+        $userGroups = $this->table('user_groups');
+        $stmt = $this->db->prepare(
+            'SELECT COUNT(*) FROM ' . $userGroups . ' WHERE "group" = :group_id'
+        );
+        $stmt->execute([':group_id' => $groupId]);
+        return (int) $stmt->fetchColumn();
     }
 
     /**

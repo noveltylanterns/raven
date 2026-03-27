@@ -1844,15 +1844,15 @@ final class PanelController
             redirect($this->panelUrl('/category/set'));
         }
 
-        $categoryCount = (int) ($this->categoryRepo->countsBySetId()[$id] ?? 0);
-        if ($categoryCount > 0) {
-            $this->flash('error', 'Cannot delete a category set that still has categories assigned.');
-            redirect($this->panelUrl('/category/set'));
-        }
-
         if ($this->channelRepo->countExplicitTaxonomySetAssignments('category', $id) > 0) {
             $this->flash('error', 'Cannot delete a category set that is still assigned to one or more channels.');
             redirect($this->panelUrl('/category/set'));
+        }
+
+        // Reassign any remaining categories in this set to the default set before deleting.
+        $categoryCount = (int) ($this->categoryRepo->countsBySetId()[$id] ?? 0);
+        if ($categoryCount > 0) {
+            $this->categoryRepo->reassignSetToDefault($id, TaxonomySetRecordPolicy::DEFAULT_SET_ID);
         }
 
         try {
@@ -1863,7 +1863,7 @@ final class PanelController
             redirect($this->panelUrl('/category/set'));
         }
 
-        $this->flash('success', 'Category set deleted.');
+        $this->flash('success', $categoryCount > 0 ? 'Category set deleted. ' . $categoryCount . ' ' . ($categoryCount === 1 ? 'category was' : 'categories were') . ' moved to the default set.' : 'Category set deleted.');
         redirect($this->panelUrl('/category/set'));
     }
 
@@ -2330,15 +2330,15 @@ final class PanelController
             redirect($this->panelUrl('/tag/set'));
         }
 
-        $tagCount = (int) ($this->tagRepo->countsBySetId()[$id] ?? 0);
-        if ($tagCount > 0) {
-            $this->flash('error', 'Cannot delete a tag set that still has tags assigned.');
-            redirect($this->panelUrl('/tag/set'));
-        }
-
         if ($this->channelRepo->countExplicitTaxonomySetAssignments('tag', $id) > 0) {
             $this->flash('error', 'Cannot delete a tag set that is still assigned to one or more channels.');
             redirect($this->panelUrl('/tag/set'));
+        }
+
+        // Reassign any remaining tags in this set to the default set before deleting.
+        $tagCount = (int) ($this->tagRepo->countsBySetId()[$id] ?? 0);
+        if ($tagCount > 0) {
+            $this->tagRepo->reassignSetToDefault($id, TaxonomySetRecordPolicy::DEFAULT_SET_ID);
         }
 
         try {
@@ -2349,7 +2349,7 @@ final class PanelController
             redirect($this->panelUrl('/tag/set'));
         }
 
-        $this->flash('success', 'Tag set deleted.');
+        $this->flash('success', $tagCount > 0 ? 'Tag set deleted. ' . $tagCount . ' ' . ($tagCount === 1 ? 'tag was' : 'tags were') . ' moved to the default set.' : 'Tag set deleted.');
         redirect($this->panelUrl('/tag/set'));
     }
 
@@ -2643,6 +2643,8 @@ final class PanelController
         }
         $groupOptions = is_array($editData['group_options'] ?? null) ? $editData['group_options'] : [];
         $actorIsSuperAdmin = $this->auth->isSuperAdmin();
+        $primaryGroupId = (int) ($user['primary_group_id'] ?? 0);
+        $secondaryGroupIds = array_map('intval', (array) ($user['secondary_group_ids'] ?? []));
         $bioMaxLength = max(1, (int) $this->config->get('user.bio', 500));
 
         $this->view->render('panel/user/edit', [
@@ -2659,9 +2661,11 @@ final class PanelController
             'avatarUploadLimitsNote' => $this->avatarUploadLimitsNote(),
             'coverImageUrl' => is_array($user) ? $this->coverPublicUrl((string) ($user['cover_image'] ?? '')) : '',
             'groupOptions' => $groupOptions,
-            // Only existing Super Admin users can assign users into Super Admin group.
+            'primaryGroupId' => $primaryGroupId,
+            'secondaryGroupIds' => $secondaryGroupIds,
+            // Only existing Admin users can assign users into the Admin group.
             'canAssignSuperAdmin' => $actorIsSuperAdmin,
-            // Groups that include Manage System Configuration are assignable by Super Admin only.
+            // Groups that include Manage System Configuration are assignable by Admin only.
             'canAssignConfigurationGroups' => $actorIsSuperAdmin,
             'themeOptions' => ['default', 'corp', 'ice', 'midnight'],
             'csrfField' => $this->csrf->field(),
@@ -2744,18 +2748,22 @@ final class PanelController
             : null;
         $currentUserString = $this->currentUserString($existingUser);
 
-        /** @var mixed $groupIdsRaw */
-        $groupIdsRaw = $post['group_ids'] ?? [];
-        $groupIds = [];
-
-        if (is_array($groupIdsRaw)) {
-            foreach ($groupIdsRaw as $raw) {
+        $primaryGroupId = $this->input->int($post['primary_group_id'] ?? null, 1) ?? 0;
+        /** @var mixed $secondaryGroupIdsRaw */
+        $secondaryGroupIdsRaw = $post['secondary_group_ids'] ?? [];
+        $secondaryGroupIds = [];
+        if (is_array($secondaryGroupIdsRaw)) {
+            foreach ($secondaryGroupIdsRaw as $raw) {
                 $parsed = $this->input->int($raw, 1);
                 if ($parsed !== null) {
-                    $groupIds[] = $parsed;
+                    $secondaryGroupIds[] = $parsed;
                 }
             }
         }
+        // Combined effective group set: primary first, then secondary (deduplicated).
+        $groupIds = $primaryGroupId > 0
+            ? array_values(array_unique(array_merge([$primaryGroupId], $secondaryGroupIds)))
+            : array_values(array_unique($secondaryGroupIds));
 
         // Keep only existing group ids to avoid invalid assignments.
         $groupOptions = $this->groupRepo->listOptions();
@@ -2770,8 +2778,8 @@ final class PanelController
             $groupPermissionMasks[(int) ($groupOption['id'] ?? 0)] = (int) ($groupOption['permission_mask'] ?? 0);
         }
 
-        // Only Super Admin actors may assign users into Super Admin group.
-        $superAdminGroupId = $this->groupRepo->idBySlug('super');
+        // Only Admin actors may assign users into the Admin group.
+        $superAdminGroupId = $this->groupRepo->idBySlug('admin') ?? $this->groupRepo->idBySlug('super');
         $actorIsSuperAdmin = $this->auth->isSuperAdmin();
         if (!$actorIsSuperAdmin && $superAdminGroupId !== null) {
             $targetAlreadyHasSuperAdmin = false;
@@ -2858,15 +2866,18 @@ final class PanelController
             redirect($this->panelEditorUrlWithTab('/user/edit', $id, $activeTab, 'security'));
         }
 
-        // Ensure users always keep at least one group assignment.
-        if ($groupIds === []) {
-            $fallbackGroupId = $this->groupRepo->idBySlug('guest');
-            if ($fallbackGroupId !== null) {
-                $groupIds = [$fallbackGroupId];
+        // Ensure users always have a primary group; fall back to Guest.
+        if ($primaryGroupId < 1) {
+            $fallbackGroupId = $this->groupRepo->idBySlug('guest') ?? 0;
+            if ($fallbackGroupId > 0) {
+                $primaryGroupId = $fallbackGroupId;
+                if (!in_array($primaryGroupId, $groupIds, true)) {
+                    $groupIds = array_merge([$primaryGroupId], $groupIds);
+                }
             }
         }
 
-        if ($groupIds === []) {
+        if ($primaryGroupId < 1 || $groupIds === []) {
             $this->flash('error', 'At least one user group is required.');
             redirect($editUrl);
         }
@@ -2994,6 +3005,7 @@ final class PanelController
                 'bio' => $bio,
                 'theme' => $theme,
                 'password' => $password !== '' ? $password : null,
+                'primary_group_id' => $primaryGroupId,
                 'group_ids' => $groupIds,
                 'contact_profiles' => $contactProfiles,
                 'set_avatar' => $avatarSet,
@@ -3011,7 +3023,8 @@ final class PanelController
                     'bio' => $bio,
                     'theme' => $theme,
                     'password' => null,
-                    'group_ids' => $groupIds,
+                    'primary_group_id' => $primaryGroupId,
+                'group_ids' => $groupIds,
                     'contact_profiles' => $contactProfiles,
                     'set_avatar' => false,
                     'avatar_path' => null,
@@ -3061,7 +3074,8 @@ final class PanelController
                         'bio' => $bio,
                         'theme' => $theme,
                         'password' => null,
-                        'group_ids' => $groupIds,
+                        'primary_group_id' => $primaryGroupId,
+                'group_ids' => $groupIds,
                         'contact_profiles' => $contactProfiles,
                         'set_avatar' => $avatarSet,
                         'avatar_path' => $avatarFilename,

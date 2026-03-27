@@ -1021,7 +1021,7 @@ final class PublicController
             'registrationPath' => '/register',
             'registrationMode' => $this->routeConfigService()->registrationMode(),
             'loginIdentifierMode' => $loginIdentifierMode,
-            'loginIdentifierLabel' => $loginIdentifierMode === 'email' ? 'Email' : 'Username',
+            'loginIdentifierLabel' => $loginIdentifierMode === 'email' ? 'Email' : 'Username or Email',
             'postLoginRedirectPath' => $redirectPath,
         ], 'wrapper');
     }
