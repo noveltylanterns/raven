@@ -45,22 +45,22 @@ final class AppSchemaBootstrap
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 slug TEXT NOT NULL UNIQUE,
-                set_id INTEGER NOT NULL DEFAULT 1,
+                "set" INTEGER NOT NULL DEFAULT 1,
                 description TEXT NULL,
-                cover_image_file TEXT NULL,
-                preview_image_file TEXT NULL,
-                created_at TEXT NOT NULL
+                cover_image TEXT NULL,
+                preview_image TEXT NULL,
+                created TEXT NOT NULL
             )');
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $tagsTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 slug TEXT NOT NULL UNIQUE,
-                set_id INTEGER NOT NULL DEFAULT 1,
+                "set" INTEGER NOT NULL DEFAULT 1,
                 description TEXT NULL,
-                cover_image_file TEXT NULL,
-                preview_image_file TEXT NULL,
-                created_at TEXT NOT NULL
+                cover_image TEXT NULL,
+                preview_image TEXT NULL,
+                created TEXT NOT NULL
             )');
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $redirectsTable . ' (
@@ -199,24 +199,24 @@ final class AppSchemaBootstrap
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
                 slug VARCHAR(160) NOT NULL UNIQUE,
-                set_id BIGINT UNSIGNED NOT NULL DEFAULT 1,
+                `set` BIGINT UNSIGNED NOT NULL DEFAULT 1,
                 description TEXT NULL,
-                cover_image_file VARCHAR(255) NULL,
-                preview_image_file VARCHAR(255) NULL,
-                created_at DATETIME NOT NULL,
-                INDEX idx_' . $prefix . 'categories_set_id (set_id)
+                cover_image VARCHAR(255) NULL,
+                preview_image VARCHAR(255) NULL,
+                created DATETIME NOT NULL,
+                INDEX idx_' . $prefix . 'categories_set (`set`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'tags (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
                 slug VARCHAR(160) NOT NULL UNIQUE,
-                set_id BIGINT UNSIGNED NOT NULL DEFAULT 1,
+                `set` BIGINT UNSIGNED NOT NULL DEFAULT 1,
                 description TEXT NULL,
-                cover_image_file VARCHAR(255) NULL,
-                preview_image_file VARCHAR(255) NULL,
-                created_at DATETIME NOT NULL,
-                INDEX idx_' . $prefix . 'tags_set_id (set_id)
+                cover_image VARCHAR(255) NULL,
+                preview_image VARCHAR(255) NULL,
+                created DATETIME NOT NULL,
+                INDEX idx_' . $prefix . 'tags_set (`set`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'redirects (
@@ -353,21 +353,21 @@ final class AppSchemaBootstrap
             id BIGSERIAL PRIMARY KEY,
             name VARCHAR(255) NOT NULL,
             slug VARCHAR(160) NOT NULL UNIQUE,
-            set_id BIGINT NOT NULL DEFAULT 1,
+            "set" BIGINT NOT NULL DEFAULT 1,
             description TEXT NULL,
-            cover_image_file VARCHAR(255) NULL,
-            preview_image_file VARCHAR(255) NULL,
-            created_at TIMESTAMP NOT NULL
+            cover_image VARCHAR(255) NULL,
+            preview_image VARCHAR(255) NULL,
+            created TIMESTAMP NOT NULL
         )');
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'tags (
             id BIGSERIAL PRIMARY KEY,
             name VARCHAR(255) NOT NULL,
             slug VARCHAR(160) NOT NULL UNIQUE,
-            set_id BIGINT NOT NULL DEFAULT 1,
+            "set" BIGINT NOT NULL DEFAULT 1,
             description TEXT NULL,
-            cover_image_file VARCHAR(255) NULL,
-            preview_image_file VARCHAR(255) NULL,
-            created_at TIMESTAMP NOT NULL
+            cover_image VARCHAR(255) NULL,
+            preview_image VARCHAR(255) NULL,
+            created TIMESTAMP NOT NULL
         )');
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'redirects (
             id BIGSERIAL PRIMARY KEY,

@@ -28,7 +28,7 @@ $tagName = trim((string) ($tag['name'] ?? ''));
 $tagId = (int) ($tag['id'] ?? 0);
 $hasPersistedTag = $tagId > 0;
 $tagSlug = trim((string) ($tag['slug'] ?? ''));
-$tagSetId = max(1, (int) ($tag['set_id'] ?? 1));
+$tagSetId = max(1, (int) ($tag['set'] ?? 1));
 $tagRoutePrefix = trim((string) ($tagRoutePrefix ?? ''), '/');
 $requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
 $activeTab = in_array($requestedTab, ['basic', 'media'], true) ? $requestedTab : 'basic';
@@ -168,8 +168,8 @@ if ($tag !== null && $publicBase !== '' && $tagSlug !== '' && $tagRoutePrefix !=
             </div>
 
             <div class="form-group">
-                <label for="set_id" class="form-label">Set</label>
-                <select id="set_id" name="set_id" class="form-select" required>
+                <label for="set" class="form-label">Set</label>
+                <select id="set" name="set" class="form-select" required>
                     <?php foreach ($setOptions as $setOption): ?>
                         <?php $setId = (int) ($setOption['id'] ?? 0); ?>
                         <?php $setSlug = (string) ($setOption['slug'] ?? ''); ?>

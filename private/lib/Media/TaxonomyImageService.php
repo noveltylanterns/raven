@@ -356,7 +356,7 @@ final class TaxonomyImageService
             }
 
             $record = TaxonomyImagePathResolver::supportsFilenameStorage($taxonomyType)
-                ? [$slot . '_image_file' => $originalFilename]
+                ? [$slot . '_image' => $originalFilename]
                 : $paths;
 
             return [

@@ -1482,7 +1482,7 @@ final class PanelController
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
-        $setId = $this->input->int($post['set_id'] ?? null, 1);
+        $setId = $this->input->int($post['set'] ?? null, 1);
         $description = $this->input->text($post['description'] ?? null, 2000);
 
         if ($name === '' || $slug === null || $setId === null || !$this->categorySetRepo->existsId($setId)) {
@@ -1496,7 +1496,7 @@ final class PanelController
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
-                'set_id' => $setId,
+                'set' => $setId,
                 'description' => $description,
             ]);
         } catch (\Throwable) {
@@ -1951,7 +1951,7 @@ final class PanelController
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
-        $setId = $this->input->int($post['set_id'] ?? null, 1);
+        $setId = $this->input->int($post['set'] ?? null, 1);
         $description = $this->input->text($post['description'] ?? null, 2000);
 
         if ($name === '' || $slug === null || $setId === null || !$this->tagSetRepo->existsId($setId)) {
@@ -1965,7 +1965,7 @@ final class PanelController
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
-                'set_id' => $setId,
+                'set' => $setId,
                 'description' => $description,
             ]);
         } catch (\Throwable) {

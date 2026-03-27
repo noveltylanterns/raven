@@ -614,7 +614,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                         <label class="form-label" for="add-category-button">Categories</label>
                         <div class="d-flex flex-wrap align-items-center gap-2" data-rvn-chip-list="category">
                             <?php foreach ($categoryOptionsSelected as $category): ?>
-                                <span class="badge text-bg-primary d-inline-flex align-items-center gap-2" data-rvn-chip-id="<?= (int) $category['id'] ?>" data-rvn-chip-set-id="<?= (int) ($category['set_id'] ?? 0) ?>">
+                                <span class="badge text-bg-primary d-inline-flex align-items-center gap-2" data-rvn-chip-id="<?= (int) $category['id'] ?>" data-rvn-chip-set-id="<?= (int) ($category['set'] ?? 0) ?>">
                                     <span><?= e((string) $category['name']) ?></span>
                                     <button type="button" class="btn btn-sm p-0 border-0 text-white" data-rvn-chip-remove="category" aria-label="Remove category">&times;</button>
                                     <input type="hidden" name="category_ids[]" value="<?= (int) $category['id'] ?>">
@@ -642,7 +642,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                                     data-rvn-add-chip="category"
                                                     data-rvn-option-id="<?= $categoryId ?>"
                                                     data-rvn-option-label="<?= e($categoryName) ?>"
-                                                    data-rvn-option-set-id="<?= (int) ($categoryOption['set_id'] ?? 0) ?>"
+                                                    data-rvn-option-set-id="<?= (int) ($categoryOption['set'] ?? 0) ?>"
                                                 >
                                                     <?= e($categoryName) ?><?= $categorySlug !== '' ? ' (' . e($categorySlug) . ')' : '' ?>
                                                 </button>
@@ -661,7 +661,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                         <label class="form-label" for="add-tag-button">Tags</label>
                         <div class="d-flex flex-wrap align-items-center gap-2" data-rvn-chip-list="tag">
                             <?php foreach ($tagOptionsSelected as $tag): ?>
-                                <span class="badge text-bg-secondary d-inline-flex align-items-center gap-2" data-rvn-chip-id="<?= (int) $tag['id'] ?>" data-rvn-chip-set-id="<?= (int) ($tag['set_id'] ?? 0) ?>">
+                                <span class="badge text-bg-secondary d-inline-flex align-items-center gap-2" data-rvn-chip-id="<?= (int) $tag['id'] ?>" data-rvn-chip-set-id="<?= (int) ($tag['set'] ?? 0) ?>">
                                     <span><?= e((string) $tag['name']) ?></span>
                                     <button type="button" class="btn btn-sm p-0 border-0 text-white" data-rvn-chip-remove="tag" aria-label="Remove tag">&times;</button>
                                     <input type="hidden" name="tag_ids[]" value="<?= (int) $tag['id'] ?>">
@@ -689,7 +689,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                                     data-rvn-add-chip="tag"
                                                     data-rvn-option-id="<?= $tagId ?>"
                                                     data-rvn-option-label="<?= e($tagName) ?>"
-                                                    data-rvn-option-set-id="<?= (int) ($tagOption['set_id'] ?? 0) ?>"
+                                                    data-rvn-option-set-id="<?= (int) ($tagOption['set'] ?? 0) ?>"
                                                 >
                                                     <?= e($tagName) ?><?= $tagSlug !== '' ? ' (' . e($tagSlug) . ')' : '' ?>
                                                 </button>

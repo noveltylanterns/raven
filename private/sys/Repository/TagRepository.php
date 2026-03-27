@@ -42,10 +42,11 @@ final class TagRepository
     {
         $tags = $this->table('tags');
         $pageTags = $this->table('page_tags');
+        $setColumn = $this->setColumn('t');
 
         $stmt = $this->db->prepare(
-            'SELECT t.id, t.name, t.slug, t.set_id, t.description, t.created_at,
-                    t.cover_image_file, t.preview_image_file,
+            'SELECT t.id, t.name, t.slug, ' . $setColumn . ' AS set_value, t.description, t.created,
+                    t.cover_image, t.preview_image,
                     COALESCE(pt.page_count, 0) AS page_count
              FROM ' . $tags . ' t
              LEFT JOIN (
@@ -70,7 +71,7 @@ final class TagRepository
         $sql = 'SELECT COUNT(*) FROM ' . $tags;
         $params = [];
         if ($setId !== null && $setId >= 0) {
-            $sql .= ' WHERE set_id = :set_id';
+            $sql .= ' WHERE ' . $this->setColumn() . ' = :set_id';
             $params[':set_id'] = $setId;
         }
         $stmt = $this->db->prepare($sql);
@@ -90,12 +91,12 @@ final class TagRepository
         $pageTags = $this->table('page_tags');
         $whereSql = '';
         if ($setId !== null && $setId >= 0) {
-            $whereSql = 'WHERE t.set_id = :set_id';
+            $whereSql = 'WHERE ' . $this->setColumn('t') . ' = :set_id';
         }
 
         $stmt = $this->db->prepare(
-            'SELECT t.id, t.name, t.slug, t.set_id, t.description, t.created_at,
-                    t.cover_image_file, t.preview_image_file,
+            'SELECT t.id, t.name, t.slug, ' . $this->setColumn('t') . ' AS set_value, t.description, t.created,
+                    t.cover_image, t.preview_image,
                     COALESCE(pt.page_count, 0) AS page_count
              FROM ' . $tags . ' t
              LEFT JOIN (
@@ -130,23 +131,23 @@ final class TagRepository
         $safeOffset = max(0, $offset);
         $whereSql = '';
         if ($setId !== null && $setId >= 0) {
-            $whereSql = 'WHERE t.set_id = :set_id';
+            $whereSql = 'WHERE ' . $this->setColumn('t') . ' = :set_id';
         }
 
         $stmt = $this->db->prepare(
             'SELECT page_rows.id,
                     page_rows.name,
                     page_rows.slug,
-                    page_rows.set_id,
+                    page_rows.set_value,
                     page_rows.description,
-                    page_rows.created_at,
-                    page_rows.cover_image_file,
-                    page_rows.preview_image_file,
+                    page_rows.created,
+                    page_rows.cover_image,
+                    page_rows.preview_image,
                     page_rows.page_count,
                     totals.total_rows
              FROM (
-                 SELECT t.id, t.name, t.slug, t.set_id, t.description, t.created_at,
-                        t.cover_image_file, t.preview_image_file,
+                 SELECT t.id, t.name, t.slug, ' . $this->setColumn('t') . ' AS set_value, t.description, t.created,
+                        t.cover_image, t.preview_image,
                         COALESCE(pt.page_count, 0) AS page_count
                  FROM ' . $tags . ' t
                  LEFT JOIN (
@@ -160,7 +161,7 @@ final class TagRepository
              ) AS page_rows
              CROSS JOIN (
                  SELECT COUNT(*) AS total_rows
-                 FROM ' . $tags . ($setId !== null && $setId >= 0 ? ' WHERE set_id = :set_id_total' : '') . '
+                 FROM ' . $tags . ($setId !== null && $setId >= 0 ? ' WHERE ' . $this->setColumn() . ' = :set_id_total' : '') . '
              ) AS totals'
         );
         if ($setId !== null && $setId >= 0) {
@@ -197,14 +198,14 @@ final class TagRepository
     /**
      * Returns minimal tag options for panel select controls.
      *
-     * @return array<int, array{id: int, name: string, slug: string, set_id: int}>
+     * @return array<int, array{id: int, name: string, slug: string, set: int}>
      */
     public function listOptions(): array
     {
         $tags = $this->table('tags');
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug, set_id
+            'SELECT id, name, slug, ' . $this->setColumn() . ' AS set_value
              FROM ' . $tags . '
              ORDER BY name ASC, id ASC'
         );
@@ -217,7 +218,7 @@ final class TagRepository
                 'id' => (int) ($row['id'] ?? 0),
                 'name' => (string) ($row['name'] ?? ''),
                 'slug' => (string) ($row['slug'] ?? ''),
-                'set_id' => (int) ($row['set_id'] ?? 0),
+                'set' => (int) ($row['set_value'] ?? 0),
             ];
         }
 
@@ -275,8 +276,8 @@ final class TagRepository
         $tags = $this->table('tags');
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug, set_id, description, created_at,
-                    cover_image_file, preview_image_file
+            'SELECT id, name, slug, ' . $this->setColumn() . ' AS set_value, description, created,
+                    cover_image, preview_image
              FROM ' . $tags . '
              WHERE id = :id
              LIMIT 1'
@@ -291,7 +292,7 @@ final class TagRepository
     /**
      * Creates or updates one tag and returns tag id.
      *
-     * @param array{id: int|null, name: string, slug: string, set_id: int, description: string} $data
+     * @param array{id: int|null, name: string, slug: string, set: int, description: string} $data
      */
     public function save(array $data): int
     {
@@ -300,7 +301,7 @@ final class TagRepository
         $id = $data['id'] ?? null;
         $name = $data['name'];
         $slug = $data['slug'];
-        $setId = max(1, (int) ($data['set_id'] ?? 1));
+        $setId = max(1, (int) ($data['set'] ?? 1));
         $description = $data['description'];
 
         if ($id !== null && $id > 0) {
@@ -309,7 +310,7 @@ final class TagRepository
                 'UPDATE ' . $tags . '
                  SET name = :name,
                      slug = :slug,
-                     set_id = :set_id,
+                     ' . $this->setColumn() . ' = :set_id,
                      description = :description
                  WHERE id = :id'
             );
@@ -326,7 +327,7 @@ final class TagRepository
 
         // Insert path creates a new tag with creation timestamp.
         $stmt = $this->db->prepare(
-            'INSERT INTO ' . $tags . ' (name, slug, set_id, description, created_at)
+            'INSERT INTO ' . $tags . ' (name, slug, ' . $this->setColumn() . ', description, created)
              VALUES (:name, :slug, :set_id, :description, :created_at)'
         );
         $stmt->execute([
@@ -344,8 +345,8 @@ final class TagRepository
      * Updates one tag's cover/preview image files.
      *
      * @param array{
-     *   cover_image_file?: string|null,
-     *   preview_image_file?: string|null
+     *   cover_image?: string|null,
+     *   preview_image?: string|null
      * } $files
      */
     public function updateImageFiles(int $id, array $files): void
@@ -354,13 +355,13 @@ final class TagRepository
 
         $stmt = $this->db->prepare(
             'UPDATE ' . $tags . '
-             SET cover_image_file = :cover_image_file,
-                 preview_image_file = :preview_image_file
+             SET cover_image = :cover_image,
+                 preview_image = :preview_image
              WHERE id = :id'
         );
         $stmt->execute([
-            ':cover_image_file' => $this->normalizeNullableFilename($files['cover_image_file'] ?? null),
-            ':preview_image_file' => $this->normalizeNullableFilename($files['preview_image_file'] ?? null),
+            ':cover_image' => $this->normalizeNullableFilename($files['cover_image'] ?? null),
+            ':preview_image' => $this->normalizeNullableFilename($files['preview_image'] ?? null),
             ':id' => $id,
         ]);
     }
@@ -410,7 +411,7 @@ final class TagRepository
         $tags = $this->table('tags');
         $placeholders = implode(', ', array_fill(0, count($normalizedIds), '?'));
         $stmt = $this->db->prepare(
-            'SELECT id, set_id
+            'SELECT id, ' . $this->setColumn() . ' AS set_value
              FROM ' . $tags . '
              WHERE id IN (' . $placeholders . ')'
         );
@@ -418,7 +419,7 @@ final class TagRepository
 
         $result = [];
         foreach ($stmt->fetchAll() ?: [] as $row) {
-            $result[(int) ($row['id'] ?? 0)] = (int) ($row['set_id'] ?? 0);
+            $result[(int) ($row['id'] ?? 0)] = (int) ($row['set_value'] ?? 0);
         }
 
         return $result;
@@ -431,15 +432,15 @@ final class TagRepository
     {
         $tags = $this->table('tags');
         $stmt = $this->db->prepare(
-            'SELECT set_id, COUNT(*) AS row_count
+            'SELECT ' . $this->setColumn() . ' AS set_value, COUNT(*) AS row_count
              FROM ' . $tags . '
-             GROUP BY set_id'
+             GROUP BY ' . $this->setColumn()
         );
         $stmt->execute();
 
         $result = [];
         foreach ($stmt->fetchAll() ?: [] as $row) {
-            $result[(int) ($row['set_id'] ?? 0)] = (int) ($row['row_count'] ?? 0);
+            $result[(int) ($row['set_value'] ?? 0)] = (int) ($row['row_count'] ?? 0);
         }
 
         return $result;
@@ -475,8 +476,10 @@ final class TagRepository
     {
         $id = (int) ($row['id'] ?? 0);
         $storage = TaxonomyImagePathResolver::storagePayloadFromRecord('tags', $row);
-        $row['cover_image_file'] = $storage['cover_image_file'] ?? null;
-        $row['preview_image_file'] = $storage['preview_image_file'] ?? null;
+        $row['set'] = (int) ($row['set_value'] ?? $row['set'] ?? 0);
+        unset($row['set_value']);
+        $row['cover_image'] = $storage['cover_image'] ?? null;
+        $row['preview_image'] = $storage['preview_image'] ?? null;
 
         return array_merge(
             $row,
@@ -492,5 +495,11 @@ final class TagRepository
         }
 
         return basename(str_replace('\\', '/', $raw));
+    }
+
+    private function setColumn(?string $alias = null): string
+    {
+        $column = $this->driver === 'mysql' ? '`set`' : '"set"';
+        return $alias !== null && $alias !== '' ? ($alias . '.' . $column) : $column;
     }
 }

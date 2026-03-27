@@ -37,7 +37,7 @@ final class TaxonomyImagePathResolver
     public static function storageKeysForSlot(string $taxonomyType, string $slot): array
     {
         if (self::supportsFilenameStorage($taxonomyType)) {
-            return [$slot . '_image_file'];
+            return [$slot . '_image'];
         }
 
         return self::imageKeysForSlot($slot);
@@ -56,8 +56,8 @@ final class TaxonomyImagePathResolver
     {
         if (self::supportsFilenameStorage($taxonomyType)) {
             return [
-                'cover_image_file' => self::normalizeFilename($record['cover_image_file'] ?? null),
-                'preview_image_file' => self::normalizeFilename($record['preview_image_file'] ?? null),
+                'cover_image' => self::normalizeFilename($record['cover_image'] ?? $record['cover_image_file'] ?? null),
+                'preview_image' => self::normalizeFilename($record['preview_image'] ?? $record['preview_image_file'] ?? null),
             ];
         }
 
@@ -117,7 +117,7 @@ final class TaxonomyImagePathResolver
 
         $paths = [];
         foreach (['cover', 'preview'] as $slot) {
-            $fileKey = $slot . '_image_file';
+            $fileKey = $slot . '_image';
             $filename = self::normalizeFilename($storage[$fileKey] ?? null);
             $slotPaths = self::pathsForSlot($taxonomyType, $taxonomyId, $slot, $filename);
             foreach ($slotPaths as $key => $value) {

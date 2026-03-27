@@ -63,8 +63,8 @@ final class TaxonomyLookupRepository
                 name,
                 slug,
                 description,
-                cover_image_file,
-                preview_image_file
+                cover_image,
+                preview_image
              FROM ' . $table . '
              WHERE slug = :slug
              LIMIT 1'
@@ -90,8 +90,8 @@ final class TaxonomyLookupRepository
                 name,
                 slug,
                 description,
-                cover_image_file,
-                preview_image_file
+                cover_image,
+                preview_image
              FROM ' . $table . '
              WHERE slug = :slug
              LIMIT 1'
@@ -275,10 +275,10 @@ final class TaxonomyLookupRepository
      *
      * @return array{
      *   channel_options: array<int, array{id: int, name: string, slug: string}>,
-     *   category_options_all: array<int, array{id: int, name: string, slug: string, set_id: int}>,
-     *   tag_options_all: array<int, array{id: int, name: string, slug: string, set_id: int}>,
-     *   category_options_selected: array<int, array{id: int, name: string, slug: string, set_id: int}>,
-     *   tag_options_selected: array<int, array{id: int, name: string, slug: string, set_id: int}>
+     *   category_options_all: array<int, array{id: int, name: string, slug: string, set: int}>,
+     *   tag_options_all: array<int, array{id: int, name: string, slug: string, set: int}>,
+     *   category_options_selected: array<int, array{id: int, name: string, slug: string, set: int}>,
+     *   tag_options_selected: array<int, array{id: int, name: string, slug: string, set: int}>
      * }
      */
     public function listPageEditorOptionSets(
@@ -310,7 +310,7 @@ final class TaxonomyLookupRepository
                     c.id,
                     c.name,
                     c.slug,
-                    c.set_id,
+                    ' . $this->setColumn('c') . ' AS set_value,
                     CASE WHEN pc.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned
                  FROM ' . $categories . ' c
                  LEFT JOIN ' . $pageCategories . ' pc
@@ -328,7 +328,7 @@ final class TaxonomyLookupRepository
                     t.id,
                     t.name,
                     t.slug,
-                    t.set_id,
+                    ' . $this->setColumn('t') . ' AS set_value,
                     CASE WHEN pt.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned
                  FROM ' . $tags . ' t
                  LEFT JOIN ' . $pageTags . ' pt
@@ -338,7 +338,7 @@ final class TaxonomyLookupRepository
         }
 
         $stmt = $this->db->prepare(
-            'SELECT option_type, id, name, slug, set_id, is_assigned
+            'SELECT option_type, id, name, slug, set_value, is_assigned
              FROM (
                  ' . implode("\n                 UNION ALL\n                 ", $unionSelects) . '
              ) options
@@ -362,7 +362,7 @@ final class TaxonomyLookupRepository
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
-                'set_id' => (int) ($row['set_id'] ?? 0),
+                'set' => (int) ($row['set_value'] ?? 0),
             ];
             $isAssigned = (int) ($row['is_assigned'] ?? 0) === 1;
 
@@ -457,10 +457,16 @@ final class TaxonomyLookupRepository
         $id = (int) ($row['id'] ?? 0);
         $storage = TaxonomyImagePathResolver::storagePayloadFromRecord($taxonomyType, $row);
         if (TaxonomyImagePathResolver::supportsFilenameStorage($taxonomyType)) {
-            $row['cover_image_file'] = $storage['cover_image_file'] ?? null;
-            $row['preview_image_file'] = $storage['preview_image_file'] ?? null;
+            $row['cover_image'] = $storage['cover_image'] ?? null;
+            $row['preview_image'] = $storage['preview_image'] ?? null;
         }
 
         return array_merge($row, TaxonomyImagePathResolver::pathsFromStoragePayload($taxonomyType, $id, $storage));
+    }
+
+    private function setColumn(?string $alias = null): string
+    {
+        $column = $this->driver === 'mysql' ? '`set`' : '"set"';
+        return $alias !== null && $alias !== '' ? ($alias . '.' . $column) : $column;
     }
 }

@@ -42,10 +42,11 @@ final class CategoryRepository
     {
         $categories = $this->table('categories');
         $pageCategories = $this->table('page_categories');
+        $setColumn = $this->setColumn('c');
 
         $stmt = $this->db->prepare(
-            'SELECT c.id, c.name, c.slug, c.set_id, c.description, c.created_at,
-                    c.cover_image_file, c.preview_image_file,
+            'SELECT c.id, c.name, c.slug, ' . $setColumn . ' AS set_value, c.description, c.created,
+                    c.cover_image, c.preview_image,
                     COALESCE(pc.page_count, 0) AS page_count
              FROM ' . $categories . ' c
              LEFT JOIN (
@@ -70,7 +71,7 @@ final class CategoryRepository
         $sql = 'SELECT COUNT(*) FROM ' . $categories;
         $params = [];
         if ($setId !== null && $setId >= 0) {
-            $sql .= ' WHERE set_id = :set_id';
+            $sql .= ' WHERE ' . $this->setColumn() . ' = :set_id';
             $params[':set_id'] = $setId;
         }
         $stmt = $this->db->prepare($sql);
@@ -90,12 +91,12 @@ final class CategoryRepository
         $pageCategories = $this->table('page_categories');
         $whereSql = '';
         if ($setId !== null && $setId >= 0) {
-            $whereSql = 'WHERE c.set_id = :set_id';
+            $whereSql = 'WHERE ' . $this->setColumn('c') . ' = :set_id';
         }
 
         $stmt = $this->db->prepare(
-            'SELECT c.id, c.name, c.slug, c.set_id, c.description, c.created_at,
-                    c.cover_image_file, c.preview_image_file,
+            'SELECT c.id, c.name, c.slug, ' . $this->setColumn('c') . ' AS set_value, c.description, c.created,
+                    c.cover_image, c.preview_image,
                     COALESCE(pc.page_count, 0) AS page_count
              FROM ' . $categories . ' c
              LEFT JOIN (
@@ -130,23 +131,23 @@ final class CategoryRepository
         $safeOffset = max(0, $offset);
         $whereSql = '';
         if ($setId !== null && $setId >= 0) {
-            $whereSql = 'WHERE c.set_id = :set_id';
+            $whereSql = 'WHERE ' . $this->setColumn('c') . ' = :set_id';
         }
 
         $stmt = $this->db->prepare(
             'SELECT page_rows.id,
                     page_rows.name,
                     page_rows.slug,
-                    page_rows.set_id,
+                    page_rows.set_value,
                     page_rows.description,
-                    page_rows.created_at,
-                    page_rows.cover_image_file,
-                    page_rows.preview_image_file,
+                    page_rows.created,
+                    page_rows.cover_image,
+                    page_rows.preview_image,
                     page_rows.page_count,
                     totals.total_rows
              FROM (
-                 SELECT c.id, c.name, c.slug, c.set_id, c.description, c.created_at,
-                        c.cover_image_file, c.preview_image_file,
+                 SELECT c.id, c.name, c.slug, ' . $this->setColumn('c') . ' AS set_value, c.description, c.created,
+                        c.cover_image, c.preview_image,
                         COALESCE(pc.page_count, 0) AS page_count
                  FROM ' . $categories . ' c
                  LEFT JOIN (
@@ -160,7 +161,7 @@ final class CategoryRepository
              ) AS page_rows
              CROSS JOIN (
                  SELECT COUNT(*) AS total_rows
-                 FROM ' . $categories . ($setId !== null && $setId >= 0 ? ' WHERE set_id = :set_id_total' : '') . '
+                 FROM ' . $categories . ($setId !== null && $setId >= 0 ? ' WHERE ' . $this->setColumn() . ' = :set_id_total' : '') . '
              ) AS totals'
         );
         if ($setId !== null && $setId >= 0) {
@@ -197,14 +198,14 @@ final class CategoryRepository
     /**
      * Returns minimal category options for panel select controls.
      *
-     * @return array<int, array{id: int, name: string, slug: string, set_id: int}>
+     * @return array<int, array{id: int, name: string, slug: string, set: int}>
      */
     public function listOptions(): array
     {
         $categories = $this->table('categories');
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug, set_id
+            'SELECT id, name, slug, ' . $this->setColumn() . ' AS set_value
              FROM ' . $categories . '
              ORDER BY name ASC, id ASC'
         );
@@ -217,7 +218,7 @@ final class CategoryRepository
                 'id' => (int) ($row['id'] ?? 0),
                 'name' => (string) ($row['name'] ?? ''),
                 'slug' => (string) ($row['slug'] ?? ''),
-                'set_id' => (int) ($row['set_id'] ?? 0),
+                'set' => (int) ($row['set_value'] ?? 0),
             ];
         }
 
@@ -275,8 +276,8 @@ final class CategoryRepository
         $categories = $this->table('categories');
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug, set_id, description, created_at,
-                    cover_image_file, preview_image_file
+            'SELECT id, name, slug, ' . $this->setColumn() . ' AS set_value, description, created,
+                    cover_image, preview_image
              FROM ' . $categories . '
              WHERE id = :id
              LIMIT 1'
@@ -291,7 +292,7 @@ final class CategoryRepository
     /**
      * Creates or updates one category and returns category id.
      *
-     * @param array{id: int|null, name: string, slug: string, set_id: int, description: string} $data
+     * @param array{id: int|null, name: string, slug: string, set: int, description: string} $data
      */
     public function save(array $data): int
     {
@@ -300,7 +301,7 @@ final class CategoryRepository
         $id = $data['id'] ?? null;
         $name = $data['name'];
         $slug = $data['slug'];
-        $setId = max(1, (int) ($data['set_id'] ?? 1));
+        $setId = max(1, (int) ($data['set'] ?? 1));
         $description = $data['description'];
 
         if ($id !== null && $id > 0) {
@@ -309,7 +310,7 @@ final class CategoryRepository
                 'UPDATE ' . $categories . '
                  SET name = :name,
                      slug = :slug,
-                     set_id = :set_id,
+                     ' . $this->setColumn() . ' = :set_id,
                      description = :description
                  WHERE id = :id'
             );
@@ -326,7 +327,7 @@ final class CategoryRepository
 
         // Insert path creates a new category with creation timestamp.
         $stmt = $this->db->prepare(
-            'INSERT INTO ' . $categories . ' (name, slug, set_id, description, created_at)
+            'INSERT INTO ' . $categories . ' (name, slug, ' . $this->setColumn() . ', description, created)
              VALUES (:name, :slug, :set_id, :description, :created_at)'
         );
         $stmt->execute([
@@ -344,8 +345,8 @@ final class CategoryRepository
      * Updates one category's cover/preview image files.
      *
      * @param array{
-     *   cover_image_file?: string|null,
-     *   preview_image_file?: string|null
+     *   cover_image?: string|null,
+     *   preview_image?: string|null
      * } $files
      */
     public function updateImageFiles(int $id, array $files): void
@@ -354,13 +355,13 @@ final class CategoryRepository
 
         $stmt = $this->db->prepare(
             'UPDATE ' . $categories . '
-             SET cover_image_file = :cover_image_file,
-                 preview_image_file = :preview_image_file
+             SET cover_image = :cover_image,
+                 preview_image = :preview_image
              WHERE id = :id'
         );
         $stmt->execute([
-            ':cover_image_file' => $this->normalizeNullableFilename($files['cover_image_file'] ?? null),
-            ':preview_image_file' => $this->normalizeNullableFilename($files['preview_image_file'] ?? null),
+            ':cover_image' => $this->normalizeNullableFilename($files['cover_image'] ?? null),
+            ':preview_image' => $this->normalizeNullableFilename($files['preview_image'] ?? null),
             ':id' => $id,
         ]);
     }
@@ -410,7 +411,7 @@ final class CategoryRepository
         $categories = $this->table('categories');
         $placeholders = implode(', ', array_fill(0, count($normalizedIds), '?'));
         $stmt = $this->db->prepare(
-            'SELECT id, set_id
+            'SELECT id, ' . $this->setColumn() . ' AS set_value
              FROM ' . $categories . '
              WHERE id IN (' . $placeholders . ')'
         );
@@ -418,7 +419,7 @@ final class CategoryRepository
 
         $result = [];
         foreach ($stmt->fetchAll() ?: [] as $row) {
-            $result[(int) ($row['id'] ?? 0)] = (int) ($row['set_id'] ?? 0);
+            $result[(int) ($row['id'] ?? 0)] = (int) ($row['set_value'] ?? 0);
         }
 
         return $result;
@@ -431,15 +432,15 @@ final class CategoryRepository
     {
         $categories = $this->table('categories');
         $stmt = $this->db->prepare(
-            'SELECT set_id, COUNT(*) AS row_count
+            'SELECT ' . $this->setColumn() . ' AS set_value, COUNT(*) AS row_count
              FROM ' . $categories . '
-             GROUP BY set_id'
+             GROUP BY ' . $this->setColumn()
         );
         $stmt->execute();
 
         $result = [];
         foreach ($stmt->fetchAll() ?: [] as $row) {
-            $result[(int) ($row['set_id'] ?? 0)] = (int) ($row['row_count'] ?? 0);
+            $result[(int) ($row['set_value'] ?? 0)] = (int) ($row['row_count'] ?? 0);
         }
 
         return $result;
@@ -475,8 +476,10 @@ final class CategoryRepository
     {
         $id = (int) ($row['id'] ?? 0);
         $storage = TaxonomyImagePathResolver::storagePayloadFromRecord('categories', $row);
-        $row['cover_image_file'] = $storage['cover_image_file'] ?? null;
-        $row['preview_image_file'] = $storage['preview_image_file'] ?? null;
+        $row['set'] = (int) ($row['set_value'] ?? $row['set'] ?? 0);
+        unset($row['set_value']);
+        $row['cover_image'] = $storage['cover_image'] ?? null;
+        $row['preview_image'] = $storage['preview_image'] ?? null;
 
         return array_merge(
             $row,
@@ -492,5 +495,11 @@ final class CategoryRepository
         }
 
         return basename(str_replace('\\', '/', $raw));
+    }
+
+    private function setColumn(?string $alias = null): string
+    {
+        $column = $this->driver === 'mysql' ? '`set`' : '"set"';
+        return $alias !== null && $alias !== '' ? ($alias . '.' . $column) : $column;
     }
 }

@@ -138,7 +138,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                         $categoryId = (int) ($category['id'] ?? 0);
                         $categoryName = (string) ($category['name'] ?? '');
                         $categorySlug = (string) ($category['slug'] ?? '');
-                        $categorySetId = (int) ($category['set_id'] ?? 0);
+                        $categorySetId = (int) ($category['set'] ?? 0);
                         $categorySetName = (string) ($categorySetNames[$categorySetId] ?? ('Set #' . $categorySetId));
                         $categoryPageCount = (int) ($category['page_count'] ?? 0);
                         $categoryPagesUrl = $panelBase . '/page?category=' . rawurlencode((string) $categoryId);

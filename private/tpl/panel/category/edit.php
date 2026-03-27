@@ -28,7 +28,7 @@ $categoryName = trim((string) ($category['name'] ?? ''));
 $categoryId = (int) ($category['id'] ?? 0);
 $hasPersistedCategory = $categoryId > 0;
 $categorySlug = trim((string) ($category['slug'] ?? ''));
-$categorySetId = max(1, (int) ($category['set_id'] ?? 1));
+$categorySetId = max(1, (int) ($category['set'] ?? 1));
 $categoryRoutePrefix = trim((string) ($categoryRoutePrefix ?? ''), '/');
 $requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
 $activeTab = in_array($requestedTab, ['basic', 'media'], true) ? $requestedTab : 'basic';
@@ -165,8 +165,8 @@ if ($category !== null && $publicBase !== '' && $categorySlug !== '' && $categor
             </div>
 
             <div class="form-group">
-                <label for="set_id" class="form-label">Set</label>
-                <select id="set_id" name="set_id" class="form-select" required>
+                <label for="set" class="form-label">Set</label>
+                <select id="set" name="set" class="form-select" required>
                     <?php foreach ($setOptions as $setOption): ?>
                         <?php $setId = (int) ($setOption['id'] ?? 0); ?>
                         <?php $setSlug = (string) ($setOption['slug'] ?? ''); ?>

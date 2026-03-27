@@ -138,7 +138,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                         $tagId = (int) ($tag['id'] ?? 0);
                         $tagName = (string) ($tag['name'] ?? '');
                         $tagSlug = (string) ($tag['slug'] ?? '');
-                        $tagSetId = (int) ($tag['set_id'] ?? 0);
+                        $tagSetId = (int) ($tag['set'] ?? 0);
                         $tagSetName = (string) ($tagSetNames[$tagSetId] ?? ('Set #' . $tagSetId));
                         $tagPageCount = (int) ($tag['page_count'] ?? 0);
                         $tagPagesUrl = $panelBase . '/page?tag=' . rawurlencode((string) $tagId);
