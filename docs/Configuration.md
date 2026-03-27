@@ -81,7 +81,7 @@ Notable options:
 - `feed.items` defaults to `10` and accepts whole numeric integers only.
 - `feed.rss` and `feed.atom` default to `rss` and `atom`, and either field can be left blank to disable that specific feed route.
 - `category.enabled` and `tag.enabled` toggle taxonomy availability in both panel and public runtime.
-- `category.set` and `tag.set` default to the stock `Default Set` (`id 1`) and define the root-channel plus undefined-channel taxonomy fallback.
+- `category.set` and `tag.set` default to the stock `Default Category Set` / `Default Tag Set` (`id 1`) and define the root-channel plus undefined-channel taxonomy fallback.
 - Category/tag URL prefix fields support blank values to disable those route families.
 
 #### Database Tab

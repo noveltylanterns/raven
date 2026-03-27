@@ -43,7 +43,7 @@ What you can do:
 - `New Tag Set`: creates a reusable set for channel assignment.
 - `Edit` row action: opens the set editor.
 - `Delete` row action: removes a non-stock set when no tags or explicit channel assignments still use it.
-- Stock `Default Set` `1` is always present and cannot be deleted.
+- Stock `Default Tag Set` `1` is always present, cannot be deleted, and is fully immutable.
 
 ### Tag Editor (`/tag/edit` and `/tag/edit/{id}`)
 
@@ -57,7 +57,7 @@ Fields/options:
 
 - `Name` (required)
 - `Slug` (required)
-- `Set` (required, defaults to `Default Set` `1`)
+- `Set` (required, defaults to `Default Tag Set` `1`)
 - `Description` (optional)
 - `Cover Image` (optional, single file)
 - `Preview Image` (optional, single file)
@@ -127,7 +127,7 @@ All state-changing routes use CSRF validation.
   - Reports deleted/failed counts for bulk operations.
 - `tagSetList()`, `tagSetEdit()`, `tagSetSave()`, `tagSetDelete()`
   - Manage file-backed tag sets under `private/dat/tag-set/`.
-  - Block deleting the stock `Default Set`, sets with assigned tags, or sets still explicitly assigned to channels.
+  - Block deleting the stock `Default Tag Set`, sets with assigned tags, or sets still explicitly assigned to channels.
 
 ### Data Model And Repository Behavior
 
@@ -145,7 +145,7 @@ Storage detail:
 
 - SQLite mode uses attached database aliases (`tags.tags`, `main.page_tags`).
 - Non-SQLite mode uses configured table prefix.
-- Tag set definitions live in `private/dat/tag-set/{id}_{slug}.php` and always include the stock `Default Set` as `1_default.php`.
+- Tag set definitions live in `private/dat/tag-set/{id}_{slug}.php` and always include the stock `Default Tag Set` as `1_default.php`.
 
 ### Public Routing Touchpoints
 

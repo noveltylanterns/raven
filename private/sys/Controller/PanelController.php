@@ -1158,8 +1158,13 @@ final class PanelController
         }
 
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'meta', 'media'], 'basic');
+        $existingSet = $id !== null && $id > 0 ? $this->categorySetRepo->findById($id) : null;
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
+        if ($slug === null && is_array($existingSet)) {
+            $persistedSlug = trim((string) ($existingSet['slug'] ?? ''));
+            $slug = $persistedSlug !== '' ? $persistedSlug : null;
+        }
         $description = $this->input->text($post['description'] ?? null, 2000);
         $editorOverride = $this->normalizeChannelEditorOverride(
             (string) ($post['editor_override'] ?? 'inherit')
@@ -1759,8 +1764,13 @@ final class PanelController
             redirect($this->panelUrl('/category/set'));
         }
 
+        $existingSet = $id !== null && $id > 0 ? $this->tagSetRepo->findById($id) : null;
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
+        if ($slug === null && is_array($existingSet)) {
+            $persistedSlug = trim((string) ($existingSet['slug'] ?? ''));
+            $slug = $persistedSlug !== '' ? $persistedSlug : null;
+        }
         $description = $this->input->text($post['description'] ?? null, 2000);
 
         if ($name === '' || ($id !== 0 && $slug === null)) {

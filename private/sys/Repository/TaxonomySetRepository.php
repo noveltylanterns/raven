@@ -21,7 +21,7 @@ final class TaxonomySetRepository
     public function __construct(string $taxonomyType, string $setDirectory)
     {
         $this->taxonomyType = strtolower(trim($taxonomyType));
-        $this->fileStore = new TaxonomySetFileStoreService($setDirectory);
+        $this->fileStore = new TaxonomySetFileStoreService($setDirectory, $this->taxonomyType);
     }
 
     /**
@@ -116,8 +116,9 @@ final class TaxonomySetRepository
         $slug = TaxonomySetRecordPolicy::normalizeSlug((string) ($data['slug'] ?? ''));
 
         if ($setId === TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
-            $name = TaxonomySetRecordPolicy::DEFAULT_SET_NAME;
+            $name = TaxonomySetRecordPolicy::defaultSetName($this->taxonomyType);
             $slug = TaxonomySetRecordPolicy::DEFAULT_SET_SLUG;
+            $description = TaxonomySetRecordPolicy::defaultSetDescription($this->taxonomyType);
         }
 
         if ($name === '' || !TaxonomySetRecordPolicy::isValidSlug($slug)) {
@@ -177,8 +178,9 @@ final class TaxonomySetRepository
         $createdAt = trim((string) ($raw['created_at'] ?? ''));
 
         if ($id === TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
-            $name = TaxonomySetRecordPolicy::DEFAULT_SET_NAME;
+            $name = TaxonomySetRecordPolicy::defaultSetName($this->taxonomyType);
             $slug = TaxonomySetRecordPolicy::DEFAULT_SET_SLUG;
+            $description = TaxonomySetRecordPolicy::defaultSetDescription($this->taxonomyType);
         } else {
             if ($name === '') {
                 $name = ucwords(str_replace('-', ' ', $slug !== '' ? $slug : ('set-' . $id)));
@@ -212,9 +214,9 @@ final class TaxonomySetRepository
     {
         return [
             'id' => TaxonomySetRecordPolicy::DEFAULT_SET_ID,
-            'name' => TaxonomySetRecordPolicy::DEFAULT_SET_NAME,
+            'name' => TaxonomySetRecordPolicy::defaultSetName($this->taxonomyType),
             'slug' => TaxonomySetRecordPolicy::DEFAULT_SET_SLUG,
-            'description' => 'If you do not configure a channel/tag set, one will be provided for you.',
+            'description' => TaxonomySetRecordPolicy::defaultSetDescription($this->taxonomyType),
             'is_stock' => true,
             'created_at' => gmdate('Y-m-d H:i:s'),
         ];

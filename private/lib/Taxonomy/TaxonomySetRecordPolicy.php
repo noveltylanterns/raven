@@ -12,7 +12,6 @@ final class TaxonomySetRecordPolicy
     public const ALL_SET_ID = 0;
     public const DEFAULT_SET_ID = 1;
     public const DEFAULT_SET_SLUG = 'default';
-    public const DEFAULT_SET_NAME = 'Default Set';
 
     public static function normalizeSetId(mixed $value, bool $allowAll = false): ?int
     {
@@ -109,5 +108,19 @@ final class TaxonomySetRecordPolicy
         }
 
         return false;
+    }
+
+    public static function defaultSetName(string $taxonomyType): string
+    {
+        return strtolower(trim($taxonomyType)) === 'tag'
+            ? 'Default Tag Set'
+            : 'Default Category Set';
+    }
+
+    public static function defaultSetDescription(string $taxonomyType): string
+    {
+        return strtolower(trim($taxonomyType)) === 'tag'
+            ? 'If you do not configure a tag set, one will be provided for you.'
+            : 'If you do not configure a category set, one will be provided for you.';
     }
 }

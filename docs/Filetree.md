@@ -70,9 +70,9 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/dat/channel/`
   - File-backed channel metadata records stored as `id_slug.php` (for example `0_root.php`).
 - `private/dat/category-set/`
-  - File-backed category-set records stored as `id_slug.php` (`1_default.php` is the stock `Default Set`; `0` is reserved as the `All Sets` sentinel in channel selection lists).
+  - File-backed category-set records stored as `id_slug.php` (`1_default.php` is the stock `Default Category Set`; `0` is reserved as the `All Sets` sentinel in channel selection lists).
 - `private/dat/tag-set/`
-  - File-backed tag-set records stored as `id_slug.php` (`1_default.php` is the stock `Default Set`; `0` is reserved as the `All Sets` sentinel in channel selection lists).
+  - File-backed tag-set records stored as `id_slug.php` (`1_default.php` is the stock `Default Tag Set`; `0` is reserved as the `All Sets` sentinel in channel selection lists).
 - `private/dat/ext/.state.php`
   - Extension enablement and permission-bit state.
 - `private/dat/ext/{slug}/`

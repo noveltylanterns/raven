@@ -12,10 +12,12 @@ use RuntimeException;
 final class TaxonomySetFileStoreService
 {
     private string $setDirectory;
+    private string $taxonomyType;
 
-    public function __construct(string $setDirectory)
+    public function __construct(string $setDirectory, string $taxonomyType)
     {
         $this->setDirectory = rtrim($setDirectory, '/');
+        $this->taxonomyType = strtolower(trim($taxonomyType));
     }
 
     public function ensureDirectory(): void
@@ -207,7 +209,8 @@ final class TaxonomySetFileStoreService
     private function defaultRecordNeedsRewrite(array $raw): bool
     {
         return TaxonomySetRecordPolicy::normalizeSetId($raw['id'] ?? null) !== TaxonomySetRecordPolicy::DEFAULT_SET_ID
-            || trim((string) ($raw['name'] ?? '')) !== TaxonomySetRecordPolicy::DEFAULT_SET_NAME
+            || trim((string) ($raw['name'] ?? '')) !== TaxonomySetRecordPolicy::defaultSetName($this->taxonomyType)
+            || trim((string) ($raw['description'] ?? '')) !== TaxonomySetRecordPolicy::defaultSetDescription($this->taxonomyType)
             || TaxonomySetRecordPolicy::normalizeSlug((string) ($raw['slug'] ?? '')) !== TaxonomySetRecordPolicy::DEFAULT_SET_SLUG;
     }
 
@@ -304,8 +307,9 @@ final class TaxonomySetFileStoreService
             $canonical['id'] = $recordId;
             $canonical['slug'] = $recordSlug;
             if ($recordId === TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
-                $canonical['name'] = TaxonomySetRecordPolicy::DEFAULT_SET_NAME;
+                $canonical['name'] = TaxonomySetRecordPolicy::defaultSetName($this->taxonomyType);
                 $canonical['slug'] = TaxonomySetRecordPolicy::DEFAULT_SET_SLUG;
+                $canonical['description'] = TaxonomySetRecordPolicy::defaultSetDescription($this->taxonomyType);
             }
 
             $targetPath = $this->pathForRecord($recordId, (string) $canonical['slug']);
