@@ -134,7 +134,7 @@ Config key management:
 - `set --key <dot.path> --value <value> [--type <auto|string|int|float|bool|null|json>]`
 - `sync-defaults` (adds missing keys from `private/dat/config.php.dist` without overwriting existing keys)
 
-`rvn-conf set` does not allow `site.default_theme`; use `rvn-theme enable --slug <slug>` instead.
+`rvn-conf set` does not allow `site.theme`; use `rvn-theme enable --slug <slug>` instead.
 
 ### `rvn-ext`
 

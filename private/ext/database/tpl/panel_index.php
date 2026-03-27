@@ -19,8 +19,8 @@ declare(strict_types=1);
 /** @var string|null $selectorError */
 /** @var array{
  *   driver: string,
- *   table_prefix: string,
- *   sqlite_base_path: string,
+ *   prefix: string,
+ *   sqlite_path: string,
  *   sqlite_file: string,
  *   mysql: array<string, string>,
  *   pgsql: array<string, string>
@@ -102,13 +102,13 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
                     </tr>
                     <tr>
                         <th scope="row">Table Prefix</th>
-                        <td><code><?= e((string) ($databaseSummary['table_prefix'] ?? '')) ?></code></td>
+                        <td><code><?= e((string) ($databaseSummary['prefix'] ?? '')) ?></code></td>
                     </tr>
 
                     <?php if ($driver === 'sqlite'): ?>
                         <tr>
                             <th scope="row">SQLite Path</th>
-                            <td><code><?= e((string) ($databaseSummary['sqlite_base_path'] ?? '')) ?></code></td>
+                            <td><code><?= e((string) ($databaseSummary['sqlite_path'] ?? '')) ?></code></td>
                         </tr>
                         <tr>
                             <th scope="row">SQLite Database</th>
@@ -133,7 +133,7 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
                         </tr>
                         <tr>
                             <th scope="row">MySQL Database</th>
-                            <td><code><?= e((string) ($mysql['dbname'] ?? '')) ?></code></td>
+                            <td><code><?= e((string) ($mysql['name'] ?? '')) ?></code></td>
                         </tr>
                         <tr>
                             <th scope="row">MySQL User</th>
@@ -151,7 +151,7 @@ $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
                         </tr>
                         <tr>
                             <th scope="row">PostgreSQL Database</th>
-                            <td><code><?= e((string) ($pgsql['dbname'] ?? '')) ?></code></td>
+                            <td><code><?= e((string) ($pgsql['name'] ?? '')) ?></code></td>
                         </tr>
                         <tr>
                             <th scope="row">PostgreSQL User</th>

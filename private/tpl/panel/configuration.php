@@ -91,6 +91,10 @@ $groupConfigFields = [];
 foreach ($configFields as $field) {
     $path = (string) ($field['path'] ?? '');
 
+    if (str_starts_with($path, 'update.')) {
+        continue;
+    }
+
     if (str_starts_with($path, 'meta.')) {
         $metaConfigFields[] = $field;
         continue;
@@ -137,7 +141,7 @@ foreach ($configFields as $field) {
     }
 
     if (str_starts_with($path, 'database.')) {
-        if ($path === 'database.table_prefix') {
+        if ($path === 'database.prefix') {
             $databaseTablePrefixField = $field;
             continue;
         }
@@ -181,6 +185,31 @@ foreach ($configFields as $field) {
     }
 
     $basicOtherConfigFields[] = $field;
+}
+
+if ($basicSiteConfigFields !== []) {
+    $basicSiteOrder = [
+        'site.name' => 10,
+        'site.domain' => 20,
+        'site.protocol' => 30,
+        'site.enabled' => 40,
+    ];
+
+    usort(
+        $basicSiteConfigFields,
+        static function (array $left, array $right) use ($basicSiteOrder): int {
+            $leftPath = (string) ($left['path'] ?? '');
+            $rightPath = (string) ($right['path'] ?? '');
+            $leftRank = (int) ($basicSiteOrder[$leftPath] ?? 1000);
+            $rightRank = (int) ($basicSiteOrder[$rightPath] ?? 1000);
+
+            if ($leftRank !== $rightRank) {
+                return $leftRank <=> $rightRank;
+            }
+
+            return strcasecmp($leftPath, $rightPath);
+        }
+    );
 }
 
 if ($debugConfigFields !== []) {
@@ -455,26 +484,26 @@ $renderConfigField = static function (array $field) use (
     $isDatabaseDriverField = $path === 'database.driver';
     $isCaptchaProviderField = $path === 'captcha.provider';
     $isMailAgentField = $path === 'mail.agent';
-    $isEditorDefaultField = $path === 'content.editor_default';
-    $isRouteModeDefaultField = $path === 'content.route_mode';
-    $isRouteSeparatorDefaultField = $path === 'content.route_separator';
+    $isEditorDefaultField = $path === 'content.editor';
+    $isRouteModeDefaultField = $path === 'content.mode';
+    $isRouteSeparatorDefaultField = $path === 'content.separator';
     $isFeedsChannelField = $path === 'feed.channels';
     $isCategoryDefaultSetField = $path === 'category.set';
     $isTagDefaultSetField = $path === 'tag.set';
     $isSiteEnabledField = $path === 'site.enabled';
     $isSiteProtocolField = $path === 'site.protocol';
-    $isPanelDefaultThemeField = $path === 'panel.default_theme';
+    $isPanelDefaultThemeField = $path === 'panel.theme';
     $isPublicProfilesModeField = $path === 'user.privacy';
     $isShowGroupsField = $path === 'group.privacy';
     $isUserLoginIdentifierField = $path === 'user.auth.login';
     $isUserRegistrationModeField = $path === 'user.auth.registration';
-    $isDatabasePasswordField = in_array($path, ['database.mysql.password', 'database.pgsql.password'], true);
+    $isDatabasePasswordField = in_array($path, ['database.mysql.pass', 'database.pgsql.pass'], true);
     $isBooleanCheckboxField = $type === 'bool';
     $isDebugCheckboxField = str_starts_with($path, 'debug.');
     $isImageUploadTargetField = $path === 'media.images.upload_target';
     $isNoLimitField = in_array($path, ['media.images.max_filesize_kb', 'media.images.max_files_per_upload', 'media.avatars.max_filesize_kb'], true);
     $isDomainPrefixedMetaPathField = in_array($path, ['meta.image', 'meta.apple_touch_icon', 'panel.brand_logo'], true);
-    $isDbSpecificField = $path === 'database.table_prefix'
+    $isDbSpecificField = $path === 'database.prefix'
         || str_starts_with($path, 'database.sqlite.')
         || str_starts_with($path, 'database.mysql.')
         || str_starts_with($path, 'database.pgsql.');
@@ -483,7 +512,7 @@ $renderConfigField = static function (array $field) use (
         || str_starts_with($path, 'captcha.recaptcha3.');
     $dbSection = '';
     $captchaSection = '';
-    if ($path === 'database.table_prefix') {
+    if ($path === 'database.prefix') {
         $dbSection = 'mysql,pgsql';
     } elseif (str_starts_with($path, 'database.sqlite.')) {
         $dbSection = 'sqlite';
@@ -516,7 +545,7 @@ $renderConfigField = static function (array $field) use (
             $inputValue = ltrim($inputValue, '/');
         }
     }
-    $isRequired = in_array($path, ['site.domain', 'site.protocol', 'panel.path', 'site.enabled', 'database.driver', 'captcha.provider', 'mail.agent', 'content.editor_default', 'content.route_mode', 'content.route_separator', 'panel.default_theme', 'session.cookie.name', 'user.privacy', 'group.privacy', 'user.auth.login', 'user.auth.registration'], true);
+    $isRequired = in_array($path, ['site.domain', 'site.protocol', 'panel.path', 'site.enabled', 'database.driver', 'captcha.provider', 'mail.agent', 'content.editor', 'content.mode', 'content.separator', 'panel.theme', 'session.cookie.name', 'user.privacy', 'group.privacy', 'user.auth.login', 'user.auth.registration'], true);
     $disableUriNote = match ($path) {
         'feed.rss' => ' (leave blank to disable RSS feeds)',
         'feed.atom' => ' (leave blank to disable Atom feeds)',

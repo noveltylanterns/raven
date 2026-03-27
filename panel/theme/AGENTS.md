@@ -8,7 +8,7 @@ Last updated: 2026-03-14
 
 ## CLI Command References
 - Use `private/bin/rvn-sys info` when you need a quick panel/runtime environment snapshot while debugging theme issues.
-- Use `private/bin/rvn-conf get --key panel.default_theme` and `private/bin/rvn-conf set --key panel.default_theme ...` when validating default panel-theme switching from CLI.
+- Use `private/bin/rvn-conf get --key panel.theme` and `private/bin/rvn-conf set --key panel.theme ...` when validating default panel-theme switching from CLI.
 - Use `private/bin/rvn-theme list` when validating public-theme inventory from a panel-admin workflow.
 - Use `private/bin/rvn-theme uninstall --slug <theme_slug>` when validating panel flows around public-theme removal. Legacy `delete` remains accepted as an alias for `uninstall`.
 
@@ -96,7 +96,7 @@ body#rvnp .card {
 - `corp`
 - `ice`
 - `midnight`
-- `default` resolves to global config `panel.default_theme` (`corp`, `ice`, or `midnight`).
+- `default` resolves to global config `panel.theme` (`corp`, `ice`, or `midnight`).
 - Login page also uses this default theme resolution (not a separate theme path).
 - Sass mode source selectors are in `panel/theme/scss/style.scss`:
 - `body#rvnp.theme-default`

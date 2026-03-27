@@ -485,7 +485,7 @@ $defaultSiteDomain = trim((string) ($defaultConfig['site']['domain'] ?? ''));
 if ($defaultSiteDomain === '') {
     $defaultSiteDomain = $detectedDomain;
 }
-$defaultTablePrefix = trim((string) ($defaultConfig['database']['table_prefix'] ?? ''));
+$defaultTablePrefix = trim((string) ($defaultConfig['database']['prefix'] ?? ($defaultConfig['database']['table_prefix'] ?? '')));
 if ($defaultTablePrefix === '') {
     $defaultTablePrefix = 'rvn_';
 }
@@ -544,12 +544,12 @@ $formPlaceholders = [
     'db_table_prefix' => $defaultTablePrefix,
     'mysql_host' => trim((string) ($defaultConfig['database']['mysql']['host'] ?? '127.0.0.1')),
     'mysql_port' => trim((string) ($defaultConfig['database']['mysql']['port'] ?? '3306')),
-    'mysql_dbname' => trim((string) ($defaultConfig['database']['mysql']['dbname'] ?? 'raven')),
+    'mysql_dbname' => trim((string) ($defaultConfig['database']['mysql']['name'] ?? ($defaultConfig['database']['mysql']['dbname'] ?? 'raven'))),
     'mysql_user' => trim((string) ($defaultConfig['database']['mysql']['user'] ?? 'raven')),
     'mysql_charset' => trim((string) ($defaultConfig['database']['mysql']['charset'] ?? 'utf8mb4')),
     'pgsql_host' => trim((string) ($defaultConfig['database']['pgsql']['host'] ?? '127.0.0.1')),
     'pgsql_port' => trim((string) ($defaultConfig['database']['pgsql']['port'] ?? '5432')),
-    'pgsql_dbname' => trim((string) ($defaultConfig['database']['pgsql']['dbname'] ?? 'raven')),
+    'pgsql_dbname' => trim((string) ($defaultConfig['database']['pgsql']['name'] ?? ($defaultConfig['database']['pgsql']['dbname'] ?? 'raven'))),
     'pgsql_user' => trim((string) ($defaultConfig['database']['pgsql']['user'] ?? 'raven')),
     'admin_username' => 'optional',
     'admin_display_name' => 'Super Admin',
@@ -677,18 +677,21 @@ if ($isPost) {
 
         // Keep installer output aligned with panel config editor expectations.
         $nextConfig['site'] = [
+            'protocol' => trim((string) ($nextConfig['site']['protocol'] ?? 'https')) !== ''
+                ? trim((string) ($nextConfig['site']['protocol'] ?? 'https'))
+                : 'https',
             'domain' => $siteDomain,
             'name' => $siteName,
             'enabled' => 'public',
-            'default_theme' => trim((string) ($nextConfig['site']['default_theme'] ?? 'raven')) !== ''
-                ? trim((string) ($nextConfig['site']['default_theme'] ?? 'raven'))
+            'theme' => trim((string) ($nextConfig['site']['theme'] ?? ($nextConfig['site']['default_theme'] ?? 'raven'))) !== ''
+                ? trim((string) ($nextConfig['site']['theme'] ?? ($nextConfig['site']['default_theme'] ?? 'raven')))
                 : 'raven',
         ];
 
         $nextConfig['panel'] = is_array($nextConfig['panel'] ?? null) ? $nextConfig['panel'] : [];
         $nextConfig['panel']['path'] = $panelPath;
-        if (!array_key_exists('default_theme', $nextConfig['panel'])) {
-            $nextConfig['panel']['default_theme'] = 'light';
+        if (!array_key_exists('theme', $nextConfig['panel'])) {
+            $nextConfig['panel']['theme'] = 'corp';
         }
         if (!array_key_exists('brand_name', $nextConfig['panel'])) {
             $nextConfig['panel']['brand_name'] = $siteName;
@@ -696,6 +699,7 @@ if ($isPost) {
         if (!array_key_exists('brand_logo', $nextConfig['panel'])) {
             $nextConfig['panel']['brand_logo'] = '';
         }
+        unset($nextConfig['panel']['default_theme']);
         unset($nextConfig['public']);
         $nextConfig['user'] = is_array($nextConfig['user'] ?? null) ? $nextConfig['user'] : [];
         $nextConfig['user']['auth'] = is_array($nextConfig['user']['auth'] ?? null) ? $nextConfig['user']['auth'] : [];
@@ -705,24 +709,24 @@ if ($isPost) {
         $nextConfig['database'] = [
             'driver' => $driver,
             'sqlite' => [
-                'base_path' => $sqliteBasePath,
+                'path' => $sqliteBasePath,
             ],
             'mysql' => [
                 'host' => $mysqlHost,
                 'port' => $mysqlPort > 0 ? $mysqlPort : 3306,
-                'dbname' => $mysqlDbName,
+                'name' => $mysqlDbName,
                 'user' => $mysqlUser,
-                'password' => $form['mysql_password'],
+                'pass' => $form['mysql_password'],
                 'charset' => $mysqlCharset !== '' ? $mysqlCharset : 'utf8mb4',
             ],
             'pgsql' => [
                 'host' => $pgsqlHost,
                 'port' => $pgsqlPort > 0 ? $pgsqlPort : 5432,
-                'dbname' => $pgsqlDbName,
+                'name' => $pgsqlDbName,
                 'user' => $pgsqlUser,
-                'password' => $form['pgsql_password'],
+                'pass' => $form['pgsql_password'],
             ],
-            'table_prefix' => $tablePrefix,
+            'prefix' => $tablePrefix,
         ];
 
         // Installer replaces bootstrap seeding; remove any legacy key entirely.

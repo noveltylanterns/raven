@@ -47,10 +47,10 @@ Tab behavior notes:
 - `Site` section:
   - core `site.*` fields
   - `site.protocol` controls whether Raven emits generated absolute URLs as `http://` or `https://`
-  - `site.default_theme` remains stored in `private/dat/config.php` but is managed via Theme Manager / `rvn-theme` (not editable in Configuration)
+  - `site.theme` remains stored in `private/dat/config.php` but is managed via Theme Manager / `rvn-theme` (not editable in Configuration)
 - `Panel` section:
   - `panel.path`
-  - `panel.default_theme` (`Corporate`, `Ice`, `Midnight`)
+  - `panel.theme` (`Corporate`, `Ice`, `Midnight`)
   - `panel.brand_name` (`Branded Panel Name`)
   - `panel.brand_logo` (`Branded Panel Logo`, URL-prefixed filename/path input)
 - `Mail` section:
@@ -87,10 +87,10 @@ Notable options:
 #### Database Tab
 
 - Database settings including:
-  - `database.table_prefix` (shown first for MySQL/PostgreSQL; hidden for SQLite)
+  - `database.prefix` (shown first for MySQL/PostgreSQL; hidden for SQLite)
   - `database.driver`
   - selected-driver fields (`sqlite`/`mysql`/`pgsql`)
-- SQLite storage is managed through `database.sqlite.base_path`; Raven keeps core, auth, taxonomy, and extension DB tables in one `db.sqlite` file and leaves `private/dat/ext/{slug}/` available for extension-local non-table storage.
+- SQLite storage is managed through `database.sqlite.path`; Raven keeps core, auth, taxonomy, and extension DB tables in one `db.sqlite` file and leaves `private/dat/ext/{slug}/` available for extension-local non-table storage.
 
 #### Debug Tab
 
@@ -219,7 +219,7 @@ Path-specific normalization is centralized in `normalizeConfigFieldValue(...)` a
 Important rules include:
 
 - constrained enums (`site.enabled`, `site.protocol`, `database.driver`, `captcha.provider`, `mail.agent`, etc.)
-- `panel.default_theme` constrained to `corp`, `ice`, or `midnight` (legacy `light`/`dark` normalize to `corp`/`midnight`)
+- `panel.theme` constrained to `corp`, `ice`, or `midnight` (legacy `light`/`dark` normalize to `corp`/`midnight`)
 - `user.auth.login` constrained to `email` or `username`
 - `user.auth.registration` constrained to `open`, `invite`, or `closed`
 - slug/prefix validation and collision checks for public route prefixes
@@ -255,16 +255,16 @@ The following config keys are expected to appear in this document and in runtime
 - `site.protocol`
 - `site.name`
 - `panel.path`
-- `panel.default_theme`
+- `panel.theme`
 - `panel.brand_name`
 - `panel.brand_logo`
-- `site.default_theme` (stored in config; changed via Theme Manager / `rvn-theme`)
+- `site.theme` (stored in config; changed via Theme Manager / `rvn-theme`)
 - `mail.agent`
 - `mail.sender_address`
 - `mail.sender_name`
-- `content.editor_default`
-- `content.route_mode`
-- `content.route_separator`
+- `content.editor`
+- `content.mode`
+- `content.separator`
 - `feed.enabled`
 - `feed.channels`
 - `feed.channels.0`
@@ -280,17 +280,17 @@ The following config keys are expected to appear in this document and in runtime
 - `category.prefix`
 - `tag.prefix`
 - `database.driver`
-- `database.table_prefix`
-- `database.sqlite.base_path`
+- `database.prefix`
+- `database.sqlite.path`
 - `database.mysql.charset`
-- `database.mysql.dbname`
+- `database.mysql.name`
 - `database.mysql.host`
-- `database.mysql.password`
+- `database.mysql.pass`
 - `database.mysql.port`
 - `database.mysql.user`
-- `database.pgsql.dbname`
+- `database.pgsql.name`
 - `database.pgsql.host`
-- `database.pgsql.password`
+- `database.pgsql.pass`
 - `database.pgsql.port`
 - `database.pgsql.user`
 - `update.source.mode`

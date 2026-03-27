@@ -21,7 +21,7 @@ return array (
     'domain' => 'SITE_DOMAIN',
     'name' => 'Raven CMS',
     'enabled' => 'public',
-    'default_theme' => 'raven',
+    'theme' => 'raven',
   ),
   'meta' =>
   array (
@@ -43,7 +43,7 @@ return array (
   'panel' =>
   array (
     'path' => 'panel',
-    'default_theme' => 'corp',
+    'theme' => 'corp',
     'brand_name' => '',
     'brand_logo' => '',
   ),
@@ -52,26 +52,26 @@ return array (
     'driver' => 'sqlite',
     'sqlite' =>
     array (
-      'base_path' => 'SQLITE_BASE_PATH',
+      'path' => 'SQLITE_BASE_PATH',
     ),
     'mysql' =>
     array (
       'host' => 'MYSQL_HOST',
       'port' => 3306,
-      'dbname' => 'MYSQL_DATABASE',
+      'name' => 'MYSQL_DATABASE',
       'user' => 'MYSQL_USER',
-      'password' => 'MYSQL_PASSWORD',
+      'pass' => 'MYSQL_PASSWORD',
       'charset' => 'utf8mb4',
     ),
     'pgsql' =>
     array (
       'host' => 'PGSQL_HOST',
       'port' => 5432,
-      'dbname' => 'PGSQL_DATABASE',
+      'name' => 'PGSQL_DATABASE',
       'user' => 'PGSQL_USER',
-      'password' => 'PGSQL_PASSWORD',
+      'pass' => 'PGSQL_PASSWORD',
     ),
-    'table_prefix' => 'rvn_',
+    'prefix' => 'rvn_',
   ),
   'debug' =>
   array (
@@ -99,9 +99,9 @@ return array (
   ),
   'content' =>
   array (
-    'editor_default' => 'tinymce',
-    'route_mode' => 'slug',
-    'route_separator' => '-',
+    'editor' => 'tinymce',
+    'mode' => 'slug',
+    'separator' => '-',
   ),
   'feed' =>
   array (

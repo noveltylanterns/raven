@@ -438,31 +438,31 @@ final class PanelConfigFieldPolicyService
             return $agent;
         }
 
-        if ($path === 'content.editor_default') {
+        if ($path === 'content.editor') {
             $editor = $normalizeBodyTextEditorOption($value);
             if ($editor === 'tinymce' && strtolower(trim($value)) !== 'tinymce') {
                 throw new \RuntimeException(
-                    'content.editor_default must be tinymce, plaintext, autobr, or markdown.'
+                    'content.editor must be tinymce, plaintext, autobr, or markdown.'
                 );
             }
 
             return $editor;
         }
 
-        if ($path === 'content.route_mode') {
+        if ($path === 'content.mode') {
             $mode = strtolower(trim($value));
             if (!in_array($mode, ['slug', 'id'], true)) {
-                throw new \RuntimeException('content.route_mode must be slug or id.');
+                throw new \RuntimeException('content.mode must be slug or id.');
             }
 
             return $mode;
         }
 
-        if ($path === 'content.route_separator') {
+        if ($path === 'content.separator') {
             $separator = $normalizeGlobalRouteSeparator($value);
             if ($separator === '-' && trim($value) !== '-') {
                 throw new \RuntimeException(
-                    'content.route_separator must be - or _.'
+                    'content.separator must be - or _.'
                 );
             }
 
@@ -493,19 +493,19 @@ final class PanelConfigFieldPolicyService
             return $this->normalizer->normalizeMetaAbsoluteUrlPathValue($siteProtocol, $siteDomain, $value);
         }
 
-        if ($path === 'panel.default_theme') {
+        if ($path === 'panel.theme') {
             $theme = $normalizePanelThemeChoice($value, false);
             if (!is_string($theme)) {
-                throw new \RuntimeException('panel.default_theme must be corp, ice, or midnight.');
+                throw new \RuntimeException('panel.theme must be corp, ice, or midnight.');
             }
 
             return $theme;
         }
 
-        if ($path === 'site.default_theme') {
+        if ($path === 'site.theme') {
             $theme = strtolower($value);
             if (!isset($publicThemeOptions[$theme])) {
-                throw new \RuntimeException('site.default_theme must match one installed theme manifest.');
+                throw new \RuntimeException('site.theme must match one installed theme manifest.');
             }
 
             return $theme;

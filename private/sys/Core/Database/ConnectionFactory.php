@@ -115,7 +115,7 @@ final class ConnectionFactory
             return new ProfiledPDO(
                 $this->dsnBuilder->mysql($mysql),
                 (string) ($mysql['user'] ?? ''),
-                (string) ($mysql['password'] ?? ''),
+                (string) ($mysql['pass'] ?? ($mysql['password'] ?? '')),
                 $this->defaultPdoOptions(),
                 $connectionLabel,
                 $this->queryProfiler
@@ -127,7 +127,7 @@ final class ConnectionFactory
         return new ProfiledPDO(
             $this->dsnBuilder->pgsql($pgsql),
             (string) ($pgsql['user'] ?? ''),
-            (string) ($pgsql['password'] ?? ''),
+            (string) ($pgsql['pass'] ?? ($pgsql['password'] ?? '')),
             $this->defaultPdoOptions(),
             $connectionLabel,
             $this->queryProfiler

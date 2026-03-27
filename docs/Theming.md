@@ -138,14 +138,14 @@ Uninstall constraints:
 
 Related helpers:
 
-- `private/bin/rvn-conf get --key site.default_theme`
+- `private/bin/rvn-conf get --key site.theme`
 - `private/bin/rvn-theme enable --slug <slug>`
 - `private/bin/rvn-sys info`
 
 Theme selection policy:
 
-- `site.default_theme` remains stored in config but is managed through Theme Manager / `rvn-theme`.
-- `rvn-conf set --key site.default_theme ...` is blocked by design.
+- `site.theme` remains stored in config but is managed through Theme Manager / `rvn-theme`.
+- `rvn-conf set --key site.theme ...` is blocked by design.
 
 Panel counterpart:
 

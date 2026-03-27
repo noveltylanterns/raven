@@ -199,7 +199,7 @@ final class CliSmokeRunner
 
         $app = require $this->root . '/private/raven.php';
         $originalCreator = (string) $app['config']->get('meta.twitter.creator', '');
-        $originalSiteTheme = trim((string) $app['config']->get('site.default_theme', 'raven'));
+        $originalSiteTheme = trim((string) $app['config']->get('site.theme', $app['config']->get('site.default_theme', 'raven')));
         if ($originalSiteTheme === '') {
             $originalSiteTheme = 'raven';
         }
@@ -232,14 +232,14 @@ final class CliSmokeRunner
 
         $blockedThemeSet = $this->runJsonExpectFailure([
             'private/bin/rvn-conf', 'set',
-            '--key', 'site.default_theme',
+            '--key', 'site.theme',
             '--value', $originalSiteTheme,
             '--type', 'string',
             '--json',
         ]);
         $this->assert(
             str_contains(strtolower((string) ($blockedThemeSet['error'] ?? '')), 'rvn-theme'),
-            'rvn-conf should direct site.default_theme writes to rvn-theme.'
+            'rvn-conf should direct site.theme writes to rvn-theme.'
         );
         $this->events[] = 'config_theme_blocked=ok';
 

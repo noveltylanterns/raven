@@ -93,19 +93,19 @@ final class RoutingSmokeRunner
         $this->assert((string) ($rootSlug['canonical_path'] ?? '') === '/hello-world', 'Global slug mode canonical root path mismatch.');
         $this->events[] = 'root_slug=ok';
 
-        $config->set('content.route_separator', '_');
+        $config->set('content.separator', '_');
         $rootUnderscore = $this->resolvePublicPath($config, $routeConfig, $routeService, $channels, $pages, 'hello_world', null);
         $this->assert((int) ($rootUnderscore['page']['id'] ?? 0) === 7, 'Underscore separator should resolve root slug page.');
         $this->assert((string) ($rootUnderscore['canonical_path'] ?? '') === '/hello_world', 'Underscore separator canonical root path mismatch.');
         $this->events[] = 'root_slug_separator=ok';
 
-        $config->set('content.route_separator', '-');
+        $config->set('content.separator', '-');
         $inheritSlug = $this->resolvePublicPath($config, $routeConfig, $routeService, $channels, $pages, 'smoke-post', 'news');
         $this->assert((int) ($inheritSlug['page']['id'] ?? 0) === 42, 'Inherited channel slug mode should resolve channel page by slug.');
         $this->assert((string) ($inheritSlug['canonical_path'] ?? '') === '/news/smoke-post', 'Inherited channel slug canonical path mismatch.');
         $this->events[] = 'channel_inherit_slug=ok';
 
-        $config->set('content.route_mode', 'id');
+        $config->set('content.mode', 'id');
         $rootId = $this->resolvePublicPath($config, $routeConfig, $routeService, $channels, $pages, '7', null);
         $this->assert((int) ($rootId['page']['id'] ?? 0) === 7, 'Global id mode should resolve root page by id.');
         $this->assert((string) ($rootId['canonical_path'] ?? '') === '/7', 'Global id mode canonical root path mismatch.');
@@ -260,7 +260,7 @@ PHP;
             $lookupTarget = $routeService->resolveLookupTarget(
                 $requestedSegment,
                 $routeMode,
-                (string) $config->get('content.route_separator', '-')
+                (string) $config->get('content.separator', $config->get('content.route_separator', '-'))
             );
             $this->assert(is_array($lookupTarget), 'Failed to parse root route segment "' . $requestedSegment . '".');
             if ((string) ($lookupTarget['type'] ?? '') === 'slug') {
@@ -281,7 +281,7 @@ PHP;
             (string) ($page['published_at'] ?? ''),
             $routeMode,
             $wordSeparator,
-            (string) $config->get('content.route_separator', '-')
+            (string) $config->get('content.separator', $config->get('content.route_separator', '-'))
         );
         $canonicalPath = $channelSlug !== null
             ? '/' . rawurlencode($channelSlug) . '/' . rawurlencode($canonicalSegment)

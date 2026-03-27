@@ -29,18 +29,24 @@ final class ConfigEditorSchemaService
         'captcha.recaptcha2.public_key' => 'Site Key',
         'captcha.recaptcha3.public_key' => 'Site Key',
         'panel.path' => 'Panel Path',
-        'panel.default_theme' => 'Default Panel Theme',
+        'panel.theme' => 'Default Panel Theme',
         'panel.brand_name' => 'Branded Panel Name',
         'panel.brand_logo' => 'Branded Panel Logo',
         'site.protocol' => 'Protocol',
-        'site.default_theme' => 'Default Site Theme',
+        'site.theme' => 'Default Site Theme',
         'site.enabled' => 'Visibility',
         'mail.agent' => 'Mail Agent',
         'mail.sender_address' => 'Mail Sender Address',
         'mail.sender_name' => 'Mail Sender Name',
-        'content.editor_default' => 'Default Text Editor',
-        'content.route_mode' => 'Default Routing Mode',
-        'content.route_separator' => 'Default Routing Separator',
+        'database.prefix' => 'Table Prefix',
+        'database.sqlite.path' => 'Base Path',
+        'database.mysql.name' => 'Database',
+        'database.mysql.pass' => 'Password',
+        'database.pgsql.name' => 'Database',
+        'database.pgsql.pass' => 'Password',
+        'content.editor' => 'Default Text Editor',
+        'content.mode' => 'Default Routing Mode',
+        'content.separator' => 'Default Routing Separator',
         'feed.channels' => 'Feed Channels',
         'feed.items' => 'Feed Items',
         'feed.rss' => 'RSS Feed Route',
@@ -127,7 +133,7 @@ final class ConfigEditorSchemaService
             // SQLite DB filenames are core-managed and intentionally hidden
             // from the configuration editor to keep installs consistent.
             // Public default theme is managed by Theme Manager / rvn-theme only.
-            if ($path === 'site.default_theme' || str_starts_with($path, 'database.sqlite.files.')) {
+            if ($path === 'site.theme' || str_starts_with($path, 'database.sqlite.files.')) {
                 continue;
             }
             $fields[] = [
@@ -240,15 +246,26 @@ final class ConfigEditorSchemaService
             $content = [];
         }
 
-        $content['editor_default'] = $this->normalizeBodyTextEditorOption(
-            (string) ($content['editor_default'] ?? 'tinymce')
+        if (!array_key_exists('editor', $content) && array_key_exists('editor_default', $content)) {
+            $content['editor'] = $content['editor_default'];
+        }
+        if (!array_key_exists('mode', $content) && array_key_exists('route_mode', $content)) {
+            $content['mode'] = $content['route_mode'];
+        }
+        if (!array_key_exists('separator', $content) && array_key_exists('route_separator', $content)) {
+            $content['separator'] = $content['route_separator'];
+        }
+
+        $content['editor'] = $this->normalizeBodyTextEditorOption(
+            (string) ($content['editor'] ?? 'tinymce')
         );
-        $content['route_mode'] = $this->normalizeGlobalPageRouteMode(
-            (string) ($content['route_mode'] ?? 'slug')
+        $content['mode'] = $this->normalizeGlobalPageRouteMode(
+            (string) ($content['mode'] ?? 'slug')
         );
-        $content['route_separator'] = $this->normalizeGlobalRouteSeparator(
-            (string) ($content['route_separator'] ?? '-')
+        $content['separator'] = $this->normalizeGlobalRouteSeparator(
+            (string) ($content['separator'] ?? '-')
         );
+        unset($content['editor_default'], $content['route_mode'], $content['route_separator']);
 
         $feed = $config['feed'] ?? null;
         if (!is_array($feed)) {
@@ -327,6 +344,89 @@ final class ConfigEditorSchemaService
 
         $config['content'] = $content;
         $config['feed'] = $feed;
+        return $config;
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     * @return array<string, mixed>
+     */
+    public function ensureDatabaseConfig(array $config): array
+    {
+        $database = $config['database'] ?? null;
+        if (!is_array($database)) {
+            $database = [];
+        }
+
+        $driver = strtolower(trim((string) ($database['driver'] ?? 'sqlite')));
+        if (!in_array($driver, ['sqlite', 'mysql', 'pgsql'], true)) {
+            $driver = 'sqlite';
+        }
+        $database['driver'] = $driver;
+
+        if (!array_key_exists('prefix', $database) && array_key_exists('table_prefix', $database)) {
+            $database['prefix'] = $database['table_prefix'];
+        }
+        $database['prefix'] = preg_replace('/[^a-zA-Z0-9_]/', '', (string) ($database['prefix'] ?? 'rvn_')) ?? 'rvn_';
+
+        $sqlite = $database['sqlite'] ?? null;
+        if (!is_array($sqlite)) {
+            $sqlite = [];
+        }
+        if (!array_key_exists('path', $sqlite) && array_key_exists('base_path', $sqlite)) {
+            $sqlite['path'] = $sqlite['base_path'];
+        }
+        $sqlite['path'] = trim((string) ($sqlite['path'] ?? 'private/dat/db.sqlite'));
+        if ($sqlite['path'] === '') {
+            $sqlite['path'] = 'private/dat/db.sqlite';
+        }
+        unset($sqlite['base_path']);
+
+        $mysql = $database['mysql'] ?? null;
+        if (!is_array($mysql)) {
+            $mysql = [];
+        }
+        if (!array_key_exists('name', $mysql) && array_key_exists('dbname', $mysql)) {
+            $mysql['name'] = $mysql['dbname'];
+        }
+        if (!array_key_exists('pass', $mysql) && array_key_exists('password', $mysql)) {
+            $mysql['pass'] = $mysql['password'];
+        }
+        $mysql['host'] = trim((string) ($mysql['host'] ?? '127.0.0.1'));
+        $mysql['port'] = max(1, (int) ($mysql['port'] ?? 3306));
+        $mysql['name'] = trim((string) ($mysql['name'] ?? 'raven'));
+        $mysql['user'] = trim((string) ($mysql['user'] ?? 'raven'));
+        $mysql['pass'] = (string) ($mysql['pass'] ?? '');
+        $mysql['charset'] = trim((string) ($mysql['charset'] ?? 'utf8mb4'));
+        if ($mysql['charset'] === '') {
+            $mysql['charset'] = 'utf8mb4';
+        }
+        unset($mysql['dbname'], $mysql['password']);
+
+        $pgsql = $database['pgsql'] ?? null;
+        if (!is_array($pgsql)) {
+            $pgsql = [];
+        }
+        if (!array_key_exists('name', $pgsql) && array_key_exists('dbname', $pgsql)) {
+            $pgsql['name'] = $pgsql['dbname'];
+        }
+        if (!array_key_exists('pass', $pgsql) && array_key_exists('password', $pgsql)) {
+            $pgsql['pass'] = $pgsql['password'];
+        }
+        $pgsql['host'] = trim((string) ($pgsql['host'] ?? '127.0.0.1'));
+        $pgsql['port'] = max(1, (int) ($pgsql['port'] ?? 5432));
+        $pgsql['name'] = trim((string) ($pgsql['name'] ?? 'raven'));
+        $pgsql['user'] = trim((string) ($pgsql['user'] ?? 'raven'));
+        $pgsql['pass'] = (string) ($pgsql['pass'] ?? '');
+        unset($pgsql['dbname'], $pgsql['password']);
+
+        $database['sqlite'] = $sqlite;
+        $database['mysql'] = $mysql;
+        $database['pgsql'] = $pgsql;
+        unset($database['table_prefix']);
+
+        $config['database'] = $database;
+
         return $config;
     }
 
@@ -677,19 +777,24 @@ final class ConfigEditorSchemaService
             $site['protocol'] = $protocol;
         }
 
-        if (!array_key_exists('default_theme', $site)) {
-            $site['default_theme'] = 'raven';
+        if (!array_key_exists('theme', $site) && array_key_exists('default_theme', $site)) {
+            $site['theme'] = $site['default_theme'];
+        }
+
+        if (!array_key_exists('theme', $site)) {
+            $site['theme'] = 'raven';
         } else {
-            $configuredTheme = strtolower(trim((string) ($site['default_theme'] ?? '')));
+            $configuredTheme = strtolower(trim((string) ($site['theme'] ?? '')));
             if (isset($publicThemeOptions[$configuredTheme])) {
-                $site['default_theme'] = $configuredTheme;
+                $site['theme'] = $configuredTheme;
             } elseif (isset($publicThemeOptions['raven'])) {
-                $site['default_theme'] = 'raven';
+                $site['theme'] = 'raven';
             } else {
                 $slugs = array_keys($publicThemeOptions);
-                $site['default_theme'] = (string) ($slugs[0] ?? 'raven');
+                $site['theme'] = (string) ($slugs[0] ?? 'raven');
             }
         }
+        unset($site['default_theme']);
 
         $config['site'] = $site;
         return $config;
@@ -714,12 +819,17 @@ final class ConfigEditorSchemaService
             $panel['path'] = $panelPath ?? 'panel';
         }
 
-        if (!array_key_exists('default_theme', $panel)) {
-            $panel['default_theme'] = 'corp';
-        } else {
-            $configuredTheme = $normalizePanelThemeChoice((string) ($panel['default_theme'] ?? ''), false);
-            $panel['default_theme'] = is_string($configuredTheme) ? $configuredTheme : 'corp';
+        if (!array_key_exists('theme', $panel) && array_key_exists('default_theme', $panel)) {
+            $panel['theme'] = $panel['default_theme'];
         }
+
+        if (!array_key_exists('theme', $panel)) {
+            $panel['theme'] = 'corp';
+        } else {
+            $configuredTheme = $normalizePanelThemeChoice((string) ($panel['theme'] ?? ''), false);
+            $panel['theme'] = is_string($configuredTheme) ? $configuredTheme : 'corp';
+        }
+        unset($panel['default_theme']);
 
         if (!array_key_exists('brand_name', $panel)) {
             $siteName = trim((string) ($config['site']['name'] ?? 'Raven CMS'));

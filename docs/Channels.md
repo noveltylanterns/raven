@@ -158,7 +158,7 @@ Storage detail:
 - Channel pages resolve at `/{channel_slug}/{segment}`, where `{segment}` depends on the channel's effective `route_mode`.
 - When global feeds are enabled and a channel has `feed_enabled = true`, that channel also exposes `/{feed.rss}/{channel_slug}` and/or `/{feed.atom}/{channel_slug}`.
 - The stock `<root>` channel is not routable; root-scope pages/redirects stay at `/...` instead of `/root/...`.
-- When a channel is set to `inherit`, it uses the global `content.route_mode` default (`slug` or `id`).
+- When a channel is set to `inherit`, it uses the global `content.mode` default (`slug` or `id`).
 - Supported channel page-route segments:
 - `/{channel}/{page-slug}`
 - `/{channel}/{YYYY-MM-DD}-{page-slug}`

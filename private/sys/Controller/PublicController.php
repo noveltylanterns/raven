@@ -223,7 +223,7 @@ final class PublicController
             $channelRouteMode = $this->effectiveChannelRouteMode((string) ($channel['route_mode'] ?? 'inherit'));
             $channelWordSeparator = $this->publicChannelPageRouteService()->resolveWordSeparator(
                 (string) ($channel['route_separator'] ?? 'inherit'),
-                (string) $this->config->get('content.route_separator', '-')
+                (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
             );
 
             $lookupTarget = $this->publicChannelPageRouteService()->resolveLookupTarget(
@@ -248,7 +248,7 @@ final class PublicController
             $lookupTarget = $this->publicChannelPageRouteService()->resolveLookupTarget(
                 $requestedSlug,
                 $channelRouteMode,
-                (string) $this->config->get('content.route_separator', '-')
+                (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
             );
             if (!is_array($lookupTarget)) {
                 if ($this->tryRedirect($requestedSlug, null)) {
@@ -287,7 +287,7 @@ final class PublicController
             (string) ($page['created_at'] ?? ''),
             $channelRouteMode,
             $channelWordSeparator,
-            (string) $this->config->get('content.route_separator', '-')
+            (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
         );
         if ($channelSlug !== null) {
             if ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedSlug) !== 0) {
@@ -345,7 +345,7 @@ final class PublicController
                     (string) ($page['created_at'] ?? ''),
                     $this->globalPageRouteMode(),
                     'inherit',
-                    (string) $this->config->get('content.route_separator', '-')
+                    (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
                 );
                 $pages[$index]['url'] = '/' . rawurlencode($rootSegment !== '' ? $rootSegment : $slug);
                 continue;
@@ -361,7 +361,7 @@ final class PublicController
                         (string) ($page['created_at'] ?? ''),
                         $this->effectiveChannelRouteMode((string) ($page['route_mode_effective'] ?? 'inherit')),
                         (string) ($page['route_separator_effective'] ?? 'inherit'),
-                        (string) $this->config->get('content.route_separator', '-')
+                        (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
                     )
                 );
         }

@@ -29,7 +29,7 @@ final class DriverConfigNormalizer
      */
     public function prefix(array $config): string
     {
-        $prefix = (string) ($config['table_prefix'] ?? '');
+        $prefix = (string) ($config['prefix'] ?? ($config['table_prefix'] ?? ''));
         return preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
     }
 
@@ -57,7 +57,7 @@ final class DriverConfigNormalizer
     public function sqliteBasePath(array $config): string
     {
         $sqlite = $this->section($config, 'sqlite');
-        $basePath = rtrim((string) ($sqlite['base_path'] ?? ''), '/');
+        $basePath = rtrim((string) ($sqlite['path'] ?? ($sqlite['base_path'] ?? '')), '/');
         if ($basePath === '') {
             throw new RuntimeException('Missing SQLite base path configuration.');
         }
@@ -73,6 +73,12 @@ final class DriverConfigNormalizer
     {
         /** @var array<string, mixed> $section */
         $section = (array) ($config[$key] ?? []);
+        if (!array_key_exists('name', $section) && array_key_exists('dbname', $section)) {
+            $section['name'] = $section['dbname'];
+        }
+        if (!array_key_exists('pass', $section) && array_key_exists('password', $section)) {
+            $section['pass'] = $section['password'];
+        }
         return $section;
     }
 }

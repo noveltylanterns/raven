@@ -389,7 +389,7 @@ $normalizePanelTheme = static function (string $theme, bool $allowDefault): ?str
  * Returns panel theme value for current user.
  */
 $defaultPanelTheme = static function () use ($app): string {
-    $theme = strtolower(trim((string) $app['config']->get('panel.default_theme', 'corp')));
+    $theme = strtolower(trim((string) $app['config']->get('panel.theme', $app['config']->get('panel.default_theme', 'corp'))));
     if (in_array($theme, ['light', 'raven', 'default', 'corp'], true)) {
         return 'corp';
     }

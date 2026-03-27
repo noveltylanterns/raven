@@ -2048,8 +2048,8 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
 
         if ($action === 'set') {
             $key = raven_cli_required_scalar_option($options, 'key', 'Missing required --key option.', 'k');
-            if ($key === 'site.default_theme') {
-                throw new RuntimeException('site.default_theme is managed by Theme Manager/rvn-theme. Use: private/bin/rvn-theme enable --slug <slug>');
+            if ($key === 'site.theme' || $key === 'site.default_theme') {
+                throw new RuntimeException('site.theme is managed by Theme Manager/rvn-theme. Use: private/bin/rvn-theme enable --slug <slug>');
             }
             $valueRaw = raven_cli_option($options, 'value', null, 'v');
             if ((!is_scalar($valueRaw) || trim((string) $valueRaw) === '') && $context->interactive) {
@@ -2815,7 +2815,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 $loadedConfig = require $configPath;
                 if (is_array($loadedConfig)) {
                     $site = is_array($loadedConfig['site'] ?? null) ? $loadedConfig['site'] : [];
-                    $activeTheme = strtolower(trim((string) ($site['default_theme'] ?? '')));
+                    $activeTheme = strtolower(trim((string) ($site['theme'] ?? ($site['default_theme'] ?? ''))));
                 }
             }
 
@@ -2869,7 +2869,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 throw new RuntimeException('Config service unavailable.');
             }
 
-            $app['config']->set('site.default_theme', $slug);
+            $app['config']->set('site.theme', $slug);
             $app['config']->save();
 
             if ($context->json) {
@@ -2980,7 +2980,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 if (!isset($app['config']) || !$app['config'] instanceof Config) {
                     throw new RuntimeException('Config service unavailable.');
                 }
-                $app['config']->set('site.default_theme', $slug);
+                $app['config']->set('site.theme', $slug);
                 $app['config']->save();
             }
 
@@ -3004,7 +3004,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                     }
                 }
                 if ($setDefault) {
-                    $context->line('  + Activated as site.default_theme');
+                    $context->line('  + Activated as site.theme');
                 }
             }
             return 0;
@@ -3034,7 +3034,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 throw new RuntimeException('Config service unavailable.');
             }
 
-            $current = strtolower(trim((string) $app['config']->get('site.default_theme', 'raven')));
+            $current = strtolower(trim((string) $app['config']->get('site.theme', $app['config']->get('site.default_theme', 'raven'))));
             if ($current === $slug) {
                 throw new RuntimeException('Active theme cannot be uninstalled. Activate another theme first.');
             }

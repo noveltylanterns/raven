@@ -402,11 +402,11 @@ final class PanelController
             'imageUploadTarget' => (string) $this->config->get('media.images.upload_target', 'local'),
             'imageMaxFilesPerUpload' => max(0, (int) $this->config->get('media.images.max_files_per_upload', 10)),
             'editorDefault' => $this->normalizeBodyTextEditorOption(
-                (string) $this->config->get('content.editor_default', 'tinymce')
+                (string) $this->config->get('content.editor', $this->config->get('content.editor_default', 'tinymce'))
             ),
             'routeModeDefault' => $this->globalPageRouteMode(),
             'routeSeparatorDefault' => $this->normalizeGlobalRouteSeparator(
-                (string) $this->config->get('content.route_separator', '-')
+                (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
             ),
             'bodyBlockTypeDefinitions' => $this->pageEditorBodyBlockTypeDefinitions(),
             'shortcodeInsertItems' => $this->pageEditorInsertableShortcodes(),
@@ -4381,7 +4381,7 @@ final class PanelController
         }
 
         try {
-            $this->config->set('site.default_theme', $themeSlug);
+            $this->config->set('site.theme', $themeSlug);
             $this->config->save();
         } catch (\RuntimeException $exception) {
             $this->flash('error', 'Failed to update active theme: ' . $exception->getMessage());
@@ -4543,7 +4543,7 @@ final class PanelController
 
         if ($setActive) {
             try {
-                $this->config->set('site.default_theme', $themeSlug);
+                $this->config->set('site.theme', $themeSlug);
                 $this->config->save();
             } catch (\RuntimeException $exception) {
                 $this->directoryTreeService()->removeDirectoryRecursively($themePath);
@@ -6367,7 +6367,7 @@ final class PanelController
     private function defaultPanelTheme(): string
     {
         $theme = $this->normalizePanelThemeChoice(
-            (string) $this->config->get('panel.default_theme', 'corp'),
+            (string) $this->config->get('panel.theme', $this->config->get('panel.default_theme', 'corp')),
             false
         );
         if (!is_string($theme)) {
@@ -6598,7 +6598,7 @@ final class PanelController
                 ? $this->globalPageRouteMode()
                 : $this->effectiveChannelRouteMode($routeModeEffective),
             $routeSeparatorEffective,
-            (string) $this->config->get('content.route_separator', '-')
+            (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
         );
     }
 

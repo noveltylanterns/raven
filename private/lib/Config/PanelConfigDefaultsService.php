@@ -30,6 +30,7 @@ final class PanelConfigDefaultsService
         callable $normalizePanelThemeChoice
     ): array {
         $config = $this->schema->ensureContentEditorConfig($config);
+        $config = $this->schema->ensureDatabaseConfig($config);
         $config = $this->schema->ensureTaxonomyRoutePrefixConfig($config);
         $config = $this->schema->ensurePublicProfileConfig($config);
         $config = $this->schema->ensureUserAuthConfig($config);
