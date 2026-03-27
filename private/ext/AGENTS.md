@@ -1,6 +1,7 @@
 # Raven Extension Agent Guide
 
-Last updated: 2026-03-25
+UPDATED: 2026-03-27
+NOTE: All paths relative to project root. (../ from the perspective of this directory)
 
 ## Scope
 - This file defines the extension-authoring contract for `private/ext/`.
@@ -49,7 +50,7 @@ Last updated: 2026-03-25
 {
   "slug": "example-framework",
   "name": "Example Framework",
-  "version": "0.8.0",
+  "version": "0.1.0",
   "description": "Background-only framework extension.",
   "type": "framework",
   "author": "Your Name",
@@ -61,7 +62,7 @@ Last updated: 2026-03-25
 {
   "slug": "example-module",
   "name": "Example Module",
-  "version": "0.8.0",
+  "version": "0.1.0",
   "description": "Example module extension.",
   "type": "module",
   "author": "Your Name",
@@ -73,7 +74,7 @@ Last updated: 2026-03-25
 {
   "slug": "example-system-tool",
   "name": "Example System Tool",
-  "version": "0.8.0",
+  "version": "0.1.0",
   "description": "Example system extension.",
   "type": "system",
   "author": "Your Name",
@@ -85,7 +86,7 @@ Last updated: 2026-03-25
 {
   "slug": "example-helper",
   "name": "Example Helper",
-  "version": "0.8.0",
+  "version": "0.1.0",
   "description": "Panel helper extension.",
   "type": "helper",
   "author": "Your Name",
@@ -97,7 +98,7 @@ Last updated: 2026-03-25
 {
   "slug": "example-content-extension",
   "name": "Example Content Extension",
-  "version": "0.8.0",
+  "version": "0.1.0",
   "description": "Panel content extension.",
   "type": "content",
   "author": "Your Name",
