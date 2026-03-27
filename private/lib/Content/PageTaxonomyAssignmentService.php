@@ -24,7 +24,7 @@ final class PageTaxonomyAssignmentService
      */
     public function replacePageCategories(PDO $db, string $driver, string $pageCategoriesTable, int $pageId, array $categoryIds): void
     {
-        $this->replaceAssignments($db, $driver, $pageCategoriesTable, $pageId, 'category_id', $categoryIds);
+        $this->replaceAssignments($db, $driver, $pageCategoriesTable, $pageId, 'category', $categoryIds);
     }
 
     /**
@@ -32,7 +32,7 @@ final class PageTaxonomyAssignmentService
      */
     public function replacePageTags(PDO $db, string $driver, string $pageTagsTable, int $pageId, array $tagIds): void
     {
-        $this->replaceAssignments($db, $driver, $pageTagsTable, $pageId, 'tag_id', $tagIds);
+        $this->replaceAssignments($db, $driver, $pageTagsTable, $pageId, 'tag', $tagIds);
     }
 
     /**
@@ -47,9 +47,9 @@ final class PageTaxonomyAssignmentService
         array $ids
     ): void {
         $delete = $db->prepare(
-            'DELETE FROM ' . $table . ' WHERE page_id = :page_id'
+            'DELETE FROM ' . $table . ' WHERE page = :page'
         );
-        $delete->execute([':page_id' => $pageId]);
+        $delete->execute([':page' => $pageId]);
 
         if ($ids === []) {
             return;
@@ -59,14 +59,14 @@ final class PageTaxonomyAssignmentService
             $this->upsertPolicy->idempotentInsertSql(
                 $driver,
                 $table,
-                ['page_id', $column],
-                ['page_id', $column]
+                ['page', $column],
+                ['page', $column]
             )
         );
 
         foreach ($ids as $id) {
             $insert->execute([
-                ':page_id' => $pageId,
+                ':page' => $pageId,
                 ':' . $column => $id,
             ]);
         }

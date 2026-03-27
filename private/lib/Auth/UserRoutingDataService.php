@@ -42,9 +42,9 @@ final class UserRoutingDataService
                     g.id AS group_id,
                     g.name AS group_name,
                     g.slug AS group_slug,
-                    g.route_enabled AS group_route_enabled,
-                    g.permission_mask AS group_permission_mask,
-                    g.is_stock AS group_is_stock,
+                    g.route AS group_route_enabled,
+                    g.permissions AS group_permission_mask,
+                    CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
                     COALESCE(mc.member_count, 0) AS group_member_count,
                     NULL AS user_id,
                     NULL AS username,
@@ -56,9 +56,9 @@ final class UserRoutingDataService
                     NULL AS user_group_permission_mask
                  FROM ' . $groupsTable . ' g
                  LEFT JOIN (
-                    SELECT group_id, COUNT(*) AS member_count
+                    SELECT "group" AS group_id, COUNT(*) AS member_count
                     FROM ' . $userGroupsTable . '
-                    GROUP BY group_id
+                    GROUP BY "group"
                  ) mc ON mc.group_id = g.id';
         }
 
@@ -74,15 +74,15 @@ final class UserRoutingDataService
                     NULL AS group_member_count,
                     u.id AS user_id,
                     u.username AS username,
-                    u.display_name AS display_name,
+                    u.name AS display_name,
                     u.email AS email,
                     u.theme AS theme,
-                    u.avatar_path AS avatar_path,
+                    u.avatar AS avatar_path,
                     g.name AS user_group_name,
-                    g.permission_mask AS user_group_permission_mask
+                    g.permissions AS user_group_permission_mask
                  FROM ' . $usersTable . ' u
-                 LEFT JOIN ' . $userGroupsTable . ' ug ON ug.user_id = u.id
-                 LEFT JOIN ' . $groupsTable . ' g ON g.id = ug.group_id';
+                 LEFT JOIN ' . $userGroupsTable . ' ug ON ug.user = u.id
+                 LEFT JOIN ' . $groupsTable . ' g ON g.id = ug."group"';
         }
 
         $stmt = $appDb->prepare(

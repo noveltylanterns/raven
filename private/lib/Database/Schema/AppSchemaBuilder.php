@@ -25,10 +25,7 @@ final class AppSchemaBuilder
     {
         $pagesTable = $prefix . 'pages';
         if ($driver === 'sqlite') {
-            if (
-                !$this->introspector->appColumnExistsSqlite($db, $pagesTable, 'extended')
-                && !$this->introspector->appColumnExistsSqlite($db, $pagesTable, 'published_at')
-            ) {
+            if ($this->pageStorageIsModernSqlite($db, $pagesTable)) {
                 return;
             }
 
@@ -37,38 +34,11 @@ final class AppSchemaBuilder
         }
 
         if ($driver === 'mysql') {
-            if ($this->introspector->appColumnExistsMySql($db, $pagesTable, 'extended')) {
-                $db->exec(
-                    'UPDATE ' . $pagesTable . '
-                     SET content = CASE
-                        WHEN TRIM(COALESCE(extended, \'\')) <> \'\' THEN extended
-                        ELSE content
-                     END'
-                );
-                $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN extended');
-            }
-
-            if ($this->introspector->appColumnExistsMySql($db, $pagesTable, 'published_at')) {
-                $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN published_at');
-            }
-
+            $this->migratePageContentStorageMySql($db, $pagesTable);
             return;
         }
 
-        if ($this->introspector->appColumnExistsPgSql($db, $pagesTable, 'extended')) {
-            $db->exec(
-                'UPDATE ' . $pagesTable . '
-                 SET content = CASE
-                    WHEN BTRIM(COALESCE(extended, \'\')) <> \'\' THEN extended
-                    ELSE content
-                 END'
-            );
-            $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN extended');
-        }
-
-        if ($this->introspector->appColumnExistsPgSql($db, $pagesTable, 'published_at')) {
-            $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN published_at');
-        }
+        $this->migratePageContentStoragePgSql($db, $pagesTable);
     }
 
     public function ensurePageDescriptionColumn(PDO $db, string $driver, string $prefix): void
@@ -121,37 +91,15 @@ final class AppSchemaBuilder
 
     public function ensurePageGalleryEnabledColumn(PDO $db, string $driver, string $prefix): void
     {
-        $pagesTable = $prefix . 'pages';
-        if ($driver === 'sqlite') {
-            if (!$this->introspector->appColumnExistsSqlite($db, $pagesTable, 'gallery_enabled')) {
-                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN gallery_enabled INTEGER NOT NULL DEFAULT 0');
-            }
-
-            $db->exec('UPDATE ' . $pagesTable . ' SET gallery_enabled = 0 WHERE gallery_enabled IS NULL');
-            return;
-        }
-
-        if ($driver === 'mysql') {
-            if (!$this->introspector->appColumnExistsMySql($db, $pagesTable, 'gallery_enabled')) {
-                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN gallery_enabled TINYINT(1) NOT NULL DEFAULT 0');
-            }
-
-            $db->exec('UPDATE ' . $pagesTable . ' SET gallery_enabled = 0 WHERE gallery_enabled IS NULL');
-            return;
-        }
-
-        if (!$this->introspector->appColumnExistsPgSql($db, $pagesTable, 'gallery_enabled')) {
-            $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN gallery_enabled SMALLINT NOT NULL DEFAULT 0');
-        }
-
-        $db->exec('UPDATE ' . $pagesTable . ' SET gallery_enabled = 0 WHERE gallery_enabled IS NULL');
+        // `gallery_enabled` was superseded by content blocks and is intentionally gone.
     }
 
     public function ensurePageSlugScopeUniqueness(PDO $db, string $driver, string $prefix): void
     {
         $pagesTable = $prefix . 'pages';
+        $channelColumn = $this->pageChannelColumn($db, $driver, $pagesTable);
         if ($driver === 'sqlite') {
-            $this->ensurePageSlugScopeUniquenessSqlite($db, $pagesTable);
+            $this->ensurePageSlugScopeUniquenessSqlite($db, $pagesTable, $channelColumn);
             return;
         }
 
@@ -159,7 +107,7 @@ final class AppSchemaBuilder
             if (!$this->introspector->mySqlIndexExists($db, $pagesTable, 'uniq_' . $prefix . 'pages_channel_slug')) {
                 $db->exec(
                     'ALTER TABLE ' . $pagesTable . '
-                     ADD UNIQUE INDEX uniq_' . $prefix . 'pages_channel_slug (channel_id, slug)'
+                     ADD UNIQUE INDEX uniq_' . $prefix . 'pages_channel_slug (' . $channelColumn . ', slug)'
                 );
             }
 
@@ -170,15 +118,15 @@ final class AppSchemaBuilder
             $db->exec(
                 'CREATE UNIQUE INDEX uniq_' . $prefix . 'pages_root_slug
                  ON ' . $this->introspector->quotePgIdentifier($pagesTable) . ' (slug)
-                 WHERE channel_id IS NULL OR channel_id = 0'
+                 WHERE ' . $channelColumn . ' IS NULL OR ' . $channelColumn . ' = 0'
             );
         }
 
         if (!$this->introspector->pgSqlIndexExists($db, $pagesTable, 'uniq_' . $prefix . 'pages_channel_slug')) {
             $db->exec(
                 'CREATE UNIQUE INDEX uniq_' . $prefix . 'pages_channel_slug
-                 ON ' . $this->introspector->quotePgIdentifier($pagesTable) . ' (channel_id, slug)
-                 WHERE channel_id IS NOT NULL AND channel_id <> 0'
+                 ON ' . $this->introspector->quotePgIdentifier($pagesTable) . ' (' . $channelColumn . ', slug)
+                 WHERE ' . $channelColumn . ' IS NOT NULL AND ' . $channelColumn . ' <> 0'
             );
         }
     }
@@ -187,17 +135,18 @@ final class AppSchemaBuilder
     {
         $pagesTable = $prefix . 'pages';
         $redirectsTable = $prefix . 'redirects';
+        $pageChannelColumn = $this->pageChannelColumn($db, $driver, $pagesTable);
         $redirectChannelColumn = $this->redirectColumnExists($db, $driver, $redirectsTable, 'channel')
             ? 'channel'
             : 'channel_id';
 
-        $db->exec('UPDATE ' . $pagesTable . ' SET channel_id = 0 WHERE channel_id IS NULL');
+        $db->exec('UPDATE ' . $pagesTable . ' SET ' . $pageChannelColumn . ' = 0 WHERE ' . $pageChannelColumn . ' IS NULL');
         $db->exec('UPDATE ' . $redirectsTable . ' SET ' . $redirectChannelColumn . ' = 0 WHERE ' . $redirectChannelColumn . ' IS NULL');
 
         if ($driver === 'sqlite') {
             $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_root_slug_unique');
             $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_channel_slug_unique');
-            $this->ensurePageSlugScopeUniquenessSqlite($db, $pagesTable);
+            $this->ensurePageSlugScopeUniquenessSqlite($db, $pagesTable, $pageChannelColumn);
             return;
         }
 
@@ -213,37 +162,15 @@ final class AppSchemaBuilder
         $groupsTable = $this->tables->resolve($driver, $prefix, 'groups');
 
         if ($driver === 'sqlite') {
-            if (!$this->introspector->appColumnExistsSqlite($db, $groupsTable, 'slug')) {
-                $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN slug TEXT NULL');
-            }
-            if (!$this->introspector->appColumnExistsSqlite($db, $groupsTable, 'route_enabled')) {
-                $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN route_enabled INTEGER NOT NULL DEFAULT 0');
-            }
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $groupsTable . '_slug ON ' . $groupsTable . ' (slug)');
+            $this->migrateGroupStorageSqlite($db, $groupsTable);
         } elseif ($driver === 'mysql') {
-            if (!$this->introspector->appColumnExistsMySql($db, $groupsTable, 'slug')) {
-                $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN slug VARCHAR(160) NULL AFTER name');
-            }
-            if (!$this->introspector->appColumnExistsMySql($db, $groupsTable, 'route_enabled')) {
-                $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN route_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER slug');
-            }
-            if (!$this->introspector->mySqlIndexExists($db, $groupsTable, 'idx_' . $prefix . 'groups_slug')) {
-                $db->exec('ALTER TABLE ' . $groupsTable . ' ADD INDEX idx_' . $prefix . 'groups_slug (slug)');
-            }
+            $this->migrateGroupStorageMySql($db, $groupsTable, $prefix);
         } else {
-            if (!$this->introspector->appColumnExistsPgSql($db, $groupsTable, 'slug')) {
-                $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN slug VARCHAR(160) NULL');
-            }
-            if (!$this->introspector->appColumnExistsPgSql($db, $groupsTable, 'route_enabled')) {
-                $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN route_enabled SMALLINT NOT NULL DEFAULT 0');
-            }
-            if (!$this->introspector->pgSqlIndexExists($db, $groupsTable, 'idx_' . $prefix . 'groups_slug')) {
-                $db->exec('CREATE INDEX idx_' . $prefix . 'groups_slug ON ' . $this->introspector->quotePgIdentifier($groupsTable) . ' (slug)');
-            }
+            $this->migrateGroupStoragePgSql($db, $groupsTable, $prefix);
         }
 
         $rows = $db->query(
-            'SELECT id, name, slug, route_enabled
+            'SELECT id, name, slug, route
              FROM ' . $groupsTable . '
              ORDER BY id ASC'
         );
@@ -254,7 +181,7 @@ final class AppSchemaBuilder
         $update = $db->prepare(
             'UPDATE ' . $groupsTable . '
              SET slug = :slug,
-                 route_enabled = :route_enabled
+                 route = :route
              WHERE id = :id'
         );
 
@@ -281,8 +208,8 @@ final class AppSchemaBuilder
             }
             $usedSlugs[$slug] = true;
 
-            $hasRouteEnabled = array_key_exists('route_enabled', $row) && $row['route_enabled'] !== null;
-            $routeEnabledRaw = $hasRouteEnabled ? (int) $row['route_enabled'] : 0;
+            $hasRouteEnabled = array_key_exists('route', $row) && $row['route'] !== null;
+            $routeEnabledRaw = $hasRouteEnabled ? (int) $row['route'] : 0;
             $normalizedRoleSlug = strtolower(trim($slug));
             $isGuestLikeGroup = $normalizedRoleSlug === 'guest' || $normalizedRoleSlug === 'validating';
             $isBannedGroup = $normalizedRoleSlug === 'banned';
@@ -296,7 +223,7 @@ final class AppSchemaBuilder
 
             $update->execute([
                 ':slug' => $slug,
-                ':route_enabled' => $routeEnabled,
+                ':route' => $routeEnabled,
                 ':id' => $groupId,
             ]);
         }
@@ -304,32 +231,127 @@ final class AppSchemaBuilder
 
     public function ensurePageImageDisplayColumns(PDO $db, string $driver, string $prefix): void
     {
-        if ($driver === 'sqlite') {
-            $imagesTable = $this->tables->resolve($driver, $prefix, 'page_images');
-            if (!$this->introspector->appColumnExistsSqlite($db, $imagesTable, 'include_in_gallery')) {
-                $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN include_in_gallery INTEGER NOT NULL DEFAULT 1');
-            }
+        $this->migratePageImageStorage($db, $driver, $prefix);
+    }
 
-            $db->exec('UPDATE ' . $imagesTable . ' SET include_in_gallery = 1 WHERE include_in_gallery IS NULL');
+    public function migratePageImageStorage(PDO $db, string $driver, string $prefix): void
+    {
+        $imagesTable = $this->tables->resolve($driver, $prefix, 'page_images');
+        $variantsTable = $this->tables->resolve($driver, $prefix, 'page_image_variants');
+        $pagesTable = $this->tables->resolve($driver, $prefix, 'pages');
+
+        if ($driver === 'sqlite') {
+            $this->migratePageImageStorageSqlite($db, $pagesTable, $imagesTable, $variantsTable);
             return;
         }
-
-        $imagesTable = $prefix . 'page_images';
 
         if ($driver === 'mysql') {
-            if (!$this->introspector->appColumnExistsMySql($db, $imagesTable, 'include_in_gallery')) {
-                $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN include_in_gallery TINYINT(1) NOT NULL DEFAULT 1');
+            $this->renameColumnIfNeededMySql($db, $imagesTable, 'page_id', 'page', 'BIGINT UNSIGNED NOT NULL');
+            $this->renameColumnIfNeededMySql($db, $imagesTable, 'hash_sha256', 'hash', 'CHAR(64) NOT NULL');
+            $this->renameColumnIfNeededMySql($db, $imagesTable, 'created_at', 'created', 'DATETIME NOT NULL');
+            $this->renameColumnIfNeededMySql($db, $imagesTable, 'updated_at', 'updated', 'DATETIME NOT NULL');
+            if ($this->introspector->appColumnExistsMySql($db, $imagesTable, 'is_cover')) {
+                $db->exec('ALTER TABLE ' . $imagesTable . ' DROP COLUMN is_cover');
             }
-
-            $db->exec('UPDATE ' . $imagesTable . ' SET include_in_gallery = 1 WHERE include_in_gallery IS NULL');
+            if ($this->introspector->appColumnExistsMySql($db, $imagesTable, 'is_preview')) {
+                $db->exec('ALTER TABLE ' . $imagesTable . ' DROP COLUMN is_preview');
+            }
+            $this->renameColumnIfNeededMySql($db, $variantsTable, 'image_id', 'image', 'BIGINT UNSIGNED NOT NULL');
+            $this->renameColumnIfNeededMySql($db, $variantsTable, 'created_at', 'created', 'DATETIME NOT NULL');
             return;
         }
 
-        if (!$this->introspector->appColumnExistsPgSql($db, $imagesTable, 'include_in_gallery')) {
-            $db->exec('ALTER TABLE ' . $imagesTable . ' ADD COLUMN include_in_gallery SMALLINT NOT NULL DEFAULT 1');
+        $this->renameColumnIfNeededPgSql($db, $imagesTable, 'page_id', 'page');
+        $this->renameColumnIfNeededPgSql($db, $imagesTable, 'hash_sha256', 'hash');
+        $this->renameColumnIfNeededPgSql($db, $imagesTable, 'created_at', 'created');
+        $this->renameColumnIfNeededPgSql($db, $imagesTable, 'updated_at', 'updated');
+        if ($this->introspector->appColumnExistsPgSql($db, $imagesTable, 'is_cover')) {
+            $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($imagesTable) . ' DROP COLUMN is_cover');
+        }
+        if ($this->introspector->appColumnExistsPgSql($db, $imagesTable, 'is_preview')) {
+            $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($imagesTable) . ' DROP COLUMN is_preview');
+        }
+        $this->renameColumnIfNeededPgSql($db, $variantsTable, 'image_id', 'image');
+        $this->renameColumnIfNeededPgSql($db, $variantsTable, 'created_at', 'created');
+    }
+
+    public function migratePageTaxonomyPivots(PDO $db, string $driver, string $prefix): void
+    {
+        if ($driver === 'sqlite') {
+            $this->migratePagePivotSqlite($db, $this->tables->resolve($driver, $prefix, 'page_categories'), 'category');
+            $this->migratePagePivotSqlite($db, $this->tables->resolve($driver, $prefix, 'page_tags'), 'tag');
+            return;
         }
 
-        $db->exec('UPDATE ' . $imagesTable . ' SET include_in_gallery = 1 WHERE include_in_gallery IS NULL');
+        if ($driver === 'mysql') {
+            $this->renameColumnIfNeededMySql($db, $prefix . 'page_categories', 'page_id', 'page', 'BIGINT UNSIGNED NOT NULL');
+            $this->renameColumnIfNeededMySql($db, $prefix . 'page_categories', 'category_id', 'category', 'BIGINT UNSIGNED NOT NULL');
+            $this->renameColumnIfNeededMySql($db, $prefix . 'page_tags', 'page_id', 'page', 'BIGINT UNSIGNED NOT NULL');
+            $this->renameColumnIfNeededMySql($db, $prefix . 'page_tags', 'tag_id', 'tag', 'BIGINT UNSIGNED NOT NULL');
+            return;
+        }
+
+        $this->renameColumnIfNeededPgSql($db, $prefix . 'page_categories', 'page_id', 'page');
+        $this->renameColumnIfNeededPgSql($db, $prefix . 'page_categories', 'category_id', 'category');
+        $this->renameColumnIfNeededPgSql($db, $prefix . 'page_tags', 'page_id', 'page');
+        $this->renameColumnIfNeededPgSql($db, $prefix . 'page_tags', 'tag_id', 'tag');
+    }
+
+    public function migrateLoginFailureStorage(PDO $db, string $driver, string $prefix): void
+    {
+        $table = $prefix . 'users_failures';
+        $legacyTable = $prefix . 'login_failures';
+
+        if ($driver === 'sqlite') {
+            $this->migrateLoginFailureStorageSqlite($db, $table, $legacyTable);
+            return;
+        }
+
+        if ($driver === 'mysql') {
+            if ($this->tableExistsMySql($db, $legacyTable) && !$this->tableExistsMySql($db, $table)) {
+                $db->exec('RENAME TABLE ' . $legacyTable . ' TO ' . $table);
+            }
+
+            $this->renameLoginFailureColumnsMySql($db, $table);
+            return;
+        }
+
+        if ($this->tableExistsPgSql($db, $legacyTable) && !$this->tableExistsPgSql($db, $table)) {
+            $db->exec(
+                'ALTER TABLE ' . $this->introspector->quotePgIdentifier($legacyTable) . '
+                 RENAME TO ' . $this->introspector->quotePgIdentifier($table)
+            );
+        }
+
+        $this->renameLoginFailureColumnsPgSql($db, $table);
+    }
+
+    public function migrateUserGroupPivot(PDO $db, string $driver, string $prefix): void
+    {
+        $table = $prefix . 'user_groups';
+
+        if ($driver === 'sqlite') {
+            $this->migrateUserGroupPivotSqlite($db, $table);
+            return;
+        }
+
+        if ($driver === 'mysql') {
+            if ($this->introspector->appColumnExistsMySql($db, $table, 'user_id') && !$this->introspector->appColumnExistsMySql($db, $table, 'user')) {
+                $db->exec('ALTER TABLE ' . $table . ' CHANGE user_id user BIGINT UNSIGNED NOT NULL');
+            }
+            if ($this->introspector->appColumnExistsMySql($db, $table, 'group_id') && !$this->introspector->appColumnExistsMySql($db, $table, 'group')) {
+                $db->exec('ALTER TABLE ' . $table . ' CHANGE group_id `group` BIGINT UNSIGNED NOT NULL');
+            }
+            return;
+        }
+
+        $quoted = $this->introspector->quotePgIdentifier($table);
+        if ($this->introspector->appColumnExistsPgSql($db, $table, 'user_id') && !$this->introspector->appColumnExistsPgSql($db, $table, 'user')) {
+            $db->exec('ALTER TABLE ' . $quoted . ' RENAME COLUMN user_id TO "user"');
+        }
+        if ($this->introspector->appColumnExistsPgSql($db, $table, 'group_id') && !$this->introspector->appColumnExistsPgSql($db, $table, 'group')) {
+            $db->exec('ALTER TABLE ' . $quoted . ' RENAME COLUMN group_id TO "group"');
+        }
     }
 
     public function ensureTaxonomyImageColumns(PDO $db, string $driver, string $prefix): void
@@ -476,9 +498,13 @@ final class AppSchemaBuilder
             $pageTagsTable = $this->tables->resolve($driver, $prefix, 'page_tags');
             $userGroupsTable = $this->tables->resolve($driver, $prefix, 'user_groups');
             $redirectsTable = $this->tables->resolve($driver, $prefix, 'redirects');
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pageCategoriesTable . '_category_id ON ' . $pageCategoriesTable . ' (category_id, page_id)');
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pageTagsTable . '_tag_id ON ' . $pageTagsTable . ' (tag_id, page_id)');
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $userGroupsTable . '_group_id ON ' . $userGroupsTable . ' (group_id, user_id)');
+            $pageCategoryColumn = $this->introspector->appColumnExistsSqlite($db, $pageCategoriesTable, 'category') ? 'category' : 'category_id';
+            $pageTagColumn = $this->introspector->appColumnExistsSqlite($db, $pageTagsTable, 'tag') ? 'tag' : 'tag_id';
+            $pagePivotColumn = $this->introspector->appColumnExistsSqlite($db, $pageCategoriesTable, 'page') ? 'page' : 'page_id';
+            $tagPivotPageColumn = $this->introspector->appColumnExistsSqlite($db, $pageTagsTable, 'page') ? 'page' : 'page_id';
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pageCategoriesTable . '_category ON ' . $pageCategoriesTable . ' (' . $pageCategoryColumn . ', ' . $pagePivotColumn . ')');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pageTagsTable . '_tag ON ' . $pageTagsTable . ' (' . $pageTagColumn . ', ' . $tagPivotPageColumn . ')');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $userGroupsTable . '_group_id ON ' . $userGroupsTable . ' ("group", user)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $redirectsTable . '_lookup ON ' . $redirectsTable . ' (slug, channel, active)');
             return;
         }
@@ -489,22 +515,26 @@ final class AppSchemaBuilder
         $redirectsTable = $prefix . 'redirects';
 
         if ($driver === 'mysql') {
-            if (!$this->introspector->mySqlIndexExists($db, $pageCategoriesTable, 'idx_' . $prefix . 'page_categories_category_id')) {
+            $pageCategoryColumn = $this->introspector->appColumnExistsMySql($db, $pageCategoriesTable, 'category') ? 'category' : 'category_id';
+            $pageTagColumn = $this->introspector->appColumnExistsMySql($db, $pageTagsTable, 'tag') ? 'tag' : 'tag_id';
+            $pagePivotColumn = $this->introspector->appColumnExistsMySql($db, $pageCategoriesTable, 'page') ? 'page' : 'page_id';
+            $tagPivotPageColumn = $this->introspector->appColumnExistsMySql($db, $pageTagsTable, 'page') ? 'page' : 'page_id';
+            if (!$this->introspector->mySqlIndexExists($db, $pageCategoriesTable, 'idx_' . $prefix . 'page_categories_category')) {
                 $db->exec(
                     'ALTER TABLE ' . $pageCategoriesTable . '
-                     ADD INDEX idx_' . $prefix . 'page_categories_category_id (category_id, page_id)'
+                     ADD INDEX idx_' . $prefix . 'page_categories_category (' . $pageCategoryColumn . ', ' . $pagePivotColumn . ')'
                 );
             }
-            if (!$this->introspector->mySqlIndexExists($db, $pageTagsTable, 'idx_' . $prefix . 'page_tags_tag_id')) {
+            if (!$this->introspector->mySqlIndexExists($db, $pageTagsTable, 'idx_' . $prefix . 'page_tags_tag')) {
                 $db->exec(
                     'ALTER TABLE ' . $pageTagsTable . '
-                     ADD INDEX idx_' . $prefix . 'page_tags_tag_id (tag_id, page_id)'
+                     ADD INDEX idx_' . $prefix . 'page_tags_tag (' . $pageTagColumn . ', ' . $tagPivotPageColumn . ')'
                 );
             }
             if (!$this->introspector->mySqlIndexExists($db, $userGroupsTable, 'idx_' . $prefix . 'user_groups_group_id')) {
                 $db->exec(
                     'ALTER TABLE ' . $userGroupsTable . '
-                     ADD INDEX idx_' . $prefix . 'user_groups_group_id (group_id, user_id)'
+                     ADD INDEX idx_' . $prefix . 'user_groups_group_id (`group`, user)'
                 );
             }
             if (!$this->introspector->mySqlIndexExists($db, $redirectsTable, 'idx_' . $prefix . 'redirects_lookup')) {
@@ -517,22 +547,26 @@ final class AppSchemaBuilder
             return;
         }
 
-        if (!$this->introspector->pgSqlIndexExists($db, $pageCategoriesTable, 'idx_' . $prefix . 'page_categories_category_id')) {
+        $pageCategoryColumn = $this->introspector->appColumnExistsPgSql($db, $pageCategoriesTable, 'category') ? 'category' : 'category_id';
+        $pageTagColumn = $this->introspector->appColumnExistsPgSql($db, $pageTagsTable, 'tag') ? 'tag' : 'tag_id';
+        $pagePivotColumn = $this->introspector->appColumnExistsPgSql($db, $pageCategoriesTable, 'page') ? 'page' : 'page_id';
+        $tagPivotPageColumn = $this->introspector->appColumnExistsPgSql($db, $pageTagsTable, 'page') ? 'page' : 'page_id';
+        if (!$this->introspector->pgSqlIndexExists($db, $pageCategoriesTable, 'idx_' . $prefix . 'page_categories_category')) {
             $db->exec(
-                'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'page_categories_category_id
-                 ON ' . $this->introspector->quotePgIdentifier($pageCategoriesTable) . ' (category_id, page_id)'
+                'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'page_categories_category
+                 ON ' . $this->introspector->quotePgIdentifier($pageCategoriesTable) . ' (' . $pageCategoryColumn . ', ' . $pagePivotColumn . ')'
             );
         }
-        if (!$this->introspector->pgSqlIndexExists($db, $pageTagsTable, 'idx_' . $prefix . 'page_tags_tag_id')) {
+        if (!$this->introspector->pgSqlIndexExists($db, $pageTagsTable, 'idx_' . $prefix . 'page_tags_tag')) {
             $db->exec(
-                'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'page_tags_tag_id
-                 ON ' . $this->introspector->quotePgIdentifier($pageTagsTable) . ' (tag_id, page_id)'
+                'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'page_tags_tag
+                 ON ' . $this->introspector->quotePgIdentifier($pageTagsTable) . ' (' . $pageTagColumn . ', ' . $tagPivotPageColumn . ')'
             );
         }
         if (!$this->introspector->pgSqlIndexExists($db, $userGroupsTable, 'idx_' . $prefix . 'user_groups_group_id')) {
             $db->exec(
                 'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'user_groups_group_id
-                 ON ' . $this->introspector->quotePgIdentifier($userGroupsTable) . ' (group_id, user_id)'
+                 ON ' . $this->introspector->quotePgIdentifier($userGroupsTable) . ' ("group", "user")'
             );
         }
         if (!$this->introspector->pgSqlIndexExists($db, $redirectsTable, 'idx_' . $prefix . 'redirects_lookup')) {
@@ -560,17 +594,67 @@ final class AppSchemaBuilder
         $this->migrateRedirectColumnsStandard($db, $driver, $redirectsTable);
     }
 
-    private function ensurePageSlugScopeUniquenessSqlite(PDO $db, string $pagesTable): void
+    private function pageStorageIsModernSqlite(PDO $db, string $pagesTable): bool
     {
-        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_created_at ON ' . $pagesTable . ' (created_at DESC)');
-        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_id ON ' . $pagesTable . ' (channel_id)');
-        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_root_slug_unique ON ' . $pagesTable . ' (slug) WHERE channel_id IS NULL OR channel_id = 0');
-        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_slug_unique ON ' . $pagesTable . ' (channel_id, slug) WHERE channel_id IS NOT NULL AND channel_id <> 0');
+        $required = ['slug', 'title', 'description', 'channel', 'content', 'display_title', 'published', 'author', 'cover_image', 'preview_image', 'created', 'updated'];
+        foreach ($required as $column) {
+            if (!$this->introspector->appColumnExistsSqlite($db, $pagesTable, $column)) {
+                return false;
+            }
+        }
+
+        foreach (['extended', 'published_at', 'gallery_enabled', 'channel_id', 'is_published', 'author_user_id', 'created_at', 'updated_at'] as $legacyColumn) {
+            if ($this->introspector->appColumnExistsSqlite($db, $pagesTable, $legacyColumn)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function pageChannelColumn(PDO $db, string $driver, string $pagesTable): string
+    {
+        if ($driver === 'sqlite') {
+            return $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'channel') ? 'channel' : 'channel_id';
+        }
+
+        if ($driver === 'mysql') {
+            return $this->introspector->appColumnExistsMySql($db, $pagesTable, 'channel') ? 'channel' : 'channel_id';
+        }
+
+        return $this->introspector->appColumnExistsPgSql($db, $pagesTable, 'channel') ? 'channel' : 'channel_id';
+    }
+
+    private function ensurePageSlugScopeUniquenessSqlite(PDO $db, string $pagesTable, string $channelColumn = 'channel'): void
+    {
+        $createdColumn = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'created') ? 'created' : 'created_at';
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_created ON ' . $pagesTable . ' (' . $createdColumn . ' DESC)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel ON ' . $pagesTable . ' (' . $channelColumn . ')');
+        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_root_slug_unique ON ' . $pagesTable . ' (slug) WHERE ' . $channelColumn . ' IS NULL OR ' . $channelColumn . ' = 0');
+        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_slug_unique ON ' . $pagesTable . ' (' . $channelColumn . ', slug) WHERE ' . $channelColumn . ' IS NOT NULL AND ' . $channelColumn . ' <> 0');
     }
 
     private function migratePageContentStorageSqlite(PDO $db, string $pagesTable): void
     {
         $tmpTable = $pagesTable . '__content_migration';
+        $hasExtended = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'extended');
+        $hasChannel = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'channel');
+        $hasPublished = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'published');
+        $hasAuthor = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'author');
+        $hasCoverImage = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'cover_image');
+        $hasPreviewImage = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'preview_image');
+        $hasCreated = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'created');
+        $hasUpdated = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'updated');
+        $contentExpr = $hasExtended
+            ? 'CASE WHEN TRIM(COALESCE(extended, \'\')) <> \'\' THEN extended ELSE content END'
+            : 'content';
+        $channelExpr = $hasChannel ? 'COALESCE(channel, 0)' : 'COALESCE(channel_id, 0)';
+        $publishedExpr = $hasPublished ? 'COALESCE(published, 1)' : 'COALESCE(is_published, 1)';
+        $authorExpr = $hasAuthor ? 'author' : 'author_user_id';
+        $coverExpr = $hasCoverImage ? 'cover_image' : 'NULL';
+        $previewExpr = $hasPreviewImage ? 'preview_image' : $coverExpr;
+        $createdExpr = $hasCreated ? 'created' : 'created_at';
+        $updatedExpr = $hasUpdated ? 'updated' : ($this->introspector->appColumnExistsSqlite($db, $pagesTable, 'updated_at') ? 'updated_at' : $createdExpr);
 
         $db->beginTransaction();
 
@@ -578,54 +662,52 @@ final class AppSchemaBuilder
             $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
             $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_published_at');
             $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_created_at');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_created');
             $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_channel_id');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_channel');
             $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_root_slug_unique');
             $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_channel_slug_unique');
 
             $db->exec('CREATE TABLE ' . $tmpTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
                 slug TEXT NOT NULL,
-                content TEXT NOT NULL DEFAULT \'\',
+                title TEXT NOT NULL,
                 description TEXT NULL,
+                channel INTEGER NOT NULL DEFAULT 0,
+                content TEXT NOT NULL DEFAULT \'\',
                 display_title INTEGER NOT NULL DEFAULT 1,
-                gallery_enabled INTEGER NOT NULL DEFAULT 0,
-                channel_id INTEGER NULL,
-                is_published INTEGER NOT NULL DEFAULT 1,
-                author_user_id INTEGER NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                published INTEGER NOT NULL DEFAULT 1,
+                author INTEGER NULL,
+                cover_image INTEGER NULL,
+                preview_image INTEGER NULL,
+                created TEXT NOT NULL,
+                updated TEXT NOT NULL
             )');
-
-            $hasExtended = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'extended');
-            $contentExpr = $hasExtended
-                ? 'CASE WHEN TRIM(COALESCE(extended, \'\')) <> \'\' THEN extended ELSE content END'
-                : 'content';
 
             $db->exec(
                 'INSERT INTO ' . $tmpTable . ' (
-                    id, title, slug, content, description, display_title, gallery_enabled, channel_id, is_published, author_user_id, created_at, updated_at
+                    id, slug, title, description, channel, content, display_title, published, author, cover_image, preview_image, created, updated
                  )
                  SELECT
                     id,
-                    title,
                     slug,
-                    ' . $contentExpr . ',
+                    title,
                     description,
+                    ' . $channelExpr . ',
+                    ' . $contentExpr . ',
                     COALESCE(display_title, 1),
-                    COALESCE(gallery_enabled, 0),
-                    channel_id,
-                    COALESCE(is_published, 1),
-                    author_user_id,
-                    created_at,
-                    updated_at
+                    ' . $publishedExpr . ',
+                    ' . $authorExpr . ',
+                    ' . $coverExpr . ',
+                    ' . $previewExpr . ',
+                    ' . $createdExpr . ',
+                    ' . $updatedExpr . '
                  FROM ' . $pagesTable
             );
 
             $db->exec('DROP TABLE ' . $pagesTable);
             $db->exec('ALTER TABLE ' . $tmpTable . ' RENAME TO ' . $pagesTable);
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_created_at ON ' . $pagesTable . ' (created_at DESC)');
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_id ON ' . $pagesTable . ' (channel_id)');
+            $this->ensurePageSlugScopeUniquenessSqlite($db, $pagesTable, 'channel');
 
             $db->commit();
         } catch (\Throwable $exception) {
@@ -636,6 +718,598 @@ final class AppSchemaBuilder
             $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
             throw $exception;
         }
+    }
+
+    private function migratePageContentStorageMySql(PDO $db, string $pagesTable): void
+    {
+        if ($this->introspector->appColumnExistsMySql($db, $pagesTable, 'extended')) {
+            $db->exec(
+                'UPDATE ' . $pagesTable . '
+                 SET content = CASE
+                    WHEN TRIM(COALESCE(extended, \'\')) <> \'\' THEN extended
+                    ELSE content
+                 END'
+            );
+            $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN extended');
+        }
+        $this->renameColumnIfNeededMySql($db, $pagesTable, 'channel_id', 'channel', 'BIGINT UNSIGNED NOT NULL DEFAULT 0');
+        $this->renameColumnIfNeededMySql($db, $pagesTable, 'is_published', 'published', 'TINYINT(1) NOT NULL DEFAULT 1');
+        $this->renameColumnIfNeededMySql($db, $pagesTable, 'author_user_id', 'author', 'BIGINT UNSIGNED NULL');
+        $this->renameColumnIfNeededMySql($db, $pagesTable, 'created_at', 'created', 'DATETIME NOT NULL');
+        $this->renameColumnIfNeededMySql($db, $pagesTable, 'updated_at', 'updated', 'DATETIME NOT NULL');
+        if (!$this->introspector->appColumnExistsMySql($db, $pagesTable, 'cover_image')) {
+            $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN cover_image BIGINT UNSIGNED NULL');
+        }
+        if (!$this->introspector->appColumnExistsMySql($db, $pagesTable, 'preview_image')) {
+            $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN preview_image BIGINT UNSIGNED NULL');
+        }
+        if ($this->introspector->appColumnExistsMySql($db, $pagesTable, 'gallery_enabled')) {
+            $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN gallery_enabled');
+        }
+        if ($this->introspector->appColumnExistsMySql($db, $pagesTable, 'published_at')) {
+            $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN published_at');
+        }
+    }
+
+    private function migratePageContentStoragePgSql(PDO $db, string $pagesTable): void
+    {
+        $quoted = $this->introspector->quotePgIdentifier($pagesTable);
+        if ($this->introspector->appColumnExistsPgSql($db, $pagesTable, 'extended')) {
+            $db->exec(
+                'UPDATE ' . $quoted . '
+                 SET content = CASE
+                    WHEN BTRIM(COALESCE(extended, \'\')) <> \'\' THEN extended
+                    ELSE content
+                 END'
+            );
+            $db->exec('ALTER TABLE ' . $quoted . ' DROP COLUMN extended');
+        }
+        $this->renameColumnIfNeededPgSql($db, $pagesTable, 'channel_id', 'channel');
+        $this->renameColumnIfNeededPgSql($db, $pagesTable, 'is_published', 'published');
+        $this->renameColumnIfNeededPgSql($db, $pagesTable, 'author_user_id', 'author');
+        $this->renameColumnIfNeededPgSql($db, $pagesTable, 'created_at', 'created');
+        $this->renameColumnIfNeededPgSql($db, $pagesTable, 'updated_at', 'updated');
+        if (!$this->introspector->appColumnExistsPgSql($db, $pagesTable, 'cover_image')) {
+            $db->exec('ALTER TABLE ' . $quoted . ' ADD COLUMN cover_image BIGINT NULL');
+        }
+        if (!$this->introspector->appColumnExistsPgSql($db, $pagesTable, 'preview_image')) {
+            $db->exec('ALTER TABLE ' . $quoted . ' ADD COLUMN preview_image BIGINT NULL');
+        }
+        if ($this->introspector->appColumnExistsPgSql($db, $pagesTable, 'gallery_enabled')) {
+            $db->exec('ALTER TABLE ' . $quoted . ' DROP COLUMN gallery_enabled');
+        }
+        if ($this->introspector->appColumnExistsPgSql($db, $pagesTable, 'published_at')) {
+            $db->exec('ALTER TABLE ' . $quoted . ' DROP COLUMN published_at');
+        }
+    }
+
+    private function migrateGroupStorageSqlite(PDO $db, string $groupsTable): void
+    {
+        $hasModern = $this->introspector->appColumnExistsSqlite($db, $groupsTable, 'route')
+            && $this->introspector->appColumnExistsSqlite($db, $groupsTable, 'permissions')
+            && $this->introspector->appColumnExistsSqlite($db, $groupsTable, 'description')
+            && $this->introspector->appColumnExistsSqlite($db, $groupsTable, 'created')
+            && $this->introspector->appColumnExistsSqlite($db, $groupsTable, 'updated')
+            && !$this->introspector->appColumnExistsSqlite($db, $groupsTable, 'route_enabled')
+            && !$this->introspector->appColumnExistsSqlite($db, $groupsTable, 'permission_mask')
+            && !$this->introspector->appColumnExistsSqlite($db, $groupsTable, 'is_stock')
+            && !$this->introspector->appColumnExistsSqlite($db, $groupsTable, 'created_at');
+        if ($hasModern) {
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $groupsTable . '_slug ON ' . $groupsTable . ' (slug)');
+            return;
+        }
+
+        $tmpTable = $groupsTable . '__routing';
+        $descriptionExpr = $this->introspector->appColumnExistsSqlite($db, $groupsTable, 'description') ? 'description' : 'NULL';
+        $routeExpr = $this->introspector->appColumnExistsSqlite($db, $groupsTable, 'route') ? 'route' : 'COALESCE(route_enabled, 0)';
+        $permissionsExpr = $this->introspector->appColumnExistsSqlite($db, $groupsTable, 'permissions') ? 'permissions' : 'COALESCE(permission_mask, 0)';
+        $coverExpr = $this->introspector->appColumnExistsSqlite($db, $groupsTable, 'cover_image') ? 'cover_image' : 'NULL';
+        $createdExpr = $this->introspector->appColumnExistsSqlite($db, $groupsTable, 'created') ? 'created' : 'created_at';
+        $updatedExpr = $this->introspector->appColumnExistsSqlite($db, $groupsTable, 'updated') ? 'updated' : $createdExpr;
+
+        $db->beginTransaction();
+        try {
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            $db->exec('DROP INDEX IF EXISTS idx_' . $groupsTable . '_slug');
+            $db->exec('CREATE TABLE ' . $tmpTable . ' (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                slug TEXT NOT NULL,
+                name TEXT NOT NULL UNIQUE,
+                description TEXT NULL,
+                route INTEGER NOT NULL DEFAULT 0,
+                permissions INTEGER NOT NULL DEFAULT 0,
+                cover_image TEXT NULL,
+                created TEXT NOT NULL,
+                updated TEXT NOT NULL
+            )');
+            $db->exec(
+                'INSERT INTO ' . $tmpTable . ' (
+                    id, slug, name, description, route, permissions, cover_image, created, updated
+                 )
+                 SELECT
+                    id,
+                    slug,
+                    name,
+                    ' . $descriptionExpr . ',
+                    ' . $routeExpr . ',
+                    ' . $permissionsExpr . ',
+                    ' . $coverExpr . ',
+                    ' . $createdExpr . ',
+                    ' . $updatedExpr . '
+                 FROM ' . $groupsTable
+            );
+            $db->exec('DROP TABLE ' . $groupsTable);
+            $db->exec('ALTER TABLE ' . $tmpTable . ' RENAME TO ' . $groupsTable);
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $groupsTable . '_slug ON ' . $groupsTable . ' (slug)');
+            $db->commit();
+        } catch (\Throwable $exception) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            throw $exception;
+        }
+    }
+
+    private function migrateGroupStorageMySql(PDO $db, string $groupsTable, string $prefix): void
+    {
+        if (!$this->introspector->appColumnExistsMySql($db, $groupsTable, 'description')) {
+            $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN description TEXT NULL AFTER name');
+        }
+        $this->renameColumnIfNeededMySql($db, $groupsTable, 'route_enabled', 'route', 'TINYINT(1) NOT NULL DEFAULT 0');
+        $this->renameColumnIfNeededMySql($db, $groupsTable, 'permission_mask', 'permissions', 'BIGINT UNSIGNED NOT NULL DEFAULT 0');
+        $this->renameColumnIfNeededMySql($db, $groupsTable, 'created_at', 'created', 'DATETIME NOT NULL');
+        if (!$this->introspector->appColumnExistsMySql($db, $groupsTable, 'cover_image')) {
+            $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN cover_image VARCHAR(255) NULL');
+        }
+        if (!$this->introspector->appColumnExistsMySql($db, $groupsTable, 'updated')) {
+            $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN updated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+        }
+        if ($this->introspector->appColumnExistsMySql($db, $groupsTable, 'is_stock')) {
+            $db->exec('ALTER TABLE ' . $groupsTable . ' DROP COLUMN is_stock');
+        }
+        if (!$this->introspector->mySqlIndexExists($db, $groupsTable, 'idx_' . $prefix . 'groups_slug')) {
+            $db->exec('ALTER TABLE ' . $groupsTable . ' ADD INDEX idx_' . $prefix . 'groups_slug (slug)');
+        }
+    }
+
+    private function migrateGroupStoragePgSql(PDO $db, string $groupsTable, string $prefix): void
+    {
+        $quoted = $this->introspector->quotePgIdentifier($groupsTable);
+        if (!$this->introspector->appColumnExistsPgSql($db, $groupsTable, 'description')) {
+            $db->exec('ALTER TABLE ' . $quoted . ' ADD COLUMN description TEXT NULL');
+        }
+        $this->renameColumnIfNeededPgSql($db, $groupsTable, 'route_enabled', 'route');
+        $this->renameColumnIfNeededPgSql($db, $groupsTable, 'permission_mask', 'permissions');
+        $this->renameColumnIfNeededPgSql($db, $groupsTable, 'created_at', 'created');
+        if (!$this->introspector->appColumnExistsPgSql($db, $groupsTable, 'cover_image')) {
+            $db->exec('ALTER TABLE ' . $quoted . ' ADD COLUMN cover_image VARCHAR(255) NULL');
+        }
+        if (!$this->introspector->appColumnExistsPgSql($db, $groupsTable, 'updated')) {
+            $db->exec('ALTER TABLE ' . $quoted . ' ADD COLUMN updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP');
+        }
+        if ($this->introspector->appColumnExistsPgSql($db, $groupsTable, 'is_stock')) {
+            $db->exec('ALTER TABLE ' . $quoted . ' DROP COLUMN is_stock');
+        }
+        if (!$this->introspector->pgSqlIndexExists($db, $groupsTable, 'idx_' . $prefix . 'groups_slug')) {
+            $db->exec('CREATE INDEX idx_' . $prefix . 'groups_slug ON ' . $quoted . ' (slug)');
+        }
+    }
+
+    private function renameColumnIfNeededMySql(PDO $db, string $table, string $old, string $new, string $definition): void
+    {
+        if ($this->introspector->appColumnExistsMySql($db, $table, $old) && !$this->introspector->appColumnExistsMySql($db, $table, $new)) {
+            $db->exec('ALTER TABLE ' . $table . ' CHANGE ' . $old . ' ' . $new . ' ' . $definition);
+        }
+    }
+
+    private function renameColumnIfNeededPgSql(PDO $db, string $table, string $old, string $new): void
+    {
+        if ($this->introspector->appColumnExistsPgSql($db, $table, $old) && !$this->introspector->appColumnExistsPgSql($db, $table, $new)) {
+            $db->exec(
+                'ALTER TABLE ' . $this->introspector->quotePgIdentifier($table) . '
+                 RENAME COLUMN ' . $this->introspector->quotePgIdentifier($old) . ' TO ' . $this->introspector->quotePgIdentifier($new)
+            );
+        }
+    }
+
+    private function migratePageImageStorageSqlite(PDO $db, string $pagesTable, string $imagesTable, string $variantsTable): void
+    {
+        $imageTableModern = $this->introspector->appColumnExistsSqlite($db, $imagesTable, 'page')
+            && $this->introspector->appColumnExistsSqlite($db, $imagesTable, 'hash')
+            && $this->introspector->appColumnExistsSqlite($db, $imagesTable, 'created')
+            && $this->introspector->appColumnExistsSqlite($db, $imagesTable, 'updated')
+            && !$this->introspector->appColumnExistsSqlite($db, $imagesTable, 'page_id')
+            && !$this->introspector->appColumnExistsSqlite($db, $imagesTable, 'hash_sha256')
+            && !$this->introspector->appColumnExistsSqlite($db, $imagesTable, 'is_cover')
+            && !$this->introspector->appColumnExistsSqlite($db, $imagesTable, 'is_preview');
+        $variantTableModern = $this->introspector->appColumnExistsSqlite($db, $variantsTable, 'image')
+            && $this->introspector->appColumnExistsSqlite($db, $variantsTable, 'created')
+            && !$this->introspector->appColumnExistsSqlite($db, $variantsTable, 'image_id')
+            && !$this->introspector->appColumnExistsSqlite($db, $variantsTable, 'created_at');
+        if ($imageTableModern && $variantTableModern) {
+            return;
+        }
+
+        $tmpImagesTable = $imagesTable . '__migrate';
+        $tmpVariantsTable = $variantsTable . '__migrate';
+        $pageExpr = $this->introspector->appColumnExistsSqlite($db, $imagesTable, 'page') ? 'page' : 'page_id';
+        $hashExpr = $this->introspector->appColumnExistsSqlite($db, $imagesTable, 'hash') ? 'hash' : 'hash_sha256';
+        $createdExpr = $this->introspector->appColumnExistsSqlite($db, $imagesTable, 'created') ? 'created' : 'created_at';
+        $updatedExpr = $this->introspector->appColumnExistsSqlite($db, $imagesTable, 'updated') ? 'updated' : ($this->introspector->appColumnExistsSqlite($db, $imagesTable, 'updated_at') ? 'updated_at' : $createdExpr);
+        $hasPreviewFlag = $this->introspector->appColumnExistsSqlite($db, $imagesTable, 'is_preview');
+        $variantImageExpr = $this->introspector->appColumnExistsSqlite($db, $variantsTable, 'image') ? 'image' : 'image_id';
+        $variantCreatedExpr = $this->introspector->appColumnExistsSqlite($db, $variantsTable, 'created') ? 'created' : 'created_at';
+
+        $db->beginTransaction();
+        try {
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpImagesTable);
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpVariantsTable);
+            $db->exec('DROP INDEX IF EXISTS idx_' . $imagesTable . '_page_id');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $imagesTable . '_page');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $imagesTable . '_sort_order');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $variantsTable . '_image_id');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $variantsTable . '_image');
+
+            $db->exec('CREATE TABLE ' . $tmpImagesTable . ' (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                page INTEGER NOT NULL,
+                storage_target TEXT NOT NULL DEFAULT \'local\',
+                original_filename TEXT NOT NULL,
+                stored_filename TEXT NOT NULL,
+                stored_path TEXT NOT NULL,
+                mime_type TEXT NOT NULL,
+                extension TEXT NOT NULL,
+                byte_size INTEGER NOT NULL DEFAULT 0,
+                width INTEGER NOT NULL DEFAULT 0,
+                height INTEGER NOT NULL DEFAULT 0,
+                hash TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT \'ready\',
+                sort_order INTEGER NOT NULL DEFAULT 1,
+                include_in_gallery INTEGER NOT NULL DEFAULT 1,
+                alt_text TEXT NULL,
+                title_text TEXT NULL,
+                caption TEXT NULL,
+                credit TEXT NULL,
+                license TEXT NULL,
+                focal_x REAL NULL,
+                focal_y REAL NULL,
+                created TEXT NOT NULL,
+                updated TEXT NOT NULL
+            )');
+            $db->exec(
+                'INSERT INTO ' . $tmpImagesTable . ' (
+                    id, page, storage_target, original_filename, stored_filename, stored_path,
+                    mime_type, extension, byte_size, width, height, hash,
+                    status, sort_order, include_in_gallery, alt_text, title_text, caption, credit, license,
+                    focal_x, focal_y, created, updated
+                 )
+                 SELECT
+                    id,
+                    ' . $pageExpr . ',
+                    storage_target,
+                    original_filename,
+                    stored_filename,
+                    stored_path,
+                    mime_type,
+                    extension,
+                    byte_size,
+                    width,
+                    height,
+                    ' . $hashExpr . ',
+                    status,
+                    sort_order,
+                    COALESCE(include_in_gallery, 1),
+                    alt_text,
+                    title_text,
+                    caption,
+                    credit,
+                    license,
+                    focal_x,
+                    focal_y,
+                    ' . $createdExpr . ',
+                    ' . $updatedExpr . '
+                 FROM ' . $imagesTable
+            );
+
+            $db->exec('CREATE TABLE ' . $tmpVariantsTable . ' (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                image INTEGER NOT NULL,
+                variant_key TEXT NOT NULL,
+                stored_filename TEXT NOT NULL,
+                stored_path TEXT NOT NULL,
+                mime_type TEXT NOT NULL,
+                extension TEXT NOT NULL,
+                byte_size INTEGER NOT NULL DEFAULT 0,
+                width INTEGER NOT NULL DEFAULT 0,
+                height INTEGER NOT NULL DEFAULT 0,
+                created TEXT NOT NULL,
+                UNIQUE (image, variant_key)
+            )');
+            $db->exec(
+                'INSERT INTO ' . $tmpVariantsTable . ' (
+                    id, image, variant_key, stored_filename, stored_path,
+                    mime_type, extension, byte_size, width, height, created
+                 )
+                 SELECT
+                    id,
+                    ' . $variantImageExpr . ',
+                    variant_key,
+                    stored_filename,
+                    stored_path,
+                    mime_type,
+                    extension,
+                    byte_size,
+                    width,
+                    height,
+                    ' . $variantCreatedExpr . '
+                 FROM ' . $variantsTable
+            );
+
+            if ($this->introspector->appColumnExistsSqlite($db, $pagesTable, 'cover_image')) {
+                $db->exec(
+                    'UPDATE ' . $pagesTable . ' AS p
+                     SET cover_image = (
+                        SELECT src.id
+                        FROM ' . $imagesTable . ' src
+                        WHERE ' . $pageExpr . ' = p.id
+                          AND COALESCE(src.is_cover, 0) = 1
+                        ORDER BY src.sort_order ASC, src.id ASC
+                        LIMIT 1
+                     )'
+                );
+            }
+            if ($this->introspector->appColumnExistsSqlite($db, $pagesTable, 'preview_image')) {
+                $previewSelect = $hasPreviewFlag
+                    ? '(
+                        SELECT src.id
+                        FROM ' . $imagesTable . ' src
+                        WHERE ' . $pageExpr . ' = p.id
+                          AND COALESCE(src.is_preview, 0) = 1
+                        ORDER BY src.sort_order ASC, src.id ASC
+                        LIMIT 1
+                     )'
+                    : 'NULL';
+                $db->exec(
+                    'UPDATE ' . $pagesTable . ' AS p
+                     SET preview_image = COALESCE(
+                        ' . $previewSelect . ',
+                        cover_image
+                     )'
+                );
+            }
+
+            $db->exec('DROP TABLE ' . $variantsTable);
+            $db->exec('DROP TABLE ' . $imagesTable);
+            $db->exec('ALTER TABLE ' . $tmpImagesTable . ' RENAME TO ' . $imagesTable);
+            $db->exec('ALTER TABLE ' . $tmpVariantsTable . ' RENAME TO ' . $variantsTable);
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $imagesTable . '_page ON ' . $imagesTable . ' (page)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $imagesTable . '_sort_order ON ' . $imagesTable . ' (page, sort_order)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $variantsTable . '_image ON ' . $variantsTable . ' (image)');
+            $db->commit();
+        } catch (\Throwable $exception) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpImagesTable);
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpVariantsTable);
+            throw $exception;
+        }
+    }
+
+    private function migratePagePivotSqlite(PDO $db, string $table, string $secondaryColumn): void
+    {
+        $legacySecondary = $secondaryColumn . '_id';
+        $hasModern = $this->introspector->appColumnExistsSqlite($db, $table, 'page')
+            && $this->introspector->appColumnExistsSqlite($db, $table, $secondaryColumn)
+            && !$this->introspector->appColumnExistsSqlite($db, $table, 'page_id')
+            && !$this->introspector->appColumnExistsSqlite($db, $table, $legacySecondary);
+        if ($hasModern) {
+            return;
+        }
+
+        $tmpTable = $table . '__pivot';
+        $pageExpr = $this->introspector->appColumnExistsSqlite($db, $table, 'page') ? 'page' : 'page_id';
+        $secondaryExpr = $this->introspector->appColumnExistsSqlite($db, $table, $secondaryColumn) ? $secondaryColumn : $legacySecondary;
+
+        $db->beginTransaction();
+        try {
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            $db->exec('CREATE TABLE ' . $tmpTable . ' (
+                page INTEGER NOT NULL,
+                ' . $secondaryColumn . ' INTEGER NOT NULL,
+                PRIMARY KEY (page, ' . $secondaryColumn . ')
+            )');
+            $db->exec(
+                'INSERT INTO ' . $tmpTable . ' (page, ' . $secondaryColumn . ')
+                 SELECT ' . $pageExpr . ', ' . $secondaryExpr . '
+                 FROM ' . $table
+            );
+            $db->exec('DROP TABLE ' . $table);
+            $db->exec('ALTER TABLE ' . $tmpTable . ' RENAME TO ' . $table);
+            $db->commit();
+        } catch (\Throwable $exception) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            throw $exception;
+        }
+    }
+
+    private function migrateLoginFailureStorageSqlite(PDO $db, string $table, string $legacyTable): void
+    {
+        $hasNewColumns = $this->introspector->appColumnExistsSqlite($db, $table, 'user')
+            && $this->introspector->appColumnExistsSqlite($db, $table, 'first_failed')
+            && $this->introspector->appColumnExistsSqlite($db, $table, 'last_failed')
+            && $this->introspector->appColumnExistsSqlite($db, $table, 'created')
+            && $this->introspector->appColumnExistsSqlite($db, $table, 'updated');
+        $hasLegacyColumns = $this->introspector->appColumnExistsSqlite($db, $legacyTable, 'username_normalized')
+            || $this->introspector->appColumnExistsSqlite($db, $table, 'username_normalized');
+        if ($hasNewColumns && !$hasLegacyColumns) {
+            return;
+        }
+
+        $sourceTable = $this->introspector->appColumnExistsSqlite($db, $legacyTable, 'bucket_hash')
+            ? $legacyTable
+            : ($hasNewColumns ? $table : null);
+        if ($sourceTable === null) {
+            return;
+        }
+
+        $tmpTable = $table . '__migrate';
+        $db->beginTransaction();
+        try {
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            $db->exec('DROP INDEX IF EXISTS uniq_' . $legacyTable . '_bucket_hash');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $legacyTable . '_locked_until');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $legacyTable . '_last_failed_at');
+            $db->exec('DROP INDEX IF EXISTS uniq_' . $table . '_bucket_hash');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $table . '_locked_until');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $table . '_last_failed');
+            $db->exec('CREATE TABLE ' . $tmpTable . ' (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bucket_hash TEXT NOT NULL UNIQUE,
+                user TEXT NOT NULL,
+                ip_address TEXT NOT NULL,
+                first_failed INTEGER NOT NULL,
+                last_failed INTEGER NOT NULL,
+                failure_count INTEGER NOT NULL DEFAULT 0,
+                locked_until INTEGER NOT NULL DEFAULT 0,
+                created TEXT NOT NULL,
+                updated TEXT NOT NULL
+            )');
+            $db->exec(
+                'INSERT INTO ' . $tmpTable . ' (
+                    id, bucket_hash, user, ip_address, first_failed, last_failed, failure_count, locked_until, created, updated
+                 )
+                 SELECT
+                    id,
+                    bucket_hash,
+                    ' . ($this->introspector->appColumnExistsSqlite($db, $sourceTable, 'user') ? 'user' : 'username_normalized') . ',
+                    ip_address,
+                    ' . ($this->introspector->appColumnExistsSqlite($db, $sourceTable, 'first_failed') ? 'first_failed' : 'first_failed_at') . ',
+                    ' . ($this->introspector->appColumnExistsSqlite($db, $sourceTable, 'last_failed') ? 'last_failed' : 'last_failed_at') . ',
+                    failure_count,
+                    locked_until,
+                    ' . ($this->introspector->appColumnExistsSqlite($db, $sourceTable, 'created') ? 'created' : 'created_at') . ',
+                    ' . ($this->introspector->appColumnExistsSqlite($db, $sourceTable, 'updated') ? 'updated' : 'updated_at') . '
+                 FROM ' . $sourceTable
+            );
+
+            if ($sourceTable !== $table) {
+                $db->exec('DROP TABLE IF EXISTS ' . $table);
+            }
+            $db->exec('DROP TABLE ' . $sourceTable);
+            $db->exec('ALTER TABLE ' . $tmpTable . ' RENAME TO ' . $table);
+            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $table . '_bucket_hash ON ' . $table . ' (bucket_hash)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_locked_until ON ' . $table . ' (locked_until)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_last_failed ON ' . $table . ' (last_failed)');
+            $db->commit();
+        } catch (\Throwable $exception) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            throw $exception;
+        }
+    }
+
+    private function migrateUserGroupPivotSqlite(PDO $db, string $table): void
+    {
+        $hasNewColumns = $this->introspector->appColumnExistsSqlite($db, $table, 'user')
+            && $this->introspector->appColumnExistsSqlite($db, $table, 'group');
+        $hasLegacyColumns = $this->introspector->appColumnExistsSqlite($db, $table, 'user_id')
+            || $this->introspector->appColumnExistsSqlite($db, $table, 'group_id');
+        if ($hasNewColumns && !$hasLegacyColumns) {
+            return;
+        }
+
+        $tmpTable = $table . '__pivot';
+        $db->beginTransaction();
+        try {
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            $db->exec('CREATE TABLE ' . $tmpTable . ' (
+                user INTEGER NOT NULL,
+                "group" INTEGER NOT NULL,
+                PRIMARY KEY (user, "group")
+            )');
+            $db->exec(
+                'INSERT INTO ' . $tmpTable . ' (user, "group")
+                 SELECT
+                    ' . ($this->introspector->appColumnExistsSqlite($db, $table, 'user') ? 'user' : 'user_id') . ',
+                    ' . ($this->introspector->appColumnExistsSqlite($db, $table, 'group') ? '"group"' : 'group_id') . '
+                 FROM ' . $table
+            );
+            $db->exec('DROP TABLE ' . $table);
+            $db->exec('ALTER TABLE ' . $tmpTable . ' RENAME TO ' . $table);
+            $db->commit();
+        } catch (\Throwable $exception) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            throw $exception;
+        }
+    }
+
+    private function renameLoginFailureColumnsMySql(PDO $db, string $table): void
+    {
+        $renames = [
+            'username_normalized' => ['user', 'VARCHAR(100) NOT NULL'],
+            'first_failed_at' => ['first_failed', 'BIGINT UNSIGNED NOT NULL'],
+            'last_failed_at' => ['last_failed', 'BIGINT UNSIGNED NOT NULL'],
+            'created_at' => ['created', 'DATETIME NOT NULL'],
+            'updated_at' => ['updated', 'DATETIME NOT NULL'],
+        ];
+
+        foreach ($renames as $old => [$new, $definition]) {
+            if ($this->introspector->appColumnExistsMySql($db, $table, $old) && !$this->introspector->appColumnExistsMySql($db, $table, $new)) {
+                $db->exec('ALTER TABLE ' . $table . ' CHANGE ' . $old . ' ' . $new . ' ' . $definition);
+            }
+        }
+    }
+
+    private function renameLoginFailureColumnsPgSql(PDO $db, string $table): void
+    {
+        $quoted = $this->introspector->quotePgIdentifier($table);
+        $renames = [
+            'username_normalized' => 'user',
+            'first_failed_at' => 'first_failed',
+            'last_failed_at' => 'last_failed',
+            'created_at' => 'created',
+            'updated_at' => 'updated',
+        ];
+
+        foreach ($renames as $old => $new) {
+            if ($this->introspector->appColumnExistsPgSql($db, $table, $old) && !$this->introspector->appColumnExistsPgSql($db, $table, $new)) {
+                $db->exec('ALTER TABLE ' . $quoted . ' RENAME COLUMN ' . $old . ' TO ' . $new);
+            }
+        }
+    }
+
+    private function tableExistsMySql(PDO $db, string $table): bool
+    {
+        $stmt = $db->prepare(
+            'SELECT 1
+             FROM information_schema.tables
+             WHERE table_schema = DATABASE()
+               AND table_name = :table_name
+             LIMIT 1'
+        );
+        $stmt->execute([':table_name' => $table]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    private function tableExistsPgSql(PDO $db, string $table): bool
+    {
+        $stmt = $db->prepare('SELECT to_regclass(:table_name)');
+        $stmt->execute([':table_name' => $table]);
+
+        return $stmt->fetchColumn() !== null;
     }
 
     /**

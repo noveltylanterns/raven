@@ -50,10 +50,10 @@ final class TagRepository
                     COALESCE(pt.page_count, 0) AS page_count
              FROM ' . $tags . ' t
              LEFT JOIN (
-                 SELECT tag_id, COUNT(*) AS page_count
+                 SELECT tag, COUNT(*) AS page_count
                  FROM ' . $pageTags . '
-                 GROUP BY tag_id
-             ) pt ON pt.tag_id = t.id
+                 GROUP BY tag
+             ) pt ON pt.tag = t.id
              ORDER BY t.name ASC, t.id ASC'
         );
         // LEFT JOIN keeps tags with zero linked pages visible in admin listings.
@@ -100,10 +100,10 @@ final class TagRepository
                     COALESCE(pt.page_count, 0) AS page_count
              FROM ' . $tags . ' t
              LEFT JOIN (
-                 SELECT tag_id, COUNT(*) AS page_count
+                 SELECT tag, COUNT(*) AS page_count
                  FROM ' . $pageTags . '
-                 GROUP BY tag_id
-             ) pt ON pt.tag_id = t.id
+                 GROUP BY tag
+             ) pt ON pt.tag = t.id
              ' . $whereSql . '
              ORDER BY t.name ASC, t.id ASC
              LIMIT :limit OFFSET :offset'
@@ -151,10 +151,10 @@ final class TagRepository
                         COALESCE(pt.page_count, 0) AS page_count
                  FROM ' . $tags . ' t
                  LEFT JOIN (
-                     SELECT tag_id, COUNT(*) AS page_count
+                     SELECT tag, COUNT(*) AS page_count
                      FROM ' . $pageTags . '
-                     GROUP BY tag_id
-                 ) pt ON pt.tag_id = t.id
+                     GROUP BY tag
+                 ) pt ON pt.tag = t.id
                  ' . $whereSql . '
                  ORDER BY t.name ASC, t.id ASC
                  LIMIT :limit OFFSET :offset
@@ -379,9 +379,9 @@ final class TagRepository
         try {
             // Remove tag links before deleting the tag row.
             $detach = $this->db->prepare(
-                'DELETE FROM ' . $pageTags . ' WHERE tag_id = :tag_id'
+                'DELETE FROM ' . $pageTags . ' WHERE tag = :tag'
             );
-            $detach->execute([':tag_id' => $id]);
+            $detach->execute([':tag' => $id]);
 
             $delete = $this->db->prepare('DELETE FROM ' . $tags . ' WHERE id = :id');
             $delete->execute([':id' => $id]);

@@ -42,7 +42,7 @@ final class LoginThrottleService
             return true;
         }
 
-        $firstFailedAt = (int) ($row['first_failed_at'] ?? 0);
+        $firstFailedAt = (int) ($row['first_failed'] ?? 0);
         if ($firstFailedAt === 0 || ($now - $firstFailedAt) > $windowSeconds) {
             $this->deleteRow($bucketHash);
         }
@@ -68,7 +68,7 @@ final class LoginThrottleService
         $existing = $this->loadRow($bucketHash);
 
         $now = time();
-        $firstFailedAt = (int) ($existing['first_failed_at'] ?? 0);
+        $firstFailedAt = (int) ($existing['first_failed'] ?? 0);
         $failureCount = (int) ($existing['failure_count'] ?? 0);
 
         if ($firstFailedAt === 0 || ($now - $firstFailedAt) > $windowSeconds) {
@@ -101,12 +101,12 @@ final class LoginThrottleService
     }
 
     /**
-     * @return array{first_failed_at: int|string, failure_count: int|string, locked_until: int|string}|null
+     * @return array{first_failed: int|string, failure_count: int|string, locked_until: int|string}|null
      */
     private function loadRow(string $bucketHash): ?array
     {
         $stmt = $this->appDb->prepare(
-            'SELECT first_failed_at, failure_count, locked_until
+            'SELECT first_failed, failure_count, locked_until
              FROM ' . $this->tableName() . '
              WHERE bucket_hash = :bucket_hash
              LIMIT 1'
@@ -130,24 +130,24 @@ final class LoginThrottleService
         $nowText = gmdate('Y-m-d H:i:s');
         $params = [
             ':bucket_hash' => $bucketHash,
-            ':username_normalized' => $normalizedIdentifier,
+            ':user' => $normalizedIdentifier,
             ':ip_address' => $normalizedIp,
-            ':first_failed_at' => $firstFailedAt,
-            ':last_failed_at' => $lastFailedAt,
+            ':first_failed' => $firstFailedAt,
+            ':last_failed' => $lastFailedAt,
             ':failure_count' => $failureCount,
             ':locked_until' => $lockedUntil,
-            ':created_at' => $nowText,
-            ':updated_at' => $nowText,
+            ':created' => $nowText,
+            ':updated' => $nowText,
         ];
 
         $sql = 'INSERT INTO ' . $table . ' (
-                    bucket_hash, username_normalized, ip_address,
-                    first_failed_at, last_failed_at, failure_count, locked_until,
-                    created_at, updated_at
+                    bucket_hash, user, ip_address,
+                    first_failed, last_failed, failure_count, locked_until,
+                    created, updated
                 ) VALUES (
-                    :bucket_hash, :username_normalized, :ip_address,
-                    :first_failed_at, :last_failed_at, :failure_count, :locked_until,
-                    :created_at, :updated_at
+                    :bucket_hash, :user, :ip_address,
+                    :first_failed, :last_failed, :failure_count, :locked_until,
+                    :created, :updated
                 ) ' . $this->upsertConflictClause();
 
         $stmt = $this->appDb->prepare($sql);
@@ -158,23 +158,23 @@ final class LoginThrottleService
     {
         if ($this->driver === 'mysql') {
             return 'ON DUPLICATE KEY UPDATE
-                    username_normalized = VALUES(username_normalized),
+                    user = VALUES(user),
                     ip_address = VALUES(ip_address),
-                    first_failed_at = VALUES(first_failed_at),
-                    last_failed_at = VALUES(last_failed_at),
+                    first_failed = VALUES(first_failed),
+                    last_failed = VALUES(last_failed),
                     failure_count = VALUES(failure_count),
                     locked_until = VALUES(locked_until),
-                    updated_at = VALUES(updated_at)';
+                    updated = VALUES(updated)';
         }
 
         return 'ON CONFLICT (bucket_hash) DO UPDATE SET
-                username_normalized = excluded.username_normalized,
+                user = excluded.user,
                 ip_address = excluded.ip_address,
-                first_failed_at = excluded.first_failed_at,
-                last_failed_at = excluded.last_failed_at,
+                first_failed = excluded.first_failed,
+                last_failed = excluded.last_failed,
                 failure_count = excluded.failure_count,
                 locked_until = excluded.locked_until,
-                updated_at = excluded.updated_at';
+                updated = excluded.updated';
     }
 
     private function deleteRow(string $bucketHash): void
@@ -197,7 +197,7 @@ final class LoginThrottleService
         $stmt = $this->appDb->prepare(
             'DELETE FROM ' . $this->tableName() . '
              WHERE locked_until <= :now
-               AND last_failed_at < :stale_before'
+               AND last_failed < :stale_before'
         );
         $stmt->execute([
             ':now' => $now,
@@ -226,6 +226,6 @@ final class LoginThrottleService
 
     private function tableName(): string
     {
-        return $this->prefix . 'login_failures';
+        return $this->prefix . 'users_failures';
     }
 }

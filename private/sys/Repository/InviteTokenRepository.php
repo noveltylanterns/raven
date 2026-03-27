@@ -52,8 +52,8 @@ final class InviteTokenRepository
     public function listForPanel(): array
     {
         $stmt = $this->authDb->prepare(
-            'SELECT id, token_value, token_hint, is_reusable, use_count, expires_at, last_used_at, created_at, created_by_user_id
-             FROM ' . $this->authTable('invite_tokens') . '
+            'SELECT id, value, hint, reusable, uses, expires, last_used, created, creator
+             FROM ' . $this->authTable('users_invites') . '
              ORDER BY id DESC'
         );
         $stmt->execute();
@@ -61,9 +61,9 @@ final class InviteTokenRepository
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
         foreach ($rows as $row) {
-            $expiresAtRaw = $row['expires_at'] ?? null;
-            $lastUsedAtRaw = $row['last_used_at'] ?? null;
-            $createdByRaw = $row['created_by_user_id'] ?? null;
+            $expiresAtRaw = $row['expires'] ?? null;
+            $lastUsedAtRaw = $row['last_used'] ?? null;
+            $createdByRaw = $row['creator'] ?? null;
 
             $expiresAt = null;
             if ($expiresAtRaw !== null && $expiresAtRaw !== '') {
@@ -91,13 +91,13 @@ final class InviteTokenRepository
 
             $result[] = [
                 'id' => (int) ($row['id'] ?? 0),
-                'token' => trim((string) ($row['token_value'] ?? '')),
-                'token_hint' => trim((string) ($row['token_hint'] ?? '')),
-                'is_reusable' => (int) ($row['is_reusable'] ?? 0) === 1 ? 1 : 0,
-                'use_count' => max(0, (int) ($row['use_count'] ?? 0)),
+                'token' => trim((string) ($row['value'] ?? '')),
+                'token_hint' => trim((string) ($row['hint'] ?? '')),
+                'is_reusable' => (int) ($row['reusable'] ?? 0) === 1 ? 1 : 0,
+                'use_count' => max(0, (int) ($row['uses'] ?? 0)),
                 'expires_at' => $expiresAt,
                 'last_used_at' => $lastUsedAt,
-                'created_at' => trim((string) ($row['created_at'] ?? '')),
+                'created_at' => trim((string) ($row['created'] ?? '')),
                 'created_by_user_id' => $createdByUserId,
             ];
         }
@@ -170,9 +170,9 @@ final class InviteTokenRepository
         }
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, is_reusable, use_count, expires_at
-             FROM ' . $this->authTable('invite_tokens') . '
-             WHERE token_hash = :token_hash
+            'SELECT id, reusable, uses, expires
+             FROM ' . $this->authTable('users_invites') . '
+             WHERE hash = :token_hash
              LIMIT 1'
         );
         $stmt->execute([
@@ -185,9 +185,9 @@ final class InviteTokenRepository
         }
 
         $id = (int) ($row['id'] ?? 0);
-        $isReusable = (int) ($row['is_reusable'] ?? 0) === 1 ? 1 : 0;
-        $useCount = max(0, (int) ($row['use_count'] ?? 0));
-        $expiresAtRaw = $row['expires_at'] ?? null;
+        $isReusable = (int) ($row['reusable'] ?? 0) === 1 ? 1 : 0;
+        $useCount = max(0, (int) ($row['uses'] ?? 0));
+        $expiresAtRaw = $row['expires'] ?? null;
         $expiresAt = null;
         if ($expiresAtRaw !== null && $expiresAtRaw !== '') {
             $expiresAt = max(0, (int) $expiresAtRaw);
@@ -228,20 +228,20 @@ final class InviteTokenRepository
 
         if ($reusable) {
             $stmt = $this->authDb->prepare(
-                'UPDATE ' . $this->authTable('invite_tokens') . '
-                 SET use_count = use_count + 1,
-                     last_used_at = :now
+                'UPDATE ' . $this->authTable('users_invites') . '
+                 SET uses = uses + 1,
+                     last_used = :now
                  WHERE id = :id
-                   AND (expires_at IS NULL OR expires_at = 0 OR expires_at > :now)'
+                   AND (expires IS NULL OR expires = 0 OR expires > :now)'
             );
         } else {
             $stmt = $this->authDb->prepare(
-                'UPDATE ' . $this->authTable('invite_tokens') . '
-                 SET use_count = use_count + 1,
-                     last_used_at = :now
+                'UPDATE ' . $this->authTable('users_invites') . '
+                 SET uses = uses + 1,
+                     last_used = :now
                  WHERE id = :id
-                   AND use_count = 0
-                   AND (expires_at IS NULL OR expires_at = 0 OR expires_at > :now)'
+                   AND uses = 0
+                   AND (expires IS NULL OR expires = 0 OR expires > :now)'
             );
         }
 
@@ -263,7 +263,7 @@ final class InviteTokenRepository
         }
 
         $stmt = $this->authDb->prepare(
-            'DELETE FROM ' . $this->authTable('invite_tokens') . ' WHERE id = :id'
+            'DELETE FROM ' . $this->authTable('users_invites') . ' WHERE id = :id'
         );
         $stmt->execute([':id' => $id]);
 
@@ -287,8 +287,8 @@ final class InviteTokenRepository
         string $createdAt
     ): bool {
         $stmt = $this->authDb->prepare(
-            'INSERT INTO ' . $this->authTable('invite_tokens') . '
-             (token_hash, token_value, token_hint, is_reusable, use_count, expires_at, last_used_at, created_at, created_by_user_id)
+            'INSERT INTO ' . $this->authTable('users_invites') . '
+             (hash, value, hint, reusable, uses, expires, last_used, created, creator)
              VALUES (:token_hash, :token_value, :token_hint, :is_reusable, :use_count, :expires_at, :last_used_at, :created_at, :created_by_user_id)'
         );
 

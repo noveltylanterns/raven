@@ -518,7 +518,7 @@ final class ChannelRepository
         $this->db->beginTransaction();
         try {
             $detachPages = $this->db->prepare(
-                'UPDATE ' . $pages . ' SET channel_id = :root_channel WHERE channel_id = :channel_id'
+                'UPDATE ' . $pages . ' SET channel = :root_channel WHERE channel = :channel_id'
             );
             $detachPages->execute([
                 ':root_channel' => ChannelRecordPolicy::ROOT_CHANNEL_ID,
@@ -554,9 +554,9 @@ final class ChannelRepository
     {
         $pages = $this->table('pages');
         $stmt = $this->db->prepare(
-            'SELECT COALESCE(channel_id, 0) AS resolved_channel_id, COUNT(*) AS page_count
+            'SELECT COALESCE(channel, 0) AS resolved_channel_id, COUNT(*) AS page_count
              FROM ' . $pages . '
-             GROUP BY COALESCE(channel_id, 0)'
+             GROUP BY COALESCE(channel, 0)'
         );
         $stmt->execute();
 

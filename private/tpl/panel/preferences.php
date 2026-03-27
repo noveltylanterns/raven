@@ -19,6 +19,7 @@
 /** @var array<string, array{label: string, url_prefix: string}> $profileContactOptions */
 /** @var array<string, string> $twoFactorTypeOptions */
 /** @var string $avatarUploadLimitsNote */
+/** @var int $bioMaxLength */
 
 use function Raven\Core\Support\e;
 
@@ -1646,6 +1647,18 @@ $themeLabels = [
             aria-labelledby="preferences-profile-tab"
             tabindex="0"
         >
+            <div class="form-group">
+                <label class="form-label h3" for="bio">Bio</label>
+                <textarea
+                    class="form-control"
+                    id="bio"
+                    name="bio"
+                    rows="5"
+                    maxlength="<?= (int) ($bioMaxLength ?? 500) ?>"
+                ><?= e((string) ($preferences['bio'] ?? '')) ?></textarea>
+                <div class="form-text">Plaintext profile bio. Max <?= (int) ($bioMaxLength ?? 500) ?> characters.</div>
+            </div>
+
             <div class="form-group">
                 <label class="form-label h3" for="avatar">Avatar</label>
                 <?php if ($avatarFilename !== ''): ?>

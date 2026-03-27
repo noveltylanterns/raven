@@ -34,10 +34,13 @@ final class SchemaEnsurePipeline
         $appSchemaBuilder->ensurePageGalleryEnabledColumn($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePageSlugScopeUniqueness($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePageImageDisplayColumns($appDb, $driver, $prefix);
+        $appSchemaBuilder->migratePageTaxonomyPivots($appDb, $driver, $prefix);
         $appSchemaBuilder->ensureRedirectDescriptionColumn($appDb, $driver, $prefix);
         $appSchemaBuilder->ensureGroupRoutingColumns($appDb, $driver, $prefix);
         $appSchemaBuilder->ensureTaxonomySetColumns($appDb, $driver, $prefix);
         $appSchemaBuilder->ensureTaxonomyImageColumns($appDb, $driver, $prefix);
+        $appSchemaBuilder->migrateUserGroupPivot($appDb, $driver, $prefix);
+        $appSchemaBuilder->migrateLoginFailureStorage($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePanelPerformanceIndexes($appDb, $driver, $prefix);
         $appSchemaBuilder->dropLegacyChannelTable($appDb, $driver, $prefix);
         $components->extensionSchemaRunner()->ensureEnabledExtensionSchemas($appDb, $driver, $prefix);

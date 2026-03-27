@@ -49,11 +49,11 @@ final class UserPanelQueryService
             }
         } else {
             $stmt = $appDb->prepare(
-                'SELECT DISTINCT ug.user_id
+                'SELECT DISTINCT ug.user AS user_id
                  FROM ' . $userGroupsTable . ' ug
-                 INNER JOIN ' . $groupsTable . ' g ON g.id = ug.group_id
+                 INNER JOIN ' . $groupsTable . ' g ON g.id = ug."group"
                  WHERE LOWER(g.name) = :group_name
-                 ORDER BY ug.user_id ASC
+                 ORDER BY ug.user ASC
                  LIMIT :limit OFFSET :offset'
             );
             $stmt->bindValue(':group_name', $normalizedGroupFilter, PDO::PARAM_STR);
@@ -82,7 +82,7 @@ final class UserPanelQueryService
         }
 
         $stmt = $authDb->prepare(
-            'SELECT id, username, display_name, email, theme, avatar_path
+            'SELECT id, username, name AS display_name, email, theme, avatar AS avatar_path
              FROM ' . $usersTable . '
              WHERE id IN (' . implode(', ', $placeholders) . ')
              ORDER BY id ASC'
@@ -124,10 +124,10 @@ final class UserPanelQueryService
                 'WITH page_users AS (
                      SELECT u.id,
                             u.username,
-                            u.display_name,
+                            u.name AS display_name,
                             u.email,
                             u.theme,
-                            u.avatar_path,
+                            u.avatar AS avatar_path,
                             COUNT(*) OVER() AS total_rows
                      FROM ' . $usersTable . ' u
                      ORDER BY u.id ASC
@@ -143,14 +143,14 @@ final class UserPanelQueryService
                         g.id AS group_id,
                         g.name AS group_name,
                         g.slug AS group_slug,
-                        g.permission_mask AS group_permission_mask,
-                        g.is_stock AS group_is_stock,
-                        CASE WHEN ug.user_id IS NULL THEN 0 ELSE 1 END AS group_selected
+                        g.permissions AS group_permission_mask,
+                        CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
+                        CASE WHEN ug.user IS NULL THEN 0 ELSE 1 END AS group_selected
                  FROM ' . $groupsTable . ' g
                  LEFT JOIN page_users pu ON 1 = 1
                  LEFT JOIN ' . $userGroupsTable . ' ug
-                   ON ug.group_id = g.id
-                  AND ug.user_id = pu.id
+                   ON ug."group" = g.id
+                  AND ug.user = pu.id
                  ORDER BY COALESCE(pu.id, 0) ASC, g.id ASC'
             );
             $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
@@ -158,18 +158,18 @@ final class UserPanelQueryService
         } else {
             $stmt = $appDb->prepare(
                 'WITH filtered_user_ids AS (
-                     SELECT DISTINCT ug.user_id
+                     SELECT DISTINCT ug.user AS user_id
                      FROM ' . $userGroupsTable . ' ug
-                     INNER JOIN ' . $groupsTable . ' gf ON gf.id = ug.group_id
+                     INNER JOIN ' . $groupsTable . ' gf ON gf.id = ug."group"
                      WHERE LOWER(gf.name) = :group_name
                  ),
                  page_users AS (
                      SELECT u.id,
                             u.username,
-                            u.display_name,
+                            u.name AS display_name,
                             u.email,
                             u.theme,
-                            u.avatar_path,
+                            u.avatar AS avatar_path,
                             COUNT(*) OVER() AS total_rows
                      FROM ' . $usersTable . ' u
                      INNER JOIN filtered_user_ids f ON f.user_id = u.id
@@ -186,14 +186,14 @@ final class UserPanelQueryService
                         g.id AS group_id,
                         g.name AS group_name,
                         g.slug AS group_slug,
-                        g.permission_mask AS group_permission_mask,
-                        g.is_stock AS group_is_stock,
-                        CASE WHEN ug.user_id IS NULL THEN 0 ELSE 1 END AS group_selected
+                        g.permissions AS group_permission_mask,
+                        CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
+                        CASE WHEN ug.user IS NULL THEN 0 ELSE 1 END AS group_selected
                  FROM ' . $groupsTable . ' g
                  LEFT JOIN page_users pu ON 1 = 1
                  LEFT JOIN ' . $userGroupsTable . ' ug
-                   ON ug.group_id = g.id
-                  AND ug.user_id = pu.id
+                   ON ug."group" = g.id
+                  AND ug.user = pu.id
                  ORDER BY COALESCE(pu.id, 0) ASC, g.id ASC'
             );
             $stmt->bindValue(':group_name', $normalizedGroupFilter, PDO::PARAM_STR);

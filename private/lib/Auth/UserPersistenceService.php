@@ -19,6 +19,7 @@ final class UserPersistenceService
      *   username: string,
      *   display_name: string,
      *   email: string,
+     *   bio: string,
      *   theme: string,
      *   password: string|null,
      *   group_ids: array<int>,
@@ -39,6 +40,7 @@ final class UserPersistenceService
         $username = trim((string) ($data['username'] ?? ''));
         $displayName = trim((string) ($data['display_name'] ?? ''));
         $email = trim((string) ($data['email'] ?? ''));
+        $bio = trim((string) ($data['bio'] ?? ''));
         $theme = trim((string) ($data['theme'] ?? ''));
         $password = is_string($data['password'] ?? null) ? $data['password'] : null;
         $groupIds = $this->normalizeGroupIds(is_array($data['group_ids'] ?? null) ? $data['group_ids'] : []);
@@ -67,10 +69,11 @@ final class UserPersistenceService
 
             $fields = [
                 'username = :username',
-                'display_name = :display_name',
+                'name = :display_name',
                 'email = :email',
+                'bio = :bio',
                 'theme = :theme',
-                'contact_profiles = :contact_profiles',
+                'contact = :contact_profiles',
             ];
 
             $params = [
@@ -78,6 +81,7 @@ final class UserPersistenceService
                 ':username' => $username,
                 ':display_name' => $displayName,
                 ':email' => $email,
+                ':bio' => $bio,
                 ':theme' => $theme,
                 ':contact_profiles' => $contactProfilesEncoded,
             ];
@@ -88,7 +92,7 @@ final class UserPersistenceService
             }
 
             if ($setAvatar) {
-                $fields[] = 'avatar_path = :avatar_path';
+                $fields[] = 'avatar = :avatar_path';
                 $params[':avatar_path'] = $avatarPath;
             }
 
@@ -121,6 +125,7 @@ final class UserPersistenceService
             ':password' => password_hash($password, PASSWORD_DEFAULT),
             ':username' => $username,
             ':display_name' => $displayName,
+            ':bio' => $bio,
             ':theme' => $theme,
             ':avatar_path' => $setAvatar ? $avatarPath : null,
             ':contact_profiles' => $contactProfilesEncoded,
@@ -142,9 +147,9 @@ final class UserPersistenceService
     public function deleteUserById(PDO $authDb, PDO $appDb, string $usersTable, string $userGroupsTable, int $id): void
     {
         $deleteMemberships = $appDb->prepare(
-            'DELETE FROM ' . $userGroupsTable . ' WHERE user_id = :user_id'
+            'DELETE FROM ' . $userGroupsTable . ' WHERE user = :user'
         );
-        $deleteMemberships->execute([':user_id' => $id]);
+        $deleteMemberships->execute([':user' => $id]);
 
         $deleteUser = $authDb->prepare(
             'DELETE FROM ' . $usersTable . ' WHERE id = :id'
@@ -206,16 +211,16 @@ final class UserPersistenceService
     public function groupIdsForUser(PDO $appDb, string $userGroupsTable, int $userId): array
     {
         $stmt = $appDb->prepare(
-            'SELECT group_id
+            'SELECT "group"
              FROM ' . $userGroupsTable . '
-             WHERE user_id = :user_id
-             ORDER BY group_id ASC'
+             WHERE user = :user
+             ORDER BY "group" ASC'
         );
-        $stmt->execute([':user_id' => $userId]);
+        $stmt->execute([':user' => $userId]);
 
         $rows = $stmt->fetchAll() ?: [];
 
-        return array_map(static fn (array $row): int => (int) $row['group_id'], $rows);
+        return array_map(static fn (array $row): int => (int) $row['group'], $rows);
     }
 
     /**
@@ -235,9 +240,9 @@ final class UserPersistenceService
 
         try {
             $delete = $appDb->prepare(
-                'DELETE FROM ' . $userGroupsTable . ' WHERE user_id = :user_id'
+                'DELETE FROM ' . $userGroupsTable . ' WHERE user = :user'
             );
-            $delete->execute([':user_id' => $userId]);
+            $delete->execute([':user' => $userId]);
 
             foreach ($groupIds as $groupId) {
                 $attachUserToGroup($userId, $groupId);
@@ -277,8 +282,8 @@ final class UserPersistenceService
     private function insertUserAndReturnId(PDO $authDb, string $usersTable, array $params): int
     {
         $sql = 'INSERT INTO ' . $usersTable . '
-            (email, password, username, display_name, theme, avatar_path, contact_profiles, status, verified, resettable, roles_mask, registered, last_login, force_logout)
-            VALUES (:email, :password, :username, :display_name, :theme, :avatar_path, :contact_profiles, :status, :verified, :resettable, :roles_mask, :registered, :last_login, :force_logout)';
+            (email, password, username, name, bio, theme, avatar, contact, status, verified, resettable, roles_mask, registered, last_login, force_logout)
+            VALUES (:email, :password, :username, :display_name, :bio, :theme, :avatar_path, :contact_profiles, :status, :verified, :resettable, :roles_mask, :registered, :last_login, :force_logout)';
 
         $driver = strtolower((string) $authDb->getAttribute(PDO::ATTR_DRIVER_NAME));
         if ($driver === 'pgsql') {

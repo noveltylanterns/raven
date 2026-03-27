@@ -109,6 +109,15 @@ final class PanelConfigFieldPolicyService
             return $items;
         }
 
+        if ($path === 'user.bio') {
+            $length = $this->defaults->normalizeInt($path, $value);
+            if ($length < 1) {
+                throw new \RuntimeException($path . ' must be greater than 0.');
+            }
+
+            return $length;
+        }
+
         if ($path === 'category.set' || $path === 'tag.set') {
             $setId = $this->defaults->normalizeInt($path, $value);
             if ($setId < 1) {

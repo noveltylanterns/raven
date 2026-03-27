@@ -21,6 +21,7 @@
 /** @var array<string, string> $twoFactorTypeOptions */
 /** @var array<int, string> $themeOptions */
 /** @var string $avatarUploadLimitsNote */
+/** @var int $bioMaxLength */
 /** @var string $csrfField */
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
@@ -402,6 +403,18 @@ $themeLabels = [
             aria-labelledby="user-profile-tab"
             tabindex="0"
         >
+            <div class="form-group">
+                <label class="form-label h3" for="bio">Bio</label>
+                <textarea
+                    id="bio"
+                    name="bio"
+                    class="form-control"
+                    rows="5"
+                    maxlength="<?= (int) ($bioMaxLength ?? 500) ?>"
+                ><?= e((string) ($userRow['bio'] ?? '')) ?></textarea>
+                <div class="form-text">Plaintext profile bio. Max <?= (int) ($bioMaxLength ?? 500) ?> characters.</div>
+            </div>
+
             <div class="form-group">
                 <label class="form-label h3" for="avatar">Avatar</label>
                 <?php if ($avatarFilename !== ''): ?>

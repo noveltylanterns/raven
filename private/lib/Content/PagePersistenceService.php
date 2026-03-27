@@ -19,10 +19,9 @@ final class PagePersistenceService
      *   content: string,
      *   description: string,
      *   display_title: int,
-     *   gallery_enabled: int,
-     *   is_published: int,
-     *   author_user_id: int|null,
-     *   channel_id: int|null,
+     *   published: int,
+     *   author: int|null,
+     *   channel: int|null,
      *   now: string,
      *   category_ids: array<int>,
      *   tag_ids: array<int>
@@ -49,11 +48,10 @@ final class PagePersistenceService
             ':content' => (string) ($payload['content'] ?? ''),
             ':description' => (string) ($payload['description'] ?? ''),
             ':display_title' => (int) ($payload['display_title'] ?? 1),
-            ':gallery_enabled' => (int) ($payload['gallery_enabled'] ?? 0),
-            ':channel_id' => $payload['channel_id'] ?? null,
-            ':is_published' => (int) ($payload['is_published'] ?? 0),
-            ':author_user_id' => $payload['author_user_id'] ?? null,
-            ':updated_at' => $now,
+            ':channel' => $payload['channel'] ?? null,
+            ':published' => (int) ($payload['published'] ?? 0),
+            ':author' => $payload['author'] ?? null,
+            ':updated' => $now,
         ];
 
         $db->beginTransaction();
@@ -67,11 +65,10 @@ final class PagePersistenceService
                          content = :content,
                          description = :description,
                          display_title = :display_title,
-                         gallery_enabled = :gallery_enabled,
-                         author_user_id = :author_user_id,
-                         channel_id = :channel_id,
-                         is_published = :is_published,
-                         updated_at = :updated_at
+                         author = :author,
+                         channel = :channel,
+                         published = :published,
+                         updated = :updated
                      WHERE id = :id'
                 );
 
@@ -81,11 +78,11 @@ final class PagePersistenceService
             } else {
                 $stmt = $db->prepare(
                     'INSERT INTO ' . $pagesTable . '
-                    (title, slug, content, description, display_title, gallery_enabled, channel_id, is_published, author_user_id, created_at, updated_at)
-                    VALUES (:title, :slug, :content, :description, :display_title, :gallery_enabled, :channel_id, :is_published, :author_user_id, :created_at, :updated_at)'
+                    (title, slug, content, description, display_title, channel, published, author, created, updated)
+                    VALUES (:title, :slug, :content, :description, :display_title, :channel, :published, :author, :created, :updated)'
                 );
 
-                $stmt->execute($writeParams + [':created_at' => $now]);
+                $stmt->execute($writeParams + [':created' => $now]);
 
                 $pageId = (int) $db->lastInsertId();
             }
@@ -122,7 +119,7 @@ final class PagePersistenceService
         $db->beginTransaction();
 
         try {
-            $pageIdParams = [':page_id' => $id];
+            $pageIdParams = [':page' => $id];
 
             foreach ([[$categoryEnabled, $pageCategoriesTable], [$tagEnabled, $pageTagsTable]] as [$enabled, $table]) {
                 if (!$enabled) {
@@ -130,7 +127,7 @@ final class PagePersistenceService
                 }
 
                 $detachTaxonomy = $db->prepare(
-                    'DELETE FROM ' . $table . ' WHERE page_id = :page_id'
+                    'DELETE FROM ' . $table . ' WHERE page = :page'
                 );
                 $detachTaxonomy->execute($pageIdParams);
             }
@@ -138,13 +135,13 @@ final class PagePersistenceService
             $detachImageVariants = $db->prepare(
                 'DELETE FROM ' . $pageImageVariantsTable . '
                  WHERE image_id IN (
-                    SELECT id FROM ' . $pageImagesTable . ' WHERE page_id = :page_id
+                    SELECT id FROM ' . $pageImagesTable . ' WHERE page = :page
                  )'
             );
             $detachImageVariants->execute($pageIdParams);
 
             $detachImages = $db->prepare(
-                'DELETE FROM ' . $pageImagesTable . ' WHERE page_id = :page_id'
+                'DELETE FROM ' . $pageImagesTable . ' WHERE page = :page'
             );
             $detachImages->execute($pageIdParams);
 

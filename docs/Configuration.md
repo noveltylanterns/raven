@@ -161,6 +161,7 @@ Notable options:
 
 - `user.auth.registration` is shown first in `Registration Options` as `Enable Public Registration`.
 - `user.auth.login` remains in `Registration Options` as `Login Method`.
+- `user.bio` controls the maximum plaintext profile-bio length allowed in both the User editor and self-service Preferences screen.
 
 ### Field Input Types You’ll See
 
@@ -333,6 +334,7 @@ The following config keys are expected to appear in this document and in runtime
 - `session.brute.lock`
 - `user.auth.login`
 - `user.auth.registration`
+- `user.bio`
 - `user.privacy`
 - `user.prefix`
 - `user.contact.email.label`

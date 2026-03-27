@@ -67,7 +67,7 @@ final class UserRepository
         $usersTable = $this->authTable('users');
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, display_name, email, theme, avatar_path
+            'SELECT id, username, name AS display_name, email, theme, avatar AS avatar_path
              FROM ' . $usersTable . '
              ORDER BY id ASC'
         );
@@ -95,15 +95,15 @@ final class UserRepository
         $stmt = $this->appDb->prepare(
             'SELECT u.id,
                     u.username,
-                    u.display_name,
+                    u.name AS display_name,
                     u.email,
                     u.theme,
-                    u.avatar_path,
+                    u.avatar AS avatar_path,
                     g.name AS group_name,
-                    g.permission_mask AS group_permission_mask
+                    g.permissions AS group_permission_mask
              FROM ' . $users . ' u
-             LEFT JOIN ' . $userGroups . ' ug ON ug.user_id = u.id
-             LEFT JOIN ' . $groups . ' g ON g.id = ug.group_id
+             LEFT JOIN ' . $userGroups . ' ug ON ug.user = u.id
+             LEFT JOIN ' . $groups . ' g ON g.id = ug."group"
              ORDER BY u.id ASC, g.id ASC'
         );
         $stmt->execute();
@@ -190,9 +190,9 @@ final class UserRepository
         $groups = $this->groupTable('groups');
         $userGroups = $this->groupTable('user_groups');
         $stmt = $this->appDb->prepare(
-            'SELECT COUNT(DISTINCT ug.user_id)
+            'SELECT COUNT(DISTINCT ug.user)
              FROM ' . $userGroups . ' ug
-             INNER JOIN ' . $groups . ' g ON g.id = ug.group_id
+             INNER JOIN ' . $groups . ' g ON g.id = ug."group"
              WHERE LOWER(g.name) = :group_name'
         );
         $stmt->execute([':group_name' => $normalizedGroupFilter]);
@@ -255,7 +255,14 @@ final class UserRepository
         $usersTable = $this->authTable('users');
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, display_name, email, theme, avatar_path, contact_profiles
+            'SELECT id,
+                    username,
+                    name AS display_name,
+                    email,
+                    bio,
+                    theme,
+                    avatar AS avatar_path,
+                    contact AS contact_profiles
              FROM ' . $usersTable . '
              WHERE id = :id
              LIMIT 1'
@@ -274,6 +281,7 @@ final class UserRepository
             'username' => (string) ($row['username'] ?? ''),
             'display_name' => (string) ($row['display_name'] ?? ''),
             'email' => (string) ($row['email'] ?? ''),
+            'bio' => (string) ($row['bio'] ?? ''),
             'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
             'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
                 ? (string) $row['avatar_path']
@@ -308,24 +316,27 @@ final class UserRepository
         $stmt = $this->appDb->prepare(
             'SELECT u.id AS user_id,
                     u.username,
-                    u.display_name,
+                    u.name AS display_name,
                     u.email,
+                    u.bio,
                     u.theme,
-                    u.avatar_path,
-                    u.contact_profiles,
+                    u.avatar AS avatar_path,
+                    u.contact AS contact_profiles,
                     g.id AS group_id,
                     g.name AS group_name,
                     g.slug AS group_slug,
-                    g.permission_mask AS group_permission_mask,
-                    g.is_stock AS group_is_stock,
-                    CASE WHEN ug.user_id IS NULL THEN 0 ELSE 1 END AS group_selected
+                    g.permissions AS group_permission_mask,
+                    CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
+                    CASE WHEN ug.user IS NULL THEN 0 ELSE 1 END AS group_selected
              FROM ' . $users . ' u
              LEFT JOIN ' . $groups . ' g ON 1 = 1
              LEFT JOIN ' . $userGroups . ' ug
-               ON ug.user_id = u.id
-              AND ug.group_id = g.id
+               ON ug.user = u.id
+              AND ug."group" = g.id
              WHERE u.id = :id
-             ORDER BY g.is_stock DESC, LOWER(g.name) ASC, g.id ASC'
+             ORDER BY CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END DESC,
+                      LOWER(g.name) ASC,
+                      g.id ASC'
         );
         $stmt->execute([':id' => $id]);
         $rows = $stmt->fetchAll() ?: [];
@@ -364,6 +375,7 @@ final class UserRepository
                 'username' => (string) ($first['username'] ?? ''),
                 'display_name' => (string) ($first['display_name'] ?? ''),
                 'email' => (string) ($first['email'] ?? ''),
+                'bio' => (string) ($first['bio'] ?? ''),
                 'theme' => (string) (($first['theme'] ?? '') !== '' ? $first['theme'] : 'default'),
                 'avatar_path' => isset($first['avatar_path']) && $first['avatar_path'] !== ''
                     ? (string) $first['avatar_path']
@@ -391,7 +403,7 @@ final class UserRepository
         $usersTable = $this->authTable('users');
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, display_name, avatar_path, contact_profiles
+            'SELECT id, username, name AS display_name, avatar AS avatar_path, contact AS contact_profiles
              FROM ' . $usersTable . '
              WHERE username = :username
              LIMIT 1'
@@ -434,7 +446,7 @@ final class UserRepository
         $usersTable = $this->authTable('users');
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, display_name, avatar_path, contact_profiles
+            'SELECT id, username, name AS display_name, avatar AS avatar_path, contact AS contact_profiles
              FROM ' . $usersTable . '
              WHERE id = :id
              LIMIT 1'
@@ -475,10 +487,10 @@ final class UserRepository
 
         $userGroups = $this->groupTable('user_groups');
         $membershipStmt = $this->appDb->prepare(
-            'SELECT user_id
+            'SELECT user AS user_id
              FROM ' . $userGroups . '
-             WHERE group_id = :group_id
-             ORDER BY user_id ASC'
+             WHERE "group" = :group_id
+             ORDER BY user ASC'
         );
         $membershipStmt->execute([':group_id' => $groupId]);
 
@@ -507,7 +519,7 @@ final class UserRepository
         }
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, display_name, avatar_path
+            'SELECT id, username, name AS display_name, avatar AS avatar_path
              FROM ' . $usersTable . '
              WHERE id IN (' . implode(', ', $placeholders) . ')
              ORDER BY username ASC, id ASC'
@@ -538,6 +550,7 @@ final class UserRepository
      *   username: string,
      *   display_name: string,
      *   email: string,
+     *   bio?: string,
      *   theme: string,
      *   password: string|null,
      *   group_ids: array<int>,
@@ -552,6 +565,7 @@ final class UserRepository
         $username = trim((string) ($data['username'] ?? ''));
         $displayName = trim((string) ($data['display_name'] ?? ''));
         $email = trim((string) ($data['email'] ?? ''));
+        $bio = trim((string) ($data['bio'] ?? ''));
         $theme = trim((string) ($data['theme'] ?? ''));
         $password = isset($data['password']) && is_string($data['password']) ? $data['password'] : null;
         $groupIds = $this->normalizeGroupIds(is_array($data['group_ids'] ?? null) ? $data['group_ids'] : []);
@@ -570,6 +584,7 @@ final class UserRepository
                 'username' => $username,
                 'display_name' => $displayName,
                 'email' => $email,
+                'bio' => $bio,
                 'theme' => $theme,
                 'password' => $password,
                 'group_ids' => $groupIds,

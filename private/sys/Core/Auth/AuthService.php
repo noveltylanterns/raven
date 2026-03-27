@@ -399,11 +399,11 @@ final class AuthService
 
         $stmt = $this->authDb->prepare(
             'UPDATE ' . $this->authTable('users') . '
-             SET two_factor_methods = :two_factor_methods
+             SET two_factor = :two_factor
              WHERE id = :id'
         );
         $stmt->execute([
-            ':two_factor_methods' => $encoded,
+            ':two_factor' => $encoded,
             ':id' => $userId,
         ]);
 
@@ -475,6 +475,7 @@ final class AuthService
      *   username: string,
      *   display_name: string,
      *   email: string,
+     *   bio: string,
      *   theme: string,
      *   avatar_path: string|null,
      *   contact_profiles: array<int, array{type: string, value: string}>,
@@ -488,7 +489,15 @@ final class AuthService
         }
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, display_name, email, theme, avatar_path, contact_profiles, two_factor_methods
+            'SELECT id,
+                    username,
+                    name AS display_name,
+                    email,
+                    bio,
+                    theme,
+                    avatar AS avatar_path,
+                    contact AS contact_profiles,
+                    two_factor AS two_factor_methods
              FROM ' . $this->authTable('users') . '
              WHERE id = :id
              LIMIT 1'
@@ -522,6 +531,7 @@ final class AuthService
      *   username: string,
      *   display_name: string,
      *   email: string,
+     *   bio?: string,
      *   theme: string,
      *   password: string|null,
      *   contact_profiles?: array<int, array{type: string, value: string}>,
@@ -538,6 +548,7 @@ final class AuthService
         $username = (string) ($normalized['username'] ?? '');
         $displayName = (string) ($normalized['display_name'] ?? '');
         $email = (string) ($normalized['email'] ?? '');
+        $bio = (string) ($normalized['bio'] ?? '');
         $theme = (string) ($normalized['theme'] ?? 'default');
         $password = $normalized['password'] ?? null;
         $contactProfilesEncoded = $normalized['contact_profiles_encoded'] ?? null;
@@ -558,17 +569,19 @@ final class AuthService
 
         $fields = [
             'username = :username',
-            'display_name = :display_name',
+            'name = :display_name',
             'email = :email',
+            'bio = :bio',
             'theme = :theme',
-            'contact_profiles = :contact_profiles',
-            'two_factor_methods = :two_factor_methods',
+            'contact = :contact_profiles',
+            'two_factor = :two_factor_methods',
         ];
 
         $params = [
             ':username' => $username,
             ':display_name' => $displayName,
             ':email' => $email,
+            ':bio' => $bio,
             ':theme' => $theme,
             ':contact_profiles' => $contactProfilesEncoded,
             ':two_factor_methods' => $twoFactorMethodsEncoded,
@@ -581,7 +594,7 @@ final class AuthService
         }
 
         if ($setAvatar) {
-            $fields[] = 'avatar_path = :avatar_path';
+            $fields[] = 'avatar = :avatar_path';
             $params[':avatar_path'] = $avatarPath;
         }
 

@@ -24,26 +24,26 @@ final class UserGroupCatalogService
         if ($userIds !== []) {
             $placeholders = [];
             foreach ($userIds as $index => $userId) {
-                $placeholder = ':user_id_' . $index;
+                $placeholder = ':user_' . $index;
                 $placeholders[] = $placeholder;
                 $params[$placeholder] = $userId;
             }
-            $where = ' WHERE ug.user_id IN (' . implode(', ', $placeholders) . ')';
+            $where = ' WHERE ug.user IN (' . implode(', ', $placeholders) . ')';
         }
 
         $stmt = $appDb->prepare(
-            'SELECT ug.user_id, g.name, g.permission_mask
+            'SELECT ug.user, g.name, g.permissions AS permission_mask
              FROM ' . $userGroupsTable . ' ug
-             INNER JOIN ' . $groupsTable . ' g ON g.id = ug.group_id
+             INNER JOIN ' . $groupsTable . ' g ON g.id = ug."group"
              ' . $where . '
-             ORDER BY ug.user_id ASC, g.id ASC'
+             ORDER BY ug.user ASC, g.id ASC'
         );
         $stmt->execute($params);
 
         $rows = $stmt->fetchAll() ?: [];
         $map = [];
         foreach ($rows as $row) {
-            $userId = (int) $row['user_id'];
+            $userId = (int) $row['user'];
             $map[$userId] ??= [];
             $map[$userId][] = [
                 'name' => (string) ($row['name'] ?? ''),
@@ -70,8 +70,8 @@ final class UserGroupCatalogService
                 'SELECT g.id AS group_id,
                         g.name AS group_name,
                         g.slug AS group_slug,
-                        g.permission_mask AS group_permission_mask,
-                        g.is_stock AS group_is_stock
+                        g.permissions AS group_permission_mask,
+                        CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock
                  FROM ' . $groupsTable . ' g
                  ORDER BY g.id ASC'
             );
@@ -103,7 +103,7 @@ final class UserGroupCatalogService
         $params = [];
         $placeholders = [];
         foreach ($normalizedUserIds as $index => $userId) {
-            $placeholder = ':user_id_' . $index;
+            $placeholder = ':user_' . $index;
             $placeholders[] = $placeholder;
             $params[$placeholder] = $userId;
         }
@@ -112,14 +112,14 @@ final class UserGroupCatalogService
             'SELECT g.id AS group_id,
                     g.name AS group_name,
                     g.slug AS group_slug,
-                    g.permission_mask AS group_permission_mask,
-                    g.is_stock AS group_is_stock,
-                    ug.user_id
+                    g.permissions AS group_permission_mask,
+                    CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
+                    ug.user
              FROM ' . $groupsTable . ' g
              LEFT JOIN ' . $userGroupsTable . ' ug
-               ON ug.group_id = g.id
-              AND ug.user_id IN (' . implode(', ', $placeholders) . ')
-             ORDER BY g.id ASC, ug.user_id ASC'
+               ON ug."group" = g.id
+              AND ug.user IN (' . implode(', ', $placeholders) . ')
+             ORDER BY g.id ASC, ug.user ASC'
         );
         $stmt->execute($params);
 
@@ -143,7 +143,7 @@ final class UserGroupCatalogService
                 ];
             }
 
-            $userId = (int) ($row['user_id'] ?? 0);
+            $userId = (int) ($row['user'] ?? 0);
             if ($userId < 1) {
                 continue;
             }

@@ -14,7 +14,7 @@ final class PageImageDeletionService
     /**
      * @return array{stored_paths: array<int, string>}|null
      */
-    public function deleteImageForPage(PDO $db, string $imagesTable, string $variantsTable, int $pageId, int $imageId): ?array
+    public function deleteImageForPage(PDO $db, string $pagesTable, string $imagesTable, string $variantsTable, int $pageId, int $imageId): ?array
     {
         $db->beginTransaction();
 
@@ -22,12 +22,12 @@ final class PageImageDeletionService
             $readImage = $db->prepare(
                 'SELECT stored_path
                  FROM ' . $imagesTable . '
-                 WHERE id = :id AND page_id = :page_id
+                 WHERE id = :id AND page = :page
                  LIMIT 1'
             );
             $readImage->execute([
                 ':id' => $imageId,
-                ':page_id' => $pageId,
+                ':page' => $pageId,
             ]);
             $imagePath = $readImage->fetchColumn();
 
@@ -48,11 +48,22 @@ final class PageImageDeletionService
             $deleteVariants->execute([':image_id' => $imageId]);
 
             $deleteImage = $db->prepare(
-                'DELETE FROM ' . $imagesTable . ' WHERE id = :id AND page_id = :page_id'
+                'DELETE FROM ' . $imagesTable . ' WHERE id = :id AND page = :page'
             );
             $deleteImage->execute([
                 ':id' => $imageId,
-                ':page_id' => $pageId,
+                ':page' => $pageId,
+            ]);
+
+            $clearPrimary = $db->prepare(
+                'UPDATE ' . $pagesTable . '
+                 SET cover_image = CASE WHEN cover_image = :image_id THEN NULL ELSE cover_image END,
+                     preview_image = CASE WHEN preview_image = :image_id THEN NULL ELSE preview_image END
+                 WHERE id = :page'
+            );
+            $clearPrimary->execute([
+                ':image_id' => $imageId,
+                ':page' => $pageId,
             ]);
 
             $db->commit();
@@ -79,7 +90,7 @@ final class PageImageDeletionService
     /**
      * @return array<int, string>
      */
-    public function deleteAllForPage(PDO $db, string $imagesTable, string $variantsTable, int $pageId): array
+    public function deleteAllForPage(PDO $db, string $pagesTable, string $imagesTable, string $variantsTable, int $pageId): array
     {
         $db->beginTransaction();
 
@@ -88,15 +99,15 @@ final class PageImageDeletionService
                 'SELECT i.stored_path AS image_path, v.stored_path AS variant_path
                  FROM ' . $imagesTable . ' i
                  LEFT JOIN ' . $variantsTable . ' v ON v.image_id = i.id
-                 WHERE i.page_id = :page_id'
+                 WHERE i.page = :page'
             );
-            $readPaths->execute([':page_id' => $pageId]);
+            $readPaths->execute([':page' => $pageId]);
             $rows = $readPaths->fetchAll() ?: [];
 
             $imageIdsStmt = $db->prepare(
-                'SELECT id FROM ' . $imagesTable . ' WHERE page_id = :page_id'
+                'SELECT id FROM ' . $imagesTable . ' WHERE page = :page'
             );
-            $imageIdsStmt->execute([':page_id' => $pageId]);
+            $imageIdsStmt->execute([':page' => $pageId]);
             $imageIds = array_map(static fn (mixed $value): int => (int) $value, $imageIdsStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
 
             if ($imageIds !== []) {
@@ -108,9 +119,17 @@ final class PageImageDeletionService
             }
 
             $deleteImages = $db->prepare(
-                'DELETE FROM ' . $imagesTable . ' WHERE page_id = :page_id'
+                'DELETE FROM ' . $imagesTable . ' WHERE page = :page'
             );
-            $deleteImages->execute([':page_id' => $pageId]);
+            $deleteImages->execute([':page' => $pageId]);
+
+            $clearPrimary = $db->prepare(
+                'UPDATE ' . $pagesTable . '
+                 SET cover_image = NULL,
+                     preview_image = NULL
+                 WHERE id = :page'
+            );
+            $clearPrimary->execute([':page' => $pageId]);
 
             $db->commit();
 

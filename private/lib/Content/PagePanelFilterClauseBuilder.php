@@ -43,7 +43,7 @@ final class PagePanelFilterClauseBuilder
                 // No channel can match this slug, so force an empty result.
                 $where[] = '1 = 0';
             } else {
-                $where[] = 'p.channel_id = ' . $channelIdPlaceholder;
+                $where[] = 'p.channel = ' . $channelIdPlaceholder;
                 $params[$channelIdPlaceholder] = $resolvedChannelId;
             }
         }
@@ -53,8 +53,8 @@ final class PagePanelFilterClauseBuilder
             $where[] = 'EXISTS (
                 SELECT 1
                 FROM ' . $pageCategoriesTable . ' pc
-                WHERE pc.page_id = p.id
-                  AND pc.category_id = ' . $categoryIdPlaceholder . '
+                WHERE pc.page = p.id
+                  AND pc.category = ' . $categoryIdPlaceholder . '
             )';
             $params[$categoryIdPlaceholder] = $categoryId;
         }
@@ -64,8 +64,8 @@ final class PagePanelFilterClauseBuilder
             $where[] = 'EXISTS (
                 SELECT 1
                 FROM ' . $pageTagsTable . ' pt
-                WHERE pt.page_id = p.id
-                  AND pt.tag_id = ' . $tagIdPlaceholder . '
+                WHERE pt.page = p.id
+                  AND pt.tag = ' . $tagIdPlaceholder . '
             )';
             $params[$tagIdPlaceholder] = $tagId;
         }

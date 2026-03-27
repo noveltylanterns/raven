@@ -67,6 +67,7 @@ Fields/options:
 
 - `Username` (required)
 - `Display Name`
+- `Bio`
 - `Email` (required)
 - `Change Password` button on existing users
 - `Password`
@@ -199,6 +200,7 @@ Public routes (declared in `public/index.php`):
 - `findById()` returns user + assigned `group_ids`.
 - `save(...)` handles create/update in one method:
   - enforces unique username/email
+  - persists plaintext `bio` with the max length capped by config key `user.bio`
   - hashes password when provided
   - updates avatar path when `set_avatar` is true
   - writes Delight-compatible auth fields on create

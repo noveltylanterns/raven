@@ -30,15 +30,9 @@ final class SeedInstaller
              WHERE LOWER(slug) = :slug
              LIMIT 1'
         );
-        $markAsStock = $db->prepare(
-            'UPDATE ' . $groupsTable . '
-             SET is_stock = 1
-             WHERE id = :id
-               AND is_stock <> 1'
-        );
         $insertStock = $db->prepare(
-            'INSERT INTO ' . $groupsTable . ' (name, slug, route_enabled, permission_mask, is_stock, created_at)
-             VALUES (:name, :slug, :route_enabled, :permission_mask, :is_stock, :created_at)'
+            'INSERT INTO ' . $groupsTable . ' (slug, name, description, route, permissions, created, updated)
+             VALUES (:slug, :name, :description, :route, :permissions, :created, :updated)'
         );
 
         foreach ($stockGroups as $group) {
@@ -54,19 +48,16 @@ final class SeedInstaller
             $existingId = $findBySlug->fetchColumn();
             if ($existingId === false) {
                 $insertStock->execute([
-                    ':name' => (string) ($group['name'] ?? ''),
                     ':slug' => $stockSlug,
-                    ':route_enabled' => 0,
-                    ':permission_mask' => (int) ($group['permission_mask'] ?? 0),
-                    ':is_stock' => 1,
-                    ':created_at' => $now,
+                    ':name' => (string) ($group['name'] ?? ''),
+                    ':description' => null,
+                    ':route' => 0,
+                    ':permissions' => (int) ($group['permission_mask'] ?? 0),
+                    ':created' => $now,
+                    ':updated' => $now,
                 ]);
                 continue;
             }
-
-            $markAsStock->execute([
-                ':id' => (int) $existingId,
-            ]);
         }
 
         $this->ensureStockGroupId($db, $driver, $prefix, 'banned', 6);
@@ -87,16 +78,15 @@ final class SeedInstaller
 
         $syncStockMask = $db->prepare(
             'UPDATE ' . $groupsTable . '
-             SET permission_mask = :permission_mask,
-                 route_enabled = 0
+             SET permissions = :permissions,
+                 route = 0
              WHERE LOWER(slug) = :slug
-               AND is_stock = 1
-               AND (permission_mask <> :permission_mask OR route_enabled <> 0)'
+               AND (permissions <> :permissions OR route <> 0)'
         );
         foreach ($stockMaskBySlug as $slug => $mask) {
             $syncStockMask->execute([
                 ':slug' => $slug,
-                ':permission_mask' => (int) $mask,
+                ':permissions' => (int) $mask,
             ]);
         }
     }
@@ -117,7 +107,7 @@ final class SeedInstaller
         }
 
         $check = $db->prepare(
-            'SELECT COUNT(*) FROM ' . $pagesTable . ' WHERE (channel_id = 0 OR channel_id IS NULL) AND slug IN (:home, :index)'
+            'SELECT COUNT(*) FROM ' . $pagesTable . ' WHERE (channel = 0 OR channel IS NULL) AND slug IN (:home, :index)'
         );
         $check->execute([
             ':home' => 'home',
@@ -131,21 +121,23 @@ final class SeedInstaller
         $now = gmdate('Y-m-d H:i:s');
         $insert = $db->prepare(
             'INSERT INTO ' . $pagesTable . '
-            (title, slug, content, description, display_title, channel_id, is_published, author_user_id, created_at, updated_at)
-            VALUES (:title, :slug, :content, :description, :display_title, :channel_id, :is_published, :author_user_id, :created_at, :updated_at)'
+            (slug, title, description, channel, content, display_title, published, author, cover_image, preview_image, created, updated)
+            VALUES (:slug, :title, :description, :channel, :content, :display_title, :published, :author, :cover_image, :preview_image, :created, :updated)'
         );
 
         $insert->execute([
-            ':title' => 'Raven Home',
             ':slug' => 'home',
-            ':content' => '[{"type":"tinymce","content":"<p>Welcome to Raven CMS.</p>","css_id":"","css_class":""}]',
+            ':title' => 'Raven Home',
             ':description' => 'Welcome to Raven CMS.',
+            ':channel' => 0,
+            ':content' => '[{"type":"tinymce","content":"<p>Welcome to Raven CMS.</p>","css_id":"","css_class":""}]',
             ':display_title' => 1,
-            ':channel_id' => 0,
-            ':is_published' => 1,
-            ':author_user_id' => null,
-            ':created_at' => $now,
-            ':updated_at' => $now,
+            ':published' => 1,
+            ':author' => null,
+            ':cover_image' => null,
+            ':preview_image' => null,
+            ':created' => $now,
+            ':updated' => $now,
         ]);
     }
 
@@ -163,7 +155,6 @@ final class SeedInstaller
             'SELECT id
              FROM ' . $groupsTable . '
              WHERE LOWER(slug) = :slug
-               AND is_stock = 1
              LIMIT 1'
         );
         $findStock->execute([':slug' => $slug]);
@@ -198,8 +189,8 @@ final class SeedInstaller
         );
         $moveMembershipGroupId = $db->prepare(
             'UPDATE ' . $userGroupsTable . '
-             SET group_id = :to_id
-             WHERE group_id = :from_id'
+             SET "group" = :to_id
+             WHERE "group" = :from_id'
         );
 
         $db->beginTransaction();

@@ -256,7 +256,7 @@ final class PageImageManager
 
             $imageTitle = $this->input->text((string) ($pathInfo['filename'] ?? ''), 255);
             $imageRow = [
-                'page_id' => $pageId,
+                'page' => $pageId,
                 'storage_target' => 'local',
                 'original_filename' => $this->input->text($originalName, 255),
                 'stored_filename' => $originalFilename,
@@ -266,10 +266,9 @@ final class PageImageManager
                 'byte_size' => $storedSourceSize > 0 ? $storedSourceSize : $size,
                 'width' => $sourceWidth,
                 'height' => $sourceHeight,
-                'hash_sha256' => $hashSha256,
+                'hash' => $hashSha256,
                 'status' => 'ready',
                 'sort_order' => $this->images->nextSortOrderForPage($pageId),
-                'is_cover' => false,
                 'include_in_gallery' => true,
                 'alt_text' => $imageTitle,
                 'title_text' => $imageTitle,

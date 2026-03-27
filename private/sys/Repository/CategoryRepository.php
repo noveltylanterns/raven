@@ -50,10 +50,10 @@ final class CategoryRepository
                     COALESCE(pc.page_count, 0) AS page_count
              FROM ' . $categories . ' c
              LEFT JOIN (
-                 SELECT category_id, COUNT(*) AS page_count
+                 SELECT category, COUNT(*) AS page_count
                  FROM ' . $pageCategories . '
-                 GROUP BY category_id
-             ) pc ON pc.category_id = c.id
+                 GROUP BY category
+             ) pc ON pc.category = c.id
              ORDER BY c.name ASC, c.id ASC'
         );
         // LEFT JOIN keeps categories with zero linked pages visible in admin listings.
@@ -100,10 +100,10 @@ final class CategoryRepository
                     COALESCE(pc.page_count, 0) AS page_count
              FROM ' . $categories . ' c
              LEFT JOIN (
-                 SELECT category_id, COUNT(*) AS page_count
+                 SELECT category, COUNT(*) AS page_count
                  FROM ' . $pageCategories . '
-                 GROUP BY category_id
-             ) pc ON pc.category_id = c.id
+                 GROUP BY category
+             ) pc ON pc.category = c.id
              ' . $whereSql . '
              ORDER BY c.name ASC, c.id ASC
              LIMIT :limit OFFSET :offset'
@@ -151,10 +151,10 @@ final class CategoryRepository
                         COALESCE(pc.page_count, 0) AS page_count
                  FROM ' . $categories . ' c
                  LEFT JOIN (
-                     SELECT category_id, COUNT(*) AS page_count
+                     SELECT category, COUNT(*) AS page_count
                      FROM ' . $pageCategories . '
-                     GROUP BY category_id
-                 ) pc ON pc.category_id = c.id
+                     GROUP BY category
+                 ) pc ON pc.category = c.id
                  ' . $whereSql . '
                  ORDER BY c.name ASC, c.id ASC
                  LIMIT :limit OFFSET :offset
@@ -379,9 +379,9 @@ final class CategoryRepository
         try {
             // Remove category links before deleting the category row.
             $detach = $this->db->prepare(
-                'DELETE FROM ' . $pageCategories . ' WHERE category_id = :category_id'
+                'DELETE FROM ' . $pageCategories . ' WHERE category = :category'
             );
-            $detach->execute([':category_id' => $id]);
+            $detach->execute([':category' => $id]);
 
             $delete = $this->db->prepare('DELETE FROM ' . $categories . ' WHERE id = :id');
             $delete->execute([':id' => $id]);

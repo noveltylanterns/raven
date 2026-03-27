@@ -17,16 +17,22 @@ final class GroupPublicRouteService
     public function findPublicBySlug(PDO $db, string $groupsTable, string $userGroupsTable, string $slug): ?array
     {
         $stmt = $db->prepare(
-            'SELECT g.id, g.name, g.slug, g.route_enabled, g.permission_mask, g.is_stock, g.created_at,
-                    COUNT(ug.user_id) AS member_count
+            'SELECT g.id,
+                    g.name,
+                    g.slug,
+                    g.route AS route_enabled,
+                    g.permissions AS permission_mask,
+                    CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS is_stock,
+                    g.created AS created_at,
+                    COUNT(ug.user) AS member_count
              FROM ' . $groupsTable . ' g
-             LEFT JOIN ' . $userGroupsTable . ' ug ON ug.group_id = g.id
+             LEFT JOIN ' . $userGroupsTable . ' ug ON ug."group" = g.id
              WHERE g.slug = :slug
-               AND g.route_enabled = 1
+               AND g.route = 1
                AND LOWER(g.slug) <> \'guest\'
                AND LOWER(g.slug) <> \'validating\'
                AND LOWER(g.slug) <> \'banned\'
-             GROUP BY g.id, g.name, g.slug, g.route_enabled, g.permission_mask, g.is_stock, g.created_at
+             GROUP BY g.id, g.name, g.slug, g.route, g.permissions, g.created
              ORDER BY g.id ASC
              LIMIT 1'
         );
@@ -53,20 +59,20 @@ final class GroupPublicRouteService
             'SELECT g.id AS group_id,
                     g.name AS group_name,
                     g.slug AS group_slug,
-                    g.route_enabled AS group_route_enabled,
-                    g.permission_mask AS group_permission_mask,
-                    g.is_stock AS group_is_stock,
-                    g.created_at AS group_created_at,
+                    g.route AS group_route_enabled,
+                    g.permissions AS group_permission_mask,
+                    CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
+                    g.created AS group_created_at,
                     COUNT(u.id) OVER() AS member_count,
                     u.id AS user_id,
                     u.username,
-                    u.display_name,
-                    u.avatar_path
+                    u.name AS display_name,
+                    u.avatar AS avatar_path
              FROM ' . $groupsTable . ' g
-             LEFT JOIN ' . $userGroupsTable . ' ug ON ug.group_id = g.id
-             LEFT JOIN ' . $usersTable . ' u ON u.id = ug.user_id
+             LEFT JOIN ' . $userGroupsTable . ' ug ON ug."group" = g.id
+             LEFT JOIN ' . $usersTable . ' u ON u.id = ug.user
              WHERE g.slug = :slug
-               AND g.route_enabled = 1
+               AND g.route = 1
                AND LOWER(g.slug) <> \'guest\'
                AND LOWER(g.slug) <> \'validating\'
                AND LOWER(g.slug) <> \'banned\'

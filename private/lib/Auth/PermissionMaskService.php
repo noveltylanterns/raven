@@ -64,7 +64,7 @@ final class PermissionMaskService
         $groupsTable = $this->groupTable('groups');
 
         $stmt = $this->appDb->prepare(
-            'SELECT permission_mask
+            'SELECT permissions AS permission_mask
              FROM ' . $groupsTable . '
              WHERE LOWER(slug) = :slug
              LIMIT 1'

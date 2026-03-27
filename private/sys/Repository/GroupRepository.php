@@ -52,15 +52,25 @@ final class GroupRepository
     {
         $groups = $this->table('groups');
         $userGroups = $this->table('user_groups');
+        $stockCase = $this->stockRoleSql();
 
         $stmt = $this->db->prepare(
-            'SELECT g.id, g.name, g.slug, g.route_enabled, g.permission_mask, g.is_stock, g.created_at,
+            'SELECT g.id,
+                    g.name,
+                    g.slug,
+                    g.description,
+                    g.route AS route_enabled,
+                    g.permissions AS permission_mask,
+                    ' . $stockCase . ' AS is_stock,
+                    g.cover_image,
+                    g.created AS created_at,
+                    g.updated AS updated_at,
                     COALESCE(ug.member_count, 0) AS member_count
              FROM ' . $groups . ' g
              LEFT JOIN (
-                 SELECT group_id, COUNT(*) AS member_count
+                 SELECT "group" AS group_id, COUNT(*) AS member_count
                  FROM ' . $userGroups . '
-                 GROUP BY group_id
+                 GROUP BY "group"
              ) ug ON ug.group_id = g.id
              ORDER BY g.id ASC'
         );
@@ -69,9 +79,7 @@ final class GroupRepository
 
         $rows = $stmt->fetchAll() ?: [];
         foreach ($rows as &$row) {
-            if ($this->rolePolicy->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
-                $row['route_enabled'] = 0;
-            }
+            $row = $this->hydrateGroupRow(is_array($row) ? $row : []);
         }
         unset($row);
 
@@ -99,15 +107,25 @@ final class GroupRepository
     {
         $groups = $this->table('groups');
         $userGroups = $this->table('user_groups');
+        $stockCase = $this->stockRoleSql();
 
         $stmt = $this->db->prepare(
-            'SELECT g.id, g.name, g.slug, g.route_enabled, g.permission_mask, g.is_stock, g.created_at,
+            'SELECT g.id,
+                    g.name,
+                    g.slug,
+                    g.description,
+                    g.route AS route_enabled,
+                    g.permissions AS permission_mask,
+                    ' . $stockCase . ' AS is_stock,
+                    g.cover_image,
+                    g.created AS created_at,
+                    g.updated AS updated_at,
                     COALESCE(ug.member_count, 0) AS member_count
              FROM ' . $groups . ' g
              LEFT JOIN (
-                 SELECT group_id, COUNT(*) AS member_count
+                 SELECT "group" AS group_id, COUNT(*) AS member_count
                  FROM ' . $userGroups . '
-                 GROUP BY group_id
+                 GROUP BY "group"
              ) ug ON ug.group_id = g.id
              ORDER BY g.id ASC
              LIMIT :limit OFFSET :offset'
@@ -118,9 +136,7 @@ final class GroupRepository
 
         $rows = $stmt->fetchAll() ?: [];
         foreach ($rows as &$row) {
-            if ($this->rolePolicy->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
-                $row['route_enabled'] = 0;
-            }
+            $row = $this->hydrateGroupRow(is_array($row) ? $row : []);
         }
         unset($row);
 
@@ -138,25 +154,38 @@ final class GroupRepository
         $userGroups = $this->table('user_groups');
         $safeLimit = max(1, $limit);
         $safeOffset = max(0, $offset);
+        $stockCase = $this->stockRoleSql();
 
         $stmt = $this->db->prepare(
             'SELECT page_rows.id,
                     page_rows.name,
                     page_rows.slug,
+                    page_rows.description,
                     page_rows.route_enabled,
                     page_rows.permission_mask,
                     page_rows.is_stock,
+                    page_rows.cover_image,
                     page_rows.created_at,
+                    page_rows.updated_at,
                     page_rows.member_count,
                     totals.total_rows
              FROM (
-                 SELECT g.id, g.name, g.slug, g.route_enabled, g.permission_mask, g.is_stock, g.created_at,
+                 SELECT g.id,
+                        g.name,
+                        g.slug,
+                        g.description,
+                        g.route AS route_enabled,
+                        g.permissions AS permission_mask,
+                        ' . $stockCase . ' AS is_stock,
+                        g.cover_image,
+                        g.created AS created_at,
+                        g.updated AS updated_at,
                         COALESCE(ug.member_count, 0) AS member_count
                  FROM ' . $groups . ' g
                  LEFT JOIN (
-                     SELECT group_id, COUNT(*) AS member_count
+                     SELECT "group" AS group_id, COUNT(*) AS member_count
                      FROM ' . $userGroups . '
-                     GROUP BY group_id
+                     GROUP BY "group"
                  ) ug ON ug.group_id = g.id
                  ORDER BY g.id ASC
                  LIMIT :limit OFFSET :offset
@@ -179,10 +208,7 @@ final class GroupRepository
             }
 
             unset($row['total_rows']);
-            if ($this->rolePolicy->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
-                $row['route_enabled'] = 0;
-            }
-            $resultRows[] = $row;
+            $resultRows[] = $this->hydrateGroupRow($row);
         }
 
         // Offset can target an empty page while rows still exist; recover accurate total.
@@ -204,9 +230,14 @@ final class GroupRepository
     public function listOptions(): array
     {
         $groups = $this->table('groups');
+        $stockCase = $this->stockRoleSql();
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug, permission_mask, is_stock
+            'SELECT id,
+                    name,
+                    slug,
+                    permissions AS permission_mask,
+                    ' . $stockCase . ' AS is_stock
              FROM ' . $groups . '
              ORDER BY is_stock DESC, name ASC'
         );
@@ -236,9 +267,19 @@ final class GroupRepository
     public function findById(int $id): ?array
     {
         $groups = $this->table('groups');
+        $stockCase = $this->stockRoleSql();
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug, route_enabled, permission_mask, is_stock, created_at
+            'SELECT id,
+                    name,
+                    slug,
+                    description,
+                    route AS route_enabled,
+                    permissions AS permission_mask,
+                    ' . $stockCase . ' AS is_stock,
+                    cover_image,
+                    created AS created_at,
+                    updated AS updated_at
              FROM ' . $groups . '
              WHERE id = :id
              LIMIT 1'
@@ -246,8 +287,8 @@ final class GroupRepository
         $stmt->execute([':id' => $id]);
 
         $row = $stmt->fetch();
-        if (is_array($row) && $this->rolePolicy->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
-            $row['route_enabled'] = 0;
+        if (is_array($row)) {
+            $row = $this->hydrateGroupRow($row);
         }
 
         return $row === false ? null : $row;
@@ -333,7 +374,7 @@ final class GroupRepository
      * Stock-group slugs are immutable; stock names are editable.
      * Stock flag cannot be changed through normal save flow.
      *
-     * @param array{id: int|null, name: string, slug?: string, route_enabled?: int|bool, permission_mask: int} $data
+     * @param array{id: int|null, name: string, slug?: string, description?: string, route_enabled?: int|bool, permission_mask?: int, permissions?: int} $data
      */
     public function save(array $data): int
     {
@@ -341,10 +382,12 @@ final class GroupRepository
 
         $id = $data['id'] ?? null;
         $name = trim($data['name']);
+        $description = trim((string) ($data['description'] ?? ''));
         $slugInput = trim((string) ($data['slug'] ?? ''));
         $slug = $this->rolePolicy->normalizeSlug($slugInput !== '' ? $slugInput : $name);
-        $mask = (int) $data['permission_mask'];
+        $mask = (int) ($data['permissions'] ?? $data['permission_mask'] ?? 0);
         $routeEnabled = !empty($data['route_enabled']) ? 1 : 0;
+        $now = gmdate('Y-m-d H:i:s');
 
         if ($id !== null && $id > 0) {
             $existing = $this->findById($id);
@@ -352,7 +395,7 @@ final class GroupRepository
                 throw new RuntimeException('Group not found.');
             }
 
-            $isStock = (int) ($existing['is_stock'] ?? 0) === 1;
+            $isStock = $this->rolePolicy->isStockRoleSlug((string) ($existing['slug'] ?? ''));
             $existingSlug = strtolower(trim((string) ($existing['slug'] ?? '')));
 
             if ($isStock) {
@@ -384,17 +427,19 @@ final class GroupRepository
                 'UPDATE ' . $groups . '
                  SET name = :name,
                      slug = :slug,
-                     route_enabled = :route_enabled,
-                     permission_mask = :permission_mask,
-                     is_stock = :is_stock
+                     description = :description,
+                     route = :route_enabled,
+                     permissions = :permission_mask,
+                     updated = :updated
                  WHERE id = :id'
             );
             $stmt->execute([
                 ':name' => $name,
                 ':slug' => $slug,
+                ':description' => $description !== '' ? $description : null,
                 ':route_enabled' => $routeEnabled,
                 ':permission_mask' => $mask,
-                ':is_stock' => $isStock ? 1 : 0,
+                ':updated' => $now,
                 ':id' => $id,
             ]);
 
@@ -419,17 +464,19 @@ final class GroupRepository
 
         // Create path is always non-stock; stock groups are schema-managed.
         $stmt = $this->db->prepare(
-            'INSERT INTO ' . $groups . ' (id, name, slug, route_enabled, permission_mask, is_stock, created_at)
-             VALUES (:id, :name, :slug, :route_enabled, :permission_mask, :is_stock, :created_at)'
+            'INSERT INTO ' . $groups . ' (id, name, slug, description, route, permissions, cover_image, created, updated)
+             VALUES (:id, :name, :slug, :description, :route, :permissions, :cover_image, :created, :updated)'
         );
         $stmt->execute([
             ':id' => $customGroupId,
             ':name' => $name,
             ':slug' => $slug,
-            ':route_enabled' => $routeEnabled,
-            ':permission_mask' => $mask,
-            ':is_stock' => 0,
-            ':created_at' => gmdate('Y-m-d H:i:s'),
+            ':description' => $description !== '' ? $description : null,
+            ':route' => $routeEnabled,
+            ':permissions' => $mask,
+            ':cover_image' => null,
+            ':created' => $now,
+            ':updated' => $now,
         ]);
 
         return $customGroupId;
@@ -449,15 +496,15 @@ final class GroupRepository
             throw new RuntimeException('Group not found.');
         }
 
-        if ((int) $group['is_stock'] === 1) {
+        if ($this->rolePolicy->isStockRoleSlug((string) ($group['slug'] ?? ''))) {
             throw new RuntimeException('Stock groups cannot be deleted.');
         }
 
         // Track only users affected by this deletion.
         $affectedStmt = $this->db->prepare(
-            'SELECT DISTINCT user_id
+            'SELECT DISTINCT user AS user_id
              FROM ' . $userGroups . '
-             WHERE group_id = :group_id'
+             WHERE "group" = :group_id'
         );
         $affectedStmt->execute([':group_id' => $id]);
 
@@ -470,7 +517,7 @@ final class GroupRepository
 
         try {
             $deleteMemberships = $this->db->prepare(
-                'DELETE FROM ' . $userGroups . ' WHERE group_id = :group_id'
+                'DELETE FROM ' . $userGroups . ' WHERE "group" = :group_id'
             );
             $deleteMemberships->execute([':group_id' => $id]);
 
@@ -587,5 +634,30 @@ final class GroupRepository
     private function table(string $table): string
     {
         return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function hydrateGroupRow(array $row): array
+    {
+        if ($this->rolePolicy->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
+            $row['route_enabled'] = 0;
+        } else {
+            $row['route_enabled'] = (int) ($row['route_enabled'] ?? 0);
+        }
+
+        $row['permission_mask'] = (int) ($row['permission_mask'] ?? 0);
+        $row['is_stock'] = !empty($row['is_stock']) ? 1 : 0;
+        $row['created_at'] = (string) ($row['created_at'] ?? '');
+        $row['updated_at'] = (string) ($row['updated_at'] ?? $row['created_at'] ?? '');
+
+        return $row;
+    }
+
+    private function stockRoleSql(): string
+    {
+        return "CASE WHEN LOWER(g.slug) IN ('super', 'admin', 'editor', 'user', 'guest', 'validating', 'banned') THEN 1 ELSE 0 END";
     }
 }

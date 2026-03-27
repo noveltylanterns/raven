@@ -311,11 +311,11 @@ final class TaxonomyLookupRepository
                     c.name,
                     c.slug,
                     ' . $this->setColumn('c') . ' AS set_value,
-                    CASE WHEN pc.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned
+                    CASE WHEN pc.page IS NULL THEN 0 ELSE 1 END AS is_assigned
                  FROM ' . $categories . ' c
                  LEFT JOIN ' . $pageCategories . ' pc
-                    ON pc.category_id = c.id
-                   AND pc.page_id = ?';
+                    ON pc.category = c.id
+                   AND pc.page = ?';
             $params[] = $normalizedPageId;
         }
 
@@ -329,11 +329,11 @@ final class TaxonomyLookupRepository
                     t.name,
                     t.slug,
                     ' . $this->setColumn('t') . ' AS set_value,
-                    CASE WHEN pt.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned
+                    CASE WHEN pt.page IS NULL THEN 0 ELSE 1 END AS is_assigned
                  FROM ' . $tags . ' t
                  LEFT JOIN ' . $pageTags . ' pt
-                    ON pt.tag_id = t.id
-                   AND pt.page_id = ?';
+                    ON pt.tag = t.id
+                   AND pt.page = ?';
             $params[] = $normalizedPageId;
         }
 

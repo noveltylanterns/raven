@@ -78,17 +78,17 @@ final class PageRepository
 
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
-                WHERE (p.channel_id = 0 OR p.channel_id IS NULL)
-                  AND p.is_published = :is_published
+                WHERE (p.channel = 0 OR p.channel IS NULL)
+                  AND p.published = :published
                   AND p.slug IN (:slug_home, :slug_index)
                 ORDER BY CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
-                         p.created_at DESC
+                         p.created DESC
                 LIMIT 1';
 
         // CASE ordering guarantees `home` wins over `index` when both exist.
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
-            ':is_published' => 1,
+            ':published' => 1,
             ':slug_home' => 'home',
             ':slug_index' => 'index',
             ':slug_home_order' => 'home',
@@ -125,17 +125,17 @@ final class PageRepository
 
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
-                WHERE p.channel_id = :channel_id
-                  AND p.is_published = :is_published
+                WHERE p.channel = :channel
+                  AND p.published = :published
                   AND p.slug IN (:slug_home, :slug_index)
                 ORDER BY CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
-                         p.created_at DESC
+                         p.created DESC
                 LIMIT 1';
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
-            ':channel_id' => $channelId,
-            ':is_published' => 1,
+            ':channel' => $channelId,
+            ':published' => 1,
             ':slug_home' => 'home',
             ':slug_index' => 'index',
             ':slug_home_order' => 'home',
@@ -161,17 +161,17 @@ final class PageRepository
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
                 WHERE p.slug = :page_slug
-                  AND p.is_published = :is_published';
+                  AND p.published = :published';
 
         $params = [
             ':page_slug' => $pageSlug,
-            ':is_published' => 1,
+            ':published' => 1,
         ];
 
         // Unchanneled pages resolve at root; channeled pages require explicit channel slug match.
         $channel = null;
         if ($channelSlug === null) {
-            $sql .= ' AND (p.channel_id = 0 OR p.channel_id IS NULL)';
+            $sql .= ' AND (p.channel = 0 OR p.channel IS NULL)';
         } else {
             $channel = $this->channelRepo->findBySlug($channelSlug);
             if ($channel === null) {
@@ -183,8 +183,8 @@ final class PageRepository
                 return null;
             }
 
-            $sql .= ' AND p.channel_id = :channel_id';
-            $params[':channel_id'] = $channelId;
+            $sql .= ' AND p.channel = :channel';
+            $params[':channel'] = $channelId;
         }
 
         $sql .= ' LIMIT 1';
@@ -215,16 +215,16 @@ final class PageRepository
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
                 WHERE p.id = :page_id
-                  AND p.is_published = :is_published';
+                  AND p.published = :published';
 
         $params = [
             ':page_id' => $pageId,
-            ':is_published' => 1,
+            ':published' => 1,
         ];
 
         $channel = null;
         if ($channelSlug === null) {
-            $sql .= ' AND (p.channel_id = 0 OR p.channel_id IS NULL)';
+            $sql .= ' AND (p.channel = 0 OR p.channel IS NULL)';
         } else {
             $channel = $this->channelRepo->findBySlug($channelSlug);
             if ($channel === null) {
@@ -236,8 +236,8 @@ final class PageRepository
                 return null;
             }
 
-            $sql .= ' AND p.channel_id = :channel_id';
-            $params[':channel_id'] = $channelId;
+            $sql .= ' AND p.channel = :channel';
+            $params[':channel'] = $channelId;
         }
 
         $sql .= ' LIMIT 1';
@@ -270,14 +270,14 @@ final class PageRepository
         $pages = $this->table('pages');
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
-                WHERE p.is_published = :is_published';
+                WHERE p.published = :published';
         $params = [
-            ':is_published' => 1,
+            ':published' => 1,
         ];
 
         $channel = null;
         if ($normalizedChannelSlug === ChannelRecordPolicy::ROOT_CHANNEL_SLUG) {
-            $sql .= ' AND (p.channel_id = 0 OR p.channel_id IS NULL)';
+            $sql .= ' AND (p.channel = 0 OR p.channel IS NULL)';
         } elseif ($normalizedChannelSlug !== '') {
             $channel = $this->channelRepo->findBySlug($normalizedChannelSlug);
             if ($channel === null) {
@@ -289,12 +289,12 @@ final class PageRepository
                 return [];
             }
 
-            $sql .= ' AND p.channel_id = :channel_id';
-            $params[':channel_id'] = $channelId;
+            $sql .= ' AND p.channel = :channel';
+            $params[':channel'] = $channelId;
         }
 
         $sql .= '
-                ORDER BY p.created_at DESC, p.id DESC
+                ORDER BY p.created DESC, p.id DESC
                 LIMIT :limit';
 
         $stmt = $this->db->prepare($sql);
@@ -347,9 +347,9 @@ final class PageRepository
         $pages = $this->table('pages');
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
-                WHERE p.is_published = :is_published';
+                WHERE p.published = :published';
         $params = [
-            ':is_published' => 1,
+            ':published' => 1,
         ];
 
         $clauses = [];
@@ -357,7 +357,7 @@ final class PageRepository
         unset($normalizedSlugs[ChannelRecordPolicy::ROOT_CHANNEL_SLUG]);
 
         if ($includeRoot) {
-            $clauses[] = '(p.channel_id = 0 OR p.channel_id IS NULL)';
+            $clauses[] = '(p.channel = 0 OR p.channel IS NULL)';
         }
 
         $channelIds = [];
@@ -379,13 +379,13 @@ final class PageRepository
             $placeholders = [];
             $index = 0;
             foreach ($channelIds as $channelId) {
-                $placeholder = ':channel_id_' . $index;
+                $placeholder = ':channel_' . $index;
                 $placeholders[] = $placeholder;
                 $params[$placeholder] = $channelId;
                 $index++;
             }
 
-            $clauses[] = 'p.channel_id IN (' . implode(', ', $placeholders) . ')';
+            $clauses[] = 'p.channel IN (' . implode(', ', $placeholders) . ')';
         }
 
         if ($clauses === []) {
@@ -394,7 +394,7 @@ final class PageRepository
 
         $sql .= ' AND (' . implode(' OR ', $clauses) . ')';
         $sql .= '
-                ORDER BY p.created_at DESC, p.id DESC
+                ORDER BY p.created DESC, p.id DESC
                 LIMIT :limit';
 
         $stmt = $this->db->prepare($sql);
@@ -483,10 +483,10 @@ final class PageRepository
         );
 
         $stmt = $this->db->prepare(
-            'SELECT p.id, p.title, p.slug, p.is_published, p.created_at, p.channel_id
+            'SELECT p.id, p.title, p.slug, p.published AS is_published, p.created AS created_at, p.channel AS channel_id
              FROM ' . $pages . ' p
              WHERE ' . implode(' AND ', $where) . '
-             ORDER BY p.created_at DESC
+             ORDER BY p.created DESC
              LIMIT :limit OFFSET :offset'
         );
 
@@ -568,10 +568,10 @@ final class PageRepository
                     page_rows.channel_id,
                     totals.total_rows
              FROM (
-                 SELECT p.id, p.title, p.slug, p.is_published, p.created_at, p.channel_id
+                 SELECT p.id, p.title, p.slug, p.published AS is_published, p.created AS created_at, p.channel AS channel_id
                  FROM ' . $pages . ' p
                  WHERE ' . implode(' AND ', $pageWhere) . '
-                 ORDER BY p.created_at DESC
+                 ORDER BY p.created DESC
                  LIMIT :limit OFFSET :offset
              ) AS page_rows
              CROSS JOIN (
@@ -625,9 +625,9 @@ final class PageRepository
         $pages = $this->table('pages');
 
         $stmt = $this->db->prepare(
-            'SELECT p.id, p.title, p.slug, p.is_published, p.created_at, p.channel_id
+            'SELECT p.id, p.title, p.slug, p.published AS is_published, p.created AS created_at, p.channel AS channel_id
              FROM ' . $pages . ' p
-             ORDER BY COALESCE(p.channel_id, 0) ASC, p.slug ASC, p.id ASC'
+             ORDER BY COALESCE(p.channel, 0) ASC, p.slug ASC, p.id ASC'
         );
         $stmt->execute();
 
@@ -662,18 +662,18 @@ final class PageRepository
         }
 
         $stmt = $this->db->prepare(
-            'SELECT p.channel_id, p.slug
+            'SELECT p.channel AS channel_id, p.slug
              FROM ' . $pages . ' p
-             WHERE p.channel_id IS NOT NULL
-               AND p.channel_id <> 0
-               AND p.is_published = :is_published
+             WHERE p.channel IS NOT NULL
+               AND p.channel <> 0
+               AND p.published = :published
                AND p.slug IN (:slug_home, :slug_index)
-             ORDER BY p.channel_id ASC,
+             ORDER BY p.channel ASC,
                       CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
-                      p.created_at DESC'
+                      p.created DESC'
         );
         $stmt->execute([
-            ':is_published' => 1,
+            ':published' => 1,
             ':slug_home' => 'home',
             ':slug_index' => 'index',
             ':slug_home_order' => 'home',
@@ -741,7 +741,7 @@ final class PageRepository
             'SELECT
                 p.*,
                 i.id AS image_id,
-                i.page_id AS image_page_id,
+                i.page AS image_page_id,
                 i.storage_target AS image_storage_target,
                 i.original_filename AS image_original_filename,
                 i.stored_filename AS image_stored_filename,
@@ -751,10 +751,10 @@ final class PageRepository
                 i.byte_size AS image_byte_size,
                 i.width AS image_width,
                 i.height AS image_height,
-                i.hash_sha256 AS image_hash_sha256,
+                i.hash AS image_hash_sha256,
                 i.status AS image_status,
                 i.sort_order AS image_sort_order,
-                i.is_cover AS image_is_cover,
+                CASE WHEN p.cover_image IS NOT NULL AND p.cover_image = i.id THEN 1 ELSE 0 END AS image_is_cover,
                 i.include_in_gallery AS image_include_in_gallery,
                 i.alt_text AS image_alt_text,
                 i.title_text AS image_title_text,
@@ -763,8 +763,8 @@ final class PageRepository
                 i.license AS image_license,
                 i.focal_x AS image_focal_x,
                 i.focal_y AS image_focal_y,
-                i.created_at AS image_created_at,
-                i.updated_at AS image_updated_at,
+                i.created AS image_created_at,
+                i.updated AS image_updated_at,
                 v.variant_key AS variant_key,
                 v.stored_filename AS variant_stored_filename,
                 v.stored_path AS variant_stored_path,
@@ -774,8 +774,8 @@ final class PageRepository
                 v.width AS variant_width,
                 v.height AS variant_height
              FROM ' . $pages . ' p
-             LEFT JOIN ' . $images . ' i ON i.page_id = p.id
-             LEFT JOIN ' . $variants . ' v ON v.image_id = i.id
+             LEFT JOIN ' . $images . ' i ON i.page = p.id
+             LEFT JOIN ' . $variants . ' v ON v.image = i.id
              WHERE p.id = :id
              ORDER BY i.sort_order ASC, i.id ASC, v.variant_key ASC'
         );
@@ -807,11 +807,10 @@ final class PageRepository
         $content = $this->encodeContentBlocks($contentBlocks);
         $description = (string) ($data['description'] ?? '');
         $displayTitle = !array_key_exists('display_title', $data) || !empty($data['display_title']) ? 1 : 0;
-        $galleryEnabled = !empty($data['gallery_enabled']) ? 1 : 0;
-        $isPublished = !empty($data['is_published']) ? 1 : 0;
-        $authorUserId = isset($data['author_user_id']) ? (int) $data['author_user_id'] : 0;
-        if ($authorUserId < 1) {
-            $authorUserId = null;
+        $published = !empty($data['is_published']) ? 1 : 0;
+        $author = isset($data['author_user_id']) ? (int) $data['author_user_id'] : 0;
+        if ($author < 1) {
+            $author = null;
         }
         $now = gmdate('Y-m-d H:i:s');
         $categoryIds = $this->categoryEnabled ? $this->normalizeIds($data['category_ids'] ?? []) : [];
@@ -845,10 +844,9 @@ final class PageRepository
                 'content' => $content,
                 'description' => $description,
                 'display_title' => $displayTitle,
-                'gallery_enabled' => $galleryEnabled,
-                'is_published' => $isPublished,
-                'author_user_id' => $authorUserId,
-                'channel_id' => $channelId,
+                'published' => $published,
+                'author' => $author,
+                'channel' => $channelId,
                 'now' => $now,
                 'category_ids' => $categoryIds,
                 'tag_ids' => $tagIds,
@@ -875,7 +873,8 @@ final class PageRepository
             $slug,
             $channelId,
             $excludeId,
-            'exclude_id'
+            'exclude_id',
+            'channel'
         );
     }
 
@@ -896,11 +895,11 @@ final class PageRepository
         $stmt = $this->db->prepare(
             'SELECT c.id, c.name, c.slug
              FROM ' . $pageCategories . ' pc
-             INNER JOIN ' . $categories . ' c ON c.id = pc.category_id
-             WHERE pc.page_id = :page_id
+             INNER JOIN ' . $categories . ' c ON c.id = pc.category
+             WHERE pc.page = :page
              ORDER BY c.name ASC, c.id ASC'
         );
-        $stmt->execute([':page_id' => $pageId]);
+        $stmt->execute([':page' => $pageId]);
 
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
@@ -933,11 +932,11 @@ final class PageRepository
         $stmt = $this->db->prepare(
             'SELECT t.id, t.name, t.slug
              FROM ' . $pageTags . ' pt
-             INNER JOIN ' . $tags . ' t ON t.id = pt.tag_id
-             WHERE pt.page_id = :page_id
+             INNER JOIN ' . $tags . ' t ON t.id = pt.tag
+             WHERE pt.page = :page
              ORDER BY t.name ASC, t.id ASC'
         );
-        $stmt->execute([':page_id' => $pageId]);
+        $stmt->execute([':page' => $pageId]);
 
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
@@ -984,18 +983,18 @@ final class PageRepository
             $categoryPlaceholders = implode(', ', array_fill(0, count($normalizedPageIds), '?'));
             $pageCategories = $this->table('page_categories');
             $unionQueries[] =
-                'SELECT page_id, category_id AS taxonomy_id, \'category\' AS taxonomy_type
+                'SELECT page AS page_id, category AS taxonomy_id, \'category\' AS taxonomy_type
                  FROM ' . $pageCategories . '
-                 WHERE page_id IN (' . $categoryPlaceholders . ')';
+                 WHERE page IN (' . $categoryPlaceholders . ')';
             $params = array_merge($params, $normalizedPageIds);
         }
         if ($this->tagEnabled) {
             $tagPlaceholders = implode(', ', array_fill(0, count($normalizedPageIds), '?'));
             $pageTags = $this->table('page_tags');
             $unionQueries[] =
-                'SELECT page_id, tag_id AS taxonomy_id, \'tag\' AS taxonomy_type
+                'SELECT page AS page_id, tag AS taxonomy_id, \'tag\' AS taxonomy_type
                  FROM ' . $pageTags . '
-                 WHERE page_id IN (' . $tagPlaceholders . ')';
+                 WHERE page IN (' . $tagPlaceholders . ')';
             $params = array_merge($params, $normalizedPageIds);
         }
 
@@ -1198,6 +1197,26 @@ final class PageRepository
      */
     private function hydratePageRow(array $row): array
     {
+        if (!array_key_exists('channel_id', $row) && array_key_exists('channel', $row)) {
+            $row['channel_id'] = (int) ($row['channel'] ?? 0);
+        }
+        if (!array_key_exists('author_user_id', $row) && array_key_exists('author', $row)) {
+            $author = (int) ($row['author'] ?? 0);
+            $row['author_user_id'] = $author > 0 ? $author : null;
+        }
+        if (!array_key_exists('is_published', $row) && array_key_exists('published', $row)) {
+            $row['is_published'] = (int) ($row['published'] ?? 0);
+        }
+        if (!array_key_exists('created_at', $row) && array_key_exists('created', $row)) {
+            $row['created_at'] = (string) ($row['created'] ?? '');
+        }
+        if (!array_key_exists('updated_at', $row) && array_key_exists('updated', $row)) {
+            $row['updated_at'] = (string) ($row['updated'] ?? '');
+        }
+        if (!array_key_exists('gallery_enabled', $row)) {
+            $row['gallery_enabled'] = 0;
+        }
+
         $rawContent = (string) ($row['content'] ?? '');
         $contentBlocks = $this->decodeContentBlocks($rawContent);
         $row['content_blocks'] = $contentBlocks;

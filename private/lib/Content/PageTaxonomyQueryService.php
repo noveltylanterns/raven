@@ -13,7 +13,7 @@ final class PageTaxonomyQueryService
 {
     public function countByCategorySlug(PDO $db, string $pagesTable, string $categoriesTable, string $pageCategoriesTable, string $slug): int
     {
-        return $this->countByTaxonomySlug($db, $pagesTable, $categoriesTable, $pageCategoriesTable, 'category_id', $slug);
+        return $this->countByTaxonomySlug($db, $pagesTable, $categoriesTable, $pageCategoriesTable, 'category', $slug);
     }
 
     /**
@@ -35,7 +35,7 @@ final class PageTaxonomyQueryService
             $pagesTable,
             $categoriesTable,
             $pageCategoriesTable,
-            'category_id',
+            'category',
             $slug,
             $limit,
             $offset,
@@ -64,7 +64,7 @@ final class PageTaxonomyQueryService
             $pagesTable,
             $categoriesTable,
             $pageCategoriesTable,
-            'category_id',
+            'category',
             $slug,
             $limit,
             $offset,
@@ -75,7 +75,7 @@ final class PageTaxonomyQueryService
 
     public function countByTagSlug(PDO $db, string $pagesTable, string $tagsTable, string $pageTagsTable, string $slug): int
     {
-        return $this->countByTaxonomySlug($db, $pagesTable, $tagsTable, $pageTagsTable, 'tag_id', $slug);
+        return $this->countByTaxonomySlug($db, $pagesTable, $tagsTable, $pageTagsTable, 'tag', $slug);
     }
 
     /**
@@ -97,7 +97,7 @@ final class PageTaxonomyQueryService
             $pagesTable,
             $tagsTable,
             $pageTagsTable,
-            'tag_id',
+            'tag',
             $slug,
             $limit,
             $offset,
@@ -126,7 +126,7 @@ final class PageTaxonomyQueryService
             $pagesTable,
             $tagsTable,
             $pageTagsTable,
-            'tag_id',
+            'tag',
             $slug,
             $limit,
             $offset,
@@ -144,15 +144,15 @@ final class PageTaxonomyQueryService
         string $slug
     ): int {
         $stmt = $db->prepare(
-            'SELECT COUNT(*)
+             'SELECT COUNT(*)
              FROM ' . $pagesTable . ' p
-             INNER JOIN ' . $pageTaxonomyTable . ' pt ON pt.page_id = p.id
+             INNER JOIN ' . $pageTaxonomyTable . ' pt ON pt.page = p.id
              INNER JOIN ' . $taxonomyTable . ' t ON t.id = pt.' . $taxonomyJoinColumn . '
-             WHERE t.slug = :slug AND p.is_published = :is_published'
+             WHERE t.slug = :slug AND p.published = :published'
         );
         $stmt->execute([
             ':slug' => $slug,
-            ':is_published' => 1,
+            ':published' => 1,
         ]);
 
         return (int) $stmt->fetchColumn();
@@ -172,14 +172,14 @@ final class PageTaxonomyQueryService
         $stmt = $db->prepare(
             'SELECT p.*
              FROM ' . $pagesTable . ' p
-             INNER JOIN ' . $pageTaxonomyTable . ' pt ON pt.page_id = p.id
+             INNER JOIN ' . $pageTaxonomyTable . ' pt ON pt.page = p.id
              INNER JOIN ' . $taxonomyTable . ' t ON t.id = pt.' . $taxonomyJoinColumn . '
-             WHERE t.slug = :slug AND p.is_published = :is_published
-             ORDER BY p.created_at DESC, p.id DESC
+             WHERE t.slug = :slug AND p.published = :published
+             ORDER BY p.created DESC, p.id DESC
              LIMIT :limit OFFSET :offset'
         );
         $stmt->bindValue(':slug', $slug);
-        $stmt->bindValue(':is_published', 1, PDO::PARAM_INT);
+        $stmt->bindValue(':published', 1, PDO::PARAM_INT);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
@@ -213,15 +213,15 @@ final class PageTaxonomyQueryService
         $stmt = $db->prepare(
             'SELECT p.*, COUNT(*) OVER() AS total_rows
              FROM ' . $pagesTable . ' p
-             INNER JOIN ' . $pageTaxonomyTable . ' pt ON pt.page_id = p.id
+             INNER JOIN ' . $pageTaxonomyTable . ' pt ON pt.page = p.id
              INNER JOIN ' . $taxonomyTable . ' t ON t.id = pt.' . $taxonomyJoinColumn . '
              WHERE t.slug = :slug
-               AND p.is_published = :is_published
-             ORDER BY p.created_at DESC, p.id DESC
+               AND p.published = :published
+             ORDER BY p.created DESC, p.id DESC
              LIMIT :limit OFFSET :offset'
         );
         $stmt->bindValue(':slug', $slug);
-        $stmt->bindValue(':is_published', 1, PDO::PARAM_INT);
+        $stmt->bindValue(':published', 1, PDO::PARAM_INT);
         $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
         $stmt->execute();

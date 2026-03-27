@@ -25,6 +25,7 @@ require_once dirname(__DIR__, 2) . '/private/lib/Content/PageTaxonomyAssignmentS
 require_once dirname(__DIR__, 2) . '/private/lib/Content/PageTaxonomyQueryService.php';
 require_once dirname(__DIR__, 2) . '/private/lib/Content/PagePersistenceService.php';
 require_once dirname(__DIR__, 2) . '/private/lib/Media/PageEditorGalleryHydrator.php';
+require_once dirname(__DIR__, 2) . '/private/lib/Taxonomy/TaxonomySetRecordPolicy.php';
 require_once dirname(__DIR__, 2) . '/private/lib/Routing/ChannelRoutePolicy.php';
 require_once dirname(__DIR__, 2) . '/private/lib/Routing/ChannelRecordPolicy.php';
 require_once dirname(__DIR__, 2) . '/private/lib/Routing/ChannelContextService.php';
@@ -149,19 +150,18 @@ PHP;
         $db->exec(
             'CREATE TABLE pages (
                 id INTEGER PRIMARY KEY,
-                title TEXT NOT NULL DEFAULT \'\',
                 slug TEXT NOT NULL DEFAULT \'\',
-                content TEXT NOT NULL DEFAULT \'\',
+                title TEXT NOT NULL DEFAULT \'\',
                 description TEXT NOT NULL DEFAULT \'\',
-                extended TEXT NOT NULL DEFAULT \'\',
+                channel INTEGER NOT NULL DEFAULT 0,
+                content TEXT NOT NULL DEFAULT \'\',
                 display_title INTEGER NOT NULL DEFAULT 1,
-                gallery_enabled INTEGER NOT NULL DEFAULT 0,
-                is_published INTEGER NOT NULL DEFAULT 1,
-                author_user_id INTEGER NULL,
-                channel_id INTEGER NULL,
-                published_at TEXT NOT NULL DEFAULT \'\',
-                created_at TEXT NOT NULL DEFAULT \'\',
-                updated_at TEXT NOT NULL DEFAULT \'\'
+                published INTEGER NOT NULL DEFAULT 1,
+                author INTEGER NULL,
+                cover_image INTEGER NULL,
+                preview_image INTEGER NULL,
+                created TEXT NOT NULL DEFAULT \'\',
+                updated TEXT NOT NULL DEFAULT \'\'
             )'
         );
     }
@@ -192,7 +192,7 @@ PHP;
         ];
 
         foreach ($fixtures as $slug => $record) {
-            $path = $channelDirectory . '/' . $slug . '.php';
+            $path = $channelDirectory . '/' . (int) ($record['id'] ?? 0) . '_' . $slug . '.php';
             $source = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export($record, true) . ";\n";
             if (file_put_contents($path, $source, LOCK_EX) === false) {
                 throw new RuntimeException('Failed to write channel fixture: ' . $slug);
@@ -203,14 +203,14 @@ PHP;
     private function seedPages(PDO $db): void
     {
         $rows = [
-            [7, 'Root Page', 'hello-world', 1, null, '2026-03-20 12:00:00'],
+            [7, 'Root Page', 'hello-world', 1, 0, '2026-03-20 12:00:00'],
             [42, 'News Post', 'smoke-post', 1, 10, '2026-03-20 12:00:00'],
             [84, 'Blog Post', 'build-log', 1, 20, '2026-03-20 12:00:00'],
         ];
 
         $stmt = $db->prepare(
-            'INSERT INTO pages (id, title, slug, is_published, channel_id, published_at)
-             VALUES (:id, :title, :slug, :is_published, :channel_id, :published_at)'
+            'INSERT INTO pages (id, title, slug, published, channel, created, updated)
+             VALUES (:id, :title, :slug, :published, :channel, :created, :updated)'
         );
 
         foreach ($rows as [$id, $title, $slug, $isPublished, $channelId, $publishedAt]) {
@@ -218,9 +218,10 @@ PHP;
                 ':id' => $id,
                 ':title' => $title,
                 ':slug' => $slug,
-                ':is_published' => $isPublished,
-                ':channel_id' => $channelId,
-                ':published_at' => $publishedAt,
+                ':published' => $isPublished,
+                ':channel' => $channelId,
+                ':created' => $publishedAt,
+                ':updated' => $publishedAt,
             ]);
         }
     }

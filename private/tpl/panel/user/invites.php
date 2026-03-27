@@ -46,7 +46,7 @@ $invitesEmptyId = 'invites-filter-empty';
 
 <header class="card">
     <div class="card-body">
-        <h1>User Invites</h1>
+        <h1>Invite Tokens</h1>
         <p class="text-muted mb-0">Create and manage registration invite tokens for public signups.</p>
     </div>
 </header>

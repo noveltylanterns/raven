@@ -53,7 +53,7 @@ final class SignupSubmissionRepository
      */
     public function create(array $data): int
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('signups');
 
         $formSlug = trim((string) ($data['form_slug'] ?? ''));
         $email = strtolower(trim((string) ($data['email'] ?? '')));
@@ -117,7 +117,7 @@ final class SignupSubmissionRepository
      */
     public function countByFormSlug(string $formSlug, string $search = ''): int
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('signups');
 
         $sql = 'SELECT COUNT(*)
                 FROM ' . $table . '
@@ -145,7 +145,7 @@ final class SignupSubmissionRepository
      */
     public function listByFormSlug(string $formSlug, int $limit, int $offset, string $search = ''): array
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('signups');
 
         $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
                 FROM ' . $table . '
@@ -183,7 +183,7 @@ final class SignupSubmissionRepository
      */
     public function listPageByFormSlug(string $formSlug, int $limit, int $offset, string $search = ''): array
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('signups');
         $safeLimit = max(1, $limit);
         $safeOffset = max(0, $offset);
 
@@ -271,7 +271,7 @@ final class SignupSubmissionRepository
      */
     public function listForExportByFormSlug(string $formSlug, string $search = ''): array
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('signups');
 
         $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
                 FROM ' . $table . '
@@ -298,7 +298,7 @@ final class SignupSubmissionRepository
      */
     public function deleteById(string $formSlug, int $id): bool
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('signups');
 
         try {
             $stmt = $this->db->prepare(
@@ -321,7 +321,7 @@ final class SignupSubmissionRepository
      */
     public function deleteAllByFormSlug(string $formSlug): int
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('signups');
 
         try {
             $stmt = $this->db->prepare(
@@ -341,7 +341,7 @@ final class SignupSubmissionRepository
      */
     public function syncFormIdentity(string $fromSlug, string $toSlug): void
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('signups');
 
         try {
             $stmt = $this->db->prepare(
@@ -367,7 +367,7 @@ final class SignupSubmissionRepository
      */
     private function existsByFormAndEmail(string $formSlug, string $email): bool
     {
-        $table = $this->table('ext_signups_submissions');
+        $table = $this->table('signups');
 
         try {
             $stmt = $this->db->prepare(

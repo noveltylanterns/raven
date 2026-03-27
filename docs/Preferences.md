@@ -22,6 +22,7 @@ Fields/options:
 
 - `Username` (required)
 - `Display Name`
+- `Bio`
 - `Email Address` (required)
 - `Change Password` button reveals password-change inputs
 - `New Password` (optional, leave blank to keep current)
@@ -92,7 +93,7 @@ Declared in `panel/index.php`:
 1. Requires panel login.
 2. Validates CSRF.
 3. Loads current profile state for safe avatar replacement/removal handling.
-4. Sanitizes and validates username/display/email/theme/password.
+4. Sanitizes and validates username/display/bio/email/theme/password.
 5. Validates avatar upload (when present) using `AvatarValidator` and media config limits.
 6. Stores avatar through sanitized re-encode flow (`storeSanitizedAvatarUpload`).
 7. Uses deterministic avatar naming: `public/uploads/avatars/{user_id}.{extension}`.
@@ -109,6 +110,7 @@ Declared in `panel/index.php`:
 - unique username/email checks
 - optional password hash update
 - theme update
+- plaintext `bio` update capped by config key `user.bio`
 - optional avatar path update
 - `two_factor_methods` JSON persistence for multi-method 2FA entries
 

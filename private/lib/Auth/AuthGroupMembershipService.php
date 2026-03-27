@@ -41,14 +41,18 @@ final class AuthGroupMembershipService
         $userGroupsTable = $this->table('user_groups');
 
         $stmt = $this->appDb->prepare(
-            'SELECT g.id, g.name, g.slug, g.permission_mask, g.is_stock
+            'SELECT g.id,
+                    g.name,
+                    g.slug,
+                    g.permissions AS permission_mask,
+                    CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS is_stock
              FROM ' . $groupsTable . ' g
-             INNER JOIN ' . $userGroupsTable . ' ug ON ug.group_id = g.id
-             WHERE ug.user_id = :user_id
+             INNER JOIN ' . $userGroupsTable . ' ug ON ug."group" = g.id
+             WHERE ug.user = :user
              ORDER BY g.id ASC'
         );
 
-        $stmt->execute([':user_id' => $userId]);
+        $stmt->execute([':user' => $userId]);
         $rows = $stmt->fetchAll();
 
         $result = [];
@@ -86,26 +90,26 @@ final class AuthGroupMembershipService
 
         if ($this->driver === 'sqlite') {
             $stmt = $this->appDb->prepare(
-                'INSERT INTO ' . $userGroupsTable . ' (user_id, group_id)
-                 VALUES (:user_id, :group_id)
-                 ON CONFLICT(user_id, group_id) DO NOTHING'
+                'INSERT INTO ' . $userGroupsTable . ' (user, "group")
+                 VALUES (:user, :group)
+                 ON CONFLICT(user, "group") DO NOTHING'
             );
         } elseif ($this->driver === 'mysql') {
             $stmt = $this->appDb->prepare(
-                'INSERT IGNORE INTO ' . $userGroupsTable . ' (user_id, group_id)
-                 VALUES (:user_id, :group_id)'
+                'INSERT IGNORE INTO ' . $userGroupsTable . ' (user, `group`)
+                 VALUES (:user, :group)'
             );
         } else {
             $stmt = $this->appDb->prepare(
-                'INSERT INTO ' . $userGroupsTable . ' (user_id, group_id)
-                 VALUES (:user_id, :group_id)
-                 ON CONFLICT (user_id, group_id) DO NOTHING'
+                'INSERT INTO ' . $userGroupsTable . ' ("user", "group")
+                 VALUES (:user, :group)
+                 ON CONFLICT ("user", "group") DO NOTHING'
             );
         }
 
         $stmt->execute([
-            ':user_id' => $userId,
-            ':group_id' => (int) $groupId,
+            ':user' => $userId,
+            ':group' => (int) $groupId,
         ]);
 
         $this->invalidateUser($userId);

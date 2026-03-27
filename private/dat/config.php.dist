@@ -194,6 +194,7 @@ return array (
       'login' => 'email',
       'registration' => 'closed',
     ),
+    'bio' => 500,
     'privacy' => 'disabled',
     'prefix' => 'user',
     'contact' =>

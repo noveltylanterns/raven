@@ -64,6 +64,7 @@ final class ConfigEditorSchemaService
         'user.privacy' => 'Profile Visibility',
         'user.auth.login' => 'Login Method',
         'user.auth.registration' => 'Enable Registration',
+        'user.bio' => 'Bio Length',
         'user.prefix' => 'Profile URL Prefix',
         'group.privacy' => 'Group Visibility',
         'group.prefix' => 'Group URL Prefix',
@@ -540,6 +541,12 @@ final class ConfigEditorSchemaService
                 $profilePrefix = $this->input->slug($rawProfilePrefix);
                 $user['prefix'] = $profilePrefix ?? '';
             }
+        }
+
+        if (!array_key_exists('bio', $user)) {
+            $user['bio'] = 500;
+        } else {
+            $user['bio'] = max(1, (int) ($user['bio'] ?? 500));
         }
 
         $user['contact'] = $this->profileContacts->normalizeOptionsConfig(

@@ -2593,10 +2593,12 @@ final class PanelController
         }
         $groupOptions = is_array($editData['group_options'] ?? null) ? $editData['group_options'] : [];
         $actorIsSuperAdmin = $this->auth->isSuperAdmin();
+        $bioMaxLength = max(1, (int) $this->config->get('user.bio', 500));
 
         $this->view->render('panel/user/edit', [
             'site' => $this->siteData(),
             'userRow' => $user,
+            'bioMaxLength' => $bioMaxLength,
             'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
             'profileContactOptions' => $this->profileContactOptions(),
             'twoFactorTypeOptions' => $this->twoFactorTypeOptions(),
@@ -2646,6 +2648,8 @@ final class PanelController
         $rawUsername = $this->input->text($post['username'] ?? null, 254);
         $username = $this->normalizeUserIdentifierValue($rawUsername);
         $displayName = $this->input->text($post['display_name'] ?? null, 160);
+        $bioMaxLength = max(1, (int) $this->config->get('user.bio', 500));
+        $bio = $this->input->text($post['bio'] ?? null, $bioMaxLength);
         $email = $this->input->email($post['email'] ?? null);
         $themeRaw = $this->input->text($post['theme'] ?? null, 50);
         $theme = $this->normalizePanelThemeChoice((string) $themeRaw, true);
@@ -2877,6 +2881,7 @@ final class PanelController
                 'username' => is_string($username) ? $username : '',
                 'display_name' => $displayName,
                 'email' => (string) $email,
+                'bio' => $bio,
                 'theme' => $theme,
                 'password' => $password !== '' ? $password : null,
                 'group_ids' => $groupIds,
@@ -2904,6 +2909,7 @@ final class PanelController
                     'username' => is_string($username) ? $username : '',
                     'display_name' => $displayName,
                     'email' => (string) $email,
+                    'bio' => $bio,
                     'theme' => $theme,
                     'password' => null,
                     'group_ids' => $groupIds,
@@ -3535,6 +3541,7 @@ final class PanelController
             is_array($preferences['two_factor_methods'] ?? null) ? $preferences['two_factor_methods'] : [],
             (string) ($preferences['email'] ?? '')
         );
+        $bioMaxLength = max(1, (int) $this->config->get('user.bio', 500));
 
         $this->view->render('panel/preferences', [
             'site' => $this->siteData(),
@@ -3544,6 +3551,7 @@ final class PanelController
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
             'preferences' => $preferences,
+            'bioMaxLength' => $bioMaxLength,
             'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
             'profileContactOptions' => $this->profileContactOptions(),
             'twoFactorTypeOptions' => $this->twoFactorTypeOptions(),
@@ -3586,6 +3594,8 @@ final class PanelController
         $rawUsername = $this->input->text($post['username'] ?? null, 254);
         $username = $this->normalizeUserIdentifierValue($rawUsername);
         $displayName = $this->input->text($post['display_name'] ?? null, 160);
+        $bioMaxLength = max(1, (int) $this->config->get('user.bio', 500));
+        $bio = $this->input->text($post['bio'] ?? null, $bioMaxLength);
         $email = $this->input->email($post['email'] ?? null);
         $themeRaw = $this->input->text($post['theme'] ?? null, 50);
         $theme = $this->normalizePanelThemeChoice((string) $themeRaw, true);
@@ -3693,6 +3703,7 @@ final class PanelController
             'username' => is_string($username) ? $username : '',
             'display_name' => $displayName,
             'email' => (string) $email,
+            'bio' => $bio,
             'theme' => $theme,
             'password' => $newPassword !== '' ? $newPassword : null,
             'contact_profiles' => $contactProfiles,

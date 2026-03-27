@@ -43,66 +43,55 @@ final class AuthSchemaBuilder
 
     public function ensureInviteTokenSchema(PDO $authDb, string $driver, string $prefix): void
     {
-        $table = $prefix . 'invite_tokens';
+        $table = $prefix . 'users_invites';
+        $legacyTable = $prefix . 'invite_tokens';
 
         if ($driver === 'sqlite') {
-            $authDb->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                token_hash TEXT NOT NULL UNIQUE,
-                token_value TEXT NULL,
-                token_hint TEXT NOT NULL,
-                is_reusable INTEGER NOT NULL DEFAULT 0,
-                use_count INTEGER NOT NULL DEFAULT 0,
-                expires_at INTEGER NULL,
-                last_used_at INTEGER NULL,
-                created_at TEXT NOT NULL,
-                created_by_user_id INTEGER NULL
-            )');
-            if (!$this->introspector->authColumnExistsSqlite($authDb, $table, 'token_value')) {
-                $authDb->exec('ALTER TABLE ' . $table . ' ADD COLUMN token_value TEXT NULL');
-            }
-            $authDb->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $table . '_token_hash ON ' . $table . ' (token_hash)');
-            $authDb->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_expires_at ON ' . $table . ' (expires_at)');
+            $this->migrateInviteTokenSchemaSqlite($authDb, $table, $legacyTable);
+            $authDb->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $table . '_hash ON ' . $table . ' (hash)');
+            $authDb->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_expires ON ' . $table . ' (expires)');
             return;
         }
 
         if ($driver === 'mysql') {
+            if ($this->tableExistsMySql($authDb, $legacyTable) && !$this->tableExistsMySql($authDb, $table)) {
+                $authDb->exec('RENAME TABLE ' . $legacyTable . ' TO ' . $table);
+            }
             $authDb->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                token_hash CHAR(64) NOT NULL,
-                token_value VARCHAR(191) NULL,
-                token_hint VARCHAR(16) NOT NULL,
-                is_reusable TINYINT(1) NOT NULL DEFAULT 0,
-                use_count INT UNSIGNED NOT NULL DEFAULT 0,
-                expires_at BIGINT UNSIGNED NULL,
-                last_used_at BIGINT UNSIGNED NULL,
-                created_at DATETIME NOT NULL,
-                created_by_user_id BIGINT UNSIGNED NULL,
-                UNIQUE KEY (token_hash),
-                INDEX (expires_at)
+                hash CHAR(64) NOT NULL,
+                value VARCHAR(191) NULL,
+                hint VARCHAR(16) NOT NULL,
+                reusable TINYINT(1) NOT NULL DEFAULT 0,
+                uses INT UNSIGNED NOT NULL DEFAULT 0,
+                expires BIGINT UNSIGNED NULL,
+                last_used BIGINT UNSIGNED NULL,
+                created DATETIME NOT NULL,
+                creator BIGINT UNSIGNED NULL,
+                UNIQUE KEY (hash),
+                INDEX (expires)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-            if (!$this->introspector->authColumnExistsMySql($authDb, $table, 'token_value')) {
-                $authDb->exec('ALTER TABLE ' . $table . ' ADD COLUMN token_value VARCHAR(191) NULL AFTER token_hash');
-            }
+            $this->renameInviteTokenColumnsMySql($authDb, $table);
             return;
         }
 
+        if ($this->tableExistsPgSql($authDb, $legacyTable) && !$this->tableExistsPgSql($authDb, $table)) {
+            $authDb->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($legacyTable) . ' RENAME TO ' . $this->introspector->quotePgIdentifier($table));
+        }
         $authDb->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
             id BIGSERIAL PRIMARY KEY,
-            token_hash CHAR(64) NOT NULL UNIQUE,
-            token_value VARCHAR(191) NULL,
-            token_hint VARCHAR(16) NOT NULL,
-            is_reusable SMALLINT NOT NULL DEFAULT 0,
-            use_count INTEGER NOT NULL DEFAULT 0,
-            expires_at BIGINT NULL,
-            last_used_at BIGINT NULL,
-            created_at TIMESTAMP NOT NULL,
-            created_by_user_id BIGINT NULL
+            hash CHAR(64) NOT NULL UNIQUE,
+            value VARCHAR(191) NULL,
+            hint VARCHAR(16) NOT NULL,
+            reusable SMALLINT NOT NULL DEFAULT 0,
+            uses INTEGER NOT NULL DEFAULT 0,
+            expires BIGINT NULL,
+            last_used BIGINT NULL,
+            created TIMESTAMP NOT NULL,
+            creator BIGINT NULL
         )');
-        if (!$this->introspector->authColumnExistsPgSql($authDb, $table, 'token_value')) {
-            $authDb->exec('ALTER TABLE ' . $table . ' ADD COLUMN token_value VARCHAR(191) NULL');
-        }
-        $authDb->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_expires_at ON ' . $table . ' (expires_at)');
+        $this->renameInviteTokenColumnsPgSql($authDb, $table);
+        $authDb->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_expires ON ' . $table . ' (expires)');
     }
 
     /**
@@ -113,76 +102,318 @@ final class AuthSchemaBuilder
         $usersTable = $prefix . 'users';
 
         if ($driver === 'sqlite') {
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'display_name')) {
-                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN display_name TEXT NULL');
-            }
-
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'theme')) {
-                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN theme TEXT NOT NULL DEFAULT \'default\'');
-            }
-
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'avatar_path')) {
-                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN avatar_path TEXT NULL');
-            }
-
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'contact_profiles')) {
-                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN contact_profiles TEXT NULL');
-            }
-
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'two_factor_methods')) {
-                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN two_factor_methods TEXT NULL');
-            }
-
+            $this->migrateAuthUsersSqlite($db, $usersTable);
             $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
             return;
         }
 
         if ($driver === 'mysql') {
-            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'display_name')) {
-                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN display_name VARCHAR(160) NULL');
-            }
-
             if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'theme')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN theme VARCHAR(50) NOT NULL DEFAULT \'default\'');
             }
 
-            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'avatar_path')) {
-                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN avatar_path VARCHAR(255) NULL');
+            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'name')) {
+                if ($this->introspector->authColumnExistsMySql($db, $usersTable, 'display_name')) {
+                    $db->exec('ALTER TABLE ' . $usersTable . ' CHANGE display_name name VARCHAR(160) NULL');
+                } else {
+                    $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN name VARCHAR(160) NULL');
+                }
             }
 
-            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'contact_profiles')) {
-                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN contact_profiles TEXT NULL');
+            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'avatar')) {
+                if ($this->introspector->authColumnExistsMySql($db, $usersTable, 'avatar_path')) {
+                    $db->exec('ALTER TABLE ' . $usersTable . ' CHANGE avatar_path avatar VARCHAR(255) NULL');
+                } else {
+                    $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN avatar VARCHAR(255) NULL');
+                }
             }
 
-            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'two_factor_methods')) {
-                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN two_factor_methods LONGTEXT NULL');
+            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'contact')) {
+                if ($this->introspector->authColumnExistsMySql($db, $usersTable, 'contact_profiles')) {
+                    $db->exec('ALTER TABLE ' . $usersTable . ' CHANGE contact_profiles contact TEXT NULL');
+                } else {
+                    $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN contact TEXT NULL');
+                }
+            }
+
+            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'two_factor')) {
+                if ($this->introspector->authColumnExistsMySql($db, $usersTable, 'two_factor_methods')) {
+                    $db->exec('ALTER TABLE ' . $usersTable . ' CHANGE two_factor_methods two_factor LONGTEXT NULL');
+                } else {
+                    $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN two_factor LONGTEXT NULL');
+                }
+            }
+
+            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'bio')) {
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN bio TEXT NULL');
             }
 
             $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
             return;
-        }
-
-        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'display_name')) {
-            $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN display_name VARCHAR(160) NULL');
         }
 
         if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'theme')) {
             $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN theme VARCHAR(50) NOT NULL DEFAULT \'default\'');
         }
 
-        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'avatar_path')) {
-            $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN avatar_path VARCHAR(255) NULL');
+        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'name')) {
+            if ($this->introspector->authColumnExistsPgSql($db, $usersTable, 'display_name')) {
+                $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' RENAME COLUMN display_name TO name');
+            } else {
+                $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN name VARCHAR(160) NULL');
+            }
         }
 
-        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'contact_profiles')) {
-            $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN contact_profiles TEXT NULL');
+        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'avatar')) {
+            if ($this->introspector->authColumnExistsPgSql($db, $usersTable, 'avatar_path')) {
+                $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' RENAME COLUMN avatar_path TO avatar');
+            } else {
+                $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN avatar VARCHAR(255) NULL');
+            }
         }
 
-        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'two_factor_methods')) {
-            $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN two_factor_methods TEXT NULL');
+        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'contact')) {
+            if ($this->introspector->authColumnExistsPgSql($db, $usersTable, 'contact_profiles')) {
+                $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' RENAME COLUMN contact_profiles TO contact');
+            } else {
+                $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN contact TEXT NULL');
+            }
+        }
+
+        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'two_factor')) {
+            if ($this->introspector->authColumnExistsPgSql($db, $usersTable, 'two_factor_methods')) {
+                $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' RENAME COLUMN two_factor_methods TO two_factor');
+            } else {
+                $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN two_factor TEXT NULL');
+            }
+        }
+
+        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'bio')) {
+            $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN bio TEXT NULL');
         }
 
         $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
+    }
+
+    private function migrateInviteTokenSchemaSqlite(PDO $db, string $table, string $legacyTable): void
+    {
+        $hasNewHash = $this->introspector->authColumnExistsSqlite($db, $table, 'hash');
+        $hasLegacyHash = $this->introspector->authColumnExistsSqlite($db, $legacyTable, 'token_hash');
+        if ($hasNewHash && !$hasLegacyHash) {
+            return;
+        }
+
+        $sourceTable = $hasLegacyHash ? $legacyTable : ($hasNewHash ? $table : null);
+        if ($sourceTable === null) {
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hash TEXT NOT NULL UNIQUE,
+                value TEXT NULL,
+                hint TEXT NOT NULL,
+                reusable INTEGER NOT NULL DEFAULT 0,
+                uses INTEGER NOT NULL DEFAULT 0,
+                expires INTEGER NULL,
+                last_used INTEGER NULL,
+                created TEXT NOT NULL,
+                creator INTEGER NULL
+            )');
+            return;
+        }
+
+        $tmpTable = $table . '__migrate';
+        $hasValue = $this->introspector->authColumnExistsSqlite($db, $sourceTable, 'value');
+        $hasTokenValue = $this->introspector->authColumnExistsSqlite($db, $sourceTable, 'token_value');
+
+        $db->beginTransaction();
+        try {
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            $db->exec('DROP INDEX IF EXISTS uniq_' . $legacyTable . '_token_hash');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $legacyTable . '_expires_at');
+            $db->exec('DROP INDEX IF EXISTS uniq_' . $table . '_hash');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $table . '_expires');
+            $db->exec('CREATE TABLE ' . $tmpTable . ' (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hash TEXT NOT NULL UNIQUE,
+                value TEXT NULL,
+                hint TEXT NOT NULL,
+                reusable INTEGER NOT NULL DEFAULT 0,
+                uses INTEGER NOT NULL DEFAULT 0,
+                expires INTEGER NULL,
+                last_used INTEGER NULL,
+                created TEXT NOT NULL,
+                creator INTEGER NULL
+            )');
+            $db->exec(
+                'INSERT INTO ' . $tmpTable . ' (id, hash, value, hint, reusable, uses, expires, last_used, created, creator)
+                 SELECT
+                    id,
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $sourceTable, 'hash') ? 'hash' : 'token_hash') . ',
+                    ' . ($hasValue ? 'value' : ($hasTokenValue ? 'token_value' : 'NULL')) . ',
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $sourceTable, 'hint') ? 'hint' : 'token_hint') . ',
+                    COALESCE(' . ($this->introspector->authColumnExistsSqlite($db, $sourceTable, 'reusable') ? 'reusable' : 'is_reusable') . ', 0),
+                    COALESCE(' . ($this->introspector->authColumnExistsSqlite($db, $sourceTable, 'uses') ? 'uses' : 'use_count') . ', 0),
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $sourceTable, 'expires') ? 'expires' : 'expires_at') . ',
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $sourceTable, 'last_used') ? 'last_used' : 'last_used_at') . ',
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $sourceTable, 'created') ? 'created' : 'created_at') . ',
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $sourceTable, 'creator') ? 'creator' : 'created_by_user_id') . '
+                 FROM ' . $sourceTable
+            );
+
+            if ($sourceTable !== $table) {
+                $db->exec('DROP TABLE IF EXISTS ' . $table);
+            }
+            $db->exec('DROP TABLE ' . $sourceTable);
+            $db->exec('ALTER TABLE ' . $tmpTable . ' RENAME TO ' . $table);
+            $db->commit();
+        } catch (\Throwable $exception) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            throw $exception;
+        }
+    }
+
+    private function migrateAuthUsersSqlite(PDO $db, string $usersTable): void
+    {
+        $hasNewColumns = $this->introspector->authColumnExistsSqlite($db, $usersTable, 'name')
+            && $this->introspector->authColumnExistsSqlite($db, $usersTable, 'avatar')
+            && $this->introspector->authColumnExistsSqlite($db, $usersTable, 'contact')
+            && $this->introspector->authColumnExistsSqlite($db, $usersTable, 'two_factor')
+            && $this->introspector->authColumnExistsSqlite($db, $usersTable, 'bio');
+        $hasLegacyColumns = $this->introspector->authColumnExistsSqlite($db, $usersTable, 'display_name')
+            || $this->introspector->authColumnExistsSqlite($db, $usersTable, 'avatar_path')
+            || $this->introspector->authColumnExistsSqlite($db, $usersTable, 'contact_profiles')
+            || $this->introspector->authColumnExistsSqlite($db, $usersTable, 'two_factor_methods');
+        if ($hasNewColumns && !$hasLegacyColumns) {
+            return;
+        }
+
+        $tmpTable = $usersTable . '__prefs';
+        $db->beginTransaction();
+        try {
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            $db->exec('CREATE TABLE ' . $tmpTable . ' (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL UNIQUE,
+                password TEXT NOT NULL,
+                username TEXT NULL UNIQUE,
+                status INTEGER NOT NULL DEFAULT 0,
+                verified INTEGER NOT NULL DEFAULT 0,
+                resettable INTEGER NOT NULL DEFAULT 1,
+                roles_mask INTEGER NOT NULL DEFAULT 0,
+                registered INTEGER NOT NULL,
+                last_login INTEGER NULL DEFAULT NULL,
+                force_logout INTEGER NOT NULL DEFAULT 0,
+                name TEXT NULL,
+                bio TEXT NULL,
+                theme TEXT NOT NULL DEFAULT \'default\',
+                avatar TEXT NULL,
+                contact TEXT NULL,
+                two_factor TEXT NULL
+            )');
+            $db->exec(
+                'INSERT INTO ' . $tmpTable . ' (
+                    id, email, password, username, status, verified, resettable, roles_mask, registered, last_login, force_logout,
+                    name, bio, theme, avatar, contact, two_factor
+                 )
+                 SELECT
+                    id,
+                    email,
+                    password,
+                    username,
+                    status,
+                    verified,
+                    resettable,
+                    roles_mask,
+                    registered,
+                    last_login,
+                    force_logout,
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'name') ? 'name' : 'display_name') . ',
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'bio') ? 'bio' : 'NULL') . ',
+                    COALESCE(theme, \'default\'),
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'avatar') ? 'avatar' : 'avatar_path') . ',
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'contact') ? 'contact' : 'contact_profiles') . ',
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'two_factor') ? 'two_factor' : 'two_factor_methods') . '
+                 FROM ' . $usersTable
+            );
+            $db->exec('DROP TABLE ' . $usersTable);
+            $db->exec('ALTER TABLE ' . $tmpTable . ' RENAME TO ' . $usersTable);
+            $db->commit();
+        } catch (\Throwable $exception) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            throw $exception;
+        }
+    }
+
+    private function renameInviteTokenColumnsMySql(PDO $db, string $table): void
+    {
+        $renames = [
+            'token_hash' => ['hash', 'CHAR(64) NOT NULL'],
+            'token_value' => ['value', 'VARCHAR(191) NULL'],
+            'token_hint' => ['hint', 'VARCHAR(16) NOT NULL'],
+            'is_reusable' => ['reusable', 'TINYINT(1) NOT NULL DEFAULT 0'],
+            'use_count' => ['uses', 'INT UNSIGNED NOT NULL DEFAULT 0'],
+            'expires_at' => ['expires', 'BIGINT UNSIGNED NULL'],
+            'last_used_at' => ['last_used', 'BIGINT UNSIGNED NULL'],
+            'created_at' => ['created', 'DATETIME NOT NULL'],
+            'created_by_user_id' => ['creator', 'BIGINT UNSIGNED NULL'],
+        ];
+
+        foreach ($renames as $old => [$new, $definition]) {
+            if ($this->introspector->authColumnExistsMySql($db, $table, $old) && !$this->introspector->authColumnExistsMySql($db, $table, $new)) {
+                $db->exec('ALTER TABLE ' . $table . ' CHANGE ' . $old . ' ' . $new . ' ' . $definition);
+            }
+        }
+    }
+
+    private function renameInviteTokenColumnsPgSql(PDO $db, string $table): void
+    {
+        $quoted = $this->introspector->quotePgIdentifier($table);
+        $renames = [
+            'token_hash' => 'hash',
+            'token_value' => 'value',
+            'token_hint' => 'hint',
+            'is_reusable' => 'reusable',
+            'use_count' => 'uses',
+            'expires_at' => 'expires',
+            'last_used_at' => 'last_used',
+            'created_at' => 'created',
+            'created_by_user_id' => 'creator',
+        ];
+
+        foreach ($renames as $old => $new) {
+            if ($this->introspector->authColumnExistsPgSql($db, $table, $old) && !$this->introspector->authColumnExistsPgSql($db, $table, $new)) {
+                $db->exec('ALTER TABLE ' . $quoted . ' RENAME COLUMN ' . $old . ' TO ' . $new);
+            }
+        }
+    }
+
+    private function tableExistsMySql(PDO $db, string $table): bool
+    {
+        $stmt = $db->prepare(
+            'SELECT 1
+             FROM information_schema.tables
+             WHERE table_schema = DATABASE()
+               AND table_name = :table_name
+             LIMIT 1'
+        );
+        $stmt->execute([':table_name' => $table]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    private function tableExistsPgSql(PDO $db, string $table): bool
+    {
+        $stmt = $db->prepare('SELECT to_regclass(:table_name)');
+        $stmt->execute([':table_name' => $table]);
+
+        return $stmt->fetchColumn() !== null;
     }
 
     private function loadDelightSchema(string $driver): ?string

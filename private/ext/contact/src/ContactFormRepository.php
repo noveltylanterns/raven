@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace Raven\Repository;
 
 use PDO;
-use PDOException;
 use RuntimeException;
 
 /**
@@ -54,21 +53,7 @@ final class ContactFormRepository
      */
     public function listAll(): array
     {
-        $table = $this->table('ext_contact');
-
-        try {
-            $stmt = $this->db->prepare(
-                'SELECT name, slug, enabled, save_mail_locally, destination, cc, bcc, additional_fields_json
-                 FROM ' . $table . '
-                 ORDER BY name ASC, id ASC'
-            );
-            $stmt->execute();
-        } catch (PDOException $exception) {
-            throw new RuntimeException('Failed to load contact form definitions.');
-        }
-
-        /** @var array<int, array<string, mixed>> $rows */
-        $rows = $stmt->fetchAll() ?: [];
+        $rows = $this->loadStoredForms();
         $forms = [];
         foreach ($rows as $row) {
             $name = trim((string) ($row['name'] ?? ''));
@@ -99,7 +84,6 @@ final class ContactFormRepository
      */
     public function replaceAll(array $forms): void
     {
-        $table = $this->table('ext_contact');
         $normalized = $this->normalizeForms($forms);
 
         usort($normalized, static function (array $left, array $right): int {
@@ -116,52 +100,7 @@ final class ContactFormRepository
             $seenSlugs[$slug] = true;
         }
 
-        $now = gmdate('Y-m-d H:i:s');
-
-        $this->db->beginTransaction();
-        try {
-            $insert = $this->db->prepare(
-                'INSERT INTO ' . $table . '
-                 (name, slug, enabled, save_mail_locally, destination, cc, bcc, additional_fields_json, created_at, updated_at)
-                 VALUES
-                 (:name, :slug, :enabled, :save_mail_locally, :destination, :cc, :bcc, :additional_fields_json, :created_at, :updated_at)'
-            );
-
-            $this->db->exec('DELETE FROM ' . $table);
-
-            foreach ($normalized as $form) {
-                $insert->execute([
-                    ':name' => (string) ($form['name'] ?? ''),
-                    ':slug' => (string) ($form['slug'] ?? ''),
-                    ':enabled' => !empty($form['enabled']) ? 1 : 0,
-                    ':save_mail_locally' => !array_key_exists('save_mail_locally', $form) || !empty($form['save_mail_locally']) ? 1 : 0,
-                    ':destination' => (string) ($form['destination'] ?? ''),
-                    ':cc' => (string) ($form['cc'] ?? ''),
-                    ':bcc' => (string) ($form['bcc'] ?? ''),
-                    ':additional_fields_json' => $this->encodeAdditionalFields((array) ($form['additional_fields'] ?? [])),
-                    ':created_at' => $now,
-                    ':updated_at' => $now,
-                ]);
-            }
-
-            $this->db->commit();
-        } catch (PDOException $exception) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-
-            if ($this->isUniqueConstraintError($exception)) {
-                throw new RuntimeException('A contact form with that slug already exists.');
-            }
-
-            throw new RuntimeException('Failed to save contact form definitions.');
-        } catch (\Throwable $exception) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-
-            throw $exception;
-        }
+        $this->persistForms($normalized);
     }
 
     /**
@@ -354,20 +293,40 @@ final class ContactFormRepository
         return $rawInput;
     }
 
-    /**
-     * Maps logical table names into backend-specific physical names.
-     */
-    private function table(string $table): string
+    private function formsFilePath(): string
     {
-        return $this->prefix . $table;
+        return dirname(__DIR__, 4) . '/private/dat/ext/contact/forms.php';
     }
 
     /**
-     * Detects duplicate-key SQL errors across supported PDO drivers.
+     * @return array<int, array<string, mixed>>
      */
-    private function isUniqueConstraintError(PDOException $exception): bool
+    private function loadStoredForms(): array
     {
-        $sqlState = (string) $exception->getCode();
-        return in_array($sqlState, ['23000', '23505'], true);
+        $path = $this->formsFilePath();
+        if (!is_file($path)) {
+            return [];
+        }
+
+        /** @var mixed $data */
+        $data = require $path;
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $forms
+     */
+    private function persistForms(array $forms): void
+    {
+        $path = $this->formsFilePath();
+        $directory = dirname($path);
+        if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
+            throw new RuntimeException('Failed to prepare contact form storage directory.');
+        }
+
+        $payload = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export(array_values($forms), true) . ";\n";
+        if (@file_put_contents($path, $payload, LOCK_EX) === false) {
+            throw new RuntimeException('Failed to save contact form definitions.');
+        }
     }
 }
