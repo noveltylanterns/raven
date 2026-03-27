@@ -54,12 +54,20 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                         <?php
                         $setId = (int) ($setRow['id'] ?? 0);
                         $isRoot = !empty($setRow['is_stock']);
+                        $categoryCount = (int) ($setRow['category_count'] ?? 0);
+                        $categoryListUrl = $panelBase . '/category?set=' . rawurlencode((string) $setId);
                         ?>
                         <tr>
                             <td><?= $setId ?></td>
                             <td><a href="<?= e($panelBase) ?>/category/set/edit/<?= $setId ?>"><?= e((string) ($setRow['name'] ?? 'Set')) ?></a></td>
                             <td><code><?= e((string) ($setRow['slug'] ?? '')) ?></code></td>
-                            <td><?= (int) ($setRow['category_count'] ?? 0) ?></td>
+                            <td>
+                                <?php if ($categoryCount > 0): ?>
+                                    <a href="<?= e($categoryListUrl) ?>"><?= $categoryCount ?></a>
+                                <?php else: ?>
+                                    <?= $categoryCount ?>
+                                <?php endif; ?>
+                            </td>
                             <td><?= (int) ($setRow['channel_count'] ?? 0) ?></td>
                             <td class="text-center">
                                 <div class="d-flex justify-content-center gap-2">

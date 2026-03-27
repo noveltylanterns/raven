@@ -1385,8 +1385,15 @@ final class PanelController
             return;
         }
 
+        $categoryCountsBySetId = $this->categoryRepo->countsBySetId();
         $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
-        if ($selectedSetId !== null && !$this->categorySetRepo->existsId($selectedSetId)) {
+        if (
+            $selectedSetId !== null
+            && (
+                !$this->categorySetRepo->existsId($selectedSetId)
+                || (int) ($categoryCountsBySetId[$selectedSetId] ?? 0) < 1
+            )
+        ) {
             $selectedSetId = null;
         }
 
@@ -1401,10 +1408,20 @@ final class PanelController
             $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
+        $setOptions = [];
+        foreach ($this->categorySetRepo->listOptions() as $setOption) {
+            $setId = (int) ($setOption['id'] ?? 0);
+            if ((int) ($categoryCountsBySetId[$setId] ?? 0) < 1) {
+                continue;
+            }
+
+            $setOptions[] = $setOption;
+        }
+
         $this->view->render('panel/category/list', [
             'site' => $this->siteData(),
             'categoryRows' => $categoryRows,
-            'setOptions' => $this->categorySetRepo->listOptions(),
+            'setOptions' => $setOptions,
             'selectedSetId' => $selectedSetId,
             'pagination' => $this->panelPaginationViewData('/category', $pagination, [
                 'set' => $selectedSetId !== null ? (string) $selectedSetId : '',
@@ -1859,8 +1876,15 @@ final class PanelController
             return;
         }
 
+        $tagCountsBySetId = $this->tagRepo->countsBySetId();
         $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
-        if ($selectedSetId !== null && !$this->tagSetRepo->existsId($selectedSetId)) {
+        if (
+            $selectedSetId !== null
+            && (
+                !$this->tagSetRepo->existsId($selectedSetId)
+                || (int) ($tagCountsBySetId[$selectedSetId] ?? 0) < 1
+            )
+        ) {
             $selectedSetId = null;
         }
 
@@ -1875,10 +1899,20 @@ final class PanelController
             $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
+        $setOptions = [];
+        foreach ($this->tagSetRepo->listOptions() as $setOption) {
+            $setId = (int) ($setOption['id'] ?? 0);
+            if ((int) ($tagCountsBySetId[$setId] ?? 0) < 1) {
+                continue;
+            }
+
+            $setOptions[] = $setOption;
+        }
+
         $this->view->render('panel/tag/list', [
             'site' => $this->siteData(),
             'tagRows' => $tagRows,
-            'setOptions' => $this->tagSetRepo->listOptions(),
+            'setOptions' => $setOptions,
             'selectedSetId' => $selectedSetId,
             'pagination' => $this->panelPaginationViewData('/tag', $pagination, [
                 'set' => $selectedSetId !== null ? (string) $selectedSetId : '',

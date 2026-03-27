@@ -54,12 +54,20 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                         <?php
                         $setId = (int) ($setRow['id'] ?? 0);
                         $isRoot = !empty($setRow['is_stock']);
+                        $tagCount = (int) ($setRow['tag_count'] ?? 0);
+                        $tagListUrl = $panelBase . '/tag?set=' . rawurlencode((string) $setId);
                         ?>
                         <tr>
                             <td><?= $setId ?></td>
                             <td><a href="<?= e($panelBase) ?>/tag/set/edit/<?= $setId ?>"><?= e((string) ($setRow['name'] ?? 'Set')) ?></a></td>
                             <td><code><?= e((string) ($setRow['slug'] ?? '')) ?></code></td>
-                            <td><?= (int) ($setRow['tag_count'] ?? 0) ?></td>
+                            <td>
+                                <?php if ($tagCount > 0): ?>
+                                    <a href="<?= e($tagListUrl) ?>"><?= $tagCount ?></a>
+                                <?php else: ?>
+                                    <?= $tagCount ?>
+                                <?php endif; ?>
+                            </td>
                             <td><?= (int) ($setRow['channel_count'] ?? 0) ?></td>
                             <td class="text-center">
                                 <div class="d-flex justify-content-center gap-2">
