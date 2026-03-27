@@ -1,10 +1,11 @@
 # Raven Theme System Agent Guide
 
-Last updated: 2026-03-14
+UPDATED: 2026-03-27
+NOTE: All paths relative to project root. (../ from the perspective of this directory)
 
 ## Scope
 - This file documents how Raven public theming works for all theme folders under `public/theme/`.
-- This guide is for theme builders and automation agents that need to create or modify themes without touching core application code.
+- This guide is for theme builders & automation agents that need to create/modify themes without touching core application code.
 - This document is intended to be standalone in production environments where repository-root `AGENTS.md` may be unavailable.
 - Keep this file thorough and self-sufficient for theme work; do not assume agents can fall back to root-level guidance.
 
@@ -18,7 +19,7 @@ Last updated: 2026-03-14
 
 ## Agent Safe Mode (Mandatory)
 - If your model is uncertain, do not invent behavior. Use only this contract.
-- Never edit core files for theme work (`public/index.php`, `private/sys/*`, `private/tpl/*`).
+- Never edit core files for theme work (ie: `public/index.php`, `private/sys/*`, `private/tpl/*`).
 - Never introduce CDN assets, remote fonts, telemetry scripts, or tracking beacons.
 - Build minimal valid theme structure first, then layer optional templates.
 - Validate each file as you create it; do not batch large uncertain changes.
