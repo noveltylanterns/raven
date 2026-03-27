@@ -43,18 +43,21 @@ final class AuthSchemaBuilder
 
     public function ensureInviteTokenSchema(PDO $authDb, string $driver, string $prefix): void
     {
-        $table = $prefix . 'users_invites';
+        $table = $prefix . 'auth_invites';
         $legacyTable = $prefix . 'invite_tokens';
+        $usersLegacyTable = $prefix . 'users_invites';
 
         if ($driver === 'sqlite') {
-            $this->migrateInviteTokenSchemaSqlite($authDb, $table, $legacyTable);
+            $this->migrateInviteTokenSchemaSqlite($authDb, $table, [$legacyTable, $usersLegacyTable]);
             $authDb->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $table . '_hash ON ' . $table . ' (hash)');
             $authDb->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_expires ON ' . $table . ' (expires)');
             return;
         }
 
         if ($driver === 'mysql') {
-            if ($this->tableExistsMySql($authDb, $legacyTable) && !$this->tableExistsMySql($authDb, $table)) {
+            if ($this->tableExistsMySql($authDb, $usersLegacyTable) && !$this->tableExistsMySql($authDb, $table)) {
+                $authDb->exec('RENAME TABLE ' . $usersLegacyTable . ' TO ' . $table);
+            } elseif ($this->tableExistsMySql($authDb, $legacyTable) && !$this->tableExistsMySql($authDb, $table)) {
                 $authDb->exec('RENAME TABLE ' . $legacyTable . ' TO ' . $table);
             }
             $authDb->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
@@ -75,7 +78,9 @@ final class AuthSchemaBuilder
             return;
         }
 
-        if ($this->tableExistsPgSql($authDb, $legacyTable) && !$this->tableExistsPgSql($authDb, $table)) {
+        if ($this->tableExistsPgSql($authDb, $usersLegacyTable) && !$this->tableExistsPgSql($authDb, $table)) {
+            $authDb->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersLegacyTable) . ' RENAME TO ' . $this->introspector->quotePgIdentifier($table));
+        } elseif ($this->tableExistsPgSql($authDb, $legacyTable) && !$this->tableExistsPgSql($authDb, $table)) {
             $authDb->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($legacyTable) . ' RENAME TO ' . $this->introspector->quotePgIdentifier($table));
         }
         $authDb->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
@@ -195,15 +200,30 @@ final class AuthSchemaBuilder
         $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
     }
 
-    private function migrateInviteTokenSchemaSqlite(PDO $db, string $table, string $legacyTable): void
+    /**
+     * @param array<int, string> $legacyTables
+     */
+    private function migrateInviteTokenSchemaSqlite(PDO $db, string $table, array $legacyTables): void
     {
         $hasNewHash = $this->introspector->authColumnExistsSqlite($db, $table, 'hash');
-        $hasLegacyHash = $this->introspector->authColumnExistsSqlite($db, $legacyTable, 'token_hash');
-        if ($hasNewHash && !$hasLegacyHash) {
-            return;
+        $sourceTable = null;
+        $hasLegacyHash = false;
+        foreach ($legacyTables as $legacyTable) {
+            if ($this->introspector->authColumnExistsSqlite($db, $legacyTable, 'token_hash')) {
+                $sourceTable = $legacyTable;
+                $hasLegacyHash = true;
+                break;
+            }
+            if ($this->introspector->authColumnExistsSqlite($db, $legacyTable, 'hash')) {
+                $sourceTable = $legacyTable;
+                break;
+            }
         }
 
-        $sourceTable = $hasLegacyHash ? $legacyTable : ($hasNewHash ? $table : null);
+        if ($hasNewHash && !$hasLegacyHash && $sourceTable === null) {
+            return;
+        }
+        $sourceTable = $sourceTable ?? ($hasNewHash ? $table : null);
         if ($sourceTable === null) {
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -227,8 +247,12 @@ final class AuthSchemaBuilder
         $db->beginTransaction();
         try {
             $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
-            $db->exec('DROP INDEX IF EXISTS uniq_' . $legacyTable . '_token_hash');
-            $db->exec('DROP INDEX IF EXISTS idx_' . $legacyTable . '_expires_at');
+            foreach ($legacyTables as $legacyTable) {
+                $db->exec('DROP INDEX IF EXISTS uniq_' . $legacyTable . '_token_hash');
+                $db->exec('DROP INDEX IF EXISTS idx_' . $legacyTable . '_expires_at');
+                $db->exec('DROP INDEX IF EXISTS uniq_' . $legacyTable . '_hash');
+                $db->exec('DROP INDEX IF EXISTS idx_' . $legacyTable . '_expires');
+            }
             $db->exec('DROP INDEX IF EXISTS uniq_' . $table . '_hash');
             $db->exec('DROP INDEX IF EXISTS idx_' . $table . '_expires');
             $db->exec('CREATE TABLE ' . $tmpTable . ' (
@@ -263,6 +287,11 @@ final class AuthSchemaBuilder
                 $db->exec('DROP TABLE IF EXISTS ' . $table);
             }
             $db->exec('DROP TABLE ' . $sourceTable);
+            foreach ($legacyTables as $legacyTable) {
+                if ($legacyTable !== $sourceTable) {
+                    $db->exec('DROP TABLE IF EXISTS ' . $legacyTable);
+                }
+            }
             $db->exec('ALTER TABLE ' . $tmpTable . ' RENAME TO ' . $table);
             $db->commit();
         } catch (\Throwable $exception) {

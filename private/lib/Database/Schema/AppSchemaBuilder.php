@@ -299,16 +299,19 @@ final class AppSchemaBuilder
 
     public function migrateLoginFailureStorage(PDO $db, string $driver, string $prefix): void
     {
-        $table = $prefix . 'users_failures';
+        $table = $prefix . 'auth_failures';
         $legacyTable = $prefix . 'login_failures';
+        $usersLegacyTable = $prefix . 'users_failures';
 
         if ($driver === 'sqlite') {
-            $this->migrateLoginFailureStorageSqlite($db, $table, $legacyTable);
+            $this->migrateLoginFailureStorageSqlite($db, $table, [$legacyTable, $usersLegacyTable]);
             return;
         }
 
         if ($driver === 'mysql') {
-            if ($this->tableExistsMySql($db, $legacyTable) && !$this->tableExistsMySql($db, $table)) {
+            if ($this->tableExistsMySql($db, $usersLegacyTable) && !$this->tableExistsMySql($db, $table)) {
+                $db->exec('RENAME TABLE ' . $usersLegacyTable . ' TO ' . $table);
+            } elseif ($this->tableExistsMySql($db, $legacyTable) && !$this->tableExistsMySql($db, $table)) {
                 $db->exec('RENAME TABLE ' . $legacyTable . ' TO ' . $table);
             }
 
@@ -316,7 +319,12 @@ final class AppSchemaBuilder
             return;
         }
 
-        if ($this->tableExistsPgSql($db, $legacyTable) && !$this->tableExistsPgSql($db, $table)) {
+        if ($this->tableExistsPgSql($db, $usersLegacyTable) && !$this->tableExistsPgSql($db, $table)) {
+            $db->exec(
+                'ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersLegacyTable) . '
+                 RENAME TO ' . $this->introspector->quotePgIdentifier($table)
+            );
+        } elseif ($this->tableExistsPgSql($db, $legacyTable) && !$this->tableExistsPgSql($db, $table)) {
             $db->exec(
                 'ALTER TABLE ' . $this->introspector->quotePgIdentifier($legacyTable) . '
                  RENAME TO ' . $this->introspector->quotePgIdentifier($table)
@@ -596,14 +604,14 @@ final class AppSchemaBuilder
 
     private function pageStorageIsModernSqlite(PDO $db, string $pagesTable): bool
     {
-        $required = ['slug', 'title', 'description', 'channel', 'content', 'display_title', 'published', 'author', 'cover_image', 'preview_image', 'created', 'updated'];
+        $required = ['slug', 'title', 'description', 'channel', 'content', 'display_title', 'status', 'author', 'cover_image', 'preview_image', 'created', 'updated'];
         foreach ($required as $column) {
             if (!$this->introspector->appColumnExistsSqlite($db, $pagesTable, $column)) {
                 return false;
             }
         }
 
-        foreach (['extended', 'published_at', 'gallery_enabled', 'channel_id', 'is_published', 'author_user_id', 'created_at', 'updated_at'] as $legacyColumn) {
+        foreach (['extended', 'published', 'published_at', 'gallery_enabled', 'channel_id', 'is_published', 'author_user_id', 'created_at', 'updated_at'] as $legacyColumn) {
             if ($this->introspector->appColumnExistsSqlite($db, $pagesTable, $legacyColumn)) {
                 return false;
             }
@@ -639,6 +647,7 @@ final class AppSchemaBuilder
         $tmpTable = $pagesTable . '__content_migration';
         $hasExtended = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'extended');
         $hasChannel = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'channel');
+        $hasStatus = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'status');
         $hasPublished = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'published');
         $hasAuthor = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'author');
         $hasCoverImage = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'cover_image');
@@ -649,7 +658,11 @@ final class AppSchemaBuilder
             ? 'CASE WHEN TRIM(COALESCE(extended, \'\')) <> \'\' THEN extended ELSE content END'
             : 'content';
         $channelExpr = $hasChannel ? 'COALESCE(channel, 0)' : 'COALESCE(channel_id, 0)';
-        $publishedExpr = $hasPublished ? 'COALESCE(published, 1)' : 'COALESCE(is_published, 1)';
+        $statusExpr = $hasStatus
+            ? "CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'draft' THEN 'draft' ELSE 'published' END"
+            : ($hasPublished
+                ? "CASE WHEN COALESCE(published, 1) = 1 THEN 'published' ELSE 'draft' END"
+                : "CASE WHEN COALESCE(is_published, 1) = 1 THEN 'published' ELSE 'draft' END");
         $authorExpr = $hasAuthor ? 'author' : 'author_user_id';
         $coverExpr = $hasCoverImage ? 'cover_image' : 'NULL';
         $previewExpr = $hasPreviewImage ? 'preview_image' : $coverExpr;
@@ -676,7 +689,7 @@ final class AppSchemaBuilder
                 channel INTEGER NOT NULL DEFAULT 0,
                 content TEXT NOT NULL DEFAULT \'\',
                 display_title INTEGER NOT NULL DEFAULT 1,
-                published INTEGER NOT NULL DEFAULT 1,
+                status TEXT NOT NULL DEFAULT \'published\',
                 author INTEGER NULL,
                 cover_image INTEGER NULL,
                 preview_image INTEGER NULL,
@@ -686,7 +699,7 @@ final class AppSchemaBuilder
 
             $db->exec(
                 'INSERT INTO ' . $tmpTable . ' (
-                    id, slug, title, description, channel, content, display_title, published, author, cover_image, preview_image, created, updated
+                    id, slug, title, description, channel, content, display_title, status, author, cover_image, preview_image, created, updated
                  )
                  SELECT
                     id,
@@ -696,7 +709,7 @@ final class AppSchemaBuilder
                     ' . $channelExpr . ',
                     ' . $contentExpr . ',
                     COALESCE(display_title, 1),
-                    ' . $publishedExpr . ',
+                    ' . $statusExpr . ',
                     ' . $authorExpr . ',
                     ' . $coverExpr . ',
                     ' . $previewExpr . ',
@@ -733,10 +746,14 @@ final class AppSchemaBuilder
             $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN extended');
         }
         $this->renameColumnIfNeededMySql($db, $pagesTable, 'channel_id', 'channel', 'BIGINT UNSIGNED NOT NULL DEFAULT 0');
-        $this->renameColumnIfNeededMySql($db, $pagesTable, 'is_published', 'published', 'TINYINT(1) NOT NULL DEFAULT 1');
+        $this->renameColumnIfNeededMySql($db, $pagesTable, 'published', 'status', 'VARCHAR(20) NOT NULL DEFAULT \'published\'');
+        $this->renameColumnIfNeededMySql($db, $pagesTable, 'is_published', 'status', 'VARCHAR(20) NOT NULL DEFAULT \'published\'');
         $this->renameColumnIfNeededMySql($db, $pagesTable, 'author_user_id', 'author', 'BIGINT UNSIGNED NULL');
         $this->renameColumnIfNeededMySql($db, $pagesTable, 'created_at', 'created', 'DATETIME NOT NULL');
         $this->renameColumnIfNeededMySql($db, $pagesTable, 'updated_at', 'updated', 'DATETIME NOT NULL');
+        if ($this->introspector->appColumnExistsMySql($db, $pagesTable, 'status')) {
+            $db->exec("UPDATE " . $pagesTable . " SET status = CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'draft' THEN 'draft' ELSE 'published' END");
+        }
         if (!$this->introspector->appColumnExistsMySql($db, $pagesTable, 'cover_image')) {
             $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN cover_image BIGINT UNSIGNED NULL');
         }
@@ -765,10 +782,14 @@ final class AppSchemaBuilder
             $db->exec('ALTER TABLE ' . $quoted . ' DROP COLUMN extended');
         }
         $this->renameColumnIfNeededPgSql($db, $pagesTable, 'channel_id', 'channel');
-        $this->renameColumnIfNeededPgSql($db, $pagesTable, 'is_published', 'published');
+        $this->renameColumnIfNeededPgSql($db, $pagesTable, 'published', 'status');
+        $this->renameColumnIfNeededPgSql($db, $pagesTable, 'is_published', 'status');
         $this->renameColumnIfNeededPgSql($db, $pagesTable, 'author_user_id', 'author');
         $this->renameColumnIfNeededPgSql($db, $pagesTable, 'created_at', 'created');
         $this->renameColumnIfNeededPgSql($db, $pagesTable, 'updated_at', 'updated');
+        if ($this->introspector->appColumnExistsPgSql($db, $pagesTable, 'status')) {
+            $db->exec("UPDATE " . $quoted . " SET status = CASE WHEN LOWER(BTRIM(COALESCE(status, ''))) = 'draft' THEN 'draft' ELSE 'published' END");
+        }
         if (!$this->introspector->appColumnExistsPgSql($db, $pagesTable, 'cover_image')) {
             $db->exec('ALTER TABLE ' . $quoted . ' ADD COLUMN cover_image BIGINT NULL');
         }
@@ -1137,22 +1158,32 @@ final class AppSchemaBuilder
         }
     }
 
-    private function migrateLoginFailureStorageSqlite(PDO $db, string $table, string $legacyTable): void
+    /**
+     * @param array<int, string> $legacyTables
+     */
+    private function migrateLoginFailureStorageSqlite(PDO $db, string $table, array $legacyTables): void
     {
+        $legacyTable = $legacyTables[0] ?? '';
         $hasNewColumns = $this->introspector->appColumnExistsSqlite($db, $table, 'user')
             && $this->introspector->appColumnExistsSqlite($db, $table, 'first_failed')
             && $this->introspector->appColumnExistsSqlite($db, $table, 'last_failed')
             && $this->introspector->appColumnExistsSqlite($db, $table, 'created')
             && $this->introspector->appColumnExistsSqlite($db, $table, 'updated');
-        $hasLegacyColumns = $this->introspector->appColumnExistsSqlite($db, $legacyTable, 'username_normalized')
-            || $this->introspector->appColumnExistsSqlite($db, $table, 'username_normalized');
+        $sourceTable = null;
+        $hasLegacyColumns = $this->introspector->appColumnExistsSqlite($db, $table, 'username_normalized');
+        foreach ($legacyTables as $candidateTable) {
+            if ($this->introspector->appColumnExistsSqlite($db, $candidateTable, 'username_normalized')) {
+                $hasLegacyColumns = true;
+            }
+            if ($sourceTable === null && $this->introspector->appColumnExistsSqlite($db, $candidateTable, 'bucket_hash')) {
+                $sourceTable = $candidateTable;
+            }
+        }
         if ($hasNewColumns && !$hasLegacyColumns) {
             return;
         }
 
-        $sourceTable = $this->introspector->appColumnExistsSqlite($db, $legacyTable, 'bucket_hash')
-            ? $legacyTable
-            : ($hasNewColumns ? $table : null);
+        $sourceTable = $sourceTable ?? ($hasNewColumns ? $table : null);
         if ($sourceTable === null) {
             return;
         }
@@ -1161,9 +1192,12 @@ final class AppSchemaBuilder
         $db->beginTransaction();
         try {
             $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
-            $db->exec('DROP INDEX IF EXISTS uniq_' . $legacyTable . '_bucket_hash');
-            $db->exec('DROP INDEX IF EXISTS idx_' . $legacyTable . '_locked_until');
-            $db->exec('DROP INDEX IF EXISTS idx_' . $legacyTable . '_last_failed_at');
+            foreach ($legacyTables as $candidateTable) {
+                $db->exec('DROP INDEX IF EXISTS uniq_' . $candidateTable . '_bucket_hash');
+                $db->exec('DROP INDEX IF EXISTS idx_' . $candidateTable . '_locked_until');
+                $db->exec('DROP INDEX IF EXISTS idx_' . $candidateTable . '_last_failed_at');
+                $db->exec('DROP INDEX IF EXISTS idx_' . $candidateTable . '_last_failed');
+            }
             $db->exec('DROP INDEX IF EXISTS uniq_' . $table . '_bucket_hash');
             $db->exec('DROP INDEX IF EXISTS idx_' . $table . '_locked_until');
             $db->exec('DROP INDEX IF EXISTS idx_' . $table . '_last_failed');
@@ -1201,6 +1235,11 @@ final class AppSchemaBuilder
                 $db->exec('DROP TABLE IF EXISTS ' . $table);
             }
             $db->exec('DROP TABLE ' . $sourceTable);
+            foreach ($legacyTables as $candidateTable) {
+                if ($candidateTable !== '' && $candidateTable !== $sourceTable) {
+                    $db->exec('DROP TABLE IF EXISTS ' . $candidateTable);
+                }
+            }
             $db->exec('ALTER TABLE ' . $tmpTable . ' RENAME TO ' . $table);
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $table . '_bucket_hash ON ' . $table . ' (bucket_hash)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_locked_until ON ' . $table . ' (locked_until)');
@@ -1325,7 +1364,9 @@ final class AppSchemaBuilder
         $hasSet = $this->introspector->appColumnExistsSqlite($db, $table, 'set');
         $hasSetId = $this->introspector->appColumnExistsSqlite($db, $table, 'set_id');
         $hasCreated = $this->introspector->appColumnExistsSqlite($db, $table, 'created');
+        $hasUpdated = $this->introspector->appColumnExistsSqlite($db, $table, 'updated');
         $hasCreatedAt = $this->introspector->appColumnExistsSqlite($db, $table, 'created_at');
+        $hasUpdatedAt = $this->introspector->appColumnExistsSqlite($db, $table, 'updated_at');
         $hasLegacy = false;
         foreach ($legacyColumns as $column) {
             if ($this->introspector->appColumnExistsSqlite($db, $table, $column)) {
@@ -1333,11 +1374,11 @@ final class AppSchemaBuilder
                 break;
             }
         }
-        if ($hasCoverFile || $hasPreviewFile || $hasSetId || $hasCreatedAt) {
+        if ($hasCoverFile || $hasPreviewFile || $hasSetId || $hasCreatedAt || $hasUpdatedAt) {
             $hasLegacy = true;
         }
 
-        if ($hasCover && $hasPreview && $hasSet && $hasCreated && !$hasLegacy) {
+        if ($hasCover && $hasPreview && $hasSet && $hasCreated && $hasUpdated && !$hasLegacy) {
             $db->exec('UPDATE ' . $table . ' SET cover_image = NULL WHERE TRIM(COALESCE(cover_image, \'\')) = \'\'');
             $db->exec('UPDATE ' . $table . ' SET preview_image = NULL WHERE TRIM(COALESCE(preview_image, \'\')) = \'\'');
             $db->exec('UPDATE ' . $table . ' SET ' . $setColumn . ' = 1 WHERE ' . $setColumn . ' IS NULL OR ' . $setColumn . ' = 0');
@@ -1355,7 +1396,8 @@ final class AppSchemaBuilder
                 description,
                 ' . $this->sqliteTaxonomyImageSourceExpr($hasCover, 'cover_image', $hasCoverFile, 'cover_image_file', $hasCoverPath, 'cover_image_path') . ' AS cover_image_source,
                 ' . $this->sqliteTaxonomyImageSourceExpr($hasPreview, 'preview_image', $hasPreviewFile, 'preview_image_file', $hasPreviewPath, 'preview_image_path') . ' AS preview_image_source,
-                ' . ($hasCreated ? 'created' : ($hasCreatedAt ? 'created_at' : "''")) . ' AS created_value
+                ' . ($hasCreated ? 'created' : ($hasCreatedAt ? 'created_at' : "''")) . ' AS created_value,
+                ' . ($hasUpdated ? 'updated' : ($hasUpdatedAt ? 'updated_at' : ($hasCreated ? 'created' : ($hasCreatedAt ? 'created_at' : "''")))) . ' AS updated_value
              FROM ' . $table;
 
             $db->beginTransaction();
@@ -1372,7 +1414,8 @@ final class AppSchemaBuilder
                 description TEXT NULL,
                 cover_image TEXT NULL,
                 preview_image TEXT NULL,
-                created TEXT NOT NULL
+                created TEXT NOT NULL,
+                updated TEXT NOT NULL
             )');
 
             $select = $db->prepare($selectSql);
@@ -1380,9 +1423,9 @@ final class AppSchemaBuilder
             $rows = $select->fetchAll() ?: [];
             $insert = $db->prepare(
                 'INSERT INTO ' . $tmpTable . ' (
-                    id, name, slug, "set", description, cover_image, preview_image, created
+                    id, name, slug, "set", description, cover_image, preview_image, created, updated
                  ) VALUES (
-                    :id, :name, :slug, :set, :description, :cover_image, :preview_image, :created
+                    :id, :name, :slug, :set, :description, :cover_image, :preview_image, :created, :updated
                  )'
             );
 
@@ -1396,6 +1439,7 @@ final class AppSchemaBuilder
                     ':cover_image' => $this->normalizeTaxonomyImageFilename($row['cover_image_source'] ?? null),
                     ':preview_image' => $this->normalizeTaxonomyImageFilename($row['preview_image_source'] ?? null),
                     ':created' => (string) ($row['created_value'] ?? ''),
+                    ':updated' => (string) ($row['updated_value'] ?? $row['created_value'] ?? ''),
                 ]);
             }
 
@@ -1421,6 +1465,7 @@ final class AppSchemaBuilder
         $setColumn = $this->taxonomySetColumnSql($driver);
         $hasSet = $this->taxonomyColumnExists($db, $driver, $table, 'set');
         $hasCreated = $this->taxonomyColumnExists($db, $driver, $table, 'created');
+        $hasUpdated = $this->taxonomyColumnExists($db, $driver, $table, 'updated');
         $hasCover = $this->taxonomyColumnExists($db, $driver, $table, 'cover_image');
         $hasPreview = $this->taxonomyColumnExists($db, $driver, $table, 'preview_image');
         if (!$hasSet) {
@@ -1431,6 +1476,13 @@ final class AppSchemaBuilder
                 $db->exec('ALTER TABLE ' . $table . ' ADD COLUMN created DATETIME NOT NULL DEFAULT \'1970-01-01 00:00:00\'');
             } else {
                 $db->exec('ALTER TABLE ' . $table . ' ADD COLUMN created TIMESTAMP NOT NULL DEFAULT \'1970-01-01 00:00:00\'');
+            }
+        }
+        if (!$hasUpdated) {
+            if ($driver === 'mysql') {
+                $db->exec('ALTER TABLE ' . $table . ' ADD COLUMN updated DATETIME NOT NULL DEFAULT \'1970-01-01 00:00:00\'');
+            } else {
+                $db->exec('ALTER TABLE ' . $table . ' ADD COLUMN updated TIMESTAMP NOT NULL DEFAULT \'1970-01-01 00:00:00\'');
             }
         }
         if (!$hasCover) {
@@ -1447,6 +1499,8 @@ final class AppSchemaBuilder
                 ' . $this->taxonomyImageSourceExpr($driver, $db, $table, 'set_id') . ' AS set_legacy,
                 ' . $this->taxonomyImageSourceExpr($driver, $db, $table, 'created') . ' AS created_current,
                 ' . $this->taxonomyImageSourceExpr($driver, $db, $table, 'created_at') . ' AS created_legacy,
+                ' . $this->taxonomyImageSourceExpr($driver, $db, $table, 'updated') . ' AS updated_current,
+                ' . $this->taxonomyImageSourceExpr($driver, $db, $table, 'updated_at') . ' AS updated_legacy,
                 ' . $this->taxonomyImageSourceExpr($driver, $db, $table, 'cover_image') . ' AS cover_image_current,
                 ' . $this->taxonomyImageSourceExpr($driver, $db, $table, 'cover_image_file') . ' AS cover_image_file,
                 ' . $this->taxonomyImageSourceExpr($driver, $db, $table, 'cover_image_path') . ' AS cover_image_path,
@@ -1462,6 +1516,7 @@ final class AppSchemaBuilder
             'UPDATE ' . $table . '
              SET ' . $setColumn . ' = :set_value,
                  created = :created_value,
+                 updated = :updated_value,
                  cover_image = :cover_image,
                  preview_image = :preview_image
              WHERE id = :id'
@@ -1471,6 +1526,7 @@ final class AppSchemaBuilder
             $update->execute([
                 ':set_value' => max(1, (int) ($row['set_current'] ?: $row['set_legacy'] ?: 1)),
                 ':created_value' => trim((string) ($row['created_current'] ?: $row['created_legacy'] ?: '')),
+                ':updated_value' => trim((string) ($row['updated_current'] ?: $row['updated_legacy'] ?: $row['created_current'] ?: $row['created_legacy'] ?: '')),
                 ':cover_image' => $this->normalizeTaxonomyImageFilename(
                     $this->firstNonEmptyValue(
                         $row['cover_image_current'] ?? null,
@@ -1490,7 +1546,7 @@ final class AppSchemaBuilder
         }
 
         $this->dropLegacyTaxonomySetIndex($db, $driver, $table);
-        $legacyColumns = array_merge($legacyColumns, ['set_id', 'created_at', 'cover_image_file', 'preview_image_file']);
+        $legacyColumns = array_merge($legacyColumns, ['set_id', 'created_at', 'updated_at', 'cover_image_file', 'preview_image_file']);
         foreach ($legacyColumns as $column) {
             if (!$this->taxonomyColumnExists($db, $driver, $table, $column)) {
                 continue;

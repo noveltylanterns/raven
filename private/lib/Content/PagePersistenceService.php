@@ -19,7 +19,7 @@ final class PagePersistenceService
      *   content: string,
      *   description: string,
      *   display_title: int,
-     *   published: int,
+     *   status: string,
      *   author: int|null,
      *   channel: int|null,
      *   now: string,
@@ -49,7 +49,7 @@ final class PagePersistenceService
             ':description' => (string) ($payload['description'] ?? ''),
             ':display_title' => (int) ($payload['display_title'] ?? 1),
             ':channel' => $payload['channel'] ?? null,
-            ':published' => (int) ($payload['published'] ?? 0),
+            ':status' => (string) ($payload['status'] ?? 'draft'),
             ':author' => $payload['author'] ?? null,
             ':updated' => $now,
         ];
@@ -67,7 +67,7 @@ final class PagePersistenceService
                          display_title = :display_title,
                          author = :author,
                          channel = :channel,
-                         published = :published,
+                         status = :status,
                          updated = :updated
                      WHERE id = :id'
                 );
@@ -78,8 +78,8 @@ final class PagePersistenceService
             } else {
                 $stmt = $db->prepare(
                     'INSERT INTO ' . $pagesTable . '
-                    (title, slug, content, description, display_title, channel, published, author, created, updated)
-                    VALUES (:title, :slug, :content, :description, :display_title, :channel, :published, :author, :created, :updated)'
+                    (title, slug, content, description, display_title, channel, status, author, created, updated)
+                    VALUES (:title, :slug, :content, :description, :display_title, :channel, :status, :author, :created, :updated)'
                 );
 
                 $stmt->execute($writeParams + [':created' => $now]);

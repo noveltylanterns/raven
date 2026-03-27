@@ -45,7 +45,7 @@ final class TagRepository
         $setColumn = $this->setColumn('t');
 
         $stmt = $this->db->prepare(
-            'SELECT t.id, t.name, t.slug, ' . $setColumn . ' AS set_value, t.description, t.created,
+            'SELECT t.id, t.name, t.slug, ' . $setColumn . ' AS set_value, t.description, t.created, t.updated,
                     t.cover_image, t.preview_image,
                     COALESCE(pt.page_count, 0) AS page_count
              FROM ' . $tags . ' t
@@ -95,7 +95,7 @@ final class TagRepository
         }
 
         $stmt = $this->db->prepare(
-            'SELECT t.id, t.name, t.slug, ' . $this->setColumn('t') . ' AS set_value, t.description, t.created,
+            'SELECT t.id, t.name, t.slug, ' . $this->setColumn('t') . ' AS set_value, t.description, t.created, t.updated,
                     t.cover_image, t.preview_image,
                     COALESCE(pt.page_count, 0) AS page_count
              FROM ' . $tags . ' t
@@ -141,12 +141,13 @@ final class TagRepository
                     page_rows.set_value,
                     page_rows.description,
                     page_rows.created,
+                    page_rows.updated,
                     page_rows.cover_image,
                     page_rows.preview_image,
                     page_rows.page_count,
                     totals.total_rows
              FROM (
-                 SELECT t.id, t.name, t.slug, ' . $this->setColumn('t') . ' AS set_value, t.description, t.created,
+                 SELECT t.id, t.name, t.slug, ' . $this->setColumn('t') . ' AS set_value, t.description, t.created, t.updated,
                         t.cover_image, t.preview_image,
                         COALESCE(pt.page_count, 0) AS page_count
                  FROM ' . $tags . ' t
@@ -276,7 +277,7 @@ final class TagRepository
         $tags = $this->table('tags');
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug, ' . $this->setColumn() . ' AS set_value, description, created,
+            'SELECT id, name, slug, ' . $this->setColumn() . ' AS set_value, description, created, updated,
                     cover_image, preview_image
              FROM ' . $tags . '
              WHERE id = :id
@@ -303,6 +304,7 @@ final class TagRepository
         $slug = $data['slug'];
         $setId = max(1, (int) ($data['set'] ?? 1));
         $description = $data['description'];
+        $now = gmdate('Y-m-d H:i:s');
 
         if ($id !== null && $id > 0) {
             // Update existing row when an id is present.
@@ -311,7 +313,8 @@ final class TagRepository
                  SET name = :name,
                      slug = :slug,
                      ' . $this->setColumn() . ' = :set_id,
-                     description = :description
+                     description = :description,
+                     updated = :updated
                  WHERE id = :id'
             );
             $stmt->execute([
@@ -319,6 +322,7 @@ final class TagRepository
                 ':slug' => $slug,
                 ':set_id' => $setId,
                 ':description' => $description,
+                ':updated' => $now,
                 ':id' => $id,
             ]);
 
@@ -327,15 +331,16 @@ final class TagRepository
 
         // Insert path creates a new tag with creation timestamp.
         $stmt = $this->db->prepare(
-            'INSERT INTO ' . $tags . ' (name, slug, ' . $this->setColumn() . ', description, created)
-             VALUES (:name, :slug, :set_id, :description, :created_at)'
+            'INSERT INTO ' . $tags . ' (name, slug, ' . $this->setColumn() . ', description, created, updated)
+             VALUES (:name, :slug, :set_id, :description, :created_at, :updated)'
         );
         $stmt->execute([
             ':name' => $name,
             ':slug' => $slug,
             ':set_id' => $setId,
             ':description' => $description,
-            ':created_at' => gmdate('Y-m-d H:i:s'),
+            ':created_at' => $now,
+            ':updated' => $now,
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -356,12 +361,14 @@ final class TagRepository
         $stmt = $this->db->prepare(
             'UPDATE ' . $tags . '
              SET cover_image = :cover_image,
-                 preview_image = :preview_image
+                 preview_image = :preview_image,
+                 updated = :updated
              WHERE id = :id'
         );
         $stmt->execute([
             ':cover_image' => $this->normalizeNullableFilename($files['cover_image'] ?? null),
             ':preview_image' => $this->normalizeNullableFilename($files['preview_image'] ?? null),
+            ':updated' => gmdate('Y-m-d H:i:s'),
             ':id' => $id,
         ]);
     }

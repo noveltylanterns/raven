@@ -121,8 +121,8 @@ final class SeedInstaller
         $now = gmdate('Y-m-d H:i:s');
         $insert = $db->prepare(
             'INSERT INTO ' . $pagesTable . '
-            (slug, title, description, channel, content, display_title, published, author, cover_image, preview_image, created, updated)
-            VALUES (:slug, :title, :description, :channel, :content, :display_title, :published, :author, :cover_image, :preview_image, :created, :updated)'
+            (slug, title, description, channel, content, display_title, status, author, cover_image, preview_image, created, updated)
+            VALUES (:slug, :title, :description, :channel, :content, :display_title, :status, :author, :cover_image, :preview_image, :created, :updated)'
         );
 
         $insert->execute([
@@ -132,7 +132,7 @@ final class SeedInstaller
             ':channel' => 0,
             ':content' => '[{"type":"tinymce","content":"<p>Welcome to Raven CMS.</p>","css_id":"","css_class":""}]',
             ':display_title' => 1,
-            ':published' => 1,
+            ':status' => 'published',
             ':author' => null,
             ':cover_image' => null,
             ':preview_image' => null,

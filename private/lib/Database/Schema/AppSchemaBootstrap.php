@@ -24,7 +24,7 @@ final class AppSchemaBootstrap
             $pageImageVariantsTable = $prefix . 'page_image_variants';
             $groupsTable = $prefix . 'groups';
             $userGroupsTable = $prefix . 'user_groups';
-            $loginFailuresTable = $prefix . 'users_failures';
+            $loginFailuresTable = $prefix . 'auth_failures';
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $pagesTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,7 +34,7 @@ final class AppSchemaBootstrap
                 channel INTEGER NOT NULL DEFAULT 0,
                 content TEXT NOT NULL DEFAULT \'\',
                 display_title INTEGER NOT NULL DEFAULT 1,
-                published INTEGER NOT NULL DEFAULT 1,
+                status TEXT NOT NULL DEFAULT \'published\',
                 author INTEGER NULL,
                 cover_image INTEGER NULL,
                 preview_image INTEGER NULL,
@@ -50,7 +50,8 @@ final class AppSchemaBootstrap
                 description TEXT NULL,
                 cover_image TEXT NULL,
                 preview_image TEXT NULL,
-                created TEXT NOT NULL
+                created TEXT NOT NULL,
+                updated TEXT NOT NULL
             )');
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $tagsTable . ' (
@@ -61,7 +62,8 @@ final class AppSchemaBootstrap
                 description TEXT NULL,
                 cover_image TEXT NULL,
                 preview_image TEXT NULL,
-                created TEXT NOT NULL
+                created TEXT NOT NULL,
+                updated TEXT NOT NULL
             )');
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $redirectsTable . ' (
@@ -180,7 +182,7 @@ final class AppSchemaBootstrap
                 channel BIGINT UNSIGNED NOT NULL DEFAULT 0,
                 content MEDIUMTEXT NOT NULL,
                 display_title TINYINT(1) NOT NULL DEFAULT 1,
-                published TINYINT(1) NOT NULL DEFAULT 1,
+                status VARCHAR(20) NOT NULL DEFAULT \'published\',
                 author BIGINT UNSIGNED NULL,
                 cover_image BIGINT UNSIGNED NULL,
                 preview_image BIGINT UNSIGNED NULL,
@@ -200,6 +202,7 @@ final class AppSchemaBootstrap
                 cover_image VARCHAR(255) NULL,
                 preview_image VARCHAR(255) NULL,
                 created DATETIME NOT NULL,
+                updated DATETIME NOT NULL,
                 INDEX idx_' . $prefix . 'categories_set (`set`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
@@ -212,6 +215,7 @@ final class AppSchemaBootstrap
                 cover_image VARCHAR(255) NULL,
                 preview_image VARCHAR(255) NULL,
                 created DATETIME NOT NULL,
+                updated DATETIME NOT NULL,
                 INDEX idx_' . $prefix . 'tags_set (`set`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
@@ -305,7 +309,7 @@ final class AppSchemaBootstrap
                 PRIMARY KEY (user, `group`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'users_failures (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'auth_failures (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 bucket_hash CHAR(64) NOT NULL,
                 user VARCHAR(100) NOT NULL,
@@ -316,9 +320,9 @@ final class AppSchemaBootstrap
                 locked_until BIGINT UNSIGNED NOT NULL DEFAULT 0,
                 created DATETIME NOT NULL,
                 updated DATETIME NOT NULL,
-                UNIQUE KEY uniq_' . $prefix . 'users_failures_bucket_hash (bucket_hash),
-                INDEX idx_' . $prefix . 'users_failures_locked_until (locked_until),
-                INDEX idx_' . $prefix . 'users_failures_last_failed (last_failed)
+                UNIQUE KEY uniq_' . $prefix . 'auth_failures_bucket_hash (bucket_hash),
+                INDEX idx_' . $prefix . 'auth_failures_locked_until (locked_until),
+                INDEX idx_' . $prefix . 'auth_failures_last_failed (last_failed)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
             // Shortcode registry is extension-owned via `{slug}/lib/shortcodes.php`; drop deprecated table when present.
@@ -335,7 +339,7 @@ final class AppSchemaBootstrap
             channel BIGINT NOT NULL DEFAULT 0,
             content TEXT NOT NULL,
             display_title SMALLINT NOT NULL DEFAULT 1,
-            published SMALLINT NOT NULL DEFAULT 1,
+            status VARCHAR(20) NOT NULL DEFAULT \'published\',
             author BIGINT NULL,
             cover_image BIGINT NULL,
             preview_image BIGINT NULL,
@@ -351,7 +355,8 @@ final class AppSchemaBootstrap
             description TEXT NULL,
             cover_image VARCHAR(255) NULL,
             preview_image VARCHAR(255) NULL,
-            created TIMESTAMP NOT NULL
+            created TIMESTAMP NOT NULL,
+            updated TIMESTAMP NOT NULL
         )');
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'tags (
             id BIGSERIAL PRIMARY KEY,
@@ -361,7 +366,8 @@ final class AppSchemaBootstrap
             description TEXT NULL,
             cover_image VARCHAR(255) NULL,
             preview_image VARCHAR(255) NULL,
-            created TIMESTAMP NOT NULL
+            created TIMESTAMP NOT NULL,
+            updated TIMESTAMP NOT NULL
         )');
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'redirects (
             id BIGSERIAL PRIMARY KEY,
@@ -448,7 +454,7 @@ final class AppSchemaBootstrap
             PRIMARY KEY ("user", "group")
         )');
 
-        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'users_failures (
+        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'auth_failures (
             id BIGSERIAL PRIMARY KEY,
             bucket_hash VARCHAR(64) NOT NULL,
             user VARCHAR(100) NOT NULL,
@@ -460,9 +466,9 @@ final class AppSchemaBootstrap
             created TIMESTAMP NOT NULL,
             updated TIMESTAMP NOT NULL
         )');
-        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $prefix . 'users_failures_bucket_hash ON ' . $prefix . 'users_failures (bucket_hash)');
-        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'users_failures_locked_until ON ' . $prefix . 'users_failures (locked_until)');
-        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'users_failures_last_failed ON ' . $prefix . 'users_failures (last_failed)');
+        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $prefix . 'auth_failures_bucket_hash ON ' . $prefix . 'auth_failures (bucket_hash)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'auth_failures_locked_until ON ' . $prefix . 'auth_failures (locked_until)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'auth_failures_last_failed ON ' . $prefix . 'auth_failures (last_failed)');
         // Shortcode registry is extension-owned via `{slug}/lib/shortcodes.php`; drop deprecated table when present.
         $db->exec('DROP TABLE IF EXISTS ' . $prefix . 'shortcodes');
     }

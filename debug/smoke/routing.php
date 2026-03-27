@@ -156,7 +156,7 @@ PHP;
                 channel INTEGER NOT NULL DEFAULT 0,
                 content TEXT NOT NULL DEFAULT \'\',
                 display_title INTEGER NOT NULL DEFAULT 1,
-                published INTEGER NOT NULL DEFAULT 1,
+                status TEXT NOT NULL DEFAULT \'published\',
                 author INTEGER NULL,
                 cover_image INTEGER NULL,
                 preview_image INTEGER NULL,
@@ -209,8 +209,8 @@ PHP;
         ];
 
         $stmt = $db->prepare(
-            'INSERT INTO pages (id, title, slug, published, channel, created, updated)
-             VALUES (:id, :title, :slug, :published, :channel, :created, :updated)'
+            'INSERT INTO pages (id, title, slug, status, channel, created, updated)
+             VALUES (:id, :title, :slug, :status, :channel, :created, :updated)'
         );
 
         foreach ($rows as [$id, $title, $slug, $isPublished, $channelId, $publishedAt]) {
@@ -218,7 +218,7 @@ PHP;
                 ':id' => $id,
                 ':title' => $title,
                 ':slug' => $slug,
-                ':published' => $isPublished,
+                ':status' => $isPublished === 1 ? 'published' : 'draft',
                 ':channel' => $channelId,
                 ':created' => $publishedAt,
                 ':updated' => $publishedAt,

@@ -79,7 +79,7 @@ final class PageRepository
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
                 WHERE (p.channel = 0 OR p.channel IS NULL)
-                  AND p.published = :published
+                  AND p.status = :status
                   AND p.slug IN (:slug_home, :slug_index)
                 ORDER BY CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
                          p.created DESC
@@ -88,7 +88,7 @@ final class PageRepository
         // CASE ordering guarantees `home` wins over `index` when both exist.
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
-            ':published' => 1,
+            ':status' => 'published',
             ':slug_home' => 'home',
             ':slug_index' => 'index',
             ':slug_home_order' => 'home',
@@ -126,7 +126,7 @@ final class PageRepository
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
                 WHERE p.channel = :channel
-                  AND p.published = :published
+                  AND p.status = :status
                   AND p.slug IN (:slug_home, :slug_index)
                 ORDER BY CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
                          p.created DESC
@@ -135,7 +135,7 @@ final class PageRepository
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
             ':channel' => $channelId,
-            ':published' => 1,
+            ':status' => 'published',
             ':slug_home' => 'home',
             ':slug_index' => 'index',
             ':slug_home_order' => 'home',
@@ -161,11 +161,11 @@ final class PageRepository
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
                 WHERE p.slug = :page_slug
-                  AND p.published = :published';
+                  AND p.status = :status';
 
         $params = [
             ':page_slug' => $pageSlug,
-            ':published' => 1,
+            ':status' => 'published',
         ];
 
         // Unchanneled pages resolve at root; channeled pages require explicit channel slug match.
@@ -215,11 +215,11 @@ final class PageRepository
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
                 WHERE p.id = :page_id
-                  AND p.published = :published';
+                  AND p.status = :status';
 
         $params = [
             ':page_id' => $pageId,
-            ':published' => 1,
+            ':status' => 'published',
         ];
 
         $channel = null;
@@ -270,9 +270,9 @@ final class PageRepository
         $pages = $this->table('pages');
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
-                WHERE p.published = :published';
+                WHERE p.status = :status';
         $params = [
-            ':published' => 1,
+            ':status' => 'published',
         ];
 
         $channel = null;
@@ -347,9 +347,9 @@ final class PageRepository
         $pages = $this->table('pages');
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
-                WHERE p.published = :published';
+                WHERE p.status = :status';
         $params = [
-            ':published' => 1,
+            ':status' => 'published',
         ];
 
         $clauses = [];
@@ -483,7 +483,9 @@ final class PageRepository
         );
 
         $stmt = $this->db->prepare(
-            'SELECT p.id, p.title, p.slug, p.published AS is_published, p.created AS created_at, p.channel AS channel_id
+            'SELECT p.id, p.title, p.slug, p.status,
+                    CASE WHEN p.status = \'published\' THEN 1 ELSE 0 END AS is_published,
+                    p.created AS created_at, p.channel AS channel_id
              FROM ' . $pages . ' p
              WHERE ' . implode(' AND ', $where) . '
              ORDER BY p.created DESC
@@ -563,12 +565,15 @@ final class PageRepository
             'SELECT page_rows.id,
                     page_rows.title,
                     page_rows.slug,
+                    page_rows.status,
                     page_rows.is_published,
                     page_rows.created_at,
                     page_rows.channel_id,
                     totals.total_rows
              FROM (
-                 SELECT p.id, p.title, p.slug, p.published AS is_published, p.created AS created_at, p.channel AS channel_id
+                 SELECT p.id, p.title, p.slug, p.status,
+                        CASE WHEN p.status = \'published\' THEN 1 ELSE 0 END AS is_published,
+                        p.created AS created_at, p.channel AS channel_id
                  FROM ' . $pages . ' p
                  WHERE ' . implode(' AND ', $pageWhere) . '
                  ORDER BY p.created DESC
@@ -625,7 +630,9 @@ final class PageRepository
         $pages = $this->table('pages');
 
         $stmt = $this->db->prepare(
-            'SELECT p.id, p.title, p.slug, p.published AS is_published, p.created AS created_at, p.channel AS channel_id
+            'SELECT p.id, p.title, p.slug, p.status,
+                    CASE WHEN p.status = \'published\' THEN 1 ELSE 0 END AS is_published,
+                    p.created AS created_at, p.channel AS channel_id
              FROM ' . $pages . ' p
              ORDER BY COALESCE(p.channel, 0) ASC, p.slug ASC, p.id ASC'
         );
@@ -666,14 +673,14 @@ final class PageRepository
              FROM ' . $pages . ' p
              WHERE p.channel IS NOT NULL
                AND p.channel <> 0
-               AND p.published = :published
+               AND p.status = :status
                AND p.slug IN (:slug_home, :slug_index)
              ORDER BY p.channel ASC,
                       CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
                       p.created DESC'
         );
         $stmt->execute([
-            ':published' => 1,
+            ':status' => 'published',
             ':slug_home' => 'home',
             ':slug_index' => 'index',
             ':slug_home_order' => 'home',
@@ -807,7 +814,13 @@ final class PageRepository
         $content = $this->encodeContentBlocks($contentBlocks);
         $description = (string) ($data['description'] ?? '');
         $displayTitle = !array_key_exists('display_title', $data) || !empty($data['display_title']) ? 1 : 0;
-        $published = !empty($data['is_published']) ? 1 : 0;
+        $status = strtolower(trim((string) ($data['status'] ?? '')));
+        if ($status === '') {
+            $status = !empty($data['is_published']) ? 'published' : 'draft';
+        }
+        if (!in_array($status, ['published', 'draft'], true)) {
+            $status = 'draft';
+        }
         $author = isset($data['author_user_id']) ? (int) $data['author_user_id'] : 0;
         if ($author < 1) {
             $author = null;
@@ -844,7 +857,7 @@ final class PageRepository
                 'content' => $content,
                 'description' => $description,
                 'display_title' => $displayTitle,
-                'published' => $published,
+                'status' => $status,
                 'author' => $author,
                 'channel' => $channelId,
                 'now' => $now,
@@ -1204,8 +1217,11 @@ final class PageRepository
             $author = (int) ($row['author'] ?? 0);
             $row['author_user_id'] = $author > 0 ? $author : null;
         }
-        if (!array_key_exists('is_published', $row) && array_key_exists('published', $row)) {
-            $row['is_published'] = (int) ($row['published'] ?? 0);
+        if (!array_key_exists('status', $row) && array_key_exists('published', $row)) {
+            $row['status'] = (int) ($row['published'] ?? 0) === 1 ? 'published' : 'draft';
+        }
+        if (!array_key_exists('is_published', $row)) {
+            $row['is_published'] = strtolower(trim((string) ($row['status'] ?? 'draft'))) === 'published' ? 1 : 0;
         }
         if (!array_key_exists('created_at', $row) && array_key_exists('created', $row)) {
             $row['created_at'] = (string) ($row['created'] ?? '');

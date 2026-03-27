@@ -148,11 +148,11 @@ final class PageTaxonomyQueryService
              FROM ' . $pagesTable . ' p
              INNER JOIN ' . $pageTaxonomyTable . ' pt ON pt.page = p.id
              INNER JOIN ' . $taxonomyTable . ' t ON t.id = pt.' . $taxonomyJoinColumn . '
-             WHERE t.slug = :slug AND p.published = :published'
+             WHERE t.slug = :slug AND p.status = :status'
         );
         $stmt->execute([
             ':slug' => $slug,
-            ':published' => 1,
+            ':status' => 'published',
         ]);
 
         return (int) $stmt->fetchColumn();
@@ -174,12 +174,12 @@ final class PageTaxonomyQueryService
              FROM ' . $pagesTable . ' p
              INNER JOIN ' . $pageTaxonomyTable . ' pt ON pt.page = p.id
              INNER JOIN ' . $taxonomyTable . ' t ON t.id = pt.' . $taxonomyJoinColumn . '
-             WHERE t.slug = :slug AND p.published = :published
+             WHERE t.slug = :slug AND p.status = :status
              ORDER BY p.created DESC, p.id DESC
              LIMIT :limit OFFSET :offset'
         );
         $stmt->bindValue(':slug', $slug);
-        $stmt->bindValue(':published', 1, PDO::PARAM_INT);
+        $stmt->bindValue(':status', 'published', PDO::PARAM_STR);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
@@ -216,12 +216,12 @@ final class PageTaxonomyQueryService
              INNER JOIN ' . $pageTaxonomyTable . ' pt ON pt.page = p.id
              INNER JOIN ' . $taxonomyTable . ' t ON t.id = pt.' . $taxonomyJoinColumn . '
              WHERE t.slug = :slug
-               AND p.published = :published
+               AND p.status = :status
              ORDER BY p.created DESC, p.id DESC
              LIMIT :limit OFFSET :offset'
         );
         $stmt->bindValue(':slug', $slug);
-        $stmt->bindValue(':published', 1, PDO::PARAM_INT);
+        $stmt->bindValue(':status', 'published', PDO::PARAM_STR);
         $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
         $stmt->execute();

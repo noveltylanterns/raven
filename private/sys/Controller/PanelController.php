@@ -543,7 +543,7 @@ final class PanelController
                 'channel_slug' => $channelSlug,
                 'category_ids' => $categoryIds,
                 'tag_ids' => $tagIds,
-                'is_published' => $status === 'published' ? 1 : 0,
+                'status' => $status,
             ]);
 
             // Keep Media tab metadata and page-level gallery toggle in sync with save.

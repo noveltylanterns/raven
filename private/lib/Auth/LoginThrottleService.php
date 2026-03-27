@@ -226,6 +226,6 @@ final class LoginThrottleService
 
     private function tableName(): string
     {
-        return $this->prefix . 'users_failures';
+        return $this->prefix . 'auth_failures';
     }
 }

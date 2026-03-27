@@ -53,7 +53,7 @@ final class InviteTokenRepository
     {
         $stmt = $this->authDb->prepare(
             'SELECT id, value, hint, reusable, uses, expires, last_used, created, creator
-             FROM ' . $this->authTable('users_invites') . '
+             FROM ' . $this->authTable('auth_invites') . '
              ORDER BY id DESC'
         );
         $stmt->execute();
@@ -171,7 +171,7 @@ final class InviteTokenRepository
 
         $stmt = $this->authDb->prepare(
             'SELECT id, reusable, uses, expires
-             FROM ' . $this->authTable('users_invites') . '
+             FROM ' . $this->authTable('auth_invites') . '
              WHERE hash = :token_hash
              LIMIT 1'
         );
@@ -228,7 +228,7 @@ final class InviteTokenRepository
 
         if ($reusable) {
             $stmt = $this->authDb->prepare(
-                'UPDATE ' . $this->authTable('users_invites') . '
+                'UPDATE ' . $this->authTable('auth_invites') . '
                  SET uses = uses + 1,
                      last_used = :now
                  WHERE id = :id
@@ -236,7 +236,7 @@ final class InviteTokenRepository
             );
         } else {
             $stmt = $this->authDb->prepare(
-                'UPDATE ' . $this->authTable('users_invites') . '
+                'UPDATE ' . $this->authTable('auth_invites') . '
                  SET uses = uses + 1,
                      last_used = :now
                  WHERE id = :id
@@ -263,7 +263,7 @@ final class InviteTokenRepository
         }
 
         $stmt = $this->authDb->prepare(
-            'DELETE FROM ' . $this->authTable('users_invites') . ' WHERE id = :id'
+            'DELETE FROM ' . $this->authTable('auth_invites') . ' WHERE id = :id'
         );
         $stmt->execute([':id' => $id]);
 
@@ -287,7 +287,7 @@ final class InviteTokenRepository
         string $createdAt
     ): bool {
         $stmt = $this->authDb->prepare(
-            'INSERT INTO ' . $this->authTable('users_invites') . '
+            'INSERT INTO ' . $this->authTable('auth_invites') . '
              (hash, value, hint, reusable, uses, expires, last_used, created, creator)
              VALUES (:token_hash, :token_value, :token_hint, :is_reusable, :use_count, :expires_at, :last_used_at, :created_at, :created_by_user_id)'
         );
