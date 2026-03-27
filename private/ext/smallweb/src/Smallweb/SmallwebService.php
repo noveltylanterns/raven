@@ -19,7 +19,8 @@ final class SmallwebService
     private object $config;
     private ?array $cachedSettings = null;
 
-    private const SETTINGS_FILE = 'settings.json';
+    private const SETTINGS_FILE = 'settings.php';
+    private const LEGACY_SETTINGS_FILE = 'settings.json';
 
     public const SUPPORTED_PROTOCOLS = ['finger', 'fingers', 'gemini', 'gopher', 'spartan'];
 
@@ -231,20 +232,7 @@ final class SmallwebService
             return $this->cachedSettings;
         }
 
-        $file = $this->storageDir . '/' . self::SETTINGS_FILE;
-        if (!is_file($file)) {
-            $this->cachedSettings = self::DEFAULT_SETTINGS;
-            return $this->cachedSettings;
-        }
-
-        $raw = file_get_contents($file);
-        if ($raw === false || trim($raw) === '') {
-            $this->cachedSettings = self::DEFAULT_SETTINGS;
-            return $this->cachedSettings;
-        }
-
-        /** @var mixed $decoded */
-        $decoded = json_decode($raw, true);
+        $decoded = $this->loadRawSettings();
         if (!is_array($decoded)) {
             $this->cachedSettings = self::DEFAULT_SETTINGS;
             return $this->cachedSettings;
@@ -280,22 +268,81 @@ final class SmallwebService
         }
 
         $file = $this->storageDir . '/' . self::SETTINGS_FILE;
-        $json = json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        if ($json === false) {
+        $content = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export($settings, true) . ";\n";
+        $tmpFile = $file . '.tmp';
+
+        if (file_put_contents($tmpFile, $content, LOCK_EX) === false) {
             return false;
         }
 
-        $result = file_put_contents($file, $json . "\n", LOCK_EX);
-        if ($result !== false) {
-            $this->cachedSettings = null;
+        if (!@rename($tmpFile, $file)) {
+            @unlink($tmpFile);
+            return false;
         }
-        return $result !== false;
+
+        $this->invalidatePhpFileCache($tmpFile);
+        $this->invalidatePhpFileCache($file);
+
+        $legacyFile = $this->storageDir . '/' . self::LEGACY_SETTINGS_FILE;
+        if (is_file($legacyFile)) {
+            @unlink($legacyFile);
+        }
+
+        $this->cachedSettings = null;
+        return true;
     }
 
     public function getProtocolSettings(string $protocol): array
     {
         $settings = $this->loadSettings();
         return $settings['protocols'][$protocol] ?? [];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function loadRawSettings(): ?array
+    {
+        $phpFile = $this->storageDir . '/' . self::SETTINGS_FILE;
+        if (is_file($phpFile)) {
+            $this->invalidatePhpFileCache($phpFile);
+
+            try {
+                /** @var mixed $raw */
+                $raw = require $phpFile;
+            } catch (\Throwable) {
+                $raw = null;
+            }
+
+            return is_array($raw) ? $raw : null;
+        }
+
+        $legacyFile = $this->storageDir . '/' . self::LEGACY_SETTINGS_FILE;
+        if (!is_file($legacyFile)) {
+            return null;
+        }
+
+        $raw = file_get_contents($legacyFile);
+        if ($raw === false || trim($raw) === '') {
+            return null;
+        }
+
+        /** @var mixed $decoded */
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    private function invalidatePhpFileCache(string $path): void
+    {
+        $normalized = trim($path);
+        if ($normalized === '') {
+            return;
+        }
+
+        clearstatcache(true, $normalized);
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($normalized, true);
+        }
     }
 
     // ── Domain ──
