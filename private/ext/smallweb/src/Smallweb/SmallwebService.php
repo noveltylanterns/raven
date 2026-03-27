@@ -13,8 +13,9 @@ namespace Raven\Smallweb;
 
 final class SmallwebService
 {
-    private string $appRoot;
     private string $storageDir;
+    /** @var array<string, string> */
+    private array $protocolRoots;
     /** @var object $config */
     private object $config;
     private ?array $cachedSettings = null;
@@ -109,10 +110,13 @@ final class SmallwebService
     private const FILENAME_PATTERN = '/^\.?[a-z0-9][a-z0-9_-]*\.[a-z0-9]+$/';
     private const SLUG_PATTERN = '/^[a-z0-9][a-z0-9_-]*$/';
 
-    public function __construct(string $appRoot, string $storageDir, object $config)
+    /**
+     * @param array<string, string> $protocolRoots
+     */
+    public function __construct(string $storageDir, array $protocolRoots, object $config)
     {
-        $this->appRoot = $appRoot;
         $this->storageDir = $storageDir;
+        $this->protocolRoots = $protocolRoots;
         $this->config = $config;
     }
 
@@ -360,7 +364,12 @@ final class SmallwebService
 
     public function getProtocolDir(string $protocol): string
     {
-        return $this->appRoot . '/' . $protocol;
+        $path = trim((string) ($this->protocolRoots[$protocol] ?? ''));
+        if ($path !== '') {
+            return rtrim($path, '/');
+        }
+
+        return $this->storageDir . '/protocol/' . $protocol;
     }
 
     public function ensureProtocolDirectory(string $protocol): bool

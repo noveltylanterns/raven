@@ -207,9 +207,17 @@ return (static function (): array {
         $storage = is_array($bootstrap['storage'] ?? null) ? (array) $bootstrap['storage'] : [];
         $rawExtensionStorage[$directory] = [
             'local' => !empty($storage['local']) ? ($root . '/private/dat/ext/' . $directory) : '',
+            'aux' => [],
             'panel' => !empty($storage['panel']) ? ($root . '/panel/ext/' . $directory) : '',
             'public' => !empty($storage['public']) ? ($root . '/public/upload/ext/' . $directory) : '',
         ];
+        foreach ((array) ($storage['aux'] ?? []) as $auxDirectory) {
+            if (!is_string($auxDirectory) || $auxDirectory === '') {
+                continue;
+            }
+
+            $rawExtensionStorage[$directory]['aux'][$auxDirectory] = $root . '/' . $auxDirectory;
+        }
         $app['extension_storage'] = $rawExtensionStorage;
 
         try {

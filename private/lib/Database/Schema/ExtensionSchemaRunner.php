@@ -67,6 +67,14 @@ final class ExtensionSchemaRunner
                 $storageLocalPath = $root . '/private/dat/ext/' . $directory;
                 $storagePanelPath = $root . '/panel/ext/' . $directory;
                 $storagePublicPath = $root . '/public/upload/ext/' . $directory;
+                $storageAuxPaths = [];
+                foreach ((array) ($storage['aux'] ?? []) as $auxDirectory) {
+                    if (!is_string($auxDirectory) || $auxDirectory === '') {
+                        continue;
+                    }
+
+                    $storageAuxPaths[$auxDirectory] = $root . '/' . $auxDirectory;
+                }
                 $tableResolver = function (?string $legacyTable = null) use ($driver, $prefix, $tableStem): string {
                     $legacyTable = strtolower(trim((string) $legacyTable));
                     if ($legacyTable !== '') {
@@ -94,6 +102,7 @@ final class ExtensionSchemaRunner
                     'extension' => $directory,
                     'storage' => [
                         'local' => $storageLocalPath,
+                        'aux' => $storageAuxPaths,
                         'panel' => $storagePanelPath,
                         'public' => $storagePublicPath,
                     ],

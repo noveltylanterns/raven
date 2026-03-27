@@ -123,6 +123,7 @@ return [
         // 'local' => true,
         // 'table' => true,
         // 'tables' => ['items'],
+        // 'aux' => ['finger'],
         // 'panel' => true,
         // 'public' => true,
     ],
@@ -500,10 +501,12 @@ declare(strict_types=1);
 - `local` => `private/dat/ext/{slug}/`
 - `table` => one DB table at `{prefix}ext_{slug}`
 - `tables` => one or more DB tables at `{prefix}ext_{slug}_{suffix}`
+- `aux` => one or more sanctioned root-level folders such as `/{name}`
 - `panel` => panel-served assets at `panel/ext/{slug}/`
 - `public` => public-served assets at `public/upload/ext/{slug}/` (`module` only)
 - `framework` may not request `panel` or `public`.
 - `lib/schema.php` receives resolved storage roots in `$context['storage']`, plus:
+- `$context['storage']['aux']` for resolved root-level aux directories (`name => absolute path`)
 - `$context['table']()` for the primary `{prefix}ext_{slug}` table
 - `$context['tables']('suffix')` for declared suffix tables
 - Raven provisions and cleans these locations; extensions should consume the resolved paths, not hardcode them.

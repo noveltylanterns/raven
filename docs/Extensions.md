@@ -178,9 +178,10 @@ Notes:
 - Panel route/nav identity comes from the extension directory slug.
 - Current bundled stock extensions are `contact`, `database`, `phpinfo`, `signups`, and `smallweb`.
 - `ext.php` may request storage with an array contract:
-  `local`, `table`, `tables`, `panel`, `public`.
+  `local`, `table`, `tables`, `aux`, `panel`, `public`.
 - `local` provisions `private/dat/ext/{slug}/`.
 - `table` and `tables` allow `lib/schema.php` to manage `{prefix}ext_{slug}` / `{prefix}ext_{slug}_*`.
+- `aux` provisions one or more sanctioned root-level folders such as `/{name}`.
 - `panel` provisions `panel/ext/{slug}/`; `public` provisions `public/upload/ext/{slug}/` (`module` only).
 - Disabling an extension leaves storage intact; uninstalling a non-stock extension removes the storage it explicitly opted into and removes the package files, while stock extension uninstall only purges the opted-in storage and keeps the bundled extension files.
 

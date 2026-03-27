@@ -4,6 +4,7 @@
 
 ### March 27, 2026
 
+- Added a new multi-folder `aux` extension storage option for sanctioned root-level folders such as `/{name}`, exposed it through the extension contract/provisioner/cleanup pipeline, and moved Smallweb onto that path so its finger/fingers/gemini/gopher/spartan webroots now come from the shared storage provisioner instead of ad hoc extension-local path assembly.
 - Finished the extension-contract sweep by replacing the old `plugin` type with `content`, adding a background-only `framework` type, letting `content` extensions expose both shortcodes and custom fields, and removing shortcode support from `helper` extensions across manifest validation, scaffolding, the Extension Manager UI, CLI scaffolds, and bundled authoring docs.
 - Moved extension storage requests out of `ext.json` and into `ext.php`, where extensions can now request multiple predefined storage options (`local`, `table`, `tables`, `panel`, `public`) without deciding their own paths; Raven provisions those roots from core lifecycle code, passes the resolved storage map back through the runtime app container, and keeps root bootstrap limited to loading enabled extension boot providers instead of doing storage provisioning work.
 - Expanded extension lifecycle cleanup so install/enable now provisions requested panel/public asset roots from `private/ext/{slug}/assets/(panel|public)/`, while uninstall removes all opted-in storage for non-stock packages and purges only opted-in storage for bundled stock extensions without deleting the shipped package directories.

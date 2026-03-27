@@ -26,6 +26,7 @@ final class ExtensionBootstrapContractResolver
      *     local: bool,
      *     table: bool,
      *     tables: array<int, string>,
+     *     aux: array<int, string>,
      *     panel: bool,
      *     public: bool,
      *     legacy_manifest: bool
@@ -123,6 +124,7 @@ final class ExtensionBootstrapContractResolver
      *     local: bool,
      *     table: bool,
      *     tables: array<int, string>,
+     *     aux: array<int, string>,
      *     panel: bool,
      *     public: bool,
      *     legacy_manifest: bool
@@ -147,7 +149,7 @@ final class ExtensionBootstrapContractResolver
             ];
         }
 
-        $allowedKeys = ['local', 'table', 'tables', 'panel', 'public'];
+        $allowedKeys = ['local', 'table', 'tables', 'aux', 'panel', 'public'];
         foreach (array_keys($rawStorage) as $key) {
             if (!is_string($key) || !in_array($key, $allowedKeys, true)) {
                 return [
@@ -160,6 +162,7 @@ final class ExtensionBootstrapContractResolver
 
         $local = $this->boolish($rawStorage['local'] ?? false);
         $table = $this->boolish($rawStorage['table'] ?? false);
+        $aux = $this->normalizeAuxDirectories($rawStorage['aux'] ?? []);
         $panel = $this->boolish($rawStorage['panel'] ?? false);
         $public = $this->boolish($rawStorage['public'] ?? false);
         $tables = $this->normalizeTableSuffixes($rawStorage['tables'] ?? []);
@@ -167,6 +170,13 @@ final class ExtensionBootstrapContractResolver
             return [
                 'valid' => false,
                 'error' => 'ext.php "storage.tables" must be a list of safe table suffix strings.',
+                'storage' => $this->emptyStorage(false),
+            ];
+        }
+        if ($aux === null) {
+            return [
+                'valid' => false,
+                'error' => 'ext.php "storage.aux" must be a list of safe root-level directory names.',
                 'storage' => $this->emptyStorage(false),
             ];
         }
@@ -210,6 +220,7 @@ final class ExtensionBootstrapContractResolver
                 'local' => $local,
                 'table' => $table,
                 'tables' => $tables,
+                'aux' => $aux,
                 'panel' => $panel,
                 'public' => $public,
                 'legacy_manifest' => false,
@@ -223,6 +234,7 @@ final class ExtensionBootstrapContractResolver
      *   local: bool,
      *   table: bool,
      *   tables: array<int, string>,
+     *   aux: array<int, string>,
      *   panel: bool,
      *   public: bool,
      *   legacy_manifest: bool
@@ -234,6 +246,7 @@ final class ExtensionBootstrapContractResolver
             'local' => !empty($manifest['local_storage']),
             'table' => !empty($manifest['db_storage']),
             'tables' => [],
+            'aux' => [],
             'panel' => false,
             'public' => false,
             'legacy_manifest' => !empty($manifest['local_storage']) || !empty($manifest['db_storage']),
@@ -245,6 +258,7 @@ final class ExtensionBootstrapContractResolver
      *   local: bool,
      *   table: bool,
      *   tables: array<int, string>,
+     *   aux: array<int, string>,
      *   panel: bool,
      *   public: bool,
      *   legacy_manifest: bool
@@ -256,10 +270,56 @@ final class ExtensionBootstrapContractResolver
             'local' => false,
             'table' => false,
             'tables' => [],
+            'aux' => [],
             'panel' => false,
             'public' => false,
             'legacy_manifest' => $legacyManifest,
         ];
+    }
+
+    /**
+     * @return array<int, string>|null
+     */
+    private function normalizeAuxDirectories(mixed $rawAux): ?array
+    {
+        if ($rawAux === null || $rawAux === false || $rawAux === '') {
+            return [];
+        }
+
+        if (!is_array($rawAux)) {
+            return null;
+        }
+
+        $reserved = [
+            'composer',
+            'debug',
+            'docs',
+            'panel',
+            'private',
+            'public',
+        ];
+
+        $normalized = [];
+        foreach ($rawAux as $entry) {
+            if (!is_scalar($entry)) {
+                return null;
+            }
+
+            $directory = strtolower(trim((string) $entry));
+            if ($directory === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $directory) !== 1) {
+                return null;
+            }
+
+            if (in_array($directory, $reserved, true)) {
+                return null;
+            }
+
+            if (!isset($normalized[$directory])) {
+                $normalized[$directory] = $directory;
+            }
+        }
+
+        return array_values($normalized);
     }
 
     private function boolish(mixed $value): bool

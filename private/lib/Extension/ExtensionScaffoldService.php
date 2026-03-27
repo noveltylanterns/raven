@@ -290,6 +290,7 @@ return [
         // 'local' => true,
         // 'table' => true,
         // 'tables' => ['items'],
+        // 'aux' => ['finger'],
         // 'panel' => true,
         // 'public' => true,
     ],
@@ -311,6 +312,7 @@ return [
     // Resolved storage roots, when requested by this extension:
     // $storage = is_array($app['extension_storage'][$extensionKey] ?? null) ? $app['extension_storage'][$extensionKey] : [];
     // $localRoot = (string) ($storage['local'] ?? '');
+    // $auxRoots = is_array($storage['aux'] ?? null) ? $storage['aux'] : [];
     // $panelRoot = (string) ($storage['panel'] ?? '');
     // $publicRoot = (string) ($storage['public'] ?? '');
 

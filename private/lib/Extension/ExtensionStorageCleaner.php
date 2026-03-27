@@ -42,6 +42,7 @@ final class ExtensionStorageCleaner
             'local' => $deleteLocalStorage,
             'table' => $deleteDbStorage,
             'tables' => [],
+            'aux' => [],
             'panel' => false,
             'public' => false,
         ]);
@@ -52,6 +53,7 @@ final class ExtensionStorageCleaner
      *   local?: bool,
      *   table?: bool,
      *   tables?: array<int, string>,
+     *   aux?: array<int, string>,
      *   panel?: bool,
      *   public?: bool
      * } $storage
@@ -64,6 +66,14 @@ final class ExtensionStorageCleaner
 
         if (!empty($storage['local'])) {
             $this->deleteDirectory($this->projectRoot . '/private/dat/ext/' . $directoryName, 'private/dat/ext/' . $directoryName);
+        }
+
+        foreach ((array) ($storage['aux'] ?? []) as $auxDirectory) {
+            if (!is_string($auxDirectory) || preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $auxDirectory) !== 1) {
+                continue;
+            }
+
+            $this->deleteDirectory($this->projectRoot . '/' . $auxDirectory, 'aux/' . $auxDirectory);
         }
 
         if (!empty($storage['panel'])) {

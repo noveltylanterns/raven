@@ -35,9 +35,35 @@ final class ExtensionStorageProvisioner
         return $this->ensureDirectory($this->projectRoot . '/public/upload/ext', $directoryName, 'public/upload/ext');
     }
 
+    public function ensureAuxStorageDirectory(string $directoryName): string
+    {
+        if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $directoryName) !== 1) {
+            throw new RuntimeException('Invalid extension aux storage directory name.');
+        }
+
+        $reserved = ['composer', 'debug', 'docs', 'panel', 'private', 'public'];
+        if (in_array(strtolower($directoryName), $reserved, true)) {
+            throw new RuntimeException('Reserved root directory name cannot be used for extension aux storage.');
+        }
+
+        $targetPath = $this->projectRoot . '/' . $directoryName;
+        if (is_file($targetPath)) {
+            throw new RuntimeException('Failed to create aux/' . $directoryName . ' directory because a file already exists there.');
+        }
+
+        if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {
+            throw new RuntimeException('Failed to create aux/' . $directoryName . ' directory.');
+        }
+
+        return $targetPath;
+    }
+
     /**
      * @param array{
      *   local?: bool,
+     *   table?: bool,
+     *   tables?: array<int, string>,
+     *   aux?: array<int, string>,
      *   panel?: bool,
      *   public?: bool
      * } $storage
@@ -50,6 +76,14 @@ final class ExtensionStorageProvisioner
 
         if (!empty($storage['local'])) {
             $this->ensureLocalStorageDirectory($directoryName);
+        }
+
+        foreach ((array) ($storage['aux'] ?? []) as $auxDirectory) {
+            if (!is_string($auxDirectory)) {
+                continue;
+            }
+
+            $this->ensureAuxStorageDirectory($auxDirectory);
         }
 
         if (!empty($storage['panel'])) {
