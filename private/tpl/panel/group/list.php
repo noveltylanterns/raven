@@ -129,7 +129,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                         $isRouted = (int) ($group['route_enabled'] ?? 0) === 1;
                         $routedLabel = $isRouted ? 'Yes' : 'No';
                         $typeLabel = $isStock ? 'Stock' : 'Custom';
-                        $typeBadgeClass = $isStock ? 'text-bg-info' : 'text-bg-success';
+                        $typeBadgeClass = $isStock ? 'text-bg-secondary' : 'text-bg-info';
                         ?>
                         <tr
                             data-rvn-sort-row="1"
