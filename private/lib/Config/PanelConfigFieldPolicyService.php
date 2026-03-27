@@ -118,6 +118,15 @@ final class PanelConfigFieldPolicyService
             return $length;
         }
 
+        if ($path === 'user.string') {
+            $length = $this->defaults->normalizeInt($path, $value);
+            if ($length < 1) {
+                throw new \RuntimeException($path . ' must be greater than 0.');
+            }
+
+            return min(128, $length);
+        }
+
         if ($path === 'category.set' || $path === 'tag.set') {
             $setId = $this->defaults->normalizeInt($path, $value);
             if ($setId < 1) {
@@ -298,6 +307,20 @@ final class PanelConfigFieldPolicyService
             }
 
             return $mode;
+        }
+
+        if ($path === 'user.selector') {
+            $selector = strtolower(trim($value));
+            if (!in_array($selector, ['id', 'username', 'string'], true)) {
+                throw new \RuntimeException('user.selector must be id, username, or string.');
+            }
+
+            $loginMode = strtolower(trim((string) ($workingConfig['user']['auth']['login'] ?? $this->config->get('user.auth.login', 'email'))));
+            if ($selector === 'username' && $loginMode !== 'username') {
+                throw new \RuntimeException('user.selector can only use username when user.auth.login is username.');
+            }
+
+            return $selector;
         }
 
         if ($path === 'user.prefix') {

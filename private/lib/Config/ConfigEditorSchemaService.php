@@ -71,6 +71,8 @@ final class ConfigEditorSchemaService
         'user.auth.login' => 'Login Method',
         'user.auth.registration' => 'Enable Registration',
         'user.bio' => 'Bio Length',
+        'user.string' => 'String Length',
+        'user.selector' => 'Profile URL Selector',
         'user.prefix' => 'Profile URL Prefix',
         'group.privacy' => 'Group Visibility',
         'group.prefix' => 'Group URL Prefix',
@@ -647,6 +649,30 @@ final class ConfigEditorSchemaService
             $user['bio'] = 500;
         } else {
             $user['bio'] = max(1, (int) ($user['bio'] ?? 500));
+        }
+
+        if (!array_key_exists('string', $user)) {
+            $user['string'] = 28;
+        } else {
+            $user['string'] = min(128, max(1, (int) ($user['string'] ?? 28)));
+        }
+
+        $loginMode = strtolower(trim((string) ($user['auth']['login'] ?? 'email')));
+        if (!in_array($loginMode, ['email', 'username'], true)) {
+            $loginMode = 'email';
+        }
+        if (!array_key_exists('selector', $user)) {
+            $user['selector'] = 'id';
+        } else {
+            $selector = strtolower(trim((string) ($user['selector'] ?? 'id')));
+            if (!in_array($selector, ['id', 'username', 'string'], true)) {
+                $selector = 'id';
+            }
+            if ($selector === 'username' && $loginMode !== 'username') {
+                $selector = 'id';
+            }
+
+            $user['selector'] = $selector;
         }
 
         $user['contact'] = $this->profileContacts->normalizeOptionsConfig(

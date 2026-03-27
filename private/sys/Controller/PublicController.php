@@ -902,7 +902,7 @@ final class PublicController
     }
 
     /**
-     * Renders one public profile route `/{profile_prefix}/{username_or_id}`.
+     * Renders one public profile route `/{profile_prefix}/{selector}`.
      */
     public function profile(string $username): void
     {
@@ -1340,6 +1340,7 @@ final class PublicController
                 'contact_profiles' => [],
                 'set_avatar' => false,
                 'avatar_path' => null,
+                'string_length' => (int) $this->config->get('user.string', 28),
             ]);
 
             if (is_array($usableInvite)) {
@@ -2176,7 +2177,7 @@ final class PublicController
     private function publicTemplateDecorator(): PublicTemplateDecorator
     {
         if (!$this->publicTemplateDecorator instanceof PublicTemplateDecorator) {
-            $this->publicTemplateDecorator = new PublicTemplateDecorator($this->config, $this->input);
+            $this->publicTemplateDecorator = new PublicTemplateDecorator($this->config, $this->input, dirname(__DIR__, 3));
         }
 
         return $this->publicTemplateDecorator;
@@ -2321,22 +2322,29 @@ final class PublicController
     }
 
     /**
-     * Resolves one public profile using the configured public route identifier strategy.
-     *
-     * Username-login installs keep username routes; email-login installs use numeric user ids.
+     * Resolves one public profile using the configured public route selector strategy.
      *
      * @return array<string, mixed>|null
      */
     private function findPublicProfileByRouteSegment(string $routeSegment): ?array
     {
-        $loginIdentifierMode = $this->identifierResolver->modeFromConfig($this->config);
-        if ($loginIdentifierMode === 'email') {
+        $selector = $this->routeConfigService()->profileSelector();
+        if ($selector === 'id') {
             $userId = $this->input->int($routeSegment, 1);
             if ($userId === null) {
                 return null;
             }
 
             return $this->userRepo->findPublicProfileById($userId);
+        }
+
+        if ($selector === 'string') {
+            $normalizedString = trim($routeSegment);
+            if ($normalizedString === '' || preg_match('/^[a-zA-Z0-9]+$/', $normalizedString) !== 1) {
+                return null;
+            }
+
+            return $this->userRepo->findPublicProfileByString($normalizedString);
         }
 
         $normalizedUsername = $this->identifierResolver->normalizeUsernameOrEmail($this->input, $routeSegment);

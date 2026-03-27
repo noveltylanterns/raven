@@ -343,12 +343,12 @@ foreach ($sessionConfigFields as $sessionField) {
 }
 foreach ($userConfigFields as $userField) {
     $userPath = (string) ($userField['path'] ?? '');
-    if (in_array($userPath, ['user.auth.login', 'user.auth.registration'], true)) {
+    if (in_array($userPath, ['user.auth.registration', 'user.auth.login', 'user.string'], true)) {
         $sessionLoginConfigFields[] = $userField;
         continue;
     }
 
-    if (in_array($userPath, ['user.privacy', 'user.prefix'], true)) {
+    if (in_array($userPath, ['user.privacy', 'user.selector', 'user.prefix'], true)) {
         $sessionProfileConfigFields[] = $userField;
         continue;
     }
@@ -372,6 +372,7 @@ if ($sessionLoginConfigFields !== []) {
     $sessionLoginOrder = [
         'user.auth.registration' => 10,
         'user.auth.login' => 20,
+        'user.string' => 30,
     ];
     usort(
         $sessionLoginConfigFields,
@@ -380,6 +381,28 @@ if ($sessionLoginConfigFields !== []) {
             $rightPath = (string) ($right['path'] ?? '');
             $leftRank = (int) ($sessionLoginOrder[$leftPath] ?? 1000);
             $rightRank = (int) ($sessionLoginOrder[$rightPath] ?? 1000);
+            if ($leftRank !== $rightRank) {
+                return $leftRank <=> $rightRank;
+            }
+
+            return strcasecmp($leftPath, $rightPath);
+        }
+    );
+}
+
+if ($sessionProfileConfigFields !== []) {
+    $sessionProfileOrder = [
+        'user.privacy' => 10,
+        'user.selector' => 20,
+        'user.prefix' => 30,
+    ];
+    usort(
+        $sessionProfileConfigFields,
+        static function (array $left, array $right) use ($sessionProfileOrder): int {
+            $leftPath = (string) ($left['path'] ?? '');
+            $rightPath = (string) ($right['path'] ?? '');
+            $leftRank = (int) ($sessionProfileOrder[$leftPath] ?? 1000);
+            $rightRank = (int) ($sessionProfileOrder[$rightPath] ?? 1000);
             if ($leftRank !== $rightRank) {
                 return $leftRank <=> $rightRank;
             }
@@ -471,7 +494,8 @@ $renderConfigField = static function (array $field) use (
     $channelOptions,
     $selectedFeedChannels,
     $categorySetOptions,
-    $tagSetOptions
+    $tagSetOptions,
+    $configSnapshot
 ): void {
     $path = (string) $field['path'];
     $segments = (array) $field['segments'];
@@ -497,6 +521,7 @@ $renderConfigField = static function (array $field) use (
     $isShowGroupsField = $path === 'group.privacy';
     $isUserLoginIdentifierField = $path === 'user.auth.login';
     $isUserRegistrationModeField = $path === 'user.auth.registration';
+    $isUserProfileSelectorField = $path === 'user.selector';
     $isDatabasePasswordField = in_array($path, ['database.mysql.pass', 'database.pgsql.pass'], true);
     $isBooleanCheckboxField = $type === 'bool';
     $isDebugCheckboxField = str_starts_with($path, 'debug.');
@@ -545,7 +570,7 @@ $renderConfigField = static function (array $field) use (
             $inputValue = ltrim($inputValue, '/');
         }
     }
-    $isRequired = in_array($path, ['site.domain', 'site.protocol', 'panel.path', 'site.enabled', 'database.driver', 'captcha.provider', 'mail.agent', 'content.editor', 'content.mode', 'content.separator', 'panel.theme', 'session.cookie.name', 'user.privacy', 'group.privacy', 'user.auth.login', 'user.auth.registration'], true);
+    $isRequired = in_array($path, ['site.domain', 'site.protocol', 'panel.path', 'site.enabled', 'database.driver', 'captcha.provider', 'mail.agent', 'content.editor', 'content.mode', 'content.separator', 'panel.theme', 'session.cookie.name', 'user.privacy', 'group.privacy', 'user.auth.login', 'user.auth.registration', 'user.selector', 'user.string'], true);
     $disableUriNote = match ($path) {
         'feed.rss' => ' (leave blank to disable RSS feeds)',
         'feed.atom' => ' (leave blank to disable Atom feeds)',
@@ -810,6 +835,21 @@ $renderConfigField = static function (array $field) use (
                 <option value="open"<?= (string) $field['value'] === 'open' ? ' selected' : '' ?>>Open</option>
                 <option value="invite"<?= (string) $field['value'] === 'invite' ? ' selected' : '' ?>>Invite</option>
                 <option value="closed"<?= (string) $field['value'] === 'closed' ? ' selected' : '' ?>>Closed</option>
+            </select>
+        <?php elseif ($isUserProfileSelectorField): ?>
+            <?php $loginMode = strtolower(trim((string) (($configSnapshot['user']['auth']['login'] ?? 'email')))); ?>
+            <?php if (!in_array($loginMode, ['email', 'username'], true)) { $loginMode = 'email'; } ?>
+            <select
+                class="form-select font-monospace"
+                id="<?= e($inputId) ?>"
+                name="<?= e($fieldName) ?>"
+                required
+            >
+                <option value="id"<?= (string) $field['value'] === 'id' ? ' selected' : '' ?>>ID</option>
+                <?php if ($loginMode === 'username'): ?>
+                    <option value="username"<?= (string) $field['value'] === 'username' ? ' selected' : '' ?>>Username</option>
+                <?php endif; ?>
+                <option value="string"<?= (string) $field['value'] === 'string' ? ' selected' : '' ?>>String</option>
             </select>
         <?php elseif ($isDomainPrefixedMetaPathField): ?>
             <div class="input-group">

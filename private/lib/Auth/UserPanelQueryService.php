@@ -82,7 +82,7 @@ final class UserPanelQueryService
         }
 
         $stmt = $authDb->prepare(
-            'SELECT id, username, name AS display_name, email, theme, avatar AS avatar_path
+            'SELECT id, username, string, name AS display_name, email, theme, avatar AS avatar_path
              FROM ' . $usersTable . '
              WHERE id IN (' . implode(', ', $placeholders) . ')
              ORDER BY id ASC'
@@ -124,6 +124,7 @@ final class UserPanelQueryService
                 'WITH page_users AS (
                      SELECT u.id,
                             u.username,
+                            u.string,
                             u.name AS display_name,
                             u.email,
                             u.theme,
@@ -135,6 +136,7 @@ final class UserPanelQueryService
                  )
                  SELECT pu.id AS user_id,
                         pu.username,
+                        pu.string,
                         pu.display_name,
                         pu.email,
                         pu.theme,
@@ -166,6 +168,7 @@ final class UserPanelQueryService
                  page_users AS (
                      SELECT u.id,
                             u.username,
+                            u.string,
                             u.name AS display_name,
                             u.email,
                             u.theme,
@@ -178,6 +181,7 @@ final class UserPanelQueryService
                  )
                  SELECT pu.id AS user_id,
                         pu.username,
+                        pu.string,
                         pu.display_name,
                         pu.email,
                         pu.theme,
@@ -233,6 +237,7 @@ final class UserPanelQueryService
                 $usersById[$userId] = [
                     'id' => $userId,
                     'username' => (string) ($row['username'] ?? ''),
+                    'string' => (string) ($row['string'] ?? $row['user_string'] ?? ''),
                     'display_name' => (string) ($row['display_name'] ?? ''),
                     'email' => (string) ($row['email'] ?? ''),
                     'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),

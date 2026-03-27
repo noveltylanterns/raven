@@ -14,13 +14,16 @@
 /** @var string|null $loginIdentifierMode */
 /** @var string $profileRoutePrefix */
 /** @var bool $profileRoutesEnabled */
+/** @var string $profileRouteSegment */
 /** @var array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}> $groupOptions */
 /** @var bool $canAssignSuperAdmin */
 /** @var bool $canAssignConfigurationGroups */
 /** @var array<string, array{label: string, url_prefix: string}> $profileContactOptions */
 /** @var array<string, string> $twoFactorTypeOptions */
 /** @var array<int, string> $themeOptions */
+/** @var array{filename: string, url: string, thumb_url: string} $avatarTemplateData */
 /** @var string $avatarUploadLimitsNote */
+/** @var string $coverImageUrl */
 /** @var int $bioMaxLength */
 /** @var string $csrfField */
 /** @var string|null $flashSuccess */
@@ -43,20 +46,18 @@ $hasPersistedUser = $userId > 0;
 $deleteFormId = 'delete-user-form';
 $profileRoutePrefix = trim((string) ($profileRoutePrefix ?? ''), '/');
 $profileRoutesEnabled = (bool) ($profileRoutesEnabled ?? false);
-$profileRouteSegment = $usernameRequiredForAuth
-    ? trim((string) ($userRow['username'] ?? ''))
-    : ($hasPersistedUser ? (string) $userId : '');
+$profileRouteSegment = trim((string) ($profileRouteSegment ?? ''));
 // Multi-select group inputs are compared against normalized integer ids.
 $selectedGroupIds = array_map('intval', (array) ($userRow['group_ids'] ?? []));
 $avatarPath = isset($userRow['avatar_path']) && is_string($userRow['avatar_path'])
     ? $userRow['avatar_path']
     : null;
 $coverImage = trim((string) ($userRow['cover_image'] ?? ''));
-$avatarFilename = is_string($avatarPath) ? basename($avatarPath) : '';
-$avatarBase = (string) pathinfo($avatarFilename, PATHINFO_FILENAME);
-$avatarThumbFilename = $avatarBase !== '' ? $avatarBase . '_thumb.jpg' : $avatarFilename;
-$avatarUrl = '/uploads/avatars/' . rawurlencode($avatarFilename);
-$avatarThumbUrl = '/uploads/avatars/' . rawurlencode($avatarThumbFilename);
+$avatarTemplateData = is_array($avatarTemplateData ?? null) ? $avatarTemplateData : ['filename' => '', 'url' => '', 'thumb_url' => ''];
+$avatarFilename = (string) ($avatarTemplateData['filename'] ?? '');
+$avatarUrl = (string) ($avatarTemplateData['url'] ?? '');
+$avatarThumbUrl = (string) ($avatarTemplateData['thumb_url'] ?? '');
+$coverImageUrl = trim((string) ($coverImageUrl ?? ''));
 $profileContactOptions = is_array($profileContactOptions ?? null) ? $profileContactOptions : [];
 $twoFactorTypeOptions = is_array($twoFactorTypeOptions ?? null) ? $twoFactorTypeOptions : [];
 $contactProfilesRaw = is_array($userRow['contact_profiles'] ?? null) ? $userRow['contact_profiles'] : [];
@@ -442,15 +443,23 @@ $themeLabels = [
 
             <div class="form-group">
                 <label class="form-label h3" for="cover_image">Cover Image</label>
-                <input
-                    id="cover_image"
-                    name="cover_image"
-                    type="text"
-                    class="form-control"
-                    value="<?= e($coverImage) ?>"
-                    placeholder="/uploads/users/cover/example.jpg"
-                >
-                <div class="form-text">Optional public image path or URL stored with the user profile.</div>
+                <?php if ($coverImageUrl !== ''): ?>
+                    <div class="mb-2">
+                        <img
+                            src="<?= e($coverImageUrl) ?>"
+                            alt="Current cover image"
+                            style="max-width: 100%; max-height: 180px; border-radius: 8px;"
+                        >
+                    </div>
+                <?php endif; ?>
+                <input id="cover_image" name="cover_image" type="file" class="form-control" accept=".gif,.jpg,.jpeg,.png,image/gif,image/jpeg,image/png">
+                <div class="form-text">Stored locally at <code>/uploads/user/cover/</code> using the user string as the filename base.</div>
+                <?php if ($coverImage !== ''): ?>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" value="1" id="remove_cover_image" name="remove_cover_image">
+                        <label class="form-check-label" for="remove_cover_image">Remove current cover image</label>
+                    </div>
+                <?php endif; ?>
             </div>
 
             <div class="form-group mb-0">

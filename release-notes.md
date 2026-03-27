@@ -24,6 +24,7 @@
 - Added `site:feed_rss_url` and `site:feed_atom_url` to the public wrapper payload so stock/scaffold wrappers can emit `<link rel="alternate">` discovery tags for the configured root RSS and Atom feeds.
 - Added numeric taxonomy sets for categories and tags, moved the stock `Default Set` to id `1` with slug `default`, reserved id `0` as the `All Sets` sentinel for channel assignment lists, added config-level `category.set` / `tag.set` root-channel fallback selectors, added a `Use System Default` channel-assignment state that persists as an empty selection, normalized taxonomy-set and channel flat files to `id_slug.php` naming under `private/dat/`, and enforced set-aware category/tag filtering in the page editor.
 - Simplified Raven-owned auth/profile storage by shortening auth-user profile columns to `name` / `avatar` / `contact` / `two_factor`, adding config-controlled plaintext user bios via `user.bio` in both the User editor and Preferences screen, and wiring the optional `cover_image` field through user, group, and self-service preferences flows.
+- Added a generated unique `users.string` selector for each account, added config keys `user.string` and `user.selector`, allowed public profile routes to resolve by `id`, `username`, or the generated string, and moved user avatar/cover storage to local `public/uploads/user/avatar/` and `public/uploads/user/cover/` paths using the user string as the filename base.
 
 ### March 24, 2026
 

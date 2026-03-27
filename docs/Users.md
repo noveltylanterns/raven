@@ -80,7 +80,8 @@ Fields/options:
   - file upload (`gif/jpg/jpeg/png`)
   - optional `Remove current avatar` checkbox when avatar exists
 - `Cover Image`
-  - optional text path/URL field on the Profile tab
+  - optional local image upload on the Profile tab
+  - optional `Remove current cover image` checkbox when a cover exists
 - `Group Memberships` (multi-select checkboxes)
 - `Two-Factor Methods` (existing users)
   - read-only method entries with `Type`, `Label`, and `Details`
@@ -168,8 +169,8 @@ Public routes (declared in `public/index.php`):
   - Enforces super-admin-only assignment rules for `super` and configuration-capable groups.
   - Applies fallback `user` group if none selected.
   - Validates avatar upload with `AvatarValidator` and stores sanitized image output.
-  - Stores avatar originals using deterministic names: `public/uploads/avatars/{user_id}.{extension}`.
-  - Generates companion avatar thumbnails as `public/uploads/avatars/{user_id}_thumb.jpg`.
+  - Stores avatar originals using deterministic names: `public/uploads/user/avatar/{user_string}.{extension}`.
+  - Generates companion avatar thumbnails as `public/uploads/user/avatar/{user_string}_thumb.jpg`.
   - If avatar exceeds `120x120`, thumb is center-cropped/resized to `120x120` JPEG.
   - If avatar is `<=120x120`, thumb file is a direct copy of the sanitized original.
   - Saves through `UserRepository::save(...)`.
@@ -191,7 +192,10 @@ Public routes (declared in `public/index.php`):
   - Keeps duplicate-account and persistence failures user-generic instead of reflecting raw repository exception text.
   - Creates user via `UserRepository::save(...)` and consumes invite token atomically where possible.
 - `PublicController::profile(string $username)` / `PublicController::group(string $groupSlug)`
-  - Email-login installs resolve public profile routes by numeric user id.
+  - public profile routes use the selector configured by `user.selector`
+  - selector mode `id` uses numeric user ids
+  - selector mode `username` uses usernames and is only valid when username login mode is enabled
+  - selector mode `string` uses each user's generated random alphanumeric `string`
   - Guest-facing profile/group payloads suppress username output entirely when the install is configured for email login.
 
 ### Data Model And Repository Behavior
@@ -202,10 +206,12 @@ Public routes (declared in `public/index.php`):
 - `findById()` returns user + assigned `group_ids`.
 - `save(...)` handles create/update in one method:
   - enforces unique username/email
+  - generates and persists a unique random alphanumeric `string` for each user when missing
+  - honors config key `user.string` as the target generated string length
   - persists plaintext `bio` with the max length capped by config key `user.bio`
   - hashes password when provided
-  - persists optional `cover_image`
-  - updates avatar path when `set_avatar` is true
+  - persists optional local `cover_image` filename
+  - updates avatar filename when `set_avatar` is true
   - writes Delight-compatible auth fields on create
   - replaces group memberships via `setUserGroups(...)`
 - `setUserGroups(...)` is replace-all transactional membership sync.
@@ -216,6 +222,9 @@ Storage detail:
 - Auth user rows are stored in auth database handle/tables.
 - Group memberships are stored in app database handle/tables (`user_groups`).
 - SQLite mode maps group tables through `groups.*` aliases.
+- User avatars are stored locally under `public/uploads/user/avatar/` using the user string as the filename base.
+- User cover images are stored locally under `public/uploads/user/cover/` using the user string as the filename base.
+- Avatar thumbs live alongside the avatar original with the `_thumb.jpg` suffix.
 
 ### Security/Validation Expectations
 

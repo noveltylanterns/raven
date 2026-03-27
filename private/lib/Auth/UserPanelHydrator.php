@@ -29,6 +29,7 @@ final class UserPanelHydrator
             $result[] = [
                 'id' => $userId,
                 'username' => (string) ($row['username'] ?? ''),
+                'string' => (string) ($row['string'] ?? ''),
                 'display_name' => (string) ($row['display_name'] ?? ''),
                 'email' => (string) ($row['email'] ?? ''),
                 'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
@@ -44,4 +45,3 @@ final class UserPanelHydrator
         return $result;
     }
 }
-

@@ -12,6 +12,13 @@ use RuntimeException;
  */
 final class UserPersistenceService
 {
+    private UserStringService $userStringService;
+
+    public function __construct()
+    {
+        $this->userStringService = new UserStringService();
+    }
+
     /**
      * @param callable(int, int): void $attachUserToGroup
      * @param array{
@@ -26,7 +33,8 @@ final class UserPersistenceService
      *   contact_profiles: string|null,
      *   set_avatar: bool,
      *   avatar_path: string|null,
-     *   cover_image?: string|null
+     *   cover_image?: string|null,
+     *   string_length?: int
      * } $data
      */
     public function saveUser(
@@ -52,6 +60,7 @@ final class UserPersistenceService
         $avatarPath = isset($data['avatar_path']) && is_string($data['avatar_path']) ? $data['avatar_path'] : null;
         $coverImage = isset($data['cover_image']) && is_string($data['cover_image']) ? trim($data['cover_image']) : '';
         $coverImage = $coverImage !== '' ? $coverImage : null;
+        $stringLength = $this->userStringService->normalizeLength($data['string_length'] ?? 28);
 
         if ($email === '') {
             throw new RuntimeException('Email is required.');
@@ -70,12 +79,18 @@ final class UserPersistenceService
                 throw new RuntimeException('Email is already in use.');
             }
 
+            $userString = $this->userStringById($authDb, $usersTable, $id);
+            if ($userString === null || $userString === '') {
+                $userString = $this->generateUniqueUserString($authDb, $usersTable, $stringLength);
+            }
+
             $fields = [
                 'username = :username',
                 'name = :display_name',
                 'email = :email',
                 'bio = :bio',
                 'theme = :theme',
+                'string = :string',
                 'cover_image = :cover_image',
                 'contact = :contact_profiles',
             ];
@@ -87,6 +102,7 @@ final class UserPersistenceService
                 ':email' => $email,
                 ':bio' => $bio,
                 ':theme' => $theme,
+                ':string' => $userString,
                 ':cover_image' => $coverImage,
                 ':contact_profiles' => $contactProfilesEncoded,
             ];
@@ -125,6 +141,8 @@ final class UserPersistenceService
             throw new RuntimeException('Password is required when creating a user.');
         }
 
+        $userString = $this->generateUniqueUserString($authDb, $usersTable, $stringLength);
+
         $insertParams = [
             ':email' => $email,
             ':password' => password_hash($password, PASSWORD_DEFAULT),
@@ -134,6 +152,7 @@ final class UserPersistenceService
             ':theme' => $theme,
             ':avatar_path' => $setAvatar ? $avatarPath : null,
             ':cover_image' => $coverImage,
+            ':string' => $userString,
             ':contact_profiles' => $contactProfilesEncoded,
             ':status' => 0,
             ':verified' => 1,
@@ -209,6 +228,55 @@ final class UserPersistenceService
         $stmt->execute([':email' => $email]);
 
         return $stmt->fetchColumn() !== false;
+    }
+
+    public function userStringExistsForOtherUser(PDO $authDb, string $usersTable, int $id, string $userString): bool
+    {
+        if (trim($userString) === '') {
+            return false;
+        }
+
+        if ($id > 0) {
+            $stmt = $authDb->prepare(
+                'SELECT 1 FROM ' . $usersTable . ' WHERE string = :string AND id <> :id LIMIT 1'
+            );
+            $stmt->execute([
+                ':string' => $userString,
+                ':id' => $id,
+            ]);
+
+            return $stmt->fetchColumn() !== false;
+        }
+
+        $stmt = $authDb->prepare(
+            'SELECT 1 FROM ' . $usersTable . ' WHERE string = :string LIMIT 1'
+        );
+        $stmt->execute([':string' => $userString]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    public function userStringById(PDO $authDb, string $usersTable, int $id): ?string
+    {
+        if ($id < 1) {
+            return null;
+        }
+
+        $stmt = $authDb->prepare(
+            'SELECT string
+             FROM ' . $usersTable . '
+             WHERE id = :id
+             LIMIT 1'
+        );
+        $stmt->execute([':id' => $id]);
+
+        $value = $stmt->fetchColumn();
+        if ($value === false) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+        return $normalized !== '' ? $normalized : null;
     }
 
     /**
@@ -288,8 +356,8 @@ final class UserPersistenceService
     private function insertUserAndReturnId(PDO $authDb, string $usersTable, array $params): int
     {
         $sql = 'INSERT INTO ' . $usersTable . '
-            (email, password, username, name, bio, theme, avatar, cover_image, contact, status, verified, resettable, roles_mask, registered, last_login, force_logout)
-            VALUES (:email, :password, :username, :display_name, :bio, :theme, :avatar_path, :cover_image, :contact_profiles, :status, :verified, :resettable, :roles_mask, :registered, :last_login, :force_logout)';
+            (email, password, username, name, bio, theme, avatar, cover_image, string, contact, status, verified, resettable, roles_mask, registered, last_login, force_logout)
+            VALUES (:email, :password, :username, :display_name, :bio, :theme, :avatar_path, :cover_image, :string, :contact_profiles, :status, :verified, :resettable, :roles_mask, :registered, :last_login, :force_logout)';
 
         $driver = strtolower((string) $authDb->getAttribute(PDO::ATTR_DRIVER_NAME));
         if ($driver === 'pgsql') {
@@ -307,5 +375,13 @@ final class UserPersistenceService
         }
 
         return $newId;
+    }
+
+    private function generateUniqueUserString(PDO $authDb, string $usersTable, int $length): string
+    {
+        return $this->userStringService->generateUnique(
+            $length,
+            fn (string $candidate): bool => $this->userStringExistsForOtherUser($authDb, $usersTable, 0, $candidate)
+        );
     }
 }

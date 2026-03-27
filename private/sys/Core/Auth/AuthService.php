@@ -64,6 +64,7 @@ final class AuthService
      * @var array<int, array{
      *   id: int,
      *   username: string,
+     *   string: string,
      *   display_name: string,
      *   email: string,
      *   theme: string,
@@ -473,6 +474,7 @@ final class AuthService
      * @return array{
      *   id: int,
      *   username: string,
+     *   string: string,
      *   display_name: string,
      *   email: string,
      *   bio: string,
@@ -492,6 +494,7 @@ final class AuthService
         $stmt = $this->authDb->prepare(
             'SELECT id,
                     username,
+                    string,
                     name AS display_name,
                     email,
                     bio,

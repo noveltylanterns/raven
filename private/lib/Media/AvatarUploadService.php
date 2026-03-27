@@ -21,6 +21,33 @@ final class AvatarUploadService
      */
     public function storeSanitizedUpload(array $upload, string $destination): ?string
     {
+        $storeError = $this->storeSanitizedImageUpload($upload, $destination);
+        if ($storeError !== null) {
+            return $storeError;
+        }
+
+        $thumbnailPath = dirname($destination) . '/' . $this->thumbnailFilename((string) basename($destination));
+        $thumbError = $this->storeThumbnail($destination, $thumbnailPath);
+        if ($thumbError !== null) {
+            @unlink($destination);
+            @unlink($thumbnailPath);
+            return $thumbError;
+        }
+
+        @chmod($thumbnailPath, 0640);
+
+        return null;
+    }
+
+    /**
+     * Stores one sanitized image upload without generating avatar thumbnail derivatives.
+     *
+     * Returns `null` on success, otherwise one user-facing error message.
+     *
+     * @param array<string, mixed> $upload
+     */
+    public function storeSanitizedImageUpload(array $upload, string $destination): ?string
+    {
         $tmpPath = (string) ($upload['tmp_name'] ?? '');
         if ($tmpPath === '' || !is_uploaded_file($tmpPath) || !is_file($tmpPath)) {
             return 'Failed to read uploaded avatar file.';
@@ -57,23 +84,14 @@ final class AvatarUploadService
             return 'Avatar processing requires Imagick or GD extension.';
         }
 
-        $thumbnailPath = dirname($destination) . '/' . $this->thumbnailFilename((string) basename($destination));
-        $thumbError = $this->storeThumbnail($destination, $thumbnailPath);
-        if ($thumbError !== null) {
-            @unlink($destination);
-            @unlink($thumbnailPath);
-            return $thumbError;
-        }
-
         @chmod($destination, 0640);
-        @chmod($thumbnailPath, 0640);
 
         return null;
     }
 
     public function storageDirectory(string $projectRoot): string
     {
-        $avatarsDir = rtrim($projectRoot, '/\\') . '/public/uploads/avatars';
+        $avatarsDir = rtrim($projectRoot, '/\\') . '/public/uploads/user/avatar';
         if (!is_dir($avatarsDir)) {
             @mkdir($avatarsDir, 0775, true);
         }
@@ -95,11 +113,15 @@ final class AvatarUploadService
         return $normalized;
     }
 
-    public function filenameForUserId(int $userId, string $extension): string
+    public function filenameForUserString(string $userString, string $extension): string
     {
         $normalizedExtension = $this->normalizeExtension($extension) ?? 'jpg';
+        $normalizedUserString = preg_replace('/[^a-zA-Z0-9]/', '', trim($userString)) ?? '';
+        if ($normalizedUserString === '') {
+            $normalizedUserString = 'avatar';
+        }
 
-        return (string) $userId . '.' . $normalizedExtension;
+        return $normalizedUserString . '.' . $normalizedExtension;
     }
 
     public function thumbnailFilename(string $filename): string
@@ -120,16 +142,22 @@ final class AvatarUploadService
             return;
         }
 
-        $avatarsDir = rtrim($projectRoot, '/\\') . '/public/uploads/avatars';
-        $path = $avatarsDir . '/' . $safeName;
-        if (is_file($path)) {
-            @unlink($path);
-        }
+        $directories = [
+            rtrim($projectRoot, '/\\') . '/public/uploads/user/avatar',
+            rtrim($projectRoot, '/\\') . '/public/uploads/avatars',
+        ];
 
-        // Keep thumbnail lifecycle tied to original avatar lifecycle.
-        $thumbPath = $avatarsDir . '/' . $this->thumbnailFilename($safeName);
-        if (is_file($thumbPath)) {
-            @unlink($thumbPath);
+        foreach ($directories as $avatarsDir) {
+            $path = $avatarsDir . '/' . $safeName;
+            if (is_file($path)) {
+                @unlink($path);
+            }
+
+            // Keep thumbnail lifecycle tied to original avatar lifecycle.
+            $thumbPath = $avatarsDir . '/' . $this->thumbnailFilename($safeName);
+            if (is_file($thumbPath)) {
+                @unlink($thumbPath);
+            }
         }
     }
 

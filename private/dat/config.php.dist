@@ -194,8 +194,10 @@ return array (
       'login' => 'email',
       'registration' => 'closed',
     ),
+    'string' => 28,
     'bio' => 500,
     'privacy' => 'disabled',
+    'selector' => 'id',
     'prefix' => 'user',
     'contact' =>
     array (

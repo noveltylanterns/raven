@@ -20,6 +20,7 @@ final class UserSecurityProfileService
      * @return array{
      *   id: int,
      *   username: string,
+     *   string: string,
      *   display_name: string,
      *   email: string,
      *   bio: string,
@@ -35,6 +36,7 @@ final class UserSecurityProfileService
         return [
             'id' => (int) ($row['id'] ?? 0),
             'username' => (string) ($row['username'] ?? ''),
+            'string' => (string) ($row['string'] ?? ''),
             'display_name' => (string) ($row['display_name'] ?? ''),
             'email' => (string) ($row['email'] ?? ''),
             'bio' => (string) ($row['bio'] ?? ''),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Database\Schema;
 
 use PDO;
+use Raven\Lib\Auth\UserStringService;
 use RuntimeException;
 
 /**
@@ -13,10 +14,12 @@ use RuntimeException;
 final class AuthSchemaBuilder
 {
     private SchemaIntrospector $introspector;
+    private UserStringService $userStringService;
 
     public function __construct(SchemaIntrospector $introspector)
     {
         $this->introspector = $introspector;
+        $this->userStringService = new UserStringService();
     }
 
     public function ensureAuthSchema(PDO $authDb, string $driver, string $prefix): void
@@ -108,6 +111,11 @@ final class AuthSchemaBuilder
 
         if ($driver === 'sqlite') {
             $this->migrateAuthUsersSqlite($db, $usersTable);
+            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'string')) {
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN string TEXT NULL');
+            }
+            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $usersTable . '_string ON ' . $usersTable . ' (string)');
+            $this->ensureAuthUserStrings($db, $usersTable);
             $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
             return;
         }
@@ -156,6 +164,14 @@ final class AuthSchemaBuilder
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN bio TEXT NULL');
             }
 
+            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'string')) {
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN string VARCHAR(128) NULL');
+            }
+            if (!$this->introspector->mySqlIndexExists($db, $usersTable, 'uniq_' . $usersTable . '_string')) {
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD UNIQUE INDEX uniq_' . $usersTable . '_string (string)');
+            }
+
+            $this->ensureAuthUserStrings($db, $usersTable);
             $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
             return;
         }
@@ -203,6 +219,14 @@ final class AuthSchemaBuilder
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN bio TEXT NULL');
         }
 
+        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'string')) {
+            $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN string VARCHAR(128) NULL');
+        }
+        if (!$this->introspector->pgSqlIndexExists($db, $usersTable, 'uniq_' . $usersTable . '_string')) {
+            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS ' . $this->introspector->quotePgIdentifier('uniq_' . $usersTable . '_string') . ' ON ' . $this->introspector->quotePgIdentifier($usersTable) . ' (string)');
+        }
+
+        $this->ensureAuthUserStrings($db, $usersTable);
         $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
     }
 
@@ -347,13 +371,14 @@ final class AuthSchemaBuilder
                 theme TEXT NOT NULL DEFAULT \'default\',
                 avatar TEXT NULL,
                 cover_image TEXT NULL,
+                string TEXT NULL,
                 contact TEXT NULL,
                 two_factor TEXT NULL
             )');
             $db->exec(
                 'INSERT INTO ' . $tmpTable . ' (
                     id, email, password, username, status, verified, resettable, roles_mask, registered, last_login, force_logout,
-                    name, bio, theme, avatar, cover_image, contact, two_factor
+                    name, bio, theme, avatar, cover_image, string, contact, two_factor
                  )
                  SELECT
                     id,
@@ -372,6 +397,7 @@ final class AuthSchemaBuilder
                     COALESCE(theme, \'default\'),
                     ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'avatar') ? 'avatar' : 'avatar_path') . ',
                     ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'cover_image') ? 'cover_image' : 'NULL') . ',
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'string') ? 'string' : 'NULL') . ',
                     ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'contact') ? 'contact' : 'contact_profiles') . ',
                     ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'two_factor') ? 'two_factor' : 'two_factor_methods') . '
                  FROM ' . $usersTable
@@ -386,6 +412,52 @@ final class AuthSchemaBuilder
 
             $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
             throw $exception;
+        }
+    }
+
+    private function ensureAuthUserStrings(PDO $db, string $usersTable): void
+    {
+        $select = $db->prepare(
+            'SELECT id
+             FROM ' . $usersTable . '
+             WHERE string IS NULL OR TRIM(COALESCE(string, \'\')) = \'\'
+             ORDER BY id ASC'
+        );
+        $select->execute();
+        $rows = $select->fetchAll() ?: [];
+        if ($rows === []) {
+            return;
+        }
+
+        $exists = $db->prepare(
+            'SELECT 1
+             FROM ' . $usersTable . '
+             WHERE string = :string
+             LIMIT 1'
+        );
+        $update = $db->prepare(
+            'UPDATE ' . $usersTable . '
+             SET string = :string
+             WHERE id = :id'
+        );
+
+        foreach ($rows as $row) {
+            $userId = (int) ($row['id'] ?? 0);
+            if ($userId < 1) {
+                continue;
+            }
+
+            $value = $this->userStringService->generateUnique(
+                28,
+                function (string $candidate) use ($exists): bool {
+                    $exists->execute([':string' => $candidate]);
+                    return $exists->fetchColumn() !== false;
+                }
+            );
+            $update->execute([
+                ':id' => $userId,
+                ':string' => $value,
+            ]);
         }
     }
 

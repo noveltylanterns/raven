@@ -67,7 +67,7 @@ final class UserRepository
         $usersTable = $this->authTable('users');
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, name AS display_name, email, theme, avatar AS avatar_path, cover_image
+            'SELECT id, username, string, name AS display_name, email, theme, avatar AS avatar_path, cover_image
              FROM ' . $usersTable . '
              ORDER BY id ASC'
         );
@@ -95,6 +95,7 @@ final class UserRepository
         $stmt = $this->appDb->prepare(
             'SELECT u.id,
                     u.username,
+                    u.string,
                     u.name AS display_name,
                     u.email,
                     u.theme,
@@ -126,6 +127,7 @@ final class UserRepository
                 $usersById[$userId] = [
                     'id' => $userId,
                     'username' => (string) ($row['username'] ?? ''),
+                    'string' => (string) ($row['string'] ?? ''),
                     'display_name' => (string) ($row['display_name'] ?? ''),
                     'email' => (string) ($row['email'] ?? ''),
                     'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
@@ -261,6 +263,7 @@ final class UserRepository
         $stmt = $this->authDb->prepare(
             'SELECT id,
                     username,
+                    string,
                     name AS display_name,
                     email,
                     bio,
@@ -284,6 +287,7 @@ final class UserRepository
         return [
             'id' => (int) $row['id'],
             'username' => (string) ($row['username'] ?? ''),
+            'string' => (string) ($row['string'] ?? ''),
             'display_name' => (string) ($row['display_name'] ?? ''),
             'email' => (string) ($row['email'] ?? ''),
             'bio' => (string) ($row['bio'] ?? ''),
@@ -324,6 +328,7 @@ final class UserRepository
         $stmt = $this->appDb->prepare(
             'SELECT u.id AS user_id,
                     u.username,
+                    u.string,
                     u.name AS display_name,
                     u.email,
                     u.bio,
@@ -382,6 +387,7 @@ final class UserRepository
             'user' => [
                 'id' => (int) ($first['user_id'] ?? 0),
                 'username' => (string) ($first['username'] ?? ''),
+                'string' => (string) ($first['string'] ?? ''),
                 'display_name' => (string) ($first['display_name'] ?? ''),
                 'email' => (string) ($first['email'] ?? ''),
                 'bio' => (string) ($first['bio'] ?? ''),
@@ -405,6 +411,7 @@ final class UserRepository
      * @return array{
      *   id: int,
      *   username: string,
+     *   string: string,
      *   display_name: string,
      *   avatar_path: string|null,
      *   contact_profiles: array<int, array{type: string, value: string}>
@@ -415,7 +422,7 @@ final class UserRepository
         $usersTable = $this->authTable('users');
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, name AS display_name, avatar AS avatar_path, contact AS contact_profiles
+            'SELECT id, username, string, name AS display_name, avatar AS avatar_path, contact AS contact_profiles
              FROM ' . $usersTable . '
              WHERE username = :username
              LIMIT 1'
@@ -430,6 +437,7 @@ final class UserRepository
         return [
             'id' => (int) ($row['id'] ?? 0),
             'username' => (string) ($row['username'] ?? ''),
+            'string' => (string) ($row['string'] ?? ''),
             'display_name' => (string) ($row['display_name'] ?? ''),
             'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
                 ? (string) $row['avatar_path']
@@ -444,6 +452,7 @@ final class UserRepository
      * @return array{
      *   id: int,
      *   username: string,
+     *   string: string,
      *   display_name: string,
      *   avatar_path: string|null,
      *   contact_profiles: array<int, array{type: string, value: string}>
@@ -458,7 +467,7 @@ final class UserRepository
         $usersTable = $this->authTable('users');
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, name AS display_name, avatar AS avatar_path, contact AS contact_profiles
+            'SELECT id, username, string, name AS display_name, avatar AS avatar_path, contact AS contact_profiles
              FROM ' . $usersTable . '
              WHERE id = :id
              LIMIT 1'
@@ -473,6 +482,51 @@ final class UserRepository
         return [
             'id' => (int) ($row['id'] ?? 0),
             'username' => (string) ($row['username'] ?? ''),
+            'string' => (string) ($row['string'] ?? ''),
+            'display_name' => (string) ($row['display_name'] ?? ''),
+            'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
+                ? (string) $row['avatar_path']
+                : null,
+            'contact_profiles' => $this->decodeContactProfiles($row['contact_profiles'] ?? null),
+        ];
+    }
+
+    /**
+     * @return array{
+     *   id: int,
+     *   username: string,
+     *   string: string,
+     *   display_name: string,
+     *   avatar_path: string|null,
+     *   contact_profiles: array<int, array{type: string, value: string}>
+     * }|null
+     */
+    public function findPublicProfileByString(string $userString): ?array
+    {
+        $normalized = trim($userString);
+        if ($normalized === '') {
+            return null;
+        }
+
+        $usersTable = $this->authTable('users');
+
+        $stmt = $this->authDb->prepare(
+            'SELECT id, username, string, name AS display_name, avatar AS avatar_path, contact AS contact_profiles
+             FROM ' . $usersTable . '
+             WHERE string = :string
+             LIMIT 1'
+        );
+        $stmt->execute([':string' => $normalized]);
+
+        $row = $stmt->fetch();
+        if ($row === false) {
+            return null;
+        }
+
+        return [
+            'id' => (int) ($row['id'] ?? 0),
+            'username' => (string) ($row['username'] ?? ''),
+            'string' => (string) ($row['string'] ?? ''),
             'display_name' => (string) ($row['display_name'] ?? ''),
             'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
                 ? (string) $row['avatar_path']
@@ -531,7 +585,7 @@ final class UserRepository
         }
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, name AS display_name, avatar AS avatar_path
+            'SELECT id, username, string, name AS display_name, avatar AS avatar_path
              FROM ' . $usersTable . '
              WHERE id IN (' . implode(', ', $placeholders) . ')
              ORDER BY username ASC, id ASC'
@@ -544,6 +598,7 @@ final class UserRepository
             $profiles[] = [
                 'id' => (int) ($row['id'] ?? 0),
                 'username' => (string) ($row['username'] ?? ''),
+                'string' => (string) ($row['string'] ?? ''),
                 'display_name' => (string) ($row['display_name'] ?? ''),
                 'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
                     ? (string) $row['avatar_path']
@@ -569,7 +624,8 @@ final class UserRepository
      *   contact_profiles?: array<int, array{type: string, value: string}>,
      *   set_avatar?: bool,
      *   avatar_path?: string|null,
-     *   cover_image?: string|null
+     *   cover_image?: string|null,
+     *   string_length?: int
      * } $data
      */
     public function save(array $data): int
@@ -588,6 +644,7 @@ final class UserRepository
         $avatarPath = isset($data['avatar_path']) && is_string($data['avatar_path']) ? $data['avatar_path'] : null;
         $coverImage = isset($data['cover_image']) && is_string($data['cover_image']) ? trim($data['cover_image']) : '';
         $coverImage = $coverImage !== '' ? $coverImage : null;
+        $stringLength = isset($data['string_length']) ? (int) $data['string_length'] : 28;
 
         return $this->userPersistenceService->saveUser(
             $this->authDb,
@@ -607,10 +664,20 @@ final class UserRepository
                 'set_avatar' => $setAvatar,
                 'avatar_path' => $avatarPath,
                 'cover_image' => $coverImage,
+                'string_length' => $stringLength,
             ],
             function (int $userId, int $groupId): void {
                 $this->attachUserToGroup($userId, $groupId);
             }
+        );
+    }
+
+    public function userStringById(int $id): ?string
+    {
+        return $this->userPersistenceService->userStringById(
+            $this->authDb,
+            $this->authTable('users'),
+            $id
         );
     }
 

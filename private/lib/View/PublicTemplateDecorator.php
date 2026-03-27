@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\View;
 
 use Raven\Core\Config;
+use Raven\Lib\Media\UserMediaPathService;
 use Raven\Lib\Pagination\Pagination;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -15,11 +16,15 @@ final class PublicTemplateDecorator
 {
     private Config $config;
     private InputSanitizer $input;
+    private string $projectRoot;
+    private UserMediaPathService $userMediaPathService;
 
-    public function __construct(Config $config, InputSanitizer $input)
+    public function __construct(Config $config, InputSanitizer $input, string $projectRoot)
     {
         $this->config = $config;
         $this->input = $input;
+        $this->projectRoot = rtrim($projectRoot, '/\\');
+        $this->userMediaPathService = new UserMediaPathService();
     }
 
     /**
@@ -459,19 +464,7 @@ final class PublicTemplateDecorator
      */
     private function avatarTemplateDataFromPath(string $avatarPath): array
     {
-        $avatarFilename = basename(trim($avatarPath));
-        if ($avatarFilename === '') {
-            return ['filename' => '', 'url' => '', 'thumb_url' => ''];
-        }
-
-        $avatarBase = (string) pathinfo($avatarFilename, PATHINFO_FILENAME);
-        $avatarThumbFilename = $avatarBase !== '' ? $avatarBase . '_thumb.jpg' : $avatarFilename;
-
-        return [
-            'filename' => $avatarFilename,
-            'url' => '/uploads/avatars/' . rawurlencode($avatarFilename),
-            'thumb_url' => '/uploads/avatars/' . rawurlencode($avatarThumbFilename),
-        ];
+        return $this->userMediaPathService->avatarTemplateData($this->projectRoot, $avatarPath);
     }
 
     private function publicTemplateUsername(string $username): string

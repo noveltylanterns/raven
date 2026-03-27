@@ -122,6 +122,21 @@ final class RouteConfigService
         return $this->normalizeRoutePrefix((string) $this->config->get('user.prefix', 'user'), 'user', true);
     }
 
+    public function profileSelector(): string
+    {
+        $selector = strtolower(trim((string) $this->config->get('user.selector', 'id')));
+        if (!in_array($selector, ['id', 'username', 'string'], true)) {
+            $selector = 'id';
+        }
+
+        $loginMode = strtolower(trim((string) $this->config->get('user.auth.login', 'email')));
+        if ($selector === 'username' && $loginMode !== 'username') {
+            return 'id';
+        }
+
+        return $selector;
+    }
+
     public function profileMode(): string
     {
         return $this->normalizeMode((string) $this->config->get('user.privacy', 'disabled'), ['public_full', 'public_limited', 'private', 'disabled'], 'disabled');

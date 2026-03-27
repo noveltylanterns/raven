@@ -30,7 +30,8 @@ Fields/options:
 - `Panel Theme` (`<Default>`, `Corporate`, `Ice`, `Midnight`)
 - `Avatar` file upload (`gif/jpg/jpeg/png`)
 - `Remove current avatar` checkbox (shown only when avatar exists)
-- `Cover Image` optional text path/URL field
+- `Cover Image` local file upload (`gif/jpg/jpeg/png`)
+- `Remove current cover image` checkbox (shown only when cover image exists)
 - `Two-Factor Methods` (Security tab)
   - section label `Two-Factor Authentication`
   - `Setup App`
@@ -97,12 +98,13 @@ Declared in `panel/index.php`:
 4. Sanitizes and validates username/display/bio/email/theme/password.
 5. Validates avatar upload (when present) using `AvatarValidator` and media config limits.
 6. Stores avatar through sanitized re-encode flow (`storeSanitizedAvatarUpload`).
-7. Uses deterministic avatar naming: `public/uploads/avatars/{user_id}.{extension}`.
-8. Generates companion avatar thumbnails as `public/uploads/avatars/{user_id}_thumb.jpg`.
+7. Uses deterministic avatar naming: `public/uploads/user/avatar/{user_string}.{extension}`.
+8. Generates companion avatar thumbnails as `public/uploads/user/avatar/{user_string}_thumb.jpg`.
    - avatars above `120x120` are center-cropped/resized to `120x120` JPEG
    - avatars at or below `120x120` are copied as-is from sanitized original
-9. Persists changes through `AuthService::updateUserPreferences(...)`, including optional `cover_image`.
-10. Removes superseded avatar file after successful update.
+9. Stores optional cover uploads at `public/uploads/user/cover/{user_string}.{extension}`.
+10. Persists changes through `AuthService::updateUserPreferences(...)`, including optional `cover_image`.
+11. Removes superseded avatar and cover files after successful update.
 
 ### Persistence Contract
 
@@ -113,7 +115,7 @@ Declared in `panel/index.php`:
 - theme update
 - plaintext `bio` update capped by config key `user.bio`
 - optional avatar path update
-- optional `cover_image` update
+- optional `cover_image` filename update
 - `two_factor_methods` JSON persistence for multi-method 2FA entries
 
 Returned result shape:
@@ -126,7 +128,7 @@ Returned result shape:
 - CSRF enforced on save.
 - Input sanitation via `InputSanitizer`.
 - Avatar validation and sanitized write path enforced before persistence.
-- Failed update flows clean up newly written avatar files to avoid orphaned writes.
+- Failed update flows clean up newly written avatar and cover files to avoid orphaned writes.
 
 ### Update Discipline
 

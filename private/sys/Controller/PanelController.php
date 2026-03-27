@@ -48,8 +48,10 @@ use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\PanelPostNormalizer;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Http\UploadFileSetNormalizer;
+use Raven\Lib\Media\AvatarValidationPolicy;
 use Raven\Lib\Media\AvatarUploadService;
 use Raven\Lib\Media\TaxonomyImageService;
+use Raven\Lib\Media\UserMediaPathService;
 use Raven\Lib\Pagination\Pagination;
 use Raven\Lib\Panel\PanelPageAuthorOptionBuilder;
 use Raven\Lib\Profile\ProfileContactService;
@@ -130,6 +132,7 @@ final class PanelController
     private ?ExtensionPermissionCatalogService $extensionPermissionCatalogService = null;
     private ?ExtensionStorageProvisioner $extensionStorageProvisioner = null;
     private ?AvatarUploadService $avatarUploadService = null;
+    private ?UserMediaPathService $userMediaPathService = null;
     private ?ConfigSnapshotSanitizer $configSnapshotSanitizer = null;
     private ?ThemeCloneService $themeCloneService = null;
     private ?ConfigEditorSchemaService $configEditorSchemaService = null;
@@ -2648,7 +2651,10 @@ final class PanelController
             'twoFactorTypeOptions' => $this->twoFactorTypeOptions(),
             'profileRoutePrefix' => $this->profileRoutePrefix(),
             'profileRoutesEnabled' => $this->profileRoutesEnabledForRoutingTable(),
+            'profileRouteSegment' => is_array($user) ? ($this->publicProfileRouteSegmentForUser($user) ?? '') : '',
+            'avatarTemplateData' => is_array($user) ? $this->avatarTemplateData((string) ($user['avatar_path'] ?? '')) : ['filename' => '', 'url' => '', 'thumb_url' => ''],
             'avatarUploadLimitsNote' => $this->avatarUploadLimitsNote(),
+            'coverImageUrl' => is_array($user) ? $this->coverPublicUrl((string) ($user['cover_image'] ?? '')) : '',
             'groupOptions' => $groupOptions,
             // Only existing Super Admin users can assign users into Super Admin group.
             'canAssignSuperAdmin' => $actorIsSuperAdmin,
@@ -2705,8 +2711,8 @@ final class PanelController
             && (string) ($post['two_factor_methods_present'] ?? '') === '1';
         $submittedTwoFactorMethods = $post['two_factor_methods'] ?? null;
         $submittedTwoFactorMethodIndices = $this->normalizeSubmittedTwoFactorExistingIndices($submittedTwoFactorMethods);
-        $coverImage = $this->input->text($post['cover_image'] ?? null, 255);
         $removeAvatar = isset($post['remove_avatar']) && (string) $post['remove_avatar'] === '1';
+        $removeCover = isset($post['remove_cover_image']) && (string) $post['remove_cover_image'] === '1';
 
         $existingUser = null;
         $existingTwoFactorMethods = [];
@@ -2730,6 +2736,10 @@ final class PanelController
         $currentAvatarPath = is_array($existingUser) && isset($existingUser['avatar_path']) && is_string($existingUser['avatar_path'])
             ? (string) $existingUser['avatar_path']
             : null;
+        $currentCoverImage = is_array($existingUser) && isset($existingUser['cover_image']) && is_string($existingUser['cover_image'])
+            ? (string) $existingUser['cover_image']
+            : null;
+        $currentUserString = $this->currentUserString($existingUser);
 
         /** @var mixed $groupIdsRaw */
         $groupIdsRaw = $post['group_ids'] ?? [];
@@ -2863,9 +2873,16 @@ final class PanelController
         $uploadedAvatarFilename = null;
         $pendingAvatarUpload = null;
         $pendingAvatarExtension = null;
+        $coverImage = $currentCoverImage;
+        $uploadedCoverFilename = null;
+        $pendingCoverUpload = null;
+        $pendingCoverExtension = null;
         if ($removeAvatar) {
             $avatarSet = true;
             $avatarFilename = null;
+        }
+        if ($removeCover) {
+            $coverImage = null;
         }
 
         $avatarUpload = $files['avatar'] ?? null;
@@ -2899,8 +2916,13 @@ final class PanelController
             }
 
             if ($id !== null) {
+                if ($currentUserString === null) {
+                    $this->flash('error', 'User string is missing for this account.');
+                    redirect($editUrl);
+                }
+
                 $avatarsDir = $this->avatarStorageDirectory();
-                $avatarFilename = $this->avatarFilenameForUserId($id, $normalizedExtension);
+                $avatarFilename = $this->avatarFilenameForUserString($currentUserString, $normalizedExtension);
                 $destination = $avatarsDir . '/' . $avatarFilename;
 
                 $storeError = $this->storeSanitizedAvatarUpload($avatarUpload, $destination);
@@ -2912,9 +2934,49 @@ final class PanelController
                 $avatarSet = true;
                 $uploadedAvatarFilename = $avatarFilename;
             } else {
-                // Create flow waits for DB-assigned id before deriving deterministic avatar filename.
+                // Create flow waits for the generated user string before deriving deterministic filenames.
                 $pendingAvatarUpload = $avatarUpload;
                 $pendingAvatarExtension = $normalizedExtension;
+            }
+        }
+
+        $coverUpload = $files['cover_image'] ?? null;
+        $hasCoverUpload = is_array($coverUpload)
+            && (($coverUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+        if ($hasCoverUpload) {
+            /** @var array<string, mixed> $coverUpload */
+            $coverResult = $this->validateUserCoverUpload($coverUpload);
+            if (!(bool) $coverResult['ok']) {
+                $this->flash('error', (string) ($coverResult['error'] ?? 'Cover image upload failed.'));
+                redirect($editUrl);
+            }
+
+            $normalizedExtension = $this->normalizeAvatarExtension((string) ($coverResult['extension'] ?? ''));
+            if ($normalizedExtension === null) {
+                $this->flash('error', 'Cover image upload format is not supported.');
+                redirect($editUrl);
+            }
+
+            if ($id !== null) {
+                if ($currentUserString === null) {
+                    $this->flash('error', 'User string is missing for this account.');
+                    redirect($editUrl);
+                }
+
+                $coversDir = $this->userCoverStorageDirectory();
+                $coverImage = $this->coverFilenameForUserString($currentUserString, $normalizedExtension);
+                $destination = $coversDir . '/' . $coverImage;
+
+                $storeError = $this->storeSanitizedUserCoverUpload($coverUpload, $destination);
+                if ($storeError !== null) {
+                    $this->flash('error', $storeError);
+                    redirect($editUrl);
+                }
+
+                $uploadedCoverFilename = $coverImage;
+            } else {
+                $pendingCoverUpload = $coverUpload;
+                $pendingCoverExtension = $normalizedExtension;
             }
         }
 
@@ -2934,22 +2996,10 @@ final class PanelController
                 'set_avatar' => $avatarSet,
                 'avatar_path' => $avatarFilename,
                 'cover_image' => $coverImage,
+                'string_length' => (int) $this->config->get('user.string', 28),
             ]);
 
-            if ($id === null && is_array($pendingAvatarUpload) && is_string($pendingAvatarExtension)) {
-                $createdUserId = $savedId;
-                $avatarsDir = $this->avatarStorageDirectory();
-                $avatarFilename = $this->avatarFilenameForUserId($savedId, $pendingAvatarExtension);
-                $destination = $avatarsDir . '/' . $avatarFilename;
-
-                $storeError = $this->storeSanitizedAvatarUpload($pendingAvatarUpload, $destination);
-                if ($storeError !== null) {
-                    throw new \RuntimeException($storeError);
-                }
-
-                $avatarSet = true;
-                $uploadedAvatarFilename = $avatarFilename;
-
+            if ($id === null) {
                 $this->userRepo->save([
                     'id' => $savedId,
                     'username' => is_string($username) ? $username : '',
@@ -2960,18 +3010,73 @@ final class PanelController
                     'password' => null,
                     'group_ids' => $groupIds,
                     'contact_profiles' => $contactProfiles,
-                    'set_avatar' => true,
-                    'avatar_path' => $avatarFilename,
+                    'set_avatar' => false,
+                    'avatar_path' => null,
                     'cover_image' => $coverImage,
+                    'string_length' => (int) $this->config->get('user.string', 28),
                 ]);
+
+                $createdUserId = $savedId;
+                $createdUserString = $this->userRepo->userStringById($savedId);
+                if ($createdUserString === null) {
+                    throw new \RuntimeException('Failed to resolve generated user string.');
+                }
+
+                if (is_array($pendingAvatarUpload) && is_string($pendingAvatarExtension)) {
+                    $avatarsDir = $this->avatarStorageDirectory();
+                    $avatarFilename = $this->avatarFilenameForUserString($createdUserString, $pendingAvatarExtension);
+                    $destination = $avatarsDir . '/' . $avatarFilename;
+
+                    $storeError = $this->storeSanitizedAvatarUpload($pendingAvatarUpload, $destination);
+                    if ($storeError !== null) {
+                        throw new \RuntimeException($storeError);
+                    }
+
+                    $avatarSet = true;
+                    $uploadedAvatarFilename = $avatarFilename;
+                }
+
+                if (is_array($pendingCoverUpload) && is_string($pendingCoverExtension)) {
+                    $coversDir = $this->userCoverStorageDirectory();
+                    $coverImage = $this->coverFilenameForUserString($createdUserString, $pendingCoverExtension);
+                    $destination = $coversDir . '/' . $coverImage;
+
+                    $storeError = $this->storeSanitizedUserCoverUpload($pendingCoverUpload, $destination);
+                    if ($storeError !== null) {
+                        throw new \RuntimeException($storeError);
+                    }
+
+                    $uploadedCoverFilename = $coverImage;
+                }
+
+                if ($avatarSet || $uploadedCoverFilename !== null) {
+                    $this->userRepo->save([
+                        'id' => $savedId,
+                        'username' => is_string($username) ? $username : '',
+                        'display_name' => $displayName,
+                        'email' => (string) $email,
+                        'bio' => $bio,
+                        'theme' => $theme,
+                        'password' => null,
+                        'group_ids' => $groupIds,
+                        'contact_profiles' => $contactProfiles,
+                        'set_avatar' => $avatarSet,
+                        'avatar_path' => $avatarFilename,
+                        'cover_image' => $coverImage,
+                        'string_length' => (int) $this->config->get('user.string', 28),
+                    ]);
+                }
             }
         } catch (\Throwable $exception) {
             // Roll back newly uploaded avatar when profile update fails.
             if ($uploadedAvatarFilename !== null) {
                 $this->deleteAvatarFile($uploadedAvatarFilename);
             }
+            if ($uploadedCoverFilename !== null) {
+                $this->deleteCoverFile($uploadedCoverFilename);
+            }
 
-            // Keep create+upload flow atomic when avatar post-write fails.
+            // Keep create+upload flow atomic when media post-write fails.
             if ($id === null && $createdUserId !== null) {
                 try {
                     $this->userRepo->deleteById($createdUserId);
@@ -3013,6 +3118,9 @@ final class PanelController
         // Remove old avatar when replaced/removed, while preserving current file.
         if ($avatarSet && is_string($currentAvatarPath) && $currentAvatarPath !== '' && $currentAvatarPath !== $avatarFilename) {
             $this->deleteAvatarFile($currentAvatarPath);
+        }
+        if ($currentCoverImage !== null && $currentCoverImage !== '' && $currentCoverImage !== $coverImage) {
+            $this->deleteCoverFile($currentCoverImage);
         }
 
         if ($twoFactorUpdateError !== null) {
@@ -3605,7 +3713,9 @@ final class PanelController
             'profileContactOptions' => $this->profileContactOptions(),
             'twoFactorTypeOptions' => $this->twoFactorTypeOptions(),
             'themeOptions' => ['default', 'corp', 'ice', 'midnight'],
+            'avatarTemplateData' => $this->avatarTemplateData((string) ($preferences['avatar_path'] ?? '')),
             'avatarUploadLimitsNote' => $this->avatarUploadLimitsNote(),
+            'coverImageUrl' => $this->coverPublicUrl((string) ($preferences['cover_image'] ?? '')),
             'userTheme' => $this->currentUserTheme(),
         ], 'panel/wrapper');
     }
@@ -3656,8 +3766,12 @@ final class PanelController
             $post['two_factor_methods'] ?? null,
             (string) ($current['email'] ?? '')
         );
-        $coverImage = $this->input->text($post['cover_image'] ?? null, 255);
         $removeAvatar = isset($post['remove_avatar']) && (string) $post['remove_avatar'] === '1';
+        $removeCover = isset($post['remove_cover_image']) && (string) $post['remove_cover_image'] === '1';
+        $currentUserString = $this->currentUserString($current);
+        $currentCoverImage = isset($current['cover_image']) && is_string($current['cover_image'])
+            ? (string) $current['cover_image']
+            : null;
 
         $errors = [];
         $usernameRequired = $loginIdentifierMode === 'username';
@@ -3691,10 +3805,15 @@ final class PanelController
         $avatarSet = false;
         $avatarFilename = null;
         $uploadedAvatarFilename = null;
+        $coverImage = $currentCoverImage;
+        $uploadedCoverFilename = null;
 
         if ($removeAvatar) {
             $avatarSet = true;
             $avatarFilename = null;
+        }
+        if ($removeCover) {
+            $coverImage = null;
         }
 
         $avatarUpload = $files['avatar'] ?? null;
@@ -3724,16 +3843,50 @@ final class PanelController
                 if ($normalizedExtension === null) {
                     $errors[] = 'Avatar upload format is not supported.';
                 } else {
-                    $avatarsDir = $this->avatarStorageDirectory();
-                    $avatarFilename = $this->avatarFilenameForUserId($userId, $normalizedExtension);
-                    $destination = $avatarsDir . '/' . $avatarFilename;
+                    if ($currentUserString === null) {
+                        $errors[] = 'User string is missing for this account.';
+                    } else {
+                        $avatarsDir = $this->avatarStorageDirectory();
+                        $avatarFilename = $this->avatarFilenameForUserString($currentUserString, $normalizedExtension);
+                        $destination = $avatarsDir . '/' . $avatarFilename;
 
-                    $storeError = $this->storeSanitizedAvatarUpload($avatarUpload, $destination);
+                        $storeError = $this->storeSanitizedAvatarUpload($avatarUpload, $destination);
+                        if ($storeError !== null) {
+                            $errors[] = $storeError;
+                        } else {
+                            $avatarSet = true;
+                            $uploadedAvatarFilename = $avatarFilename;
+                        }
+                    }
+                }
+            }
+        }
+
+        $coverUpload = $files['cover_image'] ?? null;
+        $hasCoverUpload = is_array($coverUpload)
+            && (($coverUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+        if ($hasCoverUpload) {
+            /** @var array<string, mixed> $coverUpload */
+            $result = $this->validateUserCoverUpload($coverUpload);
+
+            if (!(bool) $result['ok']) {
+                $errors[] = (string) ($result['error'] ?? 'Cover image upload failed.');
+            } else {
+                $normalizedExtension = $this->normalizeAvatarExtension((string) ($result['extension'] ?? ''));
+                if ($normalizedExtension === null) {
+                    $errors[] = 'Cover image upload format is not supported.';
+                } elseif ($currentUserString === null) {
+                    $errors[] = 'User string is missing for this account.';
+                } else {
+                    $coversDir = $this->userCoverStorageDirectory();
+                    $coverImage = $this->coverFilenameForUserString($currentUserString, $normalizedExtension);
+                    $destination = $coversDir . '/' . $coverImage;
+
+                    $storeError = $this->storeSanitizedUserCoverUpload($coverUpload, $destination);
                     if ($storeError !== null) {
                         $errors[] = $storeError;
                     } else {
-                        $avatarSet = true;
-                        $uploadedAvatarFilename = $avatarFilename;
+                        $uploadedCoverFilename = $coverImage;
                     }
                 }
             }
@@ -3743,6 +3896,9 @@ final class PanelController
             // Remove newly written avatar when validation/update fails later.
             if ($uploadedAvatarFilename !== null) {
                 $this->deleteAvatarFile($uploadedAvatarFilename);
+            }
+            if ($uploadedCoverFilename !== null) {
+                $this->deleteCoverFile($uploadedCoverFilename);
             }
 
             $this->flash('error', implode(' ', $errors));
@@ -3768,6 +3924,9 @@ final class PanelController
             if ($uploadedAvatarFilename !== null) {
                 $this->deleteAvatarFile($uploadedAvatarFilename);
             }
+            if ($uploadedCoverFilename !== null) {
+                $this->deleteCoverFile($uploadedCoverFilename);
+            }
 
             $this->flash('error', implode(' ', $update['errors']));
             redirect($preferencesUrl);
@@ -3777,6 +3936,9 @@ final class PanelController
         $oldAvatar = $current['avatar_path'] ?? null;
         if (is_string($oldAvatar) && $oldAvatar !== '' && $oldAvatar !== $avatarFilename && $avatarSet) {
             $this->deleteAvatarFile($oldAvatar);
+        }
+        if ($currentCoverImage !== null && $currentCoverImage !== '' && $currentCoverImage !== $coverImage) {
+            $this->deleteCoverFile($currentCoverImage);
         }
 
         // Keep the current session valid after enabling or rotating interactive 2FA methods.
@@ -6304,11 +6466,29 @@ final class PanelController
     }
 
     /**
+     * Stores one sanitized user cover upload without avatar thumbnail derivatives.
+     *
+     * @param array<string, mixed> $upload
+     */
+    private function storeSanitizedUserCoverUpload(array $upload, string $destination): ?string
+    {
+        return $this->avatarUploadService()->storeSanitizedImageUpload($upload, $destination);
+    }
+
+    /**
      * Returns canonical avatar storage directory and ensures it exists.
      */
     private function avatarStorageDirectory(): string
     {
-        return $this->avatarUploadService()->storageDirectory(dirname(__DIR__, 3));
+        return $this->userMediaPathService()->avatarStorageDirectory(dirname(__DIR__, 3));
+    }
+
+    /**
+     * Returns canonical user-cover storage directory and ensures it exists.
+     */
+    private function userCoverStorageDirectory(): string
+    {
+        return $this->userMediaPathService()->coverStorageDirectory(dirname(__DIR__, 3));
     }
 
     /**
@@ -6320,11 +6500,19 @@ final class PanelController
     }
 
     /**
-     * Returns deterministic avatar filename for one user id and extension.
+     * Returns deterministic avatar filename for one user string and extension.
      */
-    private function avatarFilenameForUserId(int $userId, string $extension): string
+    private function avatarFilenameForUserString(string $userString, string $extension): string
     {
-        return $this->avatarUploadService()->filenameForUserId($userId, $extension);
+        return $this->userMediaPathService()->avatarFilenameForString($userString, $extension);
+    }
+
+    /**
+     * Returns deterministic cover filename for one user string and extension.
+     */
+    private function coverFilenameForUserString(string $userString, string $extension): string
+    {
+        return $this->userMediaPathService()->coverFilenameForString($userString, $extension);
     }
 
     /**
@@ -6332,7 +6520,51 @@ final class PanelController
      */
     private function deleteAvatarFile(string $filename): void
     {
-        $this->avatarUploadService()->deleteAvatarFile(dirname(__DIR__, 3), $filename);
+        $this->userMediaPathService()->deleteAvatarFile(dirname(__DIR__, 3), $filename);
+    }
+
+    /**
+     * Removes one user cover file from public storage if present.
+     */
+    private function deleteCoverFile(string $coverValue): void
+    {
+        $this->userMediaPathService()->deleteCoverFile(dirname(__DIR__, 3), $coverValue);
+    }
+
+    private function coverPublicUrl(string $coverValue): string
+    {
+        return $this->userMediaPathService()->coverPublicUrl(dirname(__DIR__, 3), $coverValue);
+    }
+
+    /**
+     * @return array{filename: string, url: string, thumb_url: string}
+     */
+    private function avatarTemplateData(string $avatarPath): array
+    {
+        return $this->userMediaPathService()->avatarTemplateData(dirname(__DIR__, 3), $avatarPath);
+    }
+
+    /**
+     * Returns one current persisted user string when available.
+     *
+     * @param array<string, mixed>|null $user
+     */
+    private function currentUserString(?array $user): ?string
+    {
+        $userString = preg_replace('/[^a-zA-Z0-9]/', '', trim((string) ($user['string'] ?? ''))) ?? '';
+        return $userString !== '' ? $userString : null;
+    }
+
+    /**
+     * @param array<string, mixed> $upload
+     * @return array{ok: bool, error: string|null, extension: string|null}
+     */
+    private function validateUserCoverUpload(array $upload): array
+    {
+        $maxBytes = $this->resolveMediaMaxFilesizeBytes('images', 10485760);
+        $allowedExtensions = (string) $this->config->get('media.images.allowed_extensions', 'gif,jpg,jpeg,png');
+        $policy = new AvatarValidationPolicy($maxBytes, 10000, 10000, $allowedExtensions);
+        return $policy->validate($upload);
     }
 
     /**
@@ -6477,11 +6709,11 @@ final class PanelController
             return null;
         }
 
-        if ($this->panelLoginIdentifierMode() !== 'email') {
-            return $this->normalizeUserIdentifierValue((string) ($user['username'] ?? ''));
-        }
-
-        return (string) $userId;
+        return match ($this->routeConfigService()->profileSelector()) {
+            'string' => $this->currentUserString($user),
+            'username' => $this->normalizeUserIdentifierValue((string) ($user['username'] ?? '')),
+            default => (string) $userId,
+        };
     }
 
     /**
@@ -7549,6 +7781,15 @@ final class PanelController
         }
 
         return $this->avatarUploadService;
+    }
+
+    private function userMediaPathService(): UserMediaPathService
+    {
+        if (!$this->userMediaPathService instanceof UserMediaPathService) {
+            $this->userMediaPathService = new UserMediaPathService();
+        }
+
+        return $this->userMediaPathService;
     }
 
     private function configSnapshotSanitizer(): ConfigSnapshotSanitizer

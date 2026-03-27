@@ -57,11 +57,7 @@ Tab behavior notes:
   - `mail.agent`
   - `mail.sender_address` (`Mail Sender Address`, optional explicit sender email; blank uses auto no-reply fallback)
   - `mail.sender_name` (`Mail Sender Name`, display name used in outgoing `From` header)
-- `Update` section:
-  - `update.source.mode`
-  - `update.source.github_repo`
-  - `update.source.repo_url`
-  - database password fields render as password inputs in the editor so saved credentials are masked on screen
+- database password fields render as password inputs in the editor so saved credentials are masked on screen
 
 #### Content Tab
 
@@ -161,7 +157,9 @@ Notable options:
 
 - `user.auth.registration` is shown first in `Registration Options` as `Enable Public Registration`.
 - `user.auth.login` remains in `Registration Options` as `Login Method`.
+- `user.string` is shown in `Registration Options` as `String Length`, defaults to `28`, and controls the generated length of each user's unique public-safe selector string.
 - `user.bio` controls the maximum plaintext profile-bio length allowed in both the User editor and self-service Preferences screen.
+- `user.selector` is shown in `Profile Options` as `Profile URL Selector` and controls whether public profile URLs resolve by numeric `id`, `username` (only when `user.auth.login=username`), or the generated `string`.
 
 ### Field Input Types You’ll See
 
@@ -222,6 +220,8 @@ Important rules include:
 - `panel.theme` constrained to `corp`, `ice`, or `midnight` (legacy `light`/`dark` normalize to `corp`/`midnight`)
 - `user.auth.login` constrained to `email` or `username`
 - `user.auth.registration` constrained to `open`, `invite`, or `closed`
+- `user.string` is normalized to a positive integer length and capped before persistence
+- `user.selector` is constrained to `id`, `username`, or `string`, and `username` is rejected unless username login mode is active
 - slug/prefix validation and collision checks for public route prefixes
 - cookie domain/prefix format validation
 - login throttling integer minimums
@@ -334,8 +334,10 @@ The following config keys are expected to appear in this document and in runtime
 - `session.brute.lock`
 - `user.auth.login`
 - `user.auth.registration`
+- `user.string`
 - `user.bio`
 - `user.privacy`
+- `user.selector`
 - `user.prefix`
 - `user.contact.email.label`
 - `user.contact.email.url_prefix`

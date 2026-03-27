@@ -770,6 +770,7 @@ if ($isPost) {
                 'theme' => 'default',
                 'password' => $adminPassword,
                 'group_ids' => [$superAdminGroupId],
+                'string_length' => (int) (($nextConfig['user']['string'] ?? 28)),
             ]);
 
             installer_write_config($configPath, $nextConfig);
