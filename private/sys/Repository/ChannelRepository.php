@@ -526,7 +526,7 @@ final class ChannelRepository
             ]);
 
             $detachRedirects = $this->db->prepare(
-                'UPDATE ' . $redirects . ' SET channel_id = :root_channel WHERE channel_id = :channel_id'
+                'UPDATE ' . $redirects . ' SET channel = :root_channel WHERE channel = :channel_id'
             );
             $detachRedirects->execute([
                 ':root_channel' => ChannelRecordPolicy::ROOT_CHANNEL_ID,

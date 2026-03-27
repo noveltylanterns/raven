@@ -143,7 +143,7 @@ All state-changing routes use CSRF validation.
 - `updateImagePaths(...)` persists cover/preview source + variant paths.
 - `deleteById(...)` runs in a transaction:
   - updates `pages.channel_id` to `0`
-  - updates `redirects.channel_id` to `0`
+  - updates `redirects.channel` to `0`
   - deletes channel row
 - `listRecords()` ensures `private/dat/channel/0_root.php` exists with reserved id `0`, name `<root>`, and slug `root`.
 

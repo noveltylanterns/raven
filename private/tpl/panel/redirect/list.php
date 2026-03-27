@@ -47,7 +47,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
 $redirectStatusOptions = [];
 $redirectChannelOptions = [];
 foreach ($redirectRows as $redirectRow) {
-    $statusLabel = (int) ($redirectRow['is_active'] ?? 0) === 1 ? 'Active' : 'Inactive';
+    $statusLabel = (int) ($redirectRow['active'] ?? 0) === 1 ? 'Active' : 'Inactive';
     $statusOptionKey = strtolower($statusLabel);
     if (!isset($redirectStatusOptions[$statusOptionKey])) {
         $redirectStatusOptions[$statusOptionKey] = $statusLabel;
@@ -143,7 +143,7 @@ asort($redirectChannelOptions, SORT_NATURAL | SORT_FLAG_CASE);
                         <th scope="col" data-sort-key="title" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Title</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="slug" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Slug</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="channel" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Channel</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="target_url" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Target URL</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+                        <th scope="col" data-sort-key="target" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Target URL</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="status" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Status</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" class="text-center">Actions</th>
                     </tr>
@@ -156,9 +156,9 @@ asort($redirectChannelOptions, SORT_NATURAL | SORT_FLAG_CASE);
                         $redirectSlug = (string) ($row['slug'] ?? '');
                         $channelSlug = trim((string) ($row['channel_slug'] ?? ''));
                         $channelLabel = $channelSlug === '' ? '<none>' : $channelSlug;
-                        $statusLabel = (int) ($row['is_active'] ?? 0) === 1 ? 'Active' : 'Inactive';
+                        $statusLabel = (int) ($row['active'] ?? 0) === 1 ? 'Active' : 'Inactive';
                         $statusBadgeClass = $statusLabel === 'Active' ? 'text-bg-success' : 'text-bg-warning';
-                        $targetUrl = trim((string) ($row['target_url'] ?? ''));
+                        $targetUrl = trim((string) ($row['target'] ?? ''));
                         $targetUrlLabel = $targetUrl !== '' ? $targetUrl : '<empty>';
                         ?>
                         <tr
@@ -168,7 +168,7 @@ asort($redirectChannelOptions, SORT_NATURAL | SORT_FLAG_CASE);
                             data-sort-slug="<?= e($redirectSlug) ?>"
                             data-sort-channel="<?= e($channelLabel) ?>"
                             data-sort-status="<?= e($statusLabel) ?>"
-                            data-sort-target-url="<?= e($targetUrlLabel) ?>"
+                            data-sort-target="<?= e($targetUrlLabel) ?>"
                         >
                             <?php // Row checkboxes post to dedicated bulk-delete form. ?>
                             <?php // `data-rvn-row-select` hooks into global layout row-highlighting script. ?>

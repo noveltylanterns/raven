@@ -48,9 +48,9 @@ final class RedirectRepository
         $redirects = $this->table('redirects');
 
         $stmt = $this->db->prepare(
-            'SELECT r.id, r.title, r.description, r.slug, r.channel_id, r.is_active, r.target_url, r.created_at, r.updated_at
+            'SELECT r.id, r.title, r.description, r.slug, r.channel, r.active, r.target, r.created, r.updated
              FROM ' . $redirects . ' r
-             ORDER BY r.updated_at DESC, r.id DESC'
+             ORDER BY r.updated DESC, r.id DESC'
         );
         $stmt->execute();
 
@@ -89,9 +89,9 @@ final class RedirectRepository
         $redirects = $this->table('redirects');
 
         $stmt = $this->db->prepare(
-            'SELECT r.id, r.title, r.description, r.slug, r.channel_id, r.is_active, r.target_url, r.created_at, r.updated_at
+            'SELECT r.id, r.title, r.description, r.slug, r.channel, r.active, r.target, r.created, r.updated
              FROM ' . $redirects . ' r
-             ORDER BY r.updated_at DESC, r.id DESC
+             ORDER BY r.updated DESC, r.id DESC
              LIMIT :limit OFFSET :offset'
         );
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
@@ -127,17 +127,16 @@ final class RedirectRepository
                     page_rows.title,
                     page_rows.description,
                     page_rows.slug,
-                    page_rows.channel_id,
-                    page_rows.is_active,
-                    page_rows.target_url,
-                    page_rows.created_at,
-                    page_rows.updated_at,
-                    page_rows.channel_id,
+                    page_rows.channel,
+                    page_rows.active,
+                    page_rows.target,
+                    page_rows.created,
+                    page_rows.updated,
                     totals.total_rows
              FROM (
-                 SELECT r.id, r.title, r.description, r.slug, r.channel_id, r.is_active, r.target_url, r.created_at, r.updated_at
+                 SELECT r.id, r.title, r.description, r.slug, r.channel, r.active, r.target, r.created, r.updated
                  FROM ' . $redirects . ' r
-                 ORDER BY r.updated_at DESC, r.id DESC
+                 ORDER BY r.updated DESC, r.id DESC
                  LIMIT :limit OFFSET :offset
              ) AS page_rows
              CROSS JOIN (
@@ -183,7 +182,7 @@ final class RedirectRepository
         $redirects = $this->table('redirects');
 
         $stmt = $this->db->prepare(
-            'SELECT r.id, r.title, r.description, r.slug, r.channel_id, r.is_active, r.target_url, r.created_at, r.updated_at
+            'SELECT r.id, r.title, r.description, r.slug, r.channel, r.active, r.target, r.created, r.updated
              FROM ' . $redirects . ' r
              WHERE r.id = :id
              LIMIT 1'
@@ -214,7 +213,7 @@ final class RedirectRepository
         $normalizedId = $id !== null && $id > 0 ? $id : 0;
         if ($normalizedId > 0) {
             $stmt = $this->db->prepare(
-                'SELECT id, title, description, slug, channel_id, is_active, target_url, created_at, updated_at
+                'SELECT id, title, description, slug, channel, active, target, created, updated
                  FROM ' . $redirects . '
                  WHERE id = :id
                  LIMIT 1'
@@ -241,18 +240,18 @@ final class RedirectRepository
     {
         $redirects = $this->table('redirects');
 
-        $sql = 'SELECT r.id, r.title, r.slug, r.channel_id, r.target_url, r.is_active
+        $sql = 'SELECT r.id, r.title, r.slug, r.channel, r.target, r.active
                 FROM ' . $redirects . ' r
                 WHERE r.slug = :slug
-                  AND r.is_active = :is_active';
+                  AND r.active = :active';
         $params = [
             ':slug' => $slug,
-            ':is_active' => 1,
+            ':active' => 1,
         ];
 
         // Root redirects match only channelless rows; channel routes must match channel slug.
         if ($channelSlug === null) {
-            $sql .= ' AND (r.channel_id = 0 OR r.channel_id IS NULL)';
+            $sql .= ' AND (r.channel = 0 OR r.channel IS NULL)';
         } else {
             try {
                 $channelId = $this->channelIdBySlug($channelSlug);
@@ -262,8 +261,8 @@ final class RedirectRepository
             if ($channelId === null || $channelId < 1) {
                 return null;
             }
-            $sql .= ' AND r.channel_id = :channel_id';
-            $params[':channel_id'] = $channelId;
+            $sql .= ' AND r.channel = :channel';
+            $params[':channel'] = $channelId;
         }
 
         $sql .= ' LIMIT 1';
@@ -288,8 +287,8 @@ final class RedirectRepository
      *   description: string,
      *   slug: string,
      *   channel_slug: string|null,
-     *   is_active: int,
-     *   target_url: string
+     *   active: int,
+     *   target: string
      * } $data
      */
     public function save(array $data): int
@@ -301,8 +300,8 @@ final class RedirectRepository
         $description = trim((string) ($data['description'] ?? ''));
         $slug = trim((string) ($data['slug'] ?? ''));
         $channelSlug = $data['channel_slug'] ?? null;
-        $isActive = (int) ($data['is_active'] ?? 0) === 1 ? 1 : 0;
-        $targetUrl = trim((string) ($data['target_url'] ?? ''));
+        $isActive = (int) ($data['active'] ?? 0) === 1 ? 1 : 0;
+        $targetUrl = trim((string) ($data['target'] ?? ''));
         $channelId = $this->channelIdBySlug($channelSlug) ?? 0;
         if (trim((string) ($channelSlug ?? '')) !== '' && $channelId < 1) {
             throw new RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
@@ -325,20 +324,20 @@ final class RedirectRepository
                  SET title = :title,
                      description = :description,
                      slug = :slug,
-                     channel_id = :channel_id,
-                     is_active = :is_active,
-                     target_url = :target_url,
-                     updated_at = :updated_at
+                     channel = :channel,
+                     active = :active,
+                     target = :target,
+                     updated = :updated
                  WHERE id = :id'
             );
             $stmt->execute([
                 ':title' => $title,
                 ':description' => $description,
                 ':slug' => $slug,
-                ':channel_id' => $channelId,
-                ':is_active' => $isActive,
-                ':target_url' => $targetUrl,
-                ':updated_at' => $now,
+                ':channel' => $channelId,
+                ':active' => $isActive,
+                ':target' => $targetUrl,
+                ':updated' => $now,
                 ':id' => $id,
             ]);
 
@@ -348,18 +347,18 @@ final class RedirectRepository
         // Insert path stores creation/update timestamps together.
         $stmt = $this->db->prepare(
             'INSERT INTO ' . $redirects . '
-             (title, description, slug, channel_id, is_active, target_url, created_at, updated_at)
-             VALUES (:title, :description, :slug, :channel_id, :is_active, :target_url, :created_at, :updated_at)'
+             (title, description, slug, channel, active, target, created, updated)
+             VALUES (:title, :description, :slug, :channel, :active, :target, :created, :updated)'
         );
         $stmt->execute([
             ':title' => $title,
             ':description' => $description,
             ':slug' => $slug,
-            ':channel_id' => $channelId,
-            ':is_active' => $isActive,
-            ':target_url' => $targetUrl,
-            ':created_at' => $now,
-            ':updated_at' => $now,
+            ':channel' => $channelId,
+            ':active' => $isActive,
+            ':target' => $targetUrl,
+            ':created' => $now,
+            ':updated' => $now,
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -387,7 +386,8 @@ final class RedirectRepository
             $slug,
             $channelId,
             $ignoreId,
-            'ignore_id'
+            'ignore_id',
+            'channel'
         );
     }
 
@@ -406,8 +406,14 @@ final class RedirectRepository
      */
     private function withChannelContext(array $row, array $channelsById): array
     {
-        $channelId = (int) ($row['channel_id'] ?? 0);
+        $channelId = (int) ($row['channel'] ?? 0);
         $channel = $channelId > 0 ? ($channelsById[$channelId] ?? null) : null;
+        $row['channel'] = $channelId;
+        $row['active'] = (int) ($row['active'] ?? 0);
+        $row['target'] = (string) ($row['target'] ?? '');
+        $row['created'] = (string) ($row['created'] ?? '');
+        $row['updated'] = (string) ($row['updated'] ?? '');
+
         return ChannelContextService::applyBasicChannelContext($row, $channel);
     }
 

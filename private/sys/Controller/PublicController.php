@@ -733,7 +733,7 @@ final class PublicController
             return false;
         }
 
-        $targetUrl = trim((string) ($redirect['target_url'] ?? ''));
+        $targetUrl = trim((string) ($redirect['target'] ?? ''));
         if (!RedirectTargetValidator::isAllowedHttpOrRootPath($targetUrl)) {
             return false;
         }

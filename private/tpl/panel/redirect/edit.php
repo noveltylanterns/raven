@@ -26,7 +26,7 @@ $hasPersistedRedirect = $redirectId > 0;
 $deleteFormId = 'delete-redirect-form';
 $selectedChannelSlug = trim((string) ($redirectRow['channel_slug'] ?? ''));
 $redirectSlug = trim((string) ($redirectRow['slug'] ?? ''));
-$isActive = (int) ($redirectRow['is_active'] ?? 1) === 1;
+$isActive = (int) ($redirectRow['active'] ?? 1) === 1;
 $normalizedDomain = trim((string) ($site['domain'] ?? ''));
 $publicBase = $normalizedDomain;
 if ($publicBase !== '' && !preg_match('#^https?://#i', $publicBase)) {
@@ -151,14 +151,14 @@ if ($redirectRow !== null && $publicBase !== '' && $redirectSlug !== '') {
             </div>
 
             <div class="form-group mb-0">
-                <label for="target_url" class="form-label">Target URL</label>
+                <label for="target" class="form-label">Target URL</label>
                 <!-- Supports external absolute URLs and root-relative internal destinations. -->
                 <input
-                    id="target_url"
-                    name="target_url"
+                    id="target"
+                    name="target"
                     class="form-control"
                     required
-                    value="<?= e((string) ($redirectRow['target_url'] ?? '')) ?>"
+                    value="<?= e((string) ($redirectRow['target'] ?? '')) ?>"
                     placeholder="https://example.com/path or /local-path"
                 >
                 <div class="form-text">

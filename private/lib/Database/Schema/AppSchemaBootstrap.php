@@ -68,11 +68,11 @@ final class AppSchemaBootstrap
                 title TEXT NOT NULL,
                 description TEXT NULL,
                 slug TEXT NOT NULL,
-                channel_id INTEGER NULL,
-                is_active INTEGER NOT NULL DEFAULT 1,
-                target_url TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                channel INTEGER NULL,
+                active INTEGER NOT NULL DEFAULT 1,
+                target TEXT NOT NULL,
+                created TEXT NOT NULL,
+                updated TEXT NOT NULL
             )');
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $pageCategoriesTable . ' (
@@ -164,7 +164,6 @@ final class AppSchemaBootstrap
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_root_slug_unique ON ' . $pagesTable . ' (slug) WHERE channel_id IS NULL OR channel_id = 0');
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_slug_unique ON ' . $pagesTable . ' (channel_id, slug) WHERE channel_id IS NOT NULL AND channel_id <> 0');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $redirectsTable . '_slug ON ' . $redirectsTable . ' (slug)');
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $redirectsTable . '_channel_id ON ' . $redirectsTable . ' (channel_id)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pageImagesTable . '_page_id ON ' . $pageImagesTable . ' (page_id)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pageImagesTable . '_sort_order ON ' . $pageImagesTable . ' (page_id, sort_order)');
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $loginFailuresTable . '_bucket_hash ON ' . $loginFailuresTable . ' (bucket_hash)');
@@ -224,13 +223,14 @@ final class AppSchemaBootstrap
                 title VARCHAR(255) NOT NULL,
                 description TEXT NULL,
                 slug VARCHAR(160) NOT NULL,
-                channel_id BIGINT UNSIGNED NULL,
-                is_active TINYINT(1) NOT NULL DEFAULT 1,
-                target_url VARCHAR(2048) NOT NULL,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL,
+                channel BIGINT UNSIGNED NULL,
+                active TINYINT(1) NOT NULL DEFAULT 1,
+                target VARCHAR(2048) NOT NULL,
+                created DATETIME NOT NULL,
+                updated DATETIME NOT NULL,
                 INDEX idx_' . $prefix . 'redirects_slug (slug),
-                INDEX idx_' . $prefix . 'redirects_channel_id (channel_id)
+                INDEX idx_' . $prefix . 'redirects_channel (channel),
+                INDEX idx_' . $prefix . 'redirects_lookup (slug, channel, active)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'page_categories (
@@ -374,14 +374,13 @@ final class AppSchemaBootstrap
             title VARCHAR(255) NOT NULL,
             description TEXT NULL,
             slug VARCHAR(160) NOT NULL,
-            channel_id BIGINT NULL,
-            is_active SMALLINT NOT NULL DEFAULT 1,
-            target_url VARCHAR(2048) NOT NULL,
-            created_at TIMESTAMP NOT NULL,
-            updated_at TIMESTAMP NOT NULL
+            channel BIGINT NULL,
+            active SMALLINT NOT NULL DEFAULT 1,
+            target VARCHAR(2048) NOT NULL,
+            created TIMESTAMP NOT NULL,
+            updated TIMESTAMP NOT NULL
         )');
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'redirects_slug ON ' . $prefix . 'redirects (slug)');
-        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'redirects_channel_id ON ' . $prefix . 'redirects (channel_id)');
 
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'page_categories (
             page_id BIGINT NOT NULL,

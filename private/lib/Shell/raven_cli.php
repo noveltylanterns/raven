@@ -1916,7 +1916,7 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
             }
             $description = $app['input']->text($description, 1000);
 
-            $target = (string) raven_cli_option($options, 'target', is_array($existing) ? (string) ($existing['target_url'] ?? '') : '');
+            $target = (string) raven_cli_option($options, 'target', is_array($existing) ? (string) ($existing['target'] ?? '') : '');
             if ($target === '' && $context->interactive) {
                 $target = $context->prompt('Redirect target URL', $target);
             }
@@ -1933,7 +1933,7 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
             $active = raven_cli_bool_option(
                 $options,
                 'active',
-                is_array($existing) ? ((int) ($existing['is_active'] ?? 0) === 1) : true,
+                is_array($existing) ? ((int) ($existing['active'] ?? 0) === 1) : true,
                 'a'
             );
 
@@ -1943,8 +1943,8 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
                 'description' => $description,
                 'slug' => $slug,
                 'channel_slug' => $channelSlug !== '' ? $channelSlug : null,
-                'is_active' => $active ? 1 : 0,
-                'target_url' => $target,
+                'active' => $active ? 1 : 0,
+                'target' => $target,
             ]);
 
             if ($context->json) {

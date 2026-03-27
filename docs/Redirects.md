@@ -113,7 +113,7 @@ All state-changing routes use CSRF validation.
 
 - `listAll()` and `findById()` join channel metadata for panel display.
 - `findActiveByPath(slug, channelSlug)` resolves active redirects for public routing.
-- `save(...)` handles create/update and enforces path uniqueness per `(channel_id, slug)`.
+- `save(...)` handles create/update and enforces path uniqueness per `(channel, slug)`.
 - `deleteById(...)` removes one redirect row.
 
 Storage detail:
@@ -123,9 +123,9 @@ Storage detail:
 
 ### Public Resolution Rules
 
-- Root redirect path: `/{slug}` (redirect row now stores `channel_id = 0`; legacy `NULL` rows are still treated as root scope during reads).
+- Root redirect path: `/{slug}` (redirect row stores `channel = 0` for the root scope).
 - Channel redirect path: `/{channel_slug}/{slug}` (redirect row must match channel).
-- Only `is_active = 1` rows are eligible for public redirect resolution.
+- Only `active = 1` rows are eligible for public redirect resolution.
 
 ### Security/Validation Expectations
 

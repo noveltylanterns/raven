@@ -2396,7 +2396,7 @@ final class PanelController
         $slug = $this->input->slug($post['slug'] ?? null);
         $channelSlug = $this->input->slug($post['channel_slug'] ?? null);
         $status = strtolower((string) $this->input->text($post['status'] ?? null, 20));
-        $targetUrl = $this->input->text($post['target_url'] ?? null, 2048);
+        $targetUrl = $this->input->text($post['target'] ?? null, 2048);
 
         if ($title === '' || $slug === null) {
             $this->flash('error', 'Redirect title and valid slug are required.');
@@ -2432,8 +2432,8 @@ final class PanelController
                 'description' => $description,
                 'slug' => $slug,
                 'channel_slug' => $channelSlug,
-                'is_active' => $status === 'active' ? 1 : 0,
-                'target_url' => $targetUrl,
+                'active' => $status === 'active' ? 1 : 0,
+                'target' => $targetUrl,
             ]);
         } catch (\Throwable $exception) {
             $this->flash('error', $exception->getMessage() !== '' ? $exception->getMessage() : 'Failed to save redirect.');

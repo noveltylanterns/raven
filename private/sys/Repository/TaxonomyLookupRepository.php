@@ -240,7 +240,7 @@ final class TaxonomyLookupRepository
         if ($includeRedirects) {
             $channelsById = $this->channelsByIdMap();
             $stmt = $this->db->prepare(
-                'SELECT id, title, description, slug, channel_id, is_active, target_url
+                'SELECT id, title, description, slug, channel, active, target
                  FROM ' . $redirects . '
                  ORDER BY id ASC'
             );
@@ -252,16 +252,16 @@ final class TaxonomyLookupRepository
                     continue;
                 }
 
-                $channelId = $row['channel_id'] !== null ? (int) $row['channel_id'] : null;
+                $channelId = $row['channel'] !== null ? (int) $row['channel'] : null;
                 $channel = $channelId !== null ? ($channelsById[$channelId] ?? null) : null;
                 $redirectRow = [
                     'id' => $redirectId,
                     'title' => (string) ($row['title'] ?? ''),
                     'description' => (string) ($row['description'] ?? ''),
                     'slug' => $redirectSlug,
-                    'channel_id' => $channelId,
-                    'is_active' => (int) ($row['is_active'] ?? 0),
-                    'target_url' => (string) ($row['target_url'] ?? ''),
+                    'channel' => $channelId,
+                    'active' => (int) ($row['active'] ?? 0),
+                    'target' => (string) ($row['target'] ?? ''),
                 ];
                 $result['redirect_rows'][] = ChannelContextService::applyBasicChannelContext($redirectRow, $channel);
             }

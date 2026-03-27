@@ -187,9 +187,12 @@ final class AppSchemaBuilder
     {
         $pagesTable = $prefix . 'pages';
         $redirectsTable = $prefix . 'redirects';
+        $redirectChannelColumn = $this->redirectColumnExists($db, $driver, $redirectsTable, 'channel')
+            ? 'channel'
+            : 'channel_id';
 
         $db->exec('UPDATE ' . $pagesTable . ' SET channel_id = 0 WHERE channel_id IS NULL');
-        $db->exec('UPDATE ' . $redirectsTable . ' SET channel_id = 0 WHERE channel_id IS NULL');
+        $db->exec('UPDATE ' . $redirectsTable . ' SET ' . $redirectChannelColumn . ' = 0 WHERE ' . $redirectChannelColumn . ' IS NULL');
 
         if ($driver === 'sqlite') {
             $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_root_slug_unique');
@@ -476,7 +479,7 @@ final class AppSchemaBuilder
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pageCategoriesTable . '_category_id ON ' . $pageCategoriesTable . ' (category_id, page_id)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pageTagsTable . '_tag_id ON ' . $pageTagsTable . ' (tag_id, page_id)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $userGroupsTable . '_group_id ON ' . $userGroupsTable . ' (group_id, user_id)');
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $redirectsTable . '_lookup ON ' . $redirectsTable . ' (slug, channel_id, is_active)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $redirectsTable . '_lookup ON ' . $redirectsTable . ' (slug, channel, active)');
             return;
         }
 
@@ -507,7 +510,7 @@ final class AppSchemaBuilder
             if (!$this->introspector->mySqlIndexExists($db, $redirectsTable, 'idx_' . $prefix . 'redirects_lookup')) {
                 $db->exec(
                     'ALTER TABLE ' . $redirectsTable . '
-                     ADD INDEX idx_' . $prefix . 'redirects_lookup (slug, channel_id, is_active)'
+                     ADD INDEX idx_' . $prefix . 'redirects_lookup (slug, channel, active)'
                 );
             }
 
@@ -535,35 +538,26 @@ final class AppSchemaBuilder
         if (!$this->introspector->pgSqlIndexExists($db, $redirectsTable, 'idx_' . $prefix . 'redirects_lookup')) {
             $db->exec(
                 'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'redirects_lookup
-                 ON ' . $this->introspector->quotePgIdentifier($redirectsTable) . ' (slug, channel_id, is_active)'
+                 ON ' . $this->introspector->quotePgIdentifier($redirectsTable) . ' (slug, channel, active)'
             );
         }
     }
 
     public function ensureRedirectDescriptionColumn(PDO $db, string $driver, string $prefix): void
     {
-        if ($driver === 'sqlite') {
-            $redirectsTable = $this->tables->resolve($driver, $prefix, 'redirects');
-            if (!$this->introspector->appColumnExistsSqlite($db, $redirectsTable, 'description')) {
-                $db->exec('ALTER TABLE ' . $redirectsTable . ' ADD COLUMN description TEXT NULL');
-            }
-
-            return;
-        }
-
         $redirectsTable = $prefix . 'redirects';
 
-        if ($driver === 'mysql') {
-            if (!$this->introspector->appColumnExistsMySql($db, $redirectsTable, 'description')) {
-                $db->exec('ALTER TABLE ' . $redirectsTable . ' ADD COLUMN description TEXT NULL');
-            }
-
+        if ($driver === 'sqlite') {
+            $this->migrateRedirectColumnsSqlite($db, $this->tables->resolve($driver, $prefix, 'redirects'));
             return;
         }
 
-        if (!$this->introspector->appColumnExistsPgSql($db, $redirectsTable, 'description')) {
-            $db->exec('ALTER TABLE ' . $redirectsTable . ' ADD COLUMN description TEXT NULL');
+        if ($driver === 'mysql') {
+            $this->migrateRedirectColumnsStandard($db, $driver, $redirectsTable);
+            return;
         }
+
+        $this->migrateRedirectColumnsStandard($db, $driver, $redirectsTable);
     }
 
     private function ensurePageSlugScopeUniquenessSqlite(PDO $db, string $pagesTable): void
@@ -834,6 +828,187 @@ final class AppSchemaBuilder
         $this->ensureTaxonomySetIndex($db, $driver, $table);
     }
 
+    private function migrateRedirectColumnsSqlite(PDO $db, string $table): void
+    {
+        $hasDescription = $this->introspector->appColumnExistsSqlite($db, $table, 'description');
+        $hasChannel = $this->introspector->appColumnExistsSqlite($db, $table, 'channel');
+        $hasActive = $this->introspector->appColumnExistsSqlite($db, $table, 'active');
+        $hasTarget = $this->introspector->appColumnExistsSqlite($db, $table, 'target');
+        $hasCreated = $this->introspector->appColumnExistsSqlite($db, $table, 'created');
+        $hasUpdated = $this->introspector->appColumnExistsSqlite($db, $table, 'updated');
+        $hasLegacy = $this->introspector->appColumnExistsSqlite($db, $table, 'channel_id')
+            || $this->introspector->appColumnExistsSqlite($db, $table, 'is_active')
+            || $this->introspector->appColumnExistsSqlite($db, $table, 'target_url')
+            || $this->introspector->appColumnExistsSqlite($db, $table, 'created_at')
+            || $this->introspector->appColumnExistsSqlite($db, $table, 'updated_at');
+
+        if ($hasDescription && $hasChannel && $hasActive && $hasTarget && $hasCreated && $hasUpdated && !$hasLegacy) {
+            $db->exec('UPDATE ' . $table . ' SET channel = 0 WHERE channel IS NULL');
+            $this->ensureRedirectIndexesSqlite($db, $table);
+            return;
+        }
+
+        $tmpTable = $table . '__redirects';
+        $selectSql = 'SELECT
+                id,
+                title,
+                ' . ($hasDescription ? 'description' : 'NULL') . ' AS description,
+                slug,
+                ' . ($hasChannel ? 'COALESCE(channel, 0)' : ($this->introspector->appColumnExistsSqlite($db, $table, 'channel_id') ? 'COALESCE(channel_id, 0)' : '0')) . ' AS channel_value,
+                ' . ($hasActive ? 'COALESCE(active, 1)' : ($this->introspector->appColumnExistsSqlite($db, $table, 'is_active') ? 'COALESCE(is_active, 1)' : '1')) . ' AS active_value,
+                ' . ($hasTarget ? 'target' : ($this->introspector->appColumnExistsSqlite($db, $table, 'target_url') ? 'target_url' : "''")) . ' AS target_value,
+                ' . ($hasCreated ? 'created' : ($this->introspector->appColumnExistsSqlite($db, $table, 'created_at') ? 'created_at' : "''")) . ' AS created_value,
+                ' . ($hasUpdated ? 'updated' : ($this->introspector->appColumnExistsSqlite($db, $table, 'updated_at') ? 'updated_at' : "''")) . ' AS updated_value
+             FROM ' . $table;
+
+        $db->beginTransaction();
+
+        try {
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            $this->dropRedirectIndexesSqlite($db, $table);
+            $db->exec('CREATE TABLE ' . $tmpTable . ' (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                description TEXT NULL,
+                slug TEXT NOT NULL,
+                channel INTEGER NULL,
+                active INTEGER NOT NULL DEFAULT 1,
+                target TEXT NOT NULL,
+                created TEXT NOT NULL,
+                updated TEXT NOT NULL
+            )');
+
+            $select = $db->prepare($selectSql);
+            $select->execute();
+            $rows = $select->fetchAll() ?: [];
+            $insert = $db->prepare(
+                'INSERT INTO ' . $tmpTable . ' (
+                    id, title, description, slug, channel, active, target, created, updated
+                 ) VALUES (
+                    :id, :title, :description, :slug, :channel, :active, :target, :created, :updated
+                 )'
+            );
+
+            foreach ($rows as $row) {
+                $insert->execute([
+                    ':id' => (int) ($row['id'] ?? 0),
+                    ':title' => (string) ($row['title'] ?? ''),
+                    ':description' => $row['description'] ?? null,
+                    ':slug' => (string) ($row['slug'] ?? ''),
+                    ':channel' => (int) ($row['channel_value'] ?? 0),
+                    ':active' => (int) ($row['active_value'] ?? 0) === 1 ? 1 : 0,
+                    ':target' => trim((string) ($row['target_value'] ?? '')),
+                    ':created' => (string) ($row['created_value'] ?? ''),
+                    ':updated' => (string) ($row['updated_value'] ?? ''),
+                ]);
+            }
+
+            $db->exec('DROP TABLE ' . $table);
+            $db->exec('ALTER TABLE ' . $tmpTable . ' RENAME TO ' . $table);
+            $this->ensureRedirectIndexesSqlite($db, $table);
+            $db->commit();
+        } catch (\Throwable $exception) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            throw $exception;
+        }
+    }
+
+    private function migrateRedirectColumnsStandard(PDO $db, string $driver, string $table): void
+    {
+        $hasDescription = $this->redirectColumnExists($db, $driver, $table, 'description');
+        $hasChannel = $this->redirectColumnExists($db, $driver, $table, 'channel');
+        $hasActive = $this->redirectColumnExists($db, $driver, $table, 'active');
+        $hasTarget = $this->redirectColumnExists($db, $driver, $table, 'target');
+        $hasCreated = $this->redirectColumnExists($db, $driver, $table, 'created');
+        $hasUpdated = $this->redirectColumnExists($db, $driver, $table, 'updated');
+        $hasLegacy = $this->redirectColumnExists($db, $driver, $table, 'channel_id')
+            || $this->redirectColumnExists($db, $driver, $table, 'is_active')
+            || $this->redirectColumnExists($db, $driver, $table, 'target_url')
+            || $this->redirectColumnExists($db, $driver, $table, 'created_at')
+            || $this->redirectColumnExists($db, $driver, $table, 'updated_at');
+
+        if (!$hasDescription) {
+            $db->exec('ALTER TABLE ' . $table . ' ADD COLUMN description TEXT NULL');
+        }
+
+        if ($hasChannel && $hasActive && $hasTarget && $hasCreated && $hasUpdated && !$hasLegacy) {
+            $db->exec('UPDATE ' . $table . ' SET channel = 0 WHERE channel IS NULL');
+            $this->ensureRedirectIndexes($db, $driver, $table);
+            return;
+        }
+
+        if (!$hasChannel) {
+            $db->exec('ALTER TABLE ' . $table . ' ADD COLUMN channel BIGINT NULL');
+        }
+        if (!$hasActive) {
+            $db->exec('ALTER TABLE ' . $table . ' ADD COLUMN active ' . ($driver === 'mysql' ? 'TINYINT(1)' : 'SMALLINT') . ' NOT NULL DEFAULT 1');
+        }
+        if (!$hasTarget) {
+            $db->exec('ALTER TABLE ' . $table . ' ADD COLUMN target VARCHAR(2048) NOT NULL DEFAULT \'\'');
+        }
+        if (!$hasCreated) {
+            $db->exec('ALTER TABLE ' . $table . ' ADD COLUMN created ' . ($driver === 'mysql' ? 'DATETIME' : 'TIMESTAMP') . ' NOT NULL DEFAULT \'1970-01-01 00:00:00\'');
+        }
+        if (!$hasUpdated) {
+            $db->exec('ALTER TABLE ' . $table . ' ADD COLUMN updated ' . ($driver === 'mysql' ? 'DATETIME' : 'TIMESTAMP') . ' NOT NULL DEFAULT \'1970-01-01 00:00:00\'');
+        }
+
+        $select = $db->prepare(
+            'SELECT
+                id,
+                ' . $this->redirectSourceExpr($db, $driver, $table, 'channel') . ' AS channel_current,
+                ' . $this->redirectSourceExpr($db, $driver, $table, 'channel_id') . ' AS channel_legacy,
+                ' . $this->redirectSourceExpr($db, $driver, $table, 'active') . ' AS active_current,
+                ' . $this->redirectSourceExpr($db, $driver, $table, 'is_active') . ' AS active_legacy,
+                ' . $this->redirectSourceExpr($db, $driver, $table, 'target') . ' AS target_current,
+                ' . $this->redirectSourceExpr($db, $driver, $table, 'target_url') . ' AS target_legacy,
+                ' . $this->redirectSourceExpr($db, $driver, $table, 'created') . ' AS created_current,
+                ' . $this->redirectSourceExpr($db, $driver, $table, 'created_at') . ' AS created_legacy,
+                ' . $this->redirectSourceExpr($db, $driver, $table, 'updated') . ' AS updated_current,
+                ' . $this->redirectSourceExpr($db, $driver, $table, 'updated_at') . ' AS updated_legacy
+             FROM ' . $table
+        );
+        $select->execute();
+        $rows = $select->fetchAll() ?: [];
+
+        $update = $db->prepare(
+            'UPDATE ' . $table . '
+             SET channel = :channel,
+                 active = :active,
+                 target = :target,
+                 created = :created,
+                 updated = :updated
+             WHERE id = :id'
+        );
+
+        foreach ($rows as $row) {
+            $update->execute([
+                ':channel' => (int) ($row['channel_current'] ?: $row['channel_legacy'] ?: 0),
+                ':active' => (int) ($row['active_current'] ?: $row['active_legacy'] ?: 0) === 1 ? 1 : 0,
+                ':target' => trim((string) ($row['target_current'] ?: $row['target_legacy'] ?: '')),
+                ':created' => trim((string) ($row['created_current'] ?: $row['created_legacy'] ?: '1970-01-01 00:00:00')),
+                ':updated' => trim((string) ($row['updated_current'] ?: $row['updated_legacy'] ?: '1970-01-01 00:00:00')),
+                ':id' => (int) ($row['id'] ?? 0),
+            ]);
+        }
+
+        $this->dropRedirectIndexes($db, $driver, $table);
+
+        foreach (['channel_id', 'is_active', 'target_url', 'created_at', 'updated_at'] as $column) {
+            if (!$this->redirectColumnExists($db, $driver, $table, $column)) {
+                continue;
+            }
+
+            $db->exec('ALTER TABLE ' . $table . ' DROP COLUMN ' . $column);
+        }
+
+        $this->ensureRedirectIndexes($db, $driver, $table);
+    }
+
     private function sqliteTaxonomyImageSourceExpr(
         bool $hasCurrentColumn,
         string $currentColumn,
@@ -856,6 +1031,85 @@ final class AppSchemaBuilder
         }
 
         return $pathColumn;
+    }
+
+    private function redirectColumnExists(PDO $db, string $driver, string $table, string $column): bool
+    {
+        if ($driver === 'sqlite') {
+            return $this->introspector->appColumnExistsSqlite($db, $table, $column);
+        }
+
+        if ($driver === 'mysql') {
+            return $this->introspector->appColumnExistsMySql($db, $table, $column);
+        }
+
+        return $this->introspector->appColumnExistsPgSql($db, $table, $column);
+    }
+
+    private function redirectSourceExpr(PDO $db, string $driver, string $table, string $column): string
+    {
+        return $this->redirectColumnExists($db, $driver, $table, $column) ? $column : 'NULL';
+    }
+
+    private function dropRedirectIndexesSqlite(PDO $db, string $table): void
+    {
+        $db->exec('DROP INDEX IF EXISTS idx_' . $table . '_slug');
+        $db->exec('DROP INDEX IF EXISTS idx_' . $table . '_channel');
+        $db->exec('DROP INDEX IF EXISTS idx_' . $table . '_channel_id');
+        $db->exec('DROP INDEX IF EXISTS idx_' . $table . '_lookup');
+    }
+
+    private function ensureRedirectIndexesSqlite(PDO $db, string $table): void
+    {
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_slug ON ' . $table . ' (slug)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_channel ON ' . $table . ' (channel)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_lookup ON ' . $table . ' (slug, channel, active)');
+    }
+
+    private function dropRedirectIndexes(PDO $db, string $driver, string $table): void
+    {
+        if ($driver === 'mysql') {
+            foreach (['idx_' . $this->prefixlessTableName($table) . '_channel_id', 'idx_' . $this->prefixlessTableName($table) . '_channel', 'idx_' . $this->prefixlessTableName($table) . '_lookup'] as $indexName) {
+                if ($this->introspector->mySqlIndexExists($db, $table, $indexName)) {
+                    $db->exec('ALTER TABLE ' . $table . ' DROP INDEX ' . $indexName);
+                }
+            }
+
+            return;
+        }
+
+        $db->exec('DROP INDEX IF EXISTS ' . $this->introspector->quotePgIdentifier('idx_' . $this->prefixlessTableName($table) . '_channel_id'));
+        $db->exec('DROP INDEX IF EXISTS ' . $this->introspector->quotePgIdentifier('idx_' . $this->prefixlessTableName($table) . '_channel'));
+        $db->exec('DROP INDEX IF EXISTS ' . $this->introspector->quotePgIdentifier('idx_' . $this->prefixlessTableName($table) . '_lookup'));
+    }
+
+    private function ensureRedirectIndexes(PDO $db, string $driver, string $table): void
+    {
+        $indexPrefix = 'idx_' . $this->prefixlessTableName($table);
+
+        if ($driver === 'mysql') {
+            if (!$this->introspector->mySqlIndexExists($db, $table, $indexPrefix . '_slug')) {
+                $db->exec('ALTER TABLE ' . $table . ' ADD INDEX ' . $indexPrefix . '_slug (slug)');
+            }
+            if (!$this->introspector->mySqlIndexExists($db, $table, $indexPrefix . '_channel')) {
+                $db->exec('ALTER TABLE ' . $table . ' ADD INDEX ' . $indexPrefix . '_channel (channel)');
+            }
+            if (!$this->introspector->mySqlIndexExists($db, $table, $indexPrefix . '_lookup')) {
+                $db->exec('ALTER TABLE ' . $table . ' ADD INDEX ' . $indexPrefix . '_lookup (slug, channel, active)');
+            }
+
+            return;
+        }
+
+        $quotedTable = $this->introspector->quotePgIdentifier($table);
+        $db->exec('CREATE INDEX IF NOT EXISTS ' . $indexPrefix . '_slug ON ' . $quotedTable . ' (slug)');
+        $db->exec('CREATE INDEX IF NOT EXISTS ' . $indexPrefix . '_channel ON ' . $quotedTable . ' (channel)');
+        $db->exec('CREATE INDEX IF NOT EXISTS ' . $indexPrefix . '_lookup ON ' . $quotedTable . ' (slug, channel, active)');
+    }
+
+    private function prefixlessTableName(string $table): string
+    {
+        return preg_replace('/[^a-zA-Z0-9_]/', '', $table) ?? $table;
     }
 
     private function taxonomyImageSourceExpr(string $driver, PDO $db, string $table, string $column): string

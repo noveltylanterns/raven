@@ -489,7 +489,7 @@ final class RoutingInventoryBuilder
                 ? '/' . $redirectSlug
                 : '/' . $channelSlug . '/' . $redirectSlug;
 
-            $statusKey = (int) ($redirect['is_active'] ?? 0) === 1 ? 'active' : 'inactive';
+            $statusKey = (int) ($redirect['active'] ?? 0) === 1 ? 'active' : 'inactive';
             $statusLabel = $statusKey === 'active' ? 'Active' : 'Inactive';
             $notes = '';
 
@@ -508,7 +508,7 @@ final class RoutingInventoryBuilder
                 'source_label' => trim((string) ($redirect['title'] ?? '')) !== '' ? (string) $redirect['title'] : $redirectSlug,
                 'edit_url' => $canEditRedirects ? (string) $panelUrl('/redirect/edit/' . $redirectId) : '',
                 'public_url' => $publicUrl,
-                'target_url' => trim((string) ($redirect['target_url'] ?? '')),
+                'target_url' => trim((string) ($redirect['target'] ?? '')),
                 'status_key' => $statusKey,
                 'status_label' => $statusLabel,
                 'notes' => $notes,

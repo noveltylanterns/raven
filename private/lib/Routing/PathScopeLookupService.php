@@ -17,7 +17,8 @@ final class PathScopeLookupService
         string $slug,
         ?int $channelId,
         ?int $excludeId = null,
-        string $excludePlaceholder = 'exclude_id'
+        string $excludePlaceholder = 'exclude_id',
+        string $channelColumn = 'channel_id'
     ): bool {
         $excludePlaceholder = trim($excludePlaceholder);
         if ($excludePlaceholder === '') {
@@ -28,11 +29,15 @@ final class PathScopeLookupService
                 FROM ' . $table . '
                 WHERE slug = :slug';
         $params = [':slug' => $slug];
+        $channelColumn = trim($channelColumn);
+        if ($channelColumn === '') {
+            $channelColumn = 'channel_id';
+        }
 
         if ($channelId === null || $channelId <= 0) {
-            $sql .= ' AND (channel_id = 0 OR channel_id IS NULL)';
+            $sql .= ' AND (' . $channelColumn . ' = 0 OR ' . $channelColumn . ' IS NULL)';
         } else {
-            $sql .= ' AND channel_id = :channel_id';
+            $sql .= ' AND ' . $channelColumn . ' = :channel_id';
             $params[':channel_id'] = $channelId;
         }
 
