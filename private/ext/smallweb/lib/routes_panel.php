@@ -300,12 +300,7 @@ return static function (Router $router, array $context): void {
         }
 
         if ($svc->saveSettings($settings)) {
-            foreach (SmallwebService::SUPPORTED_PROTOCOLS as $proto) {
-                if (!empty($settings['protocols'][$proto]['enabled'])) {
-                    $svc->ensureProtocolDirectory($proto);
-                    $svc->applyProtocolPermissions($proto);
-                }
-            }
+            $svc->syncProtocolDirectories();
             $flash('success', 'Settings saved.');
         } else {
             $flash('error', 'Failed to save settings.');

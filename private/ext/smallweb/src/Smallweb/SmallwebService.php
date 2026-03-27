@@ -11,11 +11,12 @@ declare(strict_types=1);
 
 namespace Raven\Smallweb;
 
+use Raven\Lib\Extension\ExtensionStorageProvisioner;
+
 final class SmallwebService
 {
+    private string $projectRoot;
     private string $storageDir;
-    /** @var array<string, string> */
-    private array $protocolRoots;
     /** @var object $config */
     private object $config;
     private ?array $cachedSettings = null;
@@ -110,13 +111,10 @@ final class SmallwebService
     private const FILENAME_PATTERN = '/^\.?[a-z0-9][a-z0-9_-]*\.[a-z0-9]+$/';
     private const SLUG_PATTERN = '/^[a-z0-9][a-z0-9_-]*$/';
 
-    /**
-     * @param array<string, string> $protocolRoots
-     */
-    public function __construct(string $storageDir, array $protocolRoots, object $config)
+    public function __construct(string $projectRoot, string $storageDir, object $config)
     {
+        $this->projectRoot = rtrim($projectRoot, '/');
         $this->storageDir = $storageDir;
-        $this->protocolRoots = $protocolRoots;
         $this->config = $config;
     }
 
@@ -364,16 +362,15 @@ final class SmallwebService
 
     public function getProtocolDir(string $protocol): string
     {
-        $path = trim((string) ($this->protocolRoots[$protocol] ?? ''));
-        if ($path !== '') {
-            return rtrim($path, '/');
-        }
-
-        return $this->storageDir . '/protocol/' . $protocol;
+        return $this->projectRoot . '/' . $protocol;
     }
 
     public function ensureProtocolDirectory(string $protocol): bool
     {
+        if (!$this->isValidProtocol($protocol)) {
+            return false;
+        }
+
         $dir = $this->getProtocolDir($protocol);
         $settings = $this->getProtocolSettings($protocol);
         $chmodDir = (int) octdec($settings['chmod_dir'] ?? '0755');
@@ -383,11 +380,13 @@ final class SmallwebService
             return true;
         }
 
-        $created = @mkdir($dir, $chmodDir, false);
-        if ($created) {
+        try {
+            $dir = (new ExtensionStorageProvisioner($this->projectRoot))->ensureAuxStorageDirectory($protocol);
             @chmod($dir, $chmodDir);
+            return true;
+        } catch (\Throwable) {
+            return false;
         }
-        return $created;
     }
 
     /**
@@ -429,6 +428,45 @@ final class SmallwebService
             $isExec = ($ext === 'cgi') || is_executable($path);
             $chmod = $isExec ? $chmodCgi : $chmodTxt;
             @chmod($path, $chmod);
+        }
+    }
+
+    public function removeProtocolDirectoryIfEmpty(string $protocol): bool
+    {
+        if (!$this->isValidProtocol($protocol)) {
+            return false;
+        }
+
+        $dir = $this->getProtocolDir($protocol);
+        if (!is_dir($dir)) {
+            return true;
+        }
+
+        $entries = @scandir($dir);
+        if ($entries === false) {
+            return false;
+        }
+
+        $contents = array_filter($entries, static fn (string $entry): bool => $entry !== '.' && $entry !== '..');
+        if ($contents !== []) {
+            return false;
+        }
+
+        return @rmdir($dir);
+    }
+
+    public function syncProtocolDirectories(): void
+    {
+        foreach (self::SUPPORTED_PROTOCOLS as $protocol) {
+            $settings = $this->getProtocolSettings($protocol);
+            if (!empty($settings['enabled'])) {
+                if ($this->ensureProtocolDirectory($protocol)) {
+                    $this->applyProtocolPermissions($protocol);
+                }
+                continue;
+            }
+
+            $this->removeProtocolDirectoryIfEmpty($protocol);
         }
     }
 

@@ -17,21 +17,20 @@ use Raven\Smallweb\SmallwebService;
 return [
     'storage' => [
         'local' => true,
-        'aux' => ['finger', 'fingers', 'gemini', 'gopher', 'spartan'],
     ],
     'boot' => static function (array &$app): void {
-    if (!isset($app['config'], $app['extension_storage'])) {
+    if (!isset($app['root'], $app['config'], $app['extension_storage'])) {
         return;
     }
 
+    $root = rtrim((string) $app['root'], '/');
     $storageMap = is_array($app['extension_storage']) ? $app['extension_storage'] : [];
     $storage = is_array($storageMap['smallweb'] ?? null) ? $storageMap['smallweb'] : [];
     $storageDir = rtrim((string) ($storage['local'] ?? ''), '/');
     if ($storageDir === '') {
         return;
     }
-    $auxRoots = is_array($storage['aux'] ?? null) ? $storage['aux'] : [];
-    $service = new SmallwebService($storageDir, $auxRoots, $app['config']);
+    $service = new SmallwebService($root, $storageDir, $app['config']);
 
     /** @var mixed $rawExtensionServices */
     $rawExtensionServices = $app['extension_services'] ?? [];
