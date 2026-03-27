@@ -131,20 +131,18 @@ final class SeedInstaller
         $now = gmdate('Y-m-d H:i:s');
         $insert = $db->prepare(
             'INSERT INTO ' . $pagesTable . '
-            (title, slug, content, extended, description, display_title, channel_id, is_published, published_at, author_user_id, created_at, updated_at)
-            VALUES (:title, :slug, :content, :extended, :description, :display_title, :channel_id, :is_published, :published_at, :author_user_id, :created_at, :updated_at)'
+            (title, slug, content, description, display_title, channel_id, is_published, author_user_id, created_at, updated_at)
+            VALUES (:title, :slug, :content, :description, :display_title, :channel_id, :is_published, :author_user_id, :created_at, :updated_at)'
         );
 
         $insert->execute([
             ':title' => 'Raven Home',
             ':slug' => 'home',
-            ':content' => '<p>Welcome to Raven CMS.</p>',
-            ':extended' => '',
+            ':content' => '[{"type":"tinymce","content":"<p>Welcome to Raven CMS.</p>","css_id":"","css_class":""}]',
             ':description' => 'Welcome to Raven CMS.',
             ':display_title' => 1,
             ':channel_id' => 0,
             ':is_published' => 1,
-            ':published_at' => $now,
             ':author_user_id' => null,
             ':created_at' => $now,
             ':updated_at' => $now,

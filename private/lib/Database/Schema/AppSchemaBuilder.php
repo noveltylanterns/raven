@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Database\Schema;
 
 use PDO;
+use Raven\Lib\Media\TaxonomyImagePathResolver;
 
 /**
  * Applies app-side schema migrations and index/column backfills.
@@ -20,27 +21,53 @@ final class AppSchemaBuilder
         $this->tables = $tables ?? new TableNameResolver();
     }
 
-    public function ensurePageExtendedColumn(PDO $db, string $driver, string $prefix): void
+    public function migratePageContentStorage(PDO $db, string $driver, string $prefix): void
     {
         $pagesTable = $prefix . 'pages';
         if ($driver === 'sqlite') {
-            if (!$this->introspector->appColumnExistsSqlite($db, $pagesTable, 'extended')) {
-                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN extended TEXT NULL');
+            if (
+                !$this->introspector->appColumnExistsSqlite($db, $pagesTable, 'extended')
+                && !$this->introspector->appColumnExistsSqlite($db, $pagesTable, 'published_at')
+            ) {
+                return;
             }
 
+            $this->migratePageContentStorageSqlite($db, $pagesTable);
             return;
         }
 
         if ($driver === 'mysql') {
-            if (!$this->introspector->appColumnExistsMySql($db, $pagesTable, 'extended')) {
-                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN extended MEDIUMTEXT NULL');
+            if ($this->introspector->appColumnExistsMySql($db, $pagesTable, 'extended')) {
+                $db->exec(
+                    'UPDATE ' . $pagesTable . '
+                     SET content = CASE
+                        WHEN TRIM(COALESCE(extended, \'\')) <> \'\' THEN extended
+                        ELSE content
+                     END'
+                );
+                $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN extended');
+            }
+
+            if ($this->introspector->appColumnExistsMySql($db, $pagesTable, 'published_at')) {
+                $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN published_at');
             }
 
             return;
         }
 
-        if (!$this->introspector->appColumnExistsPgSql($db, $pagesTable, 'extended')) {
-            $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN extended TEXT NULL');
+        if ($this->introspector->appColumnExistsPgSql($db, $pagesTable, 'extended')) {
+            $db->exec(
+                'UPDATE ' . $pagesTable . '
+                 SET content = CASE
+                    WHEN BTRIM(COALESCE(extended, \'\')) <> \'\' THEN extended
+                    ELSE content
+                 END'
+            );
+            $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN extended');
+        }
+
+        if ($this->introspector->appColumnExistsPgSql($db, $pagesTable, 'published_at')) {
+            $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN published_at');
         }
     }
 
@@ -304,7 +331,7 @@ final class AppSchemaBuilder
 
     public function ensureTaxonomyImageColumns(PDO $db, string $driver, string $prefix): void
     {
-        $columns = [
+        $legacyColumns = [
             'cover_image_path',
             'cover_image_sm_path',
             'cover_image_md_path',
@@ -319,13 +346,7 @@ final class AppSchemaBuilder
         if ($driver === 'sqlite') {
             foreach ($taxonomyTables as $table) {
                 $qualifiedTable = $this->tables->resolve($driver, $prefix, $table);
-                foreach ($columns as $column) {
-                    if (!$this->introspector->appColumnExistsSqlite($db, $qualifiedTable, $column)) {
-                        $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN ' . $column . ' TEXT NULL');
-                    }
-
-                    $db->exec('UPDATE ' . $qualifiedTable . ' SET ' . $column . ' = NULL WHERE ' . $column . ' = \'\'');
-                }
+                $this->migrateTaxonomyImageColumnsSqlite($db, $qualifiedTable, $legacyColumns);
             }
 
             return;
@@ -334,13 +355,7 @@ final class AppSchemaBuilder
         if ($driver === 'mysql') {
             foreach ($taxonomyTables as $table) {
                 $physicalTable = $prefix . $table;
-                foreach ($columns as $column) {
-                    if (!$this->introspector->appColumnExistsMySql($db, $physicalTable, $column)) {
-                        $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN ' . $column . ' VARCHAR(500) NULL');
-                    }
-
-                    $db->exec('UPDATE ' . $physicalTable . ' SET ' . $column . ' = NULL WHERE ' . $column . ' = \'\'');
-                }
+                $this->migrateTaxonomyImageColumnsStandard($db, $driver, $physicalTable, $legacyColumns);
             }
 
             return;
@@ -348,13 +363,7 @@ final class AppSchemaBuilder
 
         foreach ($taxonomyTables as $table) {
             $physicalTable = $prefix . $table;
-            foreach ($columns as $column) {
-                if (!$this->introspector->appColumnExistsPgSql($db, $physicalTable, $column)) {
-                    $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN ' . $column . ' VARCHAR(500) NULL');
-                }
-
-                $db->exec('UPDATE ' . $physicalTable . ' SET ' . $column . ' = NULL WHERE ' . $column . ' = \'\'');
-            }
+            $this->migrateTaxonomyImageColumnsStandard($db, $driver, $physicalTable, $legacyColumns);
         }
     }
 
@@ -522,10 +531,276 @@ final class AppSchemaBuilder
 
     private function ensurePageSlugScopeUniquenessSqlite(PDO $db, string $pagesTable): void
     {
-        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_published_at ON ' . $pagesTable . ' (published_at DESC)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_created_at ON ' . $pagesTable . ' (created_at DESC)');
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_id ON ' . $pagesTable . ' (channel_id)');
         $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_root_slug_unique ON ' . $pagesTable . ' (slug) WHERE channel_id IS NULL OR channel_id = 0');
         $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_slug_unique ON ' . $pagesTable . ' (channel_id, slug) WHERE channel_id IS NOT NULL AND channel_id <> 0');
+    }
+
+    private function migratePageContentStorageSqlite(PDO $db, string $pagesTable): void
+    {
+        $tmpTable = $pagesTable . '__content_migration';
+
+        $db->beginTransaction();
+
+        try {
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_published_at');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_created_at');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_channel_id');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_root_slug_unique');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_channel_slug_unique');
+
+            $db->exec('CREATE TABLE ' . $tmpTable . ' (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                slug TEXT NOT NULL,
+                content TEXT NOT NULL DEFAULT \'\',
+                description TEXT NULL,
+                display_title INTEGER NOT NULL DEFAULT 1,
+                gallery_enabled INTEGER NOT NULL DEFAULT 0,
+                channel_id INTEGER NULL,
+                is_published INTEGER NOT NULL DEFAULT 1,
+                author_user_id INTEGER NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )');
+
+            $hasExtended = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'extended');
+            $contentExpr = $hasExtended
+                ? 'CASE WHEN TRIM(COALESCE(extended, \'\')) <> \'\' THEN extended ELSE content END'
+                : 'content';
+
+            $db->exec(
+                'INSERT INTO ' . $tmpTable . ' (
+                    id, title, slug, content, description, display_title, gallery_enabled, channel_id, is_published, author_user_id, created_at, updated_at
+                 )
+                 SELECT
+                    id,
+                    title,
+                    slug,
+                    ' . $contentExpr . ',
+                    description,
+                    COALESCE(display_title, 1),
+                    COALESCE(gallery_enabled, 0),
+                    channel_id,
+                    COALESCE(is_published, 1),
+                    author_user_id,
+                    created_at,
+                    updated_at
+                 FROM ' . $pagesTable
+            );
+
+            $db->exec('DROP TABLE ' . $pagesTable);
+            $db->exec('ALTER TABLE ' . $tmpTable . ' RENAME TO ' . $pagesTable);
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_created_at ON ' . $pagesTable . ' (created_at DESC)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_id ON ' . $pagesTable . ' (channel_id)');
+
+            $db->commit();
+        } catch (\Throwable $exception) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            throw $exception;
+        }
+    }
+
+    /**
+     * @param array<int, string> $legacyColumns
+     */
+    private function migrateTaxonomyImageColumnsSqlite(PDO $db, string $table, array $legacyColumns): void
+    {
+        $hasCoverFile = $this->introspector->appColumnExistsSqlite($db, $table, 'cover_image_file');
+        $hasPreviewFile = $this->introspector->appColumnExistsSqlite($db, $table, 'preview_image_file');
+        $hasLegacy = false;
+        foreach ($legacyColumns as $column) {
+            if ($this->introspector->appColumnExistsSqlite($db, $table, $column)) {
+                $hasLegacy = true;
+                break;
+            }
+        }
+
+        if ($hasCoverFile && $hasPreviewFile && !$hasLegacy) {
+            $db->exec('UPDATE ' . $table . ' SET cover_image_file = NULL WHERE TRIM(COALESCE(cover_image_file, \'\')) = \'\'');
+            $db->exec('UPDATE ' . $table . ' SET preview_image_file = NULL WHERE TRIM(COALESCE(preview_image_file, \'\')) = \'\'');
+            return;
+        }
+
+        $tmpTable = $table . '__imgfiles';
+        $hasSetId = $this->introspector->appColumnExistsSqlite($db, $table, 'set_id');
+        $hasCoverPath = $this->introspector->appColumnExistsSqlite($db, $table, 'cover_image_path');
+        $hasPreviewPath = $this->introspector->appColumnExistsSqlite($db, $table, 'preview_image_path');
+        $selectSql = 'SELECT
+                id,
+                name,
+                slug,
+                ' . ($hasSetId ? 'COALESCE(NULLIF(set_id, 0), 1)' : '1') . ' AS set_id,
+                description,
+                ' . $this->sqliteTaxonomyImageSourceExpr($hasCoverFile, 'cover_image_file', $hasCoverPath, 'cover_image_path') . ' AS cover_image_source,
+                ' . $this->sqliteTaxonomyImageSourceExpr($hasPreviewFile, 'preview_image_file', $hasPreviewPath, 'preview_image_path') . ' AS preview_image_source,
+                created_at
+             FROM ' . $table;
+
+        $db->beginTransaction();
+
+        try {
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            $db->exec('DROP INDEX IF EXISTS idx_' . $table . '_set_id');
+            $db->exec('CREATE TABLE ' . $tmpTable . ' (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                slug TEXT NOT NULL UNIQUE,
+                set_id INTEGER NOT NULL DEFAULT 1,
+                description TEXT NULL,
+                cover_image_file TEXT NULL,
+                preview_image_file TEXT NULL,
+                created_at TEXT NOT NULL
+            )');
+
+            $select = $db->prepare($selectSql);
+            $select->execute();
+            $rows = $select->fetchAll() ?: [];
+            $insert = $db->prepare(
+                'INSERT INTO ' . $tmpTable . ' (
+                    id, name, slug, set_id, description, cover_image_file, preview_image_file, created_at
+                 ) VALUES (
+                    :id, :name, :slug, :set_id, :description, :cover_image_file, :preview_image_file, :created_at
+                 )'
+            );
+
+            foreach ($rows as $row) {
+                $insert->execute([
+                    ':id' => (int) ($row['id'] ?? 0),
+                    ':name' => (string) ($row['name'] ?? ''),
+                    ':slug' => (string) ($row['slug'] ?? ''),
+                    ':set_id' => max(1, (int) ($row['set_id'] ?? 1)),
+                    ':description' => $row['description'] ?? null,
+                    ':cover_image_file' => $this->normalizeTaxonomyImageFilename($row['cover_image_source'] ?? null),
+                    ':preview_image_file' => $this->normalizeTaxonomyImageFilename($row['preview_image_source'] ?? null),
+                    ':created_at' => (string) ($row['created_at'] ?? ''),
+                ]);
+            }
+
+            $db->exec('DROP TABLE ' . $table);
+            $db->exec('ALTER TABLE ' . $tmpTable . ' RENAME TO ' . $table);
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_set_id ON ' . $table . ' (set_id)');
+            $db->commit();
+        } catch (\Throwable $exception) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+
+            $db->exec('DROP TABLE IF EXISTS ' . $tmpTable);
+            throw $exception;
+        }
+    }
+
+    /**
+     * @param array<int, string> $legacyColumns
+     */
+    private function migrateTaxonomyImageColumnsStandard(PDO $db, string $driver, string $table, array $legacyColumns): void
+    {
+        $hasCoverFile = $this->taxonomyColumnExists($db, $driver, $table, 'cover_image_file');
+        $hasPreviewFile = $this->taxonomyColumnExists($db, $driver, $table, 'preview_image_file');
+        if (!$hasCoverFile) {
+            $db->exec('ALTER TABLE ' . $table . ' ADD COLUMN cover_image_file VARCHAR(255) NULL');
+            $hasCoverFile = true;
+        }
+        if (!$hasPreviewFile) {
+            $db->exec('ALTER TABLE ' . $table . ' ADD COLUMN preview_image_file VARCHAR(255) NULL');
+            $hasPreviewFile = true;
+        }
+
+        $select = $db->prepare(
+            'SELECT
+                id,
+                cover_image_file,
+                preview_image_file,
+                ' . $this->taxonomyImageSourceExpr($driver, $db, $table, 'cover_image_path') . ' AS cover_image_path,
+                ' . $this->taxonomyImageSourceExpr($driver, $db, $table, 'preview_image_path') . ' AS preview_image_path
+             FROM ' . $table
+        );
+        $select->execute();
+        $rows = $select->fetchAll() ?: [];
+
+        $update = $db->prepare(
+            'UPDATE ' . $table . '
+             SET cover_image_file = :cover_image_file,
+                 preview_image_file = :preview_image_file
+             WHERE id = :id'
+        );
+
+        foreach ($rows as $row) {
+            $update->execute([
+                ':cover_image_file' => $this->normalizeTaxonomyImageFilename(
+                    $row['cover_image_file'] ?? $row['cover_image_path'] ?? null
+                ),
+                ':preview_image_file' => $this->normalizeTaxonomyImageFilename(
+                    $row['preview_image_file'] ?? $row['preview_image_path'] ?? null
+                ),
+                ':id' => (int) ($row['id'] ?? 0),
+            ]);
+        }
+
+        foreach ($legacyColumns as $column) {
+            if (!$this->taxonomyColumnExists($db, $driver, $table, $column)) {
+                continue;
+            }
+
+            $db->exec('ALTER TABLE ' . $table . ' DROP COLUMN ' . $column);
+        }
+    }
+
+    private function sqliteTaxonomyImageSourceExpr(
+        bool $hasFileColumn,
+        string $fileColumn,
+        bool $hasPathColumn,
+        string $pathColumn
+    ): string
+    {
+        if ($hasFileColumn) {
+            return $fileColumn;
+        }
+
+        if (!$hasPathColumn) {
+            return 'NULL';
+        }
+
+        return $pathColumn;
+    }
+
+    private function taxonomyImageSourceExpr(string $driver, PDO $db, string $table, string $column): string
+    {
+        if ($this->taxonomyColumnExists($db, $driver, $table, $column)) {
+            return $column;
+        }
+
+        return 'NULL';
+    }
+
+    private function taxonomyColumnExists(PDO $db, string $driver, string $table, string $column): bool
+    {
+        if ($driver === 'mysql') {
+            return $this->introspector->appColumnExistsMySql($db, $table, $column);
+        }
+
+        return $this->introspector->appColumnExistsPgSql($db, $table, $column);
+    }
+
+    private function normalizeTaxonomyImageFilename(mixed $value): ?string
+    {
+        $filename = trim((string) $value);
+        if ($filename === '') {
+            return null;
+        }
+
+        $normalized = TaxonomyImagePathResolver::storagePayloadFromRecord('categories', [
+            'cover_image_file' => $filename,
+        ]);
+
+        return $normalized['cover_image_file'] ?? null;
     }
 
     private function slugifyGroupName(string $value): string

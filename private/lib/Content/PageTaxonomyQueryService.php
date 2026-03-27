@@ -175,7 +175,7 @@ final class PageTaxonomyQueryService
              INNER JOIN ' . $pageTaxonomyTable . ' pt ON pt.page_id = p.id
              INNER JOIN ' . $taxonomyTable . ' t ON t.id = pt.' . $taxonomyJoinColumn . '
              WHERE t.slug = :slug AND p.is_published = :is_published
-             ORDER BY p.published_at DESC, p.id DESC
+             ORDER BY p.created_at DESC, p.id DESC
              LIMIT :limit OFFSET :offset'
         );
         $stmt->bindValue(':slug', $slug);
@@ -217,7 +217,7 @@ final class PageTaxonomyQueryService
              INNER JOIN ' . $taxonomyTable . ' t ON t.id = pt.' . $taxonomyJoinColumn . '
              WHERE t.slug = :slug
                AND p.is_published = :is_published
-             ORDER BY p.published_at DESC, p.id DESC
+             ORDER BY p.created_at DESC, p.id DESC
              LIMIT :limit OFFSET :offset'
         );
         $stmt->bindValue(':slug', $slug);

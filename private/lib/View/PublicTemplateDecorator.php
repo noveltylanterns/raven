@@ -81,7 +81,7 @@ final class PublicTemplateDecorator
             $page['channel_id'] = max(0, $channelId);
         }
 
-        $rawBlocks = is_array($page['extended_blocks'] ?? null) ? $page['extended_blocks'] : [];
+        $rawBlocks = is_array($page['content_blocks'] ?? null) ? $page['content_blocks'] : [];
         $renderedBlocks = [];
         $displayIndex = 0;
 
@@ -97,8 +97,8 @@ final class PublicTemplateDecorator
 
             $displayIndex++;
             $classNames = [
-                'raven-page-extended-block',
-                'raven-page-extended-block-' . $displayIndex,
+                'raven-page-content-block',
+                'raven-page-content-block-' . $displayIndex,
             ];
 
             if ($displayIndex > 1) {
@@ -117,7 +117,7 @@ final class PublicTemplateDecorator
             ];
         }
 
-        unset($page['extended_blocks']);
+        unset($page['content_blocks']);
         $page['content'] = $renderedBlocks;
         return $page;
     }

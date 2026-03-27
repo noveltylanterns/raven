@@ -146,7 +146,7 @@ final class ChannelRoutePolicy
         InputSanitizer $input,
         string $slug,
         int $pageId,
-        string $publishedAt,
+        string $createdAt,
         string $routeMode,
         string $channelWordSeparator,
         string $globalWordSeparator
@@ -170,7 +170,7 @@ final class ChannelRoutePolicy
                 : $normalizedSlug;
         }
 
-        $prefix = self::datePrefix($publishedAt, $mode);
+        $prefix = self::datePrefix($createdAt, $mode);
         if ($prefix === '') {
             return $routeValue;
         }
@@ -178,7 +178,7 @@ final class ChannelRoutePolicy
         return $prefix . '-' . $routeValue;
     }
 
-    public static function datePrefix(string $publishedAt, string $routeMode = 'date_slug'): string
+    public static function datePrefix(string $createdAt, string $routeMode = 'date_slug'): string
     {
         $mode = self::normalizeRouteMode($routeMode);
         $format = match ($mode) {
@@ -190,17 +190,17 @@ final class ChannelRoutePolicy
             return '';
         }
 
-        $publishedAt = trim($publishedAt);
-        if ($publishedAt !== '') {
-            if ($format === 'Y-m-d' && preg_match('/^\d{4}-\d{2}-\d{2}/', $publishedAt, $matches) === 1) {
+        $createdAt = trim($createdAt);
+        if ($createdAt !== '') {
+            if ($format === 'Y-m-d' && preg_match('/^\d{4}-\d{2}-\d{2}/', $createdAt, $matches) === 1) {
                 return (string) ($matches[0] ?? gmdate('Y-m-d'));
             }
-            if ($format === 'Y-m' && preg_match('/^\d{4}-\d{2}/', $publishedAt, $matches) === 1) {
+            if ($format === 'Y-m' && preg_match('/^\d{4}-\d{2}/', $createdAt, $matches) === 1) {
                 return (string) ($matches[0] ?? gmdate('Y-m'));
             }
         }
 
-        $timestamp = $publishedAt !== '' ? strtotime($publishedAt) : false;
+        $timestamp = $createdAt !== '' ? strtotime($createdAt) : false;
         if ($timestamp === false || $timestamp <= 0) {
             $timestamp = time();
         }

@@ -17,14 +17,12 @@ final class PagePersistenceService
      *   title: string,
      *   slug: string,
      *   content: string,
-     *   extended: string,
      *   description: string,
      *   display_title: int,
      *   gallery_enabled: int,
      *   is_published: int,
      *   author_user_id: int|null,
      *   channel_id: int|null,
-     *   published_at: string|null,
      *   now: string,
      *   category_ids: array<int>,
      *   tag_ids: array<int>
@@ -49,13 +47,11 @@ final class PagePersistenceService
             ':title' => (string) ($payload['title'] ?? ''),
             ':slug' => (string) ($payload['slug'] ?? ''),
             ':content' => (string) ($payload['content'] ?? ''),
-            ':extended' => (string) ($payload['extended'] ?? ''),
             ':description' => (string) ($payload['description'] ?? ''),
             ':display_title' => (int) ($payload['display_title'] ?? 1),
             ':gallery_enabled' => (int) ($payload['gallery_enabled'] ?? 0),
             ':channel_id' => $payload['channel_id'] ?? null,
             ':is_published' => (int) ($payload['is_published'] ?? 0),
-            ':published_at' => $payload['published_at'] ?? null,
             ':author_user_id' => $payload['author_user_id'] ?? null,
             ':updated_at' => $now,
         ];
@@ -69,14 +65,12 @@ final class PagePersistenceService
                      SET title = :title,
                          slug = :slug,
                          content = :content,
-                         extended = :extended,
                          description = :description,
                          display_title = :display_title,
                          gallery_enabled = :gallery_enabled,
                          author_user_id = :author_user_id,
                          channel_id = :channel_id,
                          is_published = :is_published,
-                         published_at = :published_at,
                          updated_at = :updated_at
                      WHERE id = :id'
                 );
@@ -87,8 +81,8 @@ final class PagePersistenceService
             } else {
                 $stmt = $db->prepare(
                     'INSERT INTO ' . $pagesTable . '
-                    (title, slug, content, extended, description, display_title, gallery_enabled, channel_id, is_published, published_at, author_user_id, created_at, updated_at)
-                    VALUES (:title, :slug, :content, :extended, :description, :display_title, :gallery_enabled, :channel_id, :is_published, :published_at, :author_user_id, :created_at, :updated_at)'
+                    (title, slug, content, description, display_title, gallery_enabled, channel_id, is_published, author_user_id, created_at, updated_at)
+                    VALUES (:title, :slug, :content, :description, :display_title, :gallery_enabled, :channel_id, :is_published, :author_user_id, :created_at, :updated_at)'
                 );
 
                 $stmt->execute($writeParams + [':created_at' => $now]);

@@ -28,7 +28,7 @@ final class SchemaEnsurePipeline
         // App schema first so auth/group seeding can rely on group tables.
         $components->appSchemaBootstrap()->ensureAppSchema($appDb, $driver, $prefix);
         $appSchemaBuilder->ensureRootChannelScope($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensurePageExtendedColumn($appDb, $driver, $prefix);
+        $appSchemaBuilder->migratePageContentStorage($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePageDescriptionColumn($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePageDisplayTitleColumn($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePageGalleryEnabledColumn($appDb, $driver, $prefix);
@@ -36,8 +36,8 @@ final class SchemaEnsurePipeline
         $appSchemaBuilder->ensurePageImageDisplayColumns($appDb, $driver, $prefix);
         $appSchemaBuilder->ensureRedirectDescriptionColumn($appDb, $driver, $prefix);
         $appSchemaBuilder->ensureGroupRoutingColumns($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensureTaxonomyImageColumns($appDb, $driver, $prefix);
         $appSchemaBuilder->ensureTaxonomySetColumns($appDb, $driver, $prefix);
+        $appSchemaBuilder->ensureTaxonomyImageColumns($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePanelPerformanceIndexes($appDb, $driver, $prefix);
         $appSchemaBuilder->dropLegacyChannelTable($appDb, $driver, $prefix);
         $components->extensionSchemaRunner()->ensureEnabledExtensionSchemas($appDb, $driver, $prefix);

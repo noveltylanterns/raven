@@ -15,6 +15,7 @@ namespace Raven\Repository;
 
 use PDO;
 use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Media\TaxonomyImagePathResolver;
 
 /**
  * Data access for Category CRUD operations in panel.
@@ -44,8 +45,7 @@ final class CategoryRepository
 
         $stmt = $this->db->prepare(
             'SELECT c.id, c.name, c.slug, c.set_id, c.description, c.created_at,
-                    c.cover_image_path, c.cover_image_sm_path, c.cover_image_md_path, c.cover_image_lg_path,
-                    c.preview_image_path, c.preview_image_sm_path, c.preview_image_md_path, c.preview_image_lg_path,
+                    c.cover_image_file, c.preview_image_file,
                     COALESCE(pc.page_count, 0) AS page_count
              FROM ' . $categories . ' c
              LEFT JOIN (
@@ -58,7 +58,7 @@ final class CategoryRepository
         // LEFT JOIN keeps categories with zero linked pages visible in admin listings.
         $stmt->execute();
 
-        return $stmt->fetchAll() ?: [];
+        return $this->hydrateRows($stmt->fetchAll() ?: []);
     }
 
     /**
@@ -95,8 +95,7 @@ final class CategoryRepository
 
         $stmt = $this->db->prepare(
             'SELECT c.id, c.name, c.slug, c.set_id, c.description, c.created_at,
-                    c.cover_image_path, c.cover_image_sm_path, c.cover_image_md_path, c.cover_image_lg_path,
-                    c.preview_image_path, c.preview_image_sm_path, c.preview_image_md_path, c.preview_image_lg_path,
+                    c.cover_image_file, c.preview_image_file,
                     COALESCE(pc.page_count, 0) AS page_count
              FROM ' . $categories . ' c
              LEFT JOIN (
@@ -115,7 +114,7 @@ final class CategoryRepository
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
 
-        return $stmt->fetchAll() ?: [];
+        return $this->hydrateRows($stmt->fetchAll() ?: []);
     }
 
     /**
@@ -141,20 +140,13 @@ final class CategoryRepository
                     page_rows.set_id,
                     page_rows.description,
                     page_rows.created_at,
-                    page_rows.cover_image_path,
-                    page_rows.cover_image_sm_path,
-                    page_rows.cover_image_md_path,
-                    page_rows.cover_image_lg_path,
-                    page_rows.preview_image_path,
-                    page_rows.preview_image_sm_path,
-                    page_rows.preview_image_md_path,
-                    page_rows.preview_image_lg_path,
+                    page_rows.cover_image_file,
+                    page_rows.preview_image_file,
                     page_rows.page_count,
                     totals.total_rows
              FROM (
                  SELECT c.id, c.name, c.slug, c.set_id, c.description, c.created_at,
-                        c.cover_image_path, c.cover_image_sm_path, c.cover_image_md_path, c.cover_image_lg_path,
-                        c.preview_image_path, c.preview_image_sm_path, c.preview_image_md_path, c.preview_image_lg_path,
+                        c.cover_image_file, c.preview_image_file,
                         COALESCE(pc.page_count, 0) AS page_count
                  FROM ' . $categories . ' c
                  LEFT JOIN (
@@ -188,7 +180,7 @@ final class CategoryRepository
             }
 
             unset($row['total_rows']);
-            $resultRows[] = $row;
+            $resultRows[] = $this->hydrateRow($row);
         }
 
         // Offset can target an empty page while rows still exist; recover accurate total.
@@ -284,8 +276,7 @@ final class CategoryRepository
 
         $stmt = $this->db->prepare(
             'SELECT id, name, slug, set_id, description, created_at,
-                    cover_image_path, cover_image_sm_path, cover_image_md_path, cover_image_lg_path,
-                    preview_image_path, preview_image_sm_path, preview_image_md_path, preview_image_lg_path
+                    cover_image_file, preview_image_file
              FROM ' . $categories . '
              WHERE id = :id
              LIMIT 1'
@@ -294,7 +285,7 @@ final class CategoryRepository
 
         $row = $stmt->fetch();
 
-        return $row === false ? null : $row;
+        return $row === false ? null : $this->hydrateRow($row);
     }
 
     /**
@@ -350,44 +341,26 @@ final class CategoryRepository
     }
 
     /**
-     * Updates one category's cover/preview image path set.
+     * Updates one category's cover/preview image files.
      *
      * @param array{
-     *   cover_image_path: string|null,
-     *   cover_image_sm_path: string|null,
-     *   cover_image_md_path: string|null,
-     *   cover_image_lg_path: string|null,
-     *   preview_image_path: string|null,
-     *   preview_image_sm_path: string|null,
-     *   preview_image_md_path: string|null,
-     *   preview_image_lg_path: string|null
-     * } $paths
+     *   cover_image_file?: string|null,
+     *   preview_image_file?: string|null
+     * } $files
      */
-    public function updateImagePaths(int $id, array $paths): void
+    public function updateImageFiles(int $id, array $files): void
     {
         $categories = $this->table('categories');
 
         $stmt = $this->db->prepare(
             'UPDATE ' . $categories . '
-             SET cover_image_path = :cover_image_path,
-                 cover_image_sm_path = :cover_image_sm_path,
-                 cover_image_md_path = :cover_image_md_path,
-                 cover_image_lg_path = :cover_image_lg_path,
-                 preview_image_path = :preview_image_path,
-                 preview_image_sm_path = :preview_image_sm_path,
-                 preview_image_md_path = :preview_image_md_path,
-                 preview_image_lg_path = :preview_image_lg_path
+             SET cover_image_file = :cover_image_file,
+                 preview_image_file = :preview_image_file
              WHERE id = :id'
         );
         $stmt->execute([
-            ':cover_image_path' => $paths['cover_image_path'] ?? null,
-            ':cover_image_sm_path' => $paths['cover_image_sm_path'] ?? null,
-            ':cover_image_md_path' => $paths['cover_image_md_path'] ?? null,
-            ':cover_image_lg_path' => $paths['cover_image_lg_path'] ?? null,
-            ':preview_image_path' => $paths['preview_image_path'] ?? null,
-            ':preview_image_sm_path' => $paths['preview_image_sm_path'] ?? null,
-            ':preview_image_md_path' => $paths['preview_image_md_path'] ?? null,
-            ':preview_image_lg_path' => $paths['preview_image_lg_path'] ?? null,
+            ':cover_image_file' => $this->normalizeNullableFilename($files['cover_image_file'] ?? null),
+            ':preview_image_file' => $this->normalizeNullableFilename($files['preview_image_file'] ?? null),
             ':id' => $id,
         ]);
     }
@@ -478,5 +451,46 @@ final class CategoryRepository
     private function table(string $table): string
     {
         return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function hydrateRows(array $rows): array
+    {
+        $result = [];
+        foreach ($rows as $row) {
+            $result[] = $this->hydrateRow($row);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function hydrateRow(array $row): array
+    {
+        $id = (int) ($row['id'] ?? 0);
+        $storage = TaxonomyImagePathResolver::storagePayloadFromRecord('categories', $row);
+        $row['cover_image_file'] = $storage['cover_image_file'] ?? null;
+        $row['preview_image_file'] = $storage['preview_image_file'] ?? null;
+
+        return array_merge(
+            $row,
+            TaxonomyImagePathResolver::pathsFromStoragePayload('categories', $id, $storage)
+        );
+    }
+
+    private function normalizeNullableFilename(mixed $value): ?string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+
+        return basename(str_replace('\\', '/', $raw));
     }
 }

@@ -41,7 +41,7 @@ final class PublicChannelPageRouteService
     public function canonicalSegment(
         string $slug,
         int $pageId,
-        string $publishedAt,
+        string $createdAt,
         string $routeMode,
         string $wordSeparator,
         string $globalSeparator
@@ -50,7 +50,7 @@ final class PublicChannelPageRouteService
             $this->input,
             $slug,
             $pageId,
-            $publishedAt,
+            $createdAt,
             $routeMode,
             $wordSeparator,
             $globalSeparator

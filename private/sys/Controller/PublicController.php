@@ -146,7 +146,7 @@ final class PublicController
             return;
         }
 
-        $page = $this->renderPageExtendedBlocks($page);
+        $page = $this->renderPageContentBlocks($page);
         $page = $this->decoratePageForTemplate($page);
 
         $this->renderPublic('home', [
@@ -175,7 +175,7 @@ final class PublicController
 
         $channel = $this->taxonomyLookupRepo->findChannelBySlug($channelSlug);
 
-        $page = $this->renderPageExtendedBlocks($page);
+        $page = $this->renderPageContentBlocks($page);
         $page = $this->decoratePageForTemplate($page);
 
         $channelTemplate = $this->publicTemplatePipeline()->resolveChannelTemplateNameForThemeChain(
@@ -284,7 +284,7 @@ final class PublicController
         $canonicalSegment = $this->publicChannelPageRouteService()->canonicalSegment(
             (string) ($page['slug'] ?? ''),
             (int) ($page['id'] ?? 0),
-            (string) ($page['published_at'] ?? ''),
+            (string) ($page['created_at'] ?? ''),
             $channelRouteMode,
             $channelWordSeparator,
             (string) $this->config->get('content.route_separator', '-')
@@ -300,7 +300,7 @@ final class PublicController
             \Raven\Core\Support\redirect('/' . rawurlencode($canonicalSegment), 301);
         }
 
-        $page = $this->renderPageExtendedBlocks($page);
+        $page = $this->renderPageContentBlocks($page);
         $page = $this->decoratePageForTemplate($page);
 
         $pageTemplate = $this->publicTemplatePipeline()->resolvePageTemplateNameForThemeChain(
@@ -342,7 +342,7 @@ final class PublicController
                 $rootSegment = $this->publicChannelPageRouteService()->canonicalSegment(
                     $slug,
                     $pageId,
-                    (string) ($page['published_at'] ?? ''),
+                    (string) ($page['created_at'] ?? ''),
                     $this->globalPageRouteMode(),
                     'inherit',
                     (string) $this->config->get('content.route_separator', '-')
@@ -358,7 +358,7 @@ final class PublicController
                     $this->publicChannelPageRouteService()->canonicalSegment(
                         $slug,
                         $pageId,
-                        (string) ($page['published_at'] ?? ''),
+                        (string) ($page['created_at'] ?? ''),
                         $this->effectiveChannelRouteMode((string) ($page['route_mode_effective'] ?? 'inherit')),
                         (string) ($page['route_separator_effective'] ?? 'inherit'),
                         (string) $this->config->get('content.route_separator', '-')
@@ -644,12 +644,9 @@ final class PublicController
             }
 
             $description = trim((string) ($page['description'] ?? ''));
-            $publishedAt = trim((string) ($page['published_at'] ?? ''));
-            if ($publishedAt === '') {
-                $publishedAt = trim((string) ($page['created_at'] ?? ''));
-            }
+            $createdAt = trim((string) ($page['created_at'] ?? ''));
 
-            $timestamp = strtotime($publishedAt);
+            $timestamp = strtotime($createdAt);
             if ($timestamp === false || $timestamp < 1) {
                 $timestamp = time();
             }
@@ -1569,14 +1566,14 @@ final class PublicController
     }
 
     /**
-     * Normalizes and shortcode-renders repeatable Extended page blocks.
+     * Normalizes and shortcode-renders repeatable page content blocks.
      *
      * @param array<string, mixed> $page
      * @return array<string, mixed>
      */
-    private function renderPageExtendedBlocks(array $page): array
+    private function renderPageContentBlocks(array $page): array
     {
-        $rawBlocks = $page['extended_blocks'] ?? null;
+        $rawBlocks = $page['content_blocks'] ?? null;
         if (!is_array($rawBlocks)) {
             $rawBlocks = [];
         }
@@ -1632,7 +1629,7 @@ final class PublicController
             ];
         }
 
-        $page['extended_blocks'] = $renderedBlocks;
+        $page['content_blocks'] = $renderedBlocks;
         return $page;
     }
 

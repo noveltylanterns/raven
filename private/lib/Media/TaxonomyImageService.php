@@ -74,49 +74,37 @@ final class TaxonomyImageService
     }
 
     /**
-     * @param array<string, mixed>|null $record
      * @return array<string, string|null>
      */
-    public function imagePathsFromRecord(?array $record): array
+    public function imagePathsFromRecord(string $taxonomyType, int $taxonomyId, ?array $record): array
     {
-        $paths = [];
-        foreach ([
-            'cover_image_path',
-            'cover_image_sm_path',
-            'cover_image_md_path',
-            'cover_image_lg_path',
-            'preview_image_path',
-            'preview_image_sm_path',
-            'preview_image_md_path',
-            'preview_image_lg_path',
-        ] as $key) {
-            $raw = trim((string) ($record[$key] ?? ''));
-            $paths[$key] = $raw !== '' ? $raw : null;
-        }
-
-        return $paths;
+        return TaxonomyImagePathResolver::pathsFromRecord($taxonomyType, $taxonomyId, $record);
     }
 
     /**
      * @return array<int, string>
      */
-    public function imageKeysForSlot(string $slot): array
+    public function imageStorageKeysForSlot(string $taxonomyType, string $slot): array
     {
-        if ($slot === 'cover') {
-            return [
-                'cover_image_path',
-                'cover_image_sm_path',
-                'cover_image_md_path',
-                'cover_image_lg_path',
-            ];
-        }
+        return TaxonomyImagePathResolver::storageKeysForSlot($taxonomyType, $slot);
+    }
 
-        return [
-            'preview_image_path',
-            'preview_image_sm_path',
-            'preview_image_md_path',
-            'preview_image_lg_path',
-        ];
+    /**
+     * @param array<string, mixed>|null $record
+     * @return array<string, string|null>
+     */
+    public function imageStoragePayloadFromRecord(string $taxonomyType, ?array $record): array
+    {
+        return TaxonomyImagePathResolver::storagePayloadFromRecord($taxonomyType, $record);
+    }
+
+    /**
+     * @param array<string, mixed> $storage
+     * @return array<string, string|null>
+     */
+    public function imagePathsFromStoragePayload(string $taxonomyType, int $taxonomyId, array $storage): array
+    {
+        return TaxonomyImagePathResolver::pathsFromStoragePayload($taxonomyType, $taxonomyId, $storage);
     }
 
     /**
@@ -203,6 +191,7 @@ final class TaxonomyImageService
      * @param array<string, mixed> $upload
      * @return array{
      *   ok: bool,
+     *   record?: array<string, string|null>,
      *   paths?: array{
      *     cover_image_path?: string,
      *     cover_image_sm_path?: string,
@@ -366,8 +355,13 @@ final class TaxonomyImageService
                 $paths[$slot . '_image_' . $variantKey . '_path'] = $variantStoredPath;
             }
 
+            $record = TaxonomyImagePathResolver::supportsFilenameStorage($taxonomyType)
+                ? [$slot . '_image_file' => $originalFilename]
+                : $paths;
+
             return [
                 'ok' => true,
+                'record' => $record,
                 'paths' => $paths,
             ];
         } catch (\Throwable $exception) {

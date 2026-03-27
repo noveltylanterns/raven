@@ -442,12 +442,12 @@ final class PanelController
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['content', 'meta', 'media'], 'content');
         $title = $this->input->text($post['title'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
-        $extendedBlocks = $this->normalizeExtendedBlocksInput($post['extended_blocks'] ?? []);
+        $contentBlocks = $this->normalizeContentBlocksInput($post['content_blocks'] ?? []);
         $description = $this->input->text($post['description'] ?? null, 1000);
         $channelSlug = $this->input->slug($post['channel_slug'] ?? null);
         $status = strtolower((string) $this->input->text($post['status'] ?? null, 20));
         $displayTitle = isset($post['display_title']) && (string) $post['display_title'] === '1';
-        $galleryEnabled = $this->pageBodyBlocksIncludeGallery($extendedBlocks)
+        $galleryEnabled = $this->pageBodyBlocksIncludeGallery($contentBlocks)
             || (isset($post['gallery_enabled']) && (string) $post['gallery_enabled'] === '1');
         $authorUserId = $this->input->int($post['author_user_id'] ?? null, 1);
         if ($authorUserId !== null && $this->userRepo->findById($authorUserId) === null) {
@@ -457,8 +457,6 @@ final class PanelController
         if ($authorUserId === null) {
             $authorUserId = $this->auth->userId();
         }
-        // Body content is now authored via repeatable body blocks in `extended`.
-        $content = '';
         $categoryIds = [];
         $tagIds = [];
 
@@ -537,8 +535,7 @@ final class PanelController
                 'id' => $id,
                 'title' => $title,
                 'slug' => $slug,
-                'content' => $content,
-                'extended_blocks' => $extendedBlocks,
+                'content_blocks' => $contentBlocks,
                 'description' => $description,
                 'display_title' => $displayTitle ? 1 : 0,
                 'gallery_enabled' => $galleryEnabled ? 1 : 0,
@@ -547,7 +544,6 @@ final class PanelController
                 'category_ids' => $categoryIds,
                 'tag_ids' => $tagIds,
                 'is_published' => $status === 'published' ? 1 : 0,
-                'published_at' => gmdate('Y-m-d H:i:s'),
             ]);
 
             // Keep Media tab metadata and page-level gallery toggle in sync with save.
@@ -584,7 +580,7 @@ final class PanelController
      *
      * @return array<int, array{type: string, content: string, css_id: string, css_class: string}>
      */
-    private function normalizeExtendedBlocksInput(mixed $raw): array
+    private function normalizeContentBlocksInput(mixed $raw): array
     {
         return $this->pageBodyBlockCodec()->normalizeEditorSubmittedBlocks(
             $raw,
@@ -1216,8 +1212,9 @@ final class PanelController
         $savedEditUrl = $this->panelEditorUrlWithTab('/channel/edit', $savedId, $activeTab, 'basic');
 
         $currentRecord = $this->channelRepo->findById($savedId);
-        $currentPaths = $this->taxonomyImagePathsFromRecord($currentRecord);
-        $nextPaths = $currentPaths;
+        $currentStorage = $this->taxonomyImageStoragePayloadFromRecord('channels', $currentRecord);
+        $currentPaths = $this->taxonomyImagePathsFromStoragePayload('channels', $savedId, $currentStorage);
+        $nextStorage = $currentStorage;
         $newPathSets = [];
 
         $coverUploads = $this->normalizeUploadedFileSet($files['cover_image'] ?? null);
@@ -1232,13 +1229,13 @@ final class PanelController
         $removePreview = isset($post['remove_preview_image']) && (string) $post['remove_preview_image'] === '1';
 
         if ($removeCover) {
-            foreach ($this->taxonomyImageKeysForSlot('cover') as $key) {
-                $nextPaths[$key] = null;
+            foreach ($this->taxonomyImageStorageKeysForSlot('channels', 'cover') as $key) {
+                $nextStorage[$key] = null;
             }
         }
         if ($removePreview) {
-            foreach ($this->taxonomyImageKeysForSlot('preview') as $key) {
-                $nextPaths[$key] = null;
+            foreach ($this->taxonomyImageStorageKeysForSlot('channels', 'preview') as $key) {
+                $nextStorage[$key] = null;
             }
         }
 
@@ -1250,8 +1247,9 @@ final class PanelController
                 redirect($savedEditUrl);
             }
 
+            $coverStorage = is_array($coverResult['record'] ?? null) ? $coverResult['record'] : [];
             $coverPaths = $coverResult['paths'] ?? [];
-            $nextPaths = array_merge($nextPaths, $coverPaths);
+            $nextStorage = array_merge($nextStorage, $coverStorage);
             $newPathSets[] = $coverPaths;
         }
 
@@ -1263,13 +1261,14 @@ final class PanelController
                 redirect($savedEditUrl);
             }
 
+            $previewStorage = is_array($previewResult['record'] ?? null) ? $previewResult['record'] : [];
             $previewPaths = $previewResult['paths'] ?? [];
-            $nextPaths = array_merge($nextPaths, $previewPaths);
+            $nextStorage = array_merge($nextStorage, $previewStorage);
             $newPathSets[] = $previewPaths;
         }
 
         try {
-            $this->channelRepo->updateImagePaths($savedId, $nextPaths);
+            $this->channelRepo->updateImagePaths($savedId, $nextStorage);
         } catch (\Throwable) {
             // Keep DB and filesystem in sync when image-path persistence fails.
             $this->cleanupTaxonomyImagePathSets('channels', $savedId, $newPathSets);
@@ -1277,6 +1276,7 @@ final class PanelController
             redirect($savedEditUrl);
         }
 
+        $nextPaths = $this->taxonomyImagePathsFromStoragePayload('channels', $savedId, $nextStorage);
         $obsoletePaths = $this->taxonomyRemovedPaths($currentPaths, $nextPaths);
         $this->deleteTaxonomyStoredPaths('channels', $savedId, $obsoletePaths);
 
@@ -1317,7 +1317,7 @@ final class PanelController
                 $this->deleteTaxonomyStoredPaths(
                     'channels',
                     $id,
-                    $this->taxonomyImagePathsFromRecord($record)
+                    $this->taxonomyImagePathsFromRecord('channels', $id, $record)
                 );
             }
 
@@ -1344,7 +1344,7 @@ final class PanelController
                     $this->deleteTaxonomyStoredPaths(
                         'channels',
                         $selectedId,
-                        $this->taxonomyImagePathsFromRecord($record)
+                        $this->taxonomyImagePathsFromRecord('channels', $selectedId, $record)
                     );
                 }
                 $deletedCount++;
@@ -1507,8 +1507,9 @@ final class PanelController
         $savedEditUrl = $this->panelEditorUrlWithTab('/category/edit', $savedId, $activeTab, 'basic');
 
         $currentRecord = $this->categoryRepo->findById($savedId);
-        $currentPaths = $this->taxonomyImagePathsFromRecord($currentRecord);
-        $nextPaths = $currentPaths;
+        $currentStorage = $this->taxonomyImageStoragePayloadFromRecord('categories', $currentRecord);
+        $currentPaths = $this->taxonomyImagePathsFromStoragePayload('categories', $savedId, $currentStorage);
+        $nextStorage = $currentStorage;
         $newPathSets = [];
 
         $coverUploads = $this->normalizeUploadedFileSet($files['cover_image'] ?? null);
@@ -1523,13 +1524,13 @@ final class PanelController
         $removePreview = isset($post['remove_preview_image']) && (string) $post['remove_preview_image'] === '1';
 
         if ($removeCover) {
-            foreach ($this->taxonomyImageKeysForSlot('cover') as $key) {
-                $nextPaths[$key] = null;
+            foreach ($this->taxonomyImageStorageKeysForSlot('categories', 'cover') as $key) {
+                $nextStorage[$key] = null;
             }
         }
         if ($removePreview) {
-            foreach ($this->taxonomyImageKeysForSlot('preview') as $key) {
-                $nextPaths[$key] = null;
+            foreach ($this->taxonomyImageStorageKeysForSlot('categories', 'preview') as $key) {
+                $nextStorage[$key] = null;
             }
         }
 
@@ -1541,8 +1542,9 @@ final class PanelController
                 redirect($savedEditUrl);
             }
 
+            $coverStorage = is_array($coverResult['record'] ?? null) ? $coverResult['record'] : [];
             $coverPaths = $coverResult['paths'] ?? [];
-            $nextPaths = array_merge($nextPaths, $coverPaths);
+            $nextStorage = array_merge($nextStorage, $coverStorage);
             $newPathSets[] = $coverPaths;
         }
 
@@ -1554,13 +1556,14 @@ final class PanelController
                 redirect($savedEditUrl);
             }
 
+            $previewStorage = is_array($previewResult['record'] ?? null) ? $previewResult['record'] : [];
             $previewPaths = $previewResult['paths'] ?? [];
-            $nextPaths = array_merge($nextPaths, $previewPaths);
+            $nextStorage = array_merge($nextStorage, $previewStorage);
             $newPathSets[] = $previewPaths;
         }
 
         try {
-            $this->categoryRepo->updateImagePaths($savedId, $nextPaths);
+            $this->categoryRepo->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
             // Keep DB and filesystem in sync when image-path persistence fails.
             $this->cleanupTaxonomyImagePathSets('categories', $savedId, $newPathSets);
@@ -1568,6 +1571,7 @@ final class PanelController
             redirect($savedEditUrl);
         }
 
+        $nextPaths = $this->taxonomyImagePathsFromStoragePayload('categories', $savedId, $nextStorage);
         $obsoletePaths = $this->taxonomyRemovedPaths($currentPaths, $nextPaths);
         $this->deleteTaxonomyStoredPaths('categories', $savedId, $obsoletePaths);
 
@@ -1611,7 +1615,7 @@ final class PanelController
                 $this->deleteTaxonomyStoredPaths(
                     'categories',
                     $id,
-                    $this->taxonomyImagePathsFromRecord($record)
+                    $this->taxonomyImagePathsFromRecord('categories', $id, $record)
                 );
             }
 
@@ -1638,7 +1642,7 @@ final class PanelController
                     $this->deleteTaxonomyStoredPaths(
                         'categories',
                         $selectedId,
-                        $this->taxonomyImagePathsFromRecord($record)
+                        $this->taxonomyImagePathsFromRecord('categories', $selectedId, $record)
                     );
                 }
                 $deletedCount++;
@@ -1972,8 +1976,9 @@ final class PanelController
         $savedEditUrl = $this->panelEditorUrlWithTab('/tag/edit', $savedId, $activeTab, 'basic');
 
         $currentRecord = $this->tagRepo->findById($savedId);
-        $currentPaths = $this->taxonomyImagePathsFromRecord($currentRecord);
-        $nextPaths = $currentPaths;
+        $currentStorage = $this->taxonomyImageStoragePayloadFromRecord('tags', $currentRecord);
+        $currentPaths = $this->taxonomyImagePathsFromStoragePayload('tags', $savedId, $currentStorage);
+        $nextStorage = $currentStorage;
         $newPathSets = [];
 
         $coverUploads = $this->normalizeUploadedFileSet($files['cover_image'] ?? null);
@@ -1988,13 +1993,13 @@ final class PanelController
         $removePreview = isset($post['remove_preview_image']) && (string) $post['remove_preview_image'] === '1';
 
         if ($removeCover) {
-            foreach ($this->taxonomyImageKeysForSlot('cover') as $key) {
-                $nextPaths[$key] = null;
+            foreach ($this->taxonomyImageStorageKeysForSlot('tags', 'cover') as $key) {
+                $nextStorage[$key] = null;
             }
         }
         if ($removePreview) {
-            foreach ($this->taxonomyImageKeysForSlot('preview') as $key) {
-                $nextPaths[$key] = null;
+            foreach ($this->taxonomyImageStorageKeysForSlot('tags', 'preview') as $key) {
+                $nextStorage[$key] = null;
             }
         }
 
@@ -2006,8 +2011,9 @@ final class PanelController
                 redirect($savedEditUrl);
             }
 
+            $coverStorage = is_array($coverResult['record'] ?? null) ? $coverResult['record'] : [];
             $coverPaths = $coverResult['paths'] ?? [];
-            $nextPaths = array_merge($nextPaths, $coverPaths);
+            $nextStorage = array_merge($nextStorage, $coverStorage);
             $newPathSets[] = $coverPaths;
         }
 
@@ -2019,13 +2025,14 @@ final class PanelController
                 redirect($savedEditUrl);
             }
 
+            $previewStorage = is_array($previewResult['record'] ?? null) ? $previewResult['record'] : [];
             $previewPaths = $previewResult['paths'] ?? [];
-            $nextPaths = array_merge($nextPaths, $previewPaths);
+            $nextStorage = array_merge($nextStorage, $previewStorage);
             $newPathSets[] = $previewPaths;
         }
 
         try {
-            $this->tagRepo->updateImagePaths($savedId, $nextPaths);
+            $this->tagRepo->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
             // Keep DB and filesystem in sync when image-path persistence fails.
             $this->cleanupTaxonomyImagePathSets('tags', $savedId, $newPathSets);
@@ -2033,6 +2040,7 @@ final class PanelController
             redirect($savedEditUrl);
         }
 
+        $nextPaths = $this->taxonomyImagePathsFromStoragePayload('tags', $savedId, $nextStorage);
         $obsoletePaths = $this->taxonomyRemovedPaths($currentPaths, $nextPaths);
         $this->deleteTaxonomyStoredPaths('tags', $savedId, $obsoletePaths);
 
@@ -2076,7 +2084,7 @@ final class PanelController
                 $this->deleteTaxonomyStoredPaths(
                     'tags',
                     $id,
-                    $this->taxonomyImagePathsFromRecord($record)
+                    $this->taxonomyImagePathsFromRecord('tags', $id, $record)
                 );
             }
 
@@ -2103,7 +2111,7 @@ final class PanelController
                     $this->deleteTaxonomyStoredPaths(
                         'tags',
                         $selectedId,
-                        $this->taxonomyImagePathsFromRecord($record)
+                        $this->taxonomyImagePathsFromRecord('tags', $selectedId, $record)
                     );
                 }
                 $deletedCount++;
@@ -5482,22 +5490,39 @@ final class PanelController
     /**
      * Returns normalized taxonomy image-path payload from one record row.
      *
-     * @param array<string, mixed>|null $record
      * @return array<string, string|null>
      */
-    private function taxonomyImagePathsFromRecord(?array $record): array
+    private function taxonomyImagePathsFromRecord(string $taxonomyBucket, int $taxonomyId, ?array $record): array
     {
-        return $this->taxonomyImageService()->imagePathsFromRecord($record);
+        return $this->taxonomyImageService()->imagePathsFromRecord($taxonomyBucket, $taxonomyId, $record);
     }
 
     /**
-     * Returns image-path column keys for one taxonomy image slot.
+     * Returns storage column keys for one taxonomy image slot.
      *
      * @return array<int, string>
      */
-    private function taxonomyImageKeysForSlot(string $slot): array
+    private function taxonomyImageStorageKeysForSlot(string $taxonomyBucket, string $slot): array
     {
-        return $this->taxonomyImageService()->imageKeysForSlot($slot);
+        return $this->taxonomyImageService()->imageStorageKeysForSlot($taxonomyBucket, $slot);
+    }
+
+    /**
+     * @param array<string, mixed>|null $record
+     * @return array<string, string|null>
+     */
+    private function taxonomyImageStoragePayloadFromRecord(string $taxonomyBucket, ?array $record): array
+    {
+        return $this->taxonomyImageService()->imageStoragePayloadFromRecord($taxonomyBucket, $record);
+    }
+
+    /**
+     * @param array<string, mixed> $storage
+     * @return array<string, string|null>
+     */
+    private function taxonomyImagePathsFromStoragePayload(string $taxonomyBucket, int $taxonomyId, array $storage): array
+    {
+        return $this->taxonomyImageService()->imagePathsFromStoragePayload($taxonomyBucket, $taxonomyId, $storage);
     }
 
     /**
@@ -5538,6 +5563,7 @@ final class PanelController
      * @param array<string, mixed> $upload
      * @return array{
      *   ok: bool,
+     *   record?: array<string, string|null>,
      *   paths?: array{
      *     cover_image_path?: string,
      *     cover_image_sm_path?: string,
@@ -6520,7 +6546,7 @@ final class PanelController
      * Landing priority per channel:
      * - published `home` first
      * - published `index` fallback
-     * - for duplicate slug candidates, latest `published_at` wins
+     * - for duplicate slug candidates, latest `created_at` wins
      *
      * @param array<int, array<string, mixed>> $pagesForRouting
      * @return array<string, string>

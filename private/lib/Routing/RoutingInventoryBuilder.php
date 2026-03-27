@@ -294,7 +294,7 @@ final class RoutingInventoryBuilder
                 $pageSlug,
                 (int) ($page['id'] ?? 0),
                 $channelSlug,
-                (string) ($page['published_at'] ?? ''),
+                (string) ($page['created_at'] ?? ''),
                 (string) ($page['route_mode_effective'] ?? 'inherit'),
                 (string) ($page['route_separator_effective'] ?? 'inherit')
             );
@@ -583,7 +583,7 @@ final class RoutingInventoryBuilder
                 continue;
             }
 
-            $publishedAt = trim((string) ($page['published_at'] ?? ''));
+            $publishedAt = trim((string) ($page['created_at'] ?? ''));
             $publishedTs = $publishedAt !== '' ? (int) strtotime($publishedAt) : 0;
             if ($publishedTs < 0) {
                 $publishedTs = 0;

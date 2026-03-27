@@ -31,13 +31,11 @@ final class AppSchemaBootstrap
                 title TEXT NOT NULL,
                 slug TEXT NOT NULL,
                 content TEXT NOT NULL DEFAULT \'\',
-                extended TEXT NULL,
                 description TEXT NULL,
                 display_title INTEGER NOT NULL DEFAULT 1,
                 gallery_enabled INTEGER NOT NULL DEFAULT 0,
                 channel_id INTEGER NULL,
                 is_published INTEGER NOT NULL DEFAULT 1,
-                published_at TEXT NULL,
                 author_user_id INTEGER NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -49,14 +47,8 @@ final class AppSchemaBootstrap
                 slug TEXT NOT NULL UNIQUE,
                 set_id INTEGER NOT NULL DEFAULT 1,
                 description TEXT NULL,
-                cover_image_path TEXT NULL,
-                cover_image_sm_path TEXT NULL,
-                cover_image_md_path TEXT NULL,
-                cover_image_lg_path TEXT NULL,
-                preview_image_path TEXT NULL,
-                preview_image_sm_path TEXT NULL,
-                preview_image_md_path TEXT NULL,
-                preview_image_lg_path TEXT NULL,
+                cover_image_file TEXT NULL,
+                preview_image_file TEXT NULL,
                 created_at TEXT NOT NULL
             )');
 
@@ -66,14 +58,8 @@ final class AppSchemaBootstrap
                 slug TEXT NOT NULL UNIQUE,
                 set_id INTEGER NOT NULL DEFAULT 1,
                 description TEXT NULL,
-                cover_image_path TEXT NULL,
-                cover_image_sm_path TEXT NULL,
-                cover_image_md_path TEXT NULL,
-                cover_image_lg_path TEXT NULL,
-                preview_image_path TEXT NULL,
-                preview_image_sm_path TEXT NULL,
-                preview_image_md_path TEXT NULL,
-                preview_image_lg_path TEXT NULL,
+                cover_image_file TEXT NULL,
+                preview_image_file TEXT NULL,
                 created_at TEXT NOT NULL
             )');
 
@@ -173,7 +159,7 @@ final class AppSchemaBootstrap
                 updated_at TEXT NOT NULL
             )');
 
-            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_published_at ON ' . $pagesTable . ' (published_at DESC)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_created_at ON ' . $pagesTable . ' (created_at DESC)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_id ON ' . $pagesTable . ' (channel_id)');
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_root_slug_unique ON ' . $pagesTable . ' (slug) WHERE channel_id IS NULL OR channel_id = 0');
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_slug_unique ON ' . $pagesTable . ' (channel_id, slug) WHERE channel_id IS NOT NULL AND channel_id <> 0');
@@ -196,18 +182,16 @@ final class AppSchemaBootstrap
                 title VARCHAR(255) NOT NULL,
                 slug VARCHAR(160) NOT NULL,
                 content MEDIUMTEXT NOT NULL,
-                extended MEDIUMTEXT NULL,
                 description TEXT NULL,
                 display_title TINYINT(1) NOT NULL DEFAULT 1,
                 gallery_enabled TINYINT(1) NOT NULL DEFAULT 0,
                 channel_id BIGINT UNSIGNED NULL,
                 is_published TINYINT(1) NOT NULL DEFAULT 1,
-                published_at DATETIME NULL,
                 author_user_id BIGINT UNSIGNED NULL,
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL,
                 UNIQUE KEY uniq_' . $prefix . 'pages_channel_slug (channel_id, slug),
-                INDEX idx_' . $prefix . 'pages_published_at (published_at),
+                INDEX idx_' . $prefix . 'pages_created_at (created_at),
                 INDEX idx_' . $prefix . 'pages_channel_id (channel_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
@@ -217,14 +201,8 @@ final class AppSchemaBootstrap
                 slug VARCHAR(160) NOT NULL UNIQUE,
                 set_id BIGINT UNSIGNED NOT NULL DEFAULT 1,
                 description TEXT NULL,
-                cover_image_path VARCHAR(500) NULL,
-                cover_image_sm_path VARCHAR(500) NULL,
-                cover_image_md_path VARCHAR(500) NULL,
-                cover_image_lg_path VARCHAR(500) NULL,
-                preview_image_path VARCHAR(500) NULL,
-                preview_image_sm_path VARCHAR(500) NULL,
-                preview_image_md_path VARCHAR(500) NULL,
-                preview_image_lg_path VARCHAR(500) NULL,
+                cover_image_file VARCHAR(255) NULL,
+                preview_image_file VARCHAR(255) NULL,
                 created_at DATETIME NOT NULL,
                 INDEX idx_' . $prefix . 'categories_set_id (set_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
@@ -235,14 +213,8 @@ final class AppSchemaBootstrap
                 slug VARCHAR(160) NOT NULL UNIQUE,
                 set_id BIGINT UNSIGNED NOT NULL DEFAULT 1,
                 description TEXT NULL,
-                cover_image_path VARCHAR(500) NULL,
-                cover_image_sm_path VARCHAR(500) NULL,
-                cover_image_md_path VARCHAR(500) NULL,
-                cover_image_lg_path VARCHAR(500) NULL,
-                preview_image_path VARCHAR(500) NULL,
-                preview_image_sm_path VARCHAR(500) NULL,
-                preview_image_md_path VARCHAR(500) NULL,
-                preview_image_lg_path VARCHAR(500) NULL,
+                cover_image_file VARCHAR(255) NULL,
+                preview_image_file VARCHAR(255) NULL,
                 created_at DATETIME NOT NULL,
                 INDEX idx_' . $prefix . 'tags_set_id (set_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
@@ -362,19 +334,17 @@ final class AppSchemaBootstrap
             title VARCHAR(255) NOT NULL,
             slug VARCHAR(160) NOT NULL,
             content TEXT NOT NULL,
-            extended TEXT NULL,
             description TEXT NULL,
             display_title SMALLINT NOT NULL DEFAULT 1,
             gallery_enabled SMALLINT NOT NULL DEFAULT 0,
             channel_id BIGINT NULL,
             is_published SMALLINT NOT NULL DEFAULT 1,
-            published_at TIMESTAMP NULL,
             author_user_id BIGINT NULL,
             created_at TIMESTAMP NOT NULL,
             updated_at TIMESTAMP NOT NULL
         )');
 
-        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'pages_published_at ON ' . $prefix . 'pages (published_at DESC)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'pages_created_at ON ' . $prefix . 'pages (created_at DESC)');
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'pages_channel_id ON ' . $prefix . 'pages (channel_id)');
         $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $prefix . 'pages_root_slug ON ' . $prefix . 'pages (slug) WHERE channel_id IS NULL OR channel_id = 0');
         $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $prefix . 'pages_channel_slug ON ' . $prefix . 'pages (channel_id, slug) WHERE channel_id IS NOT NULL AND channel_id <> 0');
@@ -385,14 +355,8 @@ final class AppSchemaBootstrap
             slug VARCHAR(160) NOT NULL UNIQUE,
             set_id BIGINT NOT NULL DEFAULT 1,
             description TEXT NULL,
-            cover_image_path VARCHAR(500) NULL,
-            cover_image_sm_path VARCHAR(500) NULL,
-            cover_image_md_path VARCHAR(500) NULL,
-            cover_image_lg_path VARCHAR(500) NULL,
-            preview_image_path VARCHAR(500) NULL,
-            preview_image_sm_path VARCHAR(500) NULL,
-            preview_image_md_path VARCHAR(500) NULL,
-            preview_image_lg_path VARCHAR(500) NULL,
+            cover_image_file VARCHAR(255) NULL,
+            preview_image_file VARCHAR(255) NULL,
             created_at TIMESTAMP NOT NULL
         )');
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'tags (
@@ -401,14 +365,8 @@ final class AppSchemaBootstrap
             slug VARCHAR(160) NOT NULL UNIQUE,
             set_id BIGINT NOT NULL DEFAULT 1,
             description TEXT NULL,
-            cover_image_path VARCHAR(500) NULL,
-            cover_image_sm_path VARCHAR(500) NULL,
-            cover_image_md_path VARCHAR(500) NULL,
-            cover_image_lg_path VARCHAR(500) NULL,
-            preview_image_path VARCHAR(500) NULL,
-            preview_image_sm_path VARCHAR(500) NULL,
-            preview_image_md_path VARCHAR(500) NULL,
-            preview_image_lg_path VARCHAR(500) NULL,
+            cover_image_file VARCHAR(255) NULL,
+            preview_image_file VARCHAR(255) NULL,
             created_at TIMESTAMP NOT NULL
         )');
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'redirects (

@@ -194,11 +194,11 @@ Core page fields live in `pages` table, with related tables:
 - `page_images`
 - `page_image_variants`
 
-Extended blocks persistence model:
+Content blocks persistence model:
 
-- panel posts `extended_blocks[]` (0..n items)
-- repository stores the array as JSON in `pages.extended`
-- read hydration exposes `extended_blocks` (array) for downstream page rendering/decorators, and public template decoration then maps rendered body rows to `page:content`
+- panel posts `content_blocks[]` (0..n items)
+- repository stores the array as JSON in `pages.content`
+- read hydration exposes `content_blocks` (array) for downstream page rendering/decorators, and public template decoration then maps rendered body rows to `page:content`
 
 `PageRepository::save(...)` details:
 

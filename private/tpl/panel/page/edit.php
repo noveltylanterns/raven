@@ -188,7 +188,7 @@ $routeSegment = trim(
         new \Raven\Lib\Security\InputSanitizer(),
         $pageSlug,
         $pageId,
-        (string) ($page['published_at'] ?? ''),
+        (string) ($page['created_at'] ?? ''),
         $effectivePageRouteMode,
         $selectedChannelUrlSeparator,
         $routeSeparatorDefault
@@ -232,9 +232,9 @@ foreach ($galleryImages as $galleryImage) {
     ];
 }
 $bodyBlocks = [];
-$rawExtendedBlocks = $page['extended_blocks'] ?? null;
-if (is_array($rawExtendedBlocks)) {
-    foreach ($rawExtendedBlocks as $entry) {
+$rawContentBlocks = $page['content_blocks'] ?? null;
+if (is_array($rawContentBlocks)) {
+    foreach ($rawContentBlocks as $entry) {
         $type = 'tinymce';
         $content = '';
         $cssId = '';
@@ -482,7 +482,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                                 placeholder="#id"
                                                 value="<?= e($blockCssId) ?>"
                                                 data-rvn-body-css-id="1"
-                                                name="extended_blocks[<?= (int) $bodyIndex ?>][css_id]"
+                                                name="content_blocks[<?= (int) $bodyIndex ?>][css_id]"
                                             >
                                             <small class="text-danger d-none" data-rvn-body-css-id-error="1">Can only enter one id!</small>
                                             <input
@@ -492,16 +492,16 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                                 placeholder=".class1 .class2"
                                                 value="<?= e($blockCssClass) ?>"
                                                 data-rvn-body-css-class="1"
-                                                name="extended_blocks[<?= (int) $bodyIndex ?>][css_class]"
+                                                name="content_blocks[<?= (int) $bodyIndex ?>][css_class]"
                                             >
                                             <span class="badge text-bg-secondary" data-rvn-body-type-label="1"><?= $blockTypeLabel ?></span>
                                         </div>
                                         <button type="button" class="btn btn-danger btn-sm" data-rvn-body-remove="1" aria-label="Remove block" title="Remove block"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
                                     </div>
-                                    <input type="hidden" data-rvn-body-type-input="1" name="extended_blocks[<?= (int) $bodyIndex ?>][type]" value="<?= e($blockType) ?>">
+                                    <input type="hidden" data-rvn-body-type-input="1" name="content_blocks[<?= (int) $bodyIndex ?>][type]" value="<?= e($blockType) ?>">
                                     <textarea
                                         id="body_block_<?= (int) $bodyIndex ?>"
-                                        name="<?= $isGalleryBlock || $isPathBlock ? '' : 'extended_blocks[' . (int) $bodyIndex . '][content]' ?>"
+                                        name="<?= $isGalleryBlock || $isPathBlock ? '' : 'content_blocks[' . (int) $bodyIndex . '][content]' ?>"
                                         class="form-control"
                                         rows="10"
                                         data-rvn-body-content="1"
@@ -511,7 +511,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                         type="text"
                                         class="form-control mt-2"
                                         id="body_block_<?= (int) $bodyIndex ?>_path"
-                                        name="<?= $isPathBlock ? 'extended_blocks[' . (int) $bodyIndex . '][content]' : '' ?>"
+                                        name="<?= $isPathBlock ? 'content_blocks[' . (int) $bodyIndex . '][content]' : '' ?>"
                                         value="<?= e($isPathBlock ? $blockContent : '') ?>"
                                         placeholder="/notes/example.md"
                                         data-rvn-body-content-path="1"
@@ -3430,12 +3430,12 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
         var type = normalizeBodyBlockType(typeInput.value);
         var editorMode = bodyBlockEditorMode(type);
         typeInput.value = type;
-        typeInput.name = 'extended_blocks[' + index + '][type]';
+        typeInput.name = 'content_blocks[' + index + '][type]';
         if (cssIdInput instanceof HTMLInputElement) {
-          cssIdInput.name = 'extended_blocks[' + index + '][css_id]';
+          cssIdInput.name = 'content_blocks[' + index + '][css_id]';
         }
         if (cssClassInput instanceof HTMLInputElement) {
-          cssClassInput.name = 'extended_blocks[' + index + '][css_class]';
+          cssClassInput.name = 'content_blocks[' + index + '][css_class]';
         }
 
         destroyTinyMceForTextarea(textarea);
@@ -3449,9 +3449,9 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
           pathInput.name = '';
         } else if (editorMode === 'markdown_file') {
           textarea.name = '';
-          pathInput.name = 'extended_blocks[' + index + '][content]';
+          pathInput.name = 'content_blocks[' + index + '][content]';
         } else {
-          textarea.name = 'extended_blocks[' + index + '][content]';
+          textarea.name = 'content_blocks[' + index + '][content]';
           pathInput.name = '';
         }
 

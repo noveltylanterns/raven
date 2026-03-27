@@ -16,6 +16,7 @@ namespace Raven\Repository;
 use PDO;
 use PDOException;
 use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Media\TaxonomyImagePathResolver;
 use Raven\Lib\Routing\ChannelContextService;
 use RuntimeException;
 
@@ -62,14 +63,8 @@ final class TaxonomyLookupRepository
                 name,
                 slug,
                 description,
-                cover_image_path,
-                cover_image_sm_path,
-                cover_image_md_path,
-                cover_image_lg_path,
-                preview_image_path,
-                preview_image_sm_path,
-                preview_image_md_path,
-                preview_image_lg_path
+                cover_image_file,
+                preview_image_file
              FROM ' . $table . '
              WHERE slug = :slug
              LIMIT 1'
@@ -77,7 +72,7 @@ final class TaxonomyLookupRepository
         $stmt->execute([':slug' => $slug]);
 
         $row = $stmt->fetch();
-        return $row === false ? null : $row;
+        return $row === false ? null : $this->hydrateTaxonomyRow('categories', $row);
     }
 
     /**
@@ -95,14 +90,8 @@ final class TaxonomyLookupRepository
                 name,
                 slug,
                 description,
-                cover_image_path,
-                cover_image_sm_path,
-                cover_image_md_path,
-                cover_image_lg_path,
-                preview_image_path,
-                preview_image_sm_path,
-                preview_image_md_path,
-                preview_image_lg_path
+                cover_image_file,
+                preview_image_file
              FROM ' . $table . '
              WHERE slug = :slug
              LIMIT 1'
@@ -110,7 +99,7 @@ final class TaxonomyLookupRepository
         $stmt->execute([':slug' => $slug]);
 
         $row = $stmt->fetch();
-        return $row === false ? null : $row;
+        return $row === false ? null : $this->hydrateTaxonomyRow('tags', $row);
     }
 
     /**
@@ -457,5 +446,21 @@ final class TaxonomyLookupRepository
     private function table(string $table): string
     {
         return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function hydrateTaxonomyRow(string $taxonomyType, array $row): array
+    {
+        $id = (int) ($row['id'] ?? 0);
+        $storage = TaxonomyImagePathResolver::storagePayloadFromRecord($taxonomyType, $row);
+        if (TaxonomyImagePathResolver::supportsFilenameStorage($taxonomyType)) {
+            $row['cover_image_file'] = $storage['cover_image_file'] ?? null;
+            $row['preview_image_file'] = $storage['preview_image_file'] ?? null;
+        }
+
+        return array_merge($row, TaxonomyImagePathResolver::pathsFromStoragePayload($taxonomyType, $id, $storage));
     }
 }

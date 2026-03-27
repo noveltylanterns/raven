@@ -89,8 +89,8 @@ final class PanelRoutingPreviewService
                 continue;
             }
 
-            $publishedAt = trim((string) ($page['published_at'] ?? ''));
-            $publishedTs = $publishedAt !== '' ? (int) strtotime($publishedAt) : 0;
+            $createdAt = trim((string) ($page['created_at'] ?? ''));
+            $publishedTs = $createdAt !== '' ? (int) strtotime($createdAt) : 0;
             if ($publishedTs < 0) {
                 $publishedTs = 0;
             }

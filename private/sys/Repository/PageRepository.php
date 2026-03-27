@@ -82,7 +82,7 @@ final class PageRepository
                   AND p.is_published = :is_published
                   AND p.slug IN (:slug_home, :slug_index)
                 ORDER BY CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
-                         p.published_at DESC
+                         p.created_at DESC
                 LIMIT 1';
 
         // CASE ordering guarantees `home` wins over `index` when both exist.
@@ -129,7 +129,7 @@ final class PageRepository
                   AND p.is_published = :is_published
                   AND p.slug IN (:slug_home, :slug_index)
                 ORDER BY CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
-                         p.published_at DESC
+                         p.created_at DESC
                 LIMIT 1';
 
         $stmt = $this->db->prepare($sql);
@@ -294,7 +294,7 @@ final class PageRepository
         }
 
         $sql .= '
-                ORDER BY COALESCE(p.published_at, p.created_at) DESC, p.id DESC
+                ORDER BY p.created_at DESC, p.id DESC
                 LIMIT :limit';
 
         $stmt = $this->db->prepare($sql);
@@ -394,7 +394,7 @@ final class PageRepository
 
         $sql .= ' AND (' . implode(' OR ', $clauses) . ')';
         $sql .= '
-                ORDER BY COALESCE(p.published_at, p.created_at) DESC, p.id DESC
+                ORDER BY p.created_at DESC, p.id DESC
                 LIMIT :limit';
 
         $stmt = $this->db->prepare($sql);
@@ -483,10 +483,10 @@ final class PageRepository
         );
 
         $stmt = $this->db->prepare(
-            'SELECT p.id, p.title, p.slug, p.is_published, p.published_at, p.channel_id
+            'SELECT p.id, p.title, p.slug, p.is_published, p.created_at, p.channel_id
              FROM ' . $pages . ' p
              WHERE ' . implode(' AND ', $where) . '
-             ORDER BY COALESCE(p.published_at, p.created_at) DESC
+             ORDER BY p.created_at DESC
              LIMIT :limit OFFSET :offset'
         );
 
@@ -564,14 +564,14 @@ final class PageRepository
                     page_rows.title,
                     page_rows.slug,
                     page_rows.is_published,
-                    page_rows.published_at,
+                    page_rows.created_at,
                     page_rows.channel_id,
                     totals.total_rows
              FROM (
-                 SELECT p.id, p.title, p.slug, p.is_published, p.published_at, p.channel_id
+                 SELECT p.id, p.title, p.slug, p.is_published, p.created_at, p.channel_id
                  FROM ' . $pages . ' p
                  WHERE ' . implode(' AND ', $pageWhere) . '
-                 ORDER BY COALESCE(p.published_at, p.created_at) DESC
+                 ORDER BY p.created_at DESC
                  LIMIT :limit OFFSET :offset
              ) AS page_rows
              CROSS JOIN (
@@ -625,7 +625,7 @@ final class PageRepository
         $pages = $this->table('pages');
 
         $stmt = $this->db->prepare(
-            'SELECT p.id, p.title, p.slug, p.is_published, p.published_at, p.channel_id
+            'SELECT p.id, p.title, p.slug, p.is_published, p.created_at, p.channel_id
              FROM ' . $pages . ' p
              ORDER BY COALESCE(p.channel_id, 0) ASC, p.slug ASC, p.id ASC'
         );
@@ -670,7 +670,7 @@ final class PageRepository
                AND p.slug IN (:slug_home, :slug_index)
              ORDER BY p.channel_id ASC,
                       CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
-                      p.published_at DESC'
+                      p.created_at DESC'
         );
         $stmt->execute([
             ':is_published' => 1,
@@ -803,9 +803,8 @@ final class PageRepository
         $id = isset($data['id']) ? (int) $data['id'] : 0;
         $title = (string) ($data['title'] ?? 'Untitled');
         $slug = (string) ($data['slug'] ?? '');
-        $content = (string) ($data['content'] ?? '');
-        $extendedBlocks = $this->normalizeExtendedBlocks($data['extended_blocks'] ?? []);
-        $extended = $this->encodeExtendedBlocks($extendedBlocks);
+        $contentBlocks = $this->normalizeContentBlocks($data['content_blocks'] ?? []);
+        $content = $this->encodeContentBlocks($contentBlocks);
         $description = (string) ($data['description'] ?? '');
         $displayTitle = !array_key_exists('display_title', $data) || !empty($data['display_title']) ? 1 : 0;
         $galleryEnabled = !empty($data['gallery_enabled']) ? 1 : 0;
@@ -815,7 +814,6 @@ final class PageRepository
             $authorUserId = null;
         }
         $now = gmdate('Y-m-d H:i:s');
-        $publishedAt = $isPublished ? ($data['published_at'] ?? $now) : null;
         $categoryIds = $this->categoryEnabled ? $this->normalizeIds($data['category_ids'] ?? []) : [];
         $tagIds = $this->tagEnabled ? $this->normalizeIds($data['tag_ids'] ?? []) : [];
 
@@ -845,14 +843,12 @@ final class PageRepository
                 'title' => $title,
                 'slug' => $slug,
                 'content' => $content,
-                'extended' => $extended,
                 'description' => $description,
                 'display_title' => $displayTitle,
                 'gallery_enabled' => $galleryEnabled,
                 'is_published' => $isPublished,
                 'author_user_id' => $authorUserId,
                 'channel_id' => $channelId,
-                'published_at' => is_scalar($publishedAt) ? (string) $publishedAt : null,
                 'now' => $now,
                 'category_ids' => $categoryIds,
                 'tag_ids' => $tagIds,
@@ -1195,16 +1191,16 @@ final class PageRepository
     }
 
     /**
-     * Hydrates page row with repeatable Extended block metadata.
+     * Hydrates page row with repeatable content-block metadata.
      *
      * @param array<string, mixed> $row
      * @return array<string, mixed>
      */
     private function hydratePageRow(array $row): array
     {
-        $rawExtended = (string) ($row['extended'] ?? '');
-        $extendedBlocks = $this->decodeExtendedBlocks($rawExtended);
-        $row['extended_blocks'] = $extendedBlocks;
+        $rawContent = (string) ($row['content'] ?? '');
+        $contentBlocks = $this->decodeContentBlocks($rawContent);
+        $row['content_blocks'] = $contentBlocks;
 
         return $row;
     }
@@ -1214,27 +1210,27 @@ final class PageRepository
      *
      * @return array<int, array{type: string, content: string, css_id: string, css_class: string}>
      */
-    private function normalizeExtendedBlocks(mixed $raw): array
+    private function normalizeContentBlocks(mixed $raw): array
     {
         return $this->bodyBlockCodec->normalizeStoredBlocks($raw);
     }
 
     /**
-     * Encodes extended blocks as JSON for DB persistence.
+     * Encodes content blocks as JSON for DB persistence.
      *
      * @param array<int, array{type: string, content: string, css_id: string, css_class: string}> $blocks
      */
-    private function encodeExtendedBlocks(array $blocks): string
+    private function encodeContentBlocks(array $blocks): string
     {
         return $this->bodyBlockCodec->encodeStoredBlocks($blocks);
     }
 
     /**
-     * Decodes stored extended JSON payload into typed body blocks.
+     * Decodes stored content JSON payload into typed body blocks.
      *
      * @return array<int, array{type: string, content: string, css_id: string, css_class: string}>
      */
-    private function decodeExtendedBlocks(string $raw): array
+    private function decodeContentBlocks(string $raw): array
     {
         return $this->bodyBlockCodec->decodeStoredBlocks($raw);
     }
