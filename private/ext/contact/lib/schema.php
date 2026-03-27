@@ -162,9 +162,9 @@ return static function (array $context): void {
                 ip_address TEXT NULL,
                 hostname TEXT NULL,
                 user_agent TEXT NULL,
-                created_at TEXT NOT NULL
+                created TEXT NOT NULL
             )');
-            $pdo->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_form_slug_created_at ON ' . $table . ' (form_slug, created_at DESC)');
+            $pdo->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_form_slug_created ON ' . $table . ' (form_slug, created DESC)');
             return;
         }
 
@@ -180,8 +180,8 @@ return static function (array $context): void {
                 ip_address VARCHAR(45) NULL,
                 hostname VARCHAR(255) NULL,
                 user_agent VARCHAR(500) NULL,
-                created_at DATETIME NOT NULL,
-                INDEX idx_' . $table . '_form_slug_created_at (form_slug, created_at)
+                created DATETIME NOT NULL,
+                INDEX idx_' . $table . '_form_slug_created (form_slug, created)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
             return;
         }
@@ -197,9 +197,9 @@ return static function (array $context): void {
             ip_address VARCHAR(45) NULL,
             hostname VARCHAR(255) NULL,
             user_agent VARCHAR(500) NULL,
-            created_at TIMESTAMP NOT NULL
+            created TIMESTAMP NOT NULL
         )');
-        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_form_slug_created_at ON ' . $table . ' (form_slug, created_at DESC)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_form_slug_created ON ' . $table . ' (form_slug, created DESC)');
     };
 
     if ($tableExists($db, $driver, $formsTable) && !$columnExists($db, $driver, $formsTable, 'form_slug')) {
@@ -227,11 +227,11 @@ return static function (array $context): void {
         $db->exec(
             'INSERT INTO ' . $submissionsTable . ' (
                 id, form_slug, sender_name, sender_email, message_text, additional_fields_json,
-                source_url, ip_address, hostname, user_agent, created_at
+                source_url, ip_address, hostname, user_agent, created
             )
             SELECT
                 id, form_slug, sender_name, sender_email, message_text, additional_fields_json,
-                source_url, ip_address, hostname, user_agent, created_at
+                source_url, ip_address, hostname, user_agent, ' . ($columnExists($db, $driver, $formsTable, 'created') ? 'created' : 'created_at') . '
             FROM ' . $formsTable
         );
         $db->exec('DROP TABLE IF EXISTS ' . $formsTable);
@@ -241,14 +241,27 @@ return static function (array $context): void {
         $db->exec(
             'INSERT INTO ' . $submissionsTable . ' (
                 id, form_slug, sender_name, sender_email, message_text, additional_fields_json,
-                source_url, ip_address, hostname, user_agent, created_at
+                source_url, ip_address, hostname, user_agent, created
             )
             SELECT
                 id, form_slug, sender_name, sender_email, message_text, additional_fields_json,
-                source_url, ip_address, hostname, user_agent, created_at
+                source_url, ip_address, hostname, user_agent, ' . ($columnExists($db, $driver, $legacySubmissionsTable, 'created') ? 'created' : 'created_at') . '
             FROM ' . $legacySubmissionsTable
         );
         $db->exec('DROP TABLE IF EXISTS ' . $legacySubmissionsTable);
+    }
+
+    if ($columnExists($db, $driver, $submissionsTable, 'created_at') && !$columnExists($db, $driver, $submissionsTable, 'created')) {
+        if ($driver === 'sqlite') {
+            $db->exec('ALTER TABLE ' . $submissionsTable . ' RENAME COLUMN created_at TO created');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $submissionsTable . '_form_slug_created_at');
+        } elseif ($driver === 'mysql') {
+            $db->exec('ALTER TABLE ' . $submissionsTable . ' CHANGE created_at created DATETIME NOT NULL');
+            $db->exec('DROP INDEX idx_' . $submissionsTable . '_form_slug_created_at ON ' . $submissionsTable);
+        } else {
+            $db->exec('ALTER TABLE ' . $submissionsTable . ' RENAME COLUMN created_at TO created');
+            $db->exec('DROP INDEX IF EXISTS idx_' . $submissionsTable . '_form_slug_created_at');
+        }
     }
 
     if (!$columnExists($db, $driver, $submissionsTable, 'additional_fields_json')) {
@@ -270,4 +283,5 @@ return static function (array $context): void {
 
     $db->exec('UPDATE ' . $submissionsTable . ' SET additional_fields_json = \'[]\' WHERE additional_fields_json IS NULL OR additional_fields_json = \'\'');
     $db->exec("UPDATE " . $submissionsTable . " SET hostname = NULL WHERE hostname = ''");
+    $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $submissionsTable . '_form_slug_created ON ' . $submissionsTable . ' (form_slug, created DESC)');
 };

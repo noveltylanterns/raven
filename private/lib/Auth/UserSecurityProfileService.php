@@ -25,6 +25,7 @@ final class UserSecurityProfileService
      *   bio: string,
      *   theme: string,
      *   avatar_path: string|null,
+     *   cover_image: string|null,
      *   contact_profiles: array<int, array{type: string, value: string}>,
      *   two_factor_methods: array<int, array<string, mixed>>
      * }
@@ -40,6 +41,9 @@ final class UserSecurityProfileService
             'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
             'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
                 ? (string) $row['avatar_path']
+                : null,
+            'cover_image' => isset($row['cover_image']) && $row['cover_image'] !== ''
+                ? (string) $row['cover_image']
                 : null,
             'contact_profiles' => $codec->decodeContactProfiles($row['contact_profiles'] ?? null),
             'two_factor_methods' => $codec->decodeTwoFactorMethods($row['two_factor_methods'] ?? null),
@@ -57,7 +61,8 @@ final class UserSecurityProfileService
      *   contact_profiles?: array<int, array{type: string, value: string}>,
      *   two_factor_methods?: array<int, array<string, mixed>>,
      *   set_avatar: bool,
-     *   avatar_path: string|null
+     *   avatar_path: string|null,
+     *   cover_image?: string|null
      * } $payload
      * @return array{
      *   username: string,
@@ -71,7 +76,8 @@ final class UserSecurityProfileService
      *   two_factor_methods: array<int, array<string, mixed>>,
      *   two_factor_methods_encoded: ?string,
      *   set_avatar: bool,
-     *   avatar_path: string|null
+     *   avatar_path: string|null,
+     *   cover_image: string|null
      * }
      */
     public function normalizePreferenceUpdatePayload(array $payload, AuthPayloadCodec $codec): array
@@ -92,6 +98,9 @@ final class UserSecurityProfileService
             'two_factor_methods_encoded' => $codec->encodeTwoFactorMethods($twoFactorMethods),
             'set_avatar' => (bool) ($payload['set_avatar'] ?? false),
             'avatar_path' => $payload['avatar_path'] ?? null,
+            'cover_image' => is_string($payload['cover_image'] ?? null)
+                ? trim((string) $payload['cover_image'])
+                : null,
         ];
     }
 

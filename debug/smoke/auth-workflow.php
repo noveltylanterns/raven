@@ -332,7 +332,51 @@ final class AuthWorkflowSmokeRunner
         $auth->clearFailedLoginAttempts($identifier, 'unknown');
         $auth->clearFailedLoginAttempts($probeIdentifier, '127.0.0.1');
         $auth->clearFailedLoginAttempts($probeIdentifier, 'unknown');
+        $this->clearDelightThrottleBuckets($app, [$identifier, $probeIdentifier]);
         $this->events[] = 'login_throttle_reset=ok';
+    }
+
+    /**
+     * @param array<string, mixed> $app
+     * @param array<int, string> $identifiers
+     */
+    private function clearDelightThrottleBuckets(array $app, array $identifiers): void
+    {
+        $authDb = $app['auth_db'] ?? null;
+        if (!$authDb instanceof \PDO) {
+            return;
+        }
+
+        $table = (string) ($app['prefix'] ?? '') . 'users_throttling';
+        $criteriaSets = [
+            ['enumerateUsers', '127.0.0.1'],
+            ['attemptToLogin', '127.0.0.1'],
+        ];
+
+        foreach ($identifiers as $identifier) {
+            $normalized = strtolower(trim($identifier));
+            if ($normalized === '') {
+                continue;
+            }
+
+            $criteriaSets[] = ['attemptToLogin', 'email', $normalized];
+            $criteriaSets[] = ['attemptToLogin', 'username', $normalized];
+        }
+
+        $stmt = $authDb->prepare('DELETE FROM ' . $table . ' WHERE bucket = :bucket');
+        foreach ($criteriaSets as $criteria) {
+            $stmt->execute([
+                ':bucket' => $this->delightThrottleBucketKey($criteria),
+            ]);
+        }
+    }
+
+    /**
+     * @param array<int, string> $criteria
+     */
+    private function delightThrottleBucketKey(array $criteria): string
+    {
+        return rtrim(strtr(base64_encode(hash('sha256', implode("\n", $criteria), true)), '+/', '-_'), '=');
     }
 
     private function loginIdentifier(): string

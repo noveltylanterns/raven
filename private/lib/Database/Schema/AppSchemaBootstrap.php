@@ -44,10 +44,10 @@ final class AppSchemaBootstrap
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $categoriesTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
                 slug TEXT NOT NULL UNIQUE,
-                "set" INTEGER NOT NULL DEFAULT 1,
+                name TEXT NOT NULL,
                 description TEXT NULL,
+                "set" INTEGER NOT NULL DEFAULT 1,
                 cover_image TEXT NULL,
                 preview_image TEXT NULL,
                 created TEXT NOT NULL,
@@ -56,10 +56,10 @@ final class AppSchemaBootstrap
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $tagsTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
                 slug TEXT NOT NULL UNIQUE,
-                "set" INTEGER NOT NULL DEFAULT 1,
+                name TEXT NOT NULL,
                 description TEXT NULL,
+                "set" INTEGER NOT NULL DEFAULT 1,
                 cover_image TEXT NULL,
                 preview_image TEXT NULL,
                 created TEXT NOT NULL,
@@ -68,9 +68,9 @@ final class AppSchemaBootstrap
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $redirectsTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                slug TEXT NOT NULL,
                 title TEXT NOT NULL,
                 description TEXT NULL,
-                slug TEXT NOT NULL,
                 channel INTEGER NULL,
                 active INTEGER NOT NULL DEFAULT 1,
                 target TEXT NOT NULL,
@@ -195,10 +195,10 @@ final class AppSchemaBootstrap
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'categories (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
                 slug VARCHAR(160) NOT NULL UNIQUE,
-                `set` BIGINT UNSIGNED NOT NULL DEFAULT 1,
+                name VARCHAR(255) NOT NULL,
                 description TEXT NULL,
+                `set` BIGINT UNSIGNED NOT NULL DEFAULT 1,
                 cover_image VARCHAR(255) NULL,
                 preview_image VARCHAR(255) NULL,
                 created DATETIME NOT NULL,
@@ -208,10 +208,10 @@ final class AppSchemaBootstrap
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'tags (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
                 slug VARCHAR(160) NOT NULL UNIQUE,
-                `set` BIGINT UNSIGNED NOT NULL DEFAULT 1,
+                name VARCHAR(255) NOT NULL,
                 description TEXT NULL,
+                `set` BIGINT UNSIGNED NOT NULL DEFAULT 1,
                 cover_image VARCHAR(255) NULL,
                 preview_image VARCHAR(255) NULL,
                 created DATETIME NOT NULL,
@@ -221,9 +221,9 @@ final class AppSchemaBootstrap
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'redirects (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                slug VARCHAR(160) NOT NULL,
                 title VARCHAR(255) NOT NULL,
                 description TEXT NULL,
-                slug VARCHAR(160) NOT NULL,
                 channel BIGINT UNSIGNED NULL,
                 active TINYINT(1) NOT NULL DEFAULT 1,
                 target VARCHAR(2048) NOT NULL,
@@ -349,10 +349,10 @@ final class AppSchemaBootstrap
 
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'categories (
             id BIGSERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
             slug VARCHAR(160) NOT NULL UNIQUE,
-            "set" BIGINT NOT NULL DEFAULT 1,
+            name VARCHAR(255) NOT NULL,
             description TEXT NULL,
+            "set" BIGINT NOT NULL DEFAULT 1,
             cover_image VARCHAR(255) NULL,
             preview_image VARCHAR(255) NULL,
             created TIMESTAMP NOT NULL,
@@ -360,10 +360,10 @@ final class AppSchemaBootstrap
         )');
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'tags (
             id BIGSERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
             slug VARCHAR(160) NOT NULL UNIQUE,
-            "set" BIGINT NOT NULL DEFAULT 1,
+            name VARCHAR(255) NOT NULL,
             description TEXT NULL,
+            "set" BIGINT NOT NULL DEFAULT 1,
             cover_image VARCHAR(255) NULL,
             preview_image VARCHAR(255) NULL,
             created TIMESTAMP NOT NULL,
@@ -371,9 +371,9 @@ final class AppSchemaBootstrap
         )');
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'redirects (
             id BIGSERIAL PRIMARY KEY,
+            slug VARCHAR(160) NOT NULL,
             title VARCHAR(255) NOT NULL,
             description TEXT NULL,
-            slug VARCHAR(160) NOT NULL,
             channel BIGINT NULL,
             active SMALLINT NOT NULL DEFAULT 1,
             target VARCHAR(2048) NOT NULL,

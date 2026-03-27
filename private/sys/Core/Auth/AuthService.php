@@ -478,6 +478,7 @@ final class AuthService
      *   bio: string,
      *   theme: string,
      *   avatar_path: string|null,
+     *   cover_image: string|null,
      *   contact_profiles: array<int, array{type: string, value: string}>,
      *   two_factor_methods: array<int, array<string, mixed>>
      * }|null
@@ -496,6 +497,7 @@ final class AuthService
                     bio,
                     theme,
                     avatar AS avatar_path,
+                    cover_image,
                     contact AS contact_profiles,
                     two_factor AS two_factor_methods
              FROM ' . $this->authTable('users') . '
@@ -537,7 +539,8 @@ final class AuthService
      *   contact_profiles?: array<int, array{type: string, value: string}>,
      *   two_factor_methods?: array<int, array<string, mixed>>,
      *   set_avatar: bool,
-     *   avatar_path: string|null
+     *   avatar_path: string|null,
+     *   cover_image?: string|null
      * } $payload
      *
      * @return array{ok: bool, errors: array<int, string>}
@@ -555,6 +558,7 @@ final class AuthService
         $twoFactorMethodsEncoded = $normalized['two_factor_methods_encoded'] ?? null;
         $setAvatar = (bool) ($normalized['set_avatar'] ?? false);
         $avatarPath = $normalized['avatar_path'] ?? null;
+        $coverImage = $normalized['cover_image'] ?? null;
 
         $errors = $this->securityProfiles->validatePreferenceUpdate(
             $email,
@@ -573,6 +577,7 @@ final class AuthService
             'email = :email',
             'bio = :bio',
             'theme = :theme',
+            'cover_image = :cover_image',
             'contact = :contact_profiles',
             'two_factor = :two_factor_methods',
         ];
@@ -583,6 +588,7 @@ final class AuthService
             ':email' => $email,
             ':bio' => $bio,
             ':theme' => $theme,
+            ':cover_image' => $coverImage,
             ':contact_profiles' => $contactProfilesEncoded,
             ':two_factor_methods' => $twoFactorMethodsEncoded,
             ':id' => $userId,

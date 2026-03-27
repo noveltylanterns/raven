@@ -97,7 +97,7 @@ final class SecuritySmokeRunner
                 'title' => 'Unauthenticated Attempt',
                 'slug' => $this->createdRedirectSlug,
                 'status' => 'active',
-                'target_url' => '/security-smoke',
+                'target' => '/security-smoke',
             ]);
             $this->assert(
                 in_array($preAuthSave['status'], [302, 303, 404], true),
@@ -169,7 +169,7 @@ final class SecuritySmokeRunner
                 'title' => 'No CSRF Redirect',
                 'slug' => $this->createdRedirectSlug,
                 'status' => 'active',
-                'target_url' => '/security-smoke',
+                'target' => '/security-smoke',
             ]);
             $this->assert(in_array($saveWithoutCsrf['status'], [302, 303], true), 'Redirect save without CSRF should redirect.');
             $afterNoCsrfRedirect = $this->findRedirectBySlug($this->createdRedirectSlug);
@@ -185,7 +185,7 @@ final class SecuritySmokeRunner
                 'title' => 'Invalid Slug Probe',
                 'slug' => '../bad<script>',
                 'status' => 'active',
-                'target_url' => '/security-smoke',
+                'target' => '/security-smoke',
             ]);
             $this->assert(in_array($saveInvalidSlug['status'], [302, 303], true), 'Invalid slug save should redirect.');
             $invalidSlugEdit = $this->request($this->root . '/panel/index.php', 'GET', $redirectEditUri);
@@ -202,7 +202,7 @@ final class SecuritySmokeRunner
                 'description' => "SQLi/XSS probe payload: ' OR 1=1 --",
                 'slug' => $this->createdRedirectSlug,
                 'status' => 'active',
-                'target_url' => '/security-smoke',
+                'target' => '/security-smoke',
             ]);
             $this->assert(in_array($savePayloadRedirect['status'], [302, 303], true), 'Payload redirect save should redirect.');
 
@@ -416,7 +416,55 @@ final class SecuritySmokeRunner
         $auth->clearFailedLoginAttempts($this->tempUsername, 'unknown');
         $auth->clearFailedLoginAttempts($probeUsername, '127.0.0.1');
         $auth->clearFailedLoginAttempts($probeUsername, 'unknown');
+        $this->clearDelightThrottleBuckets($app, [
+            $this->tempUsername,
+            $this->tempUsername . '@example.test',
+            $probeUsername,
+        ]);
         $this->events[] = 'login_throttle_reset=ok';
+    }
+
+    /**
+     * @param array<string, mixed> $app
+     * @param array<int, string> $identifiers
+     */
+    private function clearDelightThrottleBuckets(array $app, array $identifiers): void
+    {
+        $authDb = $app['auth_db'] ?? null;
+        if (!$authDb instanceof \PDO) {
+            return;
+        }
+
+        $table = (string) ($app['prefix'] ?? '') . 'users_throttling';
+        $criteriaSets = [
+            ['enumerateUsers', '127.0.0.1'],
+            ['attemptToLogin', '127.0.0.1'],
+        ];
+
+        foreach ($identifiers as $identifier) {
+            $normalized = strtolower(trim($identifier));
+            if ($normalized === '') {
+                continue;
+            }
+
+            $criteriaSets[] = ['attemptToLogin', 'email', $normalized];
+            $criteriaSets[] = ['attemptToLogin', 'username', $normalized];
+        }
+
+        $stmt = $authDb->prepare('DELETE FROM ' . $table . ' WHERE bucket = :bucket');
+        foreach ($criteriaSets as $criteria) {
+            $stmt->execute([
+                ':bucket' => $this->delightThrottleBucketKey($criteria),
+            ]);
+        }
+    }
+
+    /**
+     * @param array<int, string> $criteria
+     */
+    private function delightThrottleBucketKey(array $criteria): string
+    {
+        return rtrim(strtr(base64_encode(hash('sha256', implode("\n", $criteria), true)), '+/', '-_'), '=');
     }
 
     private function seedSessionFile(string $sessionId): void

@@ -334,6 +334,19 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
                 <?php endif; ?>
             </div>
 
+            <div class="form-group mt-3 mb-0">
+                <label for="cover_image" class="form-label">Cover Image</label>
+                <input
+                    id="cover_image"
+                    name="cover_image"
+                    type="text"
+                    class="form-control"
+                    value="<?= e((string) ($group['cover_image'] ?? '')) ?>"
+                    placeholder="/uploads/groups/cover/example.jpg"
+                >
+                <div class="form-text">Optional public image path or URL stored with this group.</div>
+            </div>
+
             <hr class="my-3">
 
             <div class="form-check mb-0">

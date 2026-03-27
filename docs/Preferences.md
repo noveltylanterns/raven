@@ -30,6 +30,7 @@ Fields/options:
 - `Panel Theme` (`<Default>`, `Corporate`, `Ice`, `Midnight`)
 - `Avatar` file upload (`gif/jpg/jpeg/png`)
 - `Remove current avatar` checkbox (shown only when avatar exists)
+- `Cover Image` optional text path/URL field
 - `Two-Factor Methods` (Security tab)
   - section label `Two-Factor Authentication`
   - `Setup App`
@@ -100,7 +101,7 @@ Declared in `panel/index.php`:
 8. Generates companion avatar thumbnails as `public/uploads/avatars/{user_id}_thumb.jpg`.
    - avatars above `120x120` are center-cropped/resized to `120x120` JPEG
    - avatars at or below `120x120` are copied as-is from sanitized original
-9. Persists changes through `AuthService::updateUserPreferences(...)`.
+9. Persists changes through `AuthService::updateUserPreferences(...)`, including optional `cover_image`.
 10. Removes superseded avatar file after successful update.
 
 ### Persistence Contract
@@ -112,6 +113,7 @@ Declared in `panel/index.php`:
 - theme update
 - plaintext `bio` update capped by config key `user.bio`
 - optional avatar path update
+- optional `cover_image` update
 - `two_factor_methods` JSON persistence for multi-method 2FA entries
 
 Returned result shape:

@@ -2661,6 +2661,7 @@ final class PanelController
             && (string) ($post['two_factor_methods_present'] ?? '') === '1';
         $submittedTwoFactorMethods = $post['two_factor_methods'] ?? null;
         $submittedTwoFactorMethodIndices = $this->normalizeSubmittedTwoFactorExistingIndices($submittedTwoFactorMethods);
+        $coverImage = $this->input->text($post['cover_image'] ?? null, 255);
         $removeAvatar = isset($post['remove_avatar']) && (string) $post['remove_avatar'] === '1';
 
         $existingUser = null;
@@ -2888,6 +2889,7 @@ final class PanelController
                 'contact_profiles' => $contactProfiles,
                 'set_avatar' => $avatarSet,
                 'avatar_path' => $avatarFilename,
+                'cover_image' => $coverImage,
             ]);
 
             if ($id === null && is_array($pendingAvatarUpload) && is_string($pendingAvatarExtension)) {
@@ -2916,6 +2918,7 @@ final class PanelController
                     'contact_profiles' => $contactProfiles,
                     'set_avatar' => true,
                     'avatar_path' => $avatarFilename,
+                    'cover_image' => $coverImage,
                 ]);
             }
         } catch (\Throwable $exception) {
@@ -3343,6 +3346,7 @@ final class PanelController
         $actorIsSuperAdmin = $this->auth->isSuperAdmin();
         $existingGroup = $id !== null ? $this->groupRepo->findById($id) : null;
         $isExistingStockGroup = is_array($existingGroup) && (int) ($existingGroup['is_stock'] ?? 0) === 1;
+        $coverImage = $this->input->text($post['cover_image'] ?? null, 255);
         $slugRaw = trim($this->input->text($post['slug'] ?? null, 160));
         $slug = '';
         if (!$isExistingStockGroup && $slugRaw !== '') {
@@ -3442,6 +3446,7 @@ final class PanelController
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
+                'cover_image' => $coverImage,
                 'route_enabled' => $routeEnabled ? 1 : 0,
                 'permission_mask' => $permissionMask,
             ]);
@@ -3607,6 +3612,7 @@ final class PanelController
             $post['two_factor_methods'] ?? null,
             (string) ($current['email'] ?? '')
         );
+        $coverImage = $this->input->text($post['cover_image'] ?? null, 255);
         $removeAvatar = isset($post['remove_avatar']) && (string) $post['remove_avatar'] === '1';
 
         $errors = [];
@@ -3710,6 +3716,7 @@ final class PanelController
             'two_factor_methods' => $twoFactorMethods,
             'set_avatar' => $avatarSet,
             'avatar_path' => $avatarFilename,
+            'cover_image' => $coverImage,
         ]);
 
         if (!$update['ok']) {

@@ -223,7 +223,7 @@ final class AggressiveSecuritySmokeRunner
             'title' => 'Aggressive CSRF Probe',
             'slug' => $slug,
             'status' => 'active',
-            'target_url' => '/csrf-probe',
+            'target' => '/csrf-probe',
         ]);
         $this->assert(in_array($tampered['status'], [302, 303], true), 'Tampered CSRF save should redirect.');
         $this->assert($this->findRedirectBySlug($slug) === null, 'Tampered CSRF save unexpectedly persisted.');
@@ -251,7 +251,7 @@ final class AggressiveSecuritySmokeRunner
                 'title' => 'Aggressive Target Probe ' . $index,
                 'slug' => $slug,
                 'status' => 'active',
-                'target_url' => $target,
+                'target' => $target,
             ]);
             $this->assert(in_array($response['status'], [302, 303], true), 'Invalid redirect target probe should redirect.');
             $this->assert($this->findRedirectBySlug($slug) === null, 'Invalid redirect target unexpectedly persisted: ' . $target);
@@ -459,7 +459,54 @@ final class AggressiveSecuritySmokeRunner
         /** @var object{clearFailedLoginAttempts: callable} $auth */
         $auth->clearFailedLoginAttempts($this->tempUsername, '127.0.0.1');
         $auth->clearFailedLoginAttempts($this->tempUsername, 'unknown');
+        $this->clearDelightThrottleBuckets($app, [
+            $this->tempUsername,
+            $this->tempUsername . '@example.test',
+        ]);
         $this->events[] = 'login_throttle_reset=ok';
+    }
+
+    /**
+     * @param array<string, mixed> $app
+     * @param array<int, string> $identifiers
+     */
+    private function clearDelightThrottleBuckets(array $app, array $identifiers): void
+    {
+        $authDb = $app['auth_db'] ?? null;
+        if (!$authDb instanceof \PDO) {
+            return;
+        }
+
+        $table = (string) ($app['prefix'] ?? '') . 'users_throttling';
+        $criteriaSets = [
+            ['enumerateUsers', '127.0.0.1'],
+            ['attemptToLogin', '127.0.0.1'],
+        ];
+
+        foreach ($identifiers as $identifier) {
+            $normalized = strtolower(trim($identifier));
+            if ($normalized === '') {
+                continue;
+            }
+
+            $criteriaSets[] = ['attemptToLogin', 'email', $normalized];
+            $criteriaSets[] = ['attemptToLogin', 'username', $normalized];
+        }
+
+        $stmt = $authDb->prepare('DELETE FROM ' . $table . ' WHERE bucket = :bucket');
+        foreach ($criteriaSets as $criteria) {
+            $stmt->execute([
+                ':bucket' => $this->delightThrottleBucketKey($criteria),
+            ]);
+        }
+    }
+
+    /**
+     * @param array<int, string> $criteria
+     */
+    private function delightThrottleBucketKey(array $criteria): string
+    {
+        return rtrim(strtr(base64_encode(hash('sha256', implode("\n", $criteria), true)), '+/', '-_'), '=');
     }
 
     private function seedSessionFile(string $sessionId): void

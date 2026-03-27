@@ -132,6 +132,9 @@ final class AuthSchemaBuilder
                     $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN avatar VARCHAR(255) NULL');
                 }
             }
+            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'cover_image')) {
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN cover_image VARCHAR(255) NULL');
+            }
 
             if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'contact')) {
                 if ($this->introspector->authColumnExistsMySql($db, $usersTable, 'contact_profiles')) {
@@ -175,6 +178,9 @@ final class AuthSchemaBuilder
             } else {
                 $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN avatar VARCHAR(255) NULL');
             }
+        }
+        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'cover_image')) {
+            $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN cover_image VARCHAR(255) NULL');
         }
 
         if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'contact')) {
@@ -308,6 +314,7 @@ final class AuthSchemaBuilder
     {
         $hasNewColumns = $this->introspector->authColumnExistsSqlite($db, $usersTable, 'name')
             && $this->introspector->authColumnExistsSqlite($db, $usersTable, 'avatar')
+            && $this->introspector->authColumnExistsSqlite($db, $usersTable, 'cover_image')
             && $this->introspector->authColumnExistsSqlite($db, $usersTable, 'contact')
             && $this->introspector->authColumnExistsSqlite($db, $usersTable, 'two_factor')
             && $this->introspector->authColumnExistsSqlite($db, $usersTable, 'bio');
@@ -339,13 +346,14 @@ final class AuthSchemaBuilder
                 bio TEXT NULL,
                 theme TEXT NOT NULL DEFAULT \'default\',
                 avatar TEXT NULL,
+                cover_image TEXT NULL,
                 contact TEXT NULL,
                 two_factor TEXT NULL
             )');
             $db->exec(
                 'INSERT INTO ' . $tmpTable . ' (
                     id, email, password, username, status, verified, resettable, roles_mask, registered, last_login, force_logout,
-                    name, bio, theme, avatar, contact, two_factor
+                    name, bio, theme, avatar, cover_image, contact, two_factor
                  )
                  SELECT
                     id,
@@ -363,6 +371,7 @@ final class AuthSchemaBuilder
                     ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'bio') ? 'bio' : 'NULL') . ',
                     COALESCE(theme, \'default\'),
                     ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'avatar') ? 'avatar' : 'avatar_path') . ',
+                    ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'cover_image') ? 'cover_image' : 'NULL') . ',
                     ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'contact') ? 'contact' : 'contact_profiles') . ',
                     ' . ($this->introspector->authColumnExistsSqlite($db, $usersTable, 'two_factor') ? 'two_factor' : 'two_factor_methods') . '
                  FROM ' . $usersTable

@@ -32,6 +32,7 @@ $usernameRequiredForAuth = $loginIdentifierMode === 'username';
 $avatarPath = isset($preferences['avatar_path']) && is_string($preferences['avatar_path'])
     ? $preferences['avatar_path']
     : null;
+$coverImage = trim((string) ($preferences['cover_image'] ?? ''));
 $avatarFilename = is_string($avatarPath) ? basename($avatarPath) : '';
 $avatarBase = (string) pathinfo($avatarFilename, PATHINFO_FILENAME);
 $avatarThumbFilename = $avatarBase !== '' ? $avatarBase . '_thumb.jpg' : $avatarFilename;
@@ -1680,6 +1681,19 @@ $themeLabels = [
                         <label class="form-check-label" for="remove_avatar">Remove current avatar</label>
                     </div>
                 <?php endif; ?>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label h3" for="cover_image">Cover Image</label>
+                <input
+                    id="cover_image"
+                    name="cover_image"
+                    type="text"
+                    class="form-control"
+                    value="<?= e($coverImage) ?>"
+                    placeholder="/uploads/users/cover/example.jpg"
+                >
+                <div class="form-text">Optional public image path or URL stored with your profile.</div>
             </div>
 
             <div class="form-group mb-0">

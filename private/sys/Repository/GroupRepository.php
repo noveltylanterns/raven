@@ -374,7 +374,7 @@ final class GroupRepository
      * Stock-group slugs are immutable; stock names are editable.
      * Stock flag cannot be changed through normal save flow.
      *
-     * @param array{id: int|null, name: string, slug?: string, description?: string, route_enabled?: int|bool, permission_mask?: int, permissions?: int} $data
+     * @param array{id: int|null, name: string, slug?: string, description?: string, cover_image?: string|null, route_enabled?: int|bool, permission_mask?: int, permissions?: int} $data
      */
     public function save(array $data): int
     {
@@ -383,6 +383,8 @@ final class GroupRepository
         $id = $data['id'] ?? null;
         $name = trim($data['name']);
         $description = trim((string) ($data['description'] ?? ''));
+        $coverImage = trim((string) ($data['cover_image'] ?? ''));
+        $coverImage = $coverImage !== '' ? $coverImage : null;
         $slugInput = trim((string) ($data['slug'] ?? ''));
         $slug = $this->rolePolicy->normalizeSlug($slugInput !== '' ? $slugInput : $name);
         $mask = (int) ($data['permissions'] ?? $data['permission_mask'] ?? 0);
@@ -428,6 +430,7 @@ final class GroupRepository
                  SET name = :name,
                      slug = :slug,
                      description = :description,
+                     cover_image = :cover_image,
                      route = :route_enabled,
                      permissions = :permission_mask,
                      updated = :updated
@@ -437,6 +440,7 @@ final class GroupRepository
                 ':name' => $name,
                 ':slug' => $slug,
                 ':description' => $description !== '' ? $description : null,
+                ':cover_image' => $coverImage,
                 ':route_enabled' => $routeEnabled,
                 ':permission_mask' => $mask,
                 ':updated' => $now,
@@ -474,7 +478,7 @@ final class GroupRepository
             ':description' => $description !== '' ? $description : null,
             ':route' => $routeEnabled,
             ':permissions' => $mask,
-            ':cover_image' => null,
+            ':cover_image' => $coverImage,
             ':created' => $now,
             ':updated' => $now,
         ]);

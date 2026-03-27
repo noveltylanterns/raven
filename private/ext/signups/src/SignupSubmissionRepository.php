@@ -48,6 +48,7 @@ final class SignupSubmissionRepository
      *   ip_address: string|null,
      *   hostname?: string|null,
      *   user_agent: string|null,
+     *   created?: string,
      *   created_at?: string
      * } $data
      */
@@ -80,14 +81,14 @@ final class SignupSubmissionRepository
             throw new RuntimeException('That email is already signed up for this signup sheet.');
         }
 
-        $createdAt = $this->normalizeCreatedAt((string) ($data['created_at'] ?? ''));
+        $createdAt = $this->normalizeCreatedAt((string) ($data['created'] ?? $data['created_at'] ?? ''));
 
         try {
             $stmt = $this->db->prepare(
                 'INSERT INTO ' . $table . '
-                 (form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at)
+                 (form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created)
                  VALUES
-                 (:form_slug, :email, :display_name, :country, :additional_fields_json, :source_url, :ip_address, :hostname, :user_agent, :created_at)'
+                 (:form_slug, :email, :display_name, :country, :additional_fields_json, :source_url, :ip_address, :hostname, :user_agent, :created)'
             );
             $stmt->execute([
                 ':form_slug' => $formSlug,
@@ -99,7 +100,7 @@ final class SignupSubmissionRepository
                 ':ip_address' => $ipAddress,
                 ':hostname' => $hostname,
                 ':user_agent' => $userAgent,
-                ':created_at' => $createdAt,
+                ':created' => $createdAt,
             ]);
         } catch (PDOException $exception) {
             if ($this->isUniqueConstraintError($exception)) {
@@ -147,7 +148,7 @@ final class SignupSubmissionRepository
     {
         $table = $this->table('signups');
 
-        $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+        $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created AS created_at
                 FROM ' . $table . '
                 WHERE form_slug = :form_slug';
         $params = [
@@ -155,7 +156,7 @@ final class SignupSubmissionRepository
         ];
 
         $sql .= $this->searchClause($search, $params);
-        $sql .= ' ORDER BY created_at DESC, id DESC
+        $sql .= ' ORDER BY created DESC, id DESC
                   LIMIT :limit OFFSET :offset';
 
         try {
@@ -210,11 +211,11 @@ final class SignupSubmissionRepository
                        page_rows.created_at,
                        totals.total_rows
                 FROM (
-                    SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+                    SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created AS created_at
                     FROM ' . $table . '
                     WHERE form_slug = :page_form_slug'
                     . $pageSearchClause
-                    . ' ORDER BY created_at DESC, id DESC
+                    . ' ORDER BY created DESC, id DESC
                     LIMIT :limit OFFSET :offset
                 ) AS page_rows
                 CROSS JOIN (
@@ -273,7 +274,7 @@ final class SignupSubmissionRepository
     {
         $table = $this->table('signups');
 
-        $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created_at
+        $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created AS created_at
                 FROM ' . $table . '
                 WHERE form_slug = :form_slug';
         $params = [
@@ -281,7 +282,7 @@ final class SignupSubmissionRepository
         ];
 
         $sql .= $this->searchClause($search, $params);
-        $sql .= ' ORDER BY created_at DESC, id DESC';
+        $sql .= ' ORDER BY created DESC, id DESC';
 
         try {
             $stmt = $this->db->prepare($sql);

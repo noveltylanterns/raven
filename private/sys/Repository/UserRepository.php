@@ -67,7 +67,7 @@ final class UserRepository
         $usersTable = $this->authTable('users');
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, name AS display_name, email, theme, avatar AS avatar_path
+            'SELECT id, username, name AS display_name, email, theme, avatar AS avatar_path, cover_image
              FROM ' . $usersTable . '
              ORDER BY id ASC'
         );
@@ -99,6 +99,7 @@ final class UserRepository
                     u.email,
                     u.theme,
                     u.avatar AS avatar_path,
+                    u.cover_image,
                     g.name AS group_name,
                     g.permissions AS group_permission_mask
              FROM ' . $users . ' u
@@ -130,6 +131,9 @@ final class UserRepository
                     'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
                     'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
                         ? (string) $row['avatar_path']
+                        : null,
+                    'cover_image' => isset($row['cover_image']) && $row['cover_image'] !== ''
+                        ? (string) $row['cover_image']
                         : null,
                 ];
             }
@@ -262,6 +266,7 @@ final class UserRepository
                     bio,
                     theme,
                     avatar AS avatar_path,
+                    cover_image,
                     contact AS contact_profiles
              FROM ' . $usersTable . '
              WHERE id = :id
@@ -285,6 +290,9 @@ final class UserRepository
             'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
             'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
                 ? (string) $row['avatar_path']
+                : null,
+            'cover_image' => isset($row['cover_image']) && $row['cover_image'] !== ''
+                ? (string) $row['cover_image']
                 : null,
             'contact_profiles' => $this->decodeContactProfiles($row['contact_profiles'] ?? null),
             'group_ids' => $groupIds,
@@ -321,6 +329,7 @@ final class UserRepository
                     u.bio,
                     u.theme,
                     u.avatar AS avatar_path,
+                    u.cover_image,
                     u.contact AS contact_profiles,
                     g.id AS group_id,
                     g.name AS group_name,
@@ -379,6 +388,9 @@ final class UserRepository
                 'theme' => (string) (($first['theme'] ?? '') !== '' ? $first['theme'] : 'default'),
                 'avatar_path' => isset($first['avatar_path']) && $first['avatar_path'] !== ''
                     ? (string) $first['avatar_path']
+                    : null,
+                'cover_image' => isset($first['cover_image']) && $first['cover_image'] !== ''
+                    ? (string) $first['cover_image']
                     : null,
                 'contact_profiles' => $this->decodeContactProfiles($first['contact_profiles'] ?? null),
                 'group_ids' => array_values($selectedGroupIds),
@@ -556,7 +568,8 @@ final class UserRepository
      *   group_ids: array<int>,
      *   contact_profiles?: array<int, array{type: string, value: string}>,
      *   set_avatar?: bool,
-     *   avatar_path?: string|null
+     *   avatar_path?: string|null,
+     *   cover_image?: string|null
      * } $data
      */
     public function save(array $data): int
@@ -573,6 +586,8 @@ final class UserRepository
         $contactProfilesEncoded = $this->encodeContactProfiles($contactProfiles);
         $setAvatar = (bool) ($data['set_avatar'] ?? false);
         $avatarPath = isset($data['avatar_path']) && is_string($data['avatar_path']) ? $data['avatar_path'] : null;
+        $coverImage = isset($data['cover_image']) && is_string($data['cover_image']) ? trim($data['cover_image']) : '';
+        $coverImage = $coverImage !== '' ? $coverImage : null;
 
         return $this->userPersistenceService->saveUser(
             $this->authDb,
@@ -591,6 +606,7 @@ final class UserRepository
                 'contact_profiles' => $contactProfilesEncoded,
                 'set_avatar' => $setAvatar,
                 'avatar_path' => $avatarPath,
+                'cover_image' => $coverImage,
             ],
             function (int $userId, int $groupId): void {
                 $this->attachUserToGroup($userId, $groupId);

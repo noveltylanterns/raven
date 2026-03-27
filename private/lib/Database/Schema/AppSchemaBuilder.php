@@ -1180,6 +1180,17 @@ final class AppSchemaBuilder
             }
         }
         if ($hasNewColumns && !$hasLegacyColumns) {
+            foreach ($legacyTables as $candidateTable) {
+                if ($candidateTable === '' || $candidateTable === $table) {
+                    continue;
+                }
+
+                $db->exec('DROP INDEX IF EXISTS uniq_' . $candidateTable . '_bucket_hash');
+                $db->exec('DROP INDEX IF EXISTS idx_' . $candidateTable . '_locked_until');
+                $db->exec('DROP INDEX IF EXISTS idx_' . $candidateTable . '_last_failed_at');
+                $db->exec('DROP INDEX IF EXISTS idx_' . $candidateTable . '_last_failed');
+                $db->exec('DROP TABLE IF EXISTS ' . $candidateTable);
+            }
             return;
         }
 

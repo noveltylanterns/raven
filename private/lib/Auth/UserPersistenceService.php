@@ -25,7 +25,8 @@ final class UserPersistenceService
      *   group_ids: array<int>,
      *   contact_profiles: string|null,
      *   set_avatar: bool,
-     *   avatar_path: string|null
+     *   avatar_path: string|null,
+     *   cover_image?: string|null
      * } $data
      */
     public function saveUser(
@@ -49,6 +50,8 @@ final class UserPersistenceService
             : null;
         $setAvatar = (bool) ($data['set_avatar'] ?? false);
         $avatarPath = isset($data['avatar_path']) && is_string($data['avatar_path']) ? $data['avatar_path'] : null;
+        $coverImage = isset($data['cover_image']) && is_string($data['cover_image']) ? trim($data['cover_image']) : '';
+        $coverImage = $coverImage !== '' ? $coverImage : null;
 
         if ($email === '') {
             throw new RuntimeException('Email is required.');
@@ -73,6 +76,7 @@ final class UserPersistenceService
                 'email = :email',
                 'bio = :bio',
                 'theme = :theme',
+                'cover_image = :cover_image',
                 'contact = :contact_profiles',
             ];
 
@@ -83,6 +87,7 @@ final class UserPersistenceService
                 ':email' => $email,
                 ':bio' => $bio,
                 ':theme' => $theme,
+                ':cover_image' => $coverImage,
                 ':contact_profiles' => $contactProfilesEncoded,
             ];
 
@@ -128,6 +133,7 @@ final class UserPersistenceService
             ':bio' => $bio,
             ':theme' => $theme,
             ':avatar_path' => $setAvatar ? $avatarPath : null,
+            ':cover_image' => $coverImage,
             ':contact_profiles' => $contactProfilesEncoded,
             ':status' => 0,
             ':verified' => 1,
@@ -282,8 +288,8 @@ final class UserPersistenceService
     private function insertUserAndReturnId(PDO $authDb, string $usersTable, array $params): int
     {
         $sql = 'INSERT INTO ' . $usersTable . '
-            (email, password, username, name, bio, theme, avatar, contact, status, verified, resettable, roles_mask, registered, last_login, force_logout)
-            VALUES (:email, :password, :username, :display_name, :bio, :theme, :avatar_path, :contact_profiles, :status, :verified, :resettable, :roles_mask, :registered, :last_login, :force_logout)';
+            (email, password, username, name, bio, theme, avatar, cover_image, contact, status, verified, resettable, roles_mask, registered, last_login, force_logout)
+            VALUES (:email, :password, :username, :display_name, :bio, :theme, :avatar_path, :cover_image, :contact_profiles, :status, :verified, :resettable, :roles_mask, :registered, :last_login, :force_logout)';
 
         $driver = strtolower((string) $authDb->getAttribute(PDO::ATTR_DRIVER_NAME));
         if ($driver === 'pgsql') {

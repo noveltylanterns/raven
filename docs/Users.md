@@ -79,6 +79,8 @@ Fields/options:
 - `Avatar`
   - file upload (`gif/jpg/jpeg/png`)
   - optional `Remove current avatar` checkbox when avatar exists
+- `Cover Image`
+  - optional text path/URL field on the Profile tab
 - `Group Memberships` (multi-select checkboxes)
 - `Two-Factor Methods` (existing users)
   - read-only method entries with `Type`, `Label`, and `Details`
@@ -202,6 +204,7 @@ Public routes (declared in `public/index.php`):
   - enforces unique username/email
   - persists plaintext `bio` with the max length capped by config key `user.bio`
   - hashes password when provided
+  - persists optional `cover_image`
   - updates avatar path when `set_avatar` is true
   - writes Delight-compatible auth fields on create
   - replaces group memberships via `setUserGroups(...)`

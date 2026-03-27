@@ -53,6 +53,8 @@ Fields/options:
 - `Slug`
   - Editable for custom groups.
   - Read-only and disabled for stock groups.
+- `Cover Image`
+  - optional text path/URL field on the Basic tab
 - `Permissions & Routing`:
   - Public permission checkboxes
   - Panel permission checkboxes
@@ -130,6 +132,7 @@ All state-changing routes use CSRF validation.
   - create/update in one method
   - stock slugs immutable
   - reserved stock slugs blocked for new custom groups
+  - persists optional `cover_image`
   - role-specific permission normalization enforced server-side
 - `deleteById(...)`:
   - rejects stock groups
