@@ -212,7 +212,7 @@ final class ChannelRepository
     /**
      * Returns minimal channel options for panel select controls.
      *
-     * @return array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>
+     * @return array<int, array{id: int, name: string, slug: string, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, route_mode: string, route_separator: string}>
      */
     public function listOptions(): array
     {
@@ -226,6 +226,8 @@ final class ChannelRepository
                 'id' => (int) ($channel['id'] ?? 0),
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
+                'category_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($channel['category_sets'] ?? ['all']),
+                'tag_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($channel['tag_sets'] ?? ['all']),
                 'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
                 'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
                 'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),
@@ -247,7 +249,7 @@ final class ChannelRepository
     /**
      * Returns channel options for routing diagnostics, including the stock root channel.
      *
-     * @return array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>
+     * @return array<int, array{id: int, name: string, slug: string, feed_enabled: bool, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, route_mode: string, route_separator: string}>
      */
     public function listRoutingOptions(): array
     {
@@ -258,6 +260,8 @@ final class ChannelRepository
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
                 'feed_enabled' => (bool) ($channel['feed_enabled'] ?? false),
+                'category_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($channel['category_sets'] ?? ['all']),
+                'tag_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($channel['tag_sets'] ?? ['all']),
                 'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
                 'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
                 'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),
@@ -340,6 +344,8 @@ final class ChannelRepository
      *   slug: string,
      *   description: string,
      *   feed_enabled?: bool,
+     *   category_sets?: array<int, int|string>,
+     *   tag_sets?: array<int, int|string>,
      *   editor_override?: string,
      *   route_mode?: string,
      *   route_separator?: string
@@ -381,6 +387,12 @@ final class ChannelRepository
         $feedEnabled = array_key_exists('feed_enabled', $data)
             ? ChannelRecordPolicy::normalizeFeedEnabled($data['feed_enabled'])
             : ChannelRecordPolicy::normalizeFeedEnabled($currentRaw['feed_enabled'] ?? false);
+        $categorySets = array_key_exists('category_sets', $data)
+            ? ChannelRecordPolicy::normalizeTaxonomySetSelection($data['category_sets'])
+            : ChannelRecordPolicy::normalizeTaxonomySetSelection($currentRaw['category_sets'] ?? ['all']);
+        $tagSets = array_key_exists('tag_sets', $data)
+            ? ChannelRecordPolicy::normalizeTaxonomySetSelection($data['tag_sets'])
+            : ChannelRecordPolicy::normalizeTaxonomySetSelection($currentRaw['tag_sets'] ?? ['all']);
         $createdAt = trim((string) ($currentRaw['created_at'] ?? ''));
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
@@ -392,6 +404,8 @@ final class ChannelRepository
             'slug' => $slug,
             'description' => $description,
             'feed_enabled' => $feedEnabled,
+            'category_sets' => $categorySets,
+            'tag_sets' => $tagSets,
             'editor_override' => $editorOverride,
             'route_mode' => $routeMode,
             'route_separator' => $routeSeparator,
@@ -420,6 +434,21 @@ final class ChannelRepository
 
         $this->channelsCache = null;
         return $channelId;
+    }
+
+    public function countExplicitTaxonomySetAssignments(string $kind, int $setId): int
+    {
+        $field = strtolower(trim($kind)) === 'tag' ? 'tag_sets' : 'category_sets';
+        $count = 0;
+
+        foreach ($this->listRecords() as $record) {
+            $selection = ChannelRecordPolicy::normalizeTaxonomySetSelection($record[$field] ?? ['all']);
+            if (in_array($setId, $selection, true)) {
+                $count++;
+            }
+        }
+
+        return $count;
     }
 
     /**
@@ -456,6 +485,12 @@ final class ChannelRepository
             'description' => (string) ($record['description'] ?? ''),
             'feed_enabled' => ChannelRecordPolicy::normalizeFeedEnabled(
                 $currentRaw['feed_enabled'] ?? ($record['feed_enabled'] ?? false)
+            ),
+            'category_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection(
+                $currentRaw['category_sets'] ?? ($record['category_sets'] ?? ['all'])
+            ),
+            'tag_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection(
+                $currentRaw['tag_sets'] ?? ($record['tag_sets'] ?? ['all'])
             ),
             'editor_override' => (string) ($record['editor_override'] ?? 'inherit'),
             'route_mode' => (string) ($record['route_mode'] ?? 'inherit'),

@@ -17,8 +17,11 @@ Maintenance note: keep this file updated whenever tag structure, tag routes, or 
 What you can do:
 
 - `New Tag` (top and bottom action bars): opens create form.
+- `Manage Sets` (top and bottom action bars): opens tag set management.
 - `Delete Selected` (top and bottom action bars): deletes checked rows after confirmation.
 - `Search` filter: filters rows by `ID`, `Title`, or `Slug` as you type.
+- `All Sets` option in the `Set` filter: clears the set-specific list filter and shows every tag.
+- `Set` filter: narrows the list to one tag set.
 - Row checkbox: marks a tag for bulk delete.
 - Clickable table headers (`ID`, `Title`, `Slug`, `Pages`): client-side sort.
 - Row `Edit` button (pencil icon): opens tag editor.
@@ -29,8 +32,18 @@ Columns shown:
 - `ID`
 - `Title`
 - `Slug`
+- `Set`
 - `Pages` (count of linked pages)
 - `Actions`
+
+### Tag Sets (`/tag/set`)
+
+What you can do:
+
+- `New Tag Set`: creates a reusable set for channel assignment.
+- `Edit` row action: opens the set editor.
+- `Delete` row action: removes a non-stock set when no tags or explicit channel assignments still use it.
+- Stock `Default Set` `#0` is always present and cannot be deleted.
 
 ### Tag Editor (`/tag/edit` and `/tag/edit/{id}`)
 
@@ -44,6 +57,7 @@ Fields/options:
 
 - `Name` (required)
 - `Slug` (required)
+- `Set` (required, defaults to `Default Set` `#0`)
 - `Description` (optional)
 - `Cover Image` (optional, single file)
 - `Preview Image` (optional, single file)
@@ -81,6 +95,11 @@ Declared in `panel/index.php`:
 - `GET /tag/edit/{id}` -> edit form
 - `POST /tag/save` -> create/update
 - `POST /tag/delete` -> delete (single or bulk)
+- `GET /tag/set` -> set list
+- `GET /tag/set/edit` -> set create form
+- `GET /tag/set/edit/{id}` -> set edit form
+- `POST /tag/set/save` -> set create/update
+- `POST /tag/set/delete` -> set delete
 
 All state-changing routes use CSRF validation.
 
@@ -90,14 +109,14 @@ All state-changing routes use CSRF validation.
 
 - `tagList()`
   - Requires login + `Manage Taxonomy` permission.
-  - Renders list with `TagRepository::listAll()`.
+  - Supports optional `?set={id}` filtering and renders set-aware rows from `TagRepository::listPageForPanel(...)`.
 - `tagEdit(?int $id)`
   - Loads existing row when id is provided.
   - Missing id row triggers flash error + redirect to `/tag`.
 - `tagSave(array $post, array $files = [])`
   - Validates CSRF.
-  - Sanitizes/normalizes `id`, `name`, `slug`, `description` via `InputSanitizer`.
-  - Requires non-empty `name` and valid `slug`.
+  - Sanitizes/normalizes `id`, `name`, `slug`, `set_id`, `description` via `InputSanitizer`.
+  - Requires non-empty `name`, valid `slug`, and valid set id.
   - Saves text fields via `TagRepository::save(...)`.
   - Processes optional `cover_image` and `preview_image` uploads (single-file each), optional remove flags, and writes image-path columns via `TagRepository::updateImagePaths(...)`.
   - Upload files/variants are stored under `public/uploads/tags/{id}/` using configured `media.images.*` rules.
@@ -106,12 +125,16 @@ All state-changing routes use CSRF validation.
   - Supports single delete (`id`) and bulk delete (`selected_ids[]`).
   - Removes associated stored cover/preview image files for deleted tags.
   - Reports deleted/failed counts for bulk operations.
+- `tagSetList()`, `tagSetEdit()`, `tagSetSave()`, `tagSetDelete()`
+  - Manage file-backed tag sets under `private/dat/tag-set/`.
+  - Block deleting the stock `Default Set`, sets with assigned tags, or sets still explicitly assigned to channels.
 
 ### Data Model And Repository Behavior
 
 `TagRepository` behavior:
 
 - `listAll()` returns tags with page counts via `page_tags` join.
+- Tag rows persist numeric `set_id` membership in the database for fast channel/page filtering.
 - `save(...)` handles create/update in one method.
 - `updateImagePaths(...)` persists cover/preview source + variant paths.
 - `deleteById(...)` runs in a transaction:
@@ -122,6 +145,7 @@ Storage detail:
 
 - SQLite mode uses attached database aliases (`tags.tags`, `main.page_tags`).
 - Non-SQLite mode uses configured table prefix.
+- Tag set definitions live in `private/dat/tag-set/{id}.php` and always include the stock `Default Set` `#0`.
 
 ### Public Routing Touchpoints
 

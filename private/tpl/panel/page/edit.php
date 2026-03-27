@@ -590,6 +590,8 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                     data-rvn-channel-editor-override="<?= e($channelEditorOverride) ?>"
                                     data-rvn-channel-route-mode="<?= e($channelRouteMode) ?>"
                                     data-rvn-channel-route-separator="<?= e($channelUrlSeparator) ?>"
+                                    data-rvn-channel-category-sets="<?= e(implode(',', array_map('strval', is_array($channel['category_sets'] ?? null) ? $channel['category_sets'] : ['all']))) ?>"
+                                    data-rvn-channel-tag-sets="<?= e(implode(',', array_map('strval', is_array($channel['tag_sets'] ?? null) ? $channel['tag_sets'] : ['all']))) ?>"
                                     <?= $selectedChannelSlug === $slug ? ' selected' : '' ?>
                                 >
                                     <?= e((string) ($channel['name'] ?? $slug)) ?> (<?= e($slug) ?>)
@@ -603,7 +605,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                         <label class="form-label" for="add-category-button">Categories</label>
                         <div class="d-flex flex-wrap align-items-center gap-2" data-rvn-chip-list="category">
                             <?php foreach ($categoryOptionsSelected as $category): ?>
-                                <span class="badge text-bg-primary d-inline-flex align-items-center gap-2" data-rvn-chip-id="<?= (int) $category['id'] ?>">
+                                <span class="badge text-bg-primary d-inline-flex align-items-center gap-2" data-rvn-chip-id="<?= (int) $category['id'] ?>" data-rvn-chip-set-id="<?= (int) ($category['set_id'] ?? 0) ?>">
                                     <span><?= e((string) $category['name']) ?></span>
                                     <button type="button" class="btn btn-sm p-0 border-0 text-white" data-rvn-chip-remove="category" aria-label="Remove category">&times;</button>
                                     <input type="hidden" name="category_ids[]" value="<?= (int) $category['id'] ?>">
@@ -631,6 +633,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                                     data-rvn-add-chip="category"
                                                     data-rvn-option-id="<?= $categoryId ?>"
                                                     data-rvn-option-label="<?= e($categoryName) ?>"
+                                                    data-rvn-option-set-id="<?= (int) ($categoryOption['set_id'] ?? 0) ?>"
                                                 >
                                                     <?= e($categoryName) ?><?= $categorySlug !== '' ? ' (' . e($categorySlug) . ')' : '' ?>
                                                 </button>
@@ -649,7 +652,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                         <label class="form-label" for="add-tag-button">Tags</label>
                         <div class="d-flex flex-wrap align-items-center gap-2" data-rvn-chip-list="tag">
                             <?php foreach ($tagOptionsSelected as $tag): ?>
-                                <span class="badge text-bg-secondary d-inline-flex align-items-center gap-2" data-rvn-chip-id="<?= (int) $tag['id'] ?>">
+                                <span class="badge text-bg-secondary d-inline-flex align-items-center gap-2" data-rvn-chip-id="<?= (int) $tag['id'] ?>" data-rvn-chip-set-id="<?= (int) ($tag['set_id'] ?? 0) ?>">
                                     <span><?= e((string) $tag['name']) ?></span>
                                     <button type="button" class="btn btn-sm p-0 border-0 text-white" data-rvn-chip-remove="tag" aria-label="Remove tag">&times;</button>
                                     <input type="hidden" name="tag_ids[]" value="<?= (int) $tag['id'] ?>">
@@ -677,6 +680,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                                     data-rvn-add-chip="tag"
                                                     data-rvn-option-id="<?= $tagId ?>"
                                                     data-rvn-option-label="<?= e($tagName) ?>"
+                                                    data-rvn-option-set-id="<?= (int) ($tagOption['set_id'] ?? 0) ?>"
                                                 >
                                                     <?= e($tagName) ?><?= $tagSlug !== '' ? ' (' . e($tagSlug) . ')' : '' ?>
                                                 </button>
@@ -1857,11 +1861,12 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
       });
     }
 
-    function createChip(id, label) {
+    function createChip(id, label, setId) {
       // Chip markup includes remove button + hidden input for form persistence.
       var chip = document.createElement('span');
       chip.className = 'badge ' + badgeClass + ' d-inline-flex align-items-center gap-2';
       chip.setAttribute('data-rvn-chip-id', id);
+      chip.setAttribute('data-rvn-chip-set-id', String(setId || '0'));
 
       var labelNode = document.createElement('span');
       labelNode.textContent = label;
@@ -1901,6 +1906,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
       button.addEventListener('click', function () {
         var id = String(button.getAttribute('data-rvn-option-id') || '');
         var label = String(button.getAttribute('data-rvn-option-label') || '');
+        var setId = String(button.getAttribute('data-rvn-option-set-id') || '0');
         if (id === '' || label === '') {
           return;
         }
@@ -1909,19 +1915,57 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
           return;
         }
 
-        chipList.insertBefore(createChip(id, label), chipList.querySelector('.dropdown'));
+        chipList.insertBefore(createChip(id, label, setId), chipList.querySelector('.dropdown'));
         syncDropdown();
       });
     });
 
     syncDropdown();
+
+    return {
+      syncAllowedSets: function (selectionValue) {
+        var normalized = String(selectionValue || '').trim().toLowerCase();
+        var allowAll = normalized === '' || normalized === 'all';
+        var allowed = new Set();
+        if (!allowAll) {
+          normalized.split(',').forEach(function (part) {
+            var value = String(part || '').trim();
+            if (value !== '') {
+              allowed.add(value);
+            }
+          });
+        }
+
+        picker.querySelectorAll('[data-rvn-add-chip="' + kind + '"]').forEach(function (button) {
+          if (!(button instanceof HTMLElement) || !(button.parentElement instanceof HTMLElement)) {
+            return;
+          }
+
+          var optionSetId = String(button.getAttribute('data-rvn-option-set-id') || '0');
+          button.parentElement.classList.toggle('d-none', !(allowAll || allowed.has(optionSetId)));
+        });
+
+        chipList.querySelectorAll('[data-rvn-chip-id]').forEach(function (chip) {
+          if (!(chip instanceof HTMLElement)) {
+            return;
+          }
+
+          var chipSetId = String(chip.getAttribute('data-rvn-chip-set-id') || '0');
+          if (!allowAll && !allowed.has(chipSetId)) {
+            chip.remove();
+          }
+        });
+
+        syncDropdown();
+      }
+    };
   }
 
   <?php if ($categoryEnabled): ?>
-  initRavenChipPicker('category', 'category_ids[]', 'text-bg-primary', 'category');
+  var ravenCategoryChipPicker = initRavenChipPicker('category', 'category_ids[]', 'text-bg-primary', 'category');
   <?php endif; ?>
   <?php if ($tagEnabled): ?>
-  initRavenChipPicker('tag', 'tag_ids[]', 'text-bg-secondary', 'tag');
+  var ravenTagChipPicker = initRavenChipPicker('tag', 'tag_ids[]', 'text-bg-secondary', 'tag');
   <?php endif; ?>
 
   var ravenGalleryItems = <?= json_encode($tinyMceGalleryItems, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) ?>;
@@ -3305,6 +3349,27 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
       addTextButton.setAttribute('data-rvn-default-text-editor', resolvePreferredTextEditor());
     }
 
+    function syncTaxonomyPickersFromChannel() {
+      if (!(channelSelect instanceof HTMLSelectElement)) {
+        return;
+      }
+
+      var selectedOption = channelSelect.options[channelSelect.selectedIndex];
+      var categorySelection = 'all';
+      var tagSelection = 'all';
+      if (selectedOption instanceof HTMLOptionElement) {
+        categorySelection = String(selectedOption.getAttribute('data-rvn-channel-category-sets') || 'all');
+        tagSelection = String(selectedOption.getAttribute('data-rvn-channel-tag-sets') || 'all');
+      }
+
+      if (typeof ravenCategoryChipPicker !== 'undefined' && ravenCategoryChipPicker && typeof ravenCategoryChipPicker.syncAllowedSets === 'function') {
+        ravenCategoryChipPicker.syncAllowedSets(categorySelection);
+      }
+      if (typeof ravenTagChipPicker !== 'undefined' && ravenTagChipPicker && typeof ravenTagChipPicker.syncAllowedSets === 'function') {
+        ravenTagChipPicker.syncAllowedSets(tagSelection);
+      }
+    }
+
     function configureRowForType(row, type) {
       if (!(row instanceof HTMLElement)) {
         return;
@@ -3512,8 +3577,10 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
 
     if (channelSelect instanceof HTMLSelectElement) {
       channelSelect.addEventListener('change', syncPreferredTextEditorFromChannel);
+      channelSelect.addEventListener('change', syncTaxonomyPickersFromChannel);
     }
     syncPreferredTextEditorFromChannel();
+    syncTaxonomyPickersFromChannel();
 
     var draggingRow = null;
 

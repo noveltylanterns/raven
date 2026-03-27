@@ -11,6 +11,7 @@
 
 /** @var array<string, string> $site */
 /** @var array<string, mixed>|null $category */
+/** @var array<int, array{id: int, name: string, slug: string, is_root: bool}> $setOptions */
 /** @var string $categoryRoutePrefix */
 /** @var string $imageAllowedExtensions */
 /** @var int|null $imageMaxFilesizeKb */
@@ -27,6 +28,7 @@ $categoryName = trim((string) ($category['name'] ?? ''));
 $categoryId = (int) ($category['id'] ?? 0);
 $hasPersistedCategory = $categoryId > 0;
 $categorySlug = trim((string) ($category['slug'] ?? ''));
+$categorySetId = (int) ($category['set_id'] ?? 0);
 $categoryRoutePrefix = trim((string) ($categoryRoutePrefix ?? ''), '/');
 $requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
 $activeTab = in_array($requestedTab, ['basic', 'media'], true) ? $requestedTab : 'basic';
@@ -160,6 +162,19 @@ if ($category !== null && $publicBase !== '' && $categorySlug !== '' && $categor
                 <label for="slug" class="form-label">Slug</label>
                 <!-- Slug powers `/{category.prefix}/{slug}` category index URLs. -->
                 <input id="slug" name="slug" class="form-control" required value="<?= e((string) ($category['slug'] ?? '')) ?>">
+            </div>
+
+            <div class="form-group">
+                <label for="set_id" class="form-label">Set</label>
+                <select id="set_id" name="set_id" class="form-select" required>
+                    <?php foreach ($setOptions as $setOption): ?>
+                        <?php $setId = (int) ($setOption['id'] ?? 0); ?>
+                        <?php $setSlug = (string) ($setOption['slug'] ?? ''); ?>
+                        <option value="<?= $setId ?>"<?= $categorySetId === $setId ? ' selected' : '' ?>>
+                            <?= e((string) ($setOption['name'] ?? 'Set')) ?><?= $setSlug !== '' ? ' (' . e($setSlug) . ')' : '' ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
 
             <div class="form-group mb-0">

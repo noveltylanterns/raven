@@ -17,8 +17,11 @@ Maintenance note: keep this file updated whenever category structure, category r
 What you can do:
 
 - `New Category` (top and bottom action bars): opens create form.
+- `Manage Sets` (top and bottom action bars): opens category set management.
 - `Delete Selected` (top and bottom action bars): deletes checked rows after confirmation.
 - `Search` filter: filters rows by `ID`, `Title`, or `Slug` as you type.
+- `All Sets` option in the `Set` filter: clears the set-specific list filter and shows every category.
+- `Set` filter: narrows the list to one category set.
 - Row checkbox: marks a category for bulk delete.
 - Clickable table headers (`ID`, `Title`, `Slug`, `Pages`): client-side sort.
 - Row `Edit` button (pencil icon): opens category editor.
@@ -29,8 +32,18 @@ Columns shown:
 - `ID`
 - `Title`
 - `Slug`
+- `Set`
 - `Pages` (count of linked pages)
 - `Actions`
+
+### Category Sets (`/category/set`)
+
+What you can do:
+
+- `New Category Set`: creates a reusable set for channel assignment.
+- `Edit` row action: opens the set editor.
+- `Delete` row action: removes a non-stock set when no categories or explicit channel assignments still use it.
+- Stock `Default Set` `#0` is always present and cannot be deleted.
 
 ### Category Editor (`/category/edit` and `/category/edit/{id}`)
 
@@ -44,6 +57,7 @@ Fields/options:
 
 - `Name` (required)
 - `Slug` (required)
+- `Set` (required, defaults to `Default Set` `#0`)
 - `Description` (optional)
 - `Cover Image` (optional, single file)
 - `Preview Image` (optional, single file)
@@ -81,6 +95,11 @@ Declared in `panel/index.php`:
 - `GET /category/edit/{id}` -> edit form
 - `POST /category/save` -> create/update
 - `POST /category/delete` -> delete (single or bulk)
+- `GET /category/set` -> set list
+- `GET /category/set/edit` -> set create form
+- `GET /category/set/edit/{id}` -> set edit form
+- `POST /category/set/save` -> set create/update
+- `POST /category/set/delete` -> set delete
 
 All state-changing routes use CSRF validation.
 
@@ -90,14 +109,14 @@ All state-changing routes use CSRF validation.
 
 - `categoryList()`
   - Requires login + `Manage Taxonomy` permission.
-  - Renders list with `CategoryRepository::listAll()`.
+  - Supports optional `?set={id}` filtering and renders set-aware rows from `CategoryRepository::listPageForPanel(...)`.
 - `categoryEdit(?int $id)`
   - Loads existing row when id is provided.
   - Missing id row triggers flash error + redirect to `/category`.
 - `categorySave(array $post, array $files = [])`
   - Validates CSRF.
-  - Sanitizes/normalizes `id`, `name`, `slug`, `description` via `InputSanitizer`.
-  - Requires non-empty `name` and valid `slug`.
+  - Sanitizes/normalizes `id`, `name`, `slug`, `set_id`, `description` via `InputSanitizer`.
+  - Requires non-empty `name`, valid `slug`, and valid set id.
   - Saves text fields via `CategoryRepository::save(...)`.
   - Processes optional `cover_image` and `preview_image` uploads (single-file each), optional remove flags, and writes image-path columns via `CategoryRepository::updateImagePaths(...)`.
   - Upload files/variants are stored under `public/uploads/categories/{id}/` using configured `media.images.*` rules.
@@ -106,12 +125,16 @@ All state-changing routes use CSRF validation.
   - Supports single delete (`id`) and bulk delete (`selected_ids[]`).
   - Removes associated stored cover/preview image files for deleted categories.
   - Reports deleted/failed counts for bulk operations.
+- `categorySetList()`, `categorySetEdit()`, `categorySetSave()`, `categorySetDelete()`
+  - Manage file-backed category sets under `private/dat/category-set/`.
+  - Block deleting the stock `Default Set`, sets with assigned categories, or sets still explicitly assigned to channels.
 
 ### Data Model And Repository Behavior
 
 `CategoryRepository` behavior:
 
 - `listAll()` returns categories with page counts via `page_categories` join.
+- Category rows persist numeric `set_id` membership in the database for fast channel/page filtering.
 - `save(...)` handles create/update in one method.
 - `updateImagePaths(...)` persists cover/preview source + variant paths.
 - `deleteById(...)` runs in a transaction:
@@ -122,6 +145,7 @@ Storage detail:
 
 - SQLite mode uses attached database aliases (`categories.categories`, `main.page_categories`).
 - Non-SQLite mode uses configured table prefix.
+- Category set definitions live in `private/dat/category-set/{id}.php` and always include the stock `Default Set` `#0`.
 
 ### Public Routing Touchpoints
 

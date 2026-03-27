@@ -101,6 +101,8 @@ final class ChannelFileStoreService
             'slug' => $slug,
             'description' => trim((string) ($raw['description'] ?? '')),
             'feed_enabled' => ChannelRecordPolicy::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
+            'category_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($raw['category_sets'] ?? ['all']),
+            'tag_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($raw['tag_sets'] ?? ['all']),
             'editor_override' => ChannelRecordPolicy::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),
@@ -195,6 +197,8 @@ final class ChannelFileStoreService
             'slug' => $slug,
             'description' => trim((string) ($raw['description'] ?? '')),
             'feed_enabled' => ChannelRecordPolicy::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
+            'category_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($raw['category_sets'] ?? ['all']),
+            'tag_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($raw['tag_sets'] ?? ['all']),
             'editor_override' => ChannelRecordPolicy::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),

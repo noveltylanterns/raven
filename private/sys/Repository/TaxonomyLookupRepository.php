@@ -286,10 +286,10 @@ final class TaxonomyLookupRepository
      *
      * @return array{
      *   channel_options: array<int, array{id: int, name: string, slug: string}>,
-     *   category_options_all: array<int, array{id: int, name: string, slug: string}>,
-     *   tag_options_all: array<int, array{id: int, name: string, slug: string}>,
-     *   category_options_selected: array<int, array{id: int, name: string, slug: string}>,
-     *   tag_options_selected: array<int, array{id: int, name: string, slug: string}>
+     *   category_options_all: array<int, array{id: int, name: string, slug: string, set_id: int}>,
+     *   tag_options_all: array<int, array{id: int, name: string, slug: string, set_id: int}>,
+     *   category_options_selected: array<int, array{id: int, name: string, slug: string, set_id: int}>,
+     *   tag_options_selected: array<int, array{id: int, name: string, slug: string, set_id: int}>
      * }
      */
     public function listPageEditorOptionSets(
@@ -321,6 +321,7 @@ final class TaxonomyLookupRepository
                     c.id,
                     c.name,
                     c.slug,
+                    c.set_id,
                     CASE WHEN pc.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned
                  FROM ' . $categories . ' c
                  LEFT JOIN ' . $pageCategories . ' pc
@@ -338,6 +339,7 @@ final class TaxonomyLookupRepository
                     t.id,
                     t.name,
                     t.slug,
+                    t.set_id,
                     CASE WHEN pt.page_id IS NULL THEN 0 ELSE 1 END AS is_assigned
                  FROM ' . $tags . ' t
                  LEFT JOIN ' . $pageTags . ' pt
@@ -347,7 +349,7 @@ final class TaxonomyLookupRepository
         }
 
         $stmt = $this->db->prepare(
-            'SELECT option_type, id, name, slug, is_assigned
+            'SELECT option_type, id, name, slug, set_id, is_assigned
              FROM (
                  ' . implode("\n                 UNION ALL\n                 ", $unionSelects) . '
              ) options
@@ -371,6 +373,7 @@ final class TaxonomyLookupRepository
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
+                'set_id' => (int) ($row['set_id'] ?? 0),
             ];
             $isAssigned = (int) ($row['is_assigned'] ?? 0) === 1;
 

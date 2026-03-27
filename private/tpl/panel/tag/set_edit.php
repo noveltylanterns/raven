@@ -1,0 +1,73 @@
+<?php
+
+declare(strict_types=1);
+
+/** @var array<string, string> $site */
+/** @var array<string, mixed>|null $set */
+/** @var string $csrfField */
+/** @var string|null $flashSuccess */
+/** @var string|null $error */
+
+use function Raven\Core\Support\e;
+
+$panelBase = '/' . trim($site['panel_path'], '/');
+$setId = $set !== null ? (int) ($set['id'] ?? 0) : null;
+$hasPersistedSet = $set !== null;
+$isRootSet = $hasPersistedSet && $setId === 0;
+$deleteFormId = 'delete-tag-set-form';
+?>
+<header class="card">
+    <div class="card-body">
+        <h1><?= $set === null ? 'New Tag Set' : 'Edit Tag Set: <span class="text-primary">\'' . e((string) ($set['name'] ?? 'Untitled')) . '\'</span>' ?></h1>
+        <p class="text-muted mb-0">Tag sets define which tags channels can use.</p>
+    </div>
+</header>
+
+<?php if ($flashSuccess !== null): ?>
+<div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
+<?php endif; ?>
+
+<?php if ($error !== null): ?>
+<div class="alert alert-danger" role="alert"><?= e($error) ?></div>
+<?php endif; ?>
+
+<?php if ($hasPersistedSet && !$isRootSet): ?>
+<form id="<?= e($deleteFormId) ?>" method="post" action="<?= e($panelBase) ?>/tag/set/delete">
+    <?= $csrfField ?>
+    <input type="hidden" name="id" value="<?= $setId ?>">
+</form>
+<?php endif; ?>
+
+<form method="post" action="<?= e($panelBase) ?>/tag/set/save">
+    <?= $csrfField ?>
+    <input type="hidden" name="id" value="<?= $setId !== null ? (string) $setId : '' ?>">
+    <nav class="rvnp-editor-actions">
+        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Tag Set</button>
+        <a href="<?= e($panelBase) ?>/tag/set" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Sets</a>
+        <?php if ($hasPersistedSet && !$isRootSet): ?>
+            <button type="submit" class="btn btn-danger" form="<?= e($deleteFormId) ?>" onclick="return confirm('Delete this tag set?');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Tag Set</button>
+        <?php endif; ?>
+    </nav>
+
+    <section class="card">
+        <div class="card-body">
+            <div class="form-group">
+                <label for="name" class="form-label">Name</label>
+                <input id="name" name="name" class="form-control" required value="<?= e((string) ($set['name'] ?? '')) ?>">
+            </div>
+
+            <div class="form-group">
+                <label for="slug" class="form-label">Slug</label>
+                <input id="slug" name="slug" class="form-control"<?= $isRootSet ? ' readonly' : ' required' ?> value="<?= e((string) ($set['slug'] ?? '')) ?>">
+                <?php if ($isRootSet): ?>
+                    <div class="form-text">The stock Default Set keeps the reserved slug <code>root</code>.</div>
+                <?php endif; ?>
+            </div>
+
+            <div class="form-group mb-0">
+                <label for="description" class="form-label">Description</label>
+                <textarea id="description" name="description" class="form-control" rows="4"><?= e((string) ($set['description'] ?? '')) ?></textarea>
+            </div>
+        </div>
+    </section>
+</form>

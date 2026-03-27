@@ -46,6 +46,8 @@ Fields/options:
 - `Slug` (required)
 - `Description` (optional)
 - `Enable Feed?` (shown only when global feeds are enabled)
+- `Category Sets` checkbox list with `All Sets`
+- `Tag Sets` checkbox list with `All Sets`
 - `Cover Image` (optional, single file)
 - `Preview Image` (optional, single file)
 - `Remove current cover image` checkbox (shown when a cover image exists)
@@ -63,6 +65,12 @@ Feed behavior notes:
 - When `feed.rss` is configured globally, enabled channels expose `/{feed.rss}/{channel-slug}`.
 - When `feed.atom` is configured globally, enabled channels expose `/{feed.atom}/{channel-slug}`.
 - When global `feed.enabled` is off, channel feed routes are disabled and the editor hides the toggle.
+
+Taxonomy set behavior notes:
+
+- Channels can allow `All Sets` or an explicit subset of category/tag sets.
+- Those assignments control which categories and tags remain available in the Page Editor when that channel is selected.
+- Channel records store those assignments in `private/dat/channel/{slug}.php`.
 
 Delete behavior note:
 
@@ -127,6 +135,7 @@ All state-changing routes use CSRF validation.
 - `listOptions()` excludes the stock `<root>` channel because it is only an internal root-scope placeholder.
 - `save(...)` handles create/update in one method.
 - Channel records include one file-backed `feed_enabled` flag for channel-specific feed routes.
+- Channel records also include file-backed `category_sets` and `tag_sets` selections.
 - `updateImagePaths(...)` persists cover/preview source + variant paths.
 - `deleteById(...)` runs in a transaction:
   - updates `pages.channel_id` to `0`

@@ -11,6 +11,8 @@
 
 /** @var array<string, string> $site */
 /** @var array<int, array<string, mixed>> $categoryRows */
+/** @var array<int, array{id: int, name: string, slug: string, is_root: bool}> $setOptions */
+/** @var int|null $selectedSetId */
 /** @var array<string, mixed> $pagination */
 /** @var string $csrfField */
 /** @var string|null $flashSuccess */
@@ -24,6 +26,11 @@ $categoryTableId = 'category-table';
 $categorySearchId = 'category-filter-search';
 $categoryCountId = 'category-filter-count';
 $categoryEmptyId = 'category-filter-empty';
+$categorySetFilterId = 'category-filter-set';
+$categorySetNames = [];
+foreach ($setOptions as $setOption) {
+    $categorySetNames[(int) ($setOption['id'] ?? 0)] = (string) ($setOption['name'] ?? 'Set');
+}
 $pagination = is_array($pagination ?? null) ? $pagination : [];
 $paginationCurrent = max(1, (int) ($pagination['current'] ?? 1));
 $paginationTotalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
@@ -65,6 +72,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
 
 <nav>
     <a class="btn btn-primary" href="<?= e($panelBase) ?>/category/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Category</a>
+    <a class="btn btn-secondary" href="<?= e($panelBase) ?>/category/set"><i class="bi bi-collection me-2" aria-hidden="true"></i>Manage Sets</a>
     <button
         type="submit"
         class="btn btn-danger"
@@ -88,6 +96,18 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                         placeholder="Filter by ID, title, or slug..."
                     >
                 </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label mb-1" for="<?= e($categorySetFilterId) ?>">Set</label>
+                    <select id="<?= e($categorySetFilterId) ?>" class="form-select form-select-sm">
+                        <option value="">All Sets</option>
+                        <?php foreach ($setOptions as $setOption): ?>
+                            <?php $setId = (int) ($setOption['id'] ?? 0); ?>
+                            <option value="<?= $setId ?>"<?= $selectedSetId === $setId ? ' selected' : '' ?>>
+                                <?= e((string) ($setOption['name'] ?? 'Set')) ?> (#<?= $setId ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
             </div>
             <div class="small text-muted mb-2" id="<?= e($categoryCountId) ?>"></div>
             <div class="table-responsive">
@@ -104,6 +124,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                         <th scope="col" data-sort-key="id" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">ID</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="title" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Title</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="slug" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Slug</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+                        <th scope="col" data-sort-key="set" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Set</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="pages" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Pages</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" class="text-center">Actions</th>
                     </tr>
@@ -114,6 +135,8 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                         $categoryId = (int) ($category['id'] ?? 0);
                         $categoryName = (string) ($category['name'] ?? '');
                         $categorySlug = (string) ($category['slug'] ?? '');
+                        $categorySetId = (int) ($category['set_id'] ?? 0);
+                        $categorySetName = (string) ($categorySetNames[$categorySetId] ?? ('Set #' . $categorySetId));
                         $categoryPageCount = (int) ($category['page_count'] ?? 0);
                         $categoryPagesUrl = $panelBase . '/page?category=' . rawurlencode((string) $categoryId);
                         ?>
@@ -122,6 +145,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                             data-sort-id="<?= e((string) $categoryId) ?>"
                             data-sort-title="<?= e($categoryName) ?>"
                             data-sort-slug="<?= e($categorySlug) ?>"
+                            data-sort-set="<?= e($categorySetName) ?>"
                             data-sort-pages="<?= e((string) $categoryPageCount) ?>"
                         >
                             <?php // Row checkboxes post to dedicated bulk-delete form. ?>
@@ -145,6 +169,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                                 </a>
                             </td>
                             <td><?= e($categorySlug) ?></td>
+                            <td><?= e($categorySetName) ?></td>
                             <td>
                                 <?php if ($categoryPageCount > 0 && $categoryId > 0): ?>
                                     <a href="<?= e($categoryPagesUrl) ?>"><?= $categoryPageCount ?></a>
@@ -199,6 +224,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
 
 <nav>
     <a class="btn btn-primary" href="<?= e($panelBase) ?>/category/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Category</a>
+    <a class="btn btn-secondary" href="<?= e($panelBase) ?>/category/set"><i class="bi bi-collection me-2" aria-hidden="true"></i>Manage Sets</a>
     <button
         type="submit"
         class="btn btn-danger"
@@ -211,11 +237,25 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     document.addEventListener('DOMContentLoaded', function () {
         var table = document.getElementById('<?= e($categoryTableId) ?>');
         var searchInput = document.getElementById('<?= e($categorySearchId) ?>');
+        var setFilter = document.getElementById('<?= e($categorySetFilterId) ?>');
         var countLabel = document.getElementById('<?= e($categoryCountId) ?>');
         var emptyLabel = document.getElementById('<?= e($categoryEmptyId) ?>');
 
         if (!(table instanceof HTMLTableElement) || !(searchInput instanceof HTMLInputElement)) {
             return;
+        }
+
+        if (setFilter instanceof HTMLSelectElement) {
+            setFilter.addEventListener('change', function () {
+                var url = new URL(window.location.href);
+                if (String(setFilter.value || '') === '') {
+                    url.searchParams.delete('set');
+                } else {
+                    url.searchParams.set('set', String(setFilter.value || ''));
+                }
+                url.searchParams.delete('page');
+                window.location.href = url.toString();
+            });
         }
 
         var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-rvn-sort-row="1"]'));

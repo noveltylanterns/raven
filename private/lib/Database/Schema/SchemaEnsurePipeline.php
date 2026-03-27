@@ -37,6 +37,7 @@ final class SchemaEnsurePipeline
         $appSchemaBuilder->ensureRedirectDescriptionColumn($appDb, $driver, $prefix);
         $appSchemaBuilder->ensureGroupRoutingColumns($appDb, $driver, $prefix);
         $appSchemaBuilder->ensureTaxonomyImageColumns($appDb, $driver, $prefix);
+        $appSchemaBuilder->ensureTaxonomySetColumns($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePanelPerformanceIndexes($appDb, $driver, $prefix);
         $appSchemaBuilder->dropLegacyChannelTable($appDb, $driver, $prefix);
         $components->extensionSchemaRunner()->ensureEnabledExtensionSchemas($appDb, $driver, $prefix);

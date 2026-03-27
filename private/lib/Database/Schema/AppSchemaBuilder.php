@@ -358,6 +358,58 @@ final class AppSchemaBuilder
         }
     }
 
+    public function ensureTaxonomySetColumns(PDO $db, string $driver, string $prefix): void
+    {
+        $taxonomyTables = ['categories', 'tags'];
+
+        if ($driver === 'sqlite') {
+            foreach ($taxonomyTables as $table) {
+                $qualifiedTable = $this->tables->resolve($driver, $prefix, $table);
+                if (!$this->introspector->appColumnExistsSqlite($db, $qualifiedTable, 'set_id')) {
+                    $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN set_id INTEGER NOT NULL DEFAULT 0');
+                }
+
+                $db->exec('UPDATE ' . $qualifiedTable . ' SET set_id = 0 WHERE set_id IS NULL');
+                $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $qualifiedTable . '_set_id ON ' . $qualifiedTable . ' (set_id)');
+            }
+
+            return;
+        }
+
+        if ($driver === 'mysql') {
+            foreach ($taxonomyTables as $table) {
+                $physicalTable = $prefix . $table;
+                if (!$this->introspector->appColumnExistsMySql($db, $physicalTable, 'set_id')) {
+                    $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN set_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER slug');
+                }
+
+                $db->exec('UPDATE ' . $physicalTable . ' SET set_id = 0 WHERE set_id IS NULL');
+                $indexName = 'idx_' . $prefix . $table . '_set_id';
+                if (!$this->introspector->mySqlIndexExists($db, $physicalTable, $indexName)) {
+                    $db->exec('ALTER TABLE ' . $physicalTable . ' ADD INDEX ' . $indexName . ' (set_id)');
+                }
+            }
+
+            return;
+        }
+
+        foreach ($taxonomyTables as $table) {
+            $physicalTable = $prefix . $table;
+            if (!$this->introspector->appColumnExistsPgSql($db, $physicalTable, 'set_id')) {
+                $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN set_id BIGINT NOT NULL DEFAULT 0');
+            }
+
+            $db->exec('UPDATE ' . $physicalTable . ' SET set_id = 0 WHERE set_id IS NULL');
+            $indexName = 'idx_' . $prefix . $table . '_set_id';
+            if (!$this->introspector->pgSqlIndexExists($db, $physicalTable, $indexName)) {
+                $db->exec(
+                    'CREATE INDEX IF NOT EXISTS ' . $indexName . '
+                     ON ' . $this->introspector->quotePgIdentifier($physicalTable) . ' (set_id)'
+                );
+            }
+        }
+    }
+
     public function dropLegacyChannelTable(PDO $db, string $driver, string $prefix): void
     {
         if ($driver === 'sqlite') {

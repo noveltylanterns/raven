@@ -11,6 +11,7 @@
 
 /** @var array<string, string> $site */
 /** @var array<string, mixed>|null $tag */
+/** @var array<int, array{id: int, name: string, slug: string, is_root: bool}> $setOptions */
 /** @var string $tagRoutePrefix */
 /** @var string $imageAllowedExtensions */
 /** @var int|null $imageMaxFilesizeKb */
@@ -27,6 +28,7 @@ $tagName = trim((string) ($tag['name'] ?? ''));
 $tagId = (int) ($tag['id'] ?? 0);
 $hasPersistedTag = $tagId > 0;
 $tagSlug = trim((string) ($tag['slug'] ?? ''));
+$tagSetId = (int) ($tag['set_id'] ?? 0);
 $tagRoutePrefix = trim((string) ($tagRoutePrefix ?? ''), '/');
 $requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
 $activeTab = in_array($requestedTab, ['basic', 'media'], true) ? $requestedTab : 'basic';
@@ -163,6 +165,19 @@ if ($tag !== null && $publicBase !== '' && $tagSlug !== '' && $tagRoutePrefix !=
                 <label for="slug" class="form-label">Slug</label>
                 <!-- Slug powers `/{tag.prefix}/{slug}` tag index URLs. -->
                 <input id="slug" name="slug" class="form-control" required value="<?= e((string) ($tag['slug'] ?? '')) ?>">
+            </div>
+
+            <div class="form-group">
+                <label for="set_id" class="form-label">Set</label>
+                <select id="set_id" name="set_id" class="form-select" required>
+                    <?php foreach ($setOptions as $setOption): ?>
+                        <?php $setId = (int) ($setOption['id'] ?? 0); ?>
+                        <?php $setSlug = (string) ($setOption['slug'] ?? ''); ?>
+                        <option value="<?= $setId ?>"<?= $tagSetId === $setId ? ' selected' : '' ?>>
+                            <?= e((string) ($setOption['name'] ?? 'Set')) ?><?= $setSlug !== '' ? ' (' . e($setSlug) . ')' : '' ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
 
             <div class="form-group mb-0">

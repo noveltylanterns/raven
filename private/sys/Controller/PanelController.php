@@ -70,6 +70,7 @@ use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\QrCodeService;
 use Raven\Lib\Security\WebAuthnService;
 use Raven\Lib\Site\SiteContextBuilder;
+use Raven\Lib\Taxonomy\TaxonomySetRecordPolicy;
 use Raven\Lib\Update\GitCommandRunner;
 use Raven\Lib\Update\UpdateSourceResolver;
 use Raven\Lib\Update\UpdateWorkflowService;
@@ -83,6 +84,7 @@ use Raven\Repository\PageRepository;
 use Raven\Repository\RedirectRepository;
 use Raven\Repository\TagRepository;
 use Raven\Repository\TaxonomyLookupRepository;
+use Raven\Repository\TaxonomySetRepository;
 use Raven\Repository\UserRepository;
 
 use function Raven\Core\Support\redirect;
@@ -104,11 +106,13 @@ final class PanelController
     private PageImageRepository $pageImages;
     private PageImageManager $pageImageManager;
     private CategoryRepository $categoryRepo;
+    private TaxonomySetRepository $categorySetRepo;
     private ChannelRepository $channelRepo;
     private GroupRepository $groupRepo;
     private PageRepository $pageRepo;
     private RedirectRepository $redirectRepo;
     private TagRepository $tagRepo;
+    private TaxonomySetRepository $tagSetRepo;
     private TaxonomyLookupRepository $taxonomyLookupRepo;
     private UserRepository $userRepo;
     private InviteTokenRepository $inviteTokens;
@@ -164,11 +168,13 @@ final class PanelController
         PageImageRepository $pageImages,
         PageImageManager $pageImageManager,
         CategoryRepository $categoryRepo,
+        TaxonomySetRepository $categorySetRepo,
         ChannelRepository $channelRepo,
         GroupRepository $groupRepo,
         PageRepository $pageRepo,
         RedirectRepository $redirectRepo,
         TagRepository $tagRepo,
+        TaxonomySetRepository $tagSetRepo,
         TaxonomyLookupRepository $taxonomyLookupRepo,
         UserRepository $userRepo,
         InviteTokenRepository $inviteTokens
@@ -184,11 +190,13 @@ final class PanelController
         $this->pageImages = $pageImages;
         $this->pageImageManager = $pageImageManager;
         $this->categoryRepo = $categoryRepo;
+        $this->categorySetRepo = $categorySetRepo;
         $this->channelRepo = $channelRepo;
         $this->groupRepo = $groupRepo;
         $this->pageRepo = $pageRepo;
         $this->redirectRepo = $redirectRepo;
         $this->tagRepo = $tagRepo;
+        $this->tagSetRepo = $tagSetRepo;
         $this->taxonomyLookupRepo = $taxonomyLookupRepo;
         $this->userRepo = $userRepo;
         $this->inviteTokens = $inviteTokens;
@@ -482,6 +490,31 @@ final class PanelController
         // Only keep ids that currently exist, preventing stale/manual post values.
         $categoryIds = $categoryEnabled ? $this->categoryRepo->existingIds($categoryIds) : [];
         $tagIds = $tagEnabled ? $this->tagRepo->existingIds($tagIds) : [];
+        $channelRecord = $channelSlug !== null && $channelSlug !== ''
+            ? $this->channelRepo->findBySlug($channelSlug)
+            : null;
+        $allowedCategorySets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'category');
+        $allowedTagSets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'tag');
+
+        if ($categoryEnabled && !$this->selectionAllowsAllSets($allowedCategorySets)) {
+            $categorySetIdsById = $this->categoryRepo->setIdsByIds($categoryIds);
+            foreach ($categorySetIdsById as $setId) {
+                if (!in_array($setId, $allowedCategorySets, true)) {
+                    $this->flash('error', 'One or more selected categories are outside the allowed sets for this channel.');
+                    redirect($this->panelEditorUrlWithTab('/page/edit', $id, $activeTab, 'meta'));
+                }
+            }
+        }
+
+        if ($tagEnabled && !$this->selectionAllowsAllSets($allowedTagSets)) {
+            $tagSetIdsById = $this->tagRepo->setIdsByIds($tagIds);
+            foreach ($tagSetIdsById as $setId) {
+                if (!in_array($setId, $allowedTagSets, true)) {
+                    $this->flash('error', 'One or more selected tags are outside the allowed sets for this channel.');
+                    redirect($this->panelEditorUrlWithTab('/page/edit', $id, $activeTab, 'meta'));
+                }
+            }
+        }
 
         if ($title === '' || $slug === null) {
             $this->flash('error', 'Title and valid slug are required.');
@@ -629,6 +662,77 @@ final class PanelController
     private function normalizeGlobalRouteSeparator(string $value): string
     {
         return ChannelRoutePolicy::normalizeGlobalSeparator($value);
+    }
+
+    /**
+     * @param mixed $raw
+     * @return array<int, int|string>
+     */
+    private function normalizeTaxonomySetSelection(mixed $raw, bool $defaultAll = true): array
+    {
+        return TaxonomySetRecordPolicy::normalizeSelection($raw, $defaultAll);
+    }
+
+    /**
+     * @param mixed $raw
+     * @param array<int, array{id: int, name: string, slug: string, is_root: bool}> $options
+     * @return array<int, int|string>
+     */
+    private function normalizeSubmittedSetSelection(mixed $raw, array $options): array
+    {
+        $selection = $this->normalizeTaxonomySetSelection($raw);
+        if (TaxonomySetRecordPolicy::selectionIncludesAll($selection)) {
+            return ['all'];
+        }
+
+        $allowedIds = [];
+        foreach ($options as $option) {
+            $allowedId = (int) ($option['id'] ?? -1);
+            if ($allowedId >= TaxonomySetRecordPolicy::ROOT_SET_ID) {
+                $allowedIds[$allowedId] = true;
+            }
+        }
+
+        $normalized = [];
+        foreach ($selection as $item) {
+            $setId = (int) $item;
+            if (isset($allowedIds[$setId])) {
+                $normalized[$setId] = $setId;
+            }
+        }
+
+        if ($normalized === []) {
+            return ['all'];
+        }
+
+        ksort($normalized, SORT_NUMERIC);
+        if (count($normalized) === count($allowedIds) && $allowedIds !== []) {
+            return ['all'];
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @param array<string, mixed>|null $channelRecord
+     * @return array<int, int|string>
+     */
+    private function allowedTaxonomySetIdsForChannel(?array $channelRecord, string $kind): array
+    {
+        if ($channelRecord === null) {
+            return ['all'];
+        }
+
+        $field = strtolower(trim($kind)) === 'tag' ? 'tag_sets' : 'category_sets';
+        return $this->normalizeTaxonomySetSelection($channelRecord[$field] ?? ['all']);
+    }
+
+    /**
+     * @param array<int, int|string> $selection
+     */
+    private function selectionAllowsAllSets(array $selection): bool
+    {
+        return TaxonomySetRecordPolicy::selectionIncludesAll($selection);
     }
 
     private function globalPageRouteMode(): string
@@ -969,6 +1073,8 @@ final class PanelController
 
         if (is_array($channel)) {
             $channel['feed_enabled'] = (bool) ($channel['feed_enabled'] ?? false);
+            $channel['category_sets'] = $this->normalizeTaxonomySetSelection($channel['category_sets'] ?? ['all']);
+            $channel['tag_sets'] = $this->normalizeTaxonomySetSelection($channel['tag_sets'] ?? ['all']);
             $channel['editor_override'] = $this->normalizeChannelEditorOverride(
                 (string) ($channel['editor_override'] ?? 'inherit')
             );
@@ -984,6 +1090,10 @@ final class PanelController
             'site' => $this->siteData(),
             'channel' => $channel,
             'feedsEnabled' => $this->routeConfigService()->feedEnabled(),
+            'categoryEnabled' => $this->categoryEnabled(),
+            'tagEnabled' => $this->tagEnabled(),
+            'categorySetOptions' => $this->categorySetRepo->listOptions(),
+            'tagSetOptions' => $this->tagSetRepo->listOptions(),
             'rssFeedRoute' => $this->routeConfigService()->rssFeedRoute(),
             'atomFeedRoute' => $this->routeConfigService()->atomFeedRoute(),
             'imageAllowedExtensions' => $this->taxonomyAllowedImageExtensionsLabel(),
@@ -1032,6 +1142,14 @@ final class PanelController
             (string) ($post['route_separator'] ?? 'inherit')
         );
         $feedsEnabled = $this->routeConfigService()->feedEnabled();
+        $categorySetSelection = $this->normalizeSubmittedSetSelection(
+            $post['category_sets'] ?? [],
+            $this->categorySetRepo->listOptions()
+        );
+        $tagSetSelection = $this->normalizeSubmittedSetSelection(
+            $post['tag_sets'] ?? [],
+            $this->tagSetRepo->listOptions()
+        );
 
         if ($name === '' || $slug === null) {
             $this->flash('error', 'Channel name and valid slug are required.');
@@ -1045,6 +1163,8 @@ final class PanelController
                 'name' => $name,
                 'slug' => $slug,
                 'description' => $description,
+                'category_sets' => $categorySetSelection,
+                'tag_sets' => $tagSetSelection,
                 'editor_override' => $editorOverride,
                 'route_mode' => $routeMode,
                 'route_separator' => $routeSeparator,
@@ -1227,21 +1347,30 @@ final class PanelController
             return;
         }
 
+        $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
+        if ($selectedSetId !== null && !$this->categorySetRepo->existsId($selectedSetId)) {
+            $selectedSetId = null;
+        }
+
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->categoryRepo->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $pageResult = $this->categoryRepo->listPageForPanel($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->categoryRepo->listPageForPanel($perPage, $pagination['offset']);
+            $pageResult = $this->categoryRepo->listPageForPanel($perPage, $pagination['offset'], $selectedSetId);
             $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
         $this->view->render('panel/category/list', [
             'site' => $this->siteData(),
             'categoryRows' => $categoryRows,
-            'pagination' => $this->panelPaginationViewData('/category', $pagination),
+            'setOptions' => $this->categorySetRepo->listOptions(),
+            'selectedSetId' => $selectedSetId,
+            'pagination' => $this->panelPaginationViewData('/category', $pagination, [
+                'set' => $selectedSetId !== null ? (string) $selectedSetId : '',
+            ]),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
@@ -1279,6 +1408,7 @@ final class PanelController
         $this->view->render('panel/category/edit', [
             'site' => $this->siteData(),
             'category' => $category,
+            'setOptions' => $this->categorySetRepo->listOptions(),
             'categoryRoutePrefix' => $this->categoryRoutePrefix(),
             'imageAllowedExtensions' => $this->taxonomyAllowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyMaxImageFilesizeKb(),
@@ -1319,10 +1449,11 @@ final class PanelController
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
+        $setId = $this->input->int($post['set_id'] ?? null, 0);
         $description = $this->input->text($post['description'] ?? null, 2000);
 
-        if ($name === '' || $slug === null) {
-            $this->flash('error', 'Category name and valid slug are required.');
+        if ($name === '' || $slug === null || $setId === null || !$this->categorySetRepo->existsId($setId)) {
+            $this->flash('error', 'Category name, valid slug, and valid set are required.');
             redirect($this->panelEditorUrlWithTab('/category/edit', $id, $activeTab, 'basic'));
         }
 
@@ -1332,6 +1463,7 @@ final class PanelController
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
+                'set_id' => $setId,
                 'description' => $description,
             ]);
         } catch (\Throwable) {
@@ -1496,6 +1628,177 @@ final class PanelController
     }
 
     /**
+     * Lists category-set records for channel-assignment management.
+     */
+    public function categorySetList(): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->categoryEnabled()) {
+            $this->renderPublicNotFound();
+            return;
+        }
+        if (!$this->requireRoutePermissionOrForbidden('category', 'view')) {
+            return;
+        }
+
+        $countsBySetId = $this->categoryRepo->countsBySetId();
+        $setRows = [];
+        foreach ($this->categorySetRepo->listAll() as $setRow) {
+            $setId = (int) ($setRow['id'] ?? 0);
+            $setRow['category_count'] = (int) ($countsBySetId[$setId] ?? 0);
+            $setRow['channel_count'] = $this->channelRepo->countExplicitTaxonomySetAssignments('category', $setId);
+            $setRows[] = $setRow;
+        }
+
+        $this->view->render('panel/category/set_list', [
+            'site' => $this->siteData(),
+            'setRows' => $setRows,
+            'csrfField' => $this->csrf->field(),
+            'flashSuccess' => $this->pullFlash('success'),
+            'flashError' => $this->pullFlash('error'),
+            'section' => 'category',
+            'showSidebar' => true,
+            'userTheme' => $this->currentUserTheme(),
+        ], 'panel/wrapper');
+    }
+
+    /**
+     * Shows category-set create/edit form.
+     */
+    public function categorySetEdit(?int $id = null): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->categoryEnabled()) {
+            $this->renderPublicNotFound();
+            return;
+        }
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('category', $requiredAction)) {
+            return;
+        }
+
+        $set = null;
+        if ($id !== null) {
+            $set = $this->categorySetRepo->findById($id);
+            if ($set === null) {
+                $this->flash('error', 'Category set not found.');
+                redirect($this->panelUrl('/category/set'));
+            }
+        }
+
+        $this->view->render('panel/category/set_edit', [
+            'site' => $this->siteData(),
+            'set' => $set,
+            'csrfField' => $this->csrf->field(),
+            'flashSuccess' => $this->pullFlash('success'),
+            'error' => $this->pullFlash('error'),
+            'section' => 'category',
+            'showSidebar' => true,
+            'userTheme' => $this->currentUserTheme(),
+        ], 'panel/wrapper');
+    }
+
+    /**
+     * Saves one category set from panel form.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function categorySetSave(array $post): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->categoryEnabled()) {
+            $this->renderPublicNotFound();
+            return;
+        }
+
+        $id = $this->input->int($post['id'] ?? null, 0);
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('category', $requiredAction)) {
+            return;
+        }
+
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flash('error', 'Invalid CSRF token.');
+            redirect($this->panelUrl('/category/set'));
+        }
+
+        $name = $this->input->text($post['name'] ?? null, 255);
+        $slug = $this->input->slug($post['slug'] ?? null);
+        $description = $this->input->text($post['description'] ?? null, 2000);
+
+        if ($name === '' || ($id !== 0 && $slug === null)) {
+            $this->flash('error', 'Set name and valid slug are required.');
+            redirect($this->panelEditorUrlWithTab('/category/set/edit', $id, 'basic', 'basic'));
+        }
+
+        try {
+            $savedId = $this->categorySetRepo->save([
+                'id' => $id,
+                'name' => $name,
+                'slug' => $slug ?? '',
+                'description' => $description,
+            ]);
+        } catch (\Throwable $exception) {
+            $message = trim($exception->getMessage());
+            $this->flash('error', $message !== '' ? $message : 'Failed to save category set.');
+            redirect($this->panelEditorUrlWithTab('/category/set/edit', $id, 'basic', 'basic'));
+        }
+
+        $this->flash('success', 'Changes saved.');
+        redirect($this->panelEditorUrlWithTab('/category/set/edit', $savedId, 'basic', 'basic'));
+    }
+
+    /**
+     * Deletes one category set when no taxonomies/channels still depend on it.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function categorySetDelete(array $post): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->categoryEnabled()) {
+            $this->renderPublicNotFound();
+            return;
+        }
+        if (!$this->requireRoutePermissionOrForbidden('category', 'delete')) {
+            return;
+        }
+
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flash('error', 'Invalid CSRF token.');
+            redirect($this->panelUrl('/category/set'));
+        }
+
+        $id = $this->input->int($post['id'] ?? null, 0);
+        if ($id === null) {
+            $this->flash('error', 'Category set not found.');
+            redirect($this->panelUrl('/category/set'));
+        }
+
+        $categoryCount = (int) ($this->categoryRepo->countsBySetId()[$id] ?? 0);
+        if ($categoryCount > 0) {
+            $this->flash('error', 'Cannot delete a category set that still has categories assigned.');
+            redirect($this->panelUrl('/category/set'));
+        }
+
+        if ($this->channelRepo->countExplicitTaxonomySetAssignments('category', $id) > 0) {
+            $this->flash('error', 'Cannot delete a category set that is still assigned to one or more channels.');
+            redirect($this->panelUrl('/category/set'));
+        }
+
+        try {
+            $this->categorySetRepo->deleteById($id);
+        } catch (\Throwable $exception) {
+            $message = trim($exception->getMessage());
+            $this->flash('error', $message !== '' ? $message : 'Failed to delete category set.');
+            redirect($this->panelUrl('/category/set'));
+        }
+
+        $this->flash('success', 'Category set deleted.');
+        redirect($this->panelUrl('/category/set'));
+    }
+
+    /**
      * Lists tags for Tag management section.
      */
     public function tagList(): void
@@ -1509,21 +1812,30 @@ final class PanelController
             return;
         }
 
+        $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
+        if ($selectedSetId !== null && !$this->tagSetRepo->existsId($selectedSetId)) {
+            $selectedSetId = null;
+        }
+
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->tagRepo->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $pageResult = $this->tagRepo->listPageForPanel($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->tagRepo->listPageForPanel($perPage, $pagination['offset']);
+            $pageResult = $this->tagRepo->listPageForPanel($perPage, $pagination['offset'], $selectedSetId);
             $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
         $this->view->render('panel/tag/list', [
             'site' => $this->siteData(),
             'tagRows' => $tagRows,
-            'pagination' => $this->panelPaginationViewData('/tag', $pagination),
+            'setOptions' => $this->tagSetRepo->listOptions(),
+            'selectedSetId' => $selectedSetId,
+            'pagination' => $this->panelPaginationViewData('/tag', $pagination, [
+                'set' => $selectedSetId !== null ? (string) $selectedSetId : '',
+            ]),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'flashError' => $this->pullFlash('error'),
@@ -1561,6 +1873,7 @@ final class PanelController
         $this->view->render('panel/tag/edit', [
             'site' => $this->siteData(),
             'tag' => $tag,
+            'setOptions' => $this->tagSetRepo->listOptions(),
             'tagRoutePrefix' => $this->tagRoutePrefix(),
             'imageAllowedExtensions' => $this->taxonomyAllowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyMaxImageFilesizeKb(),
@@ -1601,10 +1914,11 @@ final class PanelController
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
+        $setId = $this->input->int($post['set_id'] ?? null, 0);
         $description = $this->input->text($post['description'] ?? null, 2000);
 
-        if ($name === '' || $slug === null) {
-            $this->flash('error', 'Tag name and valid slug are required.');
+        if ($name === '' || $slug === null || $setId === null || !$this->tagSetRepo->existsId($setId)) {
+            $this->flash('error', 'Tag name, valid slug, and valid set are required.');
             redirect($this->panelEditorUrlWithTab('/tag/edit', $id, $activeTab, 'basic'));
         }
 
@@ -1614,6 +1928,7 @@ final class PanelController
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
+                'set_id' => $setId,
                 'description' => $description,
             ]);
         } catch (\Throwable) {
@@ -1775,6 +2090,177 @@ final class PanelController
         }
 
         redirect($this->panelUrl('/tag'));
+    }
+
+    /**
+     * Lists tag-set records for channel-assignment management.
+     */
+    public function tagSetList(): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->tagEnabled()) {
+            $this->renderPublicNotFound();
+            return;
+        }
+        if (!$this->requireRoutePermissionOrForbidden('tag', 'view')) {
+            return;
+        }
+
+        $countsBySetId = $this->tagRepo->countsBySetId();
+        $setRows = [];
+        foreach ($this->tagSetRepo->listAll() as $setRow) {
+            $setId = (int) ($setRow['id'] ?? 0);
+            $setRow['tag_count'] = (int) ($countsBySetId[$setId] ?? 0);
+            $setRow['channel_count'] = $this->channelRepo->countExplicitTaxonomySetAssignments('tag', $setId);
+            $setRows[] = $setRow;
+        }
+
+        $this->view->render('panel/tag/set_list', [
+            'site' => $this->siteData(),
+            'setRows' => $setRows,
+            'csrfField' => $this->csrf->field(),
+            'flashSuccess' => $this->pullFlash('success'),
+            'flashError' => $this->pullFlash('error'),
+            'section' => 'tag',
+            'showSidebar' => true,
+            'userTheme' => $this->currentUserTheme(),
+        ], 'panel/wrapper');
+    }
+
+    /**
+     * Shows tag-set create/edit form.
+     */
+    public function tagSetEdit(?int $id = null): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->tagEnabled()) {
+            $this->renderPublicNotFound();
+            return;
+        }
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('tag', $requiredAction)) {
+            return;
+        }
+
+        $set = null;
+        if ($id !== null) {
+            $set = $this->tagSetRepo->findById($id);
+            if ($set === null) {
+                $this->flash('error', 'Tag set not found.');
+                redirect($this->panelUrl('/tag/set'));
+            }
+        }
+
+        $this->view->render('panel/tag/set_edit', [
+            'site' => $this->siteData(),
+            'set' => $set,
+            'csrfField' => $this->csrf->field(),
+            'flashSuccess' => $this->pullFlash('success'),
+            'error' => $this->pullFlash('error'),
+            'section' => 'tag',
+            'showSidebar' => true,
+            'userTheme' => $this->currentUserTheme(),
+        ], 'panel/wrapper');
+    }
+
+    /**
+     * Saves one tag set from panel form.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function tagSetSave(array $post): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->tagEnabled()) {
+            $this->renderPublicNotFound();
+            return;
+        }
+
+        $id = $this->input->int($post['id'] ?? null, 0);
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->requireRoutePermissionOrForbidden('tag', $requiredAction)) {
+            return;
+        }
+
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flash('error', 'Invalid CSRF token.');
+            redirect($this->panelUrl('/tag/set'));
+        }
+
+        $name = $this->input->text($post['name'] ?? null, 255);
+        $slug = $this->input->slug($post['slug'] ?? null);
+        $description = $this->input->text($post['description'] ?? null, 2000);
+
+        if ($name === '' || ($id !== 0 && $slug === null)) {
+            $this->flash('error', 'Set name and valid slug are required.');
+            redirect($this->panelEditorUrlWithTab('/tag/set/edit', $id, 'basic', 'basic'));
+        }
+
+        try {
+            $savedId = $this->tagSetRepo->save([
+                'id' => $id,
+                'name' => $name,
+                'slug' => $slug ?? '',
+                'description' => $description,
+            ]);
+        } catch (\Throwable $exception) {
+            $message = trim($exception->getMessage());
+            $this->flash('error', $message !== '' ? $message : 'Failed to save tag set.');
+            redirect($this->panelEditorUrlWithTab('/tag/set/edit', $id, 'basic', 'basic'));
+        }
+
+        $this->flash('success', 'Changes saved.');
+        redirect($this->panelEditorUrlWithTab('/tag/set/edit', $savedId, 'basic', 'basic'));
+    }
+
+    /**
+     * Deletes one tag set when no taxonomies/channels still depend on it.
+     *
+     * @param array<string, mixed> $post
+     */
+    public function tagSetDelete(array $post): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->tagEnabled()) {
+            $this->renderPublicNotFound();
+            return;
+        }
+        if (!$this->requireRoutePermissionOrForbidden('tag', 'delete')) {
+            return;
+        }
+
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flash('error', 'Invalid CSRF token.');
+            redirect($this->panelUrl('/tag/set'));
+        }
+
+        $id = $this->input->int($post['id'] ?? null, 0);
+        if ($id === null) {
+            $this->flash('error', 'Tag set not found.');
+            redirect($this->panelUrl('/tag/set'));
+        }
+
+        $tagCount = (int) ($this->tagRepo->countsBySetId()[$id] ?? 0);
+        if ($tagCount > 0) {
+            $this->flash('error', 'Cannot delete a tag set that still has tags assigned.');
+            redirect($this->panelUrl('/tag/set'));
+        }
+
+        if ($this->channelRepo->countExplicitTaxonomySetAssignments('tag', $id) > 0) {
+            $this->flash('error', 'Cannot delete a tag set that is still assigned to one or more channels.');
+            redirect($this->panelUrl('/tag/set'));
+        }
+
+        try {
+            $this->tagSetRepo->deleteById($id);
+        } catch (\Throwable $exception) {
+            $message = trim($exception->getMessage());
+            $this->flash('error', $message !== '' ? $message : 'Failed to delete tag set.');
+            redirect($this->panelUrl('/tag/set'));
+        }
+
+        $this->flash('success', 'Tag set deleted.');
+        redirect($this->panelUrl('/tag/set'));
     }
 
     /**

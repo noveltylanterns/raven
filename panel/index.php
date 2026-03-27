@@ -46,11 +46,13 @@ $panelController = new PanelController(
     $app['page_images'],
     $app['page_image_manager'],
     $app['category'],
+    $app['category_set'],
     $app['channel'],
     $app['group'],
     $app['page'],
     $app['redirect'],
     $app['tag'],
+    $app['tag_set'],
     $app['taxonomy_lookup'],
     $app['user'],
     $app['invite_tokens']
@@ -700,6 +702,34 @@ if ($categoryEnabled) {
     $router->add('POST', '/category/delete', static function () use ($panelController): void {
         $panelController->categoryDelete($_POST);
     });
+
+    $router->add('GET', '/category/set', static function () use ($panelController): void {
+        $panelController->categorySetList();
+    });
+
+    $router->add('GET', '/category/set/edit', static function () use ($panelController): void {
+        $panelController->categorySetEdit(null);
+    });
+
+    $router->add('GET', '/category/set/edit/{id}', static function (array $params) use ($panelController, $app): void {
+        $id = $app['input']->int($params['id'] ?? null, 0);
+
+        if ($id === null) {
+            http_response_code(404);
+            echo 'Not Found';
+            return;
+        }
+
+        $panelController->categorySetEdit($id);
+    });
+
+    $router->add('POST', '/category/set/save', static function () use ($panelController): void {
+        $panelController->categorySetSave($_POST);
+    });
+
+    $router->add('POST', '/category/set/delete', static function () use ($panelController): void {
+        $panelController->categorySetDelete($_POST);
+    });
 }
 
 if ($tagEnabled) {
@@ -729,6 +759,34 @@ if ($tagEnabled) {
 
     $router->add('POST', '/tag/delete', static function () use ($panelController): void {
         $panelController->tagDelete($_POST);
+    });
+
+    $router->add('GET', '/tag/set', static function () use ($panelController): void {
+        $panelController->tagSetList();
+    });
+
+    $router->add('GET', '/tag/set/edit', static function () use ($panelController): void {
+        $panelController->tagSetEdit(null);
+    });
+
+    $router->add('GET', '/tag/set/edit/{id}', static function (array $params) use ($panelController, $app): void {
+        $id = $app['input']->int($params['id'] ?? null, 0);
+
+        if ($id === null) {
+            http_response_code(404);
+            echo 'Not Found';
+            return;
+        }
+
+        $panelController->tagSetEdit($id);
+    });
+
+    $router->add('POST', '/tag/set/save', static function () use ($panelController): void {
+        $panelController->tagSetSave($_POST);
+    });
+
+    $router->add('POST', '/tag/set/delete', static function () use ($panelController): void {
+        $panelController->tagSetDelete($_POST);
     });
 }
 

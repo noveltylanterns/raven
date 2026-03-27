@@ -69,6 +69,10 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Canonical SQLite database when Raven runs on SQLite.
 - `private/dat/channel/`
   - File-backed channel metadata records.
+- `private/dat/category-set/`
+  - File-backed category-set records keyed by numeric id (`0.php` is the stock `Default Set`).
+- `private/dat/tag-set/`
+  - File-backed tag-set records keyed by numeric id (`0.php` is the stock `Default Set`).
 - `private/dat/ext/.state.php`
   - Extension enablement and permission-bit state.
 - `private/dat/ext/{slug}/`
@@ -95,6 +99,8 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Extension cataloging, manifests, state, storage provisioning, and scaffolding.
 - `private/lib/Routing/`
   - Route config, channel/page routing policy, routing inventory, and URL helpers.
+- `private/lib/Taxonomy/`
+  - File-backed taxonomy-set policies and persistence helpers shared by channels/categories/tags.
 - `private/lib/View/`
   - Theme discovery/inheritance and public template rendering helpers.
 - `private/sys/Controller/`

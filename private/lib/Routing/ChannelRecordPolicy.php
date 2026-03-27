@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Routing;
 
+use Raven\Lib\Taxonomy\TaxonomySetRecordPolicy;
+
 /**
  * Shared normalization policy for filesystem-backed channel records.
  */
@@ -91,5 +93,13 @@ final class ChannelRecordPolicy
 
         $id = (int) $normalized;
         return $id >= self::ROOT_CHANNEL_ID ? $id : null;
+    }
+
+    /**
+     * @return array<int, int|string>
+     */
+    public static function normalizeTaxonomySetSelection(mixed $value, bool $defaultAll = true): array
+    {
+        return TaxonomySetRecordPolicy::normalizeSelection($value, $defaultAll);
     }
 }

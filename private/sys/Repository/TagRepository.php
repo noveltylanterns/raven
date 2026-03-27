@@ -43,7 +43,7 @@ final class TagRepository
         $pageTags = $this->table('page_tags');
 
         $stmt = $this->db->prepare(
-            'SELECT t.id, t.name, t.slug, t.description, t.created_at,
+            'SELECT t.id, t.name, t.slug, t.set_id, t.description, t.created_at,
                     t.cover_image_path, t.cover_image_sm_path, t.cover_image_md_path, t.cover_image_lg_path,
                     t.preview_image_path, t.preview_image_sm_path, t.preview_image_md_path, t.preview_image_lg_path,
                     COALESCE(pt.page_count, 0) AS page_count
@@ -64,11 +64,17 @@ final class TagRepository
     /**
      * Returns one total-count for panel tag index.
      */
-    public function countForPanel(): int
+    public function countForPanel(?int $setId = null): int
     {
         $tags = $this->table('tags');
-        $stmt = $this->db->prepare('SELECT COUNT(*) FROM ' . $tags);
-        $stmt->execute();
+        $sql = 'SELECT COUNT(*) FROM ' . $tags;
+        $params = [];
+        if ($setId !== null && $setId >= 0) {
+            $sql .= ' WHERE set_id = :set_id';
+            $params[':set_id'] = $setId;
+        }
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
 
         return (int) $stmt->fetchColumn();
     }
@@ -78,13 +84,17 @@ final class TagRepository
      *
      * @return array<int, array<string, mixed>>
      */
-    public function listForPanel(int $limit = 50, int $offset = 0): array
+    public function listForPanel(int $limit = 50, int $offset = 0, ?int $setId = null): array
     {
         $tags = $this->table('tags');
         $pageTags = $this->table('page_tags');
+        $whereSql = '';
+        if ($setId !== null && $setId >= 0) {
+            $whereSql = 'WHERE t.set_id = :set_id';
+        }
 
         $stmt = $this->db->prepare(
-            'SELECT t.id, t.name, t.slug, t.description, t.created_at,
+            'SELECT t.id, t.name, t.slug, t.set_id, t.description, t.created_at,
                     t.cover_image_path, t.cover_image_sm_path, t.cover_image_md_path, t.cover_image_lg_path,
                     t.preview_image_path, t.preview_image_sm_path, t.preview_image_md_path, t.preview_image_lg_path,
                     COALESCE(pt.page_count, 0) AS page_count
@@ -94,9 +104,13 @@ final class TagRepository
                  FROM ' . $pageTags . '
                  GROUP BY tag_id
              ) pt ON pt.tag_id = t.id
+             ' . $whereSql . '
              ORDER BY t.name ASC, t.id ASC
              LIMIT :limit OFFSET :offset'
         );
+        if ($setId !== null && $setId >= 0) {
+            $stmt->bindValue(':set_id', $setId, PDO::PARAM_INT);
+        }
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
@@ -109,17 +123,22 @@ final class TagRepository
      *
      * @return array{rows: array<int, array<string, mixed>>, total: int}
      */
-    public function listPageForPanel(int $limit = 50, int $offset = 0): array
+    public function listPageForPanel(int $limit = 50, int $offset = 0, ?int $setId = null): array
     {
         $tags = $this->table('tags');
         $pageTags = $this->table('page_tags');
         $safeLimit = max(1, $limit);
         $safeOffset = max(0, $offset);
+        $whereSql = '';
+        if ($setId !== null && $setId >= 0) {
+            $whereSql = 'WHERE t.set_id = :set_id';
+        }
 
         $stmt = $this->db->prepare(
             'SELECT page_rows.id,
                     page_rows.name,
                     page_rows.slug,
+                    page_rows.set_id,
                     page_rows.description,
                     page_rows.created_at,
                     page_rows.cover_image_path,
@@ -133,7 +152,7 @@ final class TagRepository
                     page_rows.page_count,
                     totals.total_rows
              FROM (
-                 SELECT t.id, t.name, t.slug, t.description, t.created_at,
+                 SELECT t.id, t.name, t.slug, t.set_id, t.description, t.created_at,
                         t.cover_image_path, t.cover_image_sm_path, t.cover_image_md_path, t.cover_image_lg_path,
                         t.preview_image_path, t.preview_image_sm_path, t.preview_image_md_path, t.preview_image_lg_path,
                         COALESCE(pt.page_count, 0) AS page_count
@@ -143,14 +162,19 @@ final class TagRepository
                      FROM ' . $pageTags . '
                      GROUP BY tag_id
                  ) pt ON pt.tag_id = t.id
+                 ' . $whereSql . '
                  ORDER BY t.name ASC, t.id ASC
                  LIMIT :limit OFFSET :offset
              ) AS page_rows
              CROSS JOIN (
                  SELECT COUNT(*) AS total_rows
-                 FROM ' . $tags . '
+                 FROM ' . $tags . ($setId !== null && $setId >= 0 ? ' WHERE set_id = :set_id_total' : '') . '
              ) AS totals'
         );
+        if ($setId !== null && $setId >= 0) {
+            $stmt->bindValue(':set_id', $setId, PDO::PARAM_INT);
+            $stmt->bindValue(':set_id_total', $setId, PDO::PARAM_INT);
+        }
         $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
         $stmt->execute();
@@ -169,7 +193,7 @@ final class TagRepository
 
         // Offset can target an empty page while rows still exist; recover accurate total.
         if ($resultRows === [] && $safeOffset > 0) {
-            $total = $this->countForPanel();
+            $total = $this->countForPanel($setId);
         }
 
         return [
@@ -181,14 +205,14 @@ final class TagRepository
     /**
      * Returns minimal tag options for panel select controls.
      *
-     * @return array<int, array{id: int, name: string, slug: string}>
+     * @return array<int, array{id: int, name: string, slug: string, set_id: int}>
      */
     public function listOptions(): array
     {
         $tags = $this->table('tags');
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug
+            'SELECT id, name, slug, set_id
              FROM ' . $tags . '
              ORDER BY name ASC, id ASC'
         );
@@ -201,6 +225,7 @@ final class TagRepository
                 'id' => (int) ($row['id'] ?? 0),
                 'name' => (string) ($row['name'] ?? ''),
                 'slug' => (string) ($row['slug'] ?? ''),
+                'set_id' => (int) ($row['set_id'] ?? 0),
             ];
         }
 
@@ -258,7 +283,7 @@ final class TagRepository
         $tags = $this->table('tags');
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug, description, created_at,
+            'SELECT id, name, slug, set_id, description, created_at,
                     cover_image_path, cover_image_sm_path, cover_image_md_path, cover_image_lg_path,
                     preview_image_path, preview_image_sm_path, preview_image_md_path, preview_image_lg_path
              FROM ' . $tags . '
@@ -275,7 +300,7 @@ final class TagRepository
     /**
      * Creates or updates one tag and returns tag id.
      *
-     * @param array{id: int|null, name: string, slug: string, description: string} $data
+     * @param array{id: int|null, name: string, slug: string, set_id: int, description: string} $data
      */
     public function save(array $data): int
     {
@@ -284,6 +309,7 @@ final class TagRepository
         $id = $data['id'] ?? null;
         $name = $data['name'];
         $slug = $data['slug'];
+        $setId = max(0, (int) ($data['set_id'] ?? 0));
         $description = $data['description'];
 
         if ($id !== null && $id > 0) {
@@ -292,12 +318,14 @@ final class TagRepository
                 'UPDATE ' . $tags . '
                  SET name = :name,
                      slug = :slug,
+                     set_id = :set_id,
                      description = :description
                  WHERE id = :id'
             );
             $stmt->execute([
                 ':name' => $name,
                 ':slug' => $slug,
+                ':set_id' => $setId,
                 ':description' => $description,
                 ':id' => $id,
             ]);
@@ -307,12 +335,13 @@ final class TagRepository
 
         // Insert path creates a new tag with creation timestamp.
         $stmt = $this->db->prepare(
-            'INSERT INTO ' . $tags . ' (name, slug, description, created_at)
-             VALUES (:name, :slug, :description, :created_at)'
+            'INSERT INTO ' . $tags . ' (name, slug, set_id, description, created_at)
+             VALUES (:name, :slug, :set_id, :description, :created_at)'
         );
         $stmt->execute([
             ':name' => $name,
             ':slug' => $slug,
+            ':set_id' => $setId,
             ':description' => $description,
             ':created_at' => gmdate('Y-m-d H:i:s'),
         ]);
@@ -392,6 +421,55 @@ final class TagRepository
 
             throw $exception;
         }
+    }
+
+    /**
+     * @param array<int> $ids
+     * @return array<int, int>
+     */
+    public function setIdsByIds(array $ids): array
+    {
+        $normalizedIds = $this->existingIds($ids);
+        if ($normalizedIds === []) {
+            return [];
+        }
+
+        $tags = $this->table('tags');
+        $placeholders = implode(', ', array_fill(0, count($normalizedIds), '?'));
+        $stmt = $this->db->prepare(
+            'SELECT id, set_id
+             FROM ' . $tags . '
+             WHERE id IN (' . $placeholders . ')'
+        );
+        $stmt->execute(array_values($normalizedIds));
+
+        $result = [];
+        foreach ($stmt->fetchAll() ?: [] as $row) {
+            $result[(int) ($row['id'] ?? 0)] = (int) ($row['set_id'] ?? 0);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public function countsBySetId(): array
+    {
+        $tags = $this->table('tags');
+        $stmt = $this->db->prepare(
+            'SELECT set_id, COUNT(*) AS row_count
+             FROM ' . $tags . '
+             GROUP BY set_id'
+        );
+        $stmt->execute();
+
+        $result = [];
+        foreach ($stmt->fetchAll() ?: [] as $row) {
+            $result[(int) ($row['set_id'] ?? 0)] = (int) ($row['row_count'] ?? 0);
+        }
+
+        return $result;
     }
 
     /**
