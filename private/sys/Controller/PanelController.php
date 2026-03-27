@@ -1128,7 +1128,7 @@ final class PanelController
             redirect($this->panelUrl('/channel'));
         }
 
-        $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'content', 'media'], 'basic');
+        $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'meta', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
         $description = $this->input->text($post['description'] ?? null, 2000);

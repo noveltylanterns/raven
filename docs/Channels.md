@@ -45,7 +45,9 @@ Fields/options:
 - `Name` (required)
 - `Slug` (required)
 - `Description` (optional)
+- `Syndication`
 - `Enable Feed?` (shown only when global feeds are enabled)
+- `Enable dedicated sub-feeds for this channel.`
 - `Category Sets` checkbox list with `All Sets`
 - `Tag Sets` checkbox list with `All Sets`
 - `Cover Image` (optional, single file)
@@ -178,7 +180,7 @@ When channel behavior changes, update this document in the same task. That inclu
 ### UI Labels Reference
 
 - `Basic`
-- `Content`
+- `Meta`
 - `Editor Override`
 - `Route Mode`
 - `Route Separator`

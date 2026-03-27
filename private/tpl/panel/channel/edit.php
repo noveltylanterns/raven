@@ -49,7 +49,8 @@ if (!in_array($routeSeparator, ['inherit', '-', '_'], true)) {
     $routeSeparator = 'inherit';
 }
 $requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
-$activeTab = in_array($requestedTab, ['basic', 'content', 'media'], true) ? $requestedTab : 'basic';
+$activeTab = in_array($requestedTab, ['basic', 'meta', 'media'], true) ? $requestedTab : 'basic';
+$taxonomyAssignmentsEnabled = $categoryEnabled || $tagEnabled;
 $deleteFormId = 'delete-channel-form';
 $coverPath = trim((string) ($channel['cover_image_path'] ?? ''));
 $previewPath = trim((string) ($channel['preview_image_path'] ?? ''));
@@ -163,18 +164,6 @@ if ($atomFeedRoute !== '') {
         </li>
         <li class="nav-item" role="presentation">
             <button
-                class="nav-link<?= $activeTab === 'content' ? ' active' : '' ?>"
-                id="channel-content-tab"
-                data-bs-toggle="tab"
-                data-bs-target="#rvnp-editor-pane-content"
-                type="button"
-                role="tab"
-                aria-controls="rvnp-editor-pane-content"
-                aria-selected="<?= $activeTab === 'content' ? 'true' : 'false' ?>"
-            >Content</button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button
                 class="nav-link<?= $activeTab === 'media' ? ' active' : '' ?>"
                 id="channel-media-tab"
                 data-bs-toggle="tab"
@@ -184,6 +173,18 @@ if ($atomFeedRoute !== '') {
                 aria-controls="rvnp-editor-pane-media"
                 aria-selected="<?= $activeTab === 'media' ? 'true' : 'false' ?>"
             >Media</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link<?= $activeTab === 'meta' ? ' active' : '' ?>"
+                id="channel-meta-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#rvnp-editor-pane-meta"
+                type="button"
+                role="tab"
+                aria-controls="rvnp-editor-pane-meta"
+                aria-selected="<?= $activeTab === 'meta' ? 'true' : 'false' ?>"
+            >Meta</button>
         </li>
     </ul>
 
@@ -212,187 +213,6 @@ if ($atomFeedRoute !== '') {
                 <!-- Optional description is editorial/context metadata for this channel. -->
                 <textarea id="description" name="description" class="form-control" rows="4"><?= e((string) ($channel['description'] ?? '')) ?></textarea>
             </div>
-        </div>
-
-        <div
-            class="tab-pane fade<?= $activeTab === 'content' ? ' show active' : '' ?>"
-            id="rvnp-editor-pane-content"
-            role="tabpanel"
-            aria-labelledby="channel-content-tab"
-            tabindex="0"
-        >
-            <div class="form-group">
-                <label for="editor_override" class="form-label">Editor Override</label>
-                <select id="editor_override" name="editor_override" class="form-select">
-                    <option value="inherit"<?= $editorOverride === 'inherit' ? ' selected' : '' ?>>Use Global Default</option>
-                    <option value="tinymce"<?= $editorOverride === 'tinymce' ? ' selected' : '' ?>>Rich Text (TinyMCE)</option>
-                    <option value="plaintext"<?= $editorOverride === 'plaintext' ? ' selected' : '' ?>>Plaintext</option>
-                    <option value="autobr"<?= $editorOverride === 'autobr' ? ' selected' : '' ?>>Auto &lt;br&gt;</option>
-                    <option value="markdown"<?= $editorOverride === 'markdown' ? ' selected' : '' ?>>Markdown</option>
-                </select>
-                <div class="form-text">
-                    Controls which block type the Page Editor inserts when using <strong>Add Text Block</strong> for pages in this channel.
-                </div>
-            </div>
-
-            <div class="form-group mb-0">
-                <label for="route_mode" class="form-label">Route Mode</label>
-                <select id="route_mode" name="route_mode" class="form-select">
-                    <option value="inherit"<?= $routeMode === 'inherit' ? ' selected' : '' ?>>Use System Default</option>
-                    <option value="slug"<?= $routeMode === 'slug' ? ' selected' : '' ?>>/{channel}/{page-slug}</option>
-                    <option value="date_slug"<?= $routeMode === 'date_slug' ? ' selected' : '' ?>>/{channel}/{YYYY-MM-DD}-{page-slug}</option>
-                    <option value="month_slug"<?= $routeMode === 'month_slug' ? ' selected' : '' ?>>/{channel}/{YYYY-MM}-{page-slug}</option>
-                    <option value="id"<?= $routeMode === 'id' ? ' selected' : '' ?>>/{channel}/{page-id}</option>
-                    <option value="date_id"<?= $routeMode === 'date_id' ? ' selected' : '' ?>>/{channel}/{YYYY-MM-DD}-{page-id}</option>
-                    <option value="month_id"<?= $routeMode === 'month_id' ? ' selected' : '' ?>>/{channel}/{YYYY-MM}-{page-id}</option>
-                </select>
-                <div class="form-text">
-                    Applies to page routes under this channel only. Channel landing routes stay at <code>/<?= e($channelSlug !== '' ? $channelSlug : 'channel') ?></code>.
-                </div>
-            </div>
-
-            <div class="form-group mb-0 mt-3">
-                <label class="form-label d-block">Route Separator</label>
-                <div class="form-check">
-                    <input
-                        class="form-check-input"
-                        type="radio"
-                        name="route_separator"
-                        id="route_separator_inherit"
-                        value="inherit"
-                        <?= $routeSeparator === 'inherit' ? 'checked' : '' ?>
-                    >
-                    <label class="form-check-label" for="route_separator_inherit">Use Global Default</label>
-                </div>
-                <div class="form-check">
-                    <input
-                        class="form-check-input"
-                        type="radio"
-                        name="route_separator"
-                        id="route_separator_dash"
-                        value="-"
-                        <?= $routeSeparator === '-' ? 'checked' : '' ?>
-                    >
-                    <label class="form-check-label" for="route_separator_dash">- (Hyphen)</label>
-                </div>
-                <div class="form-check">
-                    <input
-                        class="form-check-input"
-                        type="radio"
-                        name="route_separator"
-                        id="route_separator_underscore"
-                        value="_"
-                        <?= $routeSeparator === '_' ? 'checked' : '' ?>
-                    >
-                    <label class="form-check-label" for="route_separator_underscore">_ (Underscore)</label>
-                </div>
-            </div>
-
-            <?php if ($feedsEnabled): ?>
-                <div class="form-group mb-0 mt-3">
-                    <div class="form-check">
-                        <input
-                            class="form-check-input"
-                            type="checkbox"
-                            name="feed_enabled"
-                            id="feed_enabled"
-                            value="1"
-                            <?= $feedEnabled ? 'checked' : '' ?>
-                        >
-                        <label class="form-check-label" for="feed_enabled">Enable Feed?</label>
-                    </div>
-                    <div class="form-text">
-                        Enables channel-specific feeds for this channel.
-                        <?php if ($channelFeedRoutes !== []): ?>
-                            Routes:
-                            <?php foreach ($channelFeedRoutes as $index => $channelFeedRoute): ?>
-                                <?php if ($index > 0): ?>,<?php endif; ?>
-                                <code><?= e($channelFeedRoute) ?></code>
-                            <?php endforeach; ?>.
-                        <?php else: ?>
-                            Configure `feed.rss` and/or `feed.atom` globally to activate channel feed URLs.
-                        <?php endif; ?>
-                    </div>
-                </div>
-            <?php endif; ?>
-
-            <?php if ($categoryEnabled): ?>
-                <?php $allCategorySetsSelected = in_array('all', $selectedCategorySets, true); ?>
-                <div class="form-group mb-0 mt-3">
-                    <label class="form-label">Category Sets</label>
-                    <div class="border rounded p-3" data-rvn-set-selection="category">
-                        <div class="form-check mb-2">
-                            <input
-                                class="form-check-input"
-                                type="checkbox"
-                                id="category_sets_all"
-                                name="category_sets[]"
-                                value="all"
-                                data-rvn-set-all="1"
-                                <?= $allCategorySetsSelected ? 'checked' : '' ?>
-                            >
-                            <label class="form-check-label" for="category_sets_all">All Sets</label>
-                        </div>
-                        <?php foreach ($categorySetOptions as $setOption): ?>
-                            <?php $setId = (int) ($setOption['id'] ?? 0); ?>
-                            <?php $setChecked = $allCategorySetsSelected || in_array($setId, $selectedCategorySets, true); ?>
-                            <div class="form-check">
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    id="category_set_<?= $setId ?>"
-                                    name="category_sets[]"
-                                    value="<?= $setId ?>"
-                                    data-rvn-set-item="1"
-                                    <?= $setChecked ? 'checked' : '' ?>
-                                >
-                                <label class="form-check-label" for="category_set_<?= $setId ?>">
-                                    <?= e((string) ($setOption['name'] ?? 'Set')) ?> (<?= $setId ?>)
-                                </label>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            <?php endif; ?>
-
-            <?php if ($tagEnabled): ?>
-                <?php $allTagSetsSelected = in_array('all', $selectedTagSets, true); ?>
-                <div class="form-group mb-0 mt-3">
-                    <label class="form-label">Tag Sets</label>
-                    <div class="border rounded p-3" data-rvn-set-selection="tag">
-                        <div class="form-check mb-2">
-                            <input
-                                class="form-check-input"
-                                type="checkbox"
-                                id="tag_sets_all"
-                                name="tag_sets[]"
-                                value="all"
-                                data-rvn-set-all="1"
-                                <?= $allTagSetsSelected ? 'checked' : '' ?>
-                            >
-                            <label class="form-check-label" for="tag_sets_all">All Sets</label>
-                        </div>
-                        <?php foreach ($tagSetOptions as $setOption): ?>
-                            <?php $setId = (int) ($setOption['id'] ?? 0); ?>
-                            <?php $setChecked = $allTagSetsSelected || in_array($setId, $selectedTagSets, true); ?>
-                            <div class="form-check">
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    id="tag_set_<?= $setId ?>"
-                                    name="tag_sets[]"
-                                    value="<?= $setId ?>"
-                                    data-rvn-set-item="1"
-                                    <?= $setChecked ? 'checked' : '' ?>
-                                >
-                                <label class="form-check-label" for="tag_set_<?= $setId ?>">
-                                    <?= e((string) ($setOption['name'] ?? 'Set')) ?> (<?= $setId ?>)
-                                </label>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            <?php endif; ?>
         </div>
 
         <div
@@ -464,6 +284,205 @@ if ($atomFeedRoute !== '') {
                     </div>
                 <?php endif; ?>
             </div>
+        </div>
+
+        <div
+            class="tab-pane fade<?= $activeTab === 'meta' ? ' show active' : '' ?>"
+            id="rvnp-editor-pane-meta"
+            role="tabpanel"
+            aria-labelledby="channel-meta-tab"
+            tabindex="0"
+        >
+            <?php if ($taxonomyAssignmentsEnabled): ?>
+            <h3>Assignments</h3>
+            <?php endif; ?>
+            <?php if ($categoryEnabled): ?>
+                <?php $allCategorySetsSelected = in_array('all', $selectedCategorySets, true); ?>
+                <div class="form-group mb-0 mt-3">
+                    <label class="form-label">Category Sets</label>
+                    <div class="border rounded p-3" data-rvn-set-selection="category">
+                        <div class="form-check mb-2">
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
+                                id="category_sets_all"
+                                name="category_sets[]"
+                                value="all"
+                                data-rvn-set-all="1"
+                                <?= $allCategorySetsSelected ? 'checked' : '' ?>
+                            >
+                            <label class="form-check-label fw-bold" for="category_sets_all">All Sets</label>
+                        </div>
+                        <?php foreach ($categorySetOptions as $setOption): ?>
+                            <?php $setId = (int) ($setOption['id'] ?? 0); ?>
+                            <?php $setSlug = (string) ($setOption['slug'] ?? ''); ?>
+                            <?php $setChecked = $allCategorySetsSelected || in_array($setId, $selectedCategorySets, true); ?>
+                            <div class="form-check">
+                                <input
+                                    class="form-check-input"
+                                    type="checkbox"
+                                    id="category_set_<?= $setId ?>"
+                                    name="category_sets[]"
+                                    value="<?= $setId ?>"
+                                    data-rvn-set-item="1"
+                                    <?= $setChecked ? 'checked' : '' ?>
+                                >
+                                <label class="form-check-label" for="category_set_<?= $setId ?>">
+                                    <?= e((string) ($setOption['name'] ?? 'Set')) ?><?= $setSlug !== '' ? ' (' . e($setSlug) . ')' : '' ?>
+                                </label>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($tagEnabled): ?>
+                <?php $allTagSetsSelected = in_array('all', $selectedTagSets, true); ?>
+                <div class="form-group mb-3 mt-3">
+                    <label class="form-label">Tag Sets</label>
+                    <div class="border rounded p-3" data-rvn-set-selection="tag">
+                        <div class="form-check mb-2">
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
+                                id="tag_sets_all"
+                                name="tag_sets[]"
+                                value="all"
+                                data-rvn-set-all="1"
+                                <?= $allTagSetsSelected ? 'checked' : '' ?>
+                            >
+                            <label class="form-check-label fw-bold" for="tag_sets_all">All Sets</label>
+                        </div>
+                        <?php foreach ($tagSetOptions as $setOption): ?>
+                            <?php $setId = (int) ($setOption['id'] ?? 0); ?>
+                            <?php $setSlug = (string) ($setOption['slug'] ?? ''); ?>
+                            <?php $setChecked = $allTagSetsSelected || in_array($setId, $selectedTagSets, true); ?>
+                            <div class="form-check">
+                                <input
+                                    class="form-check-input"
+                                    type="checkbox"
+                                    id="tag_set_<?= $setId ?>"
+                                    name="tag_sets[]"
+                                    value="<?= $setId ?>"
+                                    data-rvn-set-item="1"
+                                    <?= $setChecked ? 'checked' : '' ?>
+                                >
+                                <label class="form-check-label" for="tag_set_<?= $setId ?>">
+                                    <?= e((string) ($setOption['name'] ?? 'Set')) ?><?= $setSlug !== '' ? ' (' . e($setSlug) . ')' : '' ?>
+                                </label>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($taxonomyAssignmentsEnabled): ?>
+            <hr class="my-4">
+            <?php endif; ?>
+
+            <h3>Content Options</h3>
+            <div class="form-group">
+                <label for="editor_override" class="form-label">Editor Override</label>
+                <select id="editor_override" name="editor_override" class="form-select">
+                    <option value="inherit"<?= $editorOverride === 'inherit' ? ' selected' : '' ?>>Use Global Default</option>
+                    <option value="tinymce"<?= $editorOverride === 'tinymce' ? ' selected' : '' ?>>Rich Text (TinyMCE)</option>
+                    <option value="plaintext"<?= $editorOverride === 'plaintext' ? ' selected' : '' ?>>Plaintext</option>
+                    <option value="autobr"<?= $editorOverride === 'autobr' ? ' selected' : '' ?>>Auto &lt;br&gt;</option>
+                    <option value="markdown"<?= $editorOverride === 'markdown' ? ' selected' : '' ?>>Markdown</option>
+                </select>
+                <div class="form-text">
+                    Controls which block type the Page Editor inserts when using <strong>Add Text Block</strong> for pages in this channel.
+                </div>
+            </div>
+
+            <hr class="my-4">
+
+            <h3>Routing</h3>
+            <div class="form-group mb-0">
+                <label for="route_mode" class="form-label">Route Mode</label>
+                <select id="route_mode" name="route_mode" class="form-select">
+                    <option value="inherit"<?= $routeMode === 'inherit' ? ' selected' : '' ?>>Use System Default</option>
+                    <option value="slug"<?= $routeMode === 'slug' ? ' selected' : '' ?>>/{channel}/{page-slug}</option>
+                    <option value="date_slug"<?= $routeMode === 'date_slug' ? ' selected' : '' ?>>/{channel}/{YYYY-MM-DD}-{page-slug}</option>
+                    <option value="month_slug"<?= $routeMode === 'month_slug' ? ' selected' : '' ?>>/{channel}/{YYYY-MM}-{page-slug}</option>
+                    <option value="id"<?= $routeMode === 'id' ? ' selected' : '' ?>>/{channel}/{page-id}</option>
+                    <option value="date_id"<?= $routeMode === 'date_id' ? ' selected' : '' ?>>/{channel}/{YYYY-MM-DD}-{page-id}</option>
+                    <option value="month_id"<?= $routeMode === 'month_id' ? ' selected' : '' ?>>/{channel}/{YYYY-MM}-{page-id}</option>
+                </select>
+                <div class="form-text">
+                    Applies to page routes under this channel only. Channel landing routes stay at <code>/<?= e($channelSlug !== '' ? $channelSlug : 'channel') ?></code>.
+                </div>
+            </div>
+
+            <div class="form-group mb-0 mt-3">
+                <label class="form-label d-block">Route Separator</label>
+                <div class="border rounded p-3" data-rvn-set-selection="separator">
+                <div class="form-check">
+                    <input
+                        class="form-check-input"
+                        type="radio"
+                        name="route_separator"
+                        id="route_separator_inherit"
+                        value="inherit"
+                        <?= $routeSeparator === 'inherit' ? 'checked' : '' ?>
+                    >
+                    <label class="form-check-label" for="route_separator_inherit">Use Global Default</label>
+                </div>
+                <div class="form-check">
+                    <input
+                        class="form-check-input"
+                        type="radio"
+                        name="route_separator"
+                        id="route_separator_dash"
+                        value="-"
+                        <?= $routeSeparator === '-' ? 'checked' : '' ?>
+                    >
+                    <label class="form-check-label" for="route_separator_dash">- (Hyphen)</label>
+                </div>
+                <div class="form-check">
+                    <input
+                        class="form-check-input"
+                        type="radio"
+                        name="route_separator"
+                        id="route_separator_underscore"
+                        value="_"
+                        <?= $routeSeparator === '_' ? 'checked' : '' ?>
+                    >
+                    <label class="form-check-label" for="route_separator_underscore">_ (Underscore)</label>
+                </div>
+                </div>
+            </div>
+
+            <?php if ($feedsEnabled): ?>
+                <div class="form-group mb-0 mt-3">
+                    <label class="form-label d-block">Syndication</label>
+                    <div class="border rounded p-3" data-rvn-set-selection="syndication">
+                    <div class="form-check">
+                        <input
+                            class="form-check-input"
+                            type="checkbox"
+                            name="feed_enabled"
+                            id="feed_enabled"
+                            value="1"
+                            <?= $feedEnabled ? 'checked' : '' ?>
+                        >
+                        <label class="form-check-label" for="feed_enabled">Enable dedicated sub-feeds for this channel.</label>
+                        <div class="form-text">
+                        <?php if ($channelFeedRoutes !== []): ?>
+                            Routes:
+                            <?php foreach ($channelFeedRoutes as $index => $channelFeedRoute): ?>
+                                <?php if ($index > 0): ?>,<?php endif; ?>
+                                <code><?= e($channelFeedRoute) ?></code>
+                            <?php endforeach; ?>.
+                        <?php else: ?>
+                            Configure `feed.rss` and/or `feed.atom` globally to activate channel feed URLs.
+                        <?php endif; ?>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+
         </div>
     </div>
     </section>

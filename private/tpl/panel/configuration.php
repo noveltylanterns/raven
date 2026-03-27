@@ -623,7 +623,7 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix, $ch
                         data-rvn-feed-channel-all="1"
                         <?= $allChannelsSelected ? 'checked' : '' ?>
                     >
-                    <label class="form-check-label" for="<?= e($inputId) ?>_all">All Channels</label>
+                    <label class="form-check-label fw-bold" for="<?= e($inputId) ?>_all">All Channels</label>
                 </div>
                 <?php foreach ($channelOptions as $channelOption): ?>
                     <?php $channelSlug = strtolower(trim((string) ($channelOption['slug'] ?? ''))); ?>
