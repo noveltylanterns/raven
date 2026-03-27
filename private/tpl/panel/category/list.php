@@ -101,9 +101,12 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                     <select id="<?= e($categorySetFilterId) ?>" class="form-select form-select-sm">
                         <option value="">All Sets</option>
                         <?php foreach ($setOptions as $setOption): ?>
-                            <?php $setId = (int) ($setOption['id'] ?? 0); ?>
+                            <?php
+                            $setId = (int) ($setOption['id'] ?? 0);
+                            $setSlug = (string) ($setOption['slug'] ?? '');
+                            ?>
                             <option value="<?= $setId ?>"<?= $selectedSetId === $setId ? ' selected' : '' ?>>
-                                <?= e((string) ($setOption['name'] ?? 'Set')) ?> (#<?= $setId ?>)
+                                <?= e((string) ($setOption['name'] ?? 'Set')) ?> (<?= e($setSlug) ?>)
                             </option>
                         <?php endforeach; ?>
                     </select>

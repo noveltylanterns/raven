@@ -23,6 +23,8 @@
  *   value: string
  * }>|null $configFields */
 /** @var array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>|null $channelOptions */
+/** @var array<int, array{id: int, name: string, slug: string, is_root: bool}>|null $categorySetOptions */
+/** @var array<int, array{id: int, name: string, slug: string, is_root: bool}>|null $tagSetOptions */
 /** @var string|null $activeConfigTab */
 
 use function Raven\Core\Support\e;
@@ -31,6 +33,8 @@ $panelBase = '/' . trim($site['panel_path'], '/');
 $configSnapshot = $configSnapshot ?? null;
 $configFields = $configFields ?? [];
 $channelOptions = is_array($channelOptions ?? null) ? $channelOptions : [];
+$categorySetOptions = is_array($categorySetOptions ?? null) ? $categorySetOptions : [];
+$tagSetOptions = is_array($tagSetOptions ?? null) ? $tagSetOptions : [];
 $activeConfigTab = strtolower(trim((string) ($activeConfigTab ?? 'basic')));
 if (!in_array($activeConfigTab, ['basic', 'content', 'database', 'debug', 'media', 'meta', 'security', 'users'], true)) {
     $activeConfigTab = 'basic';
@@ -433,7 +437,13 @@ $isActiveConfigTab = static function (string $tabKey) use ($activeConfigTab): bo
  *   value: string
  * } $field
  */
-$renderConfigField = static function (array $field) use ($metaUrlPathPrefix, $channelOptions, $selectedFeedChannels): void {
+$renderConfigField = static function (array $field) use (
+    $metaUrlPathPrefix,
+    $channelOptions,
+    $selectedFeedChannels,
+    $categorySetOptions,
+    $tagSetOptions
+): void {
     $path = (string) $field['path'];
     $segments = (array) $field['segments'];
     $type = (string) $field['type'];
@@ -449,6 +459,8 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix, $ch
     $isRouteModeDefaultField = $path === 'content.route_mode';
     $isRouteSeparatorDefaultField = $path === 'content.route_separator';
     $isFeedsChannelField = $path === 'feed.channels';
+    $isCategoryDefaultSetField = $path === 'category.set';
+    $isTagDefaultSetField = $path === 'tag.set';
     $isSiteEnabledField = $path === 'site.enabled';
     $isSiteProtocolField = $path === 'site.protocol';
     $isPanelDefaultThemeField = $path === 'panel.default_theme';
@@ -651,6 +663,26 @@ $renderConfigField = static function (array $field) use ($metaUrlPathPrefix, $ch
                     </div>
                 <?php endforeach; ?>
             </div>
+        <?php elseif ($isCategoryDefaultSetField || $isTagDefaultSetField): ?>
+            <?php $setOptions = $isTagDefaultSetField ? $tagSetOptions : $categorySetOptions; ?>
+            <?php $selectedSetId = max(1, (int) ($field['value'] ?? '1')); ?>
+            <select
+                class="form-select font-monospace"
+                id="<?= e($inputId) ?>"
+                name="<?= e($fieldName) ?>"
+                required
+            >
+                <?php foreach ($setOptions as $setOption): ?>
+                    <?php $setId = (int) ($setOption['id'] ?? 0); ?>
+                    <?php if ($setId < 1): ?>
+                        <?php continue; ?>
+                    <?php endif; ?>
+                    <?php $setSlug = trim((string) ($setOption['slug'] ?? '')); ?>
+                    <option value="<?= $setId ?>"<?= $selectedSetId === $setId ? ' selected' : '' ?>>
+                        <?= e((string) ($setOption['name'] ?? ('Set ' . $setId))) ?><?= $setSlug !== '' ? ' (' . e($setSlug) . ')' : '' ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
         <?php elseif ($isSiteEnabledField): ?>
             <select
                 class="form-select font-monospace"

@@ -38,6 +38,8 @@ final class PanelConfigFieldPolicyService
      * @param callable(string, bool): ?string $normalizePanelThemeChoice
      * @param array<string, string> $publicThemeOptions
      * @param array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}> $feedChannelOptions
+     * @param array<int, array{id: int, name: string, slug: string, is_root: bool}> $categorySetOptions
+     * @param array<int, array{id: int, name: string, slug: string, is_root: bool}> $tagSetOptions
      */
     public function normalizeFieldValue(
         string $path,
@@ -48,7 +50,9 @@ final class PanelConfigFieldPolicyService
         callable $normalizeGlobalRouteSeparator,
         callable $normalizePanelThemeChoice,
         array $publicThemeOptions,
-        array $feedChannelOptions
+        array $feedChannelOptions,
+        array $categorySetOptions,
+        array $tagSetOptions
     ): mixed {
         $value = $this->input->text($rawValue, 1000);
 
@@ -103,6 +107,22 @@ final class PanelConfigFieldPolicyService
             }
 
             return $items;
+        }
+
+        if ($path === 'category.set' || $path === 'tag.set') {
+            $setId = $this->defaults->normalizeInt($path, $value);
+            if ($setId < 1) {
+                throw new \RuntimeException($path . ' must be a valid set id.');
+            }
+
+            $options = $path === 'tag.set' ? $tagSetOptions : $categorySetOptions;
+            foreach ($options as $option) {
+                if ((int) ($option['id'] ?? 0) === $setId) {
+                    return $setId;
+                }
+            }
+
+            throw new \RuntimeException($path . ' must reference an existing set.');
         }
 
         if ($path === 'category.enabled' || $path === 'tag.enabled') {

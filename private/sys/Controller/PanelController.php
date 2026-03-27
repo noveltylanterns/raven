@@ -342,6 +342,9 @@ final class PanelController
                 continue;
             }
 
+            $channelOption['category_sets'] = $this->allowedTaxonomySetIdsForChannel($channelOption, 'category');
+            $channelOption['tag_sets'] = $this->allowedTaxonomySetIdsForChannel($channelOption, 'tag');
+
             $channelOption['editor_override'] = $this->normalizeChannelEditorOverride(
                 (string) ($channelOption['editor_override'] ?? 'inherit')
             );
@@ -387,6 +390,8 @@ final class PanelController
             'currentUserId' => $currentUserId !== null ? $currentUserId : 0,
             'authorOptions' => $this->pageAuthorOptions(),
             'channelOptions' => $channelOptions,
+            'defaultCategorySetSelection' => $this->allowedTaxonomySetIdsForChannel(null, 'category'),
+            'defaultTagSetSelection' => $this->allowedTaxonomySetIdsForChannel(null, 'tag'),
             'categoryOptionsAll' => $categoryOptionsAll,
             'tagOptionsAll' => $tagOptionsAll,
             'categoryOptionsSelected' => $categoryOptionsSelected,
@@ -680,15 +685,22 @@ final class PanelController
      */
     private function normalizeSubmittedSetSelection(mixed $raw, array $options): array
     {
-        $selection = $this->normalizeTaxonomySetSelection($raw);
+        $submitted = is_array($raw) ? $raw : [];
+        foreach ($submitted as $candidate) {
+            if (strtolower(trim((string) $candidate)) === 'default') {
+                return [];
+            }
+        }
+
+        $selection = $this->normalizeTaxonomySetSelection($submitted, false);
         if (TaxonomySetRecordPolicy::selectionIncludesAll($selection)) {
-            return ['all'];
+            return [TaxonomySetRecordPolicy::ALL_SET_ID];
         }
 
         $allowedIds = [];
         foreach ($options as $option) {
             $allowedId = (int) ($option['id'] ?? -1);
-            if ($allowedId >= TaxonomySetRecordPolicy::ROOT_SET_ID) {
+            if ($allowedId >= TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
                 $allowedIds[$allowedId] = true;
             }
         }
@@ -702,15 +714,28 @@ final class PanelController
         }
 
         if ($normalized === []) {
-            return ['all'];
+            return [];
         }
 
         ksort($normalized, SORT_NUMERIC);
         if (count($normalized) === count($allowedIds) && $allowedIds !== []) {
-            return ['all'];
+            return [TaxonomySetRecordPolicy::ALL_SET_ID];
         }
 
         return array_values($normalized);
+    }
+
+    private function configuredDefaultTaxonomySetId(string $kind): int
+    {
+        $isTag = strtolower(trim($kind)) === 'tag';
+        $path = $isTag ? 'tag.set' : 'category.set';
+        $repo = $isTag ? $this->tagSetRepo : $this->categorySetRepo;
+        $configuredId = $this->input->int($this->config->get($path, TaxonomySetRecordPolicy::DEFAULT_SET_ID), TaxonomySetRecordPolicy::DEFAULT_SET_ID);
+        if ($configuredId === null || !$repo->existsId($configuredId)) {
+            return TaxonomySetRecordPolicy::DEFAULT_SET_ID;
+        }
+
+        return $configuredId;
     }
 
     /**
@@ -720,11 +745,19 @@ final class PanelController
     private function allowedTaxonomySetIdsForChannel(?array $channelRecord, string $kind): array
     {
         if ($channelRecord === null) {
-            return ['all'];
+            return [$this->configuredDefaultTaxonomySetId($kind)];
         }
 
         $field = strtolower(trim($kind)) === 'tag' ? 'tag_sets' : 'category_sets';
-        return $this->normalizeTaxonomySetSelection($channelRecord[$field] ?? ['all']);
+        $selection = $this->normalizeTaxonomySetSelection($channelRecord[$field] ?? [], false);
+        if ($this->selectionAllowsAllSets($selection)) {
+            return [TaxonomySetRecordPolicy::ALL_SET_ID];
+        }
+        if ($selection === []) {
+            return [$this->configuredDefaultTaxonomySetId($kind)];
+        }
+
+        return $selection;
     }
 
     /**
@@ -1073,8 +1106,8 @@ final class PanelController
 
         if (is_array($channel)) {
             $channel['feed_enabled'] = (bool) ($channel['feed_enabled'] ?? false);
-            $channel['category_sets'] = $this->normalizeTaxonomySetSelection($channel['category_sets'] ?? ['all']);
-            $channel['tag_sets'] = $this->normalizeTaxonomySetSelection($channel['tag_sets'] ?? ['all']);
+            $channel['category_sets'] = $this->normalizeTaxonomySetSelection($channel['category_sets'] ?? [], false);
+            $channel['tag_sets'] = $this->normalizeTaxonomySetSelection($channel['tag_sets'] ?? [], false);
             $channel['editor_override'] = $this->normalizeChannelEditorOverride(
                 (string) ($channel['editor_override'] ?? 'inherit')
             );
@@ -1449,7 +1482,7 @@ final class PanelController
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
-        $setId = $this->input->int($post['set_id'] ?? null, 0);
+        $setId = $this->input->int($post['set_id'] ?? null, 1);
         $description = $this->input->text($post['description'] ?? null, 2000);
 
         if ($name === '' || $slug === null || $setId === null || !$this->categorySetRepo->existsId($setId)) {
@@ -1914,7 +1947,7 @@ final class PanelController
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
-        $setId = $this->input->int($post['set_id'] ?? null, 0);
+        $setId = $this->input->int($post['set_id'] ?? null, 1);
         $description = $this->input->text($post['description'] ?? null, 2000);
 
         if ($name === '' || $slug === null || $setId === null || !$this->tagSetRepo->existsId($setId)) {
@@ -3951,6 +3984,8 @@ final class PanelController
         $configSnapshot = $this->applyConfigEditorDefaults($configSnapshot);
         $activeConfigTab = $this->normalizeConfigEditorTab($_GET['tab'] ?? 'basic');
         $channelOptions = $this->channelRepo->listRoutingOptions();
+        $categorySetOptions = $this->categorySetRepo->listOptions();
+        $tagSetOptions = $this->tagSetRepo->listOptions();
 
         $this->view->render('panel/configuration', [
             'site' => $this->siteData(),
@@ -3964,6 +3999,8 @@ final class PanelController
             'configSnapshot' => $configSnapshot,
             'configFields' => $this->flattenConfigFields($configSnapshot),
             'channelOptions' => $channelOptions,
+            'categorySetOptions' => $categorySetOptions,
+            'tagSetOptions' => $tagSetOptions,
             'activeConfigTab' => $activeConfigTab,
         ], 'panel/wrapper');
     }
@@ -5307,7 +5344,9 @@ final class PanelController
             fn (string $value): string => $this->normalizeGlobalRouteSeparator($value),
             fn (string $theme, bool $allowDefault): ?string => $this->normalizePanelThemeChoice($theme, $allowDefault),
             $this->publicThemeOptions(),
-            $this->channelRepo->listRoutingOptions()
+            $this->channelRepo->listRoutingOptions(),
+            $this->categorySetRepo->listOptions(),
+            $this->tagSetRepo->listOptions()
         );
     }
 

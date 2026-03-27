@@ -18,7 +18,7 @@ use Raven\Lib\Routing\ChannelRecordPolicy;
 use RuntimeException;
 
 /**
- * Channel metadata is persisted as one PHP file per slug under `private/dat/channel/`.
+ * Channel metadata is persisted as one PHP file per channel under `private/dat/channel/`.
  */
 final class ChannelRepository
 {
@@ -90,17 +90,7 @@ final class ChannelRepository
         $pendingRecords = [];
 
         foreach ($paths as $path) {
-            $basename = (string) basename($path);
-            if ($basename === '' || !str_ends_with($basename, '.php')) {
-                continue;
-            }
-
-            $slug = substr($basename, 0, -4);
-            if ($slug === '' || !$this->isValidSlug($slug)) {
-                continue;
-            }
-
-            $record = $this->channelFileStoreService->loadRecordFromPath($path, $slug);
+            $record = $this->channelFileStoreService->loadRecordFromPath($path);
             if ($record === null) {
                 continue;
             }
@@ -226,8 +216,8 @@ final class ChannelRepository
                 'id' => (int) ($channel['id'] ?? 0),
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
-                'category_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($channel['category_sets'] ?? ['all']),
-                'tag_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($channel['tag_sets'] ?? ['all']),
+                'category_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($channel['category_sets'] ?? [], false),
+                'tag_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($channel['tag_sets'] ?? [], false),
                 'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
                 'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
                 'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),
@@ -260,8 +250,8 @@ final class ChannelRepository
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
                 'feed_enabled' => (bool) ($channel['feed_enabled'] ?? false),
-                'category_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($channel['category_sets'] ?? ['all']),
-                'tag_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($channel['tag_sets'] ?? ['all']),
+                'category_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($channel['category_sets'] ?? [], false),
+                'tag_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection($channel['tag_sets'] ?? [], false),
                 'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
                 'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
                 'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),
@@ -388,11 +378,11 @@ final class ChannelRepository
             ? ChannelRecordPolicy::normalizeFeedEnabled($data['feed_enabled'])
             : ChannelRecordPolicy::normalizeFeedEnabled($currentRaw['feed_enabled'] ?? false);
         $categorySets = array_key_exists('category_sets', $data)
-            ? ChannelRecordPolicy::normalizeTaxonomySetSelection($data['category_sets'])
-            : ChannelRecordPolicy::normalizeTaxonomySetSelection($currentRaw['category_sets'] ?? ['all']);
+            ? ChannelRecordPolicy::normalizeTaxonomySetSelection($data['category_sets'], false)
+            : ChannelRecordPolicy::normalizeTaxonomySetSelection($currentRaw['category_sets'] ?? [], false);
         $tagSets = array_key_exists('tag_sets', $data)
-            ? ChannelRecordPolicy::normalizeTaxonomySetSelection($data['tag_sets'])
-            : ChannelRecordPolicy::normalizeTaxonomySetSelection($currentRaw['tag_sets'] ?? ['all']);
+            ? ChannelRecordPolicy::normalizeTaxonomySetSelection($data['tag_sets'], false)
+            : ChannelRecordPolicy::normalizeTaxonomySetSelection($currentRaw['tag_sets'] ?? [], false);
         $createdAt = trim((string) ($currentRaw['created_at'] ?? ''));
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
@@ -422,15 +412,7 @@ final class ChannelRepository
             'created_at' => $createdAt,
         ];
 
-        $newPath = $this->channelFileStoreService->pathForSlug($slug);
-        $oldPath = $oldSlug !== '' ? $this->channelFileStoreService->pathForSlug($oldSlug) : '';
-
-        // For slug changes, write new file first, then remove old slug file.
-        $this->channelFileStoreService->writeRecordAtPath($newPath, $record);
-
-        if ($oldPath !== '' && $oldPath !== $newPath && is_file($oldPath)) {
-            @unlink($oldPath);
-        }
+        $this->channelFileStoreService->writeRecordById($channelId, $slug, $record);
 
         $this->channelsCache = null;
         return $channelId;
@@ -442,7 +424,7 @@ final class ChannelRepository
         $count = 0;
 
         foreach ($this->listRecords() as $record) {
-            $selection = ChannelRecordPolicy::normalizeTaxonomySetSelection($record[$field] ?? ['all']);
+            $selection = ChannelRecordPolicy::normalizeTaxonomySetSelection($record[$field] ?? [], false);
             if (in_array($setId, $selection, true)) {
                 $count++;
             }
@@ -487,10 +469,12 @@ final class ChannelRepository
                 $currentRaw['feed_enabled'] ?? ($record['feed_enabled'] ?? false)
             ),
             'category_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection(
-                $currentRaw['category_sets'] ?? ($record['category_sets'] ?? ['all'])
+                $currentRaw['category_sets'] ?? ($record['category_sets'] ?? []),
+                false
             ),
             'tag_sets' => ChannelRecordPolicy::normalizeTaxonomySetSelection(
-                $currentRaw['tag_sets'] ?? ($record['tag_sets'] ?? ['all'])
+                $currentRaw['tag_sets'] ?? ($record['tag_sets'] ?? []),
+                false
             ),
             'editor_override' => (string) ($record['editor_override'] ?? 'inherit'),
             'route_mode' => (string) ($record['route_mode'] ?? 'inherit'),
@@ -510,7 +494,7 @@ final class ChannelRepository
                 : gmdate('Y-m-d H:i:s'),
         ];
 
-        $this->channelFileStoreService->writeRecordBySlug($slug, $raw);
+        $this->channelFileStoreService->writeRecordById((int) ($record['id'] ?? $id), $slug, $raw);
         $this->channelsCache = null;
     }
 
@@ -527,9 +511,6 @@ final class ChannelRepository
         if ($record === null) {
             return;
         }
-
-        $slug = (string) ($record['slug'] ?? '');
-        $path = $slug !== '' ? $this->channelFileStoreService->pathForSlug($slug) : '';
 
         $pages = $this->table('pages');
         $redirects = $this->table('redirects');
@@ -561,9 +542,7 @@ final class ChannelRepository
             throw $exception;
         }
 
-        if ($path !== '' && is_file($path) && !@unlink($path)) {
-            throw new RuntimeException('Failed to delete channel file.');
-        }
+        $this->channelFileStoreService->deleteById($id);
 
         $this->channelsCache = null;
     }
@@ -683,7 +662,11 @@ final class ChannelRepository
         ];
 
         if ($raw === [] || $this->rootRecordNeedsRewrite($raw)) {
-            $this->channelFileStoreService->writeRecordBySlug(ChannelRecordPolicy::ROOT_CHANNEL_SLUG, $record);
+            $this->channelFileStoreService->writeRecordById(
+                ChannelRecordPolicy::ROOT_CHANNEL_ID,
+                ChannelRecordPolicy::ROOT_CHANNEL_SLUG,
+                $record
+            );
         }
     }
 

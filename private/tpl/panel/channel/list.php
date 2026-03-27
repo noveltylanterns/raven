@@ -144,7 +144,6 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                             <td>
                                 <?php if ($isStockRoot): ?>
                                     <?= e($channelName) ?>
-                                    <span class="badge text-bg-secondary ms-2">Stock</span>
                                 <?php else: ?>
                                     <?php // Name is primary affordance and links directly to edit screen. ?>
                                     <a href="<?= e($panelBase) ?>/channel/edit/<?= $channelId ?>">
@@ -163,7 +162,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                             <td class="text-center">
                                 <div class="d-flex justify-content-center gap-2">
                                     <?php if ($isStockRoot): ?>
-                                        <span class="text-muted small">Protected</span>
+                                        <span class="badge text-bg-info">Protected</span>
                                     <?php else: ?>
                                         <a
                                             class="btn btn-primary btn-sm"

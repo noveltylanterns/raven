@@ -74,8 +74,6 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                                 <i class="bi bi-trash3" aria-hidden="true"></i>
                                             </button>
                                         </form>
-                                    <?php else: ?>
-                                        <span class="badge text-bg-secondary">Stock</span>
                                     <?php endif; ?>
                                 </div>
                             </td>

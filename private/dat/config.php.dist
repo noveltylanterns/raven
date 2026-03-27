@@ -86,12 +86,14 @@ return array (
   'category' =>
   array (
     'enabled' => false,
+    'set' => 1,
     'prefix' => 'cat',
     'pagination' => 10,
   ),
   'tag' =>
   array (
     'enabled' => false,
+    'set' => 1,
     'prefix' => 'tag',
     'pagination' => 10,
   ),

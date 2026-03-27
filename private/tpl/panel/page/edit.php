@@ -16,6 +16,8 @@ declare(strict_types=1);
 /** @var int $currentUserId */
 /** @var array<int, array{id: int, username: string, display_name: string}> $authorOptions */
 /** @var array<int, array<string, mixed>> $channelOptions */
+/** @var array<int, int|string> $defaultCategorySetSelection */
+/** @var array<int, int|string> $defaultTagSetSelection */
 /** @var array<int, array<string, mixed>> $categoryOptionsAll */
 /** @var array<int, array<string, mixed>> $tagOptionsAll */
 /** @var array<int, array{id: int, name: string, slug: string}> $categoryOptionsSelected */
@@ -56,6 +58,8 @@ $editorDefault = in_array($editorDefault ?? '', ['tinymce', 'plaintext', 'autobr
 $routeModeDefault = in_array($routeModeDefault ?? 'slug', ['slug', 'id'], true)
     ? (string) $routeModeDefault
     : 'slug';
+$defaultCategorySetSelection = is_array($defaultCategorySetSelection ?? null) ? $defaultCategorySetSelection : [1];
+$defaultTagSetSelection = is_array($defaultTagSetSelection ?? null) ? $defaultTagSetSelection : [1];
 $categoryEnabled = (bool) ($categoryEnabled ?? true);
 $tagEnabled = (bool) ($tagEnabled ?? true);
 $routeSeparatorDefault = in_array($routeSeparatorDefault ?? '-', ['-', '_'], true)
@@ -568,7 +572,12 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                     <div class="form-group">
                         <label for="channel_slug" class="form-label">Channel</label>
                         <select id="channel_slug" name="channel_slug" class="form-select">
-                            <option value=""<?= $selectedChannelSlug === '' ? ' selected' : '' ?>>&lt;none&gt;</option>
+                            <option
+                                value=""
+                                data-rvn-channel-category-sets="<?= e(implode(',', array_map('strval', $defaultCategorySetSelection))) ?>"
+                                data-rvn-channel-tag-sets="<?= e(implode(',', array_map('strval', $defaultTagSetSelection))) ?>"
+                                <?= $selectedChannelSlug === '' ? ' selected' : '' ?>
+                            >&lt;none&gt;</option>
                             <?php foreach ($channelOptions as $channel): ?>
                                 <?php $slug = (string) ($channel['slug'] ?? ''); ?>
                                 <?php
@@ -590,8 +599,8 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                     data-rvn-channel-editor-override="<?= e($channelEditorOverride) ?>"
                                     data-rvn-channel-route-mode="<?= e($channelRouteMode) ?>"
                                     data-rvn-channel-route-separator="<?= e($channelUrlSeparator) ?>"
-                                    data-rvn-channel-category-sets="<?= e(implode(',', array_map('strval', is_array($channel['category_sets'] ?? null) ? $channel['category_sets'] : ['all']))) ?>"
-                                    data-rvn-channel-tag-sets="<?= e(implode(',', array_map('strval', is_array($channel['tag_sets'] ?? null) ? $channel['tag_sets'] : ['all']))) ?>"
+                                    data-rvn-channel-category-sets="<?= e(implode(',', array_map('strval', is_array($channel['category_sets'] ?? null) ? $channel['category_sets'] : $defaultCategorySetSelection))) ?>"
+                                    data-rvn-channel-tag-sets="<?= e(implode(',', array_map('strval', is_array($channel['tag_sets'] ?? null) ? $channel['tag_sets'] : $defaultTagSetSelection))) ?>"
                                     <?= $selectedChannelSlug === $slug ? ' selected' : '' ?>
                                 >
                                     <?= e((string) ($channel['name'] ?? $slug)) ?> (<?= e($slug) ?>)
@@ -1925,16 +1934,19 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
     return {
       syncAllowedSets: function (selectionValue) {
         var normalized = String(selectionValue || '').trim().toLowerCase();
-        var allowAll = normalized === '' || normalized === 'all';
+        var allowAll = false;
         var allowed = new Set();
-        if (!allowAll) {
-          normalized.split(',').forEach(function (part) {
-            var value = String(part || '').trim();
-            if (value !== '') {
-              allowed.add(value);
-            }
-          });
-        }
+        normalized.split(',').forEach(function (part) {
+          var value = String(part || '').trim();
+          if (value === '') {
+            return;
+          }
+          if (value === '0') {
+            allowAll = true;
+            return;
+          }
+          allowed.add(value);
+        });
 
         picker.querySelectorAll('[data-rvn-add-chip="' + kind + '"]').forEach(function (button) {
           if (!(button instanceof HTMLElement) || !(button.parentElement instanceof HTMLElement)) {
@@ -3355,11 +3367,11 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
       }
 
       var selectedOption = channelSelect.options[channelSelect.selectedIndex];
-      var categorySelection = 'all';
-      var tagSelection = 'all';
+      var categorySelection = '0';
+      var tagSelection = '0';
       if (selectedOption instanceof HTMLOptionElement) {
-        categorySelection = String(selectedOption.getAttribute('data-rvn-channel-category-sets') || 'all');
-        tagSelection = String(selectedOption.getAttribute('data-rvn-channel-tag-sets') || 'all');
+        categorySelection = String(selectedOption.getAttribute('data-rvn-channel-category-sets') || '0');
+        tagSelection = String(selectedOption.getAttribute('data-rvn-channel-tag-sets') || '0');
       }
 
       if (typeof ravenCategoryChipPicker !== 'undefined' && ravenCategoryChipPicker && typeof ravenCategoryChipPicker.syncAllowedSets === 'function') {

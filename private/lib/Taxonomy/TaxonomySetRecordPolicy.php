@@ -9,11 +9,12 @@ namespace Raven\Lib\Taxonomy;
  */
 final class TaxonomySetRecordPolicy
 {
-    public const ROOT_SET_ID = 0;
-    public const ROOT_SET_SLUG = 'root';
-    public const ROOT_SET_NAME = 'Default Set';
+    public const ALL_SET_ID = 0;
+    public const DEFAULT_SET_ID = 1;
+    public const DEFAULT_SET_SLUG = 'default';
+    public const DEFAULT_SET_NAME = 'Default Set';
 
-    public static function normalizeSetId(mixed $value): ?int
+    public static function normalizeSetId(mixed $value, bool $allowAll = false): ?int
     {
         if (!is_scalar($value) && $value !== null) {
             return null;
@@ -29,7 +30,11 @@ final class TaxonomySetRecordPolicy
         }
 
         $id = (int) $normalized;
-        return $id >= self::ROOT_SET_ID ? $id : null;
+        if ($allowAll && $id === self::ALL_SET_ID) {
+            return self::ALL_SET_ID;
+        }
+
+        return $id >= self::DEFAULT_SET_ID ? $id : null;
     }
 
     public static function normalizeSlug(string $value): string
@@ -65,7 +70,7 @@ final class TaxonomySetRecordPolicy
             }
 
             if ($normalized === 'all') {
-                return ['all'];
+                return [self::ALL_SET_ID];
             }
 
             if (preg_match('/^\d+$/', $normalized) !== 1) {
@@ -73,7 +78,11 @@ final class TaxonomySetRecordPolicy
             }
 
             $setId = (int) $normalized;
-            if ($setId < self::ROOT_SET_ID) {
+            if ($setId === self::ALL_SET_ID) {
+                return [self::ALL_SET_ID];
+            }
+
+            if ($setId < self::DEFAULT_SET_ID) {
                 continue;
             }
 
@@ -81,7 +90,7 @@ final class TaxonomySetRecordPolicy
         }
 
         if ($selection === []) {
-            return $defaultAll ? ['all'] : [];
+            return $defaultAll ? [self::ALL_SET_ID] : [];
         }
 
         ksort($selection, SORT_NUMERIC);
@@ -94,7 +103,7 @@ final class TaxonomySetRecordPolicy
     public static function selectionIncludesAll(array $selection): bool
     {
         foreach ($selection as $item) {
-            if (strtolower(trim((string) $item)) === 'all') {
+            if (self::normalizeSetId($item, true) === self::ALL_SET_ID) {
                 return true;
             }
         }

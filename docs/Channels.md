@@ -48,8 +48,8 @@ Fields/options:
 - `Syndication`
 - `Enable Feed?` (shown only when global feeds are enabled)
 - `Enable dedicated sub-feeds for this channel.`
-- `Category Sets` checkbox list with `All Sets`
-- `Tag Sets` checkbox list with `All Sets`
+- `Category Sets` checkbox list with `Use System Default` and `All Sets`
+- `Tag Sets` checkbox list with `Use System Default` and `All Sets`
 - `Cover Image` (optional, single file)
 - `Preview Image` (optional, single file)
 - `Remove current cover image` checkbox (shown when a cover image exists)
@@ -70,9 +70,11 @@ Feed behavior notes:
 
 Taxonomy set behavior notes:
 
-- Channels can allow `All Sets` or an explicit subset of category/tag sets.
+- New channels default to `Use System Default`, which stores no explicit set selection and falls back to `category.set` / `tag.set` from System Configuration.
+- Channels can explicitly switch to `All Sets` or an explicit subset of category/tag sets.
+- When `All Sets` is checked, the UI keeps every set visibly checked but only stores the `0` sentinel in the channel record.
 - Those assignments control which categories and tags remain available in the Page Editor when that channel is selected.
-- Channel records store those assignments in `private/dat/channel/{slug}.php`.
+- Channel records store those assignments in `private/dat/channel/{id}_{slug}.php`.
 
 Delete behavior note:
 
@@ -143,7 +145,7 @@ All state-changing routes use CSRF validation.
   - updates `pages.channel_id` to `0`
   - updates `redirects.channel_id` to `0`
   - deletes channel row
-- `listRecords()` ensures `private/dat/channel/root.php` exists with reserved id `0`, name `<root>`, and slug `root`.
+- `listRecords()` ensures `private/dat/channel/0_root.php` exists with reserved id `0`, name `<root>`, and slug `root`.
 
 Storage detail:
 

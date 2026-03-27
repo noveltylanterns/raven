@@ -35,10 +35,11 @@ final class TaxonomySetFileStoreService
     public function listSetFilePaths(): array
     {
         $this->ensureDirectory();
-        $paths = glob($this->setDirectory . '/*.php') ?: [];
+        $this->normalizeStorageLayout();
+        $paths = $this->rawSetFilePaths();
         usort($paths, static function (string $left, string $right): int {
-            $leftId = (int) pathinfo($left, PATHINFO_FILENAME);
-            $rightId = (int) pathinfo($right, PATHINFO_FILENAME);
+            $leftId = self::filenameId($left);
+            $rightId = self::filenameId($right);
             if ($leftId !== $rightId) {
                 return $leftId <=> $rightId;
             }
@@ -48,9 +49,15 @@ final class TaxonomySetFileStoreService
         return $paths;
     }
 
-    public function pathForId(int $id): string
+    public function pathForRecord(int $id, string $slug): string
     {
-        return $this->setDirectory . '/' . max(0, $id) . '.php';
+        $safeId = max(0, $id);
+        $safeSlug = TaxonomySetRecordPolicy::normalizeSlug($slug);
+        if ($safeSlug === '') {
+            $safeSlug = 'set-' . $safeId;
+        }
+
+        return $this->setDirectory . '/' . $safeId . '_' . $safeSlug . '.php';
     }
 
     /**
@@ -58,7 +65,32 @@ final class TaxonomySetFileStoreService
      */
     public function loadRawById(int $id): array
     {
-        $path = $this->pathForId($id);
+        $path = $this->findPathById($id);
+        if ($path === null) {
+            return [];
+        }
+
+        return $this->loadRawByPath($path);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function loadRawBySlug(string $slug): array
+    {
+        $path = $this->findPathBySlug($slug);
+        if ($path === null) {
+            return [];
+        }
+
+        return $this->loadRawByPath($path);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function loadRawByPath(string $path): array
+    {
         if (!is_file($path)) {
             return [];
         }
@@ -80,14 +112,13 @@ final class TaxonomySetFileStoreService
      */
     public function loadRecordFromPath(string $path): ?array
     {
-        $basename = basename($path, '.php');
-        if ($basename === '' || preg_match('/^\d+$/', $basename) !== 1) {
+        $raw = $this->loadRawByPath($path);
+        if ($raw === []) {
             return null;
         }
 
-        $recordId = (int) $basename;
-        $raw = $this->loadRawById($recordId);
-        if ($raw === []) {
+        $recordId = $this->recordIdFromRaw($raw, $path);
+        if ($recordId === null) {
             return null;
         }
 
@@ -103,7 +134,8 @@ final class TaxonomySetFileStoreService
     public function writeRecordById(int $id, array $record): void
     {
         $this->ensureDirectory();
-        $path = $this->pathForId($id);
+        $slug = $this->recordSlugFromRaw($record, $id, $id === TaxonomySetRecordPolicy::DEFAULT_SET_ID ? TaxonomySetRecordPolicy::DEFAULT_SET_SLUG : '');
+        $path = $this->pathForRecord($id, $slug);
         $content = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export($record, true) . ";\n";
 
         $tmpPath = $path . '.tmp';
@@ -118,24 +150,34 @@ final class TaxonomySetFileStoreService
 
         $this->invalidatePhpFileCache($tmpPath);
         $this->invalidatePhpFileCache($path);
+
+        foreach ($this->candidatePathsForId($id) as $candidatePath) {
+            if ($candidatePath === $path || !is_file($candidatePath)) {
+                continue;
+            }
+
+            @unlink($candidatePath);
+            $this->invalidatePhpFileCache($candidatePath);
+        }
     }
 
     public function deleteById(int $id): void
     {
-        $path = $this->pathForId($id);
-        if (!is_file($path)) {
-            return;
-        }
+        foreach ($this->candidatePathsForId($id) as $path) {
+            if (!is_file($path)) {
+                continue;
+            }
 
-        @unlink($path);
-        $this->invalidatePhpFileCache($path);
+            @unlink($path);
+            $this->invalidatePhpFileCache($path);
+        }
     }
 
     public function nextAvailableId(): int
     {
         $maxId = 0;
         foreach ($this->listSetFilePaths() as $path) {
-            $id = (int) pathinfo($path, PATHINFO_FILENAME);
+            $id = $this->recordIdFromRaw($this->loadRawByPath($path), $path) ?? 0;
             if ($id > $maxId) {
                 $maxId = $id;
             }
@@ -149,12 +191,196 @@ final class TaxonomySetFileStoreService
      */
     public function ensureRootRecord(array $rootRecord): void
     {
-        $path = $this->pathForId(TaxonomySetRecordPolicy::ROOT_SET_ID);
-        if (is_file($path) && $this->loadRawById(TaxonomySetRecordPolicy::ROOT_SET_ID) !== []) {
+        $this->normalizeStorageLayout();
+        $path = $this->pathForRecord(TaxonomySetRecordPolicy::DEFAULT_SET_ID, TaxonomySetRecordPolicy::DEFAULT_SET_SLUG);
+        $raw = $this->loadRawById(TaxonomySetRecordPolicy::DEFAULT_SET_ID);
+        if (is_file($path) && $raw !== [] && !$this->defaultRecordNeedsRewrite($raw)) {
             return;
         }
 
-        $this->writeRecordById(TaxonomySetRecordPolicy::ROOT_SET_ID, $rootRecord);
+        $this->writeRecordById(TaxonomySetRecordPolicy::DEFAULT_SET_ID, $rootRecord);
+    }
+
+    /**
+     * @param array<string, mixed> $raw
+     */
+    private function defaultRecordNeedsRewrite(array $raw): bool
+    {
+        return TaxonomySetRecordPolicy::normalizeSetId($raw['id'] ?? null) !== TaxonomySetRecordPolicy::DEFAULT_SET_ID
+            || trim((string) ($raw['name'] ?? '')) !== TaxonomySetRecordPolicy::DEFAULT_SET_NAME
+            || TaxonomySetRecordPolicy::normalizeSlug((string) ($raw['slug'] ?? '')) !== TaxonomySetRecordPolicy::DEFAULT_SET_SLUG;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function rawSetFilePaths(): array
+    {
+        $paths = glob($this->setDirectory . '/*.php') ?: [];
+        sort($paths, SORT_STRING);
+        return $paths;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function candidatePathsForId(int $id): array
+    {
+        $this->ensureDirectory();
+        $normalizedId = max(0, $id);
+        $paths = [];
+        $legacyPath = $this->setDirectory . '/' . $normalizedId . '.php';
+        if (is_file($legacyPath)) {
+            $paths[] = $legacyPath;
+        }
+
+        foreach (glob($this->setDirectory . '/' . $normalizedId . '_*.php') ?: [] as $path) {
+            $paths[] = $path;
+        }
+
+        foreach ($this->rawSetFilePaths() as $path) {
+            if (in_array($path, $paths, true)) {
+                continue;
+            }
+
+            $raw = $this->loadRawByPath($path);
+            if (($this->recordIdFromRaw($raw, $path) ?? -1) === $normalizedId) {
+                $paths[] = $path;
+            }
+        }
+
+        return array_values(array_unique($paths));
+    }
+
+    private function findPathById(int $id): ?string
+    {
+        $paths = $this->candidatePathsForId($id);
+        return $paths === [] ? null : $paths[0];
+    }
+
+    private function findPathBySlug(string $slug): ?string
+    {
+        $this->ensureDirectory();
+        $normalizedSlug = TaxonomySetRecordPolicy::normalizeSlug($slug);
+        if ($normalizedSlug === '') {
+            return null;
+        }
+
+        foreach ($this->rawSetFilePaths() as $path) {
+            $raw = $this->loadRawByPath($path);
+            if ($raw === []) {
+                continue;
+            }
+
+            $recordId = $this->recordIdFromRaw($raw, $path);
+            if ($recordId === null) {
+                continue;
+            }
+
+            $recordSlug = $this->recordSlugFromRaw($raw, $recordId, basename($path, '.php'));
+            if ($recordSlug === $normalizedSlug) {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeStorageLayout(): void
+    {
+        foreach ($this->rawSetFilePaths() as $path) {
+            $raw = $this->loadRawByPath($path);
+            if ($raw === []) {
+                continue;
+            }
+
+            $recordId = $this->recordIdFromRaw($raw, $path);
+            if ($recordId === null) {
+                continue;
+            }
+
+            $recordSlug = $this->recordSlugFromRaw($raw, $recordId, basename($path, '.php'));
+            $canonical = $raw;
+            $canonical['id'] = $recordId;
+            $canonical['slug'] = $recordSlug;
+            if ($recordId === TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
+                $canonical['name'] = TaxonomySetRecordPolicy::DEFAULT_SET_NAME;
+                $canonical['slug'] = TaxonomySetRecordPolicy::DEFAULT_SET_SLUG;
+            }
+
+            $targetPath = $this->pathForRecord($recordId, (string) $canonical['slug']);
+            $needsRewrite = $path !== $targetPath || $canonical !== $raw;
+            if (!$needsRewrite) {
+                continue;
+            }
+
+            $this->writeRecordById($recordId, $canonical);
+            if ($path !== $targetPath && is_file($path)) {
+                @unlink($path);
+                $this->invalidatePhpFileCache($path);
+            }
+        }
+    }
+
+    private function recordIdFromRaw(array $raw, string $path): ?int
+    {
+        $rawId = TaxonomySetRecordPolicy::normalizeSetId($raw['id'] ?? null, true);
+        $filenameId = self::filenameId($path);
+
+        if ($rawId === TaxonomySetRecordPolicy::ALL_SET_ID || $filenameId === TaxonomySetRecordPolicy::ALL_SET_ID) {
+            return TaxonomySetRecordPolicy::DEFAULT_SET_ID;
+        }
+
+        if ($rawId !== null) {
+            return $rawId;
+        }
+
+        if ($filenameId >= TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
+            return $filenameId;
+        }
+
+        return null;
+    }
+
+    private function recordSlugFromRaw(array $raw, int $id, string $fallback): string
+    {
+        if ($id === TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
+            return TaxonomySetRecordPolicy::DEFAULT_SET_SLUG;
+        }
+
+        $slug = TaxonomySetRecordPolicy::normalizeSlug((string) ($raw['slug'] ?? ''));
+        if ($slug !== '') {
+            return $slug;
+        }
+
+        if (preg_match('/^\d+_([a-z0-9-]+)$/', $fallback, $matches) === 1) {
+            $slug = TaxonomySetRecordPolicy::normalizeSlug((string) ($matches[1] ?? ''));
+            if ($slug !== '') {
+                return $slug;
+            }
+        }
+
+        $slug = TaxonomySetRecordPolicy::normalizeSlug($fallback);
+        if ($slug !== '' && preg_match('/^\d+$/', $slug) !== 1) {
+            return $slug;
+        }
+
+        $nameSlug = TaxonomySetRecordPolicy::normalizeSlug((string) ($raw['name'] ?? ''));
+        if ($nameSlug !== '') {
+            return $nameSlug;
+        }
+
+        return 'set-' . $id;
+    }
+
+    private static function filenameId(string $path): int
+    {
+        $basename = basename($path, '.php');
+        if (preg_match('/^(\d+)(?:_[a-z0-9-]+)?$/', $basename, $matches) === 1) {
+            return (int) ($matches[1] ?? 0);
+        }
+
+        return -1;
     }
 
     private function invalidatePhpFileCache(string $path): void

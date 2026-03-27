@@ -15,7 +15,7 @@
 - Extended the page-editor shortcode provider context so `private/ext/{slug}/lib/shortcodes.php` callables now receive Raven `config` alongside the existing extension/form helpers, and updated the extension scaffold/docs to advertise that supported contract.
 - Promoted `smallweb` into the bundled stock-extension set so panel/update/CLI stock-extension rules now treat it like the shipped core packages and protect it from uninstalling bundled files.
 - Added `site:feed_rss_url` and `site:feed_atom_url` to the public wrapper payload so stock/scaffold wrappers can emit `<link rel="alternate">` discovery tags for the configured root RSS and Atom feeds.
-- Added numeric taxonomy sets for categories and tags, including stock `Default Set` `#0`, file-backed set definitions under `private/dat/category-set/` and `private/dat/tag-set/`, channel-level `All Sets` assignment checklists, set-aware category/tag editors and list filters, and page-editor enforcement so channels only use categories/tags from their allowed sets.
+- Added numeric taxonomy sets for categories and tags, moved the stock `Default Set` to id `1` with slug `default`, reserved id `0` as the `All Sets` sentinel for channel assignment lists, added config-level `category.set` / `tag.set` root-channel fallback selectors, added a `Use System Default` channel-assignment state that persists as an empty selection, normalized taxonomy-set and channel flat files to `id_slug.php` naming under `private/dat/`, and enforced set-aware category/tag filtering in the page editor.
 
 ### March 24, 2026
 

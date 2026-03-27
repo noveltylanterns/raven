@@ -44,7 +44,7 @@ final class TaxonomySetRepository
 
             $setId = (int) ($loaded['id'] ?? -1);
             $raw = is_array($loaded['raw'] ?? null) ? $loaded['raw'] : [];
-            if ($setId < TaxonomySetRecordPolicy::ROOT_SET_ID || $raw === []) {
+            if ($setId < TaxonomySetRecordPolicy::DEFAULT_SET_ID || $raw === []) {
                 continue;
             }
 
@@ -54,7 +54,7 @@ final class TaxonomySetRepository
         usort($rows, static function (array $left, array $right): int {
             $leftId = (int) ($left['id'] ?? 0);
             $rightId = (int) ($right['id'] ?? 0);
-            if ($leftId === TaxonomySetRecordPolicy::ROOT_SET_ID || $rightId === TaxonomySetRecordPolicy::ROOT_SET_ID) {
+            if ($leftId === TaxonomySetRecordPolicy::DEFAULT_SET_ID || $rightId === TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
                 return $leftId <=> $rightId;
             }
 
@@ -81,7 +81,7 @@ final class TaxonomySetRepository
                 'id' => (int) ($row['id'] ?? 0),
                 'name' => (string) ($row['name'] ?? ''),
                 'slug' => (string) ($row['slug'] ?? ''),
-                'is_root' => (int) ($row['id'] ?? -1) === TaxonomySetRecordPolicy::ROOT_SET_ID,
+                'is_root' => (int) ($row['id'] ?? -1) === TaxonomySetRecordPolicy::DEFAULT_SET_ID,
             ];
         }
 
@@ -115,9 +115,9 @@ final class TaxonomySetRepository
         $description = trim((string) ($data['description'] ?? ''));
         $slug = TaxonomySetRecordPolicy::normalizeSlug((string) ($data['slug'] ?? ''));
 
-        if ($setId === TaxonomySetRecordPolicy::ROOT_SET_ID) {
-            $name = TaxonomySetRecordPolicy::ROOT_SET_NAME;
-            $slug = TaxonomySetRecordPolicy::ROOT_SET_SLUG;
+        if ($setId === TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
+            $name = TaxonomySetRecordPolicy::DEFAULT_SET_NAME;
+            $slug = TaxonomySetRecordPolicy::DEFAULT_SET_SLUG;
         }
 
         if ($name === '' || !TaxonomySetRecordPolicy::isValidSlug($slug)) {
@@ -146,7 +146,7 @@ final class TaxonomySetRepository
             'name' => $name,
             'slug' => $slug,
             'description' => $description,
-            'is_stock' => $setId === TaxonomySetRecordPolicy::ROOT_SET_ID,
+            'is_stock' => $setId === TaxonomySetRecordPolicy::DEFAULT_SET_ID,
             'created_at' => $createdAt,
         ];
 
@@ -157,8 +157,8 @@ final class TaxonomySetRepository
 
     public function deleteById(int $id): void
     {
-        if ($id === TaxonomySetRecordPolicy::ROOT_SET_ID) {
-            throw new RuntimeException('The stock root set cannot be deleted.');
+        if ($id === TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
+            throw new RuntimeException('The stock default set cannot be deleted.');
         }
 
         $this->fileStore->deleteById($id);
@@ -176,9 +176,9 @@ final class TaxonomySetRepository
         $description = trim((string) ($raw['description'] ?? ''));
         $createdAt = trim((string) ($raw['created_at'] ?? ''));
 
-        if ($id === TaxonomySetRecordPolicy::ROOT_SET_ID) {
-            $name = TaxonomySetRecordPolicy::ROOT_SET_NAME;
-            $slug = TaxonomySetRecordPolicy::ROOT_SET_SLUG;
+        if ($id === TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
+            $name = TaxonomySetRecordPolicy::DEFAULT_SET_NAME;
+            $slug = TaxonomySetRecordPolicy::DEFAULT_SET_SLUG;
         } else {
             if ($name === '') {
                 $name = ucwords(str_replace('-', ' ', $slug !== '' ? $slug : ('set-' . $id)));
@@ -200,7 +200,7 @@ final class TaxonomySetRepository
             'name' => $name,
             'slug' => $slug,
             'description' => $description,
-            'is_stock' => $id === TaxonomySetRecordPolicy::ROOT_SET_ID,
+            'is_stock' => $id === TaxonomySetRecordPolicy::DEFAULT_SET_ID,
             'created_at' => $createdAt,
         ];
     }
@@ -211,10 +211,10 @@ final class TaxonomySetRepository
     private function rootRecord(): array
     {
         return [
-            'id' => TaxonomySetRecordPolicy::ROOT_SET_ID,
-            'name' => TaxonomySetRecordPolicy::ROOT_SET_NAME,
-            'slug' => TaxonomySetRecordPolicy::ROOT_SET_SLUG,
-            'description' => '',
+            'id' => TaxonomySetRecordPolicy::DEFAULT_SET_ID,
+            'name' => TaxonomySetRecordPolicy::DEFAULT_SET_NAME,
+            'slug' => TaxonomySetRecordPolicy::DEFAULT_SET_SLUG,
+            'description' => 'If you do not configure a channel/tag set, one will be provided for you.',
             'is_stock' => true,
             'created_at' => gmdate('Y-m-d H:i:s'),
         ];

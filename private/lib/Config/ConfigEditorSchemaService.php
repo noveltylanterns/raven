@@ -45,8 +45,10 @@ final class ConfigEditorSchemaService
         'feed.items' => 'Feed Items',
         'feed.rss' => 'RSS Feed Route',
         'feed.atom' => 'Atom Feed Route',
+        'category.set' => 'Default Category Set',
         'category.prefix' => 'Category URL Prefix',
         'category.pagination' => 'Pagination',
+        'tag.set' => 'Default Tag Set',
         'tag.prefix' => 'Tag URL Prefix',
         'tag.pagination' => 'Pagination',
         'meta.twitter.card' => 'Twitter Card',
@@ -349,6 +351,15 @@ final class ConfigEditorSchemaService
             $category['enabled'] = ConfigValueParser::bool($category['enabled'], false);
         }
 
+        if (!array_key_exists('set', $category)) {
+            $category['set'] = 1;
+        } else {
+            $rawCategorySetId = trim((string) ($category['set'] ?? ''));
+            $category['set'] = preg_match('/^\d+$/', $rawCategorySetId) === 1
+                ? max(1, (int) $rawCategorySetId)
+                : 1;
+        }
+
         if (!array_key_exists('prefix', $category)) {
             $category['prefix'] = 'cat';
         } else {
@@ -371,6 +382,15 @@ final class ConfigEditorSchemaService
             $tag['enabled'] = false;
         } else {
             $tag['enabled'] = ConfigValueParser::bool($tag['enabled'], false);
+        }
+
+        if (!array_key_exists('set', $tag)) {
+            $tag['set'] = 1;
+        } else {
+            $rawTagSetId = trim((string) ($tag['set'] ?? ''));
+            $tag['set'] = preg_match('/^\d+$/', $rawTagSetId) === 1
+                ? max(1, (int) $rawTagSetId)
+                : 1;
         }
 
         if (!array_key_exists('prefix', $tag)) {

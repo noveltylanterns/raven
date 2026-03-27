@@ -34,8 +34,8 @@ $channelId = (int) ($channel['id'] ?? 0);
 $hasPersistedChannel = $channelId > 0;
 $channelSlug = trim((string) ($channel['slug'] ?? ''));
 $feedEnabled = (bool) ($channel['feed_enabled'] ?? false);
-$selectedCategorySets = is_array($channel['category_sets'] ?? null) ? $channel['category_sets'] : ['all'];
-$selectedTagSets = is_array($channel['tag_sets'] ?? null) ? $channel['tag_sets'] : ['all'];
+$selectedCategorySets = is_array($channel['category_sets'] ?? null) ? $channel['category_sets'] : [];
+$selectedTagSets = is_array($channel['tag_sets'] ?? null) ? $channel['tag_sets'] : [];
 $editorOverride = strtolower(trim((string) ($channel['editor_override'] ?? 'inherit')));
 if (!in_array($editorOverride, ['inherit', 'tinymce', 'plaintext', 'autobr', 'markdown'], true)) {
     $editorOverride = 'inherit';
@@ -297,17 +297,30 @@ if ($atomFeedRoute !== '') {
             <h3>Assignments</h3>
             <?php endif; ?>
             <?php if ($categoryEnabled): ?>
-                <?php $allCategorySetsSelected = in_array('all', $selectedCategorySets, true); ?>
-                <div class="form-group mb-0 mt-3">
+                <?php $useCategorySystemDefault = $selectedCategorySets === []; ?>
+                <?php $allCategorySetsSelected = in_array(0, array_map('intval', $selectedCategorySets), true); ?>
+                <div class="form-group mb-3">
                     <label class="form-label">Category Sets</label>
                     <div class="border rounded p-3" data-rvn-set-selection="category">
                         <div class="form-check mb-2">
                             <input
                                 class="form-check-input"
                                 type="checkbox"
+                                id="category_sets_default"
+                                name="category_sets[]"
+                                value="default"
+                                data-rvn-set-default="1"
+                                <?= $useCategorySystemDefault ? 'checked' : '' ?>
+                            >
+                            <label class="form-check-label fw-bold" for="category_sets_default">Use System Default</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
                                 id="category_sets_all"
                                 name="category_sets[]"
-                                value="all"
+                                value="0"
                                 data-rvn-set-all="1"
                                 <?= $allCategorySetsSelected ? 'checked' : '' ?>
                             >
@@ -326,6 +339,7 @@ if ($atomFeedRoute !== '') {
                                     value="<?= $setId ?>"
                                     data-rvn-set-item="1"
                                     <?= $setChecked ? 'checked' : '' ?>
+                                    <?= $allCategorySetsSelected ? ' disabled' : '' ?>
                                 >
                                 <label class="form-check-label" for="category_set_<?= $setId ?>">
                                     <?= e((string) ($setOption['name'] ?? 'Set')) ?><?= $setSlug !== '' ? ' (' . e($setSlug) . ')' : '' ?>
@@ -337,17 +351,30 @@ if ($atomFeedRoute !== '') {
             <?php endif; ?>
 
             <?php if ($tagEnabled): ?>
-                <?php $allTagSetsSelected = in_array('all', $selectedTagSets, true); ?>
-                <div class="form-group mb-3 mt-3">
+                <?php $useTagSystemDefault = $selectedTagSets === []; ?>
+                <?php $allTagSetsSelected = in_array(0, array_map('intval', $selectedTagSets), true); ?>
+                <div class="form-group mb-3">
                     <label class="form-label">Tag Sets</label>
                     <div class="border rounded p-3" data-rvn-set-selection="tag">
                         <div class="form-check mb-2">
                             <input
                                 class="form-check-input"
                                 type="checkbox"
+                                id="tag_sets_default"
+                                name="tag_sets[]"
+                                value="default"
+                                data-rvn-set-default="1"
+                                <?= $useTagSystemDefault ? 'checked' : '' ?>
+                            >
+                            <label class="form-check-label fw-bold" for="tag_sets_default">Use System Default</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
                                 id="tag_sets_all"
                                 name="tag_sets[]"
-                                value="all"
+                                value="0"
                                 data-rvn-set-all="1"
                                 <?= $allTagSetsSelected ? 'checked' : '' ?>
                             >
@@ -366,6 +393,7 @@ if ($atomFeedRoute !== '') {
                                     value="<?= $setId ?>"
                                     data-rvn-set-item="1"
                                     <?= $setChecked ? 'checked' : '' ?>
+                                    <?= $allTagSetsSelected ? ' disabled' : '' ?>
                                 >
                                 <label class="form-check-label" for="tag_set_<?= $setId ?>">
                                     <?= e((string) ($setOption['name'] ?? 'Set')) ?><?= $setSlug !== '' ? ' (' . e($setSlug) . ')' : '' ?>
@@ -398,7 +426,7 @@ if ($atomFeedRoute !== '') {
             <hr class="my-4">
 
             <h3>Routing</h3>
-            <div class="form-group mb-0">
+            <div class="form-group mb-3">
                 <label for="route_mode" class="form-label">Route Mode</label>
                 <select id="route_mode" name="route_mode" class="form-select">
                     <option value="inherit"<?= $routeMode === 'inherit' ? ' selected' : '' ?>>Use System Default</option>
@@ -414,7 +442,7 @@ if ($atomFeedRoute !== '') {
                 </div>
             </div>
 
-            <div class="form-group mb-0 mt-3">
+            <div class="form-group mb-3">
                 <label class="form-label d-block">Route Separator</label>
                 <div class="border rounded p-3" data-rvn-set-selection="separator">
                 <div class="form-check">
@@ -454,7 +482,7 @@ if ($atomFeedRoute !== '') {
             </div>
 
             <?php if ($feedsEnabled): ?>
-                <div class="form-group mb-0 mt-3">
+                <div class="form-group mb-3">
                     <label class="form-label d-block">Syndication</label>
                     <div class="border rounded p-3" data-rvn-set-selection="syndication">
                     <div class="form-check">
@@ -508,8 +536,9 @@ if ($atomFeedRoute !== '') {
         return;
       }
 
+      var defaultToggle = container.querySelector('[data-rvn-set-default="1"]');
       var allToggle = container.querySelector('[data-rvn-set-all="1"]');
-      if (!(allToggle instanceof HTMLInputElement)) {
+      if (!(allToggle instanceof HTMLInputElement) && !(defaultToggle instanceof HTMLInputElement)) {
         return;
       }
 
@@ -517,35 +546,114 @@ if ($atomFeedRoute !== '') {
         return checkbox instanceof HTMLInputElement;
       });
 
-      function syncItemsFromAll() {
-        items.forEach(function (checkbox) {
-          checkbox.checked = allToggle.checked;
-        });
-        allToggle.indeterminate = false;
+      function checkedItemCount() {
+        return items.filter(function (checkbox) {
+          return checkbox.checked;
+        }).length;
       }
 
-      function syncAllState() {
-        if (items.length === 0) {
-          allToggle.indeterminate = false;
+      function syncDisabledState() {
+        items.forEach(function (checkbox) {
+          checkbox.disabled = allToggle instanceof HTMLInputElement && allToggle.checked;
+        });
+      }
+
+      function activateSystemDefault() {
+        if (!(defaultToggle instanceof HTMLInputElement) || !defaultToggle.checked) {
           return;
         }
 
-        var checkedCount = items.filter(function (checkbox) {
-          return checkbox.checked;
-        }).length;
-
-        allToggle.checked = checkedCount === items.length;
-        allToggle.indeterminate = checkedCount > 0 && checkedCount < items.length;
+        if (allToggle instanceof HTMLInputElement) {
+          allToggle.checked = false;
+          allToggle.indeterminate = false;
+        }
+        items.forEach(function (checkbox) {
+          checkbox.checked = false;
+        });
+        syncDisabledState();
       }
 
-      allToggle.addEventListener('change', syncItemsFromAll);
+      function activateAllSets() {
+        if (!(allToggle instanceof HTMLInputElement)) {
+          return;
+        }
+
+        if (allToggle.checked && defaultToggle instanceof HTMLInputElement) {
+          defaultToggle.checked = false;
+        }
+
+        if (allToggle.checked) {
+          items.forEach(function (checkbox) {
+            checkbox.checked = true;
+          });
+        }
+
+        allToggle.indeterminate = false;
+        syncDisabledState();
+      }
+
+      function syncSelectionState() {
+        var checkedCount = checkedItemCount();
+
+        if (defaultToggle instanceof HTMLInputElement) {
+          if (checkedCount > 0 || (allToggle instanceof HTMLInputElement && allToggle.checked)) {
+            defaultToggle.checked = false;
+          } else if (!defaultToggle.checked) {
+            defaultToggle.checked = true;
+          }
+        }
+
+        if (allToggle instanceof HTMLInputElement) {
+          if (allToggle.checked) {
+            allToggle.indeterminate = false;
+          } else {
+            allToggle.indeterminate = checkedCount > 0 && checkedCount < items.length;
+          }
+        }
+
+        syncDisabledState();
+      }
+
+      if (defaultToggle instanceof HTMLInputElement) {
+        defaultToggle.addEventListener('change', function () {
+          if (!defaultToggle.checked && checkedItemCount() === 0 && (!(allToggle instanceof HTMLInputElement) || !allToggle.checked)) {
+            defaultToggle.checked = true;
+            return;
+          }
+
+          activateSystemDefault();
+          syncSelectionState();
+        });
+      }
+
+      if (allToggle instanceof HTMLInputElement) {
+        allToggle.addEventListener('change', function () {
+          activateAllSets();
+          syncSelectionState();
+        });
+      }
+
       items.forEach(function (checkbox) {
-        checkbox.addEventListener('change', syncAllState);
+        checkbox.addEventListener('change', function () {
+          if (defaultToggle instanceof HTMLInputElement && checkbox.checked) {
+            defaultToggle.checked = false;
+          }
+
+          if (allToggle instanceof HTMLInputElement && allToggle.checked && !checkbox.checked) {
+            allToggle.checked = false;
+          }
+
+          syncSelectionState();
+        });
       });
-      syncAllState();
-      if (allToggle.checked) {
-        syncItemsFromAll();
+
+      if (defaultToggle instanceof HTMLInputElement && defaultToggle.checked) {
+        activateSystemDefault();
+      } else if (allToggle instanceof HTMLInputElement && allToggle.checked) {
+        activateAllSets();
       }
+
+      syncSelectionState();
     }
 
     document.querySelectorAll('[data-rvn-set-selection]').forEach(function (container) {

@@ -309,7 +309,7 @@ final class CategoryRepository
         $id = $data['id'] ?? null;
         $name = $data['name'];
         $slug = $data['slug'];
-        $setId = max(0, (int) ($data['set_id'] ?? 0));
+        $setId = max(1, (int) ($data['set_id'] ?? 1));
         $description = $data['description'];
 
         if ($id !== null && $id > 0) {

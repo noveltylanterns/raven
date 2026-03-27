@@ -13,7 +13,7 @@ use function Raven\Core\Support\e;
 $panelBase = '/' . trim($site['panel_path'], '/');
 $setId = $set !== null ? (int) ($set['id'] ?? 0) : null;
 $hasPersistedSet = $set !== null;
-$isRootSet = $hasPersistedSet && $setId === 0;
+$isDefaultSet = $hasPersistedSet && $setId === 1;
 $deleteFormId = 'delete-category-set-form';
 ?>
 <header class="card">
@@ -31,7 +31,7 @@ $deleteFormId = 'delete-category-set-form';
 <div class="alert alert-danger" role="alert"><?= e($error) ?></div>
 <?php endif; ?>
 
-<?php if ($hasPersistedSet && !$isRootSet): ?>
+<?php if ($hasPersistedSet && !$isDefaultSet): ?>
 <form id="<?= e($deleteFormId) ?>" method="post" action="<?= e($panelBase) ?>/category/set/delete">
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $setId ?>">
@@ -44,7 +44,7 @@ $deleteFormId = 'delete-category-set-form';
     <nav class="rvnp-editor-actions">
         <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Category Set</button>
         <a href="<?= e($panelBase) ?>/category/set" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Sets</a>
-        <?php if ($hasPersistedSet && !$isRootSet): ?>
+        <?php if ($hasPersistedSet && !$isDefaultSet): ?>
             <button type="submit" class="btn btn-danger" form="<?= e($deleteFormId) ?>" onclick="return confirm('Delete this category set?');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Category Set</button>
         <?php endif; ?>
     </nav>
@@ -58,9 +58,9 @@ $deleteFormId = 'delete-category-set-form';
 
             <div class="form-group">
                 <label for="slug" class="form-label">Slug</label>
-                <input id="slug" name="slug" class="form-control"<?= $isRootSet ? ' readonly' : ' required' ?> value="<?= e((string) ($set['slug'] ?? '')) ?>">
-                <?php if ($isRootSet): ?>
-                    <div class="form-text">The stock Default Set keeps the reserved slug <code>root</code>.</div>
+                <input id="slug" name="slug" class="form-control<?= $isDefaultSet ? ' bg-light text-muted' : '' ?>"<?= $isDefaultSet ? ' disabled aria-disabled="true" tabindex="-1"' : ' required' ?> value="<?= e((string) ($set['slug'] ?? '')) ?>">
+                <?php if ($isDefaultSet): ?>
+                    <div class="form-text">The stock Default Set keeps the reserved slug <code>default</code>.</div>
                 <?php endif; ?>
             </div>
 
