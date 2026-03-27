@@ -470,7 +470,7 @@ final class ContactWorkflowSmokeRunner
             throw new RuntimeException('Missing login CSRF token.');
         }
 
-        $loginMode = strtolower(trim((string) $this->readConfigValue('user.auth.login', 'email')));
+        $loginMode = strtolower(trim((string) $this->readConfigValue('user.auth.method', 'email')));
         if (!in_array($loginMode, ['email', 'username'], true)) {
             $loginMode = 'email';
         }

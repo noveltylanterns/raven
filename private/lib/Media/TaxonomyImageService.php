@@ -27,7 +27,7 @@ final class TaxonomyImageService
      */
     public function allowedImageExtensions(): array
     {
-        $raw = strtolower(trim((string) $this->config->get('media.images.allowed_extensions', 'gif,jpg,jpeg,png')));
+        $raw = strtolower(trim((string) $this->config->get('media.allowed_extensions', 'gif,jpg,jpeg,png')));
         if ($raw === '') {
             return [];
         }
@@ -229,7 +229,7 @@ final class TaxonomyImageService
             return ['ok' => false, 'error' => 'Uploaded image could not be validated as an upload.'];
         }
 
-        $uploadTarget = strtolower((string) $this->config->get('media.images.upload_target', 'local'));
+        $uploadTarget = strtolower((string) $this->config->get('media.upload_target', 'local'));
         if ($uploadTarget !== 'local') {
             return ['ok' => false, 'error' => 'Only local image storage is supported in this build.'];
         }
@@ -298,7 +298,7 @@ final class TaxonomyImageService
             $source->setIteratorIndex(0);
             $this->variantProcessor->autoOrient($source);
 
-            if ((bool) $this->config->get('media.images.strip_exif', true)) {
+            if ((bool) $this->config->get('media.strip_exif', true)) {
                 $source->stripImage();
             }
 
@@ -376,16 +376,12 @@ final class TaxonomyImageService
     private function resolveMediaMaxFilesizeBytes(string $target, int $defaultBytes): int
     {
         $config = $this->config->all();
-        $section = $config['media'][$target] ?? null;
-        if (is_array($section) && array_key_exists('max_filesize_kb', $section)) {
-            $kilobytes = (int) $section['max_filesize_kb'];
-            if ($kilobytes > 0) {
-                return max(1, $kilobytes * 1024);
-            }
 
-            if ($kilobytes === 0) {
-                // `0` means unlimited file size in the config editor.
-                return 0;
+        if ($target === 'images') {
+            // New flat path: media.max_filesize_kb
+            $kb = (int) ($config['media']['max_filesize_kb'] ?? -1);
+            if ($kb >= 0) {
+                return $kb === 0 ? 0 : max(1, $kb * 1024);
             }
         }
 

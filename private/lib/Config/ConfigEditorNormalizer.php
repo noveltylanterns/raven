@@ -100,20 +100,20 @@ final class ConfigEditorNormalizer
 
     public function normalizeImageConfigValue(string $path, string $value): int|string|bool
     {
-        if ($path === 'media.images.upload_target') {
+        if ($path === 'media.upload_target') {
             $target = strtolower($value);
             if ($target !== 'local') {
-                throw new \RuntimeException('media.images.upload_target currently supports only local.');
+                throw new \RuntimeException('media.upload_target currently supports only local.');
             }
 
             return $target;
         }
 
-        if ($path === 'media.images.strip_exif') {
+        if ($path === 'media.strip_exif') {
             return $this->normalizeBool($path, $value);
         }
 
-        if ($path === 'media.images.max_filesize_kb') {
+        if ($path === 'media.max_filesize_kb') {
             $size = $this->normalizeInt($path, $value);
             if ($size < 0) {
                 throw new \RuntimeException($path . ' must be 0 or greater.');
@@ -122,7 +122,7 @@ final class ConfigEditorNormalizer
             return $size;
         }
 
-        if ($path === 'media.images.max_files_per_upload') {
+        if ($path === 'media.max_files_per_upload') {
             $count = $this->normalizeInt($path, $value);
             if ($count < 0) {
                 throw new \RuntimeException($path . ' must be 0 or greater.');
@@ -131,7 +131,7 @@ final class ConfigEditorNormalizer
             return $count;
         }
 
-        if ($path === 'media.images.allowed_extensions') {
+        if ($path === 'media.allowed_extensions') {
             $normalized = strtolower($value);
             $parts = array_map('trim', explode(',', $normalized));
             $parts = array_values(array_filter($parts, static fn (string $ext): bool => $ext !== ''));
@@ -149,12 +149,12 @@ final class ConfigEditorNormalizer
         }
 
         $dimensionPaths = [
-            'media.images.small.width',
-            'media.images.small.height',
-            'media.images.med.width',
-            'media.images.med.height',
-            'media.images.large.width',
-            'media.images.large.height',
+            'media.small.width',
+            'media.small.height',
+            'media.med.width',
+            'media.med.height',
+            'media.large.width',
+            'media.large.height',
         ];
         if (in_array($path, $dimensionPaths, true)) {
             $dimension = $this->normalizeInt($path, $value);

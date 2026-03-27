@@ -129,7 +129,7 @@ final class RouteConfigService
             $selector = 'id';
         }
 
-        $loginMode = strtolower(trim((string) $this->config->get('user.auth.login', 'email')));
+        $loginMode = strtolower(trim((string) $this->config->get('user.auth.method', 'email')));
         if ($selector === 'username' && $loginMode !== 'username') {
             return 'id';
         }
@@ -139,7 +139,7 @@ final class RouteConfigService
 
     public function profileMode(): string
     {
-        return $this->normalizeMode((string) $this->config->get('user.privacy', 'disabled'), ['public_full', 'public_limited', 'private', 'disabled'], 'disabled');
+        return $this->normalizeMode((string) $this->config->get('user.visibility', 'disabled'), ['public_full', 'public_limited', 'private', 'disabled'], 'disabled');
     }
 
     public function profileRoutesEnabledForRoutingTable(): bool
@@ -154,7 +154,7 @@ final class RouteConfigService
 
     public function groupMode(): string
     {
-        return $this->normalizeMode((string) $this->config->get('group.privacy', 'disabled'), ['public_full', 'public_limited', 'private', 'disabled'], 'disabled', ['public' => 'public_full']);
+        return $this->normalizeMode((string) $this->config->get('group.visibility', 'disabled'), ['public_full', 'public_limited', 'private', 'disabled'], 'disabled', ['public' => 'public_full']);
     }
 
     public function groupRoutesEnabledForRoutingTable(): bool

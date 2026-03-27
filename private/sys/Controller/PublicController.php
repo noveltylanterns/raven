@@ -1464,7 +1464,7 @@ final class PublicController
      */
     public function enforceSiteAvailability(): bool
     {
-        $mode = strtolower(trim((string) $this->config->get('site.enabled', 'public')));
+        $mode = strtolower(trim((string) $this->config->get('site.visibility', 'public')));
         if (!in_array($mode, ['public', 'private', 'disabled'], true)) {
             $mode = 'public';
         }

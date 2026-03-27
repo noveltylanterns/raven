@@ -20,7 +20,7 @@ return array (
     'protocol' => 'https',
     'domain' => 'SITE_DOMAIN',
     'name' => 'Raven CMS',
-    'enabled' => 'public',
+    'visibility' => 'public',
     'theme' => 'raven',
   ),
   'meta' =>
@@ -87,15 +87,17 @@ return array (
   array (
     'enabled' => false,
     'set' => 1,
-    'prefix' => 'cat',
     'pagination' => 10,
+    'prefix' => 'cat',
+    'selector' => 'slug',
   ),
   'tag' =>
   array (
     'enabled' => false,
     'set' => 1,
-    'prefix' => 'tag',
     'pagination' => 10,
+    'prefix' => 'tag',
+    'selector' => 'slug',
   ),
   'content' =>
   array (
@@ -141,35 +143,25 @@ return array (
   ),
   'media' =>
   array (
-    'images' =>
+    'upload_target' => 'local',
+    'max_filesize_kb' => 10240,
+    'max_files_per_upload' => 10,
+    'allowed_extensions' => 'gif,jpg,jpeg,png',
+    'strip_exif' => true,
+    'small' =>
     array (
-      'upload_target' => 'local',
-      'max_filesize_kb' => 10240,
-      'max_files_per_upload' => 10,
-      'allowed_extensions' => 'gif,jpg,jpeg,png',
-      'strip_exif' => true,
-      'small' =>
-      array (
-        'width' => 200,
-        'height' => 200,
-      ),
-      'med' =>
-      array (
-        'width' => 600,
-        'height' => 600,
-      ),
-      'large' =>
-      array (
-        'width' => 1000,
-        'height' => 1000,
-      ),
+      'width' => 200,
+      'height' => 200,
     ),
-    'avatars' =>
+    'med' =>
     array (
-      'max_filesize_kb' => 1024,
-      'max_width' => 800,
-      'max_height' => 800,
-      'allowed_extensions' => 'gif,jpg,jpeg,png',
+      'width' => 600,
+      'height' => 600,
+    ),
+    'large' =>
+    array (
+      'width' => 1000,
+      'height' => 1000,
     ),
   ),
   'session' =>
@@ -191,42 +183,50 @@ return array (
   array (
     'auth' =>
     array (
-      'login' => 'email',
+      'method' => 'email',
       'registration' => 'closed',
     ),
     'string' => 28,
     'bio' => 500,
-    'privacy' => 'disabled',
+    'visibility' => 'disabled',
     'selector' => 'id',
     'prefix' => 'user',
+    'avatar' =>
+    array (
+      'max_filesize_kb' => 1024,
+      'max_width' => 800,
+      'max_height' => 800,
+      'allowed_extensions' => 'gif,jpg,jpeg,png',
+    ),
     'contact' =>
     array (
       'email' =>
       array (
         'label' => 'Email',
-        'url_prefix' => 'mailto:',
+        'prefix' => 'mailto:',
       ),
       'phone' =>
       array (
         'label' => 'Phone',
-        'url_prefix' => 'tel:',
+        'prefix' => 'tel:',
       ),
       'homepage' =>
       array (
         'label' => 'Homepage',
-        'url_prefix' => 'https://',
+        'prefix' => 'https://',
       ),
       'x' =>
       array (
         'label' => 'X',
-        'url_prefix' => 'https://x.com/',
+        'prefix' => 'https://x.com/',
       ),
     ),
   ),
   'group' =>
   array (
-    'privacy' => 'disabled',
+    'visibility' => 'disabled',
     'prefix' => 'group',
+    'selector' => 'slug',
   ),
   'update' =>
   array (

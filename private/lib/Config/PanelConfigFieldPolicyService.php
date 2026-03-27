@@ -73,10 +73,10 @@ final class PanelConfigFieldPolicyService
             return $value;
         }
 
-        if ($path === 'site.enabled') {
+        if ($path === 'site.visibility') {
             $mode = strtolower(trim($value));
             if (!in_array($mode, ['public', 'private', 'disabled'], true)) {
-                throw new \RuntimeException('site.enabled must be public, private, or disabled.');
+                throw new \RuntimeException('site.visibility must be public, private, or disabled.');
             }
 
             return $mode;
@@ -145,6 +145,24 @@ final class PanelConfigFieldPolicyService
 
         if ($path === 'category.enabled' || $path === 'tag.enabled') {
             return $this->defaults->normalizeBool($path, $value);
+        }
+
+        if ($path === 'category.selector' || $path === 'tag.selector') {
+            $selector = strtolower(trim($value));
+            if (!in_array($selector, ['id', 'slug'], true)) {
+                throw new \RuntimeException($path . ' must be id or slug.');
+            }
+
+            return $selector;
+        }
+
+        if ($path === 'group.selector') {
+            $selector = strtolower(trim($value));
+            if (!in_array($selector, ['id', 'slug'], true)) {
+                throw new \RuntimeException('group.selector must be id or slug.');
+            }
+
+            return $selector;
         }
 
         if ($path === 'category.prefix' || $path === 'tag.prefix') {
@@ -282,19 +300,19 @@ final class PanelConfigFieldPolicyService
             return $prefix;
         }
 
-        if ($path === 'user.privacy') {
+        if ($path === 'user.visibility') {
             $mode = strtolower(trim($value));
             if (!in_array($mode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
-                throw new \RuntimeException('user.privacy must be public_full, public_limited, private, or disabled.');
+                throw new \RuntimeException('user.visibility must be public_full, public_limited, private, or disabled.');
             }
 
             return $mode;
         }
 
-        if ($path === 'user.auth.login') {
+        if ($path === 'user.auth.method') {
             $mode = strtolower(trim($value));
             if (!in_array($mode, ['email', 'username'], true)) {
-                throw new \RuntimeException('user.auth.login must be email or username.');
+                throw new \RuntimeException('user.auth.method must be email or username.');
             }
 
             return $mode;
@@ -315,9 +333,9 @@ final class PanelConfigFieldPolicyService
                 throw new \RuntimeException('user.selector must be id, username, or string.');
             }
 
-            $loginMode = strtolower(trim((string) ($workingConfig['user']['auth']['login'] ?? $this->config->get('user.auth.login', 'email'))));
+            $loginMode = strtolower(trim((string) ($workingConfig['user']['auth']['method'] ?? $this->config->get('user.auth.method', 'email'))));
             if ($selector === 'username' && $loginMode !== 'username') {
-                throw new \RuntimeException('user.selector can only use username when user.auth.login is username.');
+                throw new \RuntimeException('user.selector can only use username when user.auth.method is username.');
             }
 
             return $selector;
@@ -376,14 +394,14 @@ final class PanelConfigFieldPolicyService
             return $prefix;
         }
 
-        if ($path === 'group.privacy') {
+        if ($path === 'group.visibility') {
             $mode = strtolower(trim($value));
             if ($mode === 'public') {
                 $mode = 'public_full';
             }
             if (!in_array($mode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
                 throw new \RuntimeException(
-                    'group.privacy must be public_full, public_limited, private, or disabled.'
+                    'group.visibility must be public_full, public_limited, private, or disabled.'
                 );
             }
 
@@ -599,7 +617,7 @@ final class PanelConfigFieldPolicyService
             return $this->defaults->normalizeBool($path, $value);
         }
 
-        if ($path === 'media.avatars.max_filesize_kb') {
+        if ($path === 'user.avatar.max_filesize_kb') {
             $size = $this->defaults->normalizeInt($path, $value);
             if ($size < 0) {
                 throw new \RuntimeException($path . ' must be 0 or greater.');
@@ -608,7 +626,7 @@ final class PanelConfigFieldPolicyService
             return $size;
         }
 
-        if (str_starts_with($path, 'media.images.')) {
+        if (str_starts_with($path, 'media.')) {
             return $this->defaults->normalizeImageConfigValue($path, $value);
         }
 

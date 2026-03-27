@@ -14,17 +14,17 @@ final class ConfigEditorSchemaService
 {
     /** @var array<string, string> */
     private const PATH_LABEL_OVERRIDES = [
-        'media.images.max_filesize_kb' => 'Max Filesize (KB)',
-        'media.avatars.max_filesize_kb' => 'Max Avatar Filesize (KB)',
-        'media.avatars.max_width' => 'Max Avatar Width (px)',
-        'media.avatars.max_height' => 'Max Avatar Height (px)',
-        'media.avatars.allowed_extensions' => 'Allowed Avatar Extensions',
-        'media.images.small.width' => 'Small Width (px)',
-        'media.images.small.height' => 'Small Height (px)',
-        'media.images.med.width' => 'Medium Width (px)',
-        'media.images.med.height' => 'Medium Height (px)',
-        'media.images.large.width' => 'Large Width (px)',
-        'media.images.large.height' => 'Large Height (px)',
+        'media.max_filesize_kb' => 'Max Filesize (KB)',
+        'media.small.width' => 'Small Width (px)',
+        'media.small.height' => 'Small Height (px)',
+        'media.med.width' => 'Medium Width (px)',
+        'media.med.height' => 'Medium Height (px)',
+        'media.large.width' => 'Large Width (px)',
+        'media.large.height' => 'Large Height (px)',
+        'user.avatar.max_filesize_kb' => 'Max Avatar Filesize (KB)',
+        'user.avatar.max_width' => 'Max Avatar Width (px)',
+        'user.avatar.max_height' => 'Max Avatar Height (px)',
+        'user.avatar.allowed_extensions' => 'Allowed Avatar Extensions',
         'captcha.hcaptcha.public_key' => 'Site Key',
         'captcha.recaptcha2.public_key' => 'Site Key',
         'captcha.recaptcha3.public_key' => 'Site Key',
@@ -34,12 +34,12 @@ final class ConfigEditorSchemaService
         'panel.brand_logo' => 'Branded Panel Logo',
         'site.protocol' => 'Protocol',
         'site.theme' => 'Default Site Theme',
-        'site.enabled' => 'Visibility',
+        'site.visibility' => 'Visibility',
         'mail.agent' => 'Mail Agent',
         'mail.sender_address' => 'Mail Sender Address',
         'mail.sender_name' => 'Mail Sender Name',
         'database.prefix' => 'Table Prefix',
-        'database.sqlite.path' => 'Base Path',
+        'database.sqlite.path' => 'File Path',
         'database.mysql.name' => 'Database',
         'database.mysql.pass' => 'Password',
         'database.pgsql.name' => 'Database',
@@ -54,9 +54,11 @@ final class ConfigEditorSchemaService
         'category.set' => 'Default Category Set',
         'category.prefix' => 'Category URL Prefix',
         'category.pagination' => 'Pagination',
+        'category.selector' => 'Category URL Selector',
         'tag.set' => 'Default Tag Set',
         'tag.prefix' => 'Tag URL Prefix',
         'tag.pagination' => 'Pagination',
+        'tag.selector' => 'Tag URL Selector',
         'meta.twitter.card' => 'Twitter Card',
         'meta.twitter.site' => 'Twitter Site',
         'meta.twitter.creator' => 'Twitter Creator',
@@ -67,15 +69,16 @@ final class ConfigEditorSchemaService
         'session.cookie.name' => 'Cookie Name',
         'session.cookie.domain' => 'Cookie Domain',
         'session.cookie.prefix' => 'Cookie Prefix',
-        'user.privacy' => 'Profile Visibility',
-        'user.auth.login' => 'Login Method',
+        'user.visibility' => 'Profile Visibility',
+        'user.auth.method' => 'Login Method',
         'user.auth.registration' => 'Enable Registration',
-        'user.bio' => 'Bio Length',
+        'user.bio' => 'Profile Bio Length',
         'user.string' => 'String Length',
         'user.selector' => 'Profile URL Selector',
         'user.prefix' => 'Profile URL Prefix',
-        'group.privacy' => 'Group Visibility',
+        'group.visibility' => 'Group Visibility',
         'group.prefix' => 'Group URL Prefix',
+        'group.selector' => 'Group URL Selector',
         'session.brute.max' => 'Max Login Failures',
         'session.brute.window' => 'Login Failure Window (Seconds)',
         'session.brute.lock' => 'Login Lock Duration (Seconds)',
@@ -481,6 +484,13 @@ final class ConfigEditorSchemaService
             $category['pagination'] = max(1, (int) ($category['pagination'] ?? 10));
         }
 
+        if (!array_key_exists('selector', $category)) {
+            $category['selector'] = 'slug';
+        } else {
+            $rawCategorySelector = strtolower(trim((string) ($category['selector'] ?? 'slug')));
+            $category['selector'] = in_array($rawCategorySelector, ['id', 'slug'], true) ? $rawCategorySelector : 'slug';
+        }
+
         if (!array_key_exists('enabled', $tag)) {
             $tag['enabled'] = false;
         } else {
@@ -512,6 +522,13 @@ final class ConfigEditorSchemaService
             $tag['pagination'] = 10;
         } else {
             $tag['pagination'] = max(1, (int) ($tag['pagination'] ?? 10));
+        }
+
+        if (!array_key_exists('selector', $tag)) {
+            $tag['selector'] = 'slug';
+        } else {
+            $rawTagSelector = strtolower(trim((string) ($tag['selector'] ?? 'slug')));
+            $tag['selector'] = in_array($rawTagSelector, ['id', 'slug'], true) ? $rawTagSelector : 'slug';
         }
 
         $config['category'] = $category;
@@ -621,16 +638,22 @@ final class ConfigEditorSchemaService
             $user = [];
         }
 
-        if (!array_key_exists('privacy', $user)) {
-            $user['privacy'] = in_array($legacyProfileMode, ['public_full', 'public_limited', 'private', 'disabled'], true)
+        // Migrate legacy user.privacy → user.visibility.
+        if (!array_key_exists('visibility', $user) && array_key_exists('privacy', $user)) {
+            $user['visibility'] = $user['privacy'];
+        }
+        unset($user['privacy']);
+
+        if (!array_key_exists('visibility', $user)) {
+            $user['visibility'] = in_array($legacyProfileMode, ['public_full', 'public_limited', 'private', 'disabled'], true)
                 ? $legacyProfileMode
                 : 'disabled';
         } else {
-            $rawProfileMode = strtolower(trim((string) ($user['privacy'] ?? '')));
+            $rawProfileMode = strtolower(trim((string) ($user['visibility'] ?? '')));
             if (!in_array($rawProfileMode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
                 $rawProfileMode = 'disabled';
             }
-            $user['privacy'] = $rawProfileMode;
+            $user['visibility'] = $rawProfileMode;
         }
 
         if (!array_key_exists('prefix', $user)) {
@@ -657,7 +680,7 @@ final class ConfigEditorSchemaService
             $user['string'] = min(128, max(1, (int) ($user['string'] ?? 28)));
         }
 
-        $loginMode = strtolower(trim((string) ($user['auth']['login'] ?? 'email')));
+        $loginMode = strtolower(trim((string) ($user['auth']['method'] ?? 'email')));
         if (!in_array($loginMode, ['email', 'username'], true)) {
             $loginMode = 'email';
         }
@@ -684,22 +707,28 @@ final class ConfigEditorSchemaService
             $group = [];
         }
 
-        if (!array_key_exists('privacy', $group)) {
+        // Migrate legacy group.privacy → group.visibility.
+        if (!array_key_exists('visibility', $group) && array_key_exists('privacy', $group)) {
+            $group['visibility'] = $group['privacy'];
+        }
+        unset($group['privacy']);
+
+        if (!array_key_exists('visibility', $group)) {
             if ($legacyGroupMode === 'public') {
                 $legacyGroupMode = 'public_full';
             }
-            $group['privacy'] = in_array($legacyGroupMode, ['public_full', 'public_limited', 'private', 'disabled'], true)
+            $group['visibility'] = in_array($legacyGroupMode, ['public_full', 'public_limited', 'private', 'disabled'], true)
                 ? $legacyGroupMode
                 : 'disabled';
         } else {
-            $rawShowGroups = strtolower(trim((string) ($group['privacy'] ?? '')));
+            $rawShowGroups = strtolower(trim((string) ($group['visibility'] ?? '')));
             if ($rawShowGroups === 'public') {
                 $rawShowGroups = 'public_full';
             }
             if (!in_array($rawShowGroups, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
                 $rawShowGroups = 'disabled';
             }
-            $group['privacy'] = $rawShowGroups;
+            $group['visibility'] = $rawShowGroups;
         }
 
         if (!array_key_exists('prefix', $group)) {
@@ -712,6 +741,13 @@ final class ConfigEditorSchemaService
                 $groupPrefix = $this->input->slug($rawGroupPrefix);
                 $group['prefix'] = $groupPrefix ?? '';
             }
+        }
+
+        if (!array_key_exists('selector', $group)) {
+            $group['selector'] = 'slug';
+        } else {
+            $rawGroupSelector = strtolower(trim((string) ($group['selector'] ?? 'slug')));
+            $group['selector'] = in_array($rawGroupSelector, ['id', 'slug'], true) ? $rawGroupSelector : 'slug';
         }
 
         $config['session'] = $session;
@@ -736,18 +772,24 @@ final class ConfigEditorSchemaService
             $auth = [];
         }
 
-        if (!array_key_exists('login', $auth)) {
+        // Migrate legacy auth.login → auth.method.
+        if (!array_key_exists('method', $auth) && array_key_exists('login', $auth)) {
+            $auth['method'] = $auth['login'];
+        }
+        unset($auth['login']);
+
+        if (!array_key_exists('method', $auth)) {
             $legacyMode = strtolower(trim((string) ($user['login'] ?? $user['login_mode'] ?? '')));
             if (!in_array($legacyMode, ['email', 'username'], true)) {
                 $legacyMode = 'email';
             }
-            $auth['login'] = $legacyMode;
+            $auth['method'] = $legacyMode;
         } else {
-            $mode = strtolower(trim((string) ($auth['login'] ?? 'email')));
+            $mode = strtolower(trim((string) ($auth['method'] ?? 'email')));
             if (!in_array($mode, ['email', 'username'], true)) {
                 $mode = 'email';
             }
-            $auth['login'] = $mode;
+            $auth['method'] = $mode;
         }
 
         if (!array_key_exists('registration', $auth)) {
@@ -783,14 +825,20 @@ final class ConfigEditorSchemaService
             $site = [];
         }
 
-        if (!array_key_exists('enabled', $site)) {
-            $site['enabled'] = 'public';
+        // Migrate legacy site.enabled → site.visibility.
+        if (!array_key_exists('visibility', $site) && array_key_exists('enabled', $site)) {
+            $site['visibility'] = $site['enabled'];
+        }
+        unset($site['enabled']);
+
+        if (!array_key_exists('visibility', $site)) {
+            $site['visibility'] = 'public';
         } else {
-            $mode = strtolower(trim((string) ($site['enabled'] ?? '')));
+            $mode = strtolower(trim((string) ($site['visibility'] ?? '')));
             if (!in_array($mode, ['public', 'private', 'disabled'], true)) {
                 $mode = 'public';
             }
-            $site['enabled'] = $mode;
+            $site['visibility'] = $mode;
         }
 
         if (!array_key_exists('protocol', $site)) {
@@ -991,6 +1039,98 @@ final class ConfigEditorSchemaService
         unset($debug['show_on_public'], $debug['show_on_panel'], $debug['show_on_private'], $debug['show_stack_trace']);
 
         $config['debug'] = $debug;
+        return $config;
+    }
+
+    /**
+     * Migrates legacy media path structures to flat media.* and user.avatar.* paths.
+     * Accepts old media.images.* and media.avatars.* structures from pre-migration installs.
+     *
+     * @param array<string, mixed> $config
+     * @return array<string, mixed>
+     */
+    public function ensureMediaConfig(array $config): array
+    {
+        $media = $config['media'] ?? null;
+        if (!is_array($media)) {
+            $media = [];
+        }
+
+        $user = $config['user'] ?? null;
+        if (!is_array($user)) {
+            $user = [];
+        }
+
+        // Migrate media.avatars.* → user.avatar.*
+        if (array_key_exists('avatars', $media) && is_array($media['avatars'])) {
+            $legacyAvatars = $media['avatars'];
+            if (!array_key_exists('avatar', $user)) {
+                $user['avatar'] = $legacyAvatars;
+            }
+            unset($media['avatars']);
+        }
+
+        // Migrate media.images.* → media.* (flatten the images sub-array)
+        if (array_key_exists('images', $media) && is_array($media['images'])) {
+            $legacyImages = $media['images'];
+            foreach ($legacyImages as $key => $val) {
+                if (!array_key_exists($key, $media)) {
+                    $media[$key] = $val;
+                }
+            }
+            unset($media['images']);
+        }
+
+        // Ensure flat media fields have defaults
+        if (!array_key_exists('upload_target', $media)) {
+            $media['upload_target'] = 'local';
+        }
+        if (!array_key_exists('max_filesize_kb', $media)) {
+            $media['max_filesize_kb'] = 10240;
+        }
+        if (!array_key_exists('max_files_per_upload', $media)) {
+            $media['max_files_per_upload'] = 10;
+        }
+        if (!array_key_exists('allowed_extensions', $media)) {
+            $media['allowed_extensions'] = 'gif,jpg,jpeg,png';
+        }
+        if (!array_key_exists('strip_exif', $media)) {
+            $media['strip_exif'] = true;
+        }
+
+        foreach (['small', 'med', 'large'] as $size) {
+            if (!array_key_exists($size, $media) || !is_array($media[$size])) {
+                $media[$size] = ['width' => 0, 'height' => 0];
+            }
+            if (!array_key_exists('width', $media[$size])) {
+                $media[$size]['width'] = 0;
+            }
+            if (!array_key_exists('height', $media[$size])) {
+                $media[$size]['height'] = 0;
+            }
+        }
+
+        // Ensure user.avatar has defaults
+        $avatar = $user['avatar'] ?? null;
+        if (!is_array($avatar)) {
+            $avatar = [];
+        }
+        if (!array_key_exists('max_filesize_kb', $avatar)) {
+            $avatar['max_filesize_kb'] = 1024;
+        }
+        if (!array_key_exists('max_width', $avatar)) {
+            $avatar['max_width'] = 800;
+        }
+        if (!array_key_exists('max_height', $avatar)) {
+            $avatar['max_height'] = 800;
+        }
+        if (!array_key_exists('allowed_extensions', $avatar)) {
+            $avatar['allowed_extensions'] = 'gif,jpg,jpeg,png';
+        }
+        $user['avatar'] = $avatar;
+
+        $config['media'] = $media;
+        $config['user'] = $user;
         return $config;
     }
 

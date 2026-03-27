@@ -13,6 +13,7 @@
 /** @var array<int, array<string, mixed>> $users */
 /** @var array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}> $groupOptions */
 /** @var string|null $loginIdentifierMode */
+/** @var string|null $registrationMode */
 /** @var string $prefilterGroup */
 /** @var array<string, mixed> $pagination */
 /** @var string $csrfField */
@@ -34,6 +35,10 @@ if (!in_array($loginIdentifierMode, ['email', 'username'], true)) {
     $loginIdentifierMode = 'email';
 }
 $showUsernameColumn = $loginIdentifierMode === 'username';
+$registrationMode = strtolower(trim((string) ($registrationMode ?? 'closed')));
+if (!in_array($registrationMode, ['open', 'invite', 'closed'], true)) {
+    $registrationMode = 'closed';
+}
 $prefilterGroup = strtolower(trim((string) ($prefilterGroup ?? '')));
 $groupFilterOptions = [];
 foreach ($groupOptions as $groupOption) {
@@ -86,7 +91,9 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
 
 <nav>
     <a class="btn btn-primary" href="<?= e($panelBase) ?>/user/edit"><i class="bi bi-person-plus me-2" aria-hidden="true"></i>New User</a>
+    <?php if ($registrationMode === 'invite'): ?>
     <a class="btn btn-secondary" href="<?= e($panelBase) ?>/user/invites"><i class="bi bi-ticket-perforated me-2" aria-hidden="true"></i>Invite Tokens</a>
+    <?php endif; ?>
     <button
         type="submit"
         class="btn btn-danger"
@@ -294,7 +301,9 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
 
 <nav>
     <a class="btn btn-primary" href="<?= e($panelBase) ?>/user/edit"><i class="bi bi-person-plus me-2" aria-hidden="true"></i>New User</a>
+    <?php if ($registrationMode === 'invite'): ?>
     <a class="btn btn-secondary" href="<?= e($panelBase) ?>/user/invites"><i class="bi bi-ticket-perforated me-2" aria-hidden="true"></i>Invite Tokens</a>
+    <?php endif; ?>
     <button
         type="submit"
         class="btn btn-danger"

@@ -23,7 +23,7 @@ final class PageImageUploadPolicy
      */
     public function allowedExtensions(): array
     {
-        $raw = strtolower((string) $this->config->get('media.images.allowed_extensions', 'gif,jpg,jpeg,png'));
+        $raw = strtolower((string) $this->config->get('media.allowed_extensions', 'gif,jpg,jpeg,png'));
         $parts = array_map('trim', explode(',', $raw));
 
         $allowed = [];
@@ -49,9 +49,9 @@ final class PageImageUploadPolicy
     public function maxUploadFilesizeBytes(): int
     {
         $config = $this->config->all();
-        $images = $config['media']['images'] ?? null;
-        if (is_array($images) && array_key_exists('max_filesize_kb', $images)) {
-            $kilobytes = (int) $images['max_filesize_kb'];
+        $media = $config['media'] ?? null;
+        if (is_array($media) && array_key_exists('max_filesize_kb', $media)) {
+            $kilobytes = (int) $media['max_filesize_kb'];
             if ($kilobytes > 0) {
                 return $kilobytes * 1024;
             }

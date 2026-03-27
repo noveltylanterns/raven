@@ -14,7 +14,7 @@ final class LoginIdentifierResolver
 {
     public function modeFromConfig(Config $config): string
     {
-        $mode = strtolower(trim((string) $config->get('user.auth.login', 'email')));
+        $mode = strtolower(trim((string) $config->get('user.auth.method', 'email')));
         if (!in_array($mode, ['email', 'username'], true)) {
             return 'email';
         }

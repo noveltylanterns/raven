@@ -156,15 +156,10 @@ foreach ($configFields as $field) {
     }
 
     if (str_starts_with($path, 'media.')) {
-        if (str_starts_with($path, 'media.avatars.')) {
-            $avatarConfigFields[] = $field;
-            continue;
-        }
-
         if (
-            str_starts_with($path, 'media.images.small.')
-            || str_starts_with($path, 'media.images.med.')
-            || str_starts_with($path, 'media.images.large.')
+            str_starts_with($path, 'media.small.')
+            || str_starts_with($path, 'media.med.')
+            || str_starts_with($path, 'media.large.')
         ) {
             $mediaImageSizeConfigFields[] = $field;
             continue;
@@ -192,7 +187,7 @@ if ($basicSiteConfigFields !== []) {
         'site.name' => 10,
         'site.domain' => 20,
         'site.protocol' => 30,
-        'site.enabled' => 40,
+        'site.visibility' => 40,
     ];
 
     usort(
@@ -266,6 +261,37 @@ if (is_array($databaseTablePrefixField)) {
     } else {
         array_unshift($databaseConfigFields, $databaseTablePrefixField);
     }
+}
+
+// Sort category and tag fields in a consistent display order: enabled, set, pagination, prefix, selector.
+$taxonomyFieldOrder = [
+    'enabled' => 10,
+    'set' => 20,
+    'pagination' => 30,
+    'prefix' => 40,
+    'selector' => 50,
+];
+$sortTaxonomyFields = static function (array &$fields) use ($taxonomyFieldOrder): void {
+    usort(
+        $fields,
+        static function (array $left, array $right) use ($taxonomyFieldOrder): int {
+            $leftLeaf = (string) (explode('.', (string) ($left['path'] ?? ''))[1] ?? '');
+            $rightLeaf = (string) (explode('.', (string) ($right['path'] ?? ''))[1] ?? '');
+            $leftRank = (int) ($taxonomyFieldOrder[$leftLeaf] ?? 1000);
+            $rightRank = (int) ($taxonomyFieldOrder[$rightLeaf] ?? 1000);
+            if ($leftRank !== $rightRank) {
+                return $leftRank <=> $rightRank;
+            }
+
+            return strcasecmp((string) ($left['path'] ?? ''), (string) ($right['path'] ?? ''));
+        }
+    );
+};
+if ($contentCategoriesConfigFields !== []) {
+    $sortTaxonomyFields($contentCategoriesConfigFields);
+}
+if ($contentTagsConfigFields !== []) {
+    $sortTaxonomyFields($contentTagsConfigFields);
 }
 
 $metaSiteConfigFields = [];
@@ -343,13 +369,18 @@ foreach ($sessionConfigFields as $sessionField) {
 }
 foreach ($userConfigFields as $userField) {
     $userPath = (string) ($userField['path'] ?? '');
-    if (in_array($userPath, ['user.auth.registration', 'user.auth.login', 'user.string'], true)) {
+    if (in_array($userPath, ['user.auth.registration', 'user.auth.method', 'user.string'], true)) {
         $sessionLoginConfigFields[] = $userField;
         continue;
     }
 
-    if (in_array($userPath, ['user.privacy', 'user.selector', 'user.prefix'], true)) {
+    if (in_array($userPath, ['user.visibility', 'user.selector', 'user.prefix', 'user.bio'], true)) {
         $sessionProfileConfigFields[] = $userField;
+        continue;
+    }
+
+    if (str_starts_with($userPath, 'user.avatar.')) {
+        $avatarConfigFields[] = $userField;
         continue;
     }
 
@@ -361,17 +392,38 @@ foreach ($userConfigFields as $userField) {
 }
 foreach ($groupConfigFields as $groupField) {
     $groupPath = (string) ($groupField['path'] ?? '');
-    if (in_array($groupPath, ['group.privacy', 'group.prefix'], true)) {
+    if (in_array($groupPath, ['group.visibility', 'group.prefix', 'group.selector'], true)) {
         $sessionGroupConfigFields[] = $groupField;
         continue;
     }
 
     $sessionCookieConfigFields[] = $groupField;
 }
+if ($sessionGroupConfigFields !== []) {
+    $sessionGroupOrder = [
+        'group.visibility' => 10,
+        'group.prefix' => 20,
+        'group.selector' => 30,
+    ];
+    usort(
+        $sessionGroupConfigFields,
+        static function (array $left, array $right) use ($sessionGroupOrder): int {
+            $leftPath = (string) ($left['path'] ?? '');
+            $rightPath = (string) ($right['path'] ?? '');
+            $leftRank = (int) ($sessionGroupOrder[$leftPath] ?? 1000);
+            $rightRank = (int) ($sessionGroupOrder[$rightPath] ?? 1000);
+            if ($leftRank !== $rightRank) {
+                return $leftRank <=> $rightRank;
+            }
+
+            return strcasecmp($leftPath, $rightPath);
+        }
+    );
+}
 if ($sessionLoginConfigFields !== []) {
     $sessionLoginOrder = [
         'user.auth.registration' => 10,
-        'user.auth.login' => 20,
+        'user.auth.method' => 20,
         'user.string' => 30,
     ];
     usort(
@@ -392,9 +444,10 @@ if ($sessionLoginConfigFields !== []) {
 
 if ($sessionProfileConfigFields !== []) {
     $sessionProfileOrder = [
-        'user.privacy' => 10,
-        'user.selector' => 20,
-        'user.prefix' => 30,
+        'user.visibility' => 10,
+        'user.prefix' => 20,
+        'user.selector' => 30,
+        'user.bio' => 40,
     ];
     usort(
         $sessionProfileConfigFields,
@@ -430,7 +483,8 @@ if (is_array($rawProfileContactOptions)) {
         $urlPrefix = '';
         if (is_array($optionConfig)) {
             $label = trim((string) ($optionConfig['label'] ?? ''));
-            $urlPrefix = trim((string) ($optionConfig['url_prefix'] ?? ''));
+            // Accept both new `prefix` key and legacy `url_prefix` key.
+            $urlPrefix = trim((string) ($optionConfig['prefix'] ?? $optionConfig['url_prefix'] ?? ''));
         } else {
             $label = trim((string) $optionConfig);
         }
@@ -441,7 +495,7 @@ if (is_array($rawProfileContactOptions)) {
         $profileContactOptionRows[] = [
             'type' => $normalizedType,
             'label' => $label,
-            'url_prefix' => $urlPrefix,
+            'prefix' => $urlPrefix,
         ];
 
         if (count($profileContactOptionRows) >= 100) {
@@ -514,19 +568,22 @@ $renderConfigField = static function (array $field) use (
     $isFeedsChannelField = $path === 'feed.channels';
     $isCategoryDefaultSetField = $path === 'category.set';
     $isTagDefaultSetField = $path === 'tag.set';
-    $isSiteEnabledField = $path === 'site.enabled';
+    $isSiteEnabledField = $path === 'site.visibility';
     $isSiteProtocolField = $path === 'site.protocol';
     $isPanelDefaultThemeField = $path === 'panel.theme';
-    $isPublicProfilesModeField = $path === 'user.privacy';
-    $isShowGroupsField = $path === 'group.privacy';
-    $isUserLoginIdentifierField = $path === 'user.auth.login';
+    $isPublicProfilesModeField = $path === 'user.visibility';
+    $isShowGroupsField = $path === 'group.visibility';
+    $isUserLoginIdentifierField = $path === 'user.auth.method';
     $isUserRegistrationModeField = $path === 'user.auth.registration';
     $isUserProfileSelectorField = $path === 'user.selector';
+    $isCategorySelectorField = $path === 'category.selector';
+    $isTagSelectorField = $path === 'tag.selector';
+    $isGroupSelectorField = $path === 'group.selector';
     $isDatabasePasswordField = in_array($path, ['database.mysql.pass', 'database.pgsql.pass'], true);
     $isBooleanCheckboxField = $type === 'bool';
     $isDebugCheckboxField = str_starts_with($path, 'debug.');
-    $isImageUploadTargetField = $path === 'media.images.upload_target';
-    $isNoLimitField = in_array($path, ['media.images.max_filesize_kb', 'media.images.max_files_per_upload', 'media.avatars.max_filesize_kb'], true);
+    $isImageUploadTargetField = $path === 'media.upload_target';
+    $isNoLimitField = in_array($path, ['media.max_filesize_kb', 'media.max_files_per_upload', 'user.avatar.max_filesize_kb'], true);
     $isDomainPrefixedMetaPathField = in_array($path, ['meta.image', 'meta.apple_touch_icon', 'panel.brand_logo'], true);
     $isDbSpecificField = $path === 'database.prefix'
         || str_starts_with($path, 'database.sqlite.')
@@ -538,7 +595,7 @@ $renderConfigField = static function (array $field) use (
     $dbSection = '';
     $captchaSection = '';
     if ($path === 'database.prefix') {
-        $dbSection = 'mysql,pgsql';
+        $dbSection = 'sqlite,mysql,pgsql';
     } elseif (str_starts_with($path, 'database.sqlite.')) {
         $dbSection = 'sqlite';
     } elseif (str_starts_with($path, 'database.mysql.')) {
@@ -570,7 +627,7 @@ $renderConfigField = static function (array $field) use (
             $inputValue = ltrim($inputValue, '/');
         }
     }
-    $isRequired = in_array($path, ['site.domain', 'site.protocol', 'panel.path', 'site.enabled', 'database.driver', 'captcha.provider', 'mail.agent', 'content.editor', 'content.mode', 'content.separator', 'panel.theme', 'session.cookie.name', 'user.privacy', 'group.privacy', 'user.auth.login', 'user.auth.registration', 'user.selector', 'user.string'], true);
+    $isRequired = in_array($path, ['site.domain', 'site.protocol', 'panel.path', 'site.visibility', 'database.driver', 'captcha.provider', 'mail.agent', 'content.editor', 'content.mode', 'content.separator', 'panel.theme', 'session.cookie.name', 'user.visibility', 'group.visibility', 'user.auth.method', 'user.auth.registration', 'user.selector', 'user.string', 'category.selector', 'tag.selector', 'group.selector'], true);
     $disableUriNote = match ($path) {
         'feed.rss' => ' (leave blank to disable RSS feeds)',
         'feed.atom' => ' (leave blank to disable Atom feeds)',
@@ -850,6 +907,17 @@ $renderConfigField = static function (array $field) use (
                     <option value="username"<?= (string) $field['value'] === 'username' ? ' selected' : '' ?>>Username</option>
                 <?php endif; ?>
                 <option value="string"<?= (string) $field['value'] === 'string' ? ' selected' : '' ?>>String</option>
+            </select>
+        <?php elseif ($isCategorySelectorField || $isTagSelectorField || $isGroupSelectorField): ?>
+            <!-- Selector controls which URL segment identifies the taxonomy/group item. -->
+            <select
+                class="form-select font-monospace"
+                id="<?= e($inputId) ?>"
+                name="<?= e($fieldName) ?>"
+                required
+            >
+                <option value="slug"<?= (string) $field['value'] === 'slug' ? ' selected' : '' ?>>slug</option>
+                <option value="id"<?= (string) $field['value'] === 'id' ? ' selected' : '' ?>>id</option>
             </select>
         <?php elseif ($isDomainPrefixedMetaPathField): ?>
             <div class="input-group">
@@ -1196,7 +1264,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             aria-labelledby="config-media-tab"
                             tabindex="0"
                         >
-                            <?php if ($mediaUploadConfigFields === [] && $mediaImageSizeConfigFields === [] && $avatarConfigFields === []): ?>
+                            <?php if ($mediaUploadConfigFields === [] && $mediaImageSizeConfigFields === []): ?>
                                 <p class="text-muted mb-0">No configuration fields available.</p>
                             <?php else: ?>
                                 <?php if ($mediaUploadConfigFields !== []): ?>
@@ -1216,15 +1284,6 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                     <?php endforeach; ?>
                                 <?php endif; ?>
 
-                                <?php if ($avatarConfigFields !== []): ?>
-                                    <?php if ($mediaUploadConfigFields !== [] || $mediaImageSizeConfigFields !== []): ?>
-                                        <hr class="my-4">
-                                    <?php endif; ?>
-                                    <h3>Avatar Settings</h3>
-                                    <?php foreach ($avatarConfigFields as $avatarField): ?>
-                                        <?php $renderConfigField($avatarField); ?>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
                             <?php endif; ?>
                         </div>
                         <div
@@ -1307,7 +1366,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             aria-labelledby="config-users-tab"
                             tabindex="0"
                         >
-                            <?php if ($sessionCookieConfigFields === [] && $sessionLoginConfigFields === [] && $sessionProfileConfigFields === [] && $sessionGroupConfigFields === []): ?>
+                            <?php if ($sessionCookieConfigFields === [] && $sessionLoginConfigFields === [] && $sessionProfileConfigFields === [] && $sessionGroupConfigFields === [] && $avatarConfigFields === []): ?>
                                 <p class="text-muted mb-0">No configuration fields available.</p>
                             <?php else: ?>
                                 <?php if ($sessionLoginConfigFields !== []): ?>
@@ -1359,7 +1418,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                     <?php
                                     $rowType = trim((string) ($contactOption['type'] ?? ''));
                                     $rowLabel = trim((string) ($contactOption['label'] ?? ''));
-                                    $rowUrlPrefix = trim((string) ($contactOption['url_prefix'] ?? ''));
+                                    $rowUrlPrefix = trim((string) ($contactOption['prefix'] ?? ''));
                                     $isProtectedType = in_array(strtolower($rowType), $protectedProfileContactOptionTypes, true);
                                     ?>
                                     <div class="border rounded p-2 mb-2" data-rvn-contact-option-row="1"<?= $isProtectedType ? ' data-rvn-contact-option-protected="1"' : '' ?>>
@@ -1392,8 +1451,8 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                                 <input
                                                     type="text"
                                                     class="form-control font-monospace"
-                                                    data-rvn-contact-option-key="url_prefix"
-                                                    name="profile_contact_options[<?= (int) $index ?>][url_prefix]"
+                                                    data-rvn-contact-option-key="prefix"
+                                                    name="profile_contact_options[<?= (int) $index ?>][prefix]"
                                                     value="<?= e($rowUrlPrefix) ?>"
                                                     placeholder="https://x.com/"
                                                 >
@@ -1406,6 +1465,14 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                 <?php endforeach; ?>
                             </div>
                             <button type="button" class="btn btn-primary btn-sm" id="config-contact-option-add">Add Contact Option</button>
+
+                            <?php if ($avatarConfigFields !== []): ?>
+                                <hr class="my-4">
+                                <h3>Avatar Settings</h3>
+                                <?php foreach ($avatarConfigFields as $avatarField): ?>
+                                    <?php $renderConfigField($avatarField); ?>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </div>
         </div>
         </section>
@@ -1440,7 +1507,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                 <input
                     type="text"
                     class="form-control font-monospace"
-                    data-rvn-contact-option-key="url_prefix"
+                    data-rvn-contact-option-key="prefix"
                     placeholder="https://x.com/"
                 >
             </div>
@@ -1478,7 +1545,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
 
         var typeField = row.querySelector('[data-rvn-contact-option-key="type"]');
         var labelField = row.querySelector('[data-rvn-contact-option-key="label"]');
-        var prefixField = row.querySelector('[data-rvn-contact-option-key="url_prefix"]');
+        var prefixField = row.querySelector('[data-rvn-contact-option-key="prefix"]');
         if (typeField instanceof HTMLInputElement) {
           typeField.name = 'profile_contact_options[' + index + '][type]';
         }
@@ -1486,7 +1553,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
           labelField.name = 'profile_contact_options[' + index + '][label]';
         }
         if (prefixField instanceof HTMLInputElement) {
-          prefixField.name = 'profile_contact_options[' + index + '][url_prefix]';
+          prefixField.name = 'profile_contact_options[' + index + '][prefix]';
         }
       });
     }

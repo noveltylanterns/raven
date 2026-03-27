@@ -28,16 +28,16 @@ final class ImageVariantProcessor
             // Keep config keys stable while shortening stored variant keys/filenames.
             'sm' => [
                 // `0` means "auto" for this axis (aspect-ratio-preserving contain).
-                'width' => max(0, (int) $this->config->get('media.images.small.width', 200)),
-                'height' => max(0, (int) $this->config->get('media.images.small.height', 200)),
+                'width' => max(0, (int) $this->config->get('media.small.width', 200)),
+                'height' => max(0, (int) $this->config->get('media.small.height', 200)),
             ],
             'md' => [
-                'width' => max(0, (int) $this->config->get('media.images.med.width', 600)),
-                'height' => max(0, (int) $this->config->get('media.images.med.height', 600)),
+                'width' => max(0, (int) $this->config->get('media.med.width', 600)),
+                'height' => max(0, (int) $this->config->get('media.med.height', 600)),
             ],
             'lg' => [
-                'width' => max(0, (int) $this->config->get('media.images.large.width', 1000)),
-                'height' => max(0, (int) $this->config->get('media.images.large.height', 1000)),
+                'width' => max(0, (int) $this->config->get('media.large.width', 1000)),
+                'height' => max(0, (int) $this->config->get('media.large.height', 1000)),
             ],
         ];
     }

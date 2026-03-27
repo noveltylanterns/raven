@@ -26,15 +26,15 @@ final class ProfileContactService
     }
 
     /**
-     * @return array<string, array{label: string, url_prefix: string}>
+     * @return array<string, array{label: string, prefix: string}>
      */
     public function defaultOptions(): array
     {
         return [
-            'email' => ['label' => 'Email', 'url_prefix' => 'mailto:'],
-            'phone' => ['label' => 'Phone', 'url_prefix' => 'tel:'],
-            'homepage' => ['label' => 'Homepage', 'url_prefix' => 'https://'],
-            'x' => ['label' => 'X', 'url_prefix' => 'https://x.com/'],
+            'email' => ['label' => 'Email', 'prefix' => 'mailto:'],
+            'phone' => ['label' => 'Phone', 'prefix' => 'tel:'],
+            'homepage' => ['label' => 'Homepage', 'prefix' => 'https://'],
+            'x' => ['label' => 'X', 'prefix' => 'https://x.com/'],
         ];
     }
 
@@ -53,7 +53,7 @@ final class ProfileContactService
     }
 
     /**
-     * @return array<string, array{label: string, url_prefix: string}>
+     * @return array<string, array{label: string, prefix: string}>
      */
     public function requiredOptions(): array
     {
@@ -61,7 +61,7 @@ final class ProfileContactService
     }
 
     /**
-     * @return array<string, array{label: string, url_prefix: string}>
+     * @return array<string, array{label: string, prefix: string}>
      */
     public function normalizeOptionsConfig(mixed $raw): array
     {
@@ -86,13 +86,15 @@ final class ProfileContactService
             }
 
             $defaultLabel = (string) ($defaults[$slug]['label'] ?? ucwords(str_replace('-', ' ', $slug)));
-            $defaultPrefix = (string) ($defaults[$slug]['url_prefix'] ?? '');
+            $defaultPrefix = (string) ($defaults[$slug]['prefix'] ?? '');
 
             $safeLabel = $defaultLabel;
             $safePrefix = $defaultPrefix;
             if (is_array($definition)) {
                 $safeLabel = $this->input->text((string) ($definition['label'] ?? $defaultLabel), 80);
-                $safePrefix = $this->input->text((string) ($definition['url_prefix'] ?? $defaultPrefix), 255);
+                // Accept both new `prefix` key and legacy `url_prefix` key from old config files.
+                $rawPrefix = $definition['prefix'] ?? $definition['url_prefix'] ?? $defaultPrefix;
+                $safePrefix = $this->input->text((string) $rawPrefix, 255);
             } else {
                 $safeLabel = $this->input->text((string) $definition, 80);
             }
@@ -110,7 +112,7 @@ final class ProfileContactService
 
             $normalized[$slug] = [
                 'label' => $safeLabel,
-                'url_prefix' => $safePrefix,
+                'prefix' => $safePrefix,
             ];
             $priorities[$slug] = $priority;
         }
@@ -122,7 +124,7 @@ final class ProfileContactService
 
             $normalized[$requiredSlug] = [
                 'label' => (string) ($requiredConfig['label'] ?? ucwords(str_replace('-', ' ', $requiredSlug))),
-                'url_prefix' => trim((string) ($requiredConfig['url_prefix'] ?? '')),
+                'prefix' => trim((string) ($requiredConfig['prefix'] ?? '')),
             ];
         }
 
@@ -134,7 +136,7 @@ final class ProfileContactService
     }
 
     /**
-     * @return array<string, array{label: string, url_prefix: string}>
+     * @return array<string, array{label: string, prefix: string}>
      */
     public function normalizeSubmittedOptions(mixed $rawOptions): array
     {
@@ -158,14 +160,16 @@ final class ProfileContactService
                 continue;
             }
 
-            $urlPrefix = trim($this->input->text((string) ($entry['url_prefix'] ?? ''), 255));
+            // Accept both new `prefix` key and legacy `url_prefix` key from old form submissions.
+            $rawPrefix = $entry['prefix'] ?? $entry['url_prefix'] ?? '';
+            $urlPrefix = trim($this->input->text((string) $rawPrefix, 255));
             if (isset($normalized[$type])) {
                 continue;
             }
 
             $normalized[$type] = [
                 'label' => $label,
-                'url_prefix' => $urlPrefix,
+                'prefix' => $urlPrefix,
             ];
 
             if (count($normalized) >= 100) {
@@ -177,7 +181,7 @@ final class ProfileContactService
     }
 
     /**
-     * @param array<string, array{label: string, url_prefix: string}> $allowedOptions
+     * @param array<string, array{label: string, prefix: string}> $allowedOptions
      * @return array<int, array{type: string, value: string}>
      */
     public function normalizeSubmittedProfiles(mixed $rawProfiles, array $allowedOptions): array
@@ -218,7 +222,7 @@ final class ProfileContactService
 
     /**
      * @param array<string, mixed> $profile
-     * @param array<string, array{label: string, url_prefix: string}> $options
+     * @param array<string, array{label: string, prefix: string}> $options
      * @return array<string, mixed>
      */
     public function decorateProfileContacts(array $profile, array $options): array
@@ -243,10 +247,11 @@ final class ProfileContactService
 
             $option = $options[$type] ?? [
                 'label' => ucwords(str_replace('-', ' ', $type)),
-                'url_prefix' => '',
+                'prefix' => '',
             ];
             $label = (string) ($option['label'] ?? $type);
-            $urlPrefix = trim((string) ($option['url_prefix'] ?? ''));
+            // Accept both new `prefix` key and legacy `url_prefix` key.
+            $urlPrefix = trim((string) ($option['prefix'] ?? $option['url_prefix'] ?? ''));
             $href = $this->resolveProfileContactHref($value, $urlPrefix);
 
             $entries[] = [
@@ -293,7 +298,7 @@ final class ProfileContactService
 
     /**
      * @param array<int, array<string, mixed>> $profiles
-     * @param array<string, array{label: string, url_prefix: string}> $contactOptions
+     * @param array<string, array{label: string, prefix: string}> $contactOptions
      */
     public function twitterCreatorFromProfiles(array $profiles, array $contactOptions): string
     {
@@ -312,7 +317,8 @@ final class ProfileContactService
                 continue;
             }
 
-            $urlPrefix = trim((string) ($contactOptions[$type]['url_prefix'] ?? ''));
+            // Accept both new `prefix` key and legacy `url_prefix` key.
+            $urlPrefix = trim((string) ($contactOptions[$type]['prefix'] ?? $contactOptions[$type]['url_prefix'] ?? ''));
             if (!$this->isTwitterProfileContactType($type, $urlPrefix)) {
                 continue;
             }

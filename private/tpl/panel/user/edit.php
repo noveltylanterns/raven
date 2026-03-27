@@ -18,7 +18,7 @@
 /** @var array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}> $groupOptions */
 /** @var bool $canAssignSuperAdmin */
 /** @var bool $canAssignConfigurationGroups */
-/** @var array<string, array{label: string, url_prefix: string}> $profileContactOptions */
+/** @var array<string, array{label: string, prefix: string}> $profileContactOptions */
 /** @var array<string, string> $twoFactorTypeOptions */
 /** @var array<int, string> $themeOptions */
 /** @var array{filename: string, url: string, thumb_url: string} $avatarTemplateData */
@@ -481,7 +481,7 @@ $themeLabels = [
                                     >
                                         <?php foreach ($profileContactOptions as $optionSlug => $optionData): ?>
                                             <?php $optionLabel = (string) ($optionData['label'] ?? $optionSlug); ?>
-                                            <?php $optionPrefix = (string) ($optionData['url_prefix'] ?? ''); ?>
+                                            <?php $optionPrefix = (string) ($optionData['prefix'] ?? $optionData['url_prefix'] ?? ''); ?>
                                             <option
                                                 value="<?= e((string) $optionSlug) ?>"
                                                 data-url-prefix="<?= e($optionPrefix) ?>"
@@ -698,7 +698,7 @@ $themeLabels = [
                 <select class="form-select" data-user-contact-key="type">
                     <?php foreach ($profileContactOptions as $optionSlug => $optionData): ?>
                         <?php $optionLabel = (string) ($optionData['label'] ?? $optionSlug); ?>
-                        <?php $optionPrefix = (string) ($optionData['url_prefix'] ?? ''); ?>
+                        <?php $optionPrefix = (string) ($optionData['prefix'] ?? $optionData['url_prefix'] ?? ''); ?>
                         <option value="<?= e((string) $optionSlug) ?>" data-url-prefix="<?= e($optionPrefix) ?>"><?= e($optionLabel) ?></option>
                     <?php endforeach; ?>
                 </select>

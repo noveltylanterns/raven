@@ -404,8 +404,8 @@ final class PanelController
             'categoryEnabled' => $categoryEnabled,
             'tagEnabled' => $tagEnabled,
             'galleryImages' => $galleryImages,
-            'imageUploadTarget' => (string) $this->config->get('media.images.upload_target', 'local'),
-            'imageMaxFilesPerUpload' => max(0, (int) $this->config->get('media.images.max_files_per_upload', 10)),
+            'imageUploadTarget' => (string) $this->config->get('media.upload_target', 'local'),
+            'imageMaxFilesPerUpload' => max(0, (int) $this->config->get('media.max_files_per_upload', 10)),
             'editorDefault' => $this->normalizeBodyTextEditorOption(
                 (string) $this->config->get('content.editor', $this->config->get('content.editor_default', 'tinymce'))
             ),
@@ -881,7 +881,7 @@ final class PanelController
             redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
         }
 
-        $maxFilesPerUpload = max(0, (int) $this->config->get('media.images.max_files_per_upload', 10));
+        $maxFilesPerUpload = max(0, (int) $this->config->get('media.max_files_per_upload', 10));
         if ($maxFilesPerUpload > 0 && count($uploads) > $maxFilesPerUpload) {
             $this->flash(
                 'error',
@@ -2596,6 +2596,7 @@ final class PanelController
             'prefilterGroup' => $prefilterGroup,
             'groupOptions' => $groupOptions,
             'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
+            'registrationMode' => $this->registrationMode(),
             'pagination' => $this->panelPaginationViewData(
                 '/user',
                 $pagination,
@@ -2893,8 +2894,8 @@ final class PanelController
         if ($hasUpload) {
             // Validate bytes, dimensions, mime, and size before moving to public path.
             $avatarMaxSizeBytes = $this->resolveMediaMaxFilesizeBytes('avatars', 1048576);
-            $avatarMaxWidth = (int) $this->config->get('media.avatars.max_width', 500);
-            $avatarMaxHeight = (int) $this->config->get('media.avatars.max_height', 500);
+            $avatarMaxWidth = (int) $this->config->get('user.avatar.max_width', 500);
+            $avatarMaxHeight = (int) $this->config->get('user.avatar.max_height', 500);
             $avatarAllowedExtensions = $this->resolveAvatarAllowedExtensionsCsv();
 
             $validator = new AvatarValidator(
@@ -3825,8 +3826,8 @@ final class PanelController
         if ($hasUpload) {
             // Validate bytes, dimensions, mime, and size before moving to public path.
             $avatarMaxSizeBytes = $this->resolveMediaMaxFilesizeBytes('avatars', 1048576);
-            $avatarMaxWidth = (int) $this->config->get('media.avatars.max_width', 500);
-            $avatarMaxHeight = (int) $this->config->get('media.avatars.max_height', 500);
+            $avatarMaxWidth = (int) $this->config->get('user.avatar.max_width', 500);
+            $avatarMaxHeight = (int) $this->config->get('user.avatar.max_height', 500);
             $avatarAllowedExtensions = $this->resolveAvatarAllowedExtensionsCsv();
 
             $validator = new AvatarValidator(
@@ -5611,7 +5612,7 @@ final class PanelController
     }
 
     /**
-     * Validates one media.images.* config field from configuration editor.
+     * Validates one media.* config field from configuration editor.
      */
     private function normalizeImageConfigValue(string $path, string $value): int|string|bool
     {
@@ -6632,7 +6633,7 @@ final class PanelController
     private function validateUserCoverUpload(array $upload): array
     {
         $maxBytes = $this->resolveMediaMaxFilesizeBytes('images', 10485760);
-        $allowedExtensions = (string) $this->config->get('media.images.allowed_extensions', 'gif,jpg,jpeg,png');
+        $allowedExtensions = (string) $this->config->get('media.allowed_extensions', 'gif,jpg,jpeg,png');
         $policy = new AvatarValidationPolicy($maxBytes, 10000, 10000, $allowedExtensions);
         return $policy->validate($upload);
     }
@@ -6717,7 +6718,7 @@ final class PanelController
      */
     private function panelLoginIdentifierMode(): string
     {
-        $mode = strtolower(trim((string) $this->config->get('user.auth.login', 'email')));
+        $mode = strtolower(trim((string) $this->config->get('user.auth.method', 'email')));
         if (!in_array($mode, ['email', 'username'], true)) {
             $mode = 'email';
         }
@@ -6949,7 +6950,7 @@ final class PanelController
     /**
      * Returns default profile-contact option map (slug => metadata).
      *
-     * @return array<string, array{label: string, url_prefix: string}>
+     * @return array<string, array{label: string, prefix: string}>
      */
     private function defaultProfileContactOptions(): array
     {
@@ -6967,7 +6968,7 @@ final class PanelController
     /**
      * Returns contact-option defaults that are mandatory and cannot be removed.
      *
-     * @return array<string, array{label: string, url_prefix: string}>
+     * @return array<string, array{label: string, prefix: string}>
      */
     private function requiredProfileContactOptions(): array
     {
@@ -6977,7 +6978,7 @@ final class PanelController
     /**
      * Normalizes one profile-contact option map from config.
      *
-     * @return array<string, array{label: string, url_prefix: string}>
+     * @return array<string, array{label: string, prefix: string}>
      */
     private function normalizeProfileContactOptionsConfig(mixed $raw): array
     {
@@ -6988,7 +6989,7 @@ final class PanelController
      * Normalizes submitted profile-contact option rows from configuration editor.
      *
      * @param mixed $rawOptions
-     * @return array<string, array{label: string, url_prefix: string}>
+     * @return array<string, array{label: string, prefix: string}>
      */
     private function normalizeSubmittedProfileContactOptionsConfig(mixed $rawOptions): array
     {
@@ -6998,7 +6999,7 @@ final class PanelController
     /**
      * Returns normalized profile-contact option map from runtime config.
      *
-     * @return array<string, array{label: string, url_prefix: string}>
+     * @return array<string, array{label: string, prefix: string}>
      */
     private function profileContactOptions(): array
     {
@@ -7011,7 +7012,7 @@ final class PanelController
      * Normalizes submitted profile-contact rows from panel forms.
      *
      * @param mixed $rawProfiles
-     * @param array<string, array{label: string, url_prefix: string}> $allowedOptions
+     * @param array<string, array{label: string, prefix: string}> $allowedOptions
      * @return array<int, array{type: string, value: string}>
      */
     private function normalizeSubmittedContactProfiles(mixed $rawProfiles, array $allowedOptions): array

@@ -479,7 +479,7 @@ final class PublicTemplateDecorator
 
     private function publicUsernamesEnabled(): bool
     {
-        $mode = strtolower(trim((string) $this->config->get('user.auth.login', 'email')));
+        $mode = strtolower(trim((string) $this->config->get('user.auth.method', 'email')));
         return $mode !== 'email';
     }
 }

@@ -82,7 +82,7 @@ final class PageImageManager
             ];
         }
 
-        $uploadTarget = strtolower((string) $this->config->get('media.images.upload_target', 'local'));
+        $uploadTarget = strtolower((string) $this->config->get('media.upload_target', 'local'));
         if ($uploadTarget !== 'local') {
             return [
                 'ok' => false,
@@ -186,7 +186,7 @@ final class PageImageManager
             $source->setIteratorIndex(0);
             $this->autoOrient($source);
 
-            $stripExif = (bool) $this->config->get('media.images.strip_exif', true);
+            $stripExif = (bool) $this->config->get('media.strip_exif', true);
             if ($stripExif) {
                 $source->stripImage();
             }

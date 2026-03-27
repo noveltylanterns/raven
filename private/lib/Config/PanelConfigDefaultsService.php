@@ -29,6 +29,7 @@ final class PanelConfigDefaultsService
         array $publicThemeOptions,
         callable $normalizePanelThemeChoice
     ): array {
+        $config = $this->schema->ensureMediaConfig($config);
         $config = $this->schema->ensureContentEditorConfig($config);
         $config = $this->schema->ensureDatabaseConfig($config);
         $config = $this->schema->ensureTaxonomyRoutePrefixConfig($config);

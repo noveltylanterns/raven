@@ -16,7 +16,7 @@
 /** @var array<string, mixed> $preferences */
 /** @var string|null $loginIdentifierMode */
 /** @var array<int, string> $themeOptions */
-/** @var array<string, array{label: string, url_prefix: string}> $profileContactOptions */
+/** @var array<string, array{label: string, prefix: string}> $profileContactOptions */
 /** @var array<string, string> $twoFactorTypeOptions */
 /** @var array{filename: string, url: string, thumb_url: string} $avatarTemplateData */
 /** @var string $avatarUploadLimitsNote */
@@ -1725,7 +1725,7 @@ $themeLabels = [
                                     >
                                         <?php foreach ($profileContactOptions as $optionSlug => $optionData): ?>
                                             <?php $optionLabel = (string) ($optionData['label'] ?? $optionSlug); ?>
-                                            <?php $optionPrefix = (string) ($optionData['url_prefix'] ?? ''); ?>
+                                            <?php $optionPrefix = (string) ($optionData['prefix'] ?? $optionData['url_prefix'] ?? ''); ?>
                                             <option
                                                 value="<?= e((string) $optionSlug) ?>"
                                                 data-url-prefix="<?= e($optionPrefix) ?>"
@@ -2104,7 +2104,7 @@ $themeLabels = [
                 <select class="form-select" data-preferences-contact-key="type">
                     <?php foreach ($profileContactOptions as $optionSlug => $optionData): ?>
                         <?php $optionLabel = (string) ($optionData['label'] ?? $optionSlug); ?>
-                        <?php $optionPrefix = (string) ($optionData['url_prefix'] ?? ''); ?>
+                        <?php $optionPrefix = (string) ($optionData['prefix'] ?? $optionData['url_prefix'] ?? ''); ?>
                         <option value="<?= e((string) $optionSlug) ?>" data-url-prefix="<?= e($optionPrefix) ?>"><?= e($optionLabel) ?></option>
                     <?php endforeach; ?>
                 </select>
