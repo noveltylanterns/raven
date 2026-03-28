@@ -61,8 +61,9 @@ Fields:
 
 - `Title` (required)
 - `Body` (TinyMCE)
-- `Extended Blocks` (optional, repeatable TinyMCE fields)
-- `Add Extended Block` button (appends another TinyMCE block)
+- `Extended Blocks` (optional, repeatable body blocks)
+- `Add Text Block` button (appends a block using the channel/site default editor)
+- `Add Body Block` dropdown (choose block type: `Rich Text Area`, `Plaintext Field`, `Code Field`, `Markdown Field`, `Markdown File`, plus any extension-registered types)
 - drag-and-drop row ordering for Extended Blocks (order is saved)
 
 TinyMCE custom insert buttons (Body + every Extended block):
@@ -77,6 +78,8 @@ TinyMCE custom insert buttons (Body + every Extended block):
 Fields/options:
 
 - `Status`: `Published` or `Draft`
+- `Publish At` (datetime-local; when reached, status auto-changes to Published; blank = no scheduled publish)
+- `Expire At` (datetime-local; when reached, status auto-changes to Draft; blank = no auto-expiry)
 - `Slug`
 - `Description`
 - `Channel`: dropdown with `<none>` + available channels
@@ -271,8 +274,8 @@ When page behavior changes, update this document in the same task. That includes
 - `Add Text Block`
 - `Body Blocks`
 - `Rich Text Area`
-- `Plain Text Field`
-- `Plain Text Auto`
+- `Plaintext Field`
+- `Code Field`
 - `Markdown Field`
 - `Markdown File`
 - `Image Gallery`

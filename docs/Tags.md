@@ -61,14 +61,16 @@ Fields/options:
 - `Description` (optional)
 - `Cover Image` (optional, single file)
 - `Preview Image` (optional, single file)
+- `Icon Image` (optional, single file)
 - `Remove current cover image` checkbox (shown when a cover image exists)
 - `Remove current preview image` checkbox (shown when a preview image exists)
+- `Remove current icon image` checkbox (shown when an icon image exists)
 
 Image behavior notes:
 
-- Upload limits/extensions/variant sizes follow `media.images.*` config (same as Page Editor image rules).
+- Upload limits/extensions/variant sizes follow `media.*` config (same as Page Editor image rules).
 - Tag media is stored under `public/uploads/tags/{id}/`.
-- Only one cover image and one preview image can be attached at a time.
+- Only one cover image, one preview image, and one icon image can be attached at a time.
 
 Delete behavior note:
 

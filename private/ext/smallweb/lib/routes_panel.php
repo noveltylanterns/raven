@@ -18,7 +18,7 @@ use function Raven\Core\Support\redirect;
  * Registers Smallweb extension routes into the panel router.
  *
  * @param array{
- *   app: array<string, mixed>,
+ *   rvn: array<string, mixed>,
  *   panelUrl: callable(string): string,
  *   requirePanelLogin: callable(): void,
  *   currentUserTheme: callable(): string,

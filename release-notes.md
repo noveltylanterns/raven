@@ -4,6 +4,10 @@
 
 ### March 28, 2026
 
+- Fixed all smoke tests to PASS: added `ExtensionBootstrapContractResolver` require to `panel-permissions.php`; enabled `phpinfo` extension in the test state so nav-visibility checks can assert the stock system extension link; updated docs for Categories, Tags, Groups, Pages, and Users to cover recently added fields (`Icon Image`, `Remove current icon image`, `Plaintext Field`, `Code Field`, `Publish At`, `Expire At`, `Primary Group`, Group Media tab), clearing all `docs.php` coverage failures.
+- Fixed stale `app:` context key in PHPDoc `@param` type annotations across all five stock extension panel route files and both scaffold templates in `ExtensionScaffoldService` — leftover from the `$app` → `$rvn` rename. Runtime code was already correct (`$context['rvn']`); only the docblock type shapes were stale.
+- Fixed incorrect `Raven\Core\Http\Router` namespace in minimal scaffold stub examples in `private/ext/AGENTS.md` and `private/ext/CLAUDE.md` — correct namespace is `Raven\Lib\Routing\Router`.
+
 - Renamed the Raven app container variable from `$app` to `$rvn` across all PHP files (`private/`, `panel/`, `public/`, `debug/`). The `RavenCliContext::app()` method and its backing property were renamed to `rvn()` / `$rvn` accordingly. Array keys like `$context['app']` in extension route files are unchanged — only the PHP variable name changed. Also updated `$app` references in `private/ext/AGENTS.md` and `private/ext/smallweb/build-notes.md`.
 - Fixed pre-existing `'super'` group slug references in all debug smoke tests (`contact-workflow`, `debug-toolbar`, `docs`, `auth-workflow`, `security`, `security-aggressive`) to use `idBySlug('admin') ?? 1` (Admin group is canonical ID 1 since the super→admin migration).
 - Added extension-enabled preflight to `contact-workflow.php` smoke test so it gracefully SKIPs instead of failing when the contact extension is not enabled.

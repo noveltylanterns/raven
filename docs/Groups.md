@@ -47,14 +47,30 @@ Top and bottom action bars (same controls in both places):
 - `Back to Groups`
 - `Delete Group` (custom groups only)
 
+Tabs:
+
+- `Basic`
+- `Media`
+- `Permissions`
+
+#### Basic Tab
+
 Fields/options:
 
 - `Name`
 - `Slug`
   - Editable for custom groups.
   - Read-only and disabled for stock groups.
-- `Cover Image`
-  - optional text path/URL field on the Basic tab
+
+#### Media Tab
+
+- `Cover Image` (optional file upload)
+  - `Remove current cover image` checkbox (shown when a cover image exists)
+- `Icon Image` (optional file upload)
+  - `Remove current icon image` checkbox (shown when an icon image exists)
+
+#### Permissions Tab
+
 - `Permissions & Routing`:
   - Public permission checkboxes
   - Panel permission checkboxes

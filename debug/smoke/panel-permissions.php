@@ -13,15 +13,19 @@ error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
 
 require_once __DIR__ . '/../../private/sys/Core/Auth/PanelAccess.php';
+require_once __DIR__ . '/../../private/lib/Config/ConfigFileStore.php';
+require_once __DIR__ . '/../../private/sys/Core/Config.php';
 require_once __DIR__ . '/../../private/sys/Core/Extension/ExtensionRegistry.php';
 require_once __DIR__ . '/../../private/lib/Extension/ExtensionScaffoldService.php';
 require_once __DIR__ . '/../../private/lib/Extension/ExtensionStateStore.php';
 require_once __DIR__ . '/../../private/lib/Extension/ExtensionPermissionCatalogService.php';
 require_once __DIR__ . '/../../private/lib/Extension/ExtensionCatalogService.php';
 require_once __DIR__ . '/../../private/lib/Extension/ManifestContractValidator.php';
+require_once __DIR__ . '/../../private/lib/Extension/ExtensionBootstrapContractResolver.php';
 require_once __DIR__ . '/../../private/lib/Security/InputSanitizer.php';
 
 use Raven\Core\Auth\PanelAccess;
+use Raven\Core\Config;
 use Raven\Lib\Extension\ExtensionCatalogService;
 use Raven\Lib\Extension\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionScaffoldService;
@@ -222,8 +226,9 @@ PHP;
             $this->root . '/private/dat/ext'
         );
         $input = new InputSanitizer();
+        $config = new Config($this->root . '/private/dat/config.php');
         $permissionCatalog = new ExtensionPermissionCatalogService($stateStore, $input);
-        $catalogService = new ExtensionCatalogService($this->root, $stateStore, $permissionCatalog, $input);
+        $catalogService = new ExtensionCatalogService($this->root, $stateStore, $permissionCatalog, $config, $input);
 
         $permissionMap = $permissionCatalog->panelPermissionMapForDirectories(
             [$this->pluginSlug, $this->moduleSlug],
@@ -250,6 +255,8 @@ PHP;
         $enabled[$this->pluginSlug] = true;
         $enabled[$this->moduleSlug] = true;
         $enabled[$this->systemSlug] = true;
+        // phpinfo is a stock system extension that must be enabled for nav visibility checks.
+        $enabled['phpinfo'] = true;
         $stateStore->saveState($enabled, $state['permissions'], $state['permission_bits']);
 
         $this->events[] = 'debug_extension_bits='

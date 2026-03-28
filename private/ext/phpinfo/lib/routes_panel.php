@@ -17,7 +17,7 @@ use Raven\Lib\Routing\Router;
  * Registers PHP Info routes into the panel router.
  *
  * @param array{
- *   app: array<string, mixed>,
+ *   rvn: array<string, mixed>,
  *   panelUrl: callable(string): string,
  *   requirePanelLogin: callable(): void,
  *   currentUserTheme: callable(): string

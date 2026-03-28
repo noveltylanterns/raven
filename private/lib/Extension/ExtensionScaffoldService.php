@@ -371,7 +371,7 @@ use Raven\Lib\Routing\Router;
  * Registers __NAME_DOC__ routes into the panel router.
  *
  * @param array{
- *   app: array<string, mixed>,
+ *   rvn: array<string, mixed>,
  *   panelUrl: callable(string): string,
  *   requirePanelLogin: callable(): void,
  *   currentUserTheme: callable(): string
@@ -540,7 +540,7 @@ use Raven\Lib\Routing\Router;
  * Registers extension routes into the public router.
  *
  * @param array{
- *   app: array<string, mixed>,
+ *   rvn: array<string, mixed>,
  *   controller: object,
  *   input: mixed,
  *   extensionDirectory: string

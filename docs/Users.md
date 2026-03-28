@@ -82,6 +82,7 @@ Fields/options:
 - `Cover Image`
   - optional local image upload on the Profile tab
   - optional `Remove current cover image` checkbox when a cover exists
+- `Primary Group` (single-select dropdown; required)
 - `Group Memberships` (multi-select checkboxes)
 - `Two-Factor Methods` (existing users)
   - read-only method entries with `Type`, `Label`, and `Details`

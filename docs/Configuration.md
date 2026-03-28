@@ -121,9 +121,9 @@ Grouped sections:
 Notable options:
 
 - `0` means no limit for:
-  - `media.images.max_filesize_kb`
-  - `media.images.max_files_per_upload`
-  - `media.avatars.max_filesize_kb`
+  - `media.max_filesize_kb`
+  - `media.max_files_per_upload`
+  - `user.avatar.max_filesize_kb`
 
 #### Meta Tab
 
@@ -156,10 +156,11 @@ Grouped sections:
 Notable options:
 
 - `user.auth.registration` is shown first in `Registration Options` as `Enable Public Registration`.
-- `user.auth.login` remains in `Registration Options` as `Login Method`.
+- `user.auth.method` remains in `Registration Options` as `Login Method`.
 - `user.string` is shown in `Registration Options` as `String Length`, defaults to `28`, and controls the generated length of each user's unique public-safe selector string.
 - `user.bio` controls the maximum plaintext profile-bio length allowed in both the User editor and self-service Preferences screen.
-- `user.selector` is shown in `Profile Options` as `Profile URL Selector` and controls whether public profile URLs resolve by numeric `id`, `username` (only when `user.auth.login=username`), or the generated `string`.
+- `user.visibility` controls public-site access mode: `public`, `private`, or `disabled`.
+- `user.selector` is shown in `Profile Options` as `Profile URL Selector` and controls whether public profile URLs resolve by numeric `id`, `username` (only when `user.auth.method=username`), or the generated `string`.
 
 ### Field Input Types You’ll See
 
@@ -216,9 +217,9 @@ Path-specific normalization is centralized in `normalizeConfigFieldValue(...)` a
 
 Important rules include:
 
-- constrained enums (`site.enabled`, `site.protocol`, `database.driver`, `captcha.provider`, `mail.agent`, etc.)
+- constrained enums (`site.visibility`, `site.protocol`, `database.driver`, `captcha.provider`, `mail.agent`, etc.)
 - `panel.theme` constrained to `corp`, `ice`, or `midnight` (legacy `light`/`dark` normalize to `corp`/`midnight`)
-- `user.auth.login` constrained to `email` or `username`
+- `user.auth.method` constrained to `email` or `username`
 - `user.auth.registration` constrained to `open`, `invite`, or `closed`
 - `user.string` is normalized to a positive integer length and capped before persistence
 - `user.selector` is constrained to `id`, `username`, or `string`, and `username` is rejected unless username login mode is active
@@ -251,7 +252,7 @@ The view receives flattened field descriptors and then:
 The following config keys are expected to appear in this document and in runtime/editor behavior. Internal documentation coverage checks validate this list.
 
 - `site.domain`
-- `site.enabled`
+- `site.visibility`
 - `site.protocol`
 - `site.name`
 - `panel.path`
@@ -278,7 +279,9 @@ The following config keys are expected to appear in this document and in runtime
 - `category.pagination`
 - `tag.pagination`
 - `category.prefix`
+- `category.selector`
 - `tag.prefix`
+- `tag.selector`
 - `database.driver`
 - `database.prefix`
 - `database.sqlite.path`
@@ -303,21 +306,21 @@ The following config keys are expected to appear in this document and in runtime
 - `debug.show_trace`
 - `debug.show_request`
 - `debug.show_environment`
-- `media.images.upload_target`
-- `media.images.max_filesize_kb`
-- `media.images.max_files_per_upload`
-- `media.images.allowed_extensions`
-- `media.images.strip_exif`
-- `media.images.small.width`
-- `media.images.small.height`
-- `media.images.med.width`
-- `media.images.med.height`
-- `media.images.large.width`
-- `media.images.large.height`
-- `media.avatars.max_filesize_kb`
-- `media.avatars.max_width`
-- `media.avatars.max_height`
-- `media.avatars.allowed_extensions`
+- `media.upload_target`
+- `media.max_filesize_kb`
+- `media.max_files_per_upload`
+- `media.allowed_extensions`
+- `media.strip_exif`
+- `media.thumb.sm_x`
+- `media.thumb.sm_y`
+- `media.thumb.md_x`
+- `media.thumb.md_y`
+- `media.thumb.lg_x`
+- `media.thumb.lg_y`
+- `user.avatar.max_filesize_kb`
+- `user.avatar.max_width`
+- `user.avatar.max_height`
+- `user.avatar.allowed_extensions`
 - `meta.apple_touch_icon`
 - `meta.image`
 - `meta.robots`
@@ -332,25 +335,24 @@ The following config keys are expected to appear in this document and in runtime
 - `session.brute.max`
 - `session.brute.window`
 - `session.brute.lock`
-- `user.auth.login`
+- `user.auth.method`
 - `user.auth.registration`
 - `user.string`
 - `user.bio`
-- `user.privacy`
+- `user.visibility`
 - `user.selector`
 - `user.prefix`
 - `user.contact.email.label`
-- `user.contact.email.url_prefix`
+- `user.contact.email.prefix`
 - `user.contact.phone.label`
-- `user.contact.phone.url_prefix`
-- `user.contact.website.label` (legacy key; normalized to `user.contact.homepage.label` on save)
-- `user.contact.website.url_prefix` (legacy key; normalized to `user.contact.homepage.url_prefix` on save)
+- `user.contact.phone.prefix`
 - `user.contact.homepage.label`
-- `user.contact.homepage.url_prefix`
+- `user.contact.homepage.prefix`
 - `user.contact.x.label`
-- `user.contact.x.url_prefix`
-- `group.privacy`
+- `user.contact.x.prefix`
+- `group.visibility`
 - `group.prefix`
+- `group.selector`
 - `captcha.provider`
 - `captcha.hcaptcha.public_key`
 - `captcha.hcaptcha.secret_key`
