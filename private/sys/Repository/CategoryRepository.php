@@ -292,6 +292,46 @@ final class CategoryRepository
     }
 
     /**
+     * Returns one category by slug.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findBySlug(string $slug): ?array
+    {
+        $categories = $this->table('categories');
+
+        $stmt = $this->db->prepare(
+            'SELECT id, name, slug, ' . $this->setColumn() . ' AS set_value, description, created, updated,
+                    cover_image, preview_image, icon_image
+             FROM ' . $categories . '
+             WHERE slug = :slug
+             LIMIT 1'
+        );
+        $stmt->execute([':slug' => $slug]);
+
+        $row = $stmt->fetch();
+
+        return $row === false ? null : $this->hydrateRow($row);
+    }
+
+    /**
+     * Returns one category id by slug, or null when not found.
+     */
+    public function idBySlug(string $slug): ?int
+    {
+        $categories = $this->table('categories');
+
+        $stmt = $this->db->prepare(
+            'SELECT id FROM ' . $categories . ' WHERE slug = :slug LIMIT 1'
+        );
+        $stmt->execute([':slug' => $slug]);
+
+        $value = $stmt->fetchColumn();
+
+        return $value === false ? null : (int) $value;
+    }
+
+    /**
      * Creates or updates one category and returns category id.
      *
      * @param array{id: int|null, name: string, slug: string, set: int, description: string} $data

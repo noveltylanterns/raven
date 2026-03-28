@@ -53,7 +53,10 @@ final class AuthWorkflowSmokeRunner
         $panelPath = trim((string) (($config['panel']['path'] ?? 'panel')));
         $this->panelPath = $panelPath !== '' ? $panelPath : 'panel';
 
-        $loginMode = strtolower(trim((string) (($config['user']['auth']['login'] ?? 'email'))));
+        // Read current key (user.auth.method) with fallback to legacy key (user.auth.login).
+        $loginMode = strtolower(trim((string) (
+            $config['user']['auth']['method'] ?? $config['user']['auth']['login'] ?? 'email'
+        )));
         $this->loginIdentifierMode = in_array($loginMode, ['email', 'username'], true) ? $loginMode : 'email';
 
         /** @var array<string, mixed> $cookie */

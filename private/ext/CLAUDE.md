@@ -357,6 +357,13 @@ declare(strict_types=1);
 - Schema providers must be idempotent and safe to run repeatedly.
 - Keep extension table creation and extension-specific column migrations in this file rather than in core schema code.
 
+## Extension API Reference
+- A library and function reference is maintained at `docs/appendix/Libraries.md`.
+- It lists all public repository methods (`findBySlug`, `idBySlug`, `findById`, `save`, etc.) available on each service in `context['rvn']`, along with their signatures and usage notes.
+- This file is generator-owned and produced by `private/bin/rvn-docs`. Do not hand-edit it.
+- Consult `docs/appendix/Libraries.md` before reaching into repository internals or hand-building SQL inside extension routes.
+- A top-level API index linking all developer-facing surfaces (extensions, libraries, CLI, theming) is at `docs/API.md`.
+
 ## Services Available In `context['rvn']`
 - From `private/raven.php`, extensions can consume:
 - `root`

@@ -198,6 +198,81 @@ final class RedirectRepository
     }
 
     /**
+     * Returns one redirect by slug and optional channel scope.
+     *
+     * $channel accepts a channel ID (int), a channel slug (string), or null for root scope.
+     * Root scope matches redirects that do not belong to any channel.
+     * Matches regardless of active status — use findActiveByPath for public routing.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findBySlug(string $slug, int|string|null $channel = null): ?array
+    {
+        $redirects = $this->table('redirects');
+        $sql = 'SELECT r.id, r.title, r.description, r.slug, r.channel, r.active, r.target, r.created, r.updated
+                FROM ' . $redirects . ' r
+                WHERE r.slug = :slug';
+        $params = [':slug' => $slug];
+
+        if (is_string($channel)) {
+            $channelId = $this->channelRepo->idFromSlug($channel);
+            if ($channelId < 1) {
+                return null;
+            }
+            $sql .= ' AND r.channel = :channel';
+            $params[':channel'] = $channelId;
+        } elseif (is_int($channel) && $channel > 0) {
+            $sql .= ' AND r.channel = :channel';
+            $params[':channel'] = $channel;
+        } else {
+            // null or 0 = root scope
+            $sql .= ' AND (r.channel = 0 OR r.channel IS NULL)';
+        }
+
+        $sql .= ' LIMIT 1';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        $row = $stmt->fetch();
+
+        return $row === false ? null : $this->withChannelContext($row, $this->channelsByIdMap());
+    }
+
+    /**
+     * Returns one redirect id by slug and optional channel scope, or null when not found.
+     *
+     * $channel accepts a channel ID (int), a channel slug (string), or null for root scope.
+     */
+    public function idBySlug(string $slug, int|string|null $channel = null): ?int
+    {
+        $redirects = $this->table('redirects');
+        $sql = 'SELECT r.id FROM ' . $redirects . ' r WHERE r.slug = :slug';
+        $params = [':slug' => $slug];
+
+        if (is_string($channel)) {
+            $channelId = $this->channelRepo->idFromSlug($channel);
+            if ($channelId < 1) {
+                return null;
+            }
+            $sql .= ' AND r.channel = :channel';
+            $params[':channel'] = $channelId;
+        } elseif (is_int($channel) && $channel > 0) {
+            $sql .= ' AND r.channel = :channel';
+            $params[':channel'] = $channel;
+        } else {
+            $sql .= ' AND (r.channel = 0 OR r.channel IS NULL)';
+        }
+
+        $sql .= ' LIMIT 1';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        $value = $stmt->fetchColumn();
+
+        return $value === false ? null : (int) $value;
+    }
+
+    /**
      * Returns redirect-editor data (optional redirect row + channel options) in one query.
      *
      * @return array{

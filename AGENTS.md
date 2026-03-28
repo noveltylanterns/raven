@@ -84,6 +84,20 @@ Last updated: 2026-03-25
 - Extension services/bootstrap should stay self-contained under that extension directory.
 - Extension packaging/manifest/security contracts are governed by `private/ext/AGENTS.md`.
 
+## Inline Comment and PHPDoc Standards
+Raven is designed to be fully readable and modifiable by a human developer in a plain text editor
+with no AI assistance. Thorough inline comments are a core product requirement — not a style
+preference. They also orient future agents when context windows are collapsing mid-session, and
+they feed the `rvn-docs` documentation generator that powers the live docs site.
+
+- Every public and protected method must have a PHPDoc block: one-sentence description, `@param`
+  per argument (with meaning, not just type), `@return` (with meaning), and `@throws` where applicable.
+- Inline comments must explain the **why** behind non-obvious logic, branches, SQL structures, and
+  multi-step operations. Do not comment the obvious; do not leave the non-obvious unexplained.
+- Every PHP file must open with the standard Raven file header (path, purpose, docs link).
+- When modifying a method, update its docblock if it is now inaccurate. Stale docblocks are bugs.
+- When writing new code, comments are required before the task is considered done.
+
 ## Update Survivability
 - Keep end-user custom code in theme/extension directories only.
 - Keep runtime state/data in local/private paths (`private/dat/config.php`, `private/dat/`, `.tmp/`, uploads).

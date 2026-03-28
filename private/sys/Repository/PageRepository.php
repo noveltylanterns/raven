@@ -254,6 +254,78 @@ final class PageRepository
     }
 
     /**
+     * Returns one page by slug and optional channel scope.
+     *
+     * $channel accepts a channel ID (int), a channel slug (string), or null for root scope.
+     * Root scope matches pages that do not belong to any channel.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findBySlug(string $pageSlug, int|string|null $channel = null): ?array
+    {
+        $pages = $this->table('pages');
+        $sql = 'SELECT p.* FROM ' . $pages . ' p WHERE p.slug = :slug';
+        $params = [':slug' => $pageSlug];
+
+        if (is_string($channel)) {
+            $channelId = $this->channelRepo->idFromSlug($channel);
+            if ($channelId < 1) {
+                return null;
+            }
+            $sql .= ' AND p.channel = :channel';
+            $params[':channel'] = $channelId;
+        } elseif (is_int($channel) && $channel > 0) {
+            $sql .= ' AND p.channel = :channel';
+            $params[':channel'] = $channel;
+        } else {
+            // null or 0 = root scope
+            $sql .= ' AND (p.channel = 0 OR p.channel IS NULL)';
+        }
+
+        $sql .= ' LIMIT 1';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        $row = $stmt->fetch();
+
+        return $row === false ? null : $this->hydratePageRow($row);
+    }
+
+    /**
+     * Returns one page id by slug and optional channel scope, or null when not found.
+     *
+     * $channel accepts a channel ID (int), a channel slug (string), or null for root scope.
+     */
+    public function idBySlug(string $pageSlug, int|string|null $channel = null): ?int
+    {
+        $pages = $this->table('pages');
+        $sql = 'SELECT p.id FROM ' . $pages . ' p WHERE p.slug = :slug';
+        $params = [':slug' => $pageSlug];
+
+        if (is_string($channel)) {
+            $channelId = $this->channelRepo->idFromSlug($channel);
+            if ($channelId < 1) {
+                return null;
+            }
+            $sql .= ' AND p.channel = :channel';
+            $params[':channel'] = $channelId;
+        } elseif (is_int($channel) && $channel > 0) {
+            $sql .= ' AND p.channel = :channel';
+            $params[':channel'] = $channel;
+        } else {
+            $sql .= ' AND (p.channel = 0 OR p.channel IS NULL)';
+        }
+
+        $sql .= ' LIMIT 1';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        $value = $stmt->fetchColumn();
+
+        return $value === false ? null : (int) $value;
+    }
+
+    /**
      * Returns newest published pages, optionally scoped to one channel slug.
      *
      * Channel scope values:
