@@ -3526,6 +3526,9 @@ final class PanelController
             'groupRoutingEnabledSystemWide' => $this->groupRoutesEnabledForRoutingTable(),
             'permissionDefinitions' => $this->permissionDefinitions(),
             'canEditConfigurationBit' => $this->auth->isAdmin(),
+            'imageAllowedExtensions' => $this->taxonomyAllowedImageExtensionsLabel(),
+            'imageMaxFilesizeKb' => $this->taxonomyMaxImageFilesizeKb(),
+            'imageVariantSpecs' => $this->taxonomyImageVariantSpecs(),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'error' => $this->pullFlash('error'),
@@ -3539,8 +3542,9 @@ final class PanelController
      * Saves one usergroup.
      *
      * @param array<string, mixed> $post
+     * @param array<string, mixed> $files
      */
-    public function groupSave(array $post): void
+    public function groupSave(array $post, array $files = []): void
     {
         $this->requirePanelLogin();
         $id = $this->input->int($post['id'] ?? null, 1);
@@ -3554,14 +3558,12 @@ final class PanelController
             redirect($this->panelUrl('/group'));
         }
 
-        $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'permissions'], 'basic');
+        $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media', 'permissions'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 100);
         $editUrl = $this->panelEditorUrlWithTab('/group/edit', $id, $activeTab, 'basic');
         $actorIsAdmin = $this->auth->isAdmin();
         $existingGroup = $id !== null ? $this->groupRepo->findById($id) : null;
         $isExistingStockGroup = is_array($existingGroup) && (int) ($existingGroup['is_stock'] ?? 0) === 1;
-        $coverImage = $this->input->text($post['cover_image'] ?? null, 255);
-        $iconImage = $this->input->text($post['icon_image'] ?? null, 255);
         $slugRaw = trim($this->input->text($post['slug'] ?? null, 160));
         $slug = '';
         if (!$isExistingStockGroup && $slugRaw !== '') {
@@ -3659,8 +3661,6 @@ final class PanelController
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
-                'cover_image' => $coverImage,
-                'icon_image' => $iconImage,
                 'route_enabled' => $routeEnabled ? 1 : 0,
                 'permission_mask' => $permissionMask,
             ]);
@@ -3669,8 +3669,78 @@ final class PanelController
             redirect($editUrl);
         }
 
+        $savedEditUrl = $this->panelEditorUrlWithTab('/group/edit', $savedId, $activeTab, 'basic');
+
+        // Process cover and icon image uploads (groups skip preview slot).
+        $currentRecord = $this->groupRepo->findById($savedId);
+        $currentStorage = $this->taxonomyImageStoragePayloadFromRecord('groups', $currentRecord);
+        $currentPaths = $this->taxonomyImagePathsFromStoragePayload('groups', $savedId, $currentStorage);
+        $nextStorage = $currentStorage;
+        $newPathSets = [];
+
+        $coverUploads = $this->normalizeUploadedFileSet($files['cover_image'] ?? null);
+        $iconUploads = $this->normalizeUploadedFileSet($files['icon_image'] ?? null);
+
+        if (count($coverUploads) > 1 || count($iconUploads) > 1) {
+            $this->flash('error', 'Please upload only one image per slot.');
+            redirect($savedEditUrl);
+        }
+
+        $removeCover = isset($post['remove_cover_image']) && (string) $post['remove_cover_image'] === '1';
+        $removeIcon = isset($post['remove_icon_image']) && (string) $post['remove_icon_image'] === '1';
+
+        if ($removeCover) {
+            foreach ($this->taxonomyImageStorageKeysForSlot('groups', 'cover') as $key) {
+                $nextStorage[$key] = null;
+            }
+        }
+        if ($removeIcon) {
+            foreach ($this->taxonomyImageStorageKeysForSlot('groups', 'icon') as $key) {
+                $nextStorage[$key] = null;
+            }
+        }
+
+        if (isset($coverUploads[0])) {
+            $coverResult = $this->storeTaxonomyImageUpload('groups', $savedId, 'cover', $coverUploads[0]);
+            if (!$coverResult['ok']) {
+                $this->cleanupTaxonomyImagePathSets('groups', $savedId, $newPathSets);
+                $this->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
+                redirect($savedEditUrl);
+            }
+
+            $coverStorage = is_array($coverResult['record'] ?? null) ? $coverResult['record'] : [];
+            $newPathSets[] = $coverResult['paths'] ?? [];
+            $nextStorage = array_merge($nextStorage, $coverStorage);
+        }
+
+        if (isset($iconUploads[0])) {
+            $iconResult = $this->storeTaxonomyImageUpload('groups', $savedId, 'icon', $iconUploads[0]);
+            if (!$iconResult['ok']) {
+                $this->cleanupTaxonomyImagePathSets('groups', $savedId, $newPathSets);
+                $this->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
+                redirect($savedEditUrl);
+            }
+
+            $iconStorage = is_array($iconResult['record'] ?? null) ? $iconResult['record'] : [];
+            $newPathSets[] = $iconResult['paths'] ?? [];
+            $nextStorage = array_merge($nextStorage, $iconStorage);
+        }
+
+        try {
+            $this->groupRepo->updateImageFiles($savedId, $nextStorage);
+        } catch (\Throwable) {
+            // Keep DB and filesystem in sync when image-path persistence fails.
+            $this->cleanupTaxonomyImagePathSets('groups', $savedId, $newPathSets);
+            $this->flash('error', 'Failed to save group image selections.');
+            redirect($savedEditUrl);
+        }
+
+        $nextPaths = $this->taxonomyImagePathsFromStoragePayload('groups', $savedId, $nextStorage);
+        $obsoletePaths = $this->taxonomyRemovedPaths($currentPaths, $nextPaths);
+        $this->deleteTaxonomyStoredPaths('groups', $savedId, $obsoletePaths);
+
         $this->flash('success', 'Changes saved.');
-        redirect($this->panelEditorUrlWithTab('/group/edit', $savedId, $activeTab, 'basic'));
+        redirect($savedEditUrl);
     }
 
     /**

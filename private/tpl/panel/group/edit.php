@@ -15,6 +15,9 @@
 /** @var bool $groupRoutingEnabledSystemWide */
 /** @var array<int, array{bit: int, label: string, section?: string, group?: string, action?: string, extension?: string}> $permissionDefinitions */
 /** @var bool $canEditConfigurationBit */
+/** @var string $imageAllowedExtensions */
+/** @var int|null $imageMaxFilesizeKb */
+/** @var array<string, array{width: int, height: int}> $imageVariantSpecs */
 /** @var string $csrfField */
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
@@ -186,7 +189,28 @@ $panelPermissionState = static function (int $bit) use (
     ];
 };
 $requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
-$activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requestedTab : 'basic';
+$activeTab = in_array($requestedTab, ['basic', 'media', 'permissions'], true) ? $requestedTab : 'basic';
+// Resolve stored image filenames into public paths for display in the Media tab.
+$coverFilename = trim((string) ($group['cover_image'] ?? ''));
+$iconFilename = trim((string) ($group['icon_image'] ?? ''));
+$coverPath = $groupId > 0 && $coverFilename !== '' ? 'uploads/groups/' . $groupId . '/' . $coverFilename : '';
+$iconPath = $groupId > 0 && $iconFilename !== '' ? 'uploads/groups/' . $groupId . '/' . $iconFilename : '';
+$coverUrl = $coverPath !== '' ? '/' . $coverPath : '';
+$iconUrl = $iconPath !== '' ? '/' . $iconPath : '';
+$maxFilesizeLabel = ($imageMaxFilesizeKb ?? null) === null
+    ? 'No limit'
+    : number_format((int) $imageMaxFilesizeKb) . ' KB';
+$smallSpec = $imageVariantSpecs['sm'] ?? ['width' => 0, 'height' => 0];
+$mediumSpec = $imageVariantSpecs['md'] ?? ['width' => 0, 'height' => 0];
+$largeSpec = $imageVariantSpecs['lg'] ?? ['width' => 0, 'height' => 0];
+$normalizedDomain = trim((string) ($site['domain'] ?? ''));
+$publicBase = $normalizedDomain;
+if ($publicBase !== '' && !preg_match('#^https?://#i', $publicBase)) {
+    $publicBase = 'https://' . $publicBase;
+}
+$publicBase = rtrim($publicBase, '/');
+$coverCopyUrl = $coverUrl !== '' && $publicBase !== '' ? $publicBase . $coverUrl : $coverUrl;
+$iconCopyUrl = $iconUrl !== '' && $publicBase !== '' ? $publicBase . $iconUrl : $iconUrl;
 ?>
 <header class="card">
     <div class="card-body">
@@ -229,7 +253,7 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
 </form>
 <?php endif; ?>
 
-<form method="post" action="<?= e($panelBase) ?>/group/save">
+<form method="post" action="<?= e($panelBase) ?>/group/save" enctype="multipart/form-data">
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $groupId ?>">
     <nav class="rvnp-editor-actions">
@@ -258,6 +282,18 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
                 aria-controls="rvnp-editor-pane-basic"
                 aria-selected="<?= $activeTab === 'basic' ? 'true' : 'false' ?>"
             >Basic</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link<?= $activeTab === 'media' ? ' active' : '' ?>"
+                id="group-media-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#rvnp-editor-pane-media"
+                type="button"
+                role="tab"
+                aria-controls="rvnp-editor-pane-media"
+                aria-selected="<?= $activeTab === 'media' ? 'true' : 'false' ?>"
+            >Media</button>
         </li>
         <li class="nav-item" role="presentation">
             <button
@@ -306,32 +342,6 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
                 <?php endif; ?>
             </div>
 
-            <div class="form-group mt-3">
-                <label for="cover_image" class="form-label">Cover Image</label>
-                <input
-                    id="cover_image"
-                    name="cover_image"
-                    type="text"
-                    class="form-control"
-                    value="<?= e((string) ($group['cover_image'] ?? '')) ?>"
-                    placeholder="/uploads/groups/cover/example.jpg"
-                >
-                <div class="form-text">Optional public image path or URL stored with this group.</div>
-            </div>
-
-            <div class="form-group mb-0">
-                <label for="icon_image" class="form-label">Icon Image</label>
-                <input
-                    id="icon_image"
-                    name="icon_image"
-                    type="text"
-                    class="form-control"
-                    value="<?= e((string) ($group['icon_image'] ?? '')) ?>"
-                    placeholder="/uploads/groups/icon/example.jpg"
-                >
-                <div class="form-text">Optional public icon image path or URL stored with this group.</div>
-            </div>
-
             <hr class="my-3">
 
             <div class="form-check mb-0">
@@ -355,6 +365,81 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
                     <div class="form-text">System-level group routing is disabled in Configuration.</div>
                 <?php endif; ?>
             </div>
+        </div>
+
+        <div
+            class="tab-pane fade<?= $activeTab === 'media' ? ' show active' : '' ?>"
+            id="rvnp-editor-pane-media"
+            role="tabpanel"
+            aria-labelledby="group-media-tab"
+            tabindex="0"
+        >
+            <?php if (!$hasPersistedGroup): ?>
+                <p class="text-muted">Save the group first to enable image uploads.</p>
+            <?php else: ?>
+                <div class="form-group small text-muted">
+                    Allowed extensions: <code><?= e($imageAllowedExtensions) ?></code>.
+                    Max filesize: <code><?= e($maxFilesizeLabel) ?></code>.
+                    <br>
+                    Variants use configured contain sizes: <code>sm <?= e((string) $smallSpec['width']) ?>x<?= e((string) $smallSpec['height']) ?></code>,
+                    <code>md <?= e((string) $mediumSpec['width']) ?>x<?= e((string) $mediumSpec['height']) ?></code>,
+                    <code>lg <?= e((string) $largeSpec['width']) ?>x<?= e((string) $largeSpec['height']) ?></code>.
+                </div>
+
+                <div class="form-group">
+                    <label for="cover_image" class="form-label">Cover Image</label>
+                    <input id="cover_image" name="cover_image" type="file" class="form-control" accept=".gif,.jpg,.jpeg,.png">
+                    <?php if ($coverPath !== ''): ?>
+                        <div class="mt-2">
+                            <img src="<?= e($coverUrl) ?>" alt="Current group cover image" class="img-thumbnail" style="max-width: 240px;">
+                        </div>
+                        <div class="small text-muted mt-1">
+                            <button
+                                type="button"
+                                class="btn btn-link btn-sm p-0 text-muted text-decoration-none align-baseline"
+                                data-rvn-copy-url="1"
+                                data-copy-text="<?= e($coverCopyUrl) ?>"
+                                data-copy-label="<?= e($coverPath) ?>"
+                                title="Click to copy full URL"
+                                aria-label="Copy full URL for cover image"
+                            >
+                                <code><?= e($coverPath) ?></code>
+                            </button>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input id="remove_cover_image" name="remove_cover_image" value="1" type="checkbox" class="form-check-input">
+                            <label for="remove_cover_image" class="form-check-label">Remove current cover image</label>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="form-group mb-0">
+                    <label for="icon_image" class="form-label">Icon Image</label>
+                    <input id="icon_image" name="icon_image" type="file" class="form-control" accept=".gif,.jpg,.jpeg,.png">
+                    <?php if ($iconPath !== ''): ?>
+                        <div class="mt-2">
+                            <img src="<?= e($iconUrl) ?>" alt="Current group icon image" class="img-thumbnail" style="max-width: 240px;">
+                        </div>
+                        <div class="small text-muted mt-1">
+                            <button
+                                type="button"
+                                class="btn btn-link btn-sm p-0 text-muted text-decoration-none align-baseline"
+                                data-rvn-copy-url="1"
+                                data-copy-text="<?= e($iconCopyUrl) ?>"
+                                data-copy-label="<?= e($iconPath) ?>"
+                                title="Click to copy full URL"
+                                aria-label="Copy full URL for icon image"
+                            >
+                                <code><?= e($iconPath) ?></code>
+                            </button>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input id="remove_icon_image" name="remove_icon_image" value="1" type="checkbox" class="form-check-input">
+                            <label for="remove_icon_image" class="form-check-label">Remove current icon image</label>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         </div>
 
         <div
@@ -720,6 +805,92 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
 
         event.preventDefault();
         copyElementText(element);
+      });
+    });
+  })();
+</script>
+
+<script>
+  // Copy-URL handlers for media tab image path buttons.
+  (function () {
+    function copyViaLegacyCommand(value) {
+      var textArea = document.createElement('textarea');
+      textArea.value = String(value || '');
+      textArea.setAttribute('readonly', 'readonly');
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      textArea.style.pointerEvents = 'none';
+      document.body.appendChild(textArea);
+      textArea.select();
+      textArea.setSelectionRange(0, textArea.value.length);
+      var copied = false;
+      try {
+        copied = document.execCommand('copy');
+      } catch (error) {
+        copied = false;
+      }
+      document.body.removeChild(textArea);
+      return copied;
+    }
+
+    function copyText(value, onDone) {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function' && window.isSecureContext) {
+        navigator.clipboard.writeText(value).then(function () {
+          onDone(true);
+        }).catch(function () {
+          onDone(copyViaLegacyCommand(value));
+        });
+        return;
+      }
+
+      onDone(copyViaLegacyCommand(value));
+    }
+
+    function absoluteUrl(value) {
+      var text = String(value || '').trim();
+      if (text === '') {
+        return '';
+      }
+
+      if (/^https?:\/\//i.test(text)) {
+        return text;
+      }
+
+      if (text.charAt(0) === '/') {
+        return window.location.origin + text;
+      }
+
+      return window.location.origin + '/' + text.replace(/^\/+/, '');
+    }
+
+    function showCopyFeedback(button, success) {
+      if (!(button instanceof HTMLElement)) {
+        return;
+      }
+
+      var originalTitle = String(button.getAttribute('data-copy-title') || button.getAttribute('title') || 'Click to copy full URL');
+      button.setAttribute('data-copy-title', originalTitle);
+      button.setAttribute('title', success ? 'Copied full URL' : 'Copy failed');
+      button.classList.remove('text-muted', 'text-success', 'text-danger');
+      button.classList.add(success ? 'text-success' : 'text-danger');
+      window.setTimeout(function () {
+        button.setAttribute('title', originalTitle);
+        button.classList.remove('text-success', 'text-danger');
+        button.classList.add('text-muted');
+      }, 1200);
+    }
+
+    document.querySelectorAll('button[data-rvn-copy-url="1"][data-copy-text]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var value = absoluteUrl(button.getAttribute('data-copy-text'));
+        if (value === '') {
+          showCopyFeedback(button, false);
+          return;
+        }
+
+        copyText(value, function (copied) {
+          showCopyFeedback(button, copied);
+        });
       });
     });
   })();

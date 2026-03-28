@@ -883,7 +883,7 @@ $router->add('GET', '/group/edit/{id}', static function (array $params) use ($pa
 });
 
 $router->add('POST', '/group/save', static function () use ($panelController): void {
-    $panelController->groupSave($_POST);
+    $panelController->groupSave($_POST, $_FILES);
 });
 
 $router->add('POST', '/group/delete', static function () use ($panelController): void {

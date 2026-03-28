@@ -54,7 +54,7 @@ final class TaxonomyImagePathResolver
 
     public static function supportsFilenameStorage(string $taxonomyType): bool
     {
-        return in_array($taxonomyType, ['categories', 'tags'], true);
+        return in_array($taxonomyType, ['categories', 'groups', 'tags'], true);
     }
 
     /**

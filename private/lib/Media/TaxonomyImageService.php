@@ -160,7 +160,7 @@ final class TaxonomyImageService
      */
     public function deleteStoredPaths(string $taxonomyType, int $taxonomyId, array $paths): void
     {
-        if (!in_array($taxonomyType, ['categories', 'channels', 'tags'], true) || $taxonomyId < 1) {
+        if (!in_array($taxonomyType, ['categories', 'channels', 'groups', 'tags'], true) || $taxonomyId < 1) {
             return;
         }
 
@@ -212,7 +212,7 @@ final class TaxonomyImageService
     public function storeUpload(string $taxonomyType, int $taxonomyId, string $slot, array $upload): array
     {
         if (
-            !in_array($taxonomyType, ['categories', 'channels', 'tags'], true)
+            !in_array($taxonomyType, ['categories', 'channels', 'groups', 'tags'], true)
             || $taxonomyId < 1
             || !in_array($slot, ['cover', 'preview', 'icon'], true)
         ) {
@@ -394,7 +394,7 @@ final class TaxonomyImageService
 
     private function removeDirectoryIfEmpty(string $taxonomyType, int $taxonomyId): void
     {
-        if (!in_array($taxonomyType, ['categories', 'channels', 'tags'], true) || $taxonomyId < 1) {
+        if (!in_array($taxonomyType, ['categories', 'channels', 'groups', 'tags'], true) || $taxonomyId < 1) {
             return;
         }
 

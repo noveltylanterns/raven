@@ -16,6 +16,7 @@ use Raven\Lib\Auth\GroupMembershipWriteService;
 use Raven\Lib\Auth\GroupPublicRouteService;
 use Raven\Lib\Auth\GroupRolePolicy;
 use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Media\TaxonomyImagePathResolver;
 use RuntimeException;
 
 /**
@@ -379,7 +380,7 @@ final class GroupRepository
      * Stock-group slugs are immutable; stock names are editable.
      * Stock flag cannot be changed through normal save flow.
      *
-     * @param array{id: int|null, name: string, slug?: string, description?: string, cover_image?: string|null, icon_image?: string|null, route_enabled?: int|bool, permission_mask?: int, permissions?: int} $data
+     * @param array{id: int|null, name: string, slug?: string, description?: string, route_enabled?: int|bool, permission_mask?: int, permissions?: int} $data
      */
     public function save(array $data): int
     {
@@ -388,10 +389,6 @@ final class GroupRepository
         $id = $data['id'] ?? null;
         $name = trim($data['name']);
         $description = trim((string) ($data['description'] ?? ''));
-        $coverImage = trim((string) ($data['cover_image'] ?? ''));
-        $coverImage = $coverImage !== '' ? $coverImage : null;
-        $iconImage = trim((string) ($data['icon_image'] ?? ''));
-        $iconImage = $iconImage !== '' ? $iconImage : null;
         $slugInput = trim((string) ($data['slug'] ?? ''));
         $slug = $this->rolePolicy->normalizeSlug($slugInput !== '' ? $slugInput : $name);
         $mask = (int) ($data['permissions'] ?? $data['permission_mask'] ?? 0);
@@ -432,13 +429,12 @@ final class GroupRepository
             }
 
             // Update preserves stock flag for stock rows, but always updates permission mask.
+            // Image files are managed separately via updateImageFiles().
             $stmt = $this->db->prepare(
                 'UPDATE ' . $groups . '
                  SET name = :name,
                      slug = :slug,
                      description = :description,
-                     cover_image = :cover_image,
-                     icon_image = :icon_image,
                      route = :route_enabled,
                      permissions = :permission_mask,
                      updated = :updated
@@ -448,8 +444,6 @@ final class GroupRepository
                 ':name' => $name,
                 ':slug' => $slug,
                 ':description' => $description !== '' ? $description : null,
-                ':cover_image' => $coverImage,
-                ':icon_image' => $iconImage,
                 ':route_enabled' => $routeEnabled,
                 ':permission_mask' => $mask,
                 ':updated' => $now,
@@ -476,9 +470,10 @@ final class GroupRepository
         $customGroupId = $this->nextCustomGroupId();
 
         // Create path is always non-stock; stock groups are schema-managed.
+        // Image files are set separately via updateImageFiles() after creation.
         $stmt = $this->db->prepare(
-            'INSERT INTO ' . $groups . ' (id, name, slug, description, route, permissions, cover_image, icon_image, created, updated)
-             VALUES (:id, :name, :slug, :description, :route, :permissions, :cover_image, :icon_image, :created, :updated)'
+            'INSERT INTO ' . $groups . ' (id, name, slug, description, route, permissions, created, updated)
+             VALUES (:id, :name, :slug, :description, :route, :permissions, :created, :updated)'
         );
         $stmt->execute([
             ':id' => $customGroupId,
@@ -487,13 +482,51 @@ final class GroupRepository
             ':description' => $description !== '' ? $description : null,
             ':route' => $routeEnabled,
             ':permissions' => $mask,
-            ':cover_image' => $coverImage,
-            ':icon_image' => $iconImage,
             ':created' => $now,
             ':updated' => $now,
         ]);
 
         return $customGroupId;
+    }
+
+    /**
+     * Updates one group's cover and icon image files.
+     * Groups use filename storage (same as categories/tags) — preview slot is not supported.
+     *
+     * @param array{
+     *   cover_image?: string|null,
+     *   icon_image?: string|null
+     * } $files
+     */
+    public function updateImageFiles(int $id, array $files): void
+    {
+        $groups = $this->table('groups');
+
+        $stmt = $this->db->prepare(
+            'UPDATE ' . $groups . '
+             SET cover_image = :cover_image,
+                 icon_image = :icon_image,
+                 updated = :updated
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            ':cover_image' => $this->normalizeNullableFilename($files['cover_image'] ?? null),
+            ':icon_image' => $this->normalizeNullableFilename($files['icon_image'] ?? null),
+            ':updated' => gmdate('Y-m-d H:i:s'),
+            ':id' => $id,
+        ]);
+    }
+
+    /**
+     * Returns public image paths for one group record.
+     *
+     * @param array<string, mixed>|null $record
+     * @return array<string, string|null>
+     */
+    public function imagePathsFromRecord(int $groupId, ?array $record): array
+    {
+        $storage = TaxonomyImagePathResolver::storagePayloadFromRecord('groups', $record);
+        return TaxonomyImagePathResolver::pathsFromStoragePayload('groups', $groupId, $storage);
     }
 
     /**
@@ -663,6 +696,22 @@ final class GroupRepository
         $row['updated_at'] = (string) ($row['updated_at'] ?? $row['created_at'] ?? '');
 
         return $row;
+    }
+
+    private function normalizeNullableFilename(mixed $value): ?string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+
+        // Store only the base filename, not a full path, to keep storage portable.
+        $filename = basename(str_replace('\\', '/', $raw));
+        if ($filename === '' || $filename === '.' || $filename === '..') {
+            return null;
+        }
+
+        return $filename;
     }
 
     private function stockRoleSql(string $tableAlias = ''): string

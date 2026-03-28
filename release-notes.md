@@ -2,6 +2,10 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### March 28, 2026
+
+- Added a Media tab to the Group editor with cover and icon image upload fields, matching the tag/category pattern. `TaxonomyImageService` and `TaxonomyImagePathResolver` now include `groups` in their allowlists; `GroupRepository` gains `updateImageFiles()` (cover + icon, no preview slot); `groupEdit()` passes image spec variables to the template; `groupSave()` now accepts `$_FILES` and runs the full `storeTaxonomyImageUpload()` pipeline. Images are stored under `public/uploads/groups/{id}/`. The old plain-text cover/icon inputs on the Basic tab have been removed.
+
 ### March 27, 2026 (bugs & tweaks batch)
 
 - Renamed media thumbnail config keys from `media.small/med/large.width/height` to `media.thumb.sm_x/sm_y/md_x/md_y/lg_x/lg_y` across `ImageVariantProcessor`, `ConfigEditorSchemaService` (PATH_LABEL_OVERRIDES + migration shim in `ensureMediaConfig`), `ConfigEditorNormalizer`, `config.php.dist`, and the live `config.php`; old keys still accepted as fallback in `ImageVariantProcessor` until installs re-save through the config editor.
