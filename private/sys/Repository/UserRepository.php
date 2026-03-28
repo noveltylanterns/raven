@@ -30,7 +30,7 @@ use Raven\Lib\Database\Runtime\TableNameResolver;
 final class UserRepository
 {
     private PDO $authDb;
-    private PDO $appDb;
+    private PDO $rvnDb;
     private string $driver;
     private string $prefix;
     private AuthPayloadCodec $authPayloadCodec;
@@ -41,11 +41,11 @@ final class UserRepository
     private UserPersistenceService $userPersistenceService;
     private UserRoutingDataService $userRoutingDataService;
 
-    public function __construct(PDO $authDb, PDO $appDb, string $driver, string $prefix)
+    public function __construct(PDO $authDb, PDO $rvnDb, string $driver, string $prefix)
     {
         // Auth rows (users/passwords) and app rows (group memberships) can live in different DB handles.
         $this->authDb = $authDb;
-        $this->appDb = $appDb;
+        $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
@@ -92,7 +92,7 @@ final class UserRepository
         $groups = $this->groupTable('groups');
         $userGroups = $this->groupTable('user_groups');
 
-        $stmt = $this->appDb->prepare(
+        $stmt = $this->rvnDb->prepare(
             'SELECT u.id,
                     u.username,
                     u.string,
@@ -169,7 +169,7 @@ final class UserRepository
     public function listRoutingData(bool $includeGroups, bool $includeUsers): array
     {
         return $this->userRoutingDataService->listRoutingData(
-            $this->appDb,
+            $this->rvnDb,
             $this->appAuthTable('users'),
             $this->groupTable('groups'),
             $this->groupTable('user_groups'),
@@ -195,7 +195,7 @@ final class UserRepository
 
         $groups = $this->groupTable('groups');
         $userGroups = $this->groupTable('user_groups');
-        $stmt = $this->appDb->prepare(
+        $stmt = $this->rvnDb->prepare(
             'SELECT COUNT(DISTINCT ug.user)
              FROM ' . $userGroups . ' ug
              INNER JOIN ' . $groups . ' g ON g.id = ug."group"
@@ -215,7 +215,7 @@ final class UserRepository
     {
         return $this->userPanelQueryService->listForPanel(
             $this->authDb,
-            $this->appDb,
+            $this->rvnDb,
             $this->authTable('users'),
             $this->groupTable('groups'),
             $this->groupTable('user_groups'),
@@ -239,7 +239,7 @@ final class UserRepository
     public function listPageForPanel(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
     {
         return $this->userPanelQueryService->listPageForPanel(
-            $this->appDb,
+            $this->rvnDb,
             $this->authTable('users'),
             $this->groupTable('groups'),
             $this->groupTable('user_groups'),
@@ -333,7 +333,7 @@ final class UserRepository
         $groups = $this->groupTable('groups');
         $userGroups = $this->groupTable('user_groups');
 
-        $stmt = $this->appDb->prepare(
+        $stmt = $this->rvnDb->prepare(
             'SELECT u.id AS user_id,
                     u.username,
                     u.string,
@@ -571,7 +571,7 @@ final class UserRepository
         }
 
         $userGroups = $this->groupTable('user_groups');
-        $membershipStmt = $this->appDb->prepare(
+        $membershipStmt = $this->rvnDb->prepare(
             'SELECT user AS user_id
              FROM ' . $userGroups . '
              WHERE "group" = :group_id
@@ -669,7 +669,7 @@ final class UserRepository
 
         return $this->userPersistenceService->saveUser(
             $this->authDb,
-            $this->appDb,
+            $this->rvnDb,
             $this->authTable('users'),
             $this->groupTable('user_groups'),
             [
@@ -710,7 +710,7 @@ final class UserRepository
     {
         $this->userPersistenceService->deleteUserById(
             $this->authDb,
-            $this->appDb,
+            $this->rvnDb,
             $this->authTable('users'),
             $this->groupTable('user_groups'),
             $id
@@ -751,7 +751,7 @@ final class UserRepository
     public function groupIdsForUser(int $userId): array
     {
         return $this->userPersistenceService->groupIdsForUser(
-            $this->appDb,
+            $this->rvnDb,
             $this->groupTable('user_groups'),
             $userId
         );
@@ -765,7 +765,7 @@ final class UserRepository
     public function setUserGroups(int $userId, array $groupIds): void
     {
         $this->userPersistenceService->setUserGroups(
-            $this->appDb,
+            $this->rvnDb,
             $this->groupTable('user_groups'),
             $userId,
             $this->normalizeGroupIds($groupIds),
@@ -784,7 +784,7 @@ final class UserRepository
     private function groupEntriesByUserId(array $userIds = []): array
     {
         return $this->userGroupCatalogService->groupEntriesByUserId(
-            $this->appDb,
+            $this->rvnDb,
             $this->groupTable('groups'),
             $this->groupTable('user_groups'),
             $userIds
@@ -803,7 +803,7 @@ final class UserRepository
     private function groupEntriesAndOptionsForUserIds(array $userIds): array
     {
         return $this->userGroupCatalogService->groupEntriesAndOptionsForUserIds(
-            $this->appDb,
+            $this->rvnDb,
             $this->groupTable('groups'),
             $this->groupTable('user_groups'),
             $userIds
@@ -828,7 +828,7 @@ final class UserRepository
     private function attachUserToGroup(int $userId, int $groupId): void
     {
         $this->groupMembershipWriteService->attachUserToGroup(
-            $this->appDb,
+            $this->rvnDb,
             $this->driver,
             $this->groupTable('user_groups'),
             $userId,

@@ -15,7 +15,7 @@ final class UserGroupCatalogService
      * @param array<int> $userIds
      * @return array<int, array<int, array{name: string, permission_mask: int}>>
      */
-    public function groupEntriesByUserId(PDO $appDb, string $groupsTable, string $userGroupsTable, array $userIds = []): array
+    public function groupEntriesByUserId(PDO $rvnDb, string $groupsTable, string $userGroupsTable, array $userIds = []): array
     {
         $userIds = array_values(array_unique(array_filter($userIds, static fn (int $id): bool => $id > 0)));
 
@@ -31,7 +31,7 @@ final class UserGroupCatalogService
             $where = ' WHERE ug.user IN (' . implode(', ', $placeholders) . ')';
         }
 
-        $stmt = $appDb->prepare(
+        $stmt = $rvnDb->prepare(
             'SELECT ug.user, g.name, g.permissions AS permission_mask
              FROM ' . $userGroupsTable . ' ug
              INNER JOIN ' . $groupsTable . ' g ON g.id = ug."group"
@@ -61,12 +61,12 @@ final class UserGroupCatalogService
      *   group_options: array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>
      * }
      */
-    public function groupEntriesAndOptionsForUserIds(PDO $appDb, string $groupsTable, string $userGroupsTable, array $userIds): array
+    public function groupEntriesAndOptionsForUserIds(PDO $rvnDb, string $groupsTable, string $userGroupsTable, array $userIds): array
     {
         $normalizedUserIds = array_values(array_unique(array_filter($userIds, static fn (int $id): bool => $id > 0)));
 
         if ($normalizedUserIds === []) {
-            $stmt = $appDb->prepare(
+            $stmt = $rvnDb->prepare(
                 'SELECT g.id AS group_id,
                         g.name AS group_name,
                         g.slug AS group_slug,
@@ -108,7 +108,7 @@ final class UserGroupCatalogService
             $params[$placeholder] = $userId;
         }
 
-        $stmt = $appDb->prepare(
+        $stmt = $rvnDb->prepare(
             'SELECT g.id AS group_id,
                     g.name AS group_name,
                     g.slug AS group_slug,

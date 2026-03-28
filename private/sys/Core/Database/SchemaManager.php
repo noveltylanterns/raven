@@ -13,9 +13,9 @@ namespace Raven\Core\Database;
 
 require_once dirname(__DIR__, 3) . '/lib/Database/Schema/SchemaIntrospector.php';
 require_once dirname(__DIR__, 3) . '/lib/Database/Schema/TableNameResolver.php';
-require_once dirname(__DIR__, 3) . '/lib/Database/Schema/AppSchemaBootstrap.php';
+require_once dirname(__DIR__, 3) . '/lib/Database/Schema/RvnSchemaBootstrap.php';
 require_once dirname(__DIR__, 3) . '/lib/Database/Schema/AuthSchemaBuilder.php';
-require_once dirname(__DIR__, 3) . '/lib/Database/Schema/AppSchemaBuilder.php';
+require_once dirname(__DIR__, 3) . '/lib/Database/Schema/RvnSchemaBuilder.php';
 require_once dirname(__DIR__, 3) . '/lib/Database/Schema/SeedInstaller.php';
 require_once dirname(__DIR__, 3) . '/lib/Database/Schema/ExtensionSchemaRunner.php';
 require_once dirname(__DIR__, 3) . '/lib/Database/Schema/SchemaComponentFactory.php';
@@ -40,8 +40,8 @@ final class SchemaManager
     /**
      * Ensures both app and auth schemas exist for the selected backend.
      */
-    public function ensure(PDO $appDb, PDO $authDb, string $driver, string $prefix): void
+    public function ensure(PDO $rvnDb, PDO $authDb, string $driver, string $prefix): void
     {
-        $this->schemaManager->ensure($appDb, $authDb, $driver, $prefix);
+        $this->schemaManager->ensure($rvnDb, $authDb, $driver, $prefix);
     }
 }

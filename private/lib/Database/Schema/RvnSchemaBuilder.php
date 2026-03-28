@@ -10,7 +10,7 @@ use Raven\Lib\Media\TaxonomyImagePathResolver;
 /**
  * Applies app-side schema migrations and index/column backfills.
  */
-final class AppSchemaBuilder
+final class RvnSchemaBuilder
 {
     private SchemaIntrospector $introspector;
     private TableNameResolver $tables;

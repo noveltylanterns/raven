@@ -12,7 +12,7 @@ use Raven\Lib\Database\Runtime\TableNameResolver;
  */
 final class AuthGroupMembershipService
 {
-    private PDO $appDb;
+    private PDO $rvnDb;
     private string $driver;
     private string $prefix;
 
@@ -21,9 +21,9 @@ final class AuthGroupMembershipService
      */
     private array $groupsForUserCache = [];
 
-    public function __construct(PDO $appDb, string $driver, string $prefix)
+    public function __construct(PDO $rvnDb, string $driver, string $prefix)
     {
-        $this->appDb = $appDb;
+        $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
     }
@@ -40,7 +40,7 @@ final class AuthGroupMembershipService
         $groupsTable = $this->table('groups');
         $userGroupsTable = $this->table('user_groups');
 
-        $stmt = $this->appDb->prepare(
+        $stmt = $this->rvnDb->prepare(
             'SELECT g.id,
                     g.name,
                     g.slug,
@@ -78,7 +78,7 @@ final class AuthGroupMembershipService
         $groupsTable = $this->table('groups');
         $userGroupsTable = $this->table('user_groups');
 
-        $groupStmt = $this->appDb->prepare(
+        $groupStmt = $this->rvnDb->prepare(
             'SELECT id FROM ' . $groupsTable . ' WHERE name = :name LIMIT 1'
         );
         $groupStmt->execute([':name' => $groupName]);
@@ -89,18 +89,18 @@ final class AuthGroupMembershipService
         }
 
         if ($this->driver === 'sqlite') {
-            $stmt = $this->appDb->prepare(
+            $stmt = $this->rvnDb->prepare(
                 'INSERT INTO ' . $userGroupsTable . ' (user, "group")
                  VALUES (:user, :group)
                  ON CONFLICT(user, "group") DO NOTHING'
             );
         } elseif ($this->driver === 'mysql') {
-            $stmt = $this->appDb->prepare(
+            $stmt = $this->rvnDb->prepare(
                 'INSERT IGNORE INTO ' . $userGroupsTable . ' (user, `group`)
                  VALUES (:user, :group)'
             );
         } else {
-            $stmt = $this->appDb->prepare(
+            $stmt = $this->rvnDb->prepare(
                 'INSERT INTO ' . $userGroupsTable . ' ("user", "group")
                  VALUES (:user, :group)
                  ON CONFLICT ("user", "group") DO NOTHING'

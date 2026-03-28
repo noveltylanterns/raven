@@ -745,18 +745,18 @@ if ($isPost) {
             $driverName = $connectionFactory->getDriver();
             $prefix = $connectionFactory->getPrefix();
 
-            $appDb = $connectionFactory->createAppConnection();
+            $rvnDb = $connectionFactory->createAppConnection();
             $authDb = $connectionFactory->createAuthConnection();
 
             $schema = new SchemaManager();
-            $schema->ensure($appDb, $authDb, $driverName, $prefix);
+            $schema->ensure($rvnDb, $authDb, $driverName, $prefix);
 
-            $users = new UserRepository($authDb, $appDb, $driverName, $prefix);
+            $users = new UserRepository($authDb, $rvnDb, $driverName, $prefix);
             if ($users->listAll() !== []) {
                 throw new RuntimeException('Installer can only create the initial admin on an empty user database.');
             }
 
-            $groups = new GroupRepository($appDb, $driverName, $prefix);
+            $groups = new GroupRepository($rvnDb, $driverName, $prefix);
             $superAdminGroupId = $groups->idBySlug('super');
             if ($superAdminGroupId === null) {
                 throw new RuntimeException('Stock groups were not created correctly.');

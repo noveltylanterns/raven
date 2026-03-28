@@ -11,13 +11,13 @@ use PDO;
  */
 final class LoginThrottleService
 {
-    private PDO $appDb;
+    private PDO $rvnDb;
     private string $driver;
     private string $prefix;
 
-    public function __construct(PDO $appDb, string $driver, string $prefix)
+    public function __construct(PDO $rvnDb, string $driver, string $prefix)
     {
-        $this->appDb = $appDb;
+        $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
     }
@@ -105,7 +105,7 @@ final class LoginThrottleService
      */
     private function loadRow(string $bucketHash): ?array
     {
-        $stmt = $this->appDb->prepare(
+        $stmt = $this->rvnDb->prepare(
             'SELECT first_failed, failure_count, locked_until
              FROM ' . $this->tableName() . '
              WHERE bucket_hash = :bucket_hash
@@ -150,7 +150,7 @@ final class LoginThrottleService
                     :created, :updated
                 ) ' . $this->upsertConflictClause();
 
-        $stmt = $this->appDb->prepare($sql);
+        $stmt = $this->rvnDb->prepare($sql);
         $stmt->execute($params);
     }
 
@@ -179,7 +179,7 @@ final class LoginThrottleService
 
     private function deleteRow(string $bucketHash): void
     {
-        $stmt = $this->appDb->prepare(
+        $stmt = $this->rvnDb->prepare(
             'DELETE FROM ' . $this->tableName() . '
              WHERE bucket_hash = :bucket_hash'
         );
@@ -194,7 +194,7 @@ final class LoginThrottleService
         $now = time();
         $staleBefore = $now - $retentionSeconds;
 
-        $stmt = $this->appDb->prepare(
+        $stmt = $this->rvnDb->prepare(
             'DELETE FROM ' . $this->tableName() . '
              WHERE locked_until <= :now
                AND last_failed < :stale_before'

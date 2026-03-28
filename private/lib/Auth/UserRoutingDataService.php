@@ -19,7 +19,7 @@ final class UserRoutingDataService
      * }
      */
     public function listRoutingData(
-        PDO $appDb,
+        PDO $rvnDb,
         string $usersTable,
         string $groupsTable,
         string $userGroupsTable,
@@ -87,7 +87,7 @@ final class UserRoutingDataService
                  LEFT JOIN ' . $groupsTable . ' g ON g.id = ug."group"';
         }
 
-        $stmt = $appDb->prepare(
+        $stmt = $rvnDb->prepare(
             'SELECT
                 row_type,
                 group_id,

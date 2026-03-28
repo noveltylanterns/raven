@@ -18,42 +18,42 @@ final class SchemaEnsurePipeline
         $this->components = $components ?? new SchemaComponentFactory();
     }
 
-    public function ensure(PDO $appDb, PDO $authDb, string $driver, string $prefix): void
+    public function ensure(PDO $rvnDb, PDO $authDb, string $driver, string $prefix): void
     {
         $components = $this->components;
-        $appSchemaBuilder = $components->appSchemaBuilder();
+        $rvnSchemaBuilder = $components->rvnSchemaBuilder();
         $authSchemaBuilder = $components->authSchemaBuilder();
         $seedInstaller = $components->seedInstaller();
 
         // App schema first so auth/group seeding can rely on group tables.
-        $components->appSchemaBootstrap()->ensureAppSchema($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensureRootChannelScope($appDb, $driver, $prefix);
-        $appSchemaBuilder->migratePageContentStorage($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensurePageScheduleColumns($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensurePageDescriptionColumn($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensurePageDisplayTitleColumn($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensurePageGalleryEnabledColumn($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensurePageSlugScopeUniqueness($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensurePageImageDisplayColumns($appDb, $driver, $prefix);
-        $appSchemaBuilder->migratePageTaxonomyPivots($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensureRedirectDescriptionColumn($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensureGroupRoutingColumns($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensureTaxonomySetColumns($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensureTaxonomyImageColumns($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensureTaxonomyIconColumn($appDb, $driver, $prefix);
-        $appSchemaBuilder->migrateUserGroupPivot($appDb, $driver, $prefix);
-        $appSchemaBuilder->migrateLoginFailureStorage($appDb, $driver, $prefix);
-        $appSchemaBuilder->ensurePanelPerformanceIndexes($appDb, $driver, $prefix);
-        $appSchemaBuilder->dropLegacyChannelTable($appDb, $driver, $prefix);
-        $components->extensionSchemaRunner()->ensureEnabledExtensionSchemas($appDb, $driver, $prefix);
+        $components->rvnSchemaBootstrap()->ensureRvnSchema($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->ensureRootChannelScope($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->migratePageContentStorage($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->ensurePageScheduleColumns($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->ensurePageDescriptionColumn($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->ensurePageDisplayTitleColumn($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->ensurePageGalleryEnabledColumn($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->ensurePageSlugScopeUniqueness($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->ensurePageImageDisplayColumns($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->migratePageTaxonomyPivots($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->ensureRedirectDescriptionColumn($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->ensureGroupRoutingColumns($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->ensureTaxonomySetColumns($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->ensureTaxonomyImageColumns($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->ensureTaxonomyIconColumn($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->migrateUserGroupPivot($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->migrateLoginFailureStorage($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->ensurePanelPerformanceIndexes($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->dropLegacyChannelTable($rvnDb, $driver, $prefix);
+        $components->extensionSchemaRunner()->ensureEnabledExtensionSchemas($rvnDb, $driver, $prefix);
 
         // Auth schema must exist before user/group relationship seeding.
         $authSchemaBuilder->ensureAuthSchema($authDb, $driver, $prefix);
         $authSchemaBuilder->ensureInviteTokenSchema($authDb, $driver, $prefix);
 
-        $seedInstaller->migrateStockGroups($appDb, $driver, $prefix);
-        $seedInstaller->ensureStockGroups($appDb, $driver, $prefix);
-        $appSchemaBuilder->migrateUserPrimaryGroup($appDb, $driver, $prefix);
-        $seedInstaller->ensureSeedPages($appDb, $driver, $prefix);
+        $seedInstaller->migrateStockGroups($rvnDb, $driver, $prefix);
+        $seedInstaller->ensureStockGroups($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->migrateUserPrimaryGroup($rvnDb, $driver, $prefix);
+        $seedInstaller->ensureSeedPages($rvnDb, $driver, $prefix);
     }
 }

@@ -11,16 +11,16 @@ use PDO;
  */
 final class PermissionMaskService
 {
-    private PDO $appDb;
+    private PDO $rvnDb;
     private string $driver;
     private string $prefix;
     /** @var array<int, int> */
     private array $permissionMaskForUserCache = [];
     private ?int $permissionMaskForGuestCache = null;
 
-    public function __construct(PDO $appDb, string $driver, string $prefix)
+    public function __construct(PDO $rvnDb, string $driver, string $prefix)
     {
-        $this->appDb = $appDb;
+        $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
     }
@@ -63,7 +63,7 @@ final class PermissionMaskService
 
         $groupsTable = $this->groupTable('groups');
 
-        $stmt = $this->appDb->prepare(
+        $stmt = $this->rvnDb->prepare(
             'SELECT permissions AS permission_mask
              FROM ' . $groupsTable . '
              WHERE LOWER(slug) = :slug

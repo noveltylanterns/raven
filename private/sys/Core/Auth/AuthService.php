@@ -37,7 +37,7 @@ final class AuthService
     private PDO $authDb;
 
     /** PDO connection for groups and memberships. */
-    private PDO $appDb;
+    private PDO $rvnDb;
 
     /** Active DB driver. */
     private string $driver;
@@ -75,18 +75,18 @@ final class AuthService
      */
     private array $userPreferencesCache = [];
 
-    public function __construct(PDO $authDb, PDO $appDb, string $driver, string $prefix)
+    public function __construct(PDO $authDb, PDO $rvnDb, string $driver, string $prefix)
     {
         $this->authDb = $authDb;
-        $this->appDb = $appDb;
+        $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->loginThrottle = new LoginThrottleService($appDb, $driver, $prefix);
+        $this->loginThrottle = new LoginThrottleService($rvnDb, $driver, $prefix);
         $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
-        $this->permissionMaskService = new PermissionMaskService($appDb, $driver, $prefix);
+        $this->permissionMaskService = new PermissionMaskService($rvnDb, $driver, $prefix);
         $this->securityProfiles = new UserSecurityProfileService();
         $this->identityLookup = new AuthIdentityLookupService($authDb, $driver, $this->prefix);
-        $this->groupMembership = new AuthGroupMembershipService($appDb, $driver, $prefix);
+        $this->groupMembership = new AuthGroupMembershipService($rvnDb, $driver, $prefix);
         $this->twoFactorSessionState = new TwoFactorSessionStateService();
         $this->authAccessGateService = new AuthAccessGateService();
         $this->twoFactorChallengeVerificationService = new TwoFactorChallengeVerificationService();

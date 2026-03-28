@@ -116,18 +116,18 @@ return (static function (): array {
     $driver = $connectionFactory->getDriver();
     $prefix = $connectionFactory->getPrefix();
 
-    $appDb = $connectionFactory->createAppConnection();
+    $rvnDb = $connectionFactory->createAppConnection();
     $authDb = $connectionFactory->createAuthConnection();
 
     // Ensure schema exists on each startup to keep first run friction low.
     $schema = new SchemaManager();
-    $schema->ensure($appDb, $authDb, $driver, $prefix);
+    $schema->ensure($rvnDb, $authDb, $driver, $prefix);
 
-    $auth = new AuthService($authDb, $appDb, $driver, $prefix);
+    $auth = new AuthService($authDb, $rvnDb, $driver, $prefix);
 
     $input = new InputSanitizer();
-    $pageImages = new PageImageRepository($appDb, $driver, $prefix);
-    $channelRepo = new ChannelRepository($appDb, $driver, $prefix, $root . '/private/dat/channel');
+    $pageImages = new PageImageRepository($rvnDb, $driver, $prefix);
+    $channelRepo = new ChannelRepository($rvnDb, $driver, $prefix, $root . '/private/dat/channel');
     $categorySetRepo = new TaxonomySetRepository('category', $root . '/private/dat/category-set');
     $tagSetRepo = new TaxonomySetRepository('tag', $root . '/private/dat/tag-set');
     $categoryEnabled = ConfigValueParser::bool($config->get('category.enabled', false), false);
@@ -138,7 +138,7 @@ return (static function (): array {
         'config' => $config,
         'driver' => $driver,
         'prefix' => $prefix,
-        'db' => $appDb,
+        'db' => $rvnDb,
         'auth_db' => $authDb,
         'auth' => $auth,
         'view' => new View($root . '/private/tpl'),
@@ -147,19 +147,19 @@ return (static function (): array {
         'panel_site_data' => static function (bool $includeDomain = true) use ($siteContextBuilder, $config, $categoryEnabled, $tagEnabled): array {
             return $siteContextBuilder->panel($config, $categoryEnabled, $tagEnabled, $includeDomain);
         },
-        'category' => new CategoryRepository($appDb, $driver, $prefix),
+        'category' => new CategoryRepository($rvnDb, $driver, $prefix),
         'category_set' => $categorySetRepo,
         'channel' => $channelRepo,
-        'group' => new GroupRepository($appDb, $driver, $prefix),
+        'group' => new GroupRepository($rvnDb, $driver, $prefix),
         'invite_tokens' => new InviteTokenRepository($authDb, $driver, $prefix),
         'page_images' => $pageImages,
         'page_image_manager' => new PageImageManager($config, $input, $pageImages, $root),
-        'page' => new PageRepository($appDb, $driver, $prefix, $channelRepo, $categoryEnabled, $tagEnabled),
-        'redirect' => new RedirectRepository($appDb, $driver, $prefix, $channelRepo),
-        'tag' => new TagRepository($appDb, $driver, $prefix),
+        'page' => new PageRepository($rvnDb, $driver, $prefix, $channelRepo, $categoryEnabled, $tagEnabled),
+        'redirect' => new RedirectRepository($rvnDb, $driver, $prefix, $channelRepo),
+        'tag' => new TagRepository($rvnDb, $driver, $prefix),
         'tag_set' => $tagSetRepo,
-        'taxonomy_lookup' => new TaxonomyLookupRepository($appDb, $driver, $prefix, $channelRepo),
-        'user' => new UserRepository($authDb, $appDb, $driver, $prefix),
+        'taxonomy_lookup' => new TaxonomyLookupRepository($rvnDb, $driver, $prefix, $channelRepo),
+        'user' => new UserRepository($authDb, $rvnDb, $driver, $prefix),
     ];
 
     $extensionBootstrapResolver = new ExtensionBootstrapContractResolver();

@@ -18,8 +18,8 @@ final class SchemaManager
         $this->pipeline = $pipeline ?? new SchemaEnsurePipeline();
     }
 
-    public function ensure(PDO $appDb, PDO $authDb, string $driver, string $prefix): void
+    public function ensure(PDO $rvnDb, PDO $authDb, string $driver, string $prefix): void
     {
-        $this->pipeline->ensure($appDb, $authDb, $driver, $prefix);
+        $this->pipeline->ensure($rvnDb, $authDb, $driver, $prefix);
     }
 }

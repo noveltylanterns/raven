@@ -40,7 +40,7 @@ final class UserPersistenceService
      */
     public function saveUser(
         PDO $authDb,
-        PDO $appDb,
+        PDO $rvnDb,
         string $usersTable,
         string $userGroupsTable,
         array $data,
@@ -130,7 +130,7 @@ final class UserPersistenceService
             );
             $stmt->execute($params);
 
-            $this->setUserGroups($appDb, $userGroupsTable, $id, $groupIds, $attachUserToGroup);
+            $this->setUserGroups($rvnDb, $userGroupsTable, $id, $groupIds, $attachUserToGroup);
 
             return $id;
         }
@@ -171,14 +171,14 @@ final class UserPersistenceService
         ];
 
         $newId = $this->insertUserAndReturnId($authDb, $usersTable, $insertParams);
-        $this->setUserGroups($appDb, $userGroupsTable, $newId, $groupIds, $attachUserToGroup);
+        $this->setUserGroups($rvnDb, $userGroupsTable, $newId, $groupIds, $attachUserToGroup);
 
         return $newId;
     }
 
-    public function deleteUserById(PDO $authDb, PDO $appDb, string $usersTable, string $userGroupsTable, int $id): void
+    public function deleteUserById(PDO $authDb, PDO $rvnDb, string $usersTable, string $userGroupsTable, int $id): void
     {
-        $deleteMemberships = $appDb->prepare(
+        $deleteMemberships = $rvnDb->prepare(
             'DELETE FROM ' . $userGroupsTable . ' WHERE user = :user'
         );
         $deleteMemberships->execute([':user' => $id]);
@@ -289,9 +289,9 @@ final class UserPersistenceService
     /**
      * @return array<int>
      */
-    public function groupIdsForUser(PDO $appDb, string $userGroupsTable, int $userId): array
+    public function groupIdsForUser(PDO $rvnDb, string $userGroupsTable, int $userId): array
     {
-        $stmt = $appDb->prepare(
+        $stmt = $rvnDb->prepare(
             'SELECT "group"
              FROM ' . $userGroupsTable . '
              WHERE user = :user
@@ -309,7 +309,7 @@ final class UserPersistenceService
      * @param callable(int, int): void $attachUserToGroup
      */
     public function setUserGroups(
-        PDO $appDb,
+        PDO $rvnDb,
         string $userGroupsTable,
         int $userId,
         array $groupIds,
@@ -317,10 +317,10 @@ final class UserPersistenceService
     ): void {
         $groupIds = $this->normalizeGroupIds($groupIds);
 
-        $appDb->beginTransaction();
+        $rvnDb->beginTransaction();
 
         try {
-            $delete = $appDb->prepare(
+            $delete = $rvnDb->prepare(
                 'DELETE FROM ' . $userGroupsTable . ' WHERE user = :user'
             );
             $delete->execute([':user' => $userId]);
@@ -329,10 +329,10 @@ final class UserPersistenceService
                 $attachUserToGroup($userId, $groupId);
             }
 
-            $appDb->commit();
+            $rvnDb->commit();
         } catch (\Throwable $exception) {
-            if ($appDb->inTransaction()) {
-                $appDb->rollBack();
+            if ($rvnDb->inTransaction()) {
+                $rvnDb->rollBack();
             }
 
             throw $exception;

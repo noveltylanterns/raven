@@ -18,7 +18,7 @@ final class UserPanelQueryService
      */
     public function listForPanel(
         PDO $authDb,
-        PDO $appDb,
+        PDO $rvnDb,
         string $usersTable,
         string $groupsTable,
         string $userGroupsTable,
@@ -48,7 +48,7 @@ final class UserPanelQueryService
                 }
             }
         } else {
-            $stmt = $appDb->prepare(
+            $stmt = $rvnDb->prepare(
                 'SELECT DISTINCT ug.user AS user_id
                  FROM ' . $userGroupsTable . ' ug
                  INNER JOIN ' . $groupsTable . ' g ON g.id = ug."group"
@@ -104,7 +104,7 @@ final class UserPanelQueryService
      * }
      */
     public function listPageForPanel(
-        PDO $appDb,
+        PDO $rvnDb,
         string $usersTable,
         string $groupsTable,
         string $userGroupsTable,
@@ -120,7 +120,7 @@ final class UserPanelQueryService
         $total = 0;
 
         if ($normalizedGroupFilter === '') {
-            $stmt = $appDb->prepare(
+            $stmt = $rvnDb->prepare(
                 'WITH page_users AS (
                      SELECT u.id,
                             u.username,
@@ -158,7 +158,7 @@ final class UserPanelQueryService
             $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
             $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
         } else {
-            $stmt = $appDb->prepare(
+            $stmt = $rvnDb->prepare(
                 'WITH filtered_user_ids AS (
                      SELECT DISTINCT ug.user AS user_id
                      FROM ' . $userGroupsTable . ' ug

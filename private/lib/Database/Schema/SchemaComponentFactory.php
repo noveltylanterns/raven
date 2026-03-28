@@ -11,37 +11,37 @@ final class SchemaComponentFactory
 {
     private ?SchemaIntrospector $schemaIntrospector;
     private ?TableNameResolver $tableNameResolver;
-    private ?AppSchemaBootstrap $appSchemaBootstrap;
+    private ?RvnSchemaBootstrap $rvnSchemaBootstrap;
     private ?AuthSchemaBuilder $authSchemaBuilder;
-    private ?AppSchemaBuilder $appSchemaBuilder;
+    private ?RvnSchemaBuilder $rvnSchemaBuilder;
     private ?SeedInstaller $seedInstaller;
     private ?ExtensionSchemaRunner $extensionSchemaRunner;
 
     public function __construct(
         ?SchemaIntrospector $schemaIntrospector = null,
         ?TableNameResolver $tableNameResolver = null,
-        ?AppSchemaBootstrap $appSchemaBootstrap = null,
+        ?RvnSchemaBootstrap $rvnSchemaBootstrap = null,
         ?AuthSchemaBuilder $authSchemaBuilder = null,
-        ?AppSchemaBuilder $appSchemaBuilder = null,
+        ?RvnSchemaBuilder $rvnSchemaBuilder = null,
         ?SeedInstaller $seedInstaller = null,
         ?ExtensionSchemaRunner $extensionSchemaRunner = null
     ) {
         $this->schemaIntrospector = $schemaIntrospector;
         $this->tableNameResolver = $tableNameResolver;
-        $this->appSchemaBootstrap = $appSchemaBootstrap;
+        $this->rvnSchemaBootstrap = $rvnSchemaBootstrap;
         $this->authSchemaBuilder = $authSchemaBuilder;
-        $this->appSchemaBuilder = $appSchemaBuilder;
+        $this->rvnSchemaBuilder = $rvnSchemaBuilder;
         $this->seedInstaller = $seedInstaller;
         $this->extensionSchemaRunner = $extensionSchemaRunner;
     }
 
-    public function appSchemaBootstrap(): AppSchemaBootstrap
+    public function rvnSchemaBootstrap(): RvnSchemaBootstrap
     {
-        if ($this->appSchemaBootstrap === null) {
-            $this->appSchemaBootstrap = new AppSchemaBootstrap();
+        if ($this->rvnSchemaBootstrap === null) {
+            $this->rvnSchemaBootstrap = new RvnSchemaBootstrap();
         }
 
-        return $this->appSchemaBootstrap;
+        return $this->rvnSchemaBootstrap;
     }
 
     public function authSchemaBuilder(): AuthSchemaBuilder
@@ -53,13 +53,13 @@ final class SchemaComponentFactory
         return $this->authSchemaBuilder;
     }
 
-    public function appSchemaBuilder(): AppSchemaBuilder
+    public function rvnSchemaBuilder(): RvnSchemaBuilder
     {
-        if ($this->appSchemaBuilder === null) {
-            $this->appSchemaBuilder = new AppSchemaBuilder($this->schemaIntrospector(), $this->tableNameResolver());
+        if ($this->rvnSchemaBuilder === null) {
+            $this->rvnSchemaBuilder = new RvnSchemaBuilder($this->schemaIntrospector(), $this->tableNameResolver());
         }
 
-        return $this->appSchemaBuilder;
+        return $this->rvnSchemaBuilder;
     }
 
     public function seedInstaller(): SeedInstaller

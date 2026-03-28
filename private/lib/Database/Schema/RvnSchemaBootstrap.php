@@ -9,9 +9,9 @@ use PDO;
 /**
  * Creates base app schema tables/indexes across supported drivers.
  */
-final class AppSchemaBootstrap
+final class RvnSchemaBootstrap
 {
-    public function ensureAppSchema(PDO $db, string $driver, string $prefix): void
+    public function ensureRvnSchema(PDO $db, string $driver, string $prefix): void
     {
         if ($driver === 'sqlite') {
             $pagesTable = $prefix . 'pages';
