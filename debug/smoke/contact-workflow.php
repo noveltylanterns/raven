@@ -67,6 +67,14 @@ final class ContactWorkflowSmokeRunner
      */
     public function run(): void
     {
+        // Preflight: skip gracefully when the contact extension is not enabled.
+        $statePath = $this->root . '/private/dat/ext/.state.php';
+        if (!is_file($statePath) || empty((require $statePath)['enabled']['contact'])) {
+            $this->events[] = 'smoke_result=SKIP';
+            $this->events[] = 'reason=contact extension is not enabled';
+            return;
+        }
+
         $this->prepareCaptchaOverride();
         try {
             $this->seedSessionFile($this->cookies[$this->sessionName] ?? '');
@@ -359,21 +367,19 @@ final class ContactWorkflowSmokeRunner
      */
     private function createTempPanelUser(): void
     {
-        $app = require $this->root . '/private/raven.php';
+        $rvn = require $this->root . '/private/raven.php';
 
-        $groupId = $app['group']->idBySlug('super');
+        // Admin group is canonical ID 1; fall back to slug lookup for resilience.
+        $groupId = $rvn['group']->idBySlug('admin');
         if ($groupId === null) {
-            $groupId = $app['group']->idBySlug('admin');
-        }
-        if ($groupId === null) {
-            throw new RuntimeException('No super/admin group is available to assign smoke user.');
+            $groupId = 1;
         }
 
         $this->tempUsername = 'codex_smoke_' . $this->runId;
         $this->tempEmail = $this->tempUsername . '@example.test';
         $this->tempPassword = 'CodexSmoke!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $app['user']->save([
+        $this->tempUserId = (int) $rvn['user']->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Smoke ' . $this->runId,
@@ -397,8 +403,8 @@ final class ContactWorkflowSmokeRunner
             return;
         }
 
-        $app = require $this->root . '/private/raven.php';
-        $app['user']->deleteById($this->tempUserId);
+        $rvn = require $this->root . '/private/raven.php';
+        $rvn['user']->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }
 
@@ -411,8 +417,8 @@ final class ContactWorkflowSmokeRunner
             return;
         }
 
-        $app = require $this->root . '/private/raven.php';
-        $contactRepositories = $this->contactRepositories($app);
+        $rvn = require $this->root . '/private/raven.php';
+        $contactRepositories = $this->contactRepositories($rvn);
         $forms = $contactRepositories['forms']->listAll();
         $filtered = array_values(array_filter(
             $forms,
@@ -429,15 +435,15 @@ final class ContactWorkflowSmokeRunner
     /**
      * Resolves Contact repositories from extension-owned service registry.
      *
-     * @param array<string, mixed> $app
+     * @param array<string, mixed> $rvn
      * @return array{
      *   forms: \Raven\Repository\ContactFormRepository,
      *   submissions: \Raven\Repository\ContactSubmissionRepository
      * }
      */
-    private function contactRepositories(array $app): array
+    private function contactRepositories(array $rvn): array
     {
-        $rawExtensionServices = is_array($app['extension_services'] ?? null) ? (array) $app['extension_services'] : [];
+        $rawExtensionServices = is_array($rvn['extension_services'] ?? null) ? (array) $rvn['extension_services'] : [];
         $rawContactServices = is_array($rawExtensionServices['contact'] ?? null) ? (array) $rawExtensionServices['contact'] : [];
         $formsRepository = $rawContactServices['forms'] ?? null;
         $submissionsRepository = $rawContactServices['submissions'] ?? null;
@@ -656,8 +662,8 @@ final class ContactWorkflowSmokeRunner
             $this->events[] = 'public_submit_stderr=' . preg_replace('/\s+/', ' ', $submit['stderr']);
         }
 
-        $app = require $this->root . '/private/raven.php';
-        $contactRepositories = $this->contactRepositories($app);
+        $rvn = require $this->root . '/private/raven.php';
+        $contactRepositories = $this->contactRepositories($rvn);
         $count = (int) $contactRepositories['submissions']->countByFormSlug($this->formSlug);
         if ($count < 1) {
             throw new RuntimeException('No local contact submissions were saved after public submit.');

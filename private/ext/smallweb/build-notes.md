@@ -14,11 +14,11 @@ Notes on unclear or underdocumented behaviors encountered during extension devel
 
 ## 2. `RAVEN_VIEW_RENDER_CONTEXT` guard in extension panel templates
 
-**Problem**: The scaffolder and docs suggest extension panel templates should include the `RAVEN_VIEW_RENDER_CONTEXT` constant guard (the same one core and public-theme templates use). But extension panel templates are `require`d directly by the extension's route handler inside an `ob_start()` buffer — they are NOT loaded through `$app['view']->render()`, which is the call that actually defines the constant. The constant is only defined later, when `$app['view']->render('panel/wrapper', ...)` wraps the buffered output.
+**Problem**: The scaffolder and docs suggest extension panel templates should include the `RAVEN_VIEW_RENDER_CONTEXT` constant guard (the same one core and public-theme templates use). But extension panel templates are `require`d directly by the extension's route handler inside an `ob_start()` buffer — they are NOT loaded through `$rvn['view']->render()`, which is the call that actually defines the constant. The constant is only defined later, when `$rvn['view']->render('panel/wrapper', ...)` wraps the buffered output.
 
 **What happened**: All three smallweb panel templates had the guard. When the route handler ran, `require $viewFile` triggered the guard, which called `http_response_code(404); exit;` — producing a raw 404 with no panel wrapper.
 
-**What the docs should say**: Extension panel templates that are `require`d directly by the extension's render helper (the standard `ob_start()` / `require` / `ob_get_clean()` pattern) must NOT include the `RAVEN_VIEW_RENDER_CONTEXT` guard. The guard is only appropriate for templates loaded through the core View class (`$app['view']->render()`), which defines the constant before including the file. Stock extensions (e.g. `contact`, `signups`) do not use this guard in their panel templates — that's the correct pattern to follow.
+**What the docs should say**: Extension panel templates that are `require`d directly by the extension's render helper (the standard `ob_start()` / `require` / `ob_get_clean()` pattern) must NOT include the `RAVEN_VIEW_RENDER_CONTEXT` guard. The guard is only appropriate for templates loaded through the core View class (`$rvn['view']->render()`), which defines the constant before including the file. Stock extensions (e.g. `contact`, `signups`) do not use this guard in their panel templates — that's the correct pattern to follow.
 
 **Suggested doc location**: `private/ext/AGENTS.md` under "Panel UI Integration Pattern" and in the `tpl/panel_index.php` scaffold template.
 

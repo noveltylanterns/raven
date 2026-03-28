@@ -72,10 +72,10 @@ if ($configuredPanelPath !== '' && ($requestPath === $configuredPanelPrefix || s
     exit;
 }
 
-$app = require dirname(__DIR__) . '/private/raven.php';
+$rvn = require dirname(__DIR__) . '/private/raven.php';
 
 $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-$debugToolbarSettings = DebugToolbarConfigResolver::fromConfig($app['config']);
+$debugToolbarSettings = DebugToolbarConfigResolver::fromConfig($rvn['config']);
 $debugToolbarEnabled = false;
 $isPublicAuthHelperPath = static function (string $path) use ($requestPath): bool {
     $normalized = trim($path !== '' ? $path : $requestPath);
@@ -94,17 +94,17 @@ $isPublicAuthHelperPath = static function (string $path) use ($requestPath): boo
         '/register',
     ], true);
 };
-$canRenderPublicDebugToolbar = static function () use ($app, $isPublicAuthHelperPath, $requestPath): bool {
-    if (!isset($app['auth']) || $isPublicAuthHelperPath($requestPath)) {
+$canRenderPublicDebugToolbar = static function () use ($rvn, $isPublicAuthHelperPath, $requestPath): bool {
+    if (!isset($rvn['auth']) || $isPublicAuthHelperPath($requestPath)) {
         return false;
     }
 
-    $userId = $app['auth']->userId();
-    if ($userId === null || !$app['auth']->canManageConfiguration($userId)) {
+    $userId = $rvn['auth']->userId();
+    if ($userId === null || !$rvn['auth']->canManageConfiguration($userId)) {
         return false;
     }
 
-    return $app['auth']->isTwoFactorVerifiedForUser($userId);
+    return $rvn['auth']->isTwoFactorVerifiedForUser($userId);
 };
 
 if (
@@ -119,7 +119,7 @@ if (
 }
 
 if ($debugToolbarEnabled) {
-    ob_start(static function (string $body) use ($app, $debugToolbarSettings, $requestPath, $requestMethod, $canRenderPublicDebugToolbar): string {
+    ob_start(static function (string $body) use ($rvn, $debugToolbarSettings, $requestPath, $requestMethod, $canRenderPublicDebugToolbar): string {
         if (!RequestProfiler::isEnabled() || !DebugToolbarRenderer::isHtmlResponseCandidate($body)) {
             return $body;
         }
@@ -157,25 +157,25 @@ if ($debugToolbarEnabled) {
 }
 
 $controller = new PublicController(
-    $app['view'],
-    $app['config'],
-    $app['auth'],
-    $app['group'],
-    $app['page_images'],
-    $app['page'],
-    $app['redirect'],
-    $app['taxonomy_lookup'],
-    $app['user'],
-    $app['invite_tokens'],
-    $app['input'],
-    $app['csrf'],
-    is_array($app['extension_services'] ?? null) ? (array) $app['extension_services'] : []
+    $rvn['view'],
+    $rvn['config'],
+    $rvn['auth'],
+    $rvn['group'],
+    $rvn['page_images'],
+    $rvn['page'],
+    $rvn['redirect'],
+    $rvn['taxonomy_lookup'],
+    $rvn['user'],
+    $rvn['invite_tokens'],
+    $rvn['input'],
+    $rvn['csrf'],
+    is_array($rvn['extension_services'] ?? null) ? (array) $rvn['extension_services'] : []
 );
 
-$input = $app['input'];
-$routeConfig = new RouteConfigService($app['config'], $input);
+$input = $rvn['input'];
+$routeConfig = new RouteConfigService($rvn['config'], $input);
 
-$panelPath = (string) $app['config']->get('panel.path', 'panel');
+$panelPath = (string) $rvn['config']->get('panel.path', 'panel');
 $categoryPrefix = $routeConfig->categoryRoutePrefix();
 $tagPrefix = $routeConfig->tagRoutePrefix();
 $profilePrefix = $routeConfig->profileRoutePrefix();
@@ -306,9 +306,9 @@ $router->add('POST', '/forms/submit', static function () use ($controller, $inpu
 // - controller: PublicController instance
 // - input: InputSanitizer instance
 // - extensionDirectory: enabled extension folder name
-$enabledPublicExtensions = ExtensionRegistry::enabledDirectories((string) ($app['root'] ?? dirname(__DIR__)), true);
+$enabledPublicExtensions = ExtensionRegistry::enabledDirectories((string) ($rvn['root'] ?? dirname(__DIR__)), true);
 foreach ($enabledPublicExtensions as $extensionName) {
-    $manifest = ExtensionRegistry::readManifest((string) ($app['root'] ?? dirname(__DIR__)), $extensionName);
+    $manifest = ExtensionRegistry::readManifest((string) ($rvn['root'] ?? dirname(__DIR__)), $extensionName);
     if (!is_array($manifest)) {
         continue;
     }
@@ -319,7 +319,7 @@ foreach ($enabledPublicExtensions as $extensionName) {
         continue;
     }
 
-    $routesFile = $app['root'] . '/private/ext/' . $extensionName . '/lib/routes_public.php';
+    $routesFile = $rvn['root'] . '/private/ext/' . $extensionName . '/lib/routes_public.php';
     if (!is_file($routesFile)) {
         continue;
     }
@@ -331,7 +331,7 @@ foreach ($enabledPublicExtensions as $extensionName) {
     }
 
     $registrar($router, [
-        'app' => $app,
+        'rvn' => $rvn,
         'controller' => $controller,
         'input' => $input,
         'extensionDirectory' => $extensionName,

@@ -21,34 +21,34 @@ return [
         'local' => true,
         'table' => true,
     ],
-    'boot' => static function (array &$app): void {
+    'boot' => static function (array &$rvn): void {
     if (
-        !isset($app['db'], $app['driver'], $app['prefix'], $app['extension_storage'])
-        || !$app['db'] instanceof PDO
+        !isset($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['extension_storage'])
+        || !$rvn['db'] instanceof PDO
     ) {
         return;
     }
 
-    $driver = (string) $app['driver'];
-    $prefix = (string) $app['prefix'];
-    $storageMap = is_array($app['extension_storage']) ? $app['extension_storage'] : [];
+    $driver = (string) $rvn['driver'];
+    $prefix = (string) $rvn['prefix'];
+    $storageMap = is_array($rvn['extension_storage']) ? $rvn['extension_storage'] : [];
     $storage = is_array($storageMap['signups'] ?? null) ? $storageMap['signups'] : [];
     $formsPath = rtrim((string) ($storage['local'] ?? ''), '/');
     if ($formsPath === '') {
         return;
     }
 
-    $formsRepository = new SignupFormRepository($app['db'], $driver, $prefix, $formsPath . '/forms.php');
-    $submissionsRepository = new SignupSubmissionRepository($app['db'], $driver, $prefix);
+    $formsRepository = new SignupFormRepository($rvn['db'], $driver, $prefix, $formsPath . '/forms.php');
+    $submissionsRepository = new SignupSubmissionRepository($rvn['db'], $driver, $prefix);
     $publicFormRuntime = new SignupPublicFormRuntime(
-        $app['input'],
-        $app['csrf'],
+        $rvn['input'],
+        $rvn['csrf'],
         $formsRepository,
         $submissionsRepository
     );
 
     /** @var mixed $rawExtensionServices */
-    $rawExtensionServices = $app['extension_services'] ?? [];
+    $rawExtensionServices = $rvn['extension_services'] ?? [];
     if (!is_array($rawExtensionServices)) {
         $rawExtensionServices = [];
     }
@@ -69,6 +69,6 @@ return [
     $rawEmbeddedRuntimes[] = $publicFormRuntime;
     $rawSignupServices['embedded_form_runtimes'] = $rawEmbeddedRuntimes;
     $rawExtensionServices['signups'] = $rawSignupServices;
-    $app['extension_services'] = $rawExtensionServices;
+    $rvn['extension_services'] = $rawExtensionServices;
     },
 ];

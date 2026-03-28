@@ -91,17 +91,17 @@ final class PublicRouteProfilerRunner
      */
     private function buildScenarios(): array
     {
-        $app = $this->bootstrapApp('/');
+        $rvn = $this->bootstrapApp('/');
         /** @var PageRepository $pages */
-        $pages = $app['page'];
+        $pages = $rvn['page'];
         /** @var TaxonomyLookupRepository $taxonomyLookup */
-        $taxonomyLookup = $app['taxonomy_lookup'];
+        $taxonomyLookup = $rvn['taxonomy_lookup'];
         /** @var UserRepository $users */
-        $users = $app['user'];
+        $users = $rvn['user'];
         /** @var GroupRepository $groups */
-        $groups = $app['group'];
+        $groups = $rvn['group'];
         /** @var array<string, mixed> $configSnapshot */
-        $configSnapshot = $app['config']->all();
+        $configSnapshot = $rvn['config']->all();
 
         $categoryPrefix = $this->normalizedOptionalPrefix(
             (string) (($configSnapshot['category']['prefix'] ?? 'cat')),
@@ -316,8 +316,8 @@ final class PublicRouteProfilerRunner
         $this->seedRequestGlobals($uri);
         http_response_code(200);
 
-        $app = $this->bootstrapApp($uri);
-        $controller = $this->newPublicController($app);
+        $rvn = $this->bootstrapApp($uri);
+        $controller = $this->newPublicController($rvn);
 
         ob_start();
         RequestProfiler::start(microtime(true), 'public-profile');
@@ -391,24 +391,24 @@ final class PublicRouteProfilerRunner
     }
 
     /**
-     * @param array<string, mixed> $app
+     * @param array<string, mixed> $rvn
      */
-    private function newPublicController(array $app): PublicController
+    private function newPublicController(array $rvn): PublicController
     {
         return new PublicController(
-            $app['view'],
-            $app['config'],
-            $app['auth'],
-            $app['group'],
-            $app['page_images'],
-            $app['page'],
-            $app['redirect'],
-            $app['taxonomy_lookup'],
-            $app['user'],
-            $app['invite_tokens'],
-            $app['input'],
-            $app['csrf'],
-            is_array($app['extension_services'] ?? null) ? (array) $app['extension_services'] : []
+            $rvn['view'],
+            $rvn['config'],
+            $rvn['auth'],
+            $rvn['group'],
+            $rvn['page_images'],
+            $rvn['page'],
+            $rvn['redirect'],
+            $rvn['taxonomy_lookup'],
+            $rvn['user'],
+            $rvn['invite_tokens'],
+            $rvn['input'],
+            $rvn['csrf'],
+            is_array($rvn['extension_services'] ?? null) ? (array) $rvn['extension_services'] : []
         );
     }
 
@@ -424,10 +424,10 @@ final class PublicRouteProfilerRunner
             $_SESSION = [];
         }
 
-        /** @var array<string, mixed> $app */
-        $app = require $this->root . '/private/raven.php';
+        /** @var array<string, mixed> $rvn */
+        $rvn = require $this->root . '/private/raven.php';
 
-        return $app;
+        return $rvn;
     }
 
     private function seedRequestGlobals(string $uri): void

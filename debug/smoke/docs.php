@@ -169,18 +169,16 @@ final class ConfigurationDocsSmokeRunner
 
     private function createTempSuperUser(): void
     {
-        $app = require $this->root . '/private/raven.php';
+        $rvn = require $this->root . '/private/raven.php';
 
-        $superGroupId = $app['group']->idBySlug('super');
-        if ($superGroupId === null) {
-            throw new RuntimeException('Unable to resolve super group slug.');
-        }
+        // Admin group is canonical ID 1; slug lookup kept as fallback.
+        $superGroupId = $rvn['group']->idBySlug('admin') ?? 1;
 
         $this->tempUsername = 'codex_docs_' . $this->runId;
         $this->tempEmail = $this->tempUsername . '@example.test';
         $this->tempPassword = 'CodexDocs!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $app['user']->save([
+        $this->tempUserId = (int) $rvn['user']->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Docs ' . $this->runId,
@@ -205,8 +203,8 @@ final class ConfigurationDocsSmokeRunner
             return;
         }
 
-        $app = require $this->root . '/private/raven.php';
-        $app['user']->deleteById($this->tempUserId);
+        $rvn = require $this->root . '/private/raven.php';
+        $rvn['user']->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }
 

@@ -21,35 +21,35 @@ return [
         'local' => true,
         'table' => true,
     ],
-    'boot' => static function (array &$app): void {
+    'boot' => static function (array &$rvn): void {
     if (
-        !isset($app['db'], $app['driver'], $app['prefix'], $app['extension_storage'])
-        || !$app['db'] instanceof PDO
+        !isset($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['extension_storage'])
+        || !$rvn['db'] instanceof PDO
     ) {
         return;
     }
 
-    $driver = (string) $app['driver'];
-    $prefix = (string) $app['prefix'];
-    $storageMap = is_array($app['extension_storage']) ? $app['extension_storage'] : [];
+    $driver = (string) $rvn['driver'];
+    $prefix = (string) $rvn['prefix'];
+    $storageMap = is_array($rvn['extension_storage']) ? $rvn['extension_storage'] : [];
     $storage = is_array($storageMap['contact'] ?? null) ? $storageMap['contact'] : [];
     $formsPath = rtrim((string) ($storage['local'] ?? ''), '/');
     if ($formsPath === '') {
         return;
     }
 
-    $formsRepository = new ContactFormRepository($app['db'], $driver, $prefix, $formsPath . '/forms.php');
-    $submissionsRepository = new ContactSubmissionRepository($app['db'], $driver, $prefix);
+    $formsRepository = new ContactFormRepository($rvn['db'], $driver, $prefix, $formsPath . '/forms.php');
+    $submissionsRepository = new ContactSubmissionRepository($rvn['db'], $driver, $prefix);
     $publicFormRuntime = new ContactPublicFormRuntime(
-        $app['input'],
-        $app['csrf'],
-        $app['config'],
+        $rvn['input'],
+        $rvn['csrf'],
+        $rvn['config'],
         $formsRepository,
         $submissionsRepository
     );
 
     /** @var mixed $rawExtensionServices */
-    $rawExtensionServices = $app['extension_services'] ?? [];
+    $rawExtensionServices = $rvn['extension_services'] ?? [];
     if (!is_array($rawExtensionServices)) {
         $rawExtensionServices = [];
     }
@@ -70,6 +70,6 @@ return [
     $rawEmbeddedRuntimes[] = $publicFormRuntime;
     $rawContactServices['embedded_form_runtimes'] = $rawEmbeddedRuntimes;
     $rawExtensionServices['contact'] = $rawContactServices;
-    $app['extension_services'] = $rawExtensionServices;
+    $rvn['extension_services'] = $rawExtensionServices;
     },
 ];

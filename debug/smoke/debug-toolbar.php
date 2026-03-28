@@ -241,17 +241,15 @@ final class DebugToolbarSmokeRunner
 
     private function createTempSuperUser(): void
     {
-        $app = require $this->root . '/private/raven.php';
-        $groupId = $app['group']->idBySlug('super');
-        if ($groupId === null) {
-            throw new RuntimeException('Unable to resolve super group for smoke user.');
-        }
+        $rvn = require $this->root . '/private/raven.php';
+        // Admin group is canonical ID 1; slug lookup kept as fallback.
+        $groupId = $rvn['group']->idBySlug('admin') ?? 1;
 
         $this->tempUsername = 'codex_debug_' . $this->runId;
         $this->tempEmail = $this->tempUsername . '@example.test';
         $this->tempPassword = 'CodexDebug!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $app['user']->save([
+        $this->tempUserId = (int) $rvn['user']->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Debug ' . $this->runId,
@@ -266,18 +264,18 @@ final class DebugToolbarSmokeRunner
         if ($this->tempUserId <= 0) {
             throw new RuntimeException('Failed to create temporary super user.');
         }
-        $canManageConfiguration = $app['auth']->canManageConfiguration($this->tempUserId);
+        $canManageConfiguration = $rvn['auth']->canManageConfiguration($this->tempUserId);
         $this->events[] = 'temp_user_can_manage_configuration=' . ($canManageConfiguration ? '1' : '0');
         if (!$canManageConfiguration) {
             throw new RuntimeException('Temporary super user is missing Manage System Configuration permission.');
         }
 
-        $prefs = $app['auth']->userPreferences($this->tempUserId);
+        $prefs = $rvn['auth']->userPreferences($this->tempUserId);
         if (!is_array($prefs)) {
             throw new RuntimeException('Unable to load temporary super user preferences.');
         }
 
-        $updateResult = $app['auth']->updateUserPreferences($this->tempUserId, [
+        $updateResult = $rvn['auth']->updateUserPreferences($this->tempUserId, [
             'username' => (string) ($prefs['username'] ?? $this->tempUsername),
             'display_name' => (string) ($prefs['display_name'] ?? ('Codex Debug ' . $this->runId)),
             'email' => (string) ($prefs['email'] ?? $this->tempEmail),
@@ -306,8 +304,8 @@ final class DebugToolbarSmokeRunner
             return;
         }
 
-        $app = require $this->root . '/private/raven.php';
-        $app['user']->deleteById($this->tempUserId);
+        $rvn = require $this->root . '/private/raven.php';
+        $rvn['user']->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }
 

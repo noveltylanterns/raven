@@ -251,18 +251,16 @@ final class AuthWorkflowSmokeRunner
 
     private function createTempTwoFactorUser(): void
     {
-        $app = require $this->root . '/private/raven.php';
+        $rvn = require $this->root . '/private/raven.php';
 
-        $superGroupId = $app['group']->idBySlug('super');
-        if ($superGroupId === null) {
-            throw new RuntimeException('Unable to resolve super group slug.');
-        }
+        // Admin group is canonical ID 1; slug lookup kept as fallback.
+        $superGroupId = $rvn['group']->idBySlug('admin') ?? 1;
 
         $this->tempUsername = 'codex_auth_' . $this->runId;
         $this->tempEmail = $this->tempUsername . '@example.test';
         $this->tempPassword = 'CodexAuth!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $app['user']->save([
+        $this->tempUserId = (int) $rvn['user']->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Auth ' . $this->runId,
@@ -278,12 +276,12 @@ final class AuthWorkflowSmokeRunner
             throw new RuntimeException('Failed to create temporary auth smoke user.');
         }
 
-        $prefs = $app['auth']->userPreferences($this->tempUserId);
+        $prefs = $rvn['auth']->userPreferences($this->tempUserId);
         if (!is_array($prefs)) {
             throw new RuntimeException('Unable to load temporary auth smoke user preferences.');
         }
 
-        $updateResult = $app['auth']->updateUserPreferences($this->tempUserId, [
+        $updateResult = $rvn['auth']->updateUserPreferences($this->tempUserId, [
             'username' => (string) ($prefs['username'] ?? $this->tempUsername),
             'display_name' => (string) ($prefs['display_name'] ?? ('Codex Auth ' . $this->runId)),
             'email' => (string) ($prefs['email'] ?? $this->tempEmail),
@@ -312,15 +310,15 @@ final class AuthWorkflowSmokeRunner
             return;
         }
 
-        $app = require $this->root . '/private/raven.php';
-        $app['user']->deleteById($this->tempUserId);
+        $rvn = require $this->root . '/private/raven.php';
+        $rvn['user']->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }
 
     private function clearAuthThrottleBuckets(): void
     {
-        $app = require $this->root . '/private/raven.php';
-        $auth = $app['auth'] ?? null;
+        $rvn = require $this->root . '/private/raven.php';
+        $auth = $rvn['auth'] ?? null;
         if (!is_object($auth) || !method_exists($auth, 'clearFailedLoginAttempts')) {
             return;
         }
@@ -332,22 +330,22 @@ final class AuthWorkflowSmokeRunner
         $auth->clearFailedLoginAttempts($identifier, 'unknown');
         $auth->clearFailedLoginAttempts($probeIdentifier, '127.0.0.1');
         $auth->clearFailedLoginAttempts($probeIdentifier, 'unknown');
-        $this->clearDelightThrottleBuckets($app, [$identifier, $probeIdentifier]);
+        $this->clearDelightThrottleBuckets($rvn, [$identifier, $probeIdentifier]);
         $this->events[] = 'login_throttle_reset=ok';
     }
 
     /**
-     * @param array<string, mixed> $app
+     * @param array<string, mixed> $rvn
      * @param array<int, string> $identifiers
      */
-    private function clearDelightThrottleBuckets(array $app, array $identifiers): void
+    private function clearDelightThrottleBuckets(array $rvn, array $identifiers): void
     {
-        $authDb = $app['auth_db'] ?? null;
+        $authDb = $rvn['auth_db'] ?? null;
         if (!$authDb instanceof \PDO) {
             return;
         }
 
-        $table = (string) ($app['prefix'] ?? '') . 'users_throttling';
+        $table = (string) ($rvn['prefix'] ?? '') . 'users_throttling';
         $criteriaSets = [
             ['enumerateUsers', '127.0.0.1'],
             ['attemptToLogin', '127.0.0.1'],
@@ -554,8 +552,8 @@ $_SERVER = [
     'REMOTE_ADDR' => '127.0.0.1',
 ];
 
-$app = require $argv[1] . '/private/raven.php';
-$auth = $app['auth'];
+$rvn = require $argv[1] . '/private/raven.php';
+$auth = $rvn['auth'];
 
 $payload = [
     'is_logged_in' => $auth->isLoggedIn(),

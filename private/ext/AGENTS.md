@@ -128,9 +128,9 @@ return [
         // 'panel' => true,
         // 'public' => true,
     ],
-    'boot' => static function (array &$app): void {
-        // Use $app['extension_storage']['{slug}'] for resolved storage roots.
-        // Register extension services into $app['extension_services'] when needed.
+    'boot' => static function (array &$rvn): void {
+        // Use $rvn['extension_storage']['{slug}'] for resolved storage roots.
+        // Register extension services into $rvn['extension_services'] when needed.
     },
 ];
 ```
@@ -230,7 +230,7 @@ declare(strict_types=1);
 - Every PHP file in the extension directory passes `php -l`.
 - No extension change depends on edits in `private/sys/*`, `panel/index.php`, or `public/index.php`.
 - Any state-changing route uses CSRF validation.
-- Any input handling uses centralized sanitizer (`$app['input']`).
+- Any input handling uses centralized sanitizer (`$rvn['input']`).
 - These type/file boundaries are runtime-enforced by core manifest validation; violating extensions are treated as invalid and are not enabled.
 
 ## Critical Rule: Do Not Modify Core
@@ -314,7 +314,7 @@ declare(strict_types=1);
 - File must return a callable:
 - `function (Router $router, array $context): void`
 - Provided context keys:
-- `app` => bootstrap container array
+- `rvn` => bootstrap container array
 - `panelUrl` => callable `fn(string $suffix): string`
 - `requirePanelLogin` => callable `fn(): void`
 - `currentUserTheme` => callable `fn(): string`
@@ -330,7 +330,7 @@ declare(strict_types=1);
 - File must return a callable:
 - `function (Router $router, array $context): void`
 - Provided context keys:
-- `app` => bootstrap container array
+- `rvn` => bootstrap container array
 - `controller` => public controller instance
 - `input` => input sanitizer instance
 - `extensionDirectory` => enabled extension folder name
@@ -339,7 +339,7 @@ declare(strict_types=1);
 ## Extension Service Bootstrap Contract
 - If enabled, Raven attempts to load `private/ext/{name}/ext.php` during `private/raven.php`.
 - File must return a callable:
-- `function (array &$app): void`
+- `function (array &$rvn): void`
 - Provider should register extension services into the shared app container (for example repositories/controllers/helpers required by extension routes/runtime).
 - Bootstrap providers are loaded only for enabled extensions listed in `private/dat/ext/.state.php` with valid directory names.
 - Extension source autoloading (`private/ext/{name}/src/`) is also enabled only for extensions marked enabled in `.state.php`.
@@ -357,7 +357,7 @@ declare(strict_types=1);
 - Schema providers must be idempotent and safe to run repeatedly.
 - Keep extension table creation and extension-specific column migrations in this file rather than in core schema code.
 
-## Services Available In `context['app']`
+## Services Available In `context['rvn']`
 - From `private/raven.php`, extensions can consume:
 - `root`
 - `config`
@@ -406,12 +406,12 @@ declare(strict_types=1);
 - Extensions generally render via shared panel layout: `private/tpl/panel/wrapper.php`.
 - Typical render flow:
 - render extension body template to buffer
-- fetch canonical panel `site` payload from `$app['panel_site_data'](...)`
+- fetch canonical panel `site` payload from `$rvn['panel_site_data'](...)`
 - pass buffered HTML as `content` into panel layout render
 - pass `site`, `csrfField`, `section`, `showSidebar`, `userTheme`
 - Do not hand-build global wrapper navigation state inside extension routes. Global panel nav visibility belongs to core.
 - Extension panel templates that are included directly via `ob_start()` + `require` must NOT use the `RAVEN_VIEW_RENDER_CONTEXT` guard.
-- That guard is only appropriate for templates loaded through the core View renderer (`$app['view']->render(...)`).
+- That guard is only appropriate for templates loaded through the core View renderer (`$rvn['view']->render(...)`).
 - If you add the guard to a directly-required extension panel template, the template can exit with a raw 404 before the wrapper renders.
 - For extension sidebar/mobile nav category links:
 - extension must be enabled and manifest-valid
@@ -462,8 +462,8 @@ declare(strict_types=1);
 - Extension authors do not manage these bits manually, but must understand that an enabled extension returning 404 can be a permission failure rather than a routing failure.
 - Super admins bypass extension permission-bit checks.
 - For system-level pages, enforce `canManageConfiguration()` explicitly.
-- For state-changing requests, validate CSRF with `$app['csrf']->validate(...)`.
-- Sanitize all user input through `$app['input']` (InputSanitizer).
+- For state-changing requests, validate CSRF with `$rvn['csrf']->validate(...)`.
+- Sanitize all user input through `$rvn['input']` (InputSanitizer).
 - Keep filesystem access constrained to extension-owned directories.
 - Use defensive checks on filenames/paths to prevent traversal.
 - Never trust manifest/state file contents without validation.

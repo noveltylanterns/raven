@@ -133,7 +133,7 @@ return (static function (): array {
     $categoryEnabled = ConfigValueParser::bool($config->get('category.enabled', false), false);
     $tagEnabled = ConfigValueParser::bool($config->get('tag.enabled', false), false);
     $siteContextBuilder = new SiteContextBuilder();
-    $app = [
+    $rvn = [
         'root' => $root,
         'config' => $config,
         'driver' => $driver,
@@ -183,7 +183,7 @@ return (static function (): array {
         }
 
         /** @var mixed $rawExtensionStorage */
-        $rawExtensionStorage = $app['extension_storage'] ?? [];
+        $rawExtensionStorage = $rvn['extension_storage'] ?? [];
         if (!is_array($rawExtensionStorage)) {
             $rawExtensionStorage = [];
         }
@@ -202,14 +202,14 @@ return (static function (): array {
 
             $rawExtensionStorage[$directory]['aux'][$auxDirectory] = $root . '/' . $auxDirectory;
         }
-        $app['extension_storage'] = $rawExtensionStorage;
+        $rvn['extension_storage'] = $rawExtensionStorage;
 
         try {
-            $provider($app);
+            $provider($rvn);
         } catch (\Throwable $exception) {
             error_log('Raven extension bootstrap failed for extension "' . $directory . '": ' . $exception->getMessage());
         }
     }
 
-    return $app;
+    return $rvn;
 })();

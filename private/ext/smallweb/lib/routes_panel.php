@@ -26,8 +26,8 @@ use function Raven\Core\Support\redirect;
  * } $context
  */
 return static function (Router $router, array $context): void {
-    /** @var array<string, mixed> $app */
-    $app = (array) ($context['app'] ?? []);
+    /** @var array<string, mixed> $rvn */
+    $rvn = (array) ($context['rvn'] ?? []);
 
     /** @var callable(string): string $panelUrl */
     $panelUrl = $context['panelUrl'] ?? static fn (string $suffix = ''): string => '/' . ltrim($suffix, '/');
@@ -39,17 +39,17 @@ return static function (Router $router, array $context): void {
     $currentUserTheme = $context['currentUserTheme'] ?? static fn (): string => 'default';
 
     /** @var callable(bool=): array<string, mixed> $panelSiteData */
-    $panelSiteData = is_callable($app['panel_site_data'] ?? null)
-        ? $app['panel_site_data']
-        : static function (bool $includeDomain = true) use ($app): array {
+    $panelSiteData = is_callable($rvn['panel_site_data'] ?? null)
+        ? $rvn['panel_site_data']
+        : static function (bool $includeDomain = true) use ($rvn): array {
             $site = [
-                'name' => (string) $app['config']->get('site.name', 'Raven CMS'),
-                'panel_path' => (string) $app['config']->get('panel.path', 'panel'),
-                'panel_brand_name' => (string) $app['config']->get('panel.brand_name', ''),
-                'panel_brand_logo' => (string) $app['config']->get('panel.brand_logo', ''),
+                'name' => (string) $rvn['config']->get('site.name', 'Raven CMS'),
+                'panel_path' => (string) $rvn['config']->get('panel.path', 'panel'),
+                'panel_brand_name' => (string) $rvn['config']->get('panel.brand_name', ''),
+                'panel_brand_logo' => (string) $rvn['config']->get('panel.brand_logo', ''),
             ];
             if ($includeDomain) {
-                $site['domain'] = (string) $app['config']->get('site.domain', 'localhost');
+                $site['domain'] = (string) $rvn['config']->get('site.domain', 'localhost');
             }
             return $site;
         };
@@ -57,13 +57,13 @@ return static function (Router $router, array $context): void {
     // ── Resolve extension services ──
 
     /** @var mixed $rawExtensionServices */
-    $rawExtensionServices = $app['extension_services'] ?? [];
+    $rawExtensionServices = $rvn['extension_services'] ?? [];
     /** @var mixed $rawSmallwebServices */
     $rawSmallwebServices = is_array($rawExtensionServices) ? ($rawExtensionServices['smallweb'] ?? []) : [];
     /** @var mixed $smallwebServiceRaw */
     $smallwebServiceRaw = is_array($rawSmallwebServices) ? ($rawSmallwebServices['service'] ?? null) : null;
 
-    if (!isset($app['root'], $app['view'], $app['config'], $app['csrf'], $app['input'])) {
+    if (!isset($rvn['root'], $rvn['view'], $rvn['config'], $rvn['csrf'], $rvn['input'])) {
         return;
     }
 
@@ -72,11 +72,11 @@ return static function (Router $router, array $context): void {
     }
 
     $svc = $smallwebServiceRaw;
-    $input = $app['input'];
+    $input = $rvn['input'];
 
     // ── Paths ──
 
-    $extensionRoot = rtrim((string) $app['root'], '/') . '/private/ext/smallweb';
+    $extensionRoot = rtrim((string) $rvn['root'], '/') . '/private/ext/smallweb';
     $extensionManifestFile = $extensionRoot . '/ext.json';
 
     $indexPath        = $panelUrl('/smallweb');
@@ -137,7 +137,7 @@ return static function (Router $router, array $context): void {
 
     // ── Render helper ──
 
-    $renderView = static function (array $viewData) use ($app, $currentUserTheme, $panelSiteData): void {
+    $renderView = static function (array $viewData) use ($rvn, $currentUserTheme, $panelSiteData): void {
         $viewFile = (string) ($viewData['_view'] ?? '');
         unset($viewData['_view']);
         if ($viewFile === '' || !is_file($viewFile)) {
@@ -146,15 +146,15 @@ return static function (Router $router, array $context): void {
             return;
         }
 
-        $csrfField = $app['csrf']->field();
+        $csrfField = $rvn['csrf']->field();
         extract($viewData, EXTR_SKIP);
         ob_start();
         require $viewFile;
         $body = (string) ob_get_clean();
 
-        $app['view']->render('panel/wrapper', [
+        $rvn['view']->render('panel/wrapper', [
             'site' => $panelSiteData(),
-            'csrfField'   => $app['csrf']->field(),
+            'csrfField'   => $rvn['csrf']->field(),
             'section'     => 'smallweb',
             'showSidebar' => true,
             'userTheme'   => $currentUserTheme(),
@@ -266,7 +266,7 @@ return static function (Router $router, array $context): void {
 
     $router->add('POST', '/smallweb/settings', static function () use (
         $requirePanelLogin,
-        $app,
+        $rvn,
         $svc,
         $flash,
         $indexPath,
@@ -274,7 +274,7 @@ return static function (Router $router, array $context): void {
     ): void {
         $requirePanelLogin();
 
-        if (!$app['csrf']->validate($_POST['_csrf'] ?? null)) {
+        if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
             redirect($indexPath);
             return;
@@ -443,7 +443,7 @@ return static function (Router $router, array $context): void {
     $router->add('POST', '/smallweb/{protocol}/save', static function (array $params) use (
         $requirePanelLogin,
         $requireEnabledProtocol,
-        $app,
+        $rvn,
         $svc,
         $input,
         $flash,
@@ -458,7 +458,7 @@ return static function (Router $router, array $context): void {
 
         $tabUrl = $panelUrl('/smallweb/' . $protocol);
 
-        if (!$app['csrf']->validate($_POST['_csrf'] ?? null)) {
+        if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
             redirect($tabUrl);
             return;
@@ -534,7 +534,7 @@ return static function (Router $router, array $context): void {
     $router->add('POST', '/smallweb/{protocol}/delete', static function (array $params) use (
         $requirePanelLogin,
         $requireEnabledProtocol,
-        $app,
+        $rvn,
         $svc,
         $flash,
         $panelUrl
@@ -547,7 +547,7 @@ return static function (Router $router, array $context): void {
 
         $tabUrl = $panelUrl('/smallweb/' . $protocol);
 
-        if (!$app['csrf']->validate($_POST['_csrf'] ?? null)) {
+        if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
             redirect($tabUrl);
             return;
@@ -581,7 +581,7 @@ return static function (Router $router, array $context): void {
     $router->add('POST', '/smallweb/{protocol}/mkdir', static function (array $params) use (
         $requirePanelLogin,
         $requireEnabledProtocol,
-        $app,
+        $rvn,
         $svc,
         $input,
         $flash,
@@ -601,7 +601,7 @@ return static function (Router $router, array $context): void {
             return;
         }
 
-        if (!$app['csrf']->validate($_POST['_csrf'] ?? null)) {
+        if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
             redirect($tabUrl);
             return;
@@ -639,7 +639,7 @@ return static function (Router $router, array $context): void {
     $router->add('POST', '/smallweb/{protocol}/rmdir', static function (array $params) use (
         $requirePanelLogin,
         $requireEnabledProtocol,
-        $app,
+        $rvn,
         $svc,
         $flash,
         $panelUrl
@@ -658,7 +658,7 @@ return static function (Router $router, array $context): void {
             return;
         }
 
-        if (!$app['csrf']->validate($_POST['_csrf'] ?? null)) {
+        if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
             redirect($tabUrl);
             return;
@@ -687,7 +687,7 @@ return static function (Router $router, array $context): void {
     $router->add('POST', '/smallweb/{protocol}/upload', static function (array $params) use (
         $requirePanelLogin,
         $requireEnabledProtocol,
-        $app,
+        $rvn,
         $svc,
         $flash,
         $panelUrl
@@ -706,7 +706,7 @@ return static function (Router $router, array $context): void {
             return;
         }
 
-        if (!$app['csrf']->validate($_POST['_csrf'] ?? null)) {
+        if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
             redirect($tabUrl);
             return;

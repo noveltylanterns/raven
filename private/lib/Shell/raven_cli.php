@@ -24,7 +24,7 @@ final class RavenCliContext
     public bool $noBanner;
 
     /** @var array<string, mixed>|null */
-    private ?array $app = null;
+    private ?array $rvn = null;
 
     public function __construct(
         string $root,
@@ -45,10 +45,10 @@ final class RavenCliContext
     /**
      * @return array<string, mixed>
      */
-    public function app(): array
+    public function rvn(): array
     {
-        if (is_array($this->app)) {
-            return $this->app;
+        if (is_array($this->rvn)) {
+            return $this->rvn;
         }
 
         $configPath = $this->root . '/private/dat/config.php';
@@ -66,10 +66,10 @@ final class RavenCliContext
         /** @var mixed $loaded */
         $loaded = require $bootstrapPath;
         if (!is_array($loaded)) {
-            throw new RuntimeException('private/raven.php did not return a valid app container.');
+            throw new RuntimeException('private/raven.php did not return a valid Raven container.');
         }
 
-        $this->app = $loaded;
+        $this->rvn = $loaded;
         return $loaded;
     }
 
@@ -400,9 +400,9 @@ function raven_cli_required_scalar_option(array $options, string $name, string $
     return trim((string) $raw);
 }
 
-function raven_cli_slug_from_text(array $app, string $raw, string $label = 'Slug'): string
+function raven_cli_slug_from_text(array $rvn, string $raw, string $label = 'Slug'): string
 {
-    $slug = $app['input']->slug($raw);
+    $slug = $rvn['input']->slug($raw);
     if ($slug === null || $slug === '') {
         throw new RuntimeException($label . ' is invalid.');
     }
@@ -1069,8 +1069,8 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
     $options = $parsed['options'];
 
     try {
-        $app = $context->app();
-        $repo = $app['category'];
+        $rvn = $context->rvn();
+        $repo = $rvn['category'];
 
         if ($action === 'list') {
             $rows = $repo->listAll();
@@ -1134,7 +1134,7 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
             if ($name === '' && $context->interactive) {
                 $name = $context->prompt('Category name', is_array($existing) ? (string) ($existing['name'] ?? '') : '');
             }
-            $name = $app['input']->text($name, 120);
+            $name = $rvn['input']->text($name, 120);
             if ($name === '') {
                 throw new RuntimeException('Category name is required.');
             }
@@ -1146,13 +1146,13 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
             if ($slugInput === '' && is_array($existing)) {
                 $slugInput = (string) ($existing['slug'] ?? '');
             }
-            $slug = raven_cli_slug_from_text($app, $slugInput, 'Category slug');
+            $slug = raven_cli_slug_from_text($rvn, $slugInput, 'Category slug');
 
             $description = (string) raven_cli_option($options, 'description', is_array($existing) ? (string) ($existing['description'] ?? '') : '');
             if ($description === '' && $context->interactive) {
                 $description = $context->prompt('Category description', $description);
             }
-            $description = $app['input']->text($description, 1000);
+            $description = $rvn['input']->text($description, 1000);
 
             $id = $repo->save([
                 'id' => is_array($existing) ? (int) ($existing['id'] ?? 0) : null,
@@ -1225,8 +1225,8 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
     $options = $parsed['options'];
 
     try {
-        $app = $context->app();
-        $repo = $app['tag'];
+        $rvn = $context->rvn();
+        $repo = $rvn['tag'];
 
         if ($action === 'list') {
             $rows = $repo->listAll();
@@ -1290,7 +1290,7 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
             if ($name === '' && $context->interactive) {
                 $name = $context->prompt('Tag name', is_array($existing) ? (string) ($existing['name'] ?? '') : '');
             }
-            $name = $app['input']->text($name, 120);
+            $name = $rvn['input']->text($name, 120);
             if ($name === '') {
                 throw new RuntimeException('Tag name is required.');
             }
@@ -1302,13 +1302,13 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
             if ($slugInput === '' && is_array($existing)) {
                 $slugInput = (string) ($existing['slug'] ?? '');
             }
-            $slug = raven_cli_slug_from_text($app, $slugInput, 'Tag slug');
+            $slug = raven_cli_slug_from_text($rvn, $slugInput, 'Tag slug');
 
             $description = (string) raven_cli_option($options, 'description', is_array($existing) ? (string) ($existing['description'] ?? '') : '');
             if ($description === '' && $context->interactive) {
                 $description = $context->prompt('Tag description', $description);
             }
-            $description = $app['input']->text($description, 1000);
+            $description = $rvn['input']->text($description, 1000);
 
             $id = $repo->save([
                 'id' => is_array($existing) ? (int) ($existing['id'] ?? 0) : null,
@@ -1381,8 +1381,8 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
     $options = $parsed['options'];
 
     try {
-        $app = $context->app();
-        $repo = $app['channel'];
+        $rvn = $context->rvn();
+        $repo = $rvn['channel'];
 
         if ($action === 'list') {
             $rows = $repo->listAll();
@@ -1445,7 +1445,7 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
             if ($name === '' && $context->interactive) {
                 $name = $context->prompt('Channel name', is_array($existing) ? (string) ($existing['name'] ?? '') : '');
             }
-            $name = $app['input']->text($name, 120);
+            $name = $rvn['input']->text($name, 120);
             if ($name === '') {
                 throw new RuntimeException('Channel name is required.');
             }
@@ -1457,13 +1457,13 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
             if ($slugInput === '' && is_array($existing)) {
                 $slugInput = (string) ($existing['slug'] ?? '');
             }
-            $slug = raven_cli_slug_from_text($app, $slugInput, 'Channel slug');
+            $slug = raven_cli_slug_from_text($rvn, $slugInput, 'Channel slug');
 
             $description = (string) raven_cli_option($options, 'description', is_array($existing) ? (string) ($existing['description'] ?? '') : '');
             if ($description === '' && $context->interactive) {
                 $description = $context->prompt('Channel description', $description);
             }
-            $description = $app['input']->text($description, 1000);
+            $description = $rvn['input']->text($description, 1000);
 
             $editor = strtolower(trim((string) raven_cli_option($options, 'editor', is_array($existing) ? (string) ($existing['editor_override'] ?? 'inherit') : 'inherit')));
             $routeMode = strtolower(trim((string) raven_cli_option($options, 'route-mode', is_array($existing) ? (string) ($existing['route_mode'] ?? 'inherit') : 'inherit')));
@@ -1544,8 +1544,8 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
     $options = $parsed['options'];
 
     try {
-        $app = $context->app();
-        $repo = $app['group'];
+        $rvn = $context->rvn();
+        $repo = $rvn['group'];
 
         $orderedPermissions = [
             'view_public' => PanelAccess::VIEW_PUBLIC_SITE,
@@ -1729,7 +1729,7 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
             if ($name === '' && $context->interactive) {
                 $name = $context->prompt('Group name', $name);
             }
-            $name = $app['input']->text($name, 120);
+            $name = $rvn['input']->text($name, 120);
             if ($name === '') {
                 throw new RuntimeException('Group name is required.');
             }
@@ -1740,7 +1740,7 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
             }
             $slug = '';
             if (trim($slugInput) !== '') {
-                $slug = raven_cli_slug_from_text($app, $slugInput, 'Group slug');
+                $slug = raven_cli_slug_from_text($rvn, $slugInput, 'Group slug');
             }
 
             $routeEnabledDefault = is_array($existing) && ((int) ($existing['route_enabled'] ?? 0) === 1);
@@ -1819,8 +1819,8 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
     $options = $parsed['options'];
 
     try {
-        $app = $context->app();
-        $repo = $app['redirect'];
+        $rvn = $context->rvn();
+        $repo = $rvn['redirect'];
 
         $findRedirect = static function (array $options) use ($repo): ?array {
             $idRaw = raven_cli_option($options, 'id', null);
@@ -1899,7 +1899,7 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
             if ($title === '' && $context->interactive) {
                 $title = $context->prompt('Redirect title', $title);
             }
-            $title = $app['input']->text($title, 160);
+            $title = $rvn['input']->text($title, 160);
             if ($title === '') {
                 throw new RuntimeException('Redirect title is required.');
             }
@@ -1908,26 +1908,26 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
             if ($slugInput === '' && $context->interactive) {
                 $slugInput = $context->prompt('Redirect slug', $slugInput);
             }
-            $slug = raven_cli_slug_from_text($app, $slugInput, 'Redirect slug');
+            $slug = raven_cli_slug_from_text($rvn, $slugInput, 'Redirect slug');
 
             $description = (string) raven_cli_option($options, 'description', is_array($existing) ? (string) ($existing['description'] ?? '') : '');
             if ($description === '' && $context->interactive) {
                 $description = $context->prompt('Redirect description', $description);
             }
-            $description = $app['input']->text($description, 1000);
+            $description = $rvn['input']->text($description, 1000);
 
             $target = (string) raven_cli_option($options, 'target', is_array($existing) ? (string) ($existing['target'] ?? '') : '');
             if ($target === '' && $context->interactive) {
                 $target = $context->prompt('Redirect target URL', $target);
             }
-            $target = $app['input']->text($target, 1000);
+            $target = $rvn['input']->text($target, 1000);
             if ($target === '') {
                 throw new RuntimeException('Redirect target URL is required.');
             }
 
             $channelSlug = strtolower(trim((string) raven_cli_option($options, 'channel', is_array($existing) ? (string) ($existing['channel_slug'] ?? '') : '')));
             if ($channelSlug !== '') {
-                $channelSlug = raven_cli_slug_from_text($app, $channelSlug, 'Channel slug');
+                $channelSlug = raven_cli_slug_from_text($rvn, $channelSlug, 'Channel slug');
             }
 
             $active = raven_cli_bool_option(
@@ -2001,8 +2001,8 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
     $options = $parsed['options'];
 
     try {
-        $app = $context->app();
-        $configObject = $app['config'];
+        $rvn = $context->rvn();
+        $configObject = $rvn['config'];
         $config = $configObject->all();
 
         if ($action === 'list') {
@@ -2281,10 +2281,10 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                     throw new RuntimeException((string) ($contract['error'] ?? 'Invalid extension bootstrap contract.'));
                 }
 
-                $app = $context->app();
-                $db = $app['db'] ?? null;
-                $driver = $app['driver'] ?? null;
-                $prefix = $app['prefix'] ?? null;
+                $rvn = $context->rvn();
+                $db = $rvn['db'] ?? null;
+                $driver = $rvn['driver'] ?? null;
+                $prefix = $rvn['prefix'] ?? null;
                 if ($db instanceof PDO && is_string($driver) && is_string($prefix)) {
                     $cleaner = new \Raven\Lib\Extension\ExtensionStorageCleaner($root, $db, $driver, $prefix);
                     $cleaner->deleteStorageByContract($slug, (array) ($contract['storage'] ?? []));
@@ -2697,13 +2697,13 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 throw new RuntimeException('Theme not found or manifest invalid: ' . $slug);
             }
 
-            $app = $context->app();
-            if (!isset($app['config']) || !$app['config'] instanceof Config) {
+            $rvn = $context->rvn();
+            if (!isset($rvn['config']) || !$rvn['config'] instanceof Config) {
                 throw new RuntimeException('Config service unavailable.');
             }
 
-            $app['config']->set('site.theme', $slug);
-            $app['config']->save();
+            $rvn['config']->set('site.theme', $slug);
+            $rvn['config']->save();
 
             if ($context->json) {
                 $context->printJson(['ok' => true, 'slug' => $slug, 'enabled' => true]);
@@ -2809,12 +2809,12 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
 
             $setDefault = raven_cli_bool_option($options, 'set-default', false);
             if ($setDefault) {
-                $app = $context->app();
-                if (!isset($app['config']) || !$app['config'] instanceof Config) {
+                $rvn = $context->rvn();
+                if (!isset($rvn['config']) || !$rvn['config'] instanceof Config) {
                     throw new RuntimeException('Config service unavailable.');
                 }
-                $app['config']->set('site.theme', $slug);
-                $app['config']->save();
+                $rvn['config']->set('site.theme', $slug);
+                $rvn['config']->save();
             }
 
             if ($context->json) {
@@ -2862,12 +2862,12 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 throw new RuntimeException('Theme directory not found: ' . $slug);
             }
 
-            $app = $context->app();
-            if (!isset($app['config']) || !$app['config'] instanceof Config) {
+            $rvn = $context->rvn();
+            if (!isset($rvn['config']) || !$rvn['config'] instanceof Config) {
                 throw new RuntimeException('Config service unavailable.');
             }
 
-            $current = strtolower(trim((string) $app['config']->get('site.theme', $app['config']->get('site.default_theme', 'raven'))));
+            $current = strtolower(trim((string) $rvn['config']->get('site.theme', $rvn['config']->get('site.default_theme', 'raven'))));
             if ($current === $slug) {
                 throw new RuntimeException('Active theme cannot be uninstalled. Activate another theme first.');
             }
@@ -2936,7 +2936,7 @@ function raven_cli_command_system(RavenCliContext $context, array $tokens): int
             $gitTag = trim((string) $tagResult['output']);
         }
 
-        $app = $context->app();
+        $rvn = $context->rvn();
         $state = raven_cli_extension_state_load($root);
         $enabledCount = count($state['enabled']);
         $extensions = [];
@@ -2956,13 +2956,13 @@ function raven_cli_command_system(RavenCliContext $context, array $tokens): int
                 'php' => PHP_VERSION,
                 'os' => PHP_OS_FAMILY,
                 'sapi' => PHP_SAPI,
-                'driver' => (string) ($app['driver'] ?? ''),
-                'prefix' => (string) ($app['prefix'] ?? ''),
+                'driver' => (string) ($rvn['driver'] ?? ''),
+                'prefix' => (string) ($rvn['prefix'] ?? ''),
             ],
             'app' => [
-                'site_name' => (string) ($app['config']->get('site.name', 'Raven CMS')),
-                'site_domain' => (string) ($app['config']->get('site.domain', '')),
-                'panel_path' => (string) ($app['config']->get('panel.path', 'panel')),
+                'site_name' => (string) ($rvn['config']->get('site.name', 'Raven CMS')),
+                'site_domain' => (string) ($rvn['config']->get('site.domain', '')),
+                'panel_path' => (string) ($rvn['config']->get('panel.path', 'panel')),
             ],
             'extensions' => [
                 'enabled_count' => $enabledCount,
@@ -2986,7 +2986,7 @@ function raven_cli_command_system(RavenCliContext $context, array $tokens): int
                 'os' => PHP_OS_FAMILY,
                 'cwd' => getcwd(),
                 'root' => $root,
-                'driver' => (string) ($app['driver'] ?? ''),
+                'driver' => (string) ($rvn['driver'] ?? ''),
             ];
         } elseif ($action === 'extensions') {
             $payload = [

@@ -18,22 +18,22 @@ return [
     'storage' => [
         'local' => true,
     ],
-    'boot' => static function (array &$app): void {
-    if (!isset($app['root'], $app['config'], $app['extension_storage'])) {
+    'boot' => static function (array &$rvn): void {
+    if (!isset($rvn['root'], $rvn['config'], $rvn['extension_storage'])) {
         return;
     }
 
-    $root = rtrim((string) $app['root'], '/');
-    $storageMap = is_array($app['extension_storage']) ? $app['extension_storage'] : [];
+    $root = rtrim((string) $rvn['root'], '/');
+    $storageMap = is_array($rvn['extension_storage']) ? $rvn['extension_storage'] : [];
     $storage = is_array($storageMap['smallweb'] ?? null) ? $storageMap['smallweb'] : [];
     $storageDir = rtrim((string) ($storage['local'] ?? ''), '/');
     if ($storageDir === '') {
         return;
     }
-    $service = new SmallwebService($root, $storageDir, $app['config']);
+    $service = new SmallwebService($root, $storageDir, $rvn['config']);
 
     /** @var mixed $rawExtensionServices */
-    $rawExtensionServices = $app['extension_services'] ?? [];
+    $rawExtensionServices = $rvn['extension_services'] ?? [];
     if (!is_array($rawExtensionServices)) {
         $rawExtensionServices = [];
     }
@@ -46,6 +46,6 @@ return [
 
     $rawSmallwebServices['service'] = $service;
     $rawExtensionServices['smallweb'] = $rawSmallwebServices;
-    $app['extension_services'] = $rawExtensionServices;
+    $rvn['extension_services'] = $rawExtensionServices;
     },
 ];

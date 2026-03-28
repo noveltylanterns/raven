@@ -293,9 +293,9 @@ PHP;
      */
     private function createUserWithMask(string $suffix, int $mask): array
     {
-        $app = require $this->root . '/private/raven.php';
+        $rvn = require $this->root . '/private/raven.php';
         $groupSlug = 'nav-smoke-' . $suffix . '-' . $this->runId;
-        $groupId = (int) $app['group']->save([
+        $groupId = (int) $rvn['group']->save([
             'id' => null,
             'name' => 'Nav Smoke ' . $suffix . ' ' . $this->runId,
             'slug' => $groupSlug,
@@ -309,7 +309,7 @@ PHP;
         $email = $username . '@example.test';
         $password = 'NavSmoke!' . $this->runId . 'Aa';
 
-        $userId = (int) $app['user']->save([
+        $userId = (int) $rvn['user']->save([
             'id' => null,
             'username' => $username,
             'display_name' => 'Nav Smoke ' . $suffix,
@@ -789,10 +789,10 @@ PHP;
             return;
         }
 
-        $app = require $this->root . '/private/raven.php';
+        $rvn = require $this->root . '/private/raven.php';
         foreach (array_reverse($this->createdUsers) as $userId) {
             try {
-                $app['user']->deleteById((int) $userId);
+                $rvn['user']->deleteById((int) $userId);
             } catch (\Throwable) {
             }
         }
@@ -804,10 +804,10 @@ PHP;
             return;
         }
 
-        $app = require $this->root . '/private/raven.php';
+        $rvn = require $this->root . '/private/raven.php';
         foreach (array_reverse($this->createdGroups) as $groupId) {
             try {
-                $app['group']->deleteById((int) $groupId);
+                $rvn['group']->deleteById((int) $groupId);
             } catch (\Throwable) {
             }
         }

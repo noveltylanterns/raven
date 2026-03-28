@@ -25,8 +25,8 @@ use Raven\Lib\Routing\Router;
  * } $context
  */
 return static function (Router $router, array $context): void {
-    /** @var array<string, mixed> $app */
-    $app = (array) ($context['app'] ?? []);
+    /** @var array<string, mixed> $rvn */
+    $rvn = (array) ($context['rvn'] ?? []);
 
     /** @var callable(string): string $panelUrl */
     $panelUrl = $context['panelUrl'] ?? static fn (string $suffix = ''): string => '/' . ltrim($suffix, '/');
@@ -38,17 +38,17 @@ return static function (Router $router, array $context): void {
     $currentUserTheme = $context['currentUserTheme'] ?? static fn (): string => 'default';
 
     /** @var callable(bool=): array<string, mixed> $panelSiteData */
-    $panelSiteData = is_callable($app['panel_site_data'] ?? null)
-        ? $app['panel_site_data']
-        : static function (bool $includeDomain = true) use ($app): array {
+    $panelSiteData = is_callable($rvn['panel_site_data'] ?? null)
+        ? $rvn['panel_site_data']
+        : static function (bool $includeDomain = true) use ($rvn): array {
             $site = [
-                'name' => (string) $app['config']->get('site.name', 'Raven CMS'),
-                'panel_path' => (string) $app['config']->get('panel.path', 'panel'),
-                'panel_brand_name' => (string) $app['config']->get('panel.brand_name', ''),
-                'panel_brand_logo' => (string) $app['config']->get('panel.brand_logo', ''),
+                'name' => (string) $rvn['config']->get('site.name', 'Raven CMS'),
+                'panel_path' => (string) $rvn['config']->get('panel.path', 'panel'),
+                'panel_brand_name' => (string) $rvn['config']->get('panel.brand_name', ''),
+                'panel_brand_logo' => (string) $rvn['config']->get('panel.brand_logo', ''),
             ];
             if ($includeDomain) {
-                $site['domain'] = (string) $app['config']->get('site.domain', 'localhost');
+                $site['domain'] = (string) $rvn['config']->get('site.domain', 'localhost');
             }
             return $site;
         };
@@ -60,16 +60,16 @@ return static function (Router $router, array $context): void {
         echo 'Not Found';
     };
 
-    if (!isset($app['root'], $app['view'], $app['auth'], $app['config'], $app['csrf'])) {
+    if (!isset($rvn['root'], $rvn['view'], $rvn['auth'], $rvn['config'], $rvn['csrf'])) {
         return;
     }
 
-    $extensionRoot = rtrim((string) $app['root'], '/') . '/private/ext/database';
+    $extensionRoot = rtrim((string) $rvn['root'], '/') . '/private/ext/database';
     $extensionManifestFile = $extensionRoot . '/ext.json';
     $extensionEntrypoint = $extensionRoot . '/adminer.php';
     $extensionViewFile = $extensionRoot . '/tpl/panel_index.php';
     $adminerSelectorViewFile = $extensionRoot . '/tpl/panel_adminer_selector.php';
-    $extensionPublicRoot = rtrim((string) $app['root'], '/') . '/panel/ext/database';
+    $extensionPublicRoot = rtrim((string) $rvn['root'], '/') . '/panel/ext/database';
     $extensionMeta = [
         'name' => 'Database Manager',
         'version' => '',
@@ -106,8 +106,8 @@ return static function (Router $router, array $context): void {
     /**
      * Resolves installed Adminer entrypoint from Composer package layout.
      */
-    $resolveAdminerEntrypoint = static function () use ($app): ?string {
-        $basePath = rtrim((string) $app['root'], '/') . '/composer/vrana/adminer';
+    $resolveAdminerEntrypoint = static function () use ($rvn): ?string {
+        $basePath = rtrim((string) $rvn['root'], '/') . '/composer/vrana/adminer';
         $candidates = [
             $basePath . '/adminer.php',
             $basePath . '/adminer/index.php',
@@ -125,11 +125,11 @@ return static function (Router $router, array $context): void {
     /**
      * Resolves SQLite base path from config, allowing relative-to-root values.
      */
-    $resolveSqliteBasePath = static function (array $databaseConfig) use ($app): string {
+    $resolveSqliteBasePath = static function (array $databaseConfig) use ($rvn): string {
         $sqlite = (array) ($databaseConfig['sqlite'] ?? []);
         $basePath = trim((string) ($sqlite['path'] ?? ($sqlite['base_path'] ?? '')));
         if ($basePath === '') {
-            return rtrim((string) $app['root'], '/') . '/private/dat/db.sqlite';
+            return rtrim((string) $rvn['root'], '/') . '/private/dat/db.sqlite';
         }
 
         $isAbsolute = str_starts_with($basePath, '/')
@@ -138,7 +138,7 @@ return static function (Router $router, array $context): void {
             return rtrim($basePath, '/');
         }
 
-        return rtrim((string) $app['root'], '/') . '/' . ltrim($basePath, '/');
+        return rtrim((string) $rvn['root'], '/') . '/' . ltrim($basePath, '/');
     };
 
     /**
@@ -164,7 +164,7 @@ return static function (Router $router, array $context): void {
      * }
      */
     $buildAdminerLaunchTargets = static function (array $databaseConfig) use (
-        $app,
+        $rvn,
         $panelUrl,
         $resolveSqliteDatabasePath
     ): array {
@@ -185,7 +185,7 @@ return static function (Router $router, array $context): void {
             }
         } elseif (in_array($driver, ['mysql', 'pgsql'], true)) {
             try {
-                $db = $app['db'] ?? null;
+                $db = $rvn['db'] ?? null;
                 if (!($db instanceof \PDO)) {
                     throw new RuntimeException('App DB connection is unavailable.');
                 }
@@ -247,7 +247,7 @@ return static function (Router $router, array $context): void {
      *
      * @param array<string, mixed> $viewData
      */
-    $renderExtensionView = static function (array $viewData, ?string $viewFile = null) use ($app, $extensionViewFile, $currentUserTheme, $panelSiteData): void {
+    $renderExtensionView = static function (array $viewData, ?string $viewFile = null) use ($rvn, $extensionViewFile, $currentUserTheme, $panelSiteData): void {
         $resolvedViewFile = is_string($viewFile) && trim($viewFile) !== ''
             ? $viewFile
             : $extensionViewFile;
@@ -263,9 +263,9 @@ return static function (Router $router, array $context): void {
         require $resolvedViewFile;
         $body = (string) ob_get_clean();
 
-        $app['view']->render('panel/wrapper', [
+        $rvn['view']->render('panel/wrapper', [
             'site' => $panelSiteData(),
-            'csrfField' => $app['csrf']->field(),
+            'csrfField' => $rvn['csrf']->field(),
             'section' => 'database',
             'showSidebar' => true,
             'userTheme' => $currentUserTheme(),
@@ -323,10 +323,10 @@ return static function (Router $router, array $context): void {
     /**
      * Enforces Database Manager access gate shared by runtime and asset routes.
      */
-    $requireDatabaseManagerAccess = static function () use ($app, $requirePanelLogin, $renderPublicNotFound): bool {
+    $requireDatabaseManagerAccess = static function () use ($rvn, $requirePanelLogin, $renderPublicNotFound): bool {
         $requirePanelLogin();
 
-        if (!$app['auth']->canManageConfiguration()) {
+        if (!$rvn['auth']->canManageConfiguration()) {
             $renderPublicNotFound();
             return false;
         }
@@ -337,7 +337,7 @@ return static function (Router $router, array $context): void {
     /**
      * Runs Adminer via extension private entrypoint under panel auth + permission gates.
      */
-    $serveAdminerRuntime = static function () use ($app, $extensionEntrypoint, $requireDatabaseManagerAccess): void {
+    $serveAdminerRuntime = static function () use ($rvn, $extensionEntrypoint, $requireDatabaseManagerAccess): void {
         if (!$requireDatabaseManagerAccess()) {
             return;
         }
@@ -349,7 +349,7 @@ return static function (Router $router, array $context): void {
         }
 
         // Extension entrypoint expects `$ravenApp` container in local scope.
-        $ravenApp = $app;
+        $ravenApp = $rvn;
         require $extensionEntrypoint;
     };
 
@@ -436,7 +436,7 @@ return static function (Router $router, array $context): void {
      * - `externals/jush/{file}`
      * - `externals/jush/modules/{file}`
      */
-    $serveAdminerAssetByQuery = static function () use ($app, $extensionPublicRoot, $streamAssetFile, $requireDatabaseManagerAccess): void {
+    $serveAdminerAssetByQuery = static function () use ($rvn, $extensionPublicRoot, $streamAssetFile, $requireDatabaseManagerAccess): void {
         if (!$requireDatabaseManagerAccess()) {
             return;
         }
@@ -455,7 +455,7 @@ return static function (Router $router, array $context): void {
             return;
         }
 
-        $composerBase = rtrim((string) $app['root'], '/');
+        $composerBase = rtrim((string) $rvn['root'], '/');
         $composerAssetPath = null;
         $extensionAssetPath = null;
 
@@ -492,7 +492,7 @@ return static function (Router $router, array $context): void {
     };
 
     $router->add('GET', '/database', static function () use (
-        $app,
+        $rvn,
         $panelUrl,
         $requirePanelLogin,
         $resolveAdminerEntrypoint,
@@ -504,13 +504,13 @@ return static function (Router $router, array $context): void {
     ): void {
         $requirePanelLogin();
 
-        $canManageConfiguration = $app['auth']->canManageConfiguration();
+        $canManageConfiguration = $rvn['auth']->canManageConfiguration();
         if (!$canManageConfiguration) {
             $renderPublicNotFound();
             return;
         }
 
-        $databaseConfig = (array) $app['config']->get('database', []);
+        $databaseConfig = (array) $rvn['config']->get('database', []);
         $driver = strtolower((string) ($databaseConfig['driver'] ?? 'sqlite'));
         $isSqlite = $driver === 'sqlite';
 
@@ -561,7 +561,7 @@ return static function (Router $router, array $context): void {
     });
 
     $router->add('GET', '/database/adminer/select', static function () use (
-        $app,
+        $rvn,
         $panelUrl,
         $requirePanelLogin,
         $resolveAdminerEntrypoint,
@@ -574,13 +574,13 @@ return static function (Router $router, array $context): void {
     ): void {
         $requirePanelLogin();
 
-        $canManageConfiguration = $app['auth']->canManageConfiguration();
+        $canManageConfiguration = $rvn['auth']->canManageConfiguration();
         if (!$canManageConfiguration) {
             $renderPublicNotFound();
             return;
         }
 
-        $databaseConfig = (array) $app['config']->get('database', []);
+        $databaseConfig = (array) $rvn['config']->get('database', []);
         $targetData = $buildAdminerLaunchTargets($databaseConfig);
         $driver = strtolower((string) ($targetData['driver'] ?? 'sqlite'));
         $targets = is_array($targetData['targets'] ?? null) ? (array) $targetData['targets'] : [];

@@ -308,8 +308,8 @@ final class SecuritySmokeRunner
 
     private function groupsCount(): int
     {
-        $app = require $this->root . '/private/raven.php';
-        $rows = $app['group']->listAll();
+        $rvn = require $this->root . '/private/raven.php';
+        $rows = $rvn['group']->listAll();
         return is_array($rows) ? count($rows) : 0;
     }
 
@@ -318,8 +318,8 @@ final class SecuritySmokeRunner
      */
     private function findRedirectBySlug(string $slug): ?array
     {
-        $app = require $this->root . '/private/raven.php';
-        $rows = $app['redirect']->listAll();
+        $rvn = require $this->root . '/private/raven.php';
+        $rows = $rvn['redirect']->listAll();
         if (!is_array($rows)) {
             return null;
         }
@@ -356,23 +356,21 @@ final class SecuritySmokeRunner
             return;
         }
 
-        $app = require $this->root . '/private/raven.php';
-        $app['redirect']->deleteById($id);
+        $rvn = require $this->root . '/private/raven.php';
+        $rvn['redirect']->deleteById($id);
     }
 
     private function createTempSuperUser(): void
     {
-        $app = require $this->root . '/private/raven.php';
+        $rvn = require $this->root . '/private/raven.php';
 
-        $superGroupId = $app['group']->idBySlug('super');
-        if ($superGroupId === null) {
-            throw new RuntimeException('Unable to resolve super group slug.');
-        }
+        // Admin group is canonical ID 1; slug lookup kept as fallback.
+        $superGroupId = $rvn['group']->idBySlug('admin') ?? 1;
 
         $this->tempUsername = 'codex_security_' . $this->runId;
         $this->tempPassword = 'CodexSecurity!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $app['user']->save([
+        $this->tempUserId = (int) $rvn['user']->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Security ' . $this->runId,
@@ -397,15 +395,15 @@ final class SecuritySmokeRunner
             return;
         }
 
-        $app = require $this->root . '/private/raven.php';
-        $app['user']->deleteById($this->tempUserId);
+        $rvn = require $this->root . '/private/raven.php';
+        $rvn['user']->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }
 
     private function clearAuthThrottleBuckets(): void
     {
-        $app = require $this->root . '/private/raven.php';
-        $auth = $app['auth'] ?? null;
+        $rvn = require $this->root . '/private/raven.php';
+        $auth = $rvn['auth'] ?? null;
         if (!is_object($auth) || !method_exists($auth, 'clearFailedLoginAttempts')) {
             return;
         }
@@ -416,7 +414,7 @@ final class SecuritySmokeRunner
         $auth->clearFailedLoginAttempts($this->tempUsername, 'unknown');
         $auth->clearFailedLoginAttempts($probeUsername, '127.0.0.1');
         $auth->clearFailedLoginAttempts($probeUsername, 'unknown');
-        $this->clearDelightThrottleBuckets($app, [
+        $this->clearDelightThrottleBuckets($rvn, [
             $this->tempUsername,
             $this->tempUsername . '@example.test',
             $probeUsername,
@@ -425,17 +423,17 @@ final class SecuritySmokeRunner
     }
 
     /**
-     * @param array<string, mixed> $app
+     * @param array<string, mixed> $rvn
      * @param array<int, string> $identifiers
      */
-    private function clearDelightThrottleBuckets(array $app, array $identifiers): void
+    private function clearDelightThrottleBuckets(array $rvn, array $identifiers): void
     {
-        $authDb = $app['auth_db'] ?? null;
+        $authDb = $rvn['auth_db'] ?? null;
         if (!$authDb instanceof \PDO) {
             return;
         }
 
-        $table = (string) ($app['prefix'] ?? '') . 'users_throttling';
+        $table = (string) ($rvn['prefix'] ?? '') . 'users_throttling';
         $criteriaSets = [
             ['enumerateUsers', '127.0.0.1'],
             ['attemptToLogin', '127.0.0.1'],

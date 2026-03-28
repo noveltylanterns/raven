@@ -27,39 +27,39 @@ use function Raven\Core\Support\redirect;
 /**
  * Panel front controller for https://{domain}/{panel_path}/
  */
-$app = require dirname(__DIR__) . '/private/raven.php';
+$rvn = require dirname(__DIR__) . '/private/raven.php';
 
 $authController = new AuthController(
-    $app['view'],
-    $app['config'],
-    $app['auth'],
-    $app['input'],
-    $app['csrf']
+    $rvn['view'],
+    $rvn['config'],
+    $rvn['auth'],
+    $rvn['input'],
+    $rvn['csrf']
 );
 
 $panelController = new PanelController(
-    $app['view'],
-    $app['config'],
-    $app['auth'],
-    $app['input'],
-    $app['csrf'],
-    $app['page_images'],
-    $app['page_image_manager'],
-    $app['category'],
-    $app['category_set'],
-    $app['channel'],
-    $app['group'],
-    $app['page'],
-    $app['redirect'],
-    $app['tag'],
-    $app['tag_set'],
-    $app['taxonomy_lookup'],
-    $app['user'],
-    $app['invite_tokens']
+    $rvn['view'],
+    $rvn['config'],
+    $rvn['auth'],
+    $rvn['input'],
+    $rvn['csrf'],
+    $rvn['page_images'],
+    $rvn['page_image_manager'],
+    $rvn['category'],
+    $rvn['category_set'],
+    $rvn['channel'],
+    $rvn['group'],
+    $rvn['page'],
+    $rvn['redirect'],
+    $rvn['tag'],
+    $rvn['tag_set'],
+    $rvn['taxonomy_lookup'],
+    $rvn['user'],
+    $rvn['invite_tokens']
 );
 
-$categoryEnabled = ConfigValueParser::bool($app['config']->get('category.enabled', true), true);
-$tagEnabled = ConfigValueParser::bool($app['config']->get('tag.enabled', true), true);
+$categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', true), true);
+$tagEnabled = ConfigValueParser::bool($rvn['config']->get('tag.enabled', true), true);
 $_SESSION['_raven_category_enabled'] = $categoryEnabled;
 $_SESSION['_raven_tag_enabled'] = $tagEnabled;
 
@@ -67,7 +67,7 @@ $_SESSION['_raven_tag_enabled'] = $tagEnabled;
  * Normalizes request path into panel-internal path.
  */
 $requestedPath = request_path();
-$configuredPanelPrefix = PanelUrl::fromConfig($app['config']);
+$configuredPanelPrefix = PanelUrl::fromConfig($rvn['config']);
 
 $internalPath = $requestedPath;
 
@@ -83,7 +83,7 @@ if ($requestedPath === $configuredPanelPrefix) {
  *
  * Returns true when the request was handled and response already sent.
  */
-$servePanelThemeAsset = static function (string $path, string $method) use ($app): bool {
+$servePanelThemeAsset = static function (string $path, string $method) use ($rvn): bool {
     // Only serve static assets for read-only methods.
     if (!in_array($method, ['GET', 'HEAD'], true)) {
         return false;
@@ -113,7 +113,7 @@ $servePanelThemeAsset = static function (string $path, string $method) use ($app
         return true;
     }
 
-    $themeRoot = rtrim((string) $app['root'], '/') . '/panel/theme';
+    $themeRoot = rtrim((string) $rvn['root'], '/') . '/panel/theme';
     $themeRootReal = realpath($themeRoot);
     $assetReal = realpath($themeRoot . '/' . $relativePath);
 
@@ -238,21 +238,21 @@ if ($servePanelThemeAsset($internalPath, $requestMethod)) {
 /**
  * Builds panel URL with configured prefix.
  */
-$panelUrl = static function (string $suffix = '') use ($app): string {
-    return PanelUrl::fromConfig($app['config'], $suffix);
+$panelUrl = static function (string $suffix = '') use ($rvn): string {
+    return PanelUrl::fromConfig($rvn['config'], $suffix);
 };
 
-$enabledState = ExtensionRegistry::enabledMap((string) $app['root']);
+$enabledState = ExtensionRegistry::enabledMap((string) $rvn['root']);
 
 // Compute enabled, manifest-valid extensions once for panel nav and route registration.
 $enabledExtensions = [];
 $enabledExtensionManifests = [];
 foreach (array_keys($enabledState) as $directoryName) {
-    if (!is_dir($app['root'] . '/private/ext/' . $directoryName)) {
+    if (!is_dir($rvn['root'] . '/private/ext/' . $directoryName)) {
         continue;
     }
 
-    $manifest = ExtensionRegistry::readManifest((string) $app['root'], $directoryName);
+    $manifest = ExtensionRegistry::readManifest((string) $rvn['root'], $directoryName);
     if ($manifest === null) {
         continue;
     }
@@ -264,8 +264,8 @@ foreach (array_keys($enabledState) as $directoryName) {
 /**
  * Synchronizes lightweight identity data for the personalized welcome heading.
  */
-$syncPanelIdentity = static function () use ($app): void {
-    $userId = $app['auth']->userId();
+$syncPanelIdentity = static function () use ($rvn): void {
+    $userId = $rvn['auth']->userId();
     if ($userId === null) {
         unset($_SESSION['rvn-panel-identity']);
         unset($_SESSION['_raven_can_manage_content']);
@@ -276,7 +276,7 @@ $syncPanelIdentity = static function () use ($app): void {
         return;
     }
 
-    $preferences = $app['auth']->userPreferences($userId);
+    $preferences = $rvn['auth']->userPreferences($userId);
     if ($preferences === null) {
         unset($_SESSION['rvn-panel-identity']);
         unset($_SESSION['_raven_can_manage_content']);
@@ -291,11 +291,11 @@ $syncPanelIdentity = static function () use ($app): void {
         'display_name' => trim((string) ($preferences['display_name'] ?? '')),
         'username' => trim((string) ($preferences['username'] ?? '')),
     ];
-    $_SESSION['_raven_can_manage_content'] = $app['auth']->canManageContent();
-    $_SESSION['_raven_can_manage_taxonomy'] = $app['auth']->canManageTaxonomy();
-    $_SESSION['_raven_can_manage_users'] = $app['auth']->canManageUsers();
-    $_SESSION['_raven_can_manage_groups'] = $app['auth']->canManageGroups();
-    $_SESSION['_raven_can_manage_configuration'] = $app['auth']->canManageConfiguration();
+    $_SESSION['_raven_can_manage_content'] = $rvn['auth']->canManageContent();
+    $_SESSION['_raven_can_manage_taxonomy'] = $rvn['auth']->canManageTaxonomy();
+    $_SESSION['_raven_can_manage_users'] = $rvn['auth']->canManageUsers();
+    $_SESSION['_raven_can_manage_groups'] = $rvn['auth']->canManageGroups();
+    $_SESSION['_raven_can_manage_configuration'] = $rvn['auth']->canManageConfiguration();
 };
 
 /**
@@ -314,13 +314,13 @@ $isGuestPanelLoginEntryInternalPath = static function () use ($internalPath): bo
  * Enforces login + panel-access permission for extension routes.
  */
 $requirePanelLoginForExtension = static function () use (
-    $app,
+    $rvn,
     $panelUrl,
     $syncPanelIdentity,
     $isGuestPanelLoginEntryInternalPath,
     $panelController
 ): void {
-    if (!$app['auth']->isLoggedIn()) {
+    if (!$rvn['auth']->isLoggedIn()) {
         if ($isGuestPanelLoginEntryInternalPath()) {
             redirect($panelUrl('/login'));
         }
@@ -329,8 +329,8 @@ $requirePanelLoginForExtension = static function () use (
         exit;
     }
 
-    if (!$app['auth']->canAccessPanel()) {
-        $app['auth']->logout();
+    if (!$rvn['auth']->canAccessPanel()) {
+        $rvn['auth']->logout();
         if ($isGuestPanelLoginEntryInternalPath()) {
             redirect($panelUrl('/login'));
         }
@@ -339,13 +339,13 @@ $requirePanelLoginForExtension = static function () use (
         exit;
     }
 
-    $userId = $app['auth']->userId();
-    if ($userId !== null && !$app['auth']->isTwoFactorVerifiedForUser($userId)) {
-        if ($app['auth']->pendingTwoFactorUserId() === $userId) {
+    $userId = $rvn['auth']->userId();
+    if ($userId !== null && !$rvn['auth']->isTwoFactorVerifiedForUser($userId)) {
+        if ($rvn['auth']->pendingTwoFactorUserId() === $userId) {
             redirect($panelUrl('/login/2fa'));
         }
 
-        $app['auth']->logout();
+        $rvn['auth']->logout();
         if ($isGuestPanelLoginEntryInternalPath()) {
             redirect($panelUrl('/login'));
         }
@@ -388,8 +388,8 @@ $normalizePanelTheme = static function (string $theme, bool $allowDefault): ?str
 /**
  * Returns panel theme value for current user.
  */
-$defaultPanelTheme = static function () use ($app): string {
-    $theme = strtolower(trim((string) $app['config']->get('panel.theme', $app['config']->get('panel.default_theme', 'corp'))));
+$defaultPanelTheme = static function () use ($rvn): string {
+    $theme = strtolower(trim((string) $rvn['config']->get('panel.theme', $rvn['config']->get('panel.default_theme', 'corp'))));
     if (in_array($theme, ['light', 'raven', 'default', 'corp'], true)) {
         return 'corp';
     }
@@ -406,11 +406,11 @@ $defaultPanelTheme = static function () use ($app): string {
 /**
  * Returns panel theme value for current user.
  */
-$currentUserTheme = static function () use ($app, $defaultPanelTheme, $normalizePanelTheme): string {
+$currentUserTheme = static function () use ($rvn, $defaultPanelTheme, $normalizePanelTheme): string {
     $theme = $defaultPanelTheme();
-    $userId = $app['auth']->userId();
+    $userId = $rvn['auth']->userId();
     if ($userId !== null) {
-        $prefs = $app['auth']->userPreferences($userId);
+        $prefs = $rvn['auth']->userPreferences($userId);
         $candidate = $normalizePanelTheme((string) ($prefs['theme'] ?? 'default'), true);
         if (is_string($candidate)) {
             $theme = $candidate === 'default' ? $defaultPanelTheme() : $candidate;
@@ -423,8 +423,8 @@ $currentUserTheme = static function () use ($app, $defaultPanelTheme, $normalize
 /**
  * Returns true when current user has one panel-side permission bit.
  */
-$hasPanelPermissionBit = static function (int $bit) use ($app): bool {
-    return $app['auth']->hasPanelPermissionBit($bit);
+$hasPanelPermissionBit = static function (int $bit) use ($rvn): bool {
+    return $rvn['auth']->hasPanelPermissionBit($bit);
 };
 
 $_SESSION['_raven_nav_stock'] = [
@@ -469,7 +469,7 @@ foreach ($enabledExtensionManifests as $directoryName => $manifest) {
         $type = 'plugin';
     }
 
-    $panelRoutesFile = $app['root'] . '/private/ext/' . $directoryName . '/lib/routes_panel.php';
+    $panelRoutesFile = $rvn['root'] . '/private/ext/' . $directoryName . '/lib/routes_panel.php';
     if (!is_file($panelRoutesFile)) {
         continue;
     }
@@ -538,7 +538,7 @@ $_SESSION['_raven_nav_system_extensions'] = $systemExtensionNavItems;
 // Provide channel-aware shortcuts for Create Page sidebar/mobile accordion sublinks.
 $pageCreateChannelItems = [];
 if ($hasPanelPermissionBit(PanelAccess::PAGES_CREATE)) {
-    foreach ($app['channel']->listOptions() as $channelOption) {
+    foreach ($rvn['channel']->listOptions() as $channelOption) {
         if (!is_array($channelOption)) {
             continue;
         }
@@ -610,8 +610,8 @@ $router->add('GET', '/page/edit', static function () use ($panelController): voi
     $panelController->pageEdit(null);
 });
 
-$router->add('GET', '/page/edit/{id}', static function (array $params) use ($panelController, $app): void {
-    $id = $app['input']->int($params['id'] ?? null, 1);
+$router->add('GET', '/page/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+    $id = $rvn['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
         http_response_code(404);
@@ -651,8 +651,8 @@ $router->add('GET', '/channel/edit', static function () use ($panelController): 
     $panelController->channelEdit(null);
 });
 
-$router->add('GET', '/channel/edit/{id}', static function (array $params) use ($panelController, $app): void {
-    $id = $app['input']->int($params['id'] ?? null, 1);
+$router->add('GET', '/channel/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+    $id = $rvn['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
         http_response_code(404);
@@ -683,8 +683,8 @@ if ($categoryEnabled) {
         $panelController->categoryEdit(null);
     });
 
-    $router->add('GET', '/category/edit/{id}', static function (array $params) use ($panelController, $app): void {
-        $id = $app['input']->int($params['id'] ?? null, 1);
+    $router->add('GET', '/category/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+        $id = $rvn['input']->int($params['id'] ?? null, 1);
 
         if ($id === null) {
             http_response_code(404);
@@ -711,8 +711,8 @@ if ($categoryEnabled) {
         $panelController->categorySetEdit(null);
     });
 
-    $router->add('GET', '/category/set/edit/{id}', static function (array $params) use ($panelController, $app): void {
-        $id = $app['input']->int($params['id'] ?? null, 0);
+    $router->add('GET', '/category/set/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+        $id = $rvn['input']->int($params['id'] ?? null, 0);
 
         if ($id === null) {
             http_response_code(404);
@@ -741,8 +741,8 @@ if ($tagEnabled) {
         $panelController->tagEdit(null);
     });
 
-    $router->add('GET', '/tag/edit/{id}', static function (array $params) use ($panelController, $app): void {
-        $id = $app['input']->int($params['id'] ?? null, 1);
+    $router->add('GET', '/tag/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+        $id = $rvn['input']->int($params['id'] ?? null, 1);
 
         if ($id === null) {
             http_response_code(404);
@@ -769,8 +769,8 @@ if ($tagEnabled) {
         $panelController->tagSetEdit(null);
     });
 
-    $router->add('GET', '/tag/set/edit/{id}', static function (array $params) use ($panelController, $app): void {
-        $id = $app['input']->int($params['id'] ?? null, 0);
+    $router->add('GET', '/tag/set/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+        $id = $rvn['input']->int($params['id'] ?? null, 0);
 
         if ($id === null) {
             http_response_code(404);
@@ -798,8 +798,8 @@ $router->add('GET', '/redirect/edit', static function () use ($panelController):
     $panelController->redirectEdit(null);
 });
 
-$router->add('GET', '/redirect/edit/{id}', static function (array $params) use ($panelController, $app): void {
-    $id = $app['input']->int($params['id'] ?? null, 1);
+$router->add('GET', '/redirect/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+    $id = $rvn['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
         http_response_code(404);
@@ -826,8 +826,8 @@ $router->add('GET', '/user/edit', static function () use ($panelController): voi
     $panelController->userEdit(null);
 });
 
-$router->add('GET', '/user/edit/{id}', static function (array $params) use ($panelController, $app): void {
-    $id = $app['input']->int($params['id'] ?? null, 1);
+$router->add('GET', '/user/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+    $id = $rvn['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
         http_response_code(404);
@@ -870,8 +870,8 @@ $router->add('GET', '/group/edit', static function () use ($panelController): vo
     $panelController->groupEdit(null);
 });
 
-$router->add('GET', '/group/edit/{id}', static function (array $params) use ($panelController, $app): void {
-    $id = $app['input']->int($params['id'] ?? null, 1);
+$router->add('GET', '/group/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+    $id = $rvn['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
         http_response_code(404);
@@ -1015,7 +1015,7 @@ $router->add('POST', '/extensions/permission', static function () use ($panelCon
 // - extensionDefaultPermissionLevel: default extension-level key
 // - requireExtensionPermission: callable(?string $levelKey = null): void
 foreach (array_keys($enabledExtensions) as $extensionName) {
-    $routesFile = $app['root'] . '/private/ext/' . $extensionName . '/lib/routes_panel.php';
+    $routesFile = $rvn['root'] . '/private/ext/' . $extensionName . '/lib/routes_panel.php';
     if (!is_file($routesFile)) {
         continue;
     }
@@ -1077,9 +1077,9 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
 
     $extensionRequirePanelAccess = $requirePanelLoginForExtension;
     if ($isSystemType) {
-        $extensionRequirePanelAccess = static function () use ($requirePanelLoginForExtension, $app, $panelController): void {
+        $extensionRequirePanelAccess = static function () use ($requirePanelLoginForExtension, $rvn, $panelController): void {
             $requirePanelLoginForExtension();
-            if (!$app['auth']->hasPanelPermissionBit(PanelAccess::CONFIGURATION_VIEW)) {
+            if (!$rvn['auth']->hasPanelPermissionBit(PanelAccess::CONFIGURATION_VIEW)) {
                 $panelController->renderPublicNotFound();
                 exit;
             }
@@ -1123,7 +1123,7 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
     };
 
     $registrar($router, [
-        'app' => $app,
+        'rvn' => $rvn,
         'panelUrl' => $panelUrl,
         'requirePanelLogin' => $extensionRequirePanelAccess,
         'requireExtensionPermission' => $requireExtensionPermission,
@@ -1142,7 +1142,7 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
 }
 
 $method = $requestMethod;
-$debugToolbarSettings = DebugToolbarConfigResolver::fromConfig($app['config']);
+$debugToolbarSettings = DebugToolbarConfigResolver::fromConfig($rvn['config']);
 $debugToolbarEnabled = false;
 $isPanelAuthHelperInternalPath = static function (string $path) use ($internalPath): bool {
     $normalized = trim($path !== '' ? $path : $internalPath);
@@ -1159,17 +1159,17 @@ $isPanelAuthHelperInternalPath = static function (string $path) use ($internalPa
         '/login/2fa/webauthn/verify',
     ], true);
 };
-$canRenderPanelDebugToolbar = static function () use ($app, $isPanelAuthHelperInternalPath, $internalPath): bool {
-    if (!isset($app['auth']) || $isPanelAuthHelperInternalPath($internalPath)) {
+$canRenderPanelDebugToolbar = static function () use ($rvn, $isPanelAuthHelperInternalPath, $internalPath): bool {
+    if (!isset($rvn['auth']) || $isPanelAuthHelperInternalPath($internalPath)) {
         return false;
     }
 
-    $userId = $app['auth']->userId();
-    if ($userId === null || !$app['auth']->canManageConfiguration($userId)) {
+    $userId = $rvn['auth']->userId();
+    if ($userId === null || !$rvn['auth']->canManageConfiguration($userId)) {
         return false;
     }
 
-    return $app['auth']->isTwoFactorVerifiedForUser($userId);
+    return $rvn['auth']->isTwoFactorVerifiedForUser($userId);
 };
 
 if (
@@ -1184,7 +1184,7 @@ if (
 }
 
 if ($debugToolbarEnabled) {
-    ob_start(static function (string $body) use ($app, $debugToolbarSettings, $internalPath, $method, $canRenderPanelDebugToolbar): string {
+    ob_start(static function (string $body) use ($rvn, $debugToolbarSettings, $internalPath, $method, $canRenderPanelDebugToolbar): string {
         if (!RequestProfiler::isEnabled() || !DebugToolbarRenderer::isHtmlResponseCandidate($body)) {
             return $body;
         }

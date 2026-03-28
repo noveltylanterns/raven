@@ -351,7 +351,7 @@ final class ExtensionBoundarySmokeRunner
 
         $files = [
             'extension.json' => $manifestJson . "\n",
-            'bootstrap.php' => "<?php\n\ndeclare(strict_types=1);\n\nreturn static function (array &\$app): void {\n};\n",
+            'bootstrap.php' => "<?php\n\ndeclare(strict_types=1);\n\nreturn static function (array &\$rvn): void {\n};\n",
             'schema.php' => "<?php\n\ndeclare(strict_types=1);\n\nreturn static function (array \$context): void {\n};\n",
             'routes/panel.php' => $this->panelRouteSkeleton($directory, $displayName),
             'vis/panel_index.php' => "<?php\n\ndeclare(strict_types=1);\n\nif (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {\n    http_response_code(404);\n    exit;\n}\n?>\n<section class=\"card\"><div class=\"card-body\"><h1>" . $this->escapePhpString($displayName) . "</h1><p class=\"text-muted mb-0\">Debug fixture extension.</p></div></section>\n",

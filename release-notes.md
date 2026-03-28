@@ -4,6 +4,12 @@
 
 ### March 28, 2026
 
+- Renamed the Raven app container variable from `$app` to `$rvn` across all PHP files (`private/`, `panel/`, `public/`, `debug/`). The `RavenCliContext::app()` method and its backing property were renamed to `rvn()` / `$rvn` accordingly. Array keys like `$context['app']` in extension route files are unchanged — only the PHP variable name changed. Also updated `$app` references in `private/ext/AGENTS.md` and `private/ext/smallweb/build-notes.md`.
+- Fixed pre-existing `'super'` group slug references in all debug smoke tests (`contact-workflow`, `debug-toolbar`, `docs`, `auth-workflow`, `security`, `security-aggressive`) to use `idBySlug('admin') ?? 1` (Admin group is canonical ID 1 since the super→admin migration).
+- Added extension-enabled preflight to `contact-workflow.php` smoke test so it gracefully SKIPs instead of failing when the contact extension is not enabled.
+
+### March 28, 2026 (batch 2)
+
 - Added a Media tab to the Group editor with cover and icon image upload fields, matching the tag/category pattern. `TaxonomyImageService` and `TaxonomyImagePathResolver` now include `groups` in their allowlists; `GroupRepository` gains `updateImageFiles()` (cover + icon, no preview slot); `groupEdit()` passes image spec variables to the template; `groupSave()` now accepts `$_FILES` and runs the full `storeTaxonomyImageUpload()` pipeline. Images are stored under `public/uploads/groups/{id}/`. The old plain-text cover/icon inputs on the Basic tab have been removed.
 
 ### March 27, 2026 (bugs & tweaks batch)

@@ -294,11 +294,11 @@ return [
         // 'panel' => true,
         // 'public' => true,
     ],
-    'boot' => static function (array &$app): void {
+    'boot' => static function (array &$rvn): void {
     $extensionKey = __DIRECTORY_LITERAL__;
 
     /** @var mixed $rawExtensionServices */
-    $rawExtensionServices = $app['extension_services'] ?? [];
+    $rawExtensionServices = $rvn['extension_services'] ?? [];
     if (!is_array($rawExtensionServices)) {
         $rawExtensionServices = [];
     }
@@ -310,7 +310,7 @@ return [
     }
 
     // Resolved storage roots, when requested by this extension:
-    // $storage = is_array($app['extension_storage'][$extensionKey] ?? null) ? $app['extension_storage'][$extensionKey] : [];
+    // $storage = is_array($rvn['extension_storage'][$extensionKey] ?? null) ? $rvn['extension_storage'][$extensionKey] : [];
     // $localRoot = (string) ($storage['local'] ?? '');
     // $auxRoots = is_array($storage['aux'] ?? null) ? $storage['aux'] : [];
     // $panelRoot = (string) ($storage['panel'] ?? '');
@@ -320,7 +320,7 @@ return [
     // $rawServices['repository'] = new MyRepository(...);
 
     $rawExtensionServices[$extensionKey] = $rawServices;
-    $app['extension_services'] = $rawExtensionServices;
+    $rvn['extension_services'] = $rawExtensionServices;
     },
 ];
 PHP;
@@ -378,8 +378,8 @@ use Raven\Lib\Routing\Router;
  * } $context
  */
 return static function (Router $router, array $context): void {
-    /** @var array<string, mixed> $app */
-    $app = (array) ($context['app'] ?? []);
+    /** @var array<string, mixed> $rvn */
+    $rvn = (array) ($context['rvn'] ?? []);
 
     /** @var callable(): void $requirePanelLogin */
     $requirePanelLogin = $context['requirePanelLogin'] ?? static function (): void {};
@@ -387,7 +387,7 @@ return static function (Router $router, array $context): void {
     /** @var callable(): string $currentUserTheme */
     $currentUserTheme = $context['currentUserTheme'] ?? static fn (): string => 'light';
 
-    if (!isset($app['view'], $app['config'], $app['csrf'])) {
+    if (!isset($rvn['view'], $rvn['config'], $rvn['csrf'])) {
         return;
     }
 
@@ -436,7 +436,7 @@ return static function (Router $router, array $context): void {
      * Renders extension body inside the shared panel layout.
      */
     $renderExtensionView = static function () use (
-        $app,
+        $rvn,
         $viewFile,
         $currentUserTheme,
         $section,
@@ -448,28 +448,28 @@ return static function (Router $router, array $context): void {
             return;
         }
 
-        $panelSiteData = is_callable($app['panel_site_data'] ?? null)
-            ? $app['panel_site_data']
-            : static function (bool $includeDomain = true) use ($app): array {
+        $panelSiteData = is_callable($rvn['panel_site_data'] ?? null)
+            ? $rvn['panel_site_data']
+            : static function (bool $includeDomain = true) use ($rvn): array {
                 $site = [
-                    'name' => (string) $app['config']->get('site.name', 'Raven CMS'),
-                    'panel_path' => (string) $app['config']->get('panel.path', 'panel'),
-                    'panel_brand_name' => (string) $app['config']->get('panel.brand_name', ''),
-                    'panel_brand_logo' => (string) $app['config']->get('panel.brand_logo', ''),
+                    'name' => (string) $rvn['config']->get('site.name', 'Raven CMS'),
+                    'panel_path' => (string) $rvn['config']->get('panel.path', 'panel'),
+                    'panel_brand_name' => (string) $rvn['config']->get('panel.brand_name', ''),
+                    'panel_brand_logo' => (string) $rvn['config']->get('panel.brand_logo', ''),
                 ];
                 if ($includeDomain) {
-                    $site['domain'] = (string) $app['config']->get('site.domain', 'localhost');
+                    $site['domain'] = (string) $rvn['config']->get('site.domain', 'localhost');
                 }
                 return $site;
             };
         $site = $panelSiteData();
-        $csrfField = $app['csrf']->field();
+        $csrfField = $rvn['csrf']->field();
 
         ob_start();
         require $viewFile;
         $body = (string) ob_get_clean();
 
-        $app['view']->render('panel/wrapper', [
+        $rvn['view']->render('panel/wrapper', [
             'site' => $site,
             'csrfField' => $csrfField,
             'section' => $section,

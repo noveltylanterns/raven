@@ -24,8 +24,8 @@ use Raven\Lib\Routing\Router;
  * } $context
  */
 return static function (Router $router, array $context): void {
-    /** @var array<string, mixed> $app */
-    $app = (array) ($context['app'] ?? []);
+    /** @var array<string, mixed> $rvn */
+    $rvn = (array) ($context['rvn'] ?? []);
 
     /** @var callable(): void $requirePanelLogin */
     $requirePanelLogin = $context['requirePanelLogin'] ?? static function (): void {};
@@ -34,22 +34,22 @@ return static function (Router $router, array $context): void {
     $currentUserTheme = $context['currentUserTheme'] ?? static fn (): string => 'light';
 
     /** @var callable(bool=): array<string, mixed> $panelSiteData */
-    $panelSiteData = is_callable($app['panel_site_data'] ?? null)
-        ? $app['panel_site_data']
-        : static function (bool $includeDomain = true) use ($app): array {
+    $panelSiteData = is_callable($rvn['panel_site_data'] ?? null)
+        ? $rvn['panel_site_data']
+        : static function (bool $includeDomain = true) use ($rvn): array {
             $site = [
-                'name' => (string) $app['config']->get('site.name', 'Raven CMS'),
-                'panel_path' => (string) $app['config']->get('panel.path', 'panel'),
-                'panel_brand_name' => (string) $app['config']->get('panel.brand_name', ''),
-                'panel_brand_logo' => (string) $app['config']->get('panel.brand_logo', ''),
+                'name' => (string) $rvn['config']->get('site.name', 'Raven CMS'),
+                'panel_path' => (string) $rvn['config']->get('panel.path', 'panel'),
+                'panel_brand_name' => (string) $rvn['config']->get('panel.brand_name', ''),
+                'panel_brand_logo' => (string) $rvn['config']->get('panel.brand_logo', ''),
             ];
             if ($includeDomain) {
-                $site['domain'] = (string) $app['config']->get('site.domain', 'localhost');
+                $site['domain'] = (string) $rvn['config']->get('site.domain', 'localhost');
             }
             return $site;
         };
 
-    if (!isset($app['view'], $app['config'], $app['csrf'])) {
+    if (!isset($rvn['view'], $rvn['config'], $rvn['csrf'])) {
         return;
     }
 
@@ -98,7 +98,7 @@ return static function (Router $router, array $context): void {
      * Renders extension body inside the shared panel layout.
      */
     $renderExtensionView = static function () use (
-        $app,
+        $rvn,
         $viewFile,
         $currentUserTheme,
         $section,
@@ -112,7 +112,7 @@ return static function (Router $router, array $context): void {
         }
 
         $site = $panelSiteData();
-        $csrfField = $app['csrf']->field();
+        $csrfField = $rvn['csrf']->field();
         $phpInfoHtml = '';
         $phpInfoCss = '';
 
@@ -181,7 +181,7 @@ return static function (Router $router, array $context): void {
         require $viewFile;
         $body = (string) ob_get_clean();
 
-        $app['view']->render('panel/wrapper', [
+        $rvn['view']->render('panel/wrapper', [
             'site' => $site,
             'csrfField' => $csrfField,
             'section' => $section,

@@ -27,8 +27,8 @@ use function Raven\Core\Support\redirect;
  * } $context
  */
 return static function (Router $router, array $context): void {
-    /** @var array<string, mixed> $app */
-    $app = (array) ($context['app'] ?? []);
+    /** @var array<string, mixed> $rvn */
+    $rvn = (array) ($context['rvn'] ?? []);
 
     /** @var callable(string): string $panelUrl */
     $panelUrl = $context['panelUrl'] ?? static fn (string $suffix = ''): string => '/' . ltrim($suffix, '/');
@@ -40,23 +40,23 @@ return static function (Router $router, array $context): void {
     $currentUserTheme = $context['currentUserTheme'] ?? static fn (): string => 'default';
 
     /** @var callable(bool=): array<string, mixed> $panelSiteData */
-    $panelSiteData = is_callable($app['panel_site_data'] ?? null)
-        ? $app['panel_site_data']
-        : static function (bool $includeDomain = true) use ($app): array {
+    $panelSiteData = is_callable($rvn['panel_site_data'] ?? null)
+        ? $rvn['panel_site_data']
+        : static function (bool $includeDomain = true) use ($rvn): array {
             $site = [
-                'name' => (string) $app['config']->get('site.name', 'Raven CMS'),
-                'panel_path' => (string) $app['config']->get('panel.path', 'panel'),
-                'panel_brand_name' => (string) $app['config']->get('panel.brand_name', ''),
-                'panel_brand_logo' => (string) $app['config']->get('panel.brand_logo', ''),
+                'name' => (string) $rvn['config']->get('site.name', 'Raven CMS'),
+                'panel_path' => (string) $rvn['config']->get('panel.path', 'panel'),
+                'panel_brand_name' => (string) $rvn['config']->get('panel.brand_name', ''),
+                'panel_brand_logo' => (string) $rvn['config']->get('panel.brand_logo', ''),
             ];
             if ($includeDomain) {
-                $site['domain'] = (string) $app['config']->get('site.domain', 'localhost');
+                $site['domain'] = (string) $rvn['config']->get('site.domain', 'localhost');
             }
             return $site;
         };
 
     /** @var mixed $rawExtensionServices */
-    $rawExtensionServices = $app['extension_services'] ?? [];
+    $rawExtensionServices = $rvn['extension_services'] ?? [];
     /** @var mixed $rawContactServices */
     $rawContactServices = is_array($rawExtensionServices) ? ($rawExtensionServices['contact'] ?? []) : [];
     /** @var mixed $contactFormsService */
@@ -64,7 +64,7 @@ return static function (Router $router, array $context): void {
     /** @var mixed $contactSubmissionsService */
     $contactSubmissionsService = is_array($rawContactServices) ? ($rawContactServices['submissions'] ?? null) : null;
 
-    if (!isset($app['root'], $app['view'], $app['config'], $app['csrf'])) {
+    if (!isset($rvn['root'], $rvn['view'], $rvn['config'], $rvn['csrf'])) {
         return;
     }
 
@@ -77,7 +77,7 @@ return static function (Router $router, array $context): void {
     $contactFormsRepository = $contactFormsService;
     $contactSubmissionsRepository = $contactSubmissionsService;
 
-    $extensionRoot = rtrim((string) $app['root'], '/') . '/private/ext/contact';
+    $extensionRoot = rtrim((string) $rvn['root'], '/') . '/private/ext/contact';
     $extensionManifestFile = $extensionRoot . '/ext.json';
     $listViewFile = $extensionRoot . '/tpl/panel_index.php';
     $editViewFile = $extensionRoot . '/tpl/panel_edit.php';
@@ -241,15 +241,15 @@ return static function (Router $router, array $context): void {
      *
      * @return array{emails: array<int, string>, invalid: array<int, string>}
      */
-    $parseEmailList = static function (string $rawValue) use ($app): array {
-        if (!isset($app['input'])) {
+    $parseEmailList = static function (string $rawValue) use ($rvn): array {
+        if (!isset($rvn['input'])) {
             return [
                 'emails' => [],
                 'invalid' => [],
             ];
         }
 
-        $normalized = $app['input']->text($rawValue, 2000);
+        $normalized = $rvn['input']->text($rawValue, 2000);
         if ($normalized === '') {
             return [
                 'emails' => [],
@@ -270,7 +270,7 @@ return static function (Router $router, array $context): void {
                 continue;
             }
 
-            $email = $app['input']->email($candidate);
+            $email = $rvn['input']->email($candidate);
             if ($email === null) {
                 $invalid[] = $candidate;
                 continue;
@@ -290,7 +290,7 @@ return static function (Router $router, array $context): void {
      *
      * @param array<string, mixed> $viewData
      */
-    $renderView = static function (array $viewData) use ($app, $currentUserTheme, $panelSiteData): void {
+    $renderView = static function (array $viewData) use ($rvn, $currentUserTheme, $panelSiteData): void {
         $viewFile = (string) ($viewData['_view'] ?? '');
         unset($viewData['_view']);
         if ($viewFile === '' || !is_file($viewFile)) {
@@ -300,15 +300,15 @@ return static function (Router $router, array $context): void {
         }
 
         // Extension partials render forms directly and require a CSRF hidden field token.
-        $csrfField = $app['csrf']->field();
+        $csrfField = $rvn['csrf']->field();
         extract($viewData, EXTR_SKIP);
         ob_start();
         require $viewFile;
         $body = (string) ob_get_clean();
 
-        $app['view']->render('panel/wrapper', [
+        $rvn['view']->render('panel/wrapper', [
             'site' => $panelSiteData(),
-            'csrfField' => $app['csrf']->field(),
+            'csrfField' => $rvn['csrf']->field(),
             'section' => 'contact',
             'showSidebar' => true,
             'userTheme' => $currentUserTheme(),
@@ -379,18 +379,18 @@ return static function (Router $router, array $context): void {
         $savePath,
         $deletePath,
         $editViewFile,
-        $app,
+        $rvn,
         $extensionMeta
     ): void {
         $requirePanelLogin();
 
-        if (!isset($app['input'])) {
+        if (!isset($rvn['input'])) {
             http_response_code(500);
             echo 'Input sanitizer is unavailable.';
             return;
         }
 
-        $slug = $app['input']->slug((string) ($params['slug'] ?? ''));
+        $slug = $rvn['input']->slug((string) ($params['slug'] ?? ''));
         if ($slug === null) {
             redirect($indexPath);
         }
@@ -427,18 +427,18 @@ return static function (Router $router, array $context): void {
         $submissionsClearPath,
         $submissionsBasePath,
         $submissionsViewFile,
-        $app,
+        $rvn,
         $extensionMeta
     ): void {
         $requirePanelLogin();
 
-        if (!isset($app['input'])) {
+        if (!isset($rvn['input'])) {
             http_response_code(500);
             echo 'Input sanitizer is unavailable.';
             return;
         }
 
-        $slug = $app['input']->slug((string) ($params['slug'] ?? ''));
+        $slug = $rvn['input']->slug((string) ($params['slug'] ?? ''));
         if ($slug === null) {
             redirect($indexPath);
         }
@@ -448,8 +448,8 @@ return static function (Router $router, array $context): void {
             redirect($indexPath);
         }
 
-        $searchQuery = $app['input']->text((string) ($_GET['q'] ?? ''), 160);
-        $page = $app['input']->int($_GET['page'] ?? 1, 1, 100000) ?? 1;
+        $searchQuery = $rvn['input']->text((string) ($_GET['q'] ?? ''), 160);
+        $page = $rvn['input']->int($_GET['page'] ?? 1, 1, 100000) ?? 1;
         $perPage = 50;
 
         try {
@@ -501,17 +501,17 @@ return static function (Router $router, array $context): void {
         $flash,
         $indexPath,
         $submissionsListPath,
-        $app
+        $rvn
     ): void {
         $requirePanelLogin();
 
-        if (!isset($app['input'])) {
+        if (!isset($rvn['input'])) {
             http_response_code(500);
             echo 'Input sanitizer is unavailable.';
             return;
         }
 
-        $slug = $app['input']->slug((string) ($params['slug'] ?? ''));
+        $slug = $rvn['input']->slug((string) ($params['slug'] ?? ''));
         if ($slug === null) {
             redirect($indexPath);
         }
@@ -520,7 +520,7 @@ return static function (Router $router, array $context): void {
             redirect($indexPath);
         }
 
-        $searchQuery = $app['input']->text((string) ($_GET['q'] ?? ''), 160);
+        $searchQuery = $rvn['input']->text((string) ($_GET['q'] ?? ''), 160);
         try {
             $rows = $contactSubmissionsRepository->listForExportByFormSlug($slug, $searchQuery);
         } catch (RuntimeException $exception) {
@@ -575,25 +575,25 @@ return static function (Router $router, array $context): void {
         $flash,
         $indexPath,
         $submissionsListPath,
-        $app
+        $rvn
     ): void {
         $requirePanelLogin();
 
-        if (!isset($app['input'])) {
+        if (!isset($rvn['input'])) {
             http_response_code(500);
             echo 'Input sanitizer is unavailable.';
             return;
         }
 
-        if (!$app['csrf']->validate($_POST['_csrf'] ?? null)) {
+        if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
             redirect($indexPath);
         }
 
-        $slug = $app['input']->slug((string) ($_POST['slug'] ?? ''));
-        $submissionId = $app['input']->int($_POST['submission_id'] ?? null, 1);
-        $searchQuery = $app['input']->text((string) ($_POST['return_q'] ?? ''), 160);
-        $page = $app['input']->int($_POST['return_page'] ?? 1, 1, 100000) ?? 1;
+        $slug = $rvn['input']->slug((string) ($_POST['slug'] ?? ''));
+        $submissionId = $rvn['input']->int($_POST['submission_id'] ?? null, 1);
+        $searchQuery = $rvn['input']->text((string) ($_POST['return_q'] ?? ''), 160);
+        $page = $rvn['input']->int($_POST['return_page'] ?? 1, 1, 100000) ?? 1;
 
         if ($slug === null || $submissionId === null) {
             $flash('error', 'Invalid contact submission request.');
@@ -626,23 +626,23 @@ return static function (Router $router, array $context): void {
         $flash,
         $indexPath,
         $submissionsListPath,
-        $app
+        $rvn
     ): void {
         $requirePanelLogin();
 
-        if (!isset($app['input'])) {
+        if (!isset($rvn['input'])) {
             http_response_code(500);
             echo 'Input sanitizer is unavailable.';
             return;
         }
 
-        if (!$app['csrf']->validate($_POST['_csrf'] ?? null)) {
+        if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
             redirect($indexPath);
         }
 
-        $slug = $app['input']->slug((string) ($_POST['slug'] ?? ''));
-        $searchQuery = $app['input']->text((string) ($_POST['return_q'] ?? ''), 160);
+        $slug = $rvn['input']->slug((string) ($_POST['slug'] ?? ''));
+        $searchQuery = $rvn['input']->text((string) ($_POST['return_q'] ?? ''), 160);
         if ($slug === null) {
             $flash('error', 'Invalid form slug.');
             redirect($indexPath);
@@ -665,7 +665,7 @@ return static function (Router $router, array $context): void {
 
     $router->add('POST', '/contact/save', static function () use (
         $requirePanelLogin,
-        $app,
+        $rvn,
         $loadForms,
         $saveForms,
         $contactSubmissionsRepository,
@@ -676,23 +676,23 @@ return static function (Router $router, array $context): void {
     ): void {
         $requirePanelLogin();
 
-        if (!isset($app['input'])) {
+        if (!isset($rvn['input'])) {
             http_response_code(500);
             echo 'Input sanitizer is unavailable.';
             return;
         }
 
-        if (!$app['csrf']->validate($_POST['_csrf'] ?? null)) {
+        if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
             redirect($indexPath);
         }
 
-        $name = $app['input']->text((string) ($_POST['name'] ?? ''), 160);
-        $slug = $app['input']->slug((string) ($_POST['slug'] ?? ''));
-        $originalSlug = $app['input']->slug((string) ($_POST['original_slug'] ?? ''));
-        $destinationRaw = $app['input']->text((string) ($_POST['destination'] ?? ''), 2000);
-        $ccRaw = $app['input']->text((string) ($_POST['cc'] ?? ''), 2000);
-        $bccRaw = $app['input']->text((string) ($_POST['bcc'] ?? ''), 2000);
+        $name = $rvn['input']->text((string) ($_POST['name'] ?? ''), 160);
+        $slug = $rvn['input']->slug((string) ($_POST['slug'] ?? ''));
+        $originalSlug = $rvn['input']->slug((string) ($_POST['original_slug'] ?? ''));
+        $destinationRaw = $rvn['input']->text((string) ($_POST['destination'] ?? ''), 2000);
+        $ccRaw = $rvn['input']->text((string) ($_POST['cc'] ?? ''), 2000);
+        $bccRaw = $rvn['input']->text((string) ($_POST['bcc'] ?? ''), 2000);
         $parsedDestination = $parseEmailList($destinationRaw);
         $parsedCc = $parseEmailList($ccRaw);
         $parsedBcc = $parseEmailList($bccRaw);
@@ -702,7 +702,7 @@ return static function (Router $router, array $context): void {
         $enabled = isset($_POST['enabled']) && (string) $_POST['enabled'] === '1';
         $saveMailLocally = isset($_POST['save_mail_locally']) && (string) $_POST['save_mail_locally'] === '1';
         $redirectPath = $originalSlug !== null ? ($editBasePath . '/' . rawurlencode($originalSlug)) : $editBasePath;
-        $parseFieldOptions = static function (mixed $rawOptions) use ($app): array {
+        $parseFieldOptions = static function (mixed $rawOptions) use ($rvn): array {
             $optionCandidates = [];
             $rawInput = '';
             if (is_array($rawOptions)) {
@@ -724,7 +724,7 @@ return static function (Router $router, array $context): void {
                     continue;
                 }
 
-                $option = trim($app['input']->text((string) $optionCandidate, 120));
+                $option = trim($rvn['input']->text((string) $optionCandidate, 120));
                 if ($option === '' || isset($options[$option])) {
                     continue;
                 }
@@ -757,8 +757,8 @@ return static function (Router $router, array $context): void {
                     continue;
                 }
 
-                $fieldLabel = $app['input']->text((string) ($rawField['label'] ?? ''), 120);
-                $fieldNameInput = strtolower($app['input']->text((string) ($rawField['name'] ?? ''), 120));
+                $fieldLabel = $rvn['input']->text((string) ($rawField['label'] ?? ''), 120);
+                $fieldNameInput = strtolower($rvn['input']->text((string) ($rawField['name'] ?? ''), 120));
                 $fieldName = preg_replace('/[^a-z0-9_]+/', '_', $fieldNameInput) ?? '';
                 $fieldName = trim($fieldName, '_');
                 if ($fieldName === '' && $fieldLabel !== '') {
@@ -767,7 +767,7 @@ return static function (Router $router, array $context): void {
                     $fieldName = trim($fieldName, '_');
                 }
 
-                $fieldType = strtolower($app['input']->text((string) ($rawField['type'] ?? 'text'), 20));
+                $fieldType = strtolower($rvn['input']->text((string) ($rawField['type'] ?? 'text'), 20));
                 if ($fieldType === 'dropdown') {
                     $fieldType = 'select';
                 }
@@ -895,7 +895,7 @@ return static function (Router $router, array $context): void {
 
     $router->add('POST', '/contact/delete', static function () use (
         $requirePanelLogin,
-        $app,
+        $rvn,
         $loadForms,
         $saveForms,
         $contactSubmissionsRepository,
@@ -904,18 +904,18 @@ return static function (Router $router, array $context): void {
     ): void {
         $requirePanelLogin();
 
-        if (!isset($app['input'])) {
+        if (!isset($rvn['input'])) {
             http_response_code(500);
             echo 'Input sanitizer is unavailable.';
             return;
         }
 
-        if (!$app['csrf']->validate($_POST['_csrf'] ?? null)) {
+        if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
             redirect($indexPath);
         }
 
-        $slug = $app['input']->slug((string) ($_POST['slug'] ?? ''));
+        $slug = $rvn['input']->slug((string) ($_POST['slug'] ?? ''));
         if ($slug === null) {
             $flash('error', 'Invalid form slug.');
             redirect($indexPath);
