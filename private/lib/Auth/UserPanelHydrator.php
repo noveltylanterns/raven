@@ -30,11 +30,11 @@ final class UserPanelHydrator
                 'id' => $userId,
                 'username' => (string) ($row['username'] ?? ''),
                 'string' => (string) ($row['string'] ?? ''),
-                'display_name' => (string) ($row['display_name'] ?? ''),
+                'name' => (string) ($row['name'] ?? ''),
                 'email' => (string) ($row['email'] ?? ''),
                 'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
-                'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                    ? (string) $row['avatar_path']
+                'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
+                    ? (string) $row['avatar']
                     : null,
                 'groups' => $groupNames,
                 'group_entries' => $groupEntries,

@@ -48,8 +48,7 @@ final class SignupSubmissionRepository
      *   ip_address: string|null,
      *   hostname?: string|null,
      *   user_agent: string|null,
-     *   created?: string,
-     *   created_at?: string
+     *   created?: string
      * } $data
      */
     public function create(array $data): int
@@ -81,7 +80,7 @@ final class SignupSubmissionRepository
             throw new RuntimeException('That email is already signed up for this signup sheet.');
         }
 
-        $createdAt = $this->normalizeCreatedAt((string) ($data['created'] ?? $data['created_at'] ?? ''));
+        $createdAt = $this->normalizeCreatedAt((string) ($data['created'] ?? ''));
 
         try {
             $stmt = $this->db->prepare(
@@ -148,7 +147,7 @@ final class SignupSubmissionRepository
     {
         $table = $this->table('ext_signups');
 
-        $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created AS created_at
+        $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created
                 FROM ' . $table . '
                 WHERE form_slug = :form_slug';
         $params = [
@@ -208,10 +207,10 @@ final class SignupSubmissionRepository
                        page_rows.ip_address,
                        page_rows.hostname,
                        page_rows.user_agent,
-                       page_rows.created_at,
+                       page_rows.created,
                        totals.total_rows
                 FROM (
-                    SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created AS created_at
+                    SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created
                     FROM ' . $table . '
                     WHERE form_slug = :page_form_slug'
                     . $pageSearchClause
@@ -274,7 +273,7 @@ final class SignupSubmissionRepository
     {
         $table = $this->table('ext_signups');
 
-        $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created AS created_at
+        $sql = 'SELECT id, form_slug, email, display_name, country, additional_fields_json, source_url, ip_address, hostname, user_agent, created
                 FROM ' . $table . '
                 WHERE form_slug = :form_slug';
         $params = [

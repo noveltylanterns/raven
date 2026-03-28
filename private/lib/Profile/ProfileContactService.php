@@ -92,8 +92,7 @@ final class ProfileContactService
             $safePrefix = $defaultPrefix;
             if (is_array($definition)) {
                 $safeLabel = $this->input->text((string) ($definition['label'] ?? $defaultLabel), 80);
-                // Accept both new `prefix` key and legacy `url_prefix` key from old config files.
-                $rawPrefix = $definition['prefix'] ?? $definition['url_prefix'] ?? $defaultPrefix;
+                $rawPrefix = $definition['prefix'] ?? $defaultPrefix;
                 $safePrefix = $this->input->text((string) $rawPrefix, 255);
             } else {
                 $safeLabel = $this->input->text((string) $definition, 80);
@@ -160,8 +159,7 @@ final class ProfileContactService
                 continue;
             }
 
-            // Accept both new `prefix` key and legacy `url_prefix` key from old form submissions.
-            $rawPrefix = $entry['prefix'] ?? $entry['url_prefix'] ?? '';
+            $rawPrefix = $entry['prefix'] ?? '';
             $urlPrefix = trim($this->input->text((string) $rawPrefix, 255));
             if (isset($normalized[$type])) {
                 continue;
@@ -227,7 +225,7 @@ final class ProfileContactService
      */
     public function decorateProfileContacts(array $profile, array $options): array
     {
-        $rawEntries = is_array($profile['contact_profiles'] ?? null) ? $profile['contact_profiles'] : [];
+        $rawEntries = is_array($profile['contact'] ?? null) ? $profile['contact'] : [];
         $entries = [];
 
         foreach ($rawEntries as $entry) {
@@ -250,8 +248,7 @@ final class ProfileContactService
                 'prefix' => '',
             ];
             $label = (string) ($option['label'] ?? $type);
-            // Accept both new `prefix` key and legacy `url_prefix` key.
-            $urlPrefix = trim((string) ($option['prefix'] ?? $option['url_prefix'] ?? ''));
+            $urlPrefix = trim((string) ($option['prefix'] ?? ''));
             $href = $this->resolveProfileContactHref($value, $urlPrefix);
 
             $entries[] = [
@@ -266,7 +263,7 @@ final class ProfileContactService
             }
         }
 
-        $profile['contact_profiles'] = $entries;
+        $profile['contact'] = $entries;
         return $profile;
     }
 
@@ -317,8 +314,7 @@ final class ProfileContactService
                 continue;
             }
 
-            // Accept both new `prefix` key and legacy `url_prefix` key.
-            $urlPrefix = trim((string) ($contactOptions[$type]['prefix'] ?? $contactOptions[$type]['url_prefix'] ?? ''));
+            $urlPrefix = trim((string) ($contactOptions[$type]['prefix'] ?? ''));
             if (!$this->isTwitterProfileContactType($type, $urlPrefix)) {
                 continue;
             }

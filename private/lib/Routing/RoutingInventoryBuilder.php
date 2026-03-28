@@ -139,7 +139,7 @@ final class RoutingInventoryBuilder
             }
         }
         foreach ($pagesForRouting as &$pageForRouting) {
-            $channelId = (int) ($pageForRouting['channel_id'] ?? 0);
+            $channelId = (int) ($pageForRouting['channel'] ?? 0);
             $pageForRouting['channel_slug'] = (string) ($channelsById[$channelId]['slug'] ?? '');
             $pageForRouting['channel_name'] = (string) ($channelsById[$channelId]['name'] ?? '');
             $pageForRouting['route_mode_effective'] = (string) ($channelsById[$channelId]['route_mode'] ?? 'inherit');
@@ -294,12 +294,12 @@ final class RoutingInventoryBuilder
                 $pageSlug,
                 (int) ($page['id'] ?? 0),
                 $channelSlug,
-                (string) ($page['created_at'] ?? ''),
+                (string) ($page['created'] ?? ''),
                 (string) ($page['route_mode_effective'] ?? 'inherit'),
                 (string) ($page['route_separator_effective'] ?? 'inherit')
             );
 
-            $statusKey = (int) ($page['is_published'] ?? 0) === 1 ? 'published' : 'draft';
+            $statusKey = ($page['status'] ?? '') === 'published' ? 'published' : 'draft';
             $statusLabel = $statusKey === 'published' ? 'Published' : 'Draft';
             $notes = '';
 
@@ -563,13 +563,13 @@ final class RoutingInventoryBuilder
         $bestPublishedTs = -1;
 
         foreach ($pagesForRouting as $page) {
-            $channelId = (int) ($page['channel_id'] ?? 0);
+            $channelId = (int) ($page['channel'] ?? 0);
             $channelSlug = trim((string) ($page['channel_slug'] ?? ''));
             if ($channelId !== ChannelRecordPolicy::ROOT_CHANNEL_ID && $channelSlug !== '') {
                 continue;
             }
 
-            if ((int) ($page['is_published'] ?? 0) !== 1) {
+            if (($page['status'] ?? '') !== 'published') {
                 continue;
             }
 
@@ -583,7 +583,7 @@ final class RoutingInventoryBuilder
                 continue;
             }
 
-            $publishedAt = trim((string) ($page['created_at'] ?? ''));
+            $publishedAt = trim((string) ($page['created'] ?? ''));
             $publishedTs = $publishedAt !== '' ? (int) strtotime($publishedAt) : 0;
             if ($publishedTs < 0) {
                 $publishedTs = 0;

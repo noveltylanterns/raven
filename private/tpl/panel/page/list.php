@@ -35,7 +35,7 @@ $prefilterTagId = max(0, (int) $prefilterTagId);
 $pagesStatusOptions = [];
 $pagesChannelOptions = [];
 foreach ($pages as $pageRow) {
-    $statusLabel = (int) ($pageRow['is_published'] ?? 0) === 1 ? 'Published' : 'Draft';
+    $statusLabel = ($pageRow['status'] ?? '') === 'published' ? 'Published' : 'Draft';
     $statusOptionKey = strtolower($statusLabel);
     if (!isset($pagesStatusOptions[$statusOptionKey])) {
         $pagesStatusOptions[$statusOptionKey] = $statusLabel;
@@ -169,7 +169,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                         $rowSlug = (string) ($row['slug'] ?? '');
                         $channelSlug = trim((string) ($row['channel_slug'] ?? ''));
                         $channelLabel = $channelSlug === '' ? '<none>' : $channelSlug;
-                        $statusLabel = (int) ($row['is_published'] ?? 0) === 1 ? 'Published' : 'Draft';
+                        $statusLabel = ($row['status'] ?? '') === 'published' ? 'Published' : 'Draft';
                         $statusBadgeClass = $statusLabel === 'Published' ? 'text-bg-success' : 'text-bg-warning';
                         $rowCategoryIds = [];
                         $rowTagIds = [];

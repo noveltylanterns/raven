@@ -73,8 +73,8 @@ final class PageEditorGalleryHydrator
                     'license' => (string) ($row['image_license'] ?? ''),
                     'focal_x' => $row['image_focal_x'] === null ? null : (float) $row['image_focal_x'],
                     'focal_y' => $row['image_focal_y'] === null ? null : (float) $row['image_focal_y'],
-                    'created_at' => (string) ($row['image_created_at'] ?? ''),
-                    'updated_at' => (string) ($row['image_updated_at'] ?? ''),
+                    'created' => (string) ($row['image_created'] ?? ''),
+                    'updated' => (string) ($row['image_updated'] ?? ''),
                     'variants' => [],
                 ];
                 $orderedImageIds[] = $imageId;

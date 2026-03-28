@@ -48,8 +48,7 @@ final class ContactSubmissionRepository
      *   ip_address: string|null,
      *   hostname?: string|null,
      *   user_agent: string|null,
-     *   created?: string,
-     *   created_at?: string
+     *   created?: string
      * } $data
      */
     public function create(array $data): int
@@ -78,7 +77,7 @@ final class ContactSubmissionRepository
             $additionalFieldsJson = '[]';
         }
 
-        $createdAt = $this->normalizeCreatedAt((string) ($data['created'] ?? $data['created_at'] ?? ''));
+        $createdAt = $this->normalizeCreatedAt((string) ($data['created'] ?? ''));
 
         try {
             $stmt = $this->db->prepare(
@@ -141,7 +140,7 @@ final class ContactSubmissionRepository
     {
         $table = $this->table('ext_contact');
 
-        $sql = 'SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created AS created_at
+        $sql = 'SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created
                 FROM ' . $table . '
                 WHERE form_slug = :form_slug';
         $params = [
@@ -201,10 +200,10 @@ final class ContactSubmissionRepository
                        page_rows.ip_address,
                        page_rows.hostname,
                        page_rows.user_agent,
-                       page_rows.created_at,
+                       page_rows.created,
                        totals.total_rows
                 FROM (
-                    SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created AS created_at
+                    SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created
                     FROM ' . $table . '
                     WHERE form_slug = :page_form_slug'
                     . $pageSearchClause
@@ -267,7 +266,7 @@ final class ContactSubmissionRepository
     {
         $table = $this->table('ext_contact');
 
-        $sql = 'SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created AS created_at
+        $sql = 'SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created
                 FROM ' . $table . '
                 WHERE form_slug = :form_slug';
         $params = [

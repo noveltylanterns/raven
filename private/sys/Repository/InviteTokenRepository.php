@@ -37,16 +37,21 @@ final class InviteTokenRepository
     /**
      * Returns invite-token rows for panel management.
      *
+     * Keys match the physical auth_invites column names: id, token (display value), hint
+     * (first 8 chars of normalised token), reusable (0|1), uses (integer use count),
+     * expires (unix timestamp or null), last_used (unix timestamp or null),
+     * created (datetime string), creator (user id or null).
+     *
      * @return array<int, array{
      *   id: int,
      *   token: string,
-     *   token_hint: string,
-     *   is_reusable: int,
-     *   use_count: int,
-     *   expires_at: int|null,
-     *   last_used_at: int|null,
-     *   created_at: string,
-     *   created_by_user_id: int|null
+     *   hint: string,
+     *   reusable: int,
+     *   uses: int,
+     *   expires: int|null,
+     *   last_used: int|null,
+     *   created: string,
+     *   creator: int|null
      * }>
      */
     public function listForPanel(): array
@@ -61,44 +66,44 @@ final class InviteTokenRepository
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
         foreach ($rows as $row) {
-            $expiresAtRaw = $row['expires'] ?? null;
-            $lastUsedAtRaw = $row['last_used'] ?? null;
-            $createdByRaw = $row['creator'] ?? null;
+            $expiresRaw = $row['expires'] ?? null;
+            $lastUsedRaw = $row['last_used'] ?? null;
+            $creatorRaw = $row['creator'] ?? null;
 
-            $expiresAt = null;
-            if ($expiresAtRaw !== null && $expiresAtRaw !== '') {
-                $expiresAt = max(0, (int) $expiresAtRaw);
-                if ($expiresAt === 0) {
-                    $expiresAt = null;
+            $expires = null;
+            if ($expiresRaw !== null && $expiresRaw !== '') {
+                $expires = max(0, (int) $expiresRaw);
+                if ($expires === 0) {
+                    $expires = null;
                 }
             }
 
-            $lastUsedAt = null;
-            if ($lastUsedAtRaw !== null && $lastUsedAtRaw !== '') {
-                $lastUsedAt = max(0, (int) $lastUsedAtRaw);
-                if ($lastUsedAt === 0) {
-                    $lastUsedAt = null;
+            $lastUsed = null;
+            if ($lastUsedRaw !== null && $lastUsedRaw !== '') {
+                $lastUsed = max(0, (int) $lastUsedRaw);
+                if ($lastUsed === 0) {
+                    $lastUsed = null;
                 }
             }
 
-            $createdByUserId = null;
-            if ($createdByRaw !== null && $createdByRaw !== '') {
-                $createdByUserId = max(0, (int) $createdByRaw);
-                if ($createdByUserId === 0) {
-                    $createdByUserId = null;
+            $creator = null;
+            if ($creatorRaw !== null && $creatorRaw !== '') {
+                $creator = max(0, (int) $creatorRaw);
+                if ($creator === 0) {
+                    $creator = null;
                 }
             }
 
             $result[] = [
                 'id' => (int) ($row['id'] ?? 0),
                 'token' => trim((string) ($row['value'] ?? '')),
-                'token_hint' => trim((string) ($row['hint'] ?? '')),
-                'is_reusable' => (int) ($row['reusable'] ?? 0) === 1 ? 1 : 0,
-                'use_count' => max(0, (int) ($row['uses'] ?? 0)),
-                'expires_at' => $expiresAt,
-                'last_used_at' => $lastUsedAt,
-                'created_at' => trim((string) ($row['created'] ?? '')),
-                'created_by_user_id' => $createdByUserId,
+                'hint' => trim((string) ($row['hint'] ?? '')),
+                'reusable' => (int) ($row['reusable'] ?? 0) === 1 ? 1 : 0,
+                'uses' => max(0, (int) ($row['uses'] ?? 0)),
+                'expires' => $expires,
+                'last_used' => $lastUsed,
+                'created' => trim((string) ($row['created'] ?? '')),
+                'creator' => $creator,
             ];
         }
 
@@ -160,7 +165,10 @@ final class InviteTokenRepository
     /**
      * Finds one usable token row from a submitted token value.
      *
-     * @return array{id: int, is_reusable: int, use_count: int, expires_at: int|null}|null
+     * Returns null when the token does not exist, is expired, or is a spent single-use token.
+     * Keys match physical column names: id, reusable (0|1), uses (count), expires (timestamp or null).
+     *
+     * @return array{id: int, reusable: int, uses: int, expires: int|null}|null
      */
     public function findUsableByToken(string $submittedToken, int $now): ?array
     {
@@ -185,14 +193,14 @@ final class InviteTokenRepository
         }
 
         $id = (int) ($row['id'] ?? 0);
-        $isReusable = (int) ($row['reusable'] ?? 0) === 1 ? 1 : 0;
-        $useCount = max(0, (int) ($row['uses'] ?? 0));
-        $expiresAtRaw = $row['expires'] ?? null;
-        $expiresAt = null;
-        if ($expiresAtRaw !== null && $expiresAtRaw !== '') {
-            $expiresAt = max(0, (int) $expiresAtRaw);
-            if ($expiresAt === 0) {
-                $expiresAt = null;
+        $reusable = (int) ($row['reusable'] ?? 0) === 1 ? 1 : 0;
+        $uses = max(0, (int) ($row['uses'] ?? 0));
+        $expiresRaw = $row['expires'] ?? null;
+        $expires = null;
+        if ($expiresRaw !== null && $expiresRaw !== '') {
+            $expires = max(0, (int) $expiresRaw);
+            if ($expires === 0) {
+                $expires = null;
             }
         }
 
@@ -200,19 +208,19 @@ final class InviteTokenRepository
             return null;
         }
 
-        if ($expiresAt !== null && $expiresAt <= $now) {
+        if ($expires !== null && $expires <= $now) {
             return null;
         }
 
-        if ($isReusable !== 1 && $useCount > 0) {
+        if ($reusable !== 1 && $uses > 0) {
             return null;
         }
 
         return [
             'id' => $id,
-            'is_reusable' => $isReusable,
-            'use_count' => $useCount,
-            'expires_at' => $expiresAt,
+            'reusable' => $reusable,
+            'uses' => $uses,
+            'expires' => $expires,
         ];
     }
 

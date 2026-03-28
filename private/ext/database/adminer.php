@@ -41,7 +41,7 @@ function raven_database_manager_is_absolute_path(string $path): bool
 function raven_database_manager_sqlite_configured_path(array $databaseConfig, string $root): string
 {
     $sqlite = (array) ($databaseConfig['sqlite'] ?? []);
-    $path = trim((string) ($sqlite['path'] ?? ($sqlite['base_path'] ?? '')));
+    $path = trim((string) ($sqlite['path'] ?? ''));
     if ($path === '') {
         return rtrim($root, '/') . '/private/dat/db.sqlite';
     }
@@ -99,8 +99,8 @@ function raven_database_manager_auth_payload(array $databaseConfig, string $root
             'driver' => 'server',
             'server' => $server,
             'username' => trim((string) ($mysql['user'] ?? '')),
-            'password' => (string) ($mysql['pass'] ?? ($mysql['password'] ?? '')),
-            'db' => trim((string) ($mysql['name'] ?? ($mysql['dbname'] ?? ''))),
+            'password' => (string) ($mysql['pass'] ?? ''),
+            'db' => trim((string) ($mysql['name'] ?? '')),
         ];
     }
 
@@ -119,8 +119,8 @@ function raven_database_manager_auth_payload(array $databaseConfig, string $root
             'driver' => 'pgsql',
             'server' => $server,
             'username' => trim((string) ($pgsql['user'] ?? '')),
-            'password' => (string) ($pgsql['pass'] ?? ($pgsql['password'] ?? '')),
-            'db' => trim((string) ($pgsql['name'] ?? ($pgsql['dbname'] ?? ''))),
+            'password' => (string) ($pgsql['pass'] ?? ''),
+            'db' => trim((string) ($pgsql['name'] ?? '')),
         ];
     }
 

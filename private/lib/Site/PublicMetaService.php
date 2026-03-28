@@ -221,7 +221,7 @@ final class PublicMetaService
             return $fallback;
         }
 
-        $profiles = is_array($author['contact_profiles'] ?? null) ? $author['contact_profiles'] : [];
+        $profiles = is_array($author['contact'] ?? null) ? $author['contact'] : [];
         $creator = $this->profileContactService->twitterCreatorFromProfiles($profiles, $profileOptions);
         return $creator !== '' ? $creator : $fallback;
     }

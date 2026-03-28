@@ -49,10 +49,10 @@ final class UserRoutingDataService
                     NULL AS user_id,
                     NULL AS username,
                     NULL AS user_string,
-                    NULL AS display_name,
+                    NULL AS name,
                     NULL AS email,
                     NULL AS theme,
-                    NULL AS avatar_path,
+                    NULL AS avatar,
                     NULL AS user_group_name,
                     NULL AS user_group_permission_mask
                  FROM ' . $groupsTable . ' g
@@ -76,10 +76,10 @@ final class UserRoutingDataService
                     u.id AS user_id,
                     u.username AS username,
                     u.string AS user_string,
-                    u.name AS display_name,
+                    u.name AS name,
                     u.email AS email,
                     u.theme AS theme,
-                    u.avatar AS avatar_path,
+                    u.avatar AS avatar,
                     g.name AS user_group_name,
                     g.permissions AS user_group_permission_mask
                  FROM ' . $usersTable . ' u
@@ -100,10 +100,10 @@ final class UserRoutingDataService
                 user_id,
                 username,
                 user_string,
-                display_name,
+                name,
                 email,
                 theme,
-                avatar_path,
+                avatar,
                 user_group_name,
                 user_group_permission_mask
              FROM (
@@ -157,11 +157,11 @@ final class UserRoutingDataService
                     'id' => $userId,
                     'username' => (string) ($row['username'] ?? ''),
                     'string' => (string) ($row['user_string'] ?? ''),
-                    'display_name' => (string) ($row['display_name'] ?? ''),
+                    'name' => (string) ($row['name'] ?? ''),
                     'email' => (string) ($row['email'] ?? ''),
                     'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
-                    'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                        ? (string) $row['avatar_path']
+                    'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
+                        ? (string) $row['avatar']
                         : null,
                 ];
             }

@@ -21,14 +21,14 @@ final class UserSecurityProfileService
      *   id: int,
      *   username: string,
      *   string: string,
-     *   display_name: string,
+     *   name: string,
      *   email: string,
      *   bio: string,
      *   theme: string,
-     *   avatar_path: string|null,
+     *   avatar: string|null,
      *   cover_image: string|null,
-     *   contact_profiles: array<int, array{type: string, value: string}>,
-     *   two_factor_methods: array<int, array<string, mixed>>
+     *   contact: array<int, array{type: string, value: string}>,
+     *   two_factor: array<int, array<string, mixed>>
      * }
      */
     public function decodeUserPreferencesRow(array $row, AuthPayloadCodec $codec): array
@@ -37,18 +37,18 @@ final class UserSecurityProfileService
             'id' => (int) ($row['id'] ?? 0),
             'username' => (string) ($row['username'] ?? ''),
             'string' => (string) ($row['string'] ?? ''),
-            'display_name' => (string) ($row['display_name'] ?? ''),
+            'name' => (string) ($row['name'] ?? ''),
             'email' => (string) ($row['email'] ?? ''),
             'bio' => (string) ($row['bio'] ?? ''),
             'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
-            'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                ? (string) $row['avatar_path']
+            'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
+                ? (string) $row['avatar']
                 : null,
             'cover_image' => isset($row['cover_image']) && $row['cover_image'] !== ''
                 ? (string) $row['cover_image']
                 : null,
-            'contact_profiles' => $codec->decodeContactProfiles($row['contact_profiles'] ?? null),
-            'two_factor_methods' => $codec->decodeTwoFactorMethods($row['two_factor_methods'] ?? null),
+            'contact' => $codec->decodeContactProfiles($row['contact'] ?? null),
+            'two_factor' => $codec->decodeTwoFactorMethods($row['two_factor'] ?? null),
         ];
     }
 

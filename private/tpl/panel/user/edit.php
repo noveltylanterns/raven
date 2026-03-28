@@ -42,7 +42,7 @@ if (!in_array($loginIdentifierMode, ['email', 'username'], true)) {
 $usernameRequiredForAuth = $loginIdentifierMode === 'username';
 // Shared create/edit derivations keep template branching shallow.
 $userName = trim((string) ($userRow['username'] ?? ''));
-$userDisplayName = trim((string) ($userRow['display_name'] ?? ''));
+$userDisplayName = trim((string) ($userRow['name'] ?? ''));
 $userId = (int) ($userRow['id'] ?? 0);
 $hasPersistedUser = $userId > 0;
 $deleteFormId = 'delete-user-form';
@@ -51,8 +51,8 @@ $profileRoutesEnabled = (bool) ($profileRoutesEnabled ?? false);
 $profileRouteSegment = trim((string) ($profileRouteSegment ?? ''));
 $primaryGroupId = (int) ($primaryGroupId ?? ($userRow['primary_group_id'] ?? 0));
 $secondaryGroupIds = array_map('intval', (array) ($secondaryGroupIds ?? ($userRow['secondary_group_ids'] ?? [])));
-$avatarPath = isset($userRow['avatar_path']) && is_string($userRow['avatar_path'])
-    ? $userRow['avatar_path']
+$avatarPath = isset($userRow['avatar']) && is_string($userRow['avatar'])
+    ? $userRow['avatar']
     : null;
 $coverImage = trim((string) ($userRow['cover_image'] ?? ''));
 $avatarTemplateData = is_array($avatarTemplateData ?? null) ? $avatarTemplateData : ['filename' => '', 'url' => '', 'thumb_url' => ''];
@@ -62,7 +62,7 @@ $avatarThumbUrl = (string) ($avatarTemplateData['thumb_url'] ?? '');
 $coverImageUrl = trim((string) ($coverImageUrl ?? ''));
 $profileContactOptions = is_array($profileContactOptions ?? null) ? $profileContactOptions : [];
 $twoFactorTypeOptions = is_array($twoFactorTypeOptions ?? null) ? $twoFactorTypeOptions : [];
-$contactProfilesRaw = is_array($userRow['contact_profiles'] ?? null) ? $userRow['contact_profiles'] : [];
+$contactProfilesRaw = is_array($userRow['contact'] ?? null) ? $userRow['contact'] : [];
 $contactProfiles = [];
 foreach ($contactProfilesRaw as $entry) {
     if (!is_array($entry)) {
@@ -84,7 +84,7 @@ foreach ($contactProfilesRaw as $entry) {
         'value' => $value,
     ];
 }
-$twoFactorMethodsRaw = is_array($userRow['two_factor_methods'] ?? null) ? $userRow['two_factor_methods'] : [];
+$twoFactorMethodsRaw = is_array($userRow['two_factor'] ?? null) ? $userRow['two_factor'] : [];
 $maskMiddle = static function (string $value, int $edgeChars = 10): string {
     $value = trim($value);
     if ($value === '') {
@@ -328,7 +328,7 @@ $themeLabels = [
 
             <div class="form-group">
                 <label for="display_name" class="form-label">Display Name</label>
-                <input id="display_name" name="display_name" class="form-control" value="<?= e((string) ($userRow['display_name'] ?? '')) ?>">
+                <input id="display_name" name="display_name" class="form-control" value="<?= e((string) ($userRow['name'] ?? '')) ?>">
             </div>
 
             <div class="form-group">
@@ -509,7 +509,7 @@ $themeLabels = [
                                     >
                                         <?php foreach ($profileContactOptions as $optionSlug => $optionData): ?>
                                             <?php $optionLabel = (string) ($optionData['label'] ?? $optionSlug); ?>
-                                            <?php $optionPrefix = (string) ($optionData['prefix'] ?? $optionData['url_prefix'] ?? ''); ?>
+                                            <?php $optionPrefix = (string) ($optionData['prefix'] ?? ''); ?>
                                             <option
                                                 value="<?= e((string) $optionSlug) ?>"
                                                 data-url-prefix="<?= e($optionPrefix) ?>"
@@ -726,7 +726,7 @@ $themeLabels = [
                 <select class="form-select" data-user-contact-key="type">
                     <?php foreach ($profileContactOptions as $optionSlug => $optionData): ?>
                         <?php $optionLabel = (string) ($optionData['label'] ?? $optionSlug); ?>
-                        <?php $optionPrefix = (string) ($optionData['prefix'] ?? $optionData['url_prefix'] ?? ''); ?>
+                        <?php $optionPrefix = (string) ($optionData['prefix'] ?? ''); ?>
                         <option value="<?= e((string) $optionSlug) ?>" data-url-prefix="<?= e($optionPrefix) ?>"><?= e($optionLabel) ?></option>
                     <?php endforeach; ?>
                 </select>

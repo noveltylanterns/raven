@@ -17,10 +17,6 @@ final class ManifestContractValidator
     public function normalizeType(string $type): string
     {
         $type = strtolower(trim($type));
-        if ($type === 'plugin') {
-            return 'content';
-        }
-
         if (!in_array($type, ['helper', 'content', 'framework', 'module', 'system'], true)) {
             return 'content';
         }

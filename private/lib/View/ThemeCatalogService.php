@@ -51,7 +51,7 @@ final class ThemeCatalogService
 
     public function activeSlugFromConfig(Config $config): string
     {
-        $configured = strtolower($this->input->text((string) $config->get('site.theme', $config->get('site.default_theme', 'raven')), 80));
+        $configured = strtolower($this->input->text((string) $config->get('site.theme', 'raven'), 80));
         $options = $this->options();
 
         if (isset($options[$configured])) {

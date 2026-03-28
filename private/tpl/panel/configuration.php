@@ -483,8 +483,7 @@ if (is_array($rawProfileContactOptions)) {
         $urlPrefix = '';
         if (is_array($optionConfig)) {
             $label = trim((string) ($optionConfig['label'] ?? ''));
-            // Accept both new `prefix` key and legacy `url_prefix` key.
-            $urlPrefix = trim((string) ($optionConfig['prefix'] ?? $optionConfig['url_prefix'] ?? ''));
+            $urlPrefix = trim((string) ($optionConfig['prefix'] ?? ''));
         } else {
             $label = trim((string) $optionConfig);
         }

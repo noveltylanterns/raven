@@ -14,7 +14,7 @@ final class PanelPageAuthorOptionBuilder
     /**
      * @param array<int, mixed> $users
      * @param callable(string): ?string $normalizeIdentifier
-     * @return array<int, array{id: int, username: string, display_name: string}>
+     * @return array<int, array{id: int, username: string, name: string}>
      */
     public function build(array $users, InputSanitizer $input, callable $normalizeIdentifier): array
     {
@@ -37,14 +37,14 @@ final class PanelPageAuthorOptionBuilder
             $options[$userId] = [
                 'id' => $userId,
                 'username' => $username,
-                'display_name' => $input->text((string) ($entry['display_name'] ?? ''), 120),
+                'name' => $input->text((string) ($entry['name'] ?? ''), 120),
             ];
         }
 
         $options = array_values($options);
         usort($options, static function (array $left, array $right): int {
-            $leftLabel = strtolower(trim((string) (($left['display_name'] ?? '') ?: ($left['username'] ?? ''))));
-            $rightLabel = strtolower(trim((string) (($right['display_name'] ?? '') ?: ($right['username'] ?? ''))));
+            $leftLabel = strtolower(trim((string) (($left['name'] ?? '') ?: ($left['username'] ?? ''))));
+            $rightLabel = strtolower(trim((string) (($right['name'] ?? '') ?: ($right['username'] ?? ''))));
             if ($leftLabel !== $rightLabel) {
                 return $leftLabel <=> $rightLabel;
             }

@@ -18,7 +18,7 @@ final class DsnBuilder
             'mysql:host=%s;port=%d;dbname=%s;charset=%s',
             (string) ($mysql['host'] ?? '127.0.0.1'),
             (int) ($mysql['port'] ?? 3306),
-            (string) ($mysql['name'] ?? ($mysql['dbname'] ?? 'raven')),
+            (string) ($mysql['name'] ?? 'raven'),
             (string) ($mysql['charset'] ?? 'utf8mb4')
         );
     }
@@ -32,7 +32,7 @@ final class DsnBuilder
             'pgsql:host=%s;port=%d;dbname=%s',
             (string) ($pgsql['host'] ?? '127.0.0.1'),
             (int) ($pgsql['port'] ?? 5432),
-            (string) ($pgsql['name'] ?? ($pgsql['dbname'] ?? 'raven'))
+            (string) ($pgsql['name'] ?? 'raven')
         );
     }
 }

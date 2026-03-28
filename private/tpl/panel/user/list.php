@@ -154,7 +154,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                         <?php
                         $userId = (int) ($user['id'] ?? 0);
                         $username = (string) ($user['username'] ?? '');
-                        $displayName = (string) ($user['display_name'] ?? '');
+                        $displayName = (string) ($user['name'] ?? '');
                         $email = (string) ($user['email'] ?? '');
                         $groupsText = (string) ($user['groups_text'] ?? '');
                         /** @var mixed $rawGroupEntries */

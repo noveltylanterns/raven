@@ -10,7 +10,7 @@
 declare(strict_types=1);
 
 /** @var array{name: string, slug: string, enabled: bool} $formData */
-/** @var array<int, array{id: int, sender_name: string, sender_email: string, message_text: string, additional_fields_json: string, source_url: string, ip_address: string|null, hostname: string|null, user_agent: string|null, created_at: string}> $submissions */
+/** @var array<int, array{id: int, sender_name: string, sender_email: string, message_text: string, additional_fields_json: string, source_url: string, ip_address: string|null, hostname: string|null, user_agent: string|null, created: string}> $submissions */
 /** @var string $searchQuery */
 /** @var array{current: int, total_pages: int, total_items: int, base_path: string} $pagination */
 /** @var string $indexPath */
@@ -153,7 +153,7 @@ $submissionsEmptyId = 'contact-submissions-filter-empty';
                             $hostname,
                             trim((string) ($submission['user_agent'] ?? '')),
                             implode(' ', $additionalSearchValues),
-                            (string) ($submission['created_at'] ?? ''),
+                            (string) ($submission['created'] ?? ''),
                         ]);
                         ?>
                         <tr
@@ -179,7 +179,7 @@ $submissionsEmptyId = 'contact-submissions-filter-empty';
                                     <code><?= e($senderEmail) ?></code>
                                 <?php endif; ?>
                             </td>
-                            <td><?= e((string) ($submission['created_at'] ?? '')) ?></td>
+                            <td><?= e((string) ($submission['created'] ?? '')) ?></td>
                             <td class="text-center">
                                 <form method="post" action="<?= e($deleteSubmissionPath) ?>" class="d-inline m-0" onsubmit="return confirm('Delete this submission?');">
                                     <?= $csrfField ?>

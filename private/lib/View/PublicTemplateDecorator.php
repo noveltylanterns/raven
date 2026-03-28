@@ -81,9 +81,9 @@ final class PublicTemplateDecorator
             || (int) ($page['display_title'] ?? 1) === 1;
         unset($page['show_title']);
 
-        if (array_key_exists('channel_id', $page)) {
-            $channelId = (int) ($page['channel_id'] ?? 0);
-            $page['channel_id'] = max(0, $channelId);
+        if (array_key_exists('channel', $page)) {
+            $channelId = (int) ($page['channel'] ?? 0);
+            $page['channel'] = max(0, $channelId);
         }
 
         $rawBlocks = is_array($page['content_blocks'] ?? null) ? $page['content_blocks'] : [];
@@ -157,18 +157,18 @@ final class PublicTemplateDecorator
      */
     public function decorateProfileForTemplate(array $profile): array
     {
-        $displayName = trim((string) ($profile['display_name'] ?? ''));
+        $displayName = trim((string) ($profile['name'] ?? ''));
         $username = $this->publicTemplateUsername((string) ($profile['username'] ?? ''));
         $profile['name'] = $displayName !== '' ? $displayName : $username;
         $profile['username'] = $username;
 
-        $avatar = $this->avatarTemplateDataFromPath((string) ($profile['avatar_path'] ?? ''));
+        $avatar = $this->avatarTemplateDataFromPath((string) ($profile['avatar'] ?? ''));
         $profile['avatar_filename'] = $avatar['filename'];
         $profile['avatar_full'] = $avatar['url'];
         $profile['avatar_thumb'] = $avatar['thumb_url'];
         $profile['avatar'] = $avatar['filename'] !== '';
 
-        $contacts = is_array($profile['contact_profiles'] ?? null) ? $profile['contact_profiles'] : [];
+        $contacts = is_array($profile['contact'] ?? null) ? $profile['contact'] : [];
         $contactValues = [];
         foreach ($contacts as $index => $contact) {
             if (!is_array($contact)) {
@@ -191,7 +191,7 @@ final class PublicTemplateDecorator
             $profile['avatar_url'],
             $profile['avatar_thumb_url'],
             $profile['has_avatar'],
-            $profile['contact_profiles']
+            $profile['contact']
         );
 
         return $profile;
@@ -208,12 +208,12 @@ final class PublicTemplateDecorator
                 continue;
             }
 
-            $displayName = trim((string) ($member['display_name'] ?? ''));
+            $displayName = trim((string) ($member['name'] ?? ''));
             $username = $this->publicTemplateUsername((string) ($member['username'] ?? ''));
             $members[$index]['name'] = $displayName !== '' ? $displayName : $username;
             $members[$index]['username'] = $username;
 
-            $avatar = $this->avatarTemplateDataFromPath((string) ($member['avatar_path'] ?? ''));
+            $avatar = $this->avatarTemplateDataFromPath((string) ($member['avatar'] ?? ''));
             $members[$index]['avatar_filename'] = $avatar['filename'];
             $members[$index]['avatar_full'] = $avatar['url'];
             $members[$index]['avatar_thumb'] = $avatar['thumb_url'];
@@ -374,7 +374,7 @@ final class PublicTemplateDecorator
                 }
             }
         } elseif (is_array($data['profile'] ?? null)) {
-            $profileName = trim((string) ($data['profile']['name'] ?? $data['profile']['display_name'] ?? ''));
+            $profileName = trim((string) ($data['profile']['name'] ?? ''));
             if ($profileName === '') {
                 $profileName = trim((string) ($data['profile']['username'] ?? ''));
             }

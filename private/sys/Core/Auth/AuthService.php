@@ -65,12 +65,12 @@ final class AuthService
      *   id: int,
      *   username: string,
      *   string: string,
-     *   display_name: string,
+     *   name: string,
      *   email: string,
      *   theme: string,
-     *   avatar_path: string|null,
-     *   contact_profiles: array<int, array{type: string, value: string}>,
-     *   two_factor_methods: array<int, array<string, mixed>>
+     *   avatar: string|null,
+     *   contact: array<int, array{type: string, value: string}>,
+     *   two_factor: array<int, array<string, mixed>>
      * }|null>
      */
     private array $userPreferencesCache = [];
@@ -293,8 +293,8 @@ final class AuthService
             return [];
         }
 
-        $methods = is_array($preferences['two_factor_methods'] ?? null)
-            ? $preferences['two_factor_methods']
+        $methods = is_array($preferences['two_factor'] ?? null)
+            ? $preferences['two_factor']
             : [];
         return $this->securityProfiles->interactiveTwoFactorMethods($methods, (string) ($preferences['email'] ?? ''));
     }
@@ -423,8 +423,8 @@ final class AuthService
             return;
         }
 
-        $methods = is_array($preferences['two_factor_methods'] ?? null)
-            ? $preferences['two_factor_methods']
+        $methods = is_array($preferences['two_factor'] ?? null)
+            ? $preferences['two_factor']
             : [];
         $mutation = $this->securityProfiles->withUpdatedWebauthnSignatureCounter(
             $methods,
@@ -475,14 +475,14 @@ final class AuthService
      *   id: int,
      *   username: string,
      *   string: string,
-     *   display_name: string,
+     *   name: string,
      *   email: string,
      *   bio: string,
      *   theme: string,
-     *   avatar_path: string|null,
+     *   avatar: string|null,
      *   cover_image: string|null,
-     *   contact_profiles: array<int, array{type: string, value: string}>,
-     *   two_factor_methods: array<int, array<string, mixed>>
+     *   contact: array<int, array{type: string, value: string}>,
+     *   two_factor: array<int, array<string, mixed>>
      * }|null
      */
     public function userPreferences(int $userId): ?array
@@ -495,14 +495,14 @@ final class AuthService
             'SELECT id,
                     username,
                     string,
-                    name AS display_name,
+                    name,
                     email,
                     bio,
                     theme,
-                    avatar AS avatar_path,
+                    avatar,
                     cover_image,
-                    contact AS contact_profiles,
-                    two_factor AS two_factor_methods
+                    contact,
+                    two_factor
              FROM ' . $this->authTable('users') . '
              WHERE id = :id
              LIMIT 1'

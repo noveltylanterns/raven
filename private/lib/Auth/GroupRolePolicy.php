@@ -18,8 +18,6 @@ final class GroupRolePolicy
         'guest',
         'validating',
         'banned',
-        'super',   // legacy slug — kept as stock to prevent deletion on unmigrated installs
-        'editor',  // legacy slug — kept as stock to prevent deletion on unmigrated installs
     ];
 
     public function normalizeSlug(string $value): string
@@ -65,38 +63,35 @@ final class GroupRolePolicy
 
     public function isAdminRoleSlug(string $slug): bool
     {
-        $normalized = strtolower(trim($slug));
-        // 'super' is the legacy slug for the Admin group; treat it the same.
-        return $normalized === 'admin' || $normalized === 'super';
+        return strtolower(trim($slug)) === 'admin';
     }
 
     /**
-     * @deprecated Legacy alias — 'editor' group is being removed.
-     */
-    public function isEditorRoleSlug(string $slug): bool
-    {
-        return strtolower(trim($slug)) === 'editor';
-    }
-
-    /**
-     * @return array{route_enabled: int, permission_mask: int}
+     * Returns enforced route and permissions values for a stock role slug.
+     * Stock roles have fixed constraints (e.g. guest/validating cannot have route access;
+     * admin always receives the full permission mask).
+     *
+     * @param string $roleSlug     The group slug to evaluate.
+     * @param int    $routeEnabled Caller-supplied route_enabled value (0 or 1).
+     * @param int    $mask         Caller-supplied permissions bitmask.
+     * @return array{route: int, permissions: int}
      */
     public function normalizeStockRoleSettings(string $roleSlug, int $routeEnabled, int $mask): array
     {
         $normalizedSlug = strtolower(trim($roleSlug));
-        $resolvedRouteEnabled = $routeEnabled > 0 ? 1 : 0;
+        $resolvedRoute = $routeEnabled > 0 ? 1 : 0;
         $resolvedMask = $mask;
 
         if ($this->isBannedRoleSlug($normalizedSlug)) {
-            $resolvedRouteEnabled = 0;
+            $resolvedRoute = 0;
             $resolvedMask = 0;
         } elseif ($this->isGuestLikeRoleSlug($normalizedSlug)) {
-            $resolvedRouteEnabled = 0;
+            $resolvedRoute = 0;
             $resolvedMask &= PanelAccess::VIEW_PUBLIC_SITE;
         } elseif ($this->isUserRoleSlug($normalizedSlug)) {
             $resolvedMask &= (PanelAccess::VIEW_PUBLIC_SITE | PanelAccess::VIEW_PRIVATE_SITE);
         } elseif ($this->isAdminRoleSlug($normalizedSlug)) {
-            // Admin (and legacy 'super') always get the full permission mask.
+            // Admin group always gets the full permission mask.
             $resolvedMask = (
                 PanelAccess::VIEW_PUBLIC_SITE
                 | PanelAccess::VIEW_PRIVATE_SITE
@@ -109,13 +104,11 @@ final class GroupRolePolicy
                 | PanelAccess::MANAGE_CONFIGURATION
                 | PanelAccess::allStockPanelBitsMask()
             );
-        } elseif ($this->isEditorRoleSlug($normalizedSlug)) {
-            // Legacy 'editor' group: preserve existing mask unchanged on save (no longer seeded).
         }
 
         return [
-            'route_enabled' => $resolvedRouteEnabled,
-            'permission_mask' => $this->normalizeMaskForPanelAccess($resolvedMask),
+            'route'       => $resolvedRoute,
+            'permissions' => $this->normalizeMaskForPanelAccess($resolvedMask),
         ];
     }
 

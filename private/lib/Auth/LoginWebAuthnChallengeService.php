@@ -67,7 +67,7 @@ final class LoginWebAuthnChallengeService
         }
 
         $resolvedMethod = $flow->resolveRegisteredWebauthnMethod(
-            (array) ($preferences['two_factor_methods'] ?? []),
+            (array) ($preferences['two_factor'] ?? []),
             $selectedCredentialIdB64
         );
         if (!is_array($resolvedMethod)) {
@@ -146,7 +146,7 @@ final class LoginWebAuthnChallengeService
         $credentialPublicKey = '';
         $requiresUserVerification = false;
         $previousSignatureCounter = 0;
-        foreach ((array) ($preferences['two_factor_methods'] ?? []) as $method) {
+        foreach ((array) ($preferences['two_factor'] ?? []) as $method) {
             if (!is_array($method)) {
                 continue;
             }

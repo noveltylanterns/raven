@@ -226,7 +226,7 @@ final class PublicController
             $channelRouteMode = $this->effectiveChannelRouteMode((string) ($channel['route_mode'] ?? 'inherit'));
             $channelWordSeparator = $this->publicChannelPageRouteService()->resolveWordSeparator(
                 (string) ($channel['route_separator'] ?? 'inherit'),
-                (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
+                (string) $this->config->get('content.separator', '-')
             );
 
             $lookupTarget = $this->publicChannelPageRouteService()->resolveLookupTarget(
@@ -251,7 +251,7 @@ final class PublicController
             $lookupTarget = $this->publicChannelPageRouteService()->resolveLookupTarget(
                 $requestedSlug,
                 $channelRouteMode,
-                (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
+                (string) $this->config->get('content.separator', '-')
             );
             if (!is_array($lookupTarget)) {
                 if ($this->tryRedirect($requestedSlug, null)) {
@@ -287,10 +287,10 @@ final class PublicController
         $canonicalSegment = $this->publicChannelPageRouteService()->canonicalSegment(
             (string) ($page['slug'] ?? ''),
             (int) ($page['id'] ?? 0),
-            (string) ($page['created_at'] ?? ''),
+            (string) ($page['created'] ?? ''),
             $channelRouteMode,
             $channelWordSeparator,
-            (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
+            (string) $this->config->get('content.separator', '-')
         );
         if ($channelSlug !== null) {
             if ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedSlug) !== 0) {
@@ -345,10 +345,10 @@ final class PublicController
                 $rootSegment = $this->publicChannelPageRouteService()->canonicalSegment(
                     $slug,
                     $pageId,
-                    (string) ($page['created_at'] ?? ''),
+                    (string) ($page['created'] ?? ''),
                     $this->globalPageRouteMode(),
                     'inherit',
-                    (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
+                    (string) $this->config->get('content.separator', '-')
                 );
                 $pages[$index]['url'] = '/' . rawurlencode($rootSegment !== '' ? $rootSegment : $slug);
                 continue;
@@ -361,10 +361,10 @@ final class PublicController
                     $this->publicChannelPageRouteService()->canonicalSegment(
                         $slug,
                         $pageId,
-                        (string) ($page['created_at'] ?? ''),
+                        (string) ($page['created'] ?? ''),
                         $this->effectiveChannelRouteMode((string) ($page['route_mode_effective'] ?? 'inherit')),
                         (string) ($page['route_separator_effective'] ?? 'inherit'),
-                        (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
+                        (string) $this->config->get('content.separator', '-')
                     )
                 );
         }
@@ -647,7 +647,7 @@ final class PublicController
             }
 
             $description = trim((string) ($page['description'] ?? ''));
-            $createdAt = trim((string) ($page['created_at'] ?? ''));
+            $createdAt = trim((string) ($page['created'] ?? ''));
 
             $timestamp = strtotime($createdAt);
             if ($timestamp === false || $timestamp < 1) {
@@ -1348,7 +1348,7 @@ final class PublicController
 
             if (is_array($usableInvite)) {
                 $inviteId = (int) ($usableInvite['id'] ?? 0);
-                $isReusable = (int) ($usableInvite['is_reusable'] ?? 0) === 1;
+                $isReusable = (int) ($usableInvite['reusable'] ?? 0) === 1;
                 if ($inviteId < 1 || !$this->inviteTokens->consume($inviteId, $isReusable, $now)) {
                     if (is_int($savedUserId) && $savedUserId > 0) {
                         try {

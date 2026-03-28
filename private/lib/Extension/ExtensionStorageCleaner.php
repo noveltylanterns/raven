@@ -36,18 +36,6 @@ final class ExtensionStorageCleaner
         $this->directoryTreeService = $directoryTreeService ?? new DirectoryTreeService();
     }
 
-    public function deleteStorage(string $directoryName, bool $deleteLocalStorage, bool $deleteDbStorage): void
-    {
-        $this->deleteStorageByContract($directoryName, [
-            'local' => $deleteLocalStorage,
-            'table' => $deleteDbStorage,
-            'tables' => [],
-            'aux' => [],
-            'panel' => false,
-            'public' => false,
-        ]);
-    }
-
     /**
      * @param array{
      *   local?: bool,

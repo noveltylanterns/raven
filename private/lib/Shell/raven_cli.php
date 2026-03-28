@@ -2048,7 +2048,7 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
 
         if ($action === 'set') {
             $key = raven_cli_required_scalar_option($options, 'key', 'Missing required --key option.', 'k');
-            if ($key === 'site.theme' || $key === 'site.default_theme') {
+            if ($key === 'site.theme') {
                 throw new RuntimeException('site.theme is managed by Theme Manager/rvn-theme. Use: private/bin/rvn-theme enable --slug <slug>');
             }
             $valueRaw = raven_cli_option($options, 'value', null, 'v');
@@ -2648,7 +2648,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 $loadedConfig = require $configPath;
                 if (is_array($loadedConfig)) {
                     $site = is_array($loadedConfig['site'] ?? null) ? $loadedConfig['site'] : [];
-                    $activeTheme = strtolower(trim((string) ($site['theme'] ?? ($site['default_theme'] ?? ''))));
+                    $activeTheme = strtolower(trim((string) ($site['theme'] ?? '')));
                 }
             }
 
@@ -2867,7 +2867,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 throw new RuntimeException('Config service unavailable.');
             }
 
-            $current = strtolower(trim((string) $rvn['config']->get('site.theme', $rvn['config']->get('site.default_theme', 'raven'))));
+            $current = strtolower(trim((string) $rvn['config']->get('site.theme', 'raven')));
             if ($current === $slug) {
                 throw new RuntimeException('Active theme cannot be uninstalled. Activate another theme first.');
             }

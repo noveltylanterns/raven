@@ -31,8 +31,8 @@ if (!in_array($loginIdentifierMode, ['email', 'username'], true)) {
     $loginIdentifierMode = 'email';
 }
 $usernameRequiredForAuth = $loginIdentifierMode === 'username';
-$avatarPath = isset($preferences['avatar_path']) && is_string($preferences['avatar_path'])
-    ? $preferences['avatar_path']
+$avatarPath = isset($preferences['avatar']) && is_string($preferences['avatar'])
+    ? $preferences['avatar']
     : null;
 $coverImage = trim((string) ($preferences['cover_image'] ?? ''));
 $avatarTemplateData = is_array($avatarTemplateData ?? null) ? $avatarTemplateData : ['filename' => '', 'url' => '', 'thumb_url' => ''];
@@ -42,7 +42,7 @@ $avatarThumbUrl = (string) ($avatarTemplateData['thumb_url'] ?? '');
 $coverImageUrl = trim((string) ($coverImageUrl ?? ''));
 $profileContactOptions = is_array($profileContactOptions ?? null) ? $profileContactOptions : [];
 $twoFactorTypeOptions = is_array($twoFactorTypeOptions ?? null) ? $twoFactorTypeOptions : [];
-$contactProfilesRaw = is_array($preferences['contact_profiles'] ?? null) ? $preferences['contact_profiles'] : [];
+$contactProfilesRaw = is_array($preferences['contact'] ?? null) ? $preferences['contact'] : [];
 $contactProfiles = [];
 foreach ($contactProfilesRaw as $entry) {
     if (!is_array($entry)) {
@@ -66,7 +66,7 @@ foreach ($contactProfilesRaw as $entry) {
 }
 $requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
 $activeTab = in_array($requestedTab, ['account', 'profile', 'security'], true) ? $requestedTab : 'account';
-$twoFactorMethodsRaw = is_array($preferences['two_factor_methods'] ?? null) ? $preferences['two_factor_methods'] : [];
+$twoFactorMethodsRaw = is_array($preferences['two_factor'] ?? null) ? $preferences['two_factor'] : [];
 $twoFactorMethods = [];
 foreach ($twoFactorMethodsRaw as $methodRow) {
     if (!is_array($methodRow)) {
@@ -1614,7 +1614,7 @@ $themeLabels = [
                 <input class="form-control"
                     id="display_name"
                     name="display_name"
-                    value="<?= e((string) ($preferences['display_name'] ?? '')) ?>"
+                    value="<?= e((string) ($preferences['name'] ?? '')) ?>"
                 >
             </div>
 
@@ -1725,7 +1725,7 @@ $themeLabels = [
                                     >
                                         <?php foreach ($profileContactOptions as $optionSlug => $optionData): ?>
                                             <?php $optionLabel = (string) ($optionData['label'] ?? $optionSlug); ?>
-                                            <?php $optionPrefix = (string) ($optionData['prefix'] ?? $optionData['url_prefix'] ?? ''); ?>
+                                            <?php $optionPrefix = (string) ($optionData['prefix'] ?? ''); ?>
                                             <option
                                                 value="<?= e((string) $optionSlug) ?>"
                                                 data-url-prefix="<?= e($optionPrefix) ?>"
@@ -2104,7 +2104,7 @@ $themeLabels = [
                 <select class="form-select" data-preferences-contact-key="type">
                     <?php foreach ($profileContactOptions as $optionSlug => $optionData): ?>
                         <?php $optionLabel = (string) ($optionData['label'] ?? $optionSlug); ?>
-                        <?php $optionPrefix = (string) ($optionData['prefix'] ?? $optionData['url_prefix'] ?? ''); ?>
+                        <?php $optionPrefix = (string) ($optionData['prefix'] ?? ''); ?>
                         <option value="<?= e((string) $optionSlug) ?>" data-url-prefix="<?= e($optionPrefix) ?>"><?= e($optionLabel) ?></option>
                     <?php endforeach; ?>
                 </select>

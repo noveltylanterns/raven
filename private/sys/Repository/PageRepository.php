@@ -555,9 +555,7 @@ final class PageRepository
         );
 
         $stmt = $this->db->prepare(
-            'SELECT p.id, p.title, p.slug, p.status,
-                    CASE WHEN p.status = \'published\' THEN 1 ELSE 0 END AS is_published,
-                    p.created AS created_at, p.channel AS channel_id
+            'SELECT p.id, p.title, p.slug, p.status, p.created, p.channel
              FROM ' . $pages . ' p
              WHERE ' . implode(' AND ', $where) . '
              ORDER BY p.created DESC
@@ -638,14 +636,11 @@ final class PageRepository
                     page_rows.title,
                     page_rows.slug,
                     page_rows.status,
-                    page_rows.is_published,
-                    page_rows.created_at,
-                    page_rows.channel_id,
+                    page_rows.created,
+                    page_rows.channel,
                     totals.total_rows
              FROM (
-                 SELECT p.id, p.title, p.slug, p.status,
-                        CASE WHEN p.status = \'published\' THEN 1 ELSE 0 END AS is_published,
-                        p.created AS created_at, p.channel AS channel_id
+                 SELECT p.id, p.title, p.slug, p.status, p.created, p.channel
                  FROM ' . $pages . ' p
                  WHERE ' . implode(' AND ', $pageWhere) . '
                  ORDER BY p.created DESC
@@ -702,9 +697,7 @@ final class PageRepository
         $pages = $this->table('pages');
 
         $stmt = $this->db->prepare(
-            'SELECT p.id, p.title, p.slug, p.status,
-                    CASE WHEN p.status = \'published\' THEN 1 ELSE 0 END AS is_published,
-                    p.created AS created_at, p.channel AS channel_id
+            'SELECT p.id, p.title, p.slug, p.status, p.created, p.channel
              FROM ' . $pages . ' p
              ORDER BY COALESCE(p.channel, 0) ASC, p.slug ASC, p.id ASC'
         );
@@ -741,7 +734,7 @@ final class PageRepository
         }
 
         $stmt = $this->db->prepare(
-            'SELECT p.channel AS channel_id, p.slug
+            'SELECT p.channel, p.slug
              FROM ' . $pages . ' p
              WHERE p.channel IS NOT NULL
                AND p.channel <> 0
@@ -761,7 +754,7 @@ final class PageRepository
         $rows = $stmt->fetchAll() ?: [];
         $seen = [];
         foreach ($rows as $row) {
-            $channelId = (int) ($row['channel_id'] ?? 0);
+            $channelId = (int) ($row['channel'] ?? 0);
             if ($channelId < 1 || isset($seen[$channelId]) || !isset($channelsById[$channelId])) {
                 continue;
             }
@@ -842,8 +835,8 @@ final class PageRepository
                 i.license AS image_license,
                 i.focal_x AS image_focal_x,
                 i.focal_y AS image_focal_y,
-                i.created AS image_created_at,
-                i.updated AS image_updated_at,
+                i.created AS image_created,
+                i.updated AS image_updated,
                 v.variant_key AS variant_key,
                 v.stored_filename AS variant_stored_filename,
                 v.stored_path AS variant_stored_path,
@@ -887,9 +880,6 @@ final class PageRepository
         $description = (string) ($data['description'] ?? '');
         $displayTitle = !array_key_exists('display_title', $data) || !empty($data['display_title']) ? 1 : 0;
         $status = strtolower(trim((string) ($data['status'] ?? '')));
-        if ($status === '') {
-            $status = !empty($data['is_published']) ? 'published' : 'draft';
-        }
         if (!in_array($status, ['published', 'draft'], true)) {
             $status = 'draft';
         }
@@ -1348,21 +1338,9 @@ final class PageRepository
      */
     private function hydratePageRow(array $row): array
     {
-        if (!array_key_exists('channel_id', $row) && array_key_exists('channel', $row)) {
-            $row['channel_id'] = (int) ($row['channel'] ?? 0);
-        }
         if (!array_key_exists('author_user_id', $row) && array_key_exists('author', $row)) {
             $author = (int) ($row['author'] ?? 0);
             $row['author_user_id'] = $author > 0 ? $author : null;
-        }
-        if (!array_key_exists('is_published', $row)) {
-            $row['is_published'] = strtolower(trim((string) ($row['status'] ?? 'draft'))) === 'published' ? 1 : 0;
-        }
-        if (!array_key_exists('created_at', $row) && array_key_exists('created', $row)) {
-            $row['created_at'] = (string) ($row['created'] ?? '');
-        }
-        if (!array_key_exists('updated_at', $row) && array_key_exists('updated', $row)) {
-            $row['updated_at'] = (string) ($row['updated'] ?? '');
         }
         if (!array_key_exists('gallery_enabled', $row)) {
             $row['gallery_enabled'] = 0;
@@ -1458,7 +1436,7 @@ final class PageRepository
     {
         $resolvedChannel = $channel;
         if ($resolvedChannel === null) {
-            $channelId = (int) ($row['channel_id'] ?? 0);
+            $channelId = (int) ($row['channel'] ?? 0);
             if ($channelId > 0) {
                 $channelsById ??= $this->channelsByIdMap();
                 $resolvedChannel = $channelsById[$channelId] ?? null;

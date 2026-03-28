@@ -28,32 +28,24 @@ final class SchemaEnsurePipeline
         // App schema first so auth/group seeding can rely on group tables.
         $components->rvnSchemaBootstrap()->ensureRvnSchema($rvnDb, $driver, $prefix);
         $rvnSchemaBuilder->ensureRootChannelScope($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->migratePageContentStorage($rvnDb, $driver, $prefix);
         $rvnSchemaBuilder->ensurePageScheduleColumns($rvnDb, $driver, $prefix);
         $rvnSchemaBuilder->ensurePageDescriptionColumn($rvnDb, $driver, $prefix);
         $rvnSchemaBuilder->ensurePageDisplayTitleColumn($rvnDb, $driver, $prefix);
         $rvnSchemaBuilder->ensurePageGalleryEnabledColumn($rvnDb, $driver, $prefix);
         $rvnSchemaBuilder->ensurePageSlugScopeUniqueness($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->ensurePageImageDisplayColumns($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->migratePageTaxonomyPivots($rvnDb, $driver, $prefix);
         $rvnSchemaBuilder->ensureRedirectDescriptionColumn($rvnDb, $driver, $prefix);
         $rvnSchemaBuilder->ensureGroupRoutingColumns($rvnDb, $driver, $prefix);
         $rvnSchemaBuilder->ensureTaxonomySetColumns($rvnDb, $driver, $prefix);
         $rvnSchemaBuilder->ensureTaxonomyImageColumns($rvnDb, $driver, $prefix);
         $rvnSchemaBuilder->ensureTaxonomyIconColumn($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->migrateUserGroupPivot($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->migrateLoginFailureStorage($rvnDb, $driver, $prefix);
         $rvnSchemaBuilder->ensurePanelPerformanceIndexes($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->dropLegacyChannelTable($rvnDb, $driver, $prefix);
         $components->extensionSchemaRunner()->ensureEnabledExtensionSchemas($rvnDb, $driver, $prefix);
 
         // Auth schema must exist before user/group relationship seeding.
         $authSchemaBuilder->ensureAuthSchema($authDb, $driver, $prefix);
         $authSchemaBuilder->ensureInviteTokenSchema($authDb, $driver, $prefix);
 
-        $seedInstaller->migrateStockGroups($rvnDb, $driver, $prefix);
         $seedInstaller->ensureStockGroups($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->migrateUserPrimaryGroup($rvnDb, $driver, $prefix);
         $seedInstaller->ensureSeedPages($rvnDb, $driver, $prefix);
     }
 }

@@ -334,7 +334,7 @@ final class AuthController
      */
     private function defaultPanelTheme(): string
     {
-        $theme = strtolower($this->input->text((string) $this->config->get('panel.theme', $this->config->get('panel.default_theme', 'corp')), 20));
+        $theme = strtolower($this->input->text((string) $this->config->get('panel.theme', 'corp'), 20));
         if (in_array($theme, ['light', 'raven', 'default', 'corp'], true)) {
             return 'corp';
         }

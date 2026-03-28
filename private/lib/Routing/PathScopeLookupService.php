@@ -7,7 +7,7 @@ namespace Raven\Lib\Routing;
 use PDO;
 
 /**
- * Shared (slug, channel_id) path-scope uniqueness lookup helper.
+ * Shared (slug, channel) path-scope uniqueness lookup helper.
  */
 final class PathScopeLookupService
 {
@@ -18,7 +18,7 @@ final class PathScopeLookupService
         ?int $channelId,
         ?int $excludeId = null,
         string $excludePlaceholder = 'exclude_id',
-        string $channelColumn = 'channel_id'
+        string $channelColumn = 'channel'
     ): bool {
         $excludePlaceholder = trim($excludePlaceholder);
         if ($excludePlaceholder === '') {
@@ -31,7 +31,7 @@ final class PathScopeLookupService
         $params = [':slug' => $slug];
         $channelColumn = trim($channelColumn);
         if ($channelColumn === '') {
-            $channelColumn = 'channel_id';
+            $channelColumn = 'channel';
         }
 
         if ($channelId === null || $channelId <= 0) {

@@ -268,8 +268,8 @@ final class PageImageRepository
                 i.license,
                 i.focal_x,
                 i.focal_y,
-                i.created AS created_at,
-                i.updated AS updated_at,
+                i.created,
+                i.updated,
                 v.variant_key,
                 v.stored_filename AS variant_stored_filename,
                 v.stored_path AS variant_stored_path,
@@ -326,8 +326,8 @@ final class PageImageRepository
                     'license' => (string) ($row['license'] ?? ''),
                     'focal_x' => $row['focal_x'] === null ? null : (float) $row['focal_x'],
                     'focal_y' => $row['focal_y'] === null ? null : (float) $row['focal_y'],
-                    'created_at' => (string) ($row['created_at'] ?? ''),
-                    'updated_at' => (string) ($row['updated_at'] ?? ''),
+                    'created' => (string) ($row['created'] ?? ''),
+                    'updated' => (string) ($row['updated'] ?? ''),
                     'variants' => [],
                 ];
                 $orderedImageIds[] = $imageId;

@@ -67,7 +67,7 @@ final class UserRepository
         $usersTable = $this->authTable('users');
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, string, name AS display_name, email, theme, avatar AS avatar_path, cover_image
+            'SELECT id, username, string, name, email, theme, avatar, cover_image
              FROM ' . $usersTable . '
              ORDER BY id ASC'
         );
@@ -96,10 +96,10 @@ final class UserRepository
             'SELECT u.id,
                     u.username,
                     u.string,
-                    u.name AS display_name,
+                    u.name,
                     u.email,
                     u.theme,
-                    u.avatar AS avatar_path,
+                    u.avatar,
                     u.cover_image,
                     g.name AS group_name,
                     g.permissions AS group_permission_mask
@@ -128,11 +128,11 @@ final class UserRepository
                     'id' => $userId,
                     'username' => (string) ($row['username'] ?? ''),
                     'string' => (string) ($row['string'] ?? ''),
-                    'display_name' => (string) ($row['display_name'] ?? ''),
+                    'name' => (string) ($row['name'] ?? ''),
                     'email' => (string) ($row['email'] ?? ''),
                     'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
-                    'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                        ? (string) $row['avatar_path']
+                    'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
+                        ? (string) $row['avatar']
                         : null,
                     'cover_image' => isset($row['cover_image']) && $row['cover_image'] !== ''
                         ? (string) $row['cover_image']
@@ -264,13 +264,13 @@ final class UserRepository
             'SELECT id,
                     username,
                     string,
-                    name AS display_name,
+                    name,
                     email,
                     bio,
                     theme,
-                    avatar AS avatar_path,
+                    avatar,
                     cover_image,
-                    contact AS contact_profiles,
+                    contact,
                     "group" AS primary_group_id
              FROM ' . $usersTable . '
              WHERE id = :id
@@ -294,17 +294,17 @@ final class UserRepository
             'id' => (int) $row['id'],
             'username' => (string) ($row['username'] ?? ''),
             'string' => (string) ($row['string'] ?? ''),
-            'display_name' => (string) ($row['display_name'] ?? ''),
+            'name' => (string) ($row['name'] ?? ''),
             'email' => (string) ($row['email'] ?? ''),
             'bio' => (string) ($row['bio'] ?? ''),
             'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
-            'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                ? (string) $row['avatar_path']
+            'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
+                ? (string) $row['avatar']
                 : null,
             'cover_image' => isset($row['cover_image']) && $row['cover_image'] !== ''
                 ? (string) $row['cover_image']
                 : null,
-            'contact_profiles' => $this->decodeContactProfiles($row['contact_profiles'] ?? null),
+            'contact' => $this->decodeContactProfiles($row['contact'] ?? null),
             'group_ids' => $groupIds,
             'primary_group_id' => $primaryGroupId,
             'secondary_group_ids' => $secondaryGroupIds,
@@ -337,13 +337,13 @@ final class UserRepository
             'SELECT u.id AS user_id,
                     u.username,
                     u.string,
-                    u.name AS display_name,
+                    u.name,
                     u.email,
                     u.bio,
                     u.theme,
-                    u.avatar AS avatar_path,
+                    u.avatar,
                     u.cover_image,
-                    u.contact AS contact_profiles,
+                    u.contact,
                     u."group" AS primary_group_id,
                     g.id AS group_id,
                     g.name AS group_name,
@@ -405,17 +405,17 @@ final class UserRepository
                 'id' => (int) ($first['user_id'] ?? 0),
                 'username' => (string) ($first['username'] ?? ''),
                 'string' => (string) ($first['string'] ?? ''),
-                'display_name' => (string) ($first['display_name'] ?? ''),
+                'name' => (string) ($first['name'] ?? ''),
                 'email' => (string) ($first['email'] ?? ''),
                 'bio' => (string) ($first['bio'] ?? ''),
                 'theme' => (string) (($first['theme'] ?? '') !== '' ? $first['theme'] : 'default'),
-                'avatar_path' => isset($first['avatar_path']) && $first['avatar_path'] !== ''
-                    ? (string) $first['avatar_path']
+                'avatar' => isset($first['avatar']) && $first['avatar'] !== ''
+                    ? (string) $first['avatar']
                     : null,
                 'cover_image' => isset($first['cover_image']) && $first['cover_image'] !== ''
                     ? (string) $first['cover_image']
                     : null,
-                'contact_profiles' => $this->decodeContactProfiles($first['contact_profiles'] ?? null),
+                'contact' => $this->decodeContactProfiles($first['contact'] ?? null),
                 'group_ids' => $allGroupIds,
                 'primary_group_id' => $primaryGroupId,
                 'secondary_group_ids' => $secondaryGroupIds,
@@ -431,9 +431,9 @@ final class UserRepository
      *   id: int,
      *   username: string,
      *   string: string,
-     *   display_name: string,
-     *   avatar_path: string|null,
-     *   contact_profiles: array<int, array{type: string, value: string}>
+     *   name: string,
+     *   avatar: string|null,
+     *   contact: array<int, array{type: string, value: string}>
      * }|null
      */
     public function findPublicProfileByUsername(string $username): ?array
@@ -441,7 +441,7 @@ final class UserRepository
         $usersTable = $this->authTable('users');
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, string, name AS display_name, avatar AS avatar_path, contact AS contact_profiles
+            'SELECT id, username, string, name, avatar, contact
              FROM ' . $usersTable . '
              WHERE username = :username
              LIMIT 1'
@@ -457,11 +457,11 @@ final class UserRepository
             'id' => (int) ($row['id'] ?? 0),
             'username' => (string) ($row['username'] ?? ''),
             'string' => (string) ($row['string'] ?? ''),
-            'display_name' => (string) ($row['display_name'] ?? ''),
-            'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                ? (string) $row['avatar_path']
+            'name' => (string) ($row['name'] ?? ''),
+            'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
+                ? (string) $row['avatar']
                 : null,
-            'contact_profiles' => $this->decodeContactProfiles($row['contact_profiles'] ?? null),
+            'contact' => $this->decodeContactProfiles($row['contact'] ?? null),
         ];
     }
 
@@ -472,9 +472,9 @@ final class UserRepository
      *   id: int,
      *   username: string,
      *   string: string,
-     *   display_name: string,
-     *   avatar_path: string|null,
-     *   contact_profiles: array<int, array{type: string, value: string}>
+     *   name: string,
+     *   avatar: string|null,
+     *   contact: array<int, array{type: string, value: string}>
      * }|null
      */
     public function findPublicProfileById(int $userId): ?array
@@ -486,7 +486,7 @@ final class UserRepository
         $usersTable = $this->authTable('users');
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, string, name AS display_name, avatar AS avatar_path, contact AS contact_profiles
+            'SELECT id, username, string, name, avatar, contact
              FROM ' . $usersTable . '
              WHERE id = :id
              LIMIT 1'
@@ -502,11 +502,11 @@ final class UserRepository
             'id' => (int) ($row['id'] ?? 0),
             'username' => (string) ($row['username'] ?? ''),
             'string' => (string) ($row['string'] ?? ''),
-            'display_name' => (string) ($row['display_name'] ?? ''),
-            'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                ? (string) $row['avatar_path']
+            'name' => (string) ($row['name'] ?? ''),
+            'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
+                ? (string) $row['avatar']
                 : null,
-            'contact_profiles' => $this->decodeContactProfiles($row['contact_profiles'] ?? null),
+            'contact' => $this->decodeContactProfiles($row['contact'] ?? null),
         ];
     }
 
@@ -515,9 +515,9 @@ final class UserRepository
      *   id: int,
      *   username: string,
      *   string: string,
-     *   display_name: string,
-     *   avatar_path: string|null,
-     *   contact_profiles: array<int, array{type: string, value: string}>
+     *   name: string,
+     *   avatar: string|null,
+     *   contact: array<int, array{type: string, value: string}>
      * }|null
      */
     public function findPublicProfileByString(string $userString): ?array
@@ -530,7 +530,7 @@ final class UserRepository
         $usersTable = $this->authTable('users');
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, string, name AS display_name, avatar AS avatar_path, contact AS contact_profiles
+            'SELECT id, username, string, name, avatar, contact
              FROM ' . $usersTable . '
              WHERE string = :string
              LIMIT 1'
@@ -546,11 +546,11 @@ final class UserRepository
             'id' => (int) ($row['id'] ?? 0),
             'username' => (string) ($row['username'] ?? ''),
             'string' => (string) ($row['string'] ?? ''),
-            'display_name' => (string) ($row['display_name'] ?? ''),
-            'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                ? (string) $row['avatar_path']
+            'name' => (string) ($row['name'] ?? ''),
+            'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
+                ? (string) $row['avatar']
                 : null,
-            'contact_profiles' => $this->decodeContactProfiles($row['contact_profiles'] ?? null),
+            'contact' => $this->decodeContactProfiles($row['contact'] ?? null),
         ];
     }
 
@@ -560,8 +560,8 @@ final class UserRepository
      * @return array<int, array{
      *   id: int,
      *   username: string,
-     *   display_name: string,
-     *   avatar_path: string|null
+     *   name: string,
+     *   avatar: string|null
      * }>
      */
     public function listPublicProfilesByGroupId(int $groupId): array
@@ -604,7 +604,7 @@ final class UserRepository
         }
 
         $stmt = $this->authDb->prepare(
-            'SELECT id, username, string, name AS display_name, avatar AS avatar_path
+            'SELECT id, username, string, name, avatar
              FROM ' . $usersTable . '
              WHERE id IN (' . implode(', ', $placeholders) . ')
              ORDER BY username ASC, id ASC'
@@ -618,9 +618,9 @@ final class UserRepository
                 'id' => (int) ($row['id'] ?? 0),
                 'username' => (string) ($row['username'] ?? ''),
                 'string' => (string) ($row['string'] ?? ''),
-                'display_name' => (string) ($row['display_name'] ?? ''),
-                'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                    ? (string) $row['avatar_path']
+                'name' => (string) ($row['name'] ?? ''),
+                'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
+                    ? (string) $row['avatar']
                     : null,
             ];
         }

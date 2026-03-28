@@ -127,7 +127,7 @@ return static function (Router $router, array $context): void {
      */
     $resolveSqliteBasePath = static function (array $databaseConfig) use ($rvn): string {
         $sqlite = (array) ($databaseConfig['sqlite'] ?? []);
-        $basePath = trim((string) ($sqlite['path'] ?? ($sqlite['base_path'] ?? '')));
+        $basePath = trim((string) ($sqlite['path'] ?? ''));
         if ($basePath === '') {
             return rtrim((string) $rvn['root'], '/') . '/private/dat/db.sqlite';
         }
@@ -516,7 +516,7 @@ return static function (Router $router, array $context): void {
 
         $summary = [
             'driver' => $driver,
-            'prefix' => (string) ($databaseConfig['prefix'] ?? ($databaseConfig['table_prefix'] ?? '')),
+            'prefix' => (string) ($databaseConfig['prefix'] ?? ''),
             'sqlite_path' => '',
             'sqlite_file' => '',
             'mysql' => [],
@@ -525,7 +525,7 @@ return static function (Router $router, array $context): void {
 
         if ($isSqlite) {
             $sqlite = (array) ($databaseConfig['sqlite'] ?? []);
-            $summary['sqlite_path'] = (string) ($sqlite['path'] ?? ($sqlite['base_path'] ?? ''));
+            $summary['sqlite_path'] = (string) ($sqlite['path'] ?? '');
             $summary['sqlite_file'] = 'db.sqlite';
         } else {
             $mysql = (array) ($databaseConfig['mysql'] ?? []);
@@ -534,13 +534,13 @@ return static function (Router $router, array $context): void {
             $summary['mysql'] = [
                 'host' => (string) ($mysql['host'] ?? ''),
                 'port' => (string) ($mysql['port'] ?? ''),
-                'name' => (string) ($mysql['name'] ?? ($mysql['dbname'] ?? '')),
+                'name' => (string) ($mysql['name'] ?? ''),
                 'user' => (string) ($mysql['user'] ?? ''),
             ];
             $summary['pgsql'] = [
                 'host' => (string) ($pgsql['host'] ?? ''),
                 'port' => (string) ($pgsql['port'] ?? ''),
-                'name' => (string) ($pgsql['name'] ?? ($pgsql['dbname'] ?? '')),
+                'name' => (string) ($pgsql['name'] ?? ''),
                 'user' => (string) ($pgsql['user'] ?? ''),
             ];
         }

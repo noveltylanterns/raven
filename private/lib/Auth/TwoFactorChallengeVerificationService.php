@@ -22,8 +22,8 @@ final class TwoFactorChallengeVerificationService
             return false;
         }
 
-        $methods = is_array($preferences['two_factor_methods'] ?? null)
-            ? $preferences['two_factor_methods']
+        $methods = is_array($preferences['two_factor'] ?? null)
+            ? $preferences['two_factor']
             : [];
 
         return $securityProfiles->verifyTotpCode($methods, $submittedCode, $issuer);
@@ -44,8 +44,8 @@ final class TwoFactorChallengeVerificationService
             return false;
         }
 
-        $methods = is_array($preferences['two_factor_methods'] ?? null)
-            ? array_values($preferences['two_factor_methods'])
+        $methods = is_array($preferences['two_factor'] ?? null)
+            ? array_values($preferences['two_factor'])
             : [];
         $matched = $securityProfiles->matchRecoveryMethod($methods, $submittedPhrase, $selectedMethodKey);
         if (!is_array($matched)) {

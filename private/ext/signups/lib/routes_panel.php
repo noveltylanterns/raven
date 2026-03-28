@@ -499,7 +499,7 @@ return static function (Router $router, array $context): void {
                 (string) ($row['ip_address'] ?? ''),
                 (string) ($row['hostname'] ?? ''),
                 (string) ($row['user_agent'] ?? ''),
-                (string) ($row['created_at'] ?? ''),
+                (string) ($row['created'] ?? ''),
             ]);
         }
         fclose($stream);
@@ -660,9 +660,9 @@ return static function (Router $router, array $context): void {
                         'ip_address' => $findHeaderIndex($normalizedHeaders, ['ip_address', 'ip']),
                         'hostname' => $findHeaderIndex($normalizedHeaders, ['hostname', 'host']),
                         'user_agent' => $findHeaderIndex($normalizedHeaders, ['user_agent', 'useragent', 'ua']),
-                        'created_at' => $findHeaderIndex($normalizedHeaders, [
-                            'created_at',
+                        'created' => $findHeaderIndex($normalizedHeaders, [
                             'created',
+                            'created_at',
                             'submitted_at',
                             'submission_date',
                             'submitted_on',
@@ -699,7 +699,7 @@ return static function (Router $router, array $context): void {
                 $rawIpAddress = $fieldValue($row, $headerMap['ip_address'] ?? null);
                 $rawHostname = $fieldValue($row, $headerMap['hostname'] ?? null);
                 $rawUserAgent = $fieldValue($row, $headerMap['user_agent'] ?? null);
-                $rawCreatedAt = $fieldValue($row, $headerMap['created_at'] ?? null);
+                $rawCreatedAt = $fieldValue($row, $headerMap['created'] ?? null);
             } else {
                 $emailIndex = 0;
                 if (isset($row[1]) && $rvn['input']->email((string) $row[1]) !== null) {
@@ -765,7 +765,7 @@ return static function (Router $router, array $context): void {
                     'ip_address' => $ipAddress !== '' ? $ipAddress : null,
                     'hostname' => $hostname !== '' ? $hostname : null,
                     'user_agent' => $userAgent !== '' ? $userAgent : null,
-                    'created_at' => $createdAt,
+                    'created' => $createdAt,
                 ]);
                 $importedCount++;
             } catch (RuntimeException $exception) {

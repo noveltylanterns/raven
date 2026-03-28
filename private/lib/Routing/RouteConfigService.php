@@ -80,8 +80,7 @@ final class RouteConfigService
     {
         $rawChannels = $this->config->get('feed.channels', null);
         if (!is_array($rawChannels)) {
-            $legacyChannel = trim((string) $this->config->get('feed.channel', ''));
-            $rawChannels = $legacyChannel === '' ? ['all'] : [$legacyChannel];
+            $rawChannels = ['all'];
         }
 
         $normalizedChannels = [];
@@ -176,13 +175,13 @@ final class RouteConfigService
     {
         return ChannelRoutePolicy::resolveSeparator(
             $channelValue,
-            (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
+            (string) $this->config->get('content.separator', '-')
         );
     }
 
     public function globalPageRouteMode(): string
     {
-        $mode = strtolower(trim((string) $this->config->get('content.mode', $this->config->get('content.route_mode', 'slug'))));
+        $mode = strtolower(trim((string) $this->config->get('content.mode', 'slug')));
         return in_array($mode, ['slug', 'id'], true) ? $mode : 'slug';
     }
 

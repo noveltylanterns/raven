@@ -48,7 +48,7 @@ if ($selectedAuthorUserId < 1) {
 }
 $deleteFormId = 'delete-page-form';
 $selectedChannelSlug = (string) ($page['channel_slug'] ?? '');
-$selectedStatus = (int) ($page['is_published'] ?? 1) === 1 ? 'published' : 'draft';
+$selectedStatus = ($page['status'] ?? 'published') === 'published' ? 'published' : 'draft';
 $rawPublishAt = (string) ($page['published'] ?? '');
 $rawExpireAt = (string) ($page['expires'] ?? '');
 // For display: published defaults to page created date when page is published and no published is set.
@@ -195,7 +195,7 @@ $routeSegment = trim(
         new \Raven\Lib\Security\InputSanitizer(),
         $pageSlug,
         $pageId,
-        (string) ($page['created_at'] ?? ''),
+        (string) ($page['created'] ?? ''),
         $effectivePageRouteMode,
         $selectedChannelUrlSeparator,
         $routeSeparatorDefault
@@ -590,7 +590,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                 if ($authorUsername === '') {
                                     continue;
                                 }
-                                $authorDisplayName = trim((string) ($authorOption['display_name'] ?? ''));
+                                $authorDisplayName = trim((string) ($authorOption['name'] ?? ''));
                                 ?>
                                 <option value="<?= $authorId ?>"<?= $selectedAuthorUserId === $authorId ? ' selected' : '' ?>>
                                     <?= e($authorDisplayName !== '' ? $authorDisplayName : $authorUsername) ?> (<?= e($authorUsername) ?>)

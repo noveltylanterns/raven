@@ -12,40 +12,9 @@ use PDO;
 final class GroupPublicRouteService
 {
     /**
-     * @return array<string, mixed>|null
-     */
-    public function findPublicBySlug(PDO $db, string $groupsTable, string $userGroupsTable, string $slug): ?array
-    {
-        $stmt = $db->prepare(
-            'SELECT g.id,
-                    g.name,
-                    g.slug,
-                    g.route AS route_enabled,
-                    g.permissions AS permission_mask,
-                    CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS is_stock,
-                    g.created AS created_at,
-                    COUNT(ug.user) AS member_count
-             FROM ' . $groupsTable . ' g
-             LEFT JOIN ' . $userGroupsTable . ' ug ON ug."group" = g.id
-             WHERE g.slug = :slug
-               AND g.route = 1
-               AND LOWER(g.slug) <> \'guest\'
-               AND LOWER(g.slug) <> \'validating\'
-               AND LOWER(g.slug) <> \'banned\'
-             GROUP BY g.id, g.name, g.slug, g.route, g.permissions, g.created
-             ORDER BY g.id ASC
-             LIMIT 1'
-        );
-        $stmt->execute([':slug' => trim($slug)]);
-
-        $row = $stmt->fetch();
-        return $row === false ? null : $row;
-    }
-
-    /**
      * @return array{
      *   group: array<string, mixed>,
-     *   members: array<int, array{id: int, username: string, display_name: string, avatar_path: string|null}>
+     *   members: array<int, array{id: int, username: string, name: string, avatar: string|null}>
      * }|null
      */
     public function findPublicRouteDataBySlug(
@@ -62,12 +31,12 @@ final class GroupPublicRouteService
                     g.route AS group_route_enabled,
                     g.permissions AS group_permission_mask,
                     CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
-                    g.created AS group_created_at,
+                    g.created AS group_created,
                     COUNT(u.id) OVER() AS member_count,
                     u.id AS user_id,
                     u.username,
-                    u.name AS display_name,
-                    u.avatar AS avatar_path
+                    u.name,
+                    u.avatar
              FROM ' . $groupsTable . ' g
              LEFT JOIN ' . $userGroupsTable . ' ug ON ug."group" = g.id
              LEFT JOIN ' . $usersTable . ' u ON u.id = ug.user
@@ -93,7 +62,7 @@ final class GroupPublicRouteService
             'route_enabled' => (int) ($first['group_route_enabled'] ?? 0),
             'permission_mask' => (int) ($first['group_permission_mask'] ?? 0),
             'is_stock' => (int) ($first['group_is_stock'] ?? 0),
-            'created_at' => (string) ($first['group_created_at'] ?? ''),
+            'created' => (string) ($first['group_created'] ?? ''),
             'member_count' => max(0, (int) ($first['member_count'] ?? 0)),
         ];
 
@@ -107,9 +76,9 @@ final class GroupPublicRouteService
             $members[] = [
                 'id' => $userId,
                 'username' => (string) ($row['username'] ?? ''),
-                'display_name' => (string) ($row['display_name'] ?? ''),
-                'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                    ? (string) $row['avatar_path']
+                'name' => (string) ($row['name'] ?? ''),
+                'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
+                    ? (string) $row['avatar']
                     : null,
             ];
         }

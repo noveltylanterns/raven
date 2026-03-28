@@ -407,11 +407,11 @@ final class PanelController
             'imageUploadTarget' => (string) $this->config->get('media.upload_target', 'local'),
             'imageMaxFilesPerUpload' => max(0, (int) $this->config->get('media.max_files_per_upload', 10)),
             'editorDefault' => $this->normalizeBodyTextEditorOption(
-                (string) $this->config->get('content.editor', $this->config->get('content.editor_default', 'tinymce'))
+                (string) $this->config->get('content.editor', 'tinymce')
             ),
             'routeModeDefault' => $this->globalPageRouteMode(),
             'routeSeparatorDefault' => $this->normalizeGlobalRouteSeparator(
-                (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
+                (string) $this->config->get('content.separator', '-')
             ),
             'bodyBlockTypeDefinitions' => $this->pageEditorBodyBlockTypeDefinitions(),
             'shortcodeInsertItems' => $this->pageEditorInsertableShortcodes(),
@@ -573,7 +573,7 @@ final class PanelController
     /**
      * Returns page-author select options for page editor Meta tab.
      *
-     * @return array<int, array{id: int, username: string, display_name: string}>
+     * @return array<int, array{id: int, username: string, name: string}>
      */
     private function pageAuthorOptions(): array
     {
@@ -2676,11 +2676,11 @@ final class PanelController
 
             if ($id !== null) {
                 $preferences = $this->auth->userPreferences($id);
-                $user['two_factor_methods'] = is_array($preferences['two_factor_methods'] ?? null)
-                    ? array_values((array) $preferences['two_factor_methods'])
+                $user['two_factor'] = is_array($preferences['two_factor'] ?? null)
+                    ? array_values((array) $preferences['two_factor'])
                     : [];
             } else {
-                $user['two_factor_methods'] = [];
+                $user['two_factor'] = [];
             }
         }
         if ($id !== null && $user === null) {
@@ -2703,7 +2703,7 @@ final class PanelController
             'profileRoutePrefix' => $this->profileRoutePrefix(),
             'profileRoutesEnabled' => $this->profileRoutesEnabledForRoutingTable(),
             'profileRouteSegment' => is_array($user) ? ($this->publicProfileRouteSegmentForUser($user) ?? '') : '',
-            'avatarTemplateData' => is_array($user) ? $this->avatarTemplateData((string) ($user['avatar_path'] ?? '')) : ['filename' => '', 'url' => '', 'thumb_url' => ''],
+            'avatarTemplateData' => is_array($user) ? $this->avatarTemplateData((string) ($user['avatar'] ?? '')) : ['filename' => '', 'url' => '', 'thumb_url' => ''],
             'avatarUploadLimitsNote' => $this->avatarUploadLimitsNote(),
             'coverImageUrl' => is_array($user) ? $this->coverPublicUrl((string) ($user['cover_image'] ?? '')) : '',
             'groupOptions' => $groupOptions,
@@ -2779,15 +2779,15 @@ final class PanelController
 
             $existingPreferences = $this->auth->userPreferences($id);
             if (is_array($existingPreferences)) {
-                $existingTwoFactorMethods = is_array($existingPreferences['two_factor_methods'] ?? null)
-                    ? array_values($existingPreferences['two_factor_methods'])
+                $existingTwoFactorMethods = is_array($existingPreferences['two_factor'] ?? null)
+                    ? array_values($existingPreferences['two_factor'])
                     : [];
                 $canUpdateTwoFactorMethods = true;
             }
         }
 
-        $currentAvatarPath = is_array($existingUser) && isset($existingUser['avatar_path']) && is_string($existingUser['avatar_path'])
-            ? (string) $existingUser['avatar_path']
+        $currentAvatarPath = is_array($existingUser) && isset($existingUser['avatar']) && is_string($existingUser['avatar'])
+            ? (string) $existingUser['avatar']
             : null;
         $currentCoverImage = is_array($existingUser) && isset($existingUser['cover_image']) && is_string($existingUser['cover_image'])
             ? (string) $existingUser['cover_image']
@@ -3323,7 +3323,7 @@ final class PanelController
                 continue;
             }
 
-            $displayName = trim((string) ($row['display_name'] ?? ''));
+            $displayName = trim((string) ($row['name'] ?? ''));
             $username = trim((string) ($row['username'] ?? ''));
             $email = trim((string) ($row['email'] ?? ''));
             $label = $displayName !== ''
@@ -3826,8 +3826,8 @@ final class PanelController
         }
         $normalizedTheme = $this->normalizePanelThemeChoice((string) ($preferences['theme'] ?? 'default'), true);
         $preferences['theme'] = $normalizedTheme ?? 'default';
-        $preferences['two_factor_methods'] = $this->prepareTwoFactorMethodsForView(
-            is_array($preferences['two_factor_methods'] ?? null) ? $preferences['two_factor_methods'] : [],
+        $preferences['two_factor'] = $this->prepareTwoFactorMethodsForView(
+            is_array($preferences['two_factor'] ?? null) ? $preferences['two_factor'] : [],
             (string) ($preferences['email'] ?? '')
         );
         $bioMaxLength = max(1, (int) $this->config->get('user.bio', 500));
@@ -3845,7 +3845,7 @@ final class PanelController
             'profileContactOptions' => $this->profileContactOptions(),
             'twoFactorTypeOptions' => $this->twoFactorTypeOptions(),
             'themeOptions' => ['default', 'corp', 'ice', 'midnight'],
-            'avatarTemplateData' => $this->avatarTemplateData((string) ($preferences['avatar_path'] ?? '')),
+            'avatarTemplateData' => $this->avatarTemplateData((string) ($preferences['avatar'] ?? '')),
             'avatarUploadLimitsNote' => $this->avatarUploadLimitsNote(),
             'coverImageUrl' => $this->coverPublicUrl((string) ($preferences['cover_image'] ?? '')),
             'userTheme' => $this->currentUserTheme(),
@@ -4065,7 +4065,7 @@ final class PanelController
         }
 
         // Remove old avatar when replaced/removed, while preserving current file.
-        $oldAvatar = $current['avatar_path'] ?? null;
+        $oldAvatar = $current['avatar'] ?? null;
         if (is_string($oldAvatar) && $oldAvatar !== '' && $oldAvatar !== $avatarFilename && $avatarSet) {
             $this->deleteAvatarFile($oldAvatar);
         }
@@ -4188,7 +4188,7 @@ final class PanelController
         }
 
         $excludeCredentialIds = $this->panelTwoFactorPreferencesService()->collectWebauthnExcludeCredentialIds(
-            (array) ($preferences['two_factor_methods'] ?? []),
+            (array) ($preferences['two_factor'] ?? []),
             $post['exclude_credential_ids'] ?? null,
             20
         );
@@ -6279,12 +6279,6 @@ final class PanelController
     private function listEnabledExtensionForms(string $extensionKey): array
     {
         $normalized = strtolower(trim($extensionKey));
-        if ($normalized === 'ext_contact') {
-            $normalized = 'contact';
-        } elseif ($normalized === 'ext_signups') {
-            $normalized = 'signups';
-        }
-
         $services = $this->app['extension_services'] ?? [];
         if (is_array($services)) {
             $extensionServices = $services[$normalized] ?? null;
@@ -6803,7 +6797,7 @@ final class PanelController
     private function defaultPanelTheme(): string
     {
         $theme = $this->normalizePanelThemeChoice(
-            (string) $this->config->get('panel.theme', $this->config->get('panel.default_theme', 'corp')),
+            (string) $this->config->get('panel.theme', 'corp'),
             false
         );
         if (!is_string($theme)) {
@@ -7034,7 +7028,7 @@ final class PanelController
                 ? $this->globalPageRouteMode()
                 : $this->effectiveChannelRouteMode($routeModeEffective),
             $routeSeparatorEffective,
-            (string) $this->config->get('content.separator', $this->config->get('content.route_separator', '-'))
+            (string) $this->config->get('content.separator', '-')
         );
     }
 

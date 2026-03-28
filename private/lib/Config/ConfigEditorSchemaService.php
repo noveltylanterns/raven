@@ -251,16 +251,6 @@ final class ConfigEditorSchemaService
             $content = [];
         }
 
-        if (!array_key_exists('editor', $content) && array_key_exists('editor_default', $content)) {
-            $content['editor'] = $content['editor_default'];
-        }
-        if (!array_key_exists('mode', $content) && array_key_exists('route_mode', $content)) {
-            $content['mode'] = $content['route_mode'];
-        }
-        if (!array_key_exists('separator', $content) && array_key_exists('route_separator', $content)) {
-            $content['separator'] = $content['route_separator'];
-        }
-
         $content['editor'] = $this->normalizeBodyTextEditorOption(
             (string) ($content['editor'] ?? 'tinymce')
         );
@@ -270,8 +260,6 @@ final class ConfigEditorSchemaService
         $content['separator'] = $this->normalizeGlobalRouteSeparator(
             (string) ($content['separator'] ?? '-')
         );
-        unset($content['editor_default'], $content['route_mode'], $content['route_separator']);
-
         $feed = $config['feed'] ?? null;
         if (!is_array($feed)) {
             $feed = [];
@@ -283,11 +271,6 @@ final class ConfigEditorSchemaService
         }
         $channelsWereExplicit = array_key_exists('channels', $feed);
         $rawChannels = $feed['channels'] ?? null;
-        if (!$channelsWereExplicit && array_key_exists('channel', $feed)) {
-            $legacyChannel = trim((string) ($feed['channel'] ?? ''));
-            $rawChannels = $legacyChannel === '' ? ['all'] : [$legacyChannel];
-            $channelsWereExplicit = true;
-        }
         if (!$channelsWereExplicit) {
             $rawChannels = ['all'];
         } elseif (!is_array($rawChannels)) {
@@ -315,7 +298,6 @@ final class ConfigEditorSchemaService
         if ($feed['channels'] === [] && !$channelsWereExplicit) {
             $feed['channels'] = ['all'];
         }
-        unset($feed['channel']);
         if (!array_key_exists('items', $feed)) {
             $feed['items'] = 10;
         } else {
@@ -369,33 +351,20 @@ final class ConfigEditorSchemaService
         }
         $database['driver'] = $driver;
 
-        if (!array_key_exists('prefix', $database) && array_key_exists('table_prefix', $database)) {
-            $database['prefix'] = $database['table_prefix'];
-        }
         $database['prefix'] = preg_replace('/[^a-zA-Z0-9_]/', '', (string) ($database['prefix'] ?? 'rvn_')) ?? 'rvn_';
 
         $sqlite = $database['sqlite'] ?? null;
         if (!is_array($sqlite)) {
             $sqlite = [];
         }
-        if (!array_key_exists('path', $sqlite) && array_key_exists('base_path', $sqlite)) {
-            $sqlite['path'] = $sqlite['base_path'];
-        }
         $sqlite['path'] = trim((string) ($sqlite['path'] ?? 'private/dat/db.sqlite'));
         if ($sqlite['path'] === '') {
             $sqlite['path'] = 'private/dat/db.sqlite';
         }
-        unset($sqlite['base_path']);
 
         $mysql = $database['mysql'] ?? null;
         if (!is_array($mysql)) {
             $mysql = [];
-        }
-        if (!array_key_exists('name', $mysql) && array_key_exists('dbname', $mysql)) {
-            $mysql['name'] = $mysql['dbname'];
-        }
-        if (!array_key_exists('pass', $mysql) && array_key_exists('password', $mysql)) {
-            $mysql['pass'] = $mysql['password'];
         }
         $mysql['host'] = trim((string) ($mysql['host'] ?? '127.0.0.1'));
         $mysql['port'] = max(1, (int) ($mysql['port'] ?? 3306));
@@ -406,29 +375,20 @@ final class ConfigEditorSchemaService
         if ($mysql['charset'] === '') {
             $mysql['charset'] = 'utf8mb4';
         }
-        unset($mysql['dbname'], $mysql['password']);
 
         $pgsql = $database['pgsql'] ?? null;
         if (!is_array($pgsql)) {
             $pgsql = [];
-        }
-        if (!array_key_exists('name', $pgsql) && array_key_exists('dbname', $pgsql)) {
-            $pgsql['name'] = $pgsql['dbname'];
-        }
-        if (!array_key_exists('pass', $pgsql) && array_key_exists('password', $pgsql)) {
-            $pgsql['pass'] = $pgsql['password'];
         }
         $pgsql['host'] = trim((string) ($pgsql['host'] ?? '127.0.0.1'));
         $pgsql['port'] = max(1, (int) ($pgsql['port'] ?? 5432));
         $pgsql['name'] = trim((string) ($pgsql['name'] ?? 'raven'));
         $pgsql['user'] = trim((string) ($pgsql['user'] ?? 'raven'));
         $pgsql['pass'] = (string) ($pgsql['pass'] ?? '');
-        unset($pgsql['dbname'], $pgsql['password']);
 
         $database['sqlite'] = $sqlite;
         $database['mysql'] = $mysql;
         $database['pgsql'] = $pgsql;
-        unset($database['table_prefix']);
 
         $config['database'] = $database;
 
@@ -548,30 +508,6 @@ final class ConfigEditorSchemaService
             $session = [];
         }
 
-        $legacyProfileMode = strtolower(trim((string) ($session['profile_mode'] ?? '')));
-        $legacyProfilePrefix = trim((string) ($session['profile_prefix'] ?? ''));
-        $legacyProfileContact = $session['profile_contact_options'] ?? null;
-        $legacyGroupMode = strtolower(trim((string) ($session['show_groups'] ?? '')));
-        $legacyGroupPrefix = trim((string) ($session['group_prefix'] ?? ''));
-        $legacySessionName = trim((string) ($session['name'] ?? ''));
-        $legacyCookieDomain = strtolower(trim((string) ($session['cookie_domain'] ?? '')));
-        $legacyCookiePrefix = trim((string) ($session['cookie_prefix'] ?? ''));
-        $legacyBruteMax = (int) ($session['login_attempt_max'] ?? 5);
-        $legacyBruteWindow = (int) ($session['login_attempt_window_seconds'] ?? 600);
-        $legacyBruteLock = (int) ($session['login_attempt_lock_seconds'] ?? 900);
-        unset(
-            $session['profile_mode'],
-            $session['profile_prefix'],
-            $session['profile_contact_options'],
-            $session['show_groups'],
-            $session['group_prefix'],
-            $session['name'],
-            $session['cookie_domain'],
-            $session['cookie_prefix'],
-            $session['login_attempt_max'],
-            $session['login_attempt_window_seconds'],
-            $session['login_attempt_lock_seconds']
-        );
 
         $cookie = $session['cookie'] ?? null;
         if (!is_array($cookie)) {
@@ -579,7 +515,7 @@ final class ConfigEditorSchemaService
         }
 
         if (!array_key_exists('name', $cookie)) {
-            $cookie['name'] = $legacySessionName !== '' ? $legacySessionName : 'session';
+            $cookie['name'] = 'session';
         } else {
             $cookie['name'] = trim((string) ($cookie['name'] ?? ''));
         }
@@ -588,7 +524,7 @@ final class ConfigEditorSchemaService
         }
 
         if (!array_key_exists('domain', $cookie)) {
-            $cookie['domain'] = $legacyCookieDomain;
+            $cookie['domain'] = '';
         } else {
             $cookie['domain'] = strtolower(trim((string) ($cookie['domain'] ?? '')));
         }
@@ -604,7 +540,7 @@ final class ConfigEditorSchemaService
         }
 
         if (!array_key_exists('prefix', $cookie)) {
-            $cookie['prefix'] = $legacyCookiePrefix !== '' ? $legacyCookiePrefix : 'rvn_';
+            $cookie['prefix'] = 'rvn_';
         } else {
             $cookie['prefix'] = trim((string) ($cookie['prefix'] ?? ''));
         }
@@ -618,13 +554,13 @@ final class ConfigEditorSchemaService
             $brute = [];
         }
         if (!array_key_exists('max', $brute)) {
-            $brute['max'] = $legacyBruteMax;
+            $brute['max'] = 5;
         }
         if (!array_key_exists('window', $brute)) {
-            $brute['window'] = $legacyBruteWindow;
+            $brute['window'] = 600;
         }
         if (!array_key_exists('lock', $brute)) {
-            $brute['lock'] = $legacyBruteLock;
+            $brute['lock'] = 86400;
         }
         $brute['max'] = max(1, (int) ($brute['max'] ?? 5));
         $brute['window'] = max(1, (int) ($brute['window'] ?? 600));
@@ -638,16 +574,8 @@ final class ConfigEditorSchemaService
             $user = [];
         }
 
-        // Migrate legacy user.privacy → user.visibility.
-        if (!array_key_exists('visibility', $user) && array_key_exists('privacy', $user)) {
-            $user['visibility'] = $user['privacy'];
-        }
-        unset($user['privacy']);
-
         if (!array_key_exists('visibility', $user)) {
-            $user['visibility'] = in_array($legacyProfileMode, ['public_full', 'public_limited', 'private', 'disabled'], true)
-                ? $legacyProfileMode
-                : 'disabled';
+            $user['visibility'] = 'disabled';
         } else {
             $rawProfileMode = strtolower(trim((string) ($user['visibility'] ?? '')));
             if (!in_array($rawProfileMode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
@@ -657,7 +585,7 @@ final class ConfigEditorSchemaService
         }
 
         if (!array_key_exists('prefix', $user)) {
-            $user['prefix'] = $legacyProfilePrefix !== '' ? $legacyProfilePrefix : 'user';
+            $user['prefix'] = 'user';
         } else {
             $rawProfilePrefix = trim((string) ($user['prefix'] ?? ''));
             if ($rawProfilePrefix === '') {
@@ -698,33 +626,17 @@ final class ConfigEditorSchemaService
             $user['selector'] = $selector;
         }
 
-        $user['contact'] = $this->profileContacts->normalizeOptionsConfig(
-            array_key_exists('contact', $user) ? $user['contact'] : $legacyProfileContact
-        );
+        $user['contact'] = $this->profileContacts->normalizeOptionsConfig($user['contact'] ?? null);
 
         $group = $config['group'] ?? null;
         if (!is_array($group)) {
             $group = [];
         }
 
-        // Migrate legacy group.privacy → group.visibility.
-        if (!array_key_exists('visibility', $group) && array_key_exists('privacy', $group)) {
-            $group['visibility'] = $group['privacy'];
-        }
-        unset($group['privacy']);
-
         if (!array_key_exists('visibility', $group)) {
-            if ($legacyGroupMode === 'public') {
-                $legacyGroupMode = 'public_full';
-            }
-            $group['visibility'] = in_array($legacyGroupMode, ['public_full', 'public_limited', 'private', 'disabled'], true)
-                ? $legacyGroupMode
-                : 'disabled';
+            $group['visibility'] = 'disabled';
         } else {
             $rawShowGroups = strtolower(trim((string) ($group['visibility'] ?? '')));
-            if ($rawShowGroups === 'public') {
-                $rawShowGroups = 'public_full';
-            }
             if (!in_array($rawShowGroups, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
                 $rawShowGroups = 'disabled';
             }
@@ -732,7 +644,7 @@ final class ConfigEditorSchemaService
         }
 
         if (!array_key_exists('prefix', $group)) {
-            $group['prefix'] = $legacyGroupPrefix !== '' ? $legacyGroupPrefix : 'group';
+            $group['prefix'] = 'group';
         } else {
             $rawGroupPrefix = trim((string) ($group['prefix'] ?? ''));
             if ($rawGroupPrefix === '') {
@@ -772,18 +684,8 @@ final class ConfigEditorSchemaService
             $auth = [];
         }
 
-        // Migrate legacy auth.login → auth.method.
-        if (!array_key_exists('method', $auth) && array_key_exists('login', $auth)) {
-            $auth['method'] = $auth['login'];
-        }
-        unset($auth['login']);
-
         if (!array_key_exists('method', $auth)) {
-            $legacyMode = strtolower(trim((string) ($user['login'] ?? $user['login_mode'] ?? '')));
-            if (!in_array($legacyMode, ['email', 'username'], true)) {
-                $legacyMode = 'email';
-            }
-            $auth['method'] = $legacyMode;
+            $auth['method'] = 'email';
         } else {
             $mode = strtolower(trim((string) ($auth['method'] ?? 'email')));
             if (!in_array($mode, ['email', 'username'], true)) {
@@ -793,11 +695,7 @@ final class ConfigEditorSchemaService
         }
 
         if (!array_key_exists('registration', $auth)) {
-            $legacyRegistration = strtolower(trim((string) ($user['registration'] ?? $user['registration_mode'] ?? '')));
-            if (!in_array($legacyRegistration, ['open', 'invite', 'closed'], true)) {
-                $legacyRegistration = 'closed';
-            }
-            $auth['registration'] = $legacyRegistration;
+            $auth['registration'] = 'closed';
         } else {
             $registrationMode = strtolower(trim((string) ($auth['registration'] ?? 'closed')));
             if (!in_array($registrationMode, ['open', 'invite', 'closed'], true)) {
@@ -806,7 +704,6 @@ final class ConfigEditorSchemaService
             $auth['registration'] = $registrationMode;
         }
 
-        unset($user['login'], $user['login_mode'], $user['registration'], $user['registration_mode']);
         $user['auth'] = $auth;
         $config['user'] = $user;
 
@@ -824,12 +721,6 @@ final class ConfigEditorSchemaService
         if (!is_array($site)) {
             $site = [];
         }
-
-        // Migrate legacy site.enabled → site.visibility.
-        if (!array_key_exists('visibility', $site) && array_key_exists('enabled', $site)) {
-            $site['visibility'] = $site['enabled'];
-        }
-        unset($site['enabled']);
 
         if (!array_key_exists('visibility', $site)) {
             $site['visibility'] = 'public';
@@ -851,10 +742,6 @@ final class ConfigEditorSchemaService
             $site['protocol'] = $protocol;
         }
 
-        if (!array_key_exists('theme', $site) && array_key_exists('default_theme', $site)) {
-            $site['theme'] = $site['default_theme'];
-        }
-
         if (!array_key_exists('theme', $site)) {
             $site['theme'] = 'raven';
         } else {
@@ -868,8 +755,6 @@ final class ConfigEditorSchemaService
                 $site['theme'] = (string) ($slugs[0] ?? 'raven');
             }
         }
-        unset($site['default_theme']);
-
         $config['site'] = $site;
         return $config;
     }
@@ -893,18 +778,12 @@ final class ConfigEditorSchemaService
             $panel['path'] = $panelPath ?? 'panel';
         }
 
-        if (!array_key_exists('theme', $panel) && array_key_exists('default_theme', $panel)) {
-            $panel['theme'] = $panel['default_theme'];
-        }
-
         if (!array_key_exists('theme', $panel)) {
             $panel['theme'] = 'corp';
         } else {
             $configuredTheme = $normalizePanelThemeChoice((string) ($panel['theme'] ?? ''), false);
             $panel['theme'] = is_string($configuredTheme) ? $configuredTheme : 'corp';
         }
-        unset($panel['default_theme']);
-
         if (!array_key_exists('brand_name', $panel)) {
             $siteName = trim((string) ($config['site']['name'] ?? 'Raven CMS'));
             $panel['brand_name'] = $siteName !== '' ? $siteName : 'Raven CMS';
@@ -1016,19 +895,6 @@ final class ConfigEditorSchemaService
             $debug = [];
         }
 
-        if (!array_key_exists('show_public', $debug) && array_key_exists('show_on_public', $debug)) {
-            $debug['show_public'] = $debug['show_on_public'];
-        }
-        if (!array_key_exists('show_private', $debug) && array_key_exists('show_on_panel', $debug)) {
-            $debug['show_private'] = $debug['show_on_panel'];
-        }
-        if (!array_key_exists('show_private', $debug) && array_key_exists('show_on_private', $debug)) {
-            $debug['show_private'] = $debug['show_on_private'];
-        }
-        if (!array_key_exists('show_trace', $debug) && array_key_exists('show_stack_trace', $debug)) {
-            $debug['show_trace'] = $debug['show_stack_trace'];
-        }
-
         $debug['show_public'] = ConfigValueParser::bool($debug['show_public'] ?? false, false);
         $debug['show_private'] = ConfigValueParser::bool($debug['show_private'] ?? false, false);
         $debug['show_benchmarks'] = ConfigValueParser::bool($debug['show_benchmarks'] ?? true, true);
@@ -1036,15 +902,13 @@ final class ConfigEditorSchemaService
         $debug['show_trace'] = ConfigValueParser::bool($debug['show_trace'] ?? true, true);
         $debug['show_request'] = ConfigValueParser::bool($debug['show_request'] ?? true, true);
         $debug['show_environment'] = ConfigValueParser::bool($debug['show_environment'] ?? true, true);
-        unset($debug['show_on_public'], $debug['show_on_panel'], $debug['show_on_private'], $debug['show_stack_trace']);
 
         $config['debug'] = $debug;
         return $config;
     }
 
     /**
-     * Migrates legacy media path structures to flat media.* and user.avatar.* paths.
-     * Accepts old media.images.* and media.avatars.* structures from pre-migration installs.
+     * Normalizes and seeds defaults for all media and user avatar configuration.
      *
      * @param array<string, mixed> $config
      * @return array<string, mixed>
@@ -1059,26 +923,6 @@ final class ConfigEditorSchemaService
         $user = $config['user'] ?? null;
         if (!is_array($user)) {
             $user = [];
-        }
-
-        // Migrate media.avatars.* → user.avatar.*
-        if (array_key_exists('avatars', $media) && is_array($media['avatars'])) {
-            $legacyAvatars = $media['avatars'];
-            if (!array_key_exists('avatar', $user)) {
-                $user['avatar'] = $legacyAvatars;
-            }
-            unset($media['avatars']);
-        }
-
-        // Migrate media.images.* → media.* (flatten the images sub-array)
-        if (array_key_exists('images', $media) && is_array($media['images'])) {
-            $legacyImages = $media['images'];
-            foreach ($legacyImages as $key => $val) {
-                if (!array_key_exists($key, $media)) {
-                    $media[$key] = $val;
-                }
-            }
-            unset($media['images']);
         }
 
         // Ensure flat media fields have defaults
@@ -1098,24 +942,7 @@ final class ConfigEditorSchemaService
             $media['strip_exif'] = true;
         }
 
-        // Migrate media.small/med/large → media.thumb.{sm|md|lg}_{x|y}
-        $legacySizeMap = [
-            'small' => ['sm_x', 'sm_y'],
-            'med'   => ['md_x', 'md_y'],
-            'large' => ['lg_x', 'lg_y'],
-        ];
         $thumb = array_key_exists('thumb', $media) && is_array($media['thumb']) ? $media['thumb'] : [];
-        foreach ($legacySizeMap as $legacyKey => [$xKey, $yKey]) {
-            if (array_key_exists($legacyKey, $media) && is_array($media[$legacyKey])) {
-                if (!array_key_exists($xKey, $thumb)) {
-                    $thumb[$xKey] = (int) ($media[$legacyKey]['width'] ?? 0);
-                }
-                if (!array_key_exists($yKey, $thumb)) {
-                    $thumb[$yKey] = (int) ($media[$legacyKey]['height'] ?? 0);
-                }
-                unset($media[$legacyKey]);
-            }
-        }
         // Ensure all thumb keys have defaults
         $thumbDefaults = ['sm_x' => 200, 'sm_y' => 200, 'md_x' => 600, 'md_y' => 600, 'lg_x' => 1000, 'lg_y' => 1000];
         foreach ($thumbDefaults as $key => $default) {

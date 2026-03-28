@@ -10,7 +10,7 @@
 declare(strict_types=1);
 
 /**
- * Ensures signup extension storage.
+ * Ensures signup extension storage: flat-file form definitions and submissions table.
  *
  * @param array<string, mixed> $context
  */
@@ -24,10 +24,7 @@ return static function (array $context): void {
 
     $db = $context['db'];
     $driver = (string) $context['driver'];
-    $tableResolver = is_callable($context['table'] ?? null) ? $context['table'] : static fn (?string $legacyTable = null): string => (string) $legacyTable;
-    $legacyTableResolver = is_callable($context['legacy_table'] ?? null) ? $context['legacy_table'] : $tableResolver;
-    $formsTable = $legacyTableResolver('ext_signups');
-    $legacySubmissionsTable = $legacyTableResolver('ext_signups_submissions');
+    $tableResolver = is_callable($context['table'] ?? null) ? $context['table'] : static fn (?string $t = null): string => (string) $t;
     $submissionsTable = $tableResolver();
     $storage = is_array($context['storage']) ? $context['storage'] : [];
     $localRoot = rtrim((string) ($storage['local'] ?? ''), '/');
@@ -142,21 +139,23 @@ return static function (array $context): void {
         return $stmt->fetchColumn() !== false;
     };
 
-    $writeForms = static function (string $path, array $forms): void {
-        $directory = dirname($path);
+    // Ensure forms flat-file exists.
+    if (!is_file($dataFile)) {
+        $directory = dirname($dataFile);
         if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new \RuntimeException('Failed to prepare signup data directory.');
         }
 
-        $payload = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export(array_values($forms), true) . ";\n";
-        if (@file_put_contents($path, $payload, LOCK_EX) === false) {
+        $payload = "<?php\n\ndeclare(strict_types=1);\n\nreturn [];\n";
+        if (@file_put_contents($dataFile, $payload, LOCK_EX) === false) {
             throw new \RuntimeException('Failed to write signup forms data.');
         }
-    };
+    }
 
-    $createSubmissionsTable = static function (\PDO $pdo, string $dbDriver, string $table): void {
-        if ($dbDriver === 'sqlite') {
-            $pdo->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
+    // Ensure submissions table exists.
+    if (!$tableExists($db, $driver, $submissionsTable)) {
+        if ($driver === 'sqlite') {
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $submissionsTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 form_slug TEXT NOT NULL,
                 email TEXT NOT NULL,
@@ -169,13 +168,10 @@ return static function (array $context): void {
                 user_agent TEXT NULL,
                 created TEXT NOT NULL
             )');
-            $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $table . '_form_slug_email ON ' . $table . ' (form_slug, email)');
-            $pdo->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_form_slug_created ON ' . $table . ' (form_slug, created DESC)');
-            return;
-        }
-
-        if ($dbDriver === 'mysql') {
-            $pdo->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
+            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $submissionsTable . '_form_slug_email ON ' . $submissionsTable . ' (form_slug, email)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $submissionsTable . '_form_slug_created ON ' . $submissionsTable . ' (form_slug, created DESC)');
+        } elseif ($driver === 'mysql') {
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $submissionsTable . ' (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 form_slug VARCHAR(160) NOT NULL,
                 email VARCHAR(254) NOT NULL,
@@ -187,101 +183,29 @@ return static function (array $context): void {
                 hostname VARCHAR(255) NULL,
                 user_agent VARCHAR(500) NULL,
                 created DATETIME NOT NULL,
-                UNIQUE KEY uniq_' . $table . '_form_slug_email (form_slug, email),
-                INDEX idx_' . $table . '_form_slug_created (form_slug, created)
+                UNIQUE KEY uniq_' . $submissionsTable . '_form_slug_email (form_slug, email),
+                INDEX idx_' . $submissionsTable . '_form_slug_created (form_slug, created)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-            return;
-        }
-
-        $pdo->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
-            id BIGSERIAL PRIMARY KEY,
-            form_slug VARCHAR(160) NOT NULL,
-            email VARCHAR(254) NOT NULL,
-            display_name VARCHAR(255) NOT NULL,
-            country VARCHAR(16) NOT NULL,
-            additional_fields_json TEXT NOT NULL DEFAULT \'[]\',
-            source_url VARCHAR(2048) NOT NULL DEFAULT \'\',
-            ip_address VARCHAR(45) NULL,
-            hostname VARCHAR(255) NULL,
-            user_agent VARCHAR(500) NULL,
-            created TIMESTAMP NOT NULL
-        )');
-        $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $table . '_form_slug_email ON ' . $table . ' (form_slug, email)');
-        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_form_slug_created ON ' . $table . ' (form_slug, created DESC)');
-    };
-
-    if ($tableExists($db, $driver, $formsTable) && !$columnExists($db, $driver, $formsTable, 'form_slug')) {
-        $stmt = $db->prepare(
-            'SELECT name, slug, enabled, additional_fields_json
-             FROM ' . $formsTable . '
-             ORDER BY name ASC, id ASC'
-        );
-        $stmt->execute();
-        $writeForms($dataFile, $stmt->fetchAll() ?: []);
-        $db->exec('DROP TABLE IF EXISTS ' . $formsTable);
-    } elseif (!is_file($dataFile)) {
-        $writeForms($dataFile, []);
-    }
-
-    // Rename rvn_signups → rvn_ext_signups for installs that used the old naming convention.
-    $oldSubmissionsTable = $legacyTableResolver('signups');
-    if (
-        $oldSubmissionsTable !== $submissionsTable
-        && $tableExists($db, $driver, $oldSubmissionsTable)
-        && !$tableExists($db, $driver, $submissionsTable)
-    ) {
-        $db->exec('ALTER TABLE ' . $oldSubmissionsTable . ' RENAME TO ' . $submissionsTable);
-    }
-
-    $legacyExists = $tableExists($db, $driver, $legacySubmissionsTable);
-    if (!$tableExists($db, $driver, $submissionsTable)) {
-        $createSubmissionsTable($db, $driver, $submissionsTable);
-    }
-
-    $legacyInlineSubmissions = $formsTable !== $submissionsTable
-        && $tableExists($db, $driver, $formsTable)
-        && $columnExists($db, $driver, $formsTable, 'form_slug');
-    if ($legacyInlineSubmissions) {
-        $db->exec(
-            'INSERT INTO ' . $submissionsTable . ' (
-                id, form_slug, email, display_name, country, additional_fields_json,
-                source_url, ip_address, hostname, user_agent, created
-            )
-            SELECT
-                id, form_slug, email, display_name, country, additional_fields_json,
-                source_url, ip_address, hostname, user_agent, ' . ($columnExists($db, $driver, $formsTable, 'created') ? 'created' : 'created_at') . '
-            FROM ' . $formsTable
-        );
-        $db->exec('DROP TABLE IF EXISTS ' . $formsTable);
-    }
-
-    if ($legacyExists) {
-        $db->exec(
-            'INSERT INTO ' . $submissionsTable . ' (
-                id, form_slug, email, display_name, country, additional_fields_json,
-                source_url, ip_address, hostname, user_agent, created
-            )
-            SELECT
-                id, form_slug, email, display_name, country, additional_fields_json,
-                source_url, ip_address, hostname, user_agent, ' . ($columnExists($db, $driver, $legacySubmissionsTable, 'created') ? 'created' : 'created_at') . '
-            FROM ' . $legacySubmissionsTable
-        );
-        $db->exec('DROP TABLE IF EXISTS ' . $legacySubmissionsTable);
-    }
-
-    if ($columnExists($db, $driver, $submissionsTable, 'created_at') && !$columnExists($db, $driver, $submissionsTable, 'created')) {
-        if ($driver === 'sqlite') {
-            $db->exec('ALTER TABLE ' . $submissionsTable . ' RENAME COLUMN created_at TO created');
-            $db->exec('DROP INDEX IF EXISTS idx_' . $submissionsTable . '_form_slug_created_at');
-        } elseif ($driver === 'mysql') {
-            $db->exec('ALTER TABLE ' . $submissionsTable . ' CHANGE created_at created DATETIME NOT NULL');
-            $db->exec('DROP INDEX idx_' . $submissionsTable . '_form_slug_created_at ON ' . $submissionsTable);
         } else {
-            $db->exec('ALTER TABLE ' . $submissionsTable . ' RENAME COLUMN created_at TO created');
-            $db->exec('DROP INDEX IF EXISTS idx_' . $submissionsTable . '_form_slug_created_at');
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $submissionsTable . ' (
+                id BIGSERIAL PRIMARY KEY,
+                form_slug VARCHAR(160) NOT NULL,
+                email VARCHAR(254) NOT NULL,
+                display_name VARCHAR(255) NOT NULL,
+                country VARCHAR(16) NOT NULL,
+                additional_fields_json TEXT NOT NULL DEFAULT \'[]\',
+                source_url VARCHAR(2048) NOT NULL DEFAULT \'\',
+                ip_address VARCHAR(45) NULL,
+                hostname VARCHAR(255) NULL,
+                user_agent VARCHAR(500) NULL,
+                created TIMESTAMP NOT NULL
+            )');
+            $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $submissionsTable . '_form_slug_email ON ' . $submissionsTable . ' (form_slug, email)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $submissionsTable . '_form_slug_created ON ' . $submissionsTable . ' (form_slug, created DESC)');
         }
     }
 
+    // Ensure optional columns added in later versions exist.
     if (!$columnExists($db, $driver, $submissionsTable, 'additional_fields_json')) {
         if ($driver === 'sqlite') {
             $db->exec('ALTER TABLE ' . $submissionsTable . ' ADD COLUMN additional_fields_json TEXT NOT NULL DEFAULT \'[]\'');

@@ -75,7 +75,7 @@ final class PanelRoutingPreviewService
                 continue;
             }
 
-            if ((int) ($page['is_published'] ?? 0) !== 1) {
+            if (($page['status'] ?? '') !== 'published') {
                 continue;
             }
 
@@ -89,7 +89,7 @@ final class PanelRoutingPreviewService
                 continue;
             }
 
-            $createdAt = trim((string) ($page['created_at'] ?? ''));
+            $createdAt = trim((string) ($page['created'] ?? ''));
             $publishedTs = $createdAt !== '' ? (int) strtotime($createdAt) : 0;
             if ($publishedTs < 0) {
                 $publishedTs = 0;

@@ -116,7 +116,7 @@ final class PanelSessionGuard
         }
 
         $_SESSION['rvn-panel-identity'] = [
-            'display_name' => trim((string) ($preferences['display_name'] ?? '')),
+            'display_name' => trim((string) ($preferences['name'] ?? '')),
             'username' => trim((string) ($preferences['username'] ?? '')),
             'email' => trim((string) ($preferences['email'] ?? '')),
         ];

@@ -562,7 +562,7 @@ return static function (Router $router, array $context): void {
                 (string) ($row['ip_address'] ?? ''),
                 (string) ($row['hostname'] ?? ''),
                 (string) ($row['user_agent'] ?? ''),
-                (string) ($row['created_at'] ?? ''),
+                (string) ($row['created'] ?? ''),
             ]);
         }
         fclose($stream);

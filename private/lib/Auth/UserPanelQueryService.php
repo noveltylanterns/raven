@@ -82,7 +82,7 @@ final class UserPanelQueryService
         }
 
         $stmt = $authDb->prepare(
-            'SELECT id, username, string, name AS display_name, email, theme, avatar AS avatar_path
+            'SELECT id, username, string, name, email, theme, avatar
              FROM ' . $usersTable . '
              WHERE id IN (' . implode(', ', $placeholders) . ')
              ORDER BY id ASC'
@@ -125,10 +125,10 @@ final class UserPanelQueryService
                      SELECT u.id,
                             u.username,
                             u.string,
-                            u.name AS display_name,
+                            u.name,
                             u.email,
                             u.theme,
-                            u.avatar AS avatar_path,
+                            u.avatar,
                             COUNT(*) OVER() AS total_rows
                      FROM ' . $usersTable . ' u
                      ORDER BY u.id ASC
@@ -137,10 +137,10 @@ final class UserPanelQueryService
                  SELECT pu.id AS user_id,
                         pu.username,
                         pu.string,
-                        pu.display_name,
+                        pu.name,
                         pu.email,
                         pu.theme,
-                        pu.avatar_path,
+                        pu.avatar,
                         pu.total_rows,
                         g.id AS group_id,
                         g.name AS group_name,
@@ -169,10 +169,10 @@ final class UserPanelQueryService
                      SELECT u.id,
                             u.username,
                             u.string,
-                            u.name AS display_name,
+                            u.name,
                             u.email,
                             u.theme,
-                            u.avatar AS avatar_path,
+                            u.avatar,
                             COUNT(*) OVER() AS total_rows
                      FROM ' . $usersTable . ' u
                      INNER JOIN filtered_user_ids f ON f.user_id = u.id
@@ -182,10 +182,10 @@ final class UserPanelQueryService
                  SELECT pu.id AS user_id,
                         pu.username,
                         pu.string,
-                        pu.display_name,
+                        pu.name,
                         pu.email,
                         pu.theme,
-                        pu.avatar_path,
+                        pu.avatar,
                         pu.total_rows,
                         g.id AS group_id,
                         g.name AS group_name,
@@ -238,11 +238,11 @@ final class UserPanelQueryService
                     'id' => $userId,
                     'username' => (string) ($row['username'] ?? ''),
                     'string' => (string) ($row['string'] ?? $row['user_string'] ?? ''),
-                    'display_name' => (string) ($row['display_name'] ?? ''),
+                    'name' => (string) ($row['name'] ?? ''),
                     'email' => (string) ($row['email'] ?? ''),
                     'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
-                    'avatar_path' => isset($row['avatar_path']) && $row['avatar_path'] !== ''
-                        ? (string) $row['avatar_path']
+                    'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
+                        ? (string) $row['avatar']
                         : null,
                 ];
             }

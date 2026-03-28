@@ -26,18 +26,17 @@ final class ImageVariantProcessor
     {
         return [
             // `0` means "auto" for this axis (aspect-ratio-preserving contain).
-            // New keys: media.thumb.{sm|md|lg}_{x|y}. Legacy keys accepted as fallback.
             'sm' => [
-                'width' => max(0, (int) $this->config->get('media.thumb.sm_x', $this->config->get('media.small.width', 200))),
-                'height' => max(0, (int) $this->config->get('media.thumb.sm_y', $this->config->get('media.small.height', 200))),
+                'width' => max(0, (int) $this->config->get('media.thumb.sm_x', 200)),
+                'height' => max(0, (int) $this->config->get('media.thumb.sm_y', 200)),
             ],
             'md' => [
-                'width' => max(0, (int) $this->config->get('media.thumb.md_x', $this->config->get('media.med.width', 600))),
-                'height' => max(0, (int) $this->config->get('media.thumb.md_y', $this->config->get('media.med.height', 600))),
+                'width' => max(0, (int) $this->config->get('media.thumb.md_x', 600)),
+                'height' => max(0, (int) $this->config->get('media.thumb.md_y', 600)),
             ],
             'lg' => [
-                'width' => max(0, (int) $this->config->get('media.thumb.lg_x', $this->config->get('media.large.width', 1000))),
-                'height' => max(0, (int) $this->config->get('media.thumb.lg_y', $this->config->get('media.large.height', 1000))),
+                'width' => max(0, (int) $this->config->get('media.thumb.lg_x', 1000)),
+                'height' => max(0, (int) $this->config->get('media.thumb.lg_y', 1000)),
             ],
         ];
     }

@@ -10,7 +10,7 @@
 declare(strict_types=1);
 
 /** @var array{name: string, slug: string, enabled: bool} $formData */
-/** @var array<int, array{id: int, email: string, display_name: string, country: string, additional_fields_json: string, source_url: string, ip_address: string|null, hostname: string|null, user_agent: string|null, created_at: string}> $signups */
+/** @var array<int, array{id: int, email: string, display_name: string, country: string, additional_fields_json: string, source_url: string, ip_address: string|null, hostname: string|null, user_agent: string|null, created: string}> $signups */
 /** @var string $searchQuery */
 /** @var array{current: int, total_pages: int, total_items: int, base_path: string} $pagination */
 /** @var string $indexPath */
@@ -162,7 +162,7 @@ $signupsEmptyId = 'signups-filter-empty';
                             $ipAddress,
                             $hostname,
                             implode(' ', $additionalSearchValues),
-                            (string) ($signup['created_at'] ?? ''),
+                            (string) ($signup['created'] ?? ''),
                         ]);
                         ?>
                         <tr
@@ -193,7 +193,7 @@ $signupsEmptyId = 'signups-filter-empty';
                             </td>
                             <td><?= e($displayName !== '' ? $displayName : '-') ?></td>
                             <td><?= e($countryLabel) ?></td>
-                            <td><?= e((string) ($signup['created_at'] ?? '')) ?></td>
+                            <td><?= e((string) ($signup['created'] ?? '')) ?></td>
                             <td class="text-center">
                                 <form method="post" action="<?= e($deleteSignupPath) ?>" class="d-inline m-0" onsubmit="return confirm('Delete this submission?');">
                                     <?= $csrfField ?>

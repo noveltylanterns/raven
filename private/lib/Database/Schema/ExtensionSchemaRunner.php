@@ -108,10 +108,6 @@ final class ExtensionSchemaRunner
                     ],
                     'table' => $tableResolver,
                     'tables' => $tablesResolver,
-                    // Legacy schema fallback for older providers that still pass explicit table names.
-                    'legacy_table' => function (string $table) use ($driver, $prefix): string {
-                        return $this->tables->resolve($driver, $prefix, $table);
-                    },
                 ]);
             } catch (\Throwable $exception) {
                 error_log('Raven extension schema provider failed for extension "' . $directory . '": ' . $exception->getMessage());

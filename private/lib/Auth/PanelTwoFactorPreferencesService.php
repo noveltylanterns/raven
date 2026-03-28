@@ -206,7 +206,7 @@ final class PanelTwoFactorPreferencesService
             $username = 'user-' . $userId;
         }
 
-        $displayName = trim((string) ($preferences['display_name'] ?? ''));
+        $displayName = trim((string) ($preferences['name'] ?? ''));
         if ($displayName === '') {
             $displayName = $username;
         }

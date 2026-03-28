@@ -8,7 +8,7 @@
  */
 
 /** @var array<string, string> $site */
-/** @var array<int, array{id: int, token: string, token_hint: string, is_reusable: int, use_count: int, expires_at: int|null, last_used_at: int|null, created_at: string, created_by_user_id: int|null}> $inviteRows */
+/** @var array<int, array{id: int, token: string, hint: string, reusable: int, uses: int, expires: int|null, last_used: int|null, created: string, creator: int|null}> $inviteRows */
 /** @var array<int, array{label: string, edit_url: string}> $inviteCreatorMap */
 /** @var array<int, string>|null $inviteGeneratedTokens */
 /** @var string $inviteRegistrationMode */
@@ -189,18 +189,18 @@ $invitesEmptyId = 'invites-filter-empty';
                             $inviteId = (int) ($inviteRow['id'] ?? 0);
                             $detailsId = 'invite-token-details-' . $inviteId;
                             $tokenValue = trim((string) ($inviteRow['token'] ?? ''));
-                            $tokenHint = trim((string) ($inviteRow['token_hint'] ?? ''));
+                            $tokenHint = trim((string) ($inviteRow['hint'] ?? ''));
                             $legacyTokenOnly = false;
                             if ($tokenValue === '' && $tokenHint !== '') {
                                 $tokenValue = $tokenHint . '...';
                                 $legacyTokenOnly = true;
                             }
-                            $isReusable = (int) ($inviteRow['is_reusable'] ?? 0) === 1;
-                            $useCount = max(0, (int) ($inviteRow['use_count'] ?? 0));
-                            $expiresAt = isset($inviteRow['expires_at']) ? (int) $inviteRow['expires_at'] : null;
-                            $lastUsedAt = isset($inviteRow['last_used_at']) ? (int) $inviteRow['last_used_at'] : null;
-                            $createdAt = trim((string) ($inviteRow['created_at'] ?? ''));
-                            $createdByUserId = isset($inviteRow['created_by_user_id']) ? (int) $inviteRow['created_by_user_id'] : null;
+                            $isReusable = (int) ($inviteRow['reusable'] ?? 0) === 1;
+                            $useCount = max(0, (int) ($inviteRow['uses'] ?? 0));
+                            $expiresAt = isset($inviteRow['expires']) ? (int) $inviteRow['expires'] : null;
+                            $lastUsedAt = isset($inviteRow['last_used']) ? (int) $inviteRow['last_used'] : null;
+                            $createdAt = trim((string) ($inviteRow['created'] ?? ''));
+                            $createdByUserId = isset($inviteRow['creator']) ? (int) $inviteRow['creator'] : null;
                             $creatorLabel = '-';
                             $creatorEditUrl = '';
                             if ($createdByUserId !== null && $createdByUserId > 0) {

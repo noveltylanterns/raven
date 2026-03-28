@@ -187,7 +187,7 @@ body { background: #fff; color: #212529; }
 - `GET /{channel}/{slug}` -> channel-scoped page
 
 ## Frontend Availability Modes
-- Global frontend mode comes from config key `site.enabled`:
+- Global frontend mode comes from config key `site.visibility`:
 - `public`: frontend available to guests and logged-in users that have `View Public Site`
 - `private`: guests are denied; logged-in users require `View Private Site`
 - `disabled`: frontend uses `tpl/status/disabled.php` for both guests and logged-in users

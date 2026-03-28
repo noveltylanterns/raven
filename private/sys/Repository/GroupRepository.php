@@ -65,8 +65,8 @@ final class GroupRepository
                     ' . $stockCase . ' AS is_stock,
                     g.cover_image,
                     g.icon_image,
-                    g.created AS created_at,
-                    g.updated AS updated_at,
+                    g.created,
+                    g.updated,
                     COALESCE(ug.member_count, 0) AS member_count
              FROM ' . $groups . ' g
              LEFT JOIN (
@@ -121,8 +121,8 @@ final class GroupRepository
                     ' . $stockCase . ' AS is_stock,
                     g.cover_image,
                     g.icon_image,
-                    g.created AS created_at,
-                    g.updated AS updated_at,
+                    g.created,
+                    g.updated,
                     COALESCE(ug.member_count, 0) AS member_count
              FROM ' . $groups . ' g
              LEFT JOIN (
@@ -169,8 +169,8 @@ final class GroupRepository
                     page_rows.is_stock,
                     page_rows.cover_image,
                     page_rows.icon_image,
-                    page_rows.created_at,
-                    page_rows.updated_at,
+                    page_rows.created,
+                    page_rows.updated,
                     page_rows.member_count,
                     totals.total_rows
              FROM (
@@ -183,8 +183,8 @@ final class GroupRepository
                         ' . $stockCase . ' AS is_stock,
                         g.cover_image,
                         g.icon_image,
-                        g.created AS created_at,
-                        g.updated AS updated_at,
+                        g.created,
+                        g.updated,
                         COALESCE(ug.member_count, 0) AS member_count
                  FROM ' . $groups . ' g
                  LEFT JOIN (
@@ -284,8 +284,8 @@ final class GroupRepository
                     ' . $stockCase . ' AS is_stock,
                     cover_image,
                     icon_image,
-                    created AS created_at,
-                    updated AS updated_at
+                    created,
+                    updated
              FROM ' . $groups . '
              WHERE id = :id
              LIMIT 1'
@@ -301,26 +301,11 @@ final class GroupRepository
     }
 
     /**
-     * Returns one public-route-enabled group by slug with member count.
-     *
-     * @return array<string, mixed>|null
-     */
-    public function findPublicBySlug(string $slug): ?array
-    {
-        return $this->groupPublicRouteService->findPublicBySlug(
-            $this->db,
-            $this->table('groups'),
-            $this->table('user_groups'),
-            $slug
-        );
-    }
-
-    /**
      * Returns one public group row and member profiles in one query.
      *
      * @return array{
      *   group: array<string, mixed>,
-     *   members: array<int, array{id: int, username: string, display_name: string, avatar_path: string|null}>
+     *   members: array<int, array{id: int, username: string, name: string, avatar: string|null}>
      * }|null
      */
     public function findPublicRouteDataBySlug(string $slug): ?array
@@ -415,8 +400,8 @@ final class GroupRepository
 
             $roleSlug = $isStock ? $existingSlug : strtolower($slug);
             $normalizedStockRole = $this->rolePolicy->normalizeStockRoleSettings($roleSlug, $routeEnabled, $mask);
-            $routeEnabled = (int) ($normalizedStockRole['route_enabled'] ?? $routeEnabled);
-            $mask = (int) ($normalizedStockRole['permission_mask'] ?? $mask);
+            $routeEnabled = (int) ($normalizedStockRole['route'] ?? $routeEnabled);
+            $mask = (int) ($normalizedStockRole['permissions'] ?? $mask);
 
             if ($slug === '') {
                 $slug = $this->rolePolicy->normalizeSlug($name);
@@ -435,8 +420,8 @@ final class GroupRepository
                  SET name = :name,
                      slug = :slug,
                      description = :description,
-                     route = :route_enabled,
-                     permissions = :permission_mask,
+                     route = :route,
+                     permissions = :permissions,
                      updated = :updated
                  WHERE id = :id'
             );
@@ -444,8 +429,8 @@ final class GroupRepository
                 ':name' => $name,
                 ':slug' => $slug,
                 ':description' => $description !== '' ? $description : null,
-                ':route_enabled' => $routeEnabled,
-                ':permission_mask' => $mask,
+                ':route' => $routeEnabled,
+                ':permissions' => $mask,
                 ':updated' => $now,
                 ':id' => $id,
             ]);
@@ -692,8 +677,8 @@ final class GroupRepository
 
         $row['permission_mask'] = (int) ($row['permission_mask'] ?? 0);
         $row['is_stock'] = !empty($row['is_stock']) ? 1 : 0;
-        $row['created_at'] = (string) ($row['created_at'] ?? '');
-        $row['updated_at'] = (string) ($row['updated_at'] ?? $row['created_at'] ?? '');
+        $row['created'] = (string) ($row['created'] ?? '');
+        $row['updated'] = (string) ($row['updated'] ?? $row['created'] ?? '');
 
         return $row;
     }

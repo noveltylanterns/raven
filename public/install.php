@@ -682,9 +682,9 @@ if ($isPost) {
                 : 'https',
             'domain' => $siteDomain,
             'name' => $siteName,
-            'enabled' => 'public',
-            'theme' => trim((string) ($nextConfig['site']['theme'] ?? ($nextConfig['site']['default_theme'] ?? 'raven'))) !== ''
-                ? trim((string) ($nextConfig['site']['theme'] ?? ($nextConfig['site']['default_theme'] ?? 'raven')))
+            'visibility' => 'public',
+            'theme' => trim((string) ($nextConfig['site']['theme'] ?? 'raven')) !== ''
+                ? trim((string) ($nextConfig['site']['theme'] ?? 'raven'))
                 : 'raven',
         ];
 
@@ -699,11 +699,10 @@ if ($isPost) {
         if (!array_key_exists('brand_logo', $nextConfig['panel'])) {
             $nextConfig['panel']['brand_logo'] = '';
         }
-        unset($nextConfig['panel']['default_theme']);
         unset($nextConfig['public']);
         $nextConfig['user'] = is_array($nextConfig['user'] ?? null) ? $nextConfig['user'] : [];
         $nextConfig['user']['auth'] = is_array($nextConfig['user']['auth'] ?? null) ? $nextConfig['user']['auth'] : [];
-        $nextConfig['user']['auth']['login'] = $enableUsernames ? 'username' : 'email';
+        $nextConfig['user']['auth']['method'] = $enableUsernames ? 'username' : 'email';
         $nextConfig['user']['auth']['registration'] = 'closed';
 
         $nextConfig['database'] = [
