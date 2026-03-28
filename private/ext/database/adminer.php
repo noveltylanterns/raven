@@ -232,7 +232,7 @@ if (!function_exists('adminer_object')) {
              */
             public function name(): string
             {
-                return 'Raven Database Manager';
+                return 'Adminer Database Manager';
             }
 
             /**

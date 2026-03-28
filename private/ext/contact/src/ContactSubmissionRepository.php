@@ -54,7 +54,7 @@ final class ContactSubmissionRepository
      */
     public function create(array $data): int
     {
-        $table = $this->table('contact');
+        $table = $this->table('ext_contact');
 
         $formSlug = trim((string) ($data['form_slug'] ?? ''));
         $senderName = trim((string) ($data['sender_name'] ?? ''));
@@ -111,7 +111,7 @@ final class ContactSubmissionRepository
      */
     public function countByFormSlug(string $formSlug, string $search = ''): int
     {
-        $table = $this->table('contact');
+        $table = $this->table('ext_contact');
 
         $sql = 'SELECT COUNT(*)
                 FROM ' . $table . '
@@ -139,7 +139,7 @@ final class ContactSubmissionRepository
      */
     public function listByFormSlug(string $formSlug, int $limit, int $offset, string $search = ''): array
     {
-        $table = $this->table('contact');
+        $table = $this->table('ext_contact');
 
         $sql = 'SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created AS created_at
                 FROM ' . $table . '
@@ -177,7 +177,7 @@ final class ContactSubmissionRepository
      */
     public function listPageByFormSlug(string $formSlug, int $limit, int $offset, string $search = ''): array
     {
-        $table = $this->table('contact');
+        $table = $this->table('ext_contact');
         $safeLimit = max(1, $limit);
         $safeOffset = max(0, $offset);
 
@@ -265,7 +265,7 @@ final class ContactSubmissionRepository
      */
     public function listForExportByFormSlug(string $formSlug, string $search = ''): array
     {
-        $table = $this->table('contact');
+        $table = $this->table('ext_contact');
 
         $sql = 'SELECT id, form_slug, sender_name, sender_email, message_text, additional_fields_json, source_url, ip_address, hostname, user_agent, created AS created_at
                 FROM ' . $table . '
@@ -292,7 +292,7 @@ final class ContactSubmissionRepository
      */
     public function deleteById(string $formSlug, int $id): bool
     {
-        $table = $this->table('contact');
+        $table = $this->table('ext_contact');
 
         try {
             $stmt = $this->db->prepare(
@@ -315,7 +315,7 @@ final class ContactSubmissionRepository
      */
     public function deleteAllByFormSlug(string $formSlug): int
     {
-        $table = $this->table('contact');
+        $table = $this->table('ext_contact');
 
         try {
             $stmt = $this->db->prepare(
@@ -335,7 +335,7 @@ final class ContactSubmissionRepository
      */
     public function syncFormIdentity(string $fromSlug, string $toSlug): void
     {
-        $table = $this->table('contact');
+        $table = $this->table('ext_contact');
 
         try {
             $stmt = $this->db->prepare(

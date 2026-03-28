@@ -19,26 +19,26 @@ final class AuthAccessGateService
     /**
      * @param array<int, int> $bits
      */
-    public function hasAnyPanelPermissionBit(int $mask, array $bits, bool $isSuperAdmin): bool
+    public function hasAnyPanelPermissionBit(int $mask, array $bits, bool $isAdmin): bool
     {
         if (!$this->canAccessPanel($mask)) {
             return false;
         }
 
-        if ($isSuperAdmin) {
+        if ($isAdmin) {
             return true;
         }
 
         return PanelAccess::hasAnyPanelPermissionBit($mask, $bits);
     }
 
-    public function hasPanelPermissionBit(int $mask, int $bit, bool $isSuperAdmin): bool
+    public function hasPanelPermissionBit(int $mask, int $bit, bool $isAdmin): bool
     {
         if ($bit <= 0 || !$this->canAccessPanel($mask)) {
             return false;
         }
 
-        if ($isSuperAdmin) {
+        if ($isAdmin) {
             return true;
         }
 

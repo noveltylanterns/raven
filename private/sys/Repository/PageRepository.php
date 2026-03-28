@@ -826,6 +826,8 @@ final class PageRepository
             $author = null;
         }
         $now = gmdate('Y-m-d H:i:s');
+        $publishAt = $this->normalizeDateTimeField($data['published'] ?? null);
+        $expireAt = $this->normalizeDateTimeField($data['expires'] ?? null);
         $categoryIds = $this->categoryEnabled ? $this->normalizeIds($data['category_ids'] ?? []) : [];
         $tagIds = $this->tagEnabled ? $this->normalizeIds($data['tag_ids'] ?? []) : [];
 
@@ -858,6 +860,8 @@ final class PageRepository
                 'description' => $description,
                 'display_title' => $displayTitle,
                 'status' => $status,
+                'published' => $publishAt,
+                'expires' => $expireAt,
                 'author' => $author,
                 'channel' => $channelId,
                 'now' => $now,
@@ -873,6 +877,68 @@ final class PageRepository
                 $this->replacePageTags($pageId, $ids);
             }
         );
+    }
+
+    /**
+     * Flips page statuses based on published / expires schedule columns.
+     *
+     * - draft pages whose published is in the past become published.
+     * - published pages whose expires is in the past become draft.
+     *
+     * Safe to call on every public request; only updates rows that need flipping.
+     */
+    public function applySchedule(): void
+    {
+        $pages = $this->table('pages');
+        $now = gmdate('Y-m-d H:i:s');
+
+        $this->db->prepare(
+            'UPDATE ' . $pages . '
+             SET status = \'published\', updated = :now
+             WHERE status = \'draft\'
+               AND published IS NOT NULL
+               AND published <= :now2'
+        )->execute([':now' => $now, ':now2' => $now]);
+
+        $this->db->prepare(
+            'UPDATE ' . $pages . '
+             SET status = \'draft\', updated = :now
+             WHERE status = \'published\'
+               AND expires IS NOT NULL
+               AND expires <= :now2'
+        )->execute([':now' => $now, ':now2' => $now]);
+    }
+
+    /**
+     * Normalises a datetime string from panel input to Y-m-d H:i:s DB format, or null.
+     *
+     * Accepts `Y-m-d H:i:s`, `Y-m-d H:i`, and HTML datetime-local format `Y-m-d\TH:i`.
+     */
+    private function normalizeDateTimeField(mixed $raw): ?string
+    {
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+
+        $value = trim((string) $raw);
+        if ($value === '') {
+            return null;
+        }
+
+        // datetime-local browser format: 2026-03-27T14:30 or 2026-03-27T14:30:00
+        $value = str_replace('T', ' ', $value);
+
+        // Append seconds if missing (H:i → H:i:s)
+        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $value)) {
+            $value .= ':00';
+        }
+
+        // Validate basic Y-m-d H:i:s shape
+        if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $value)) {
+            return null;
+        }
+
+        return $value;
     }
 
     /**
@@ -1216,9 +1282,6 @@ final class PageRepository
         if (!array_key_exists('author_user_id', $row) && array_key_exists('author', $row)) {
             $author = (int) ($row['author'] ?? 0);
             $row['author_user_id'] = $author > 0 ? $author : null;
-        }
-        if (!array_key_exists('status', $row) && array_key_exists('published', $row)) {
-            $row['status'] = (int) ($row['published'] ?? 0) === 1 ? 'published' : 'draft';
         }
         if (!array_key_exists('is_published', $row)) {
             $row['is_published'] = strtolower(trim((string) ($row['status'] ?? 'draft'))) === 'published' ? 1 : 0;

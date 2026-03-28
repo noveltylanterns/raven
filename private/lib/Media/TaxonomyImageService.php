@@ -200,7 +200,11 @@ final class TaxonomyImageService
      *     preview_image_path?: string,
      *     preview_image_sm_path?: string,
      *     preview_image_md_path?: string,
-     *     preview_image_lg_path?: string
+     *     preview_image_lg_path?: string,
+     *     icon_image_path?: string,
+     *     icon_image_sm_path?: string,
+     *     icon_image_md_path?: string,
+     *     icon_image_lg_path?: string
      *   },
      *   error?: string
      * }
@@ -210,7 +214,7 @@ final class TaxonomyImageService
         if (
             !in_array($taxonomyType, ['categories', 'channels', 'tags'], true)
             || $taxonomyId < 1
-            || !in_array($slot, ['cover', 'preview'], true)
+            || !in_array($slot, ['cover', 'preview', 'icon'], true)
         ) {
             return ['ok' => false, 'error' => 'Invalid taxonomy image target.'];
         }

@@ -4,6 +4,14 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Security;
 
+// Load bacon/bacon-qr-code package handler on first use.
+(static function (): void {
+    $handler = dirname(__DIR__) . '/Composer/bacon/bacon-qr-code.php';
+    if (is_file($handler)) {
+        require_once $handler;
+    }
+})();
+
 /**
  * Shared QR-code rendering helpers.
  */

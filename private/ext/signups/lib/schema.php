@@ -28,7 +28,7 @@ return static function (array $context): void {
     $legacyTableResolver = is_callable($context['legacy_table'] ?? null) ? $context['legacy_table'] : $tableResolver;
     $formsTable = $legacyTableResolver('ext_signups');
     $legacySubmissionsTable = $legacyTableResolver('ext_signups_submissions');
-    $submissionsTable = $legacyTableResolver('signups');
+    $submissionsTable = $tableResolver();
     $storage = is_array($context['storage']) ? $context['storage'] : [];
     $localRoot = rtrim((string) ($storage['local'] ?? ''), '/');
     if ($localRoot === '') {
@@ -221,6 +221,16 @@ return static function (array $context): void {
         $db->exec('DROP TABLE IF EXISTS ' . $formsTable);
     } elseif (!is_file($dataFile)) {
         $writeForms($dataFile, []);
+    }
+
+    // Rename rvn_signups → rvn_ext_signups for installs that used the old naming convention.
+    $oldSubmissionsTable = $legacyTableResolver('signups');
+    if (
+        $oldSubmissionsTable !== $submissionsTable
+        && $tableExists($db, $driver, $oldSubmissionsTable)
+        && !$tableExists($db, $driver, $submissionsTable)
+    ) {
+        $db->exec('ALTER TABLE ' . $oldSubmissionsTable . ' RENAME TO ' . $submissionsTable);
     }
 
     $legacyExists = $tableExists($db, $driver, $legacySubmissionsTable);

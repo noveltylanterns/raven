@@ -451,6 +451,8 @@ final class PanelController
         $description = $this->input->text($post['description'] ?? null, 1000);
         $channelSlug = $this->input->slug($post['channel_slug'] ?? null);
         $status = strtolower((string) $this->input->text($post['status'] ?? null, 20));
+        $publishAt = $this->input->text($post['published'] ?? null, 32);
+        $expireAt = $this->input->text($post['expires'] ?? null, 32);
         $displayTitle = isset($post['display_title']) && (string) $post['display_title'] === '1';
         $galleryEnabled = $this->pageBodyBlocksIncludeGallery($contentBlocks)
             || (isset($post['gallery_enabled']) && (string) $post['gallery_enabled'] === '1');
@@ -549,6 +551,8 @@ final class PanelController
                 'category_ids' => $categoryIds,
                 'tag_ids' => $tagIds,
                 'status' => $status,
+                'published' => $publishAt !== '' ? $publishAt : null,
+                'expires' => $expireAt !== '' ? $expireAt : null,
             ]);
 
             // Keep Media tab metadata and page-level gallery toggle in sync with save.
@@ -1541,14 +1545,16 @@ final class PanelController
 
         $coverUploads = $this->normalizeUploadedFileSet($files['cover_image'] ?? null);
         $previewUploads = $this->normalizeUploadedFileSet($files['preview_image'] ?? null);
+        $iconUploads = $this->normalizeUploadedFileSet($files['icon_image'] ?? null);
 
-        if (count($coverUploads) > 1 || count($previewUploads) > 1) {
-            $this->flash('error', 'Please upload only one cover image and one preview image.');
+        if (count($coverUploads) > 1 || count($previewUploads) > 1 || count($iconUploads) > 1) {
+            $this->flash('error', 'Please upload only one image per slot.');
             redirect($savedEditUrl);
         }
 
         $removeCover = isset($post['remove_cover_image']) && (string) $post['remove_cover_image'] === '1';
         $removePreview = isset($post['remove_preview_image']) && (string) $post['remove_preview_image'] === '1';
+        $removeIcon = isset($post['remove_icon_image']) && (string) $post['remove_icon_image'] === '1';
 
         if ($removeCover) {
             foreach ($this->taxonomyImageStorageKeysForSlot('categories', 'cover') as $key) {
@@ -1557,6 +1563,11 @@ final class PanelController
         }
         if ($removePreview) {
             foreach ($this->taxonomyImageStorageKeysForSlot('categories', 'preview') as $key) {
+                $nextStorage[$key] = null;
+            }
+        }
+        if ($removeIcon) {
+            foreach ($this->taxonomyImageStorageKeysForSlot('categories', 'icon') as $key) {
                 $nextStorage[$key] = null;
             }
         }
@@ -1587,6 +1598,20 @@ final class PanelController
             $previewPaths = $previewResult['paths'] ?? [];
             $nextStorage = array_merge($nextStorage, $previewStorage);
             $newPathSets[] = $previewPaths;
+        }
+
+        if (isset($iconUploads[0])) {
+            $iconResult = $this->storeTaxonomyImageUpload('categories', $savedId, 'icon', $iconUploads[0]);
+            if (!$iconResult['ok']) {
+                $this->cleanupTaxonomyImagePathSets('categories', $savedId, $newPathSets);
+                $this->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
+                redirect($savedEditUrl);
+            }
+
+            $iconStorage = is_array($iconResult['record'] ?? null) ? $iconResult['record'] : [];
+            $iconPaths = $iconResult['paths'] ?? [];
+            $nextStorage = array_merge($nextStorage, $iconStorage);
+            $newPathSets[] = $iconPaths;
         }
 
         try {
@@ -2032,14 +2057,16 @@ final class PanelController
 
         $coverUploads = $this->normalizeUploadedFileSet($files['cover_image'] ?? null);
         $previewUploads = $this->normalizeUploadedFileSet($files['preview_image'] ?? null);
+        $iconUploads = $this->normalizeUploadedFileSet($files['icon_image'] ?? null);
 
-        if (count($coverUploads) > 1 || count($previewUploads) > 1) {
-            $this->flash('error', 'Please upload only one cover image and one preview image.');
+        if (count($coverUploads) > 1 || count($previewUploads) > 1 || count($iconUploads) > 1) {
+            $this->flash('error', 'Please upload only one image per slot.');
             redirect($savedEditUrl);
         }
 
         $removeCover = isset($post['remove_cover_image']) && (string) $post['remove_cover_image'] === '1';
         $removePreview = isset($post['remove_preview_image']) && (string) $post['remove_preview_image'] === '1';
+        $removeIcon = isset($post['remove_icon_image']) && (string) $post['remove_icon_image'] === '1';
 
         if ($removeCover) {
             foreach ($this->taxonomyImageStorageKeysForSlot('tags', 'cover') as $key) {
@@ -2048,6 +2075,11 @@ final class PanelController
         }
         if ($removePreview) {
             foreach ($this->taxonomyImageStorageKeysForSlot('tags', 'preview') as $key) {
+                $nextStorage[$key] = null;
+            }
+        }
+        if ($removeIcon) {
+            foreach ($this->taxonomyImageStorageKeysForSlot('tags', 'icon') as $key) {
                 $nextStorage[$key] = null;
             }
         }
@@ -2078,6 +2110,20 @@ final class PanelController
             $previewPaths = $previewResult['paths'] ?? [];
             $nextStorage = array_merge($nextStorage, $previewStorage);
             $newPathSets[] = $previewPaths;
+        }
+
+        if (isset($iconUploads[0])) {
+            $iconResult = $this->storeTaxonomyImageUpload('tags', $savedId, 'icon', $iconUploads[0]);
+            if (!$iconResult['ok']) {
+                $this->cleanupTaxonomyImagePathSets('tags', $savedId, $newPathSets);
+                $this->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
+                redirect($savedEditUrl);
+            }
+
+            $iconStorage = is_array($iconResult['record'] ?? null) ? $iconResult['record'] : [];
+            $iconPaths = $iconResult['paths'] ?? [];
+            $nextStorage = array_merge($nextStorage, $iconStorage);
+            $newPathSets[] = $iconPaths;
         }
 
         try {
@@ -2642,7 +2688,7 @@ final class PanelController
             redirect($this->panelUrl('/user'));
         }
         $groupOptions = is_array($editData['group_options'] ?? null) ? $editData['group_options'] : [];
-        $actorIsSuperAdmin = $this->auth->isSuperAdmin();
+        $actorIsAdmin = $this->auth->isAdmin();
         $primaryGroupId = (int) ($user['primary_group_id'] ?? 0);
         $secondaryGroupIds = array_map('intval', (array) ($user['secondary_group_ids'] ?? []));
         $bioMaxLength = max(1, (int) $this->config->get('user.bio', 500));
@@ -2664,9 +2710,9 @@ final class PanelController
             'primaryGroupId' => $primaryGroupId,
             'secondaryGroupIds' => $secondaryGroupIds,
             // Only existing Admin users can assign users into the Admin group.
-            'canAssignSuperAdmin' => $actorIsSuperAdmin,
+            'canAssignAdmin' => $actorIsAdmin,
             // Groups that include Manage System Configuration are assignable by Admin only.
-            'canAssignConfigurationGroups' => $actorIsSuperAdmin,
+            'canAssignConfigurationGroups' => $actorIsAdmin,
             'themeOptions' => ['default', 'corp', 'ice', 'midnight'],
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
@@ -2778,32 +2824,31 @@ final class PanelController
             $groupPermissionMasks[(int) ($groupOption['id'] ?? 0)] = (int) ($groupOption['permission_mask'] ?? 0);
         }
 
-        // Only Admin actors may assign users into the Admin group.
-        $superAdminGroupId = $this->groupRepo->idBySlug('admin') ?? $this->groupRepo->idBySlug('super');
-        $actorIsSuperAdmin = $this->auth->isSuperAdmin();
-        if (!$actorIsSuperAdmin && $superAdminGroupId !== null) {
-            $targetAlreadyHasSuperAdmin = false;
+        // Only Admin actors may assign users into the Admin group (ID 1).
+        $actorIsAdmin = $this->auth->isAdmin();
+        if (!$actorIsAdmin) {
+            $targetAlreadyHasAdmin = false;
 
             if (is_array($existingUser)) {
                 $existingGroupIds = array_map('intval', (array) ($existingUser['group_ids'] ?? []));
-                $targetAlreadyHasSuperAdmin = in_array($superAdminGroupId, $existingGroupIds, true);
+                $targetAlreadyHasAdmin = in_array(1, $existingGroupIds, true);
             }
 
-            $requestedSuperAdmin = in_array($superAdminGroupId, $groupIds, true);
-            if ($requestedSuperAdmin && !$targetAlreadyHasSuperAdmin) {
-                $this->flash('error', 'Only Super Admin users can assign the Super Admin group.');
+            $requestedAdmin = in_array(1, $groupIds, true);
+            if ($requestedAdmin && !$targetAlreadyHasAdmin) {
+                $this->flash('error', 'Only Admin users can assign the Admin group.');
                 redirect($editUrl);
             }
 
-            // Preserve existing Super Admin membership on edits by non-Super-Admin actors.
-            if ($targetAlreadyHasSuperAdmin && !in_array($superAdminGroupId, $groupIds, true)) {
-                $groupIds[] = $superAdminGroupId;
+            // Preserve existing Admin membership on edits by non-Admin actors.
+            if ($targetAlreadyHasAdmin && !in_array(1, $groupIds, true)) {
+                $groupIds[] = 1;
             }
         }
 
-        // Only Super Admin actors may promote users into any group that grants
+        // Only Admin actors may promote users into any group that grants
         // Manage System Configuration capability.
-        if (!$actorIsSuperAdmin) {
+        if (!$actorIsAdmin) {
             $configurationGroupIds = [];
             $systemPanelBitsMask = PanelAccess::maskFromBits(PanelAccess::systemPanelBits());
             foreach ($groupPermissionMasks as $groupIdKey => $mask) {
@@ -2821,7 +2866,7 @@ final class PanelController
                 $newConfigurationAssignments = array_values(array_diff($requestedConfigurationGroupIds, $existingConfigurationGroupIds));
 
                 if ($newConfigurationAssignments !== []) {
-                    $this->flash('error', 'Only Super Admin users can assign groups with Manage System Configuration.');
+                    $this->flash('error', 'Only Admin users can assign groups with Manage System Configuration.');
                     redirect($editUrl);
                 }
             }
@@ -3480,7 +3525,7 @@ final class PanelController
             'groupRoutePrefix' => $this->groupRoutePrefix(),
             'groupRoutingEnabledSystemWide' => $this->groupRoutesEnabledForRoutingTable(),
             'permissionDefinitions' => $this->permissionDefinitions(),
-            'canEditConfigurationBit' => $this->auth->isSuperAdmin(),
+            'canEditConfigurationBit' => $this->auth->isAdmin(),
             'csrfField' => $this->csrf->field(),
             'flashSuccess' => $this->pullFlash('success'),
             'error' => $this->pullFlash('error'),
@@ -3512,10 +3557,11 @@ final class PanelController
         $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'permissions'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 100);
         $editUrl = $this->panelEditorUrlWithTab('/group/edit', $id, $activeTab, 'basic');
-        $actorIsSuperAdmin = $this->auth->isSuperAdmin();
+        $actorIsAdmin = $this->auth->isAdmin();
         $existingGroup = $id !== null ? $this->groupRepo->findById($id) : null;
         $isExistingStockGroup = is_array($existingGroup) && (int) ($existingGroup['is_stock'] ?? 0) === 1;
         $coverImage = $this->input->text($post['cover_image'] ?? null, 255);
+        $iconImage = $this->input->text($post['icon_image'] ?? null, 255);
         $slugRaw = trim($this->input->text($post['slug'] ?? null, 160));
         $slug = '';
         if (!$isExistingStockGroup && $slugRaw !== '') {
@@ -3537,8 +3583,8 @@ final class PanelController
         $isBannedGroup = $roleSlug === 'banned';
         $isUserGroup = $roleSlug === 'user';
         $isEditorGroup = $roleSlug === 'editor';
-        $isAdminGroup = $roleSlug === 'admin';
-        $isSuperAdminGroup = $roleSlug === 'super';
+        // Admin group is canonical ID 1.
+        $isAdminGroup = $isExistingStockGroup && $id === 1;
         if ($isGuestLikeGroup || $isBannedGroup) {
             $routeEnabled = false;
         }
@@ -3582,8 +3628,6 @@ final class PanelController
         } elseif ($isEditorGroup) {
             $permissionMask = $editorStockMask;
         } elseif ($isAdminGroup) {
-            $permissionMask = $adminStockMask;
-        } elseif ($isSuperAdminGroup) {
             $permissionMask = $allValidBitsMask;
         }
 
@@ -3592,11 +3636,11 @@ final class PanelController
         $existingSystemBits = is_array($existingGroup)
             ? (((int) ($existingGroup['permission_mask'] ?? 0)) & $systemBitsMask)
             : 0;
-        if (!$actorIsSuperAdmin && $requestedSystemBits !== $existingSystemBits) {
-            $this->flash('error', 'Only Super Admin users can change system administration permissions.');
+        if (!$actorIsAdmin && $requestedSystemBits !== $existingSystemBits) {
+            $this->flash('error', 'Only Admin users can change system administration permissions.');
             redirect($editUrl);
         }
-        if (!$actorIsSuperAdmin) {
+        if (!$actorIsAdmin) {
             $permissionMask = ($permissionMask & (~$systemBitsMask)) | $existingSystemBits;
         }
         if (($permissionMask & PanelAccess::PANEL_LOGIN) !== PanelAccess::PANEL_LOGIN) {
@@ -3616,6 +3660,7 @@ final class PanelController
                 'name' => $name,
                 'slug' => $slug,
                 'cover_image' => $coverImage,
+                'icon_image' => $iconImage,
                 'route_enabled' => $routeEnabled ? 1 : 0,
                 'permission_mask' => $permissionMask,
             ]);
@@ -5815,7 +5860,11 @@ final class PanelController
      *     preview_image_path?: string,
      *     preview_image_sm_path?: string,
      *     preview_image_md_path?: string,
-     *     preview_image_lg_path?: string
+     *     preview_image_lg_path?: string,
+     *     icon_image_path?: string,
+     *     icon_image_sm_path?: string,
+     *     icon_image_md_path?: string,
+     *     icon_image_lg_path?: string
      *   },
      *   error?: string
      * }

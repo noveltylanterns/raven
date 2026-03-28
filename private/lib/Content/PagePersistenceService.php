@@ -20,6 +20,8 @@ final class PagePersistenceService
      *   description: string,
      *   display_title: int,
      *   status: string,
+     *   published: string|null,
+     *   expires: string|null,
      *   author: int|null,
      *   channel: int|null,
      *   now: string,
@@ -42,6 +44,9 @@ final class PagePersistenceService
         $now = (string) ($payload['now'] ?? gmdate('Y-m-d H:i:s'));
         $categoryIds = is_array($payload['category_ids'] ?? null) ? $payload['category_ids'] : [];
         $tagIds = is_array($payload['tag_ids'] ?? null) ? $payload['tag_ids'] : [];
+        $published = isset($payload['published']) && $payload['published'] !== '' ? (string) $payload['published'] : null;
+        $expires = isset($payload['expires']) && $payload['expires'] !== '' ? (string) $payload['expires'] : null;
+
         $writeParams = [
             ':title' => (string) ($payload['title'] ?? ''),
             ':slug' => (string) ($payload['slug'] ?? ''),
@@ -50,6 +55,8 @@ final class PagePersistenceService
             ':display_title' => (int) ($payload['display_title'] ?? 1),
             ':channel' => $payload['channel'] ?? null,
             ':status' => (string) ($payload['status'] ?? 'draft'),
+            ':published' => $published,
+            ':expires' => $expires,
             ':author' => $payload['author'] ?? null,
             ':updated' => $now,
         ];
@@ -68,6 +75,8 @@ final class PagePersistenceService
                          author = :author,
                          channel = :channel,
                          status = :status,
+                         published = :published,
+                         expires = :expires,
                          updated = :updated
                      WHERE id = :id'
                 );
@@ -78,8 +87,8 @@ final class PagePersistenceService
             } else {
                 $stmt = $db->prepare(
                     'INSERT INTO ' . $pagesTable . '
-                    (title, slug, content, description, display_title, channel, status, author, created, updated)
-                    VALUES (:title, :slug, :content, :description, :display_title, :channel, :status, :author, :created, :updated)'
+                    (title, slug, content, description, display_title, channel, status, published, expires, author, created, updated)
+                    VALUES (:title, :slug, :content, :description, :display_title, :channel, :status, :published, :expires, :author, :created, :updated)'
                 );
 
                 $stmt->execute($writeParams + [':created' => $now]);

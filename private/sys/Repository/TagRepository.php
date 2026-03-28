@@ -46,7 +46,7 @@ final class TagRepository
 
         $stmt = $this->db->prepare(
             'SELECT t.id, t.name, t.slug, ' . $setColumn . ' AS set_value, t.description, t.created, t.updated,
-                    t.cover_image, t.preview_image,
+                    t.cover_image, t.preview_image, t.icon_image,
                     COALESCE(pt.page_count, 0) AS page_count
              FROM ' . $tags . ' t
              LEFT JOIN (
@@ -96,7 +96,7 @@ final class TagRepository
 
         $stmt = $this->db->prepare(
             'SELECT t.id, t.name, t.slug, ' . $this->setColumn('t') . ' AS set_value, t.description, t.created, t.updated,
-                    t.cover_image, t.preview_image,
+                    t.cover_image, t.preview_image, t.icon_image,
                     COALESCE(pt.page_count, 0) AS page_count
              FROM ' . $tags . ' t
              LEFT JOIN (
@@ -144,11 +144,12 @@ final class TagRepository
                     page_rows.updated,
                     page_rows.cover_image,
                     page_rows.preview_image,
+                    page_rows.icon_image,
                     page_rows.page_count,
                     totals.total_rows
              FROM (
                  SELECT t.id, t.name, t.slug, ' . $this->setColumn('t') . ' AS set_value, t.description, t.created, t.updated,
-                        t.cover_image, t.preview_image,
+                        t.cover_image, t.preview_image, t.icon_image,
                         COALESCE(pt.page_count, 0) AS page_count
                  FROM ' . $tags . ' t
                  LEFT JOIN (
@@ -278,7 +279,7 @@ final class TagRepository
 
         $stmt = $this->db->prepare(
             'SELECT id, name, slug, ' . $this->setColumn() . ' AS set_value, description, created, updated,
-                    cover_image, preview_image
+                    cover_image, preview_image, icon_image
              FROM ' . $tags . '
              WHERE id = :id
              LIMIT 1'
@@ -347,11 +348,12 @@ final class TagRepository
     }
 
     /**
-     * Updates one tag's cover/preview image files.
+     * Updates one tag's cover/preview/icon image files.
      *
      * @param array{
      *   cover_image?: string|null,
-     *   preview_image?: string|null
+     *   preview_image?: string|null,
+     *   icon_image?: string|null
      * } $files
      */
     public function updateImageFiles(int $id, array $files): void
@@ -362,12 +364,14 @@ final class TagRepository
             'UPDATE ' . $tags . '
              SET cover_image = :cover_image,
                  preview_image = :preview_image,
+                 icon_image = :icon_image,
                  updated = :updated
              WHERE id = :id'
         );
         $stmt->execute([
             ':cover_image' => $this->normalizeNullableFilename($files['cover_image'] ?? null),
             ':preview_image' => $this->normalizeNullableFilename($files['preview_image'] ?? null),
+            ':icon_image' => $this->normalizeNullableFilename($files['icon_image'] ?? null),
             ':updated' => gmdate('Y-m-d H:i:s'),
             ':id' => $id,
         ]);
@@ -505,6 +509,7 @@ final class TagRepository
         unset($row['set_value']);
         $row['cover_image'] = $storage['cover_image'] ?? null;
         $row['preview_image'] = $storage['preview_image'] ?? null;
+        $row['icon_image'] = $storage['icon_image'] ?? null;
 
         return array_merge(
             $row,

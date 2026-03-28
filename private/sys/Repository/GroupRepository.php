@@ -63,6 +63,7 @@ final class GroupRepository
                     g.permissions AS permission_mask,
                     ' . $stockCase . ' AS is_stock,
                     g.cover_image,
+                    g.icon_image,
                     g.created AS created_at,
                     g.updated AS updated_at,
                     COALESCE(ug.member_count, 0) AS member_count
@@ -118,6 +119,7 @@ final class GroupRepository
                     g.permissions AS permission_mask,
                     ' . $stockCase . ' AS is_stock,
                     g.cover_image,
+                    g.icon_image,
                     g.created AS created_at,
                     g.updated AS updated_at,
                     COALESCE(ug.member_count, 0) AS member_count
@@ -165,6 +167,7 @@ final class GroupRepository
                     page_rows.permission_mask,
                     page_rows.is_stock,
                     page_rows.cover_image,
+                    page_rows.icon_image,
                     page_rows.created_at,
                     page_rows.updated_at,
                     page_rows.member_count,
@@ -178,6 +181,7 @@ final class GroupRepository
                         g.permissions AS permission_mask,
                         ' . $stockCase . ' AS is_stock,
                         g.cover_image,
+                        g.icon_image,
                         g.created AS created_at,
                         g.updated AS updated_at,
                         COALESCE(ug.member_count, 0) AS member_count
@@ -278,6 +282,7 @@ final class GroupRepository
                     permissions AS permission_mask,
                     ' . $stockCase . ' AS is_stock,
                     cover_image,
+                    icon_image,
                     created AS created_at,
                     updated AS updated_at
              FROM ' . $groups . '
@@ -374,7 +379,7 @@ final class GroupRepository
      * Stock-group slugs are immutable; stock names are editable.
      * Stock flag cannot be changed through normal save flow.
      *
-     * @param array{id: int|null, name: string, slug?: string, description?: string, cover_image?: string|null, route_enabled?: int|bool, permission_mask?: int, permissions?: int} $data
+     * @param array{id: int|null, name: string, slug?: string, description?: string, cover_image?: string|null, icon_image?: string|null, route_enabled?: int|bool, permission_mask?: int, permissions?: int} $data
      */
     public function save(array $data): int
     {
@@ -385,6 +390,8 @@ final class GroupRepository
         $description = trim((string) ($data['description'] ?? ''));
         $coverImage = trim((string) ($data['cover_image'] ?? ''));
         $coverImage = $coverImage !== '' ? $coverImage : null;
+        $iconImage = trim((string) ($data['icon_image'] ?? ''));
+        $iconImage = $iconImage !== '' ? $iconImage : null;
         $slugInput = trim((string) ($data['slug'] ?? ''));
         $slug = $this->rolePolicy->normalizeSlug($slugInput !== '' ? $slugInput : $name);
         $mask = (int) ($data['permissions'] ?? $data['permission_mask'] ?? 0);
@@ -431,6 +438,7 @@ final class GroupRepository
                      slug = :slug,
                      description = :description,
                      cover_image = :cover_image,
+                     icon_image = :icon_image,
                      route = :route_enabled,
                      permissions = :permission_mask,
                      updated = :updated
@@ -441,6 +449,7 @@ final class GroupRepository
                 ':slug' => $slug,
                 ':description' => $description !== '' ? $description : null,
                 ':cover_image' => $coverImage,
+                ':icon_image' => $iconImage,
                 ':route_enabled' => $routeEnabled,
                 ':permission_mask' => $mask,
                 ':updated' => $now,
@@ -468,8 +477,8 @@ final class GroupRepository
 
         // Create path is always non-stock; stock groups are schema-managed.
         $stmt = $this->db->prepare(
-            'INSERT INTO ' . $groups . ' (id, name, slug, description, route, permissions, cover_image, created, updated)
-             VALUES (:id, :name, :slug, :description, :route, :permissions, :cover_image, :created, :updated)'
+            'INSERT INTO ' . $groups . ' (id, name, slug, description, route, permissions, cover_image, icon_image, created, updated)
+             VALUES (:id, :name, :slug, :description, :route, :permissions, :cover_image, :icon_image, :created, :updated)'
         );
         $stmt->execute([
             ':id' => $customGroupId,
@@ -479,6 +488,7 @@ final class GroupRepository
             ':route' => $routeEnabled,
             ':permissions' => $mask,
             ':cover_image' => $coverImage,
+            ':icon_image' => $iconImage,
             ':created' => $now,
             ':updated' => $now,
         ]);

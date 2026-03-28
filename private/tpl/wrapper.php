@@ -39,10 +39,10 @@ $documentTitle = $metaTitle === '' ? $siteName : ($metaTitle . ' [' . $siteName 
 <meta property="og:type" content="{meta:og_type}">
 <meta property="og:url" content="{meta:url}">
 <meta property="twitter:card" content="{meta:x_card}">
-<meta property="twitter:creator" content="{meta:x_creator}">
+<meta property="twitter:creator" content="@{meta:x_creator}">
 <meta property="twitter:description" content="{meta:desc}">
 <meta property="twitter:image" content="{meta:image}">
-<meta property="twitter:site" content="{meta:x_site}">
+<meta property="twitter:site" content="@{meta:x_site}">
 <meta property="twitter:title" content="{meta:title} [{site:name}]">
 <meta property="twitter:url" content="{meta:url}">
 <link rel="apple-touch-icon" href="{meta:apple_touch_icon}">

@@ -53,8 +53,7 @@ $isGuestGroup = $groupRoleSlug === 'guest';
 $isValidatingGroup = $groupRoleSlug === 'validating';
 $isGuestLikeGroup = $isGuestGroup || $isValidatingGroup;
 $isUserGroup = $groupRoleSlug === 'user';
-$isAdminGroup = $groupRoleSlug === 'admin';
-$isSuperAdminGroup = $groupRoleSlug === 'super'; // legacy slug still present on unmigrated installs
+$isAdminGroup = $groupId === 1;
 $allDefinedBitsMask = 0;
 foreach ($permissionDefinitions as $permissionDefinitionRow) {
     $allDefinedBitsMask |= (int) ($permissionDefinitionRow['bit'] ?? 0);
@@ -77,7 +76,7 @@ if ($isBannedGroup) {
     $permissionMask &= $viewPublicSiteBit;
 } elseif ($isUserGroup) {
     $permissionMask &= ($viewPublicSiteBit | $viewPrivateSiteBit);
-} elseif ($isAdminGroup || $isSuperAdminGroup) {
+} elseif ($isAdminGroup) {
     $permissionMask = $allDefinedBitsMask;
 }
 if (($permissionMask & PanelAccess::PANEL_LOGIN) !== PanelAccess::PANEL_LOGIN) {
@@ -158,21 +157,19 @@ foreach ($panelPermissionDefinitions as $permission) {
 
     $panelPermissionMatrix[$groupLabel]['actions'][$actionKey] = $permission;
 }
-$adminAllowedBits = []; // Admin/Super groups get all bits; no restriction needed here.
+$adminAllowedBits = []; // Admin group gets all bits; no restriction needed here.
 $panelPermissionState = static function (int $bit) use (
     $permissionMask,
     $isBannedGroup,
     $isGuestLikeGroup,
     $isUserGroup,
     $isAdminGroup,
-    $isSuperAdminGroup,
     $canEditConfigurationBit,
     $systemPanelBits
 ): array {
     $checked = ($permissionMask & $bit) === $bit;
-    $isFullAdminGroup = $isAdminGroup || $isSuperAdminGroup;
     $configurationPermissionLocked = !$canEditConfigurationBit && in_array($bit, $systemPanelBits, true);
-    $lockedPermission = (($isBannedGroup || $isGuestLikeGroup || $isUserGroup) && !$isFullAdminGroup);
+    $lockedPermission = (($isBannedGroup || $isGuestLikeGroup || $isUserGroup) && !$isAdminGroup);
     $requiresPanelAccess = $bit !== PanelAccess::PANEL_LOGIN;
     $panelAccessEnabled = ($permissionMask & PanelAccess::PANEL_LOGIN) === PanelAccess::PANEL_LOGIN;
     if (!$lockedPermission && $requiresPanelAccess && !$panelAccessEnabled) {
@@ -309,7 +306,7 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
                 <?php endif; ?>
             </div>
 
-            <div class="form-group mt-3 mb-0">
+            <div class="form-group mt-3">
                 <label for="cover_image" class="form-label">Cover Image</label>
                 <input
                     id="cover_image"
@@ -320,6 +317,19 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
                     placeholder="/uploads/groups/cover/example.jpg"
                 >
                 <div class="form-text">Optional public image path or URL stored with this group.</div>
+            </div>
+
+            <div class="form-group mb-0">
+                <label for="icon_image" class="form-label">Icon Image</label>
+                <input
+                    id="icon_image"
+                    name="icon_image"
+                    type="text"
+                    class="form-control"
+                    value="<?= e((string) ($group['icon_image'] ?? '')) ?>"
+                    placeholder="/uploads/groups/icon/example.jpg"
+                >
+                <div class="form-text">Optional public icon image path or URL stored with this group.</div>
             </div>
 
             <hr class="my-3">
@@ -377,12 +387,11 @@ $activeTab = in_array($requestedTab, ['basic', 'permissions'], true) ? $requeste
                     <?php
                     $bit = (int) $permission['bit'];
                     $checked = ($permissionMask & $bit) === $bit;
-                    $isFullAdminGroup = $isAdminGroup || $isSuperAdminGroup;
                     $allowedForGuestLike = $isGuestLikeGroup && $bit === $viewPublicSiteBit;
                     $allowedForUser = $isUserGroup && in_array($bit, [$viewPublicSiteBit, $viewPrivateSiteBit], true);
                     $requiresPanelAccess = $bit === $viewDisabledSiteBit;
                     $panelAccessEnabled = ($permissionMask & PanelAccess::PANEL_LOGIN) === PanelAccess::PANEL_LOGIN;
-                    $lockedPermission = !$isFullAdminGroup
+                    $lockedPermission = !$isAdminGroup
                         && ($isBannedGroup || $isGuestLikeGroup || $isUserGroup)
                         && !($allowedForGuestLike || $allowedForUser);
                     if (!$lockedPermission && $requiresPanelAccess && !$panelAccessEnabled) {

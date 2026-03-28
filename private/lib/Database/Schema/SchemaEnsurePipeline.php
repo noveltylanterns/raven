@@ -29,6 +29,7 @@ final class SchemaEnsurePipeline
         $components->appSchemaBootstrap()->ensureAppSchema($appDb, $driver, $prefix);
         $appSchemaBuilder->ensureRootChannelScope($appDb, $driver, $prefix);
         $appSchemaBuilder->migratePageContentStorage($appDb, $driver, $prefix);
+        $appSchemaBuilder->ensurePageScheduleColumns($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePageDescriptionColumn($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePageDisplayTitleColumn($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePageGalleryEnabledColumn($appDb, $driver, $prefix);
@@ -39,6 +40,7 @@ final class SchemaEnsurePipeline
         $appSchemaBuilder->ensureGroupRoutingColumns($appDb, $driver, $prefix);
         $appSchemaBuilder->ensureTaxonomySetColumns($appDb, $driver, $prefix);
         $appSchemaBuilder->ensureTaxonomyImageColumns($appDb, $driver, $prefix);
+        $appSchemaBuilder->ensureTaxonomyIconColumn($appDb, $driver, $prefix);
         $appSchemaBuilder->migrateUserGroupPivot($appDb, $driver, $prefix);
         $appSchemaBuilder->migrateLoginFailureStorage($appDb, $driver, $prefix);
         $appSchemaBuilder->ensurePanelPerformanceIndexes($appDb, $driver, $prefix);

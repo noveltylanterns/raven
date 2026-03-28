@@ -19,6 +19,7 @@ use Raven\SignupPublicFormRuntime;
 return [
     'storage' => [
         'local' => true,
+        'table' => true,
     ],
     'boot' => static function (array &$app): void {
     if (

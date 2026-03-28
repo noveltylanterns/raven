@@ -15,12 +15,12 @@ final class ConfigEditorSchemaService
     /** @var array<string, string> */
     private const PATH_LABEL_OVERRIDES = [
         'media.max_filesize_kb' => 'Max Filesize (KB)',
-        'media.small.width' => 'Small Width (px)',
-        'media.small.height' => 'Small Height (px)',
-        'media.med.width' => 'Medium Width (px)',
-        'media.med.height' => 'Medium Height (px)',
-        'media.large.width' => 'Large Width (px)',
-        'media.large.height' => 'Large Height (px)',
+        'media.thumb.sm_x' => 'Small Width (px)',
+        'media.thumb.sm_y' => 'Small Height (px)',
+        'media.thumb.md_x' => 'Medium Width (px)',
+        'media.thumb.md_y' => 'Medium Height (px)',
+        'media.thumb.lg_x' => 'Large Width (px)',
+        'media.thumb.lg_y' => 'Large Height (px)',
         'user.avatar.max_filesize_kb' => 'Max Avatar Filesize (KB)',
         'user.avatar.max_width' => 'Max Avatar Width (px)',
         'user.avatar.max_height' => 'Max Avatar Height (px)',
@@ -1098,17 +1098,32 @@ final class ConfigEditorSchemaService
             $media['strip_exif'] = true;
         }
 
-        foreach (['small', 'med', 'large'] as $size) {
-            if (!array_key_exists($size, $media) || !is_array($media[$size])) {
-                $media[$size] = ['width' => 0, 'height' => 0];
-            }
-            if (!array_key_exists('width', $media[$size])) {
-                $media[$size]['width'] = 0;
-            }
-            if (!array_key_exists('height', $media[$size])) {
-                $media[$size]['height'] = 0;
+        // Migrate media.small/med/large → media.thumb.{sm|md|lg}_{x|y}
+        $legacySizeMap = [
+            'small' => ['sm_x', 'sm_y'],
+            'med'   => ['md_x', 'md_y'],
+            'large' => ['lg_x', 'lg_y'],
+        ];
+        $thumb = array_key_exists('thumb', $media) && is_array($media['thumb']) ? $media['thumb'] : [];
+        foreach ($legacySizeMap as $legacyKey => [$xKey, $yKey]) {
+            if (array_key_exists($legacyKey, $media) && is_array($media[$legacyKey])) {
+                if (!array_key_exists($xKey, $thumb)) {
+                    $thumb[$xKey] = (int) ($media[$legacyKey]['width'] ?? 0);
+                }
+                if (!array_key_exists($yKey, $thumb)) {
+                    $thumb[$yKey] = (int) ($media[$legacyKey]['height'] ?? 0);
+                }
+                unset($media[$legacyKey]);
             }
         }
+        // Ensure all thumb keys have defaults
+        $thumbDefaults = ['sm_x' => 200, 'sm_y' => 200, 'md_x' => 600, 'md_y' => 600, 'lg_x' => 1000, 'lg_y' => 1000];
+        foreach ($thumbDefaults as $key => $default) {
+            if (!array_key_exists($key, $thumb)) {
+                $thumb[$key] = $default;
+            }
+        }
+        $media['thumb'] = $thumb;
 
         // Ensure user.avatar has defaults
         $avatar = $user['avatar'] ?? null;

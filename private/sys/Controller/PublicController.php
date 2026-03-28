@@ -139,6 +139,7 @@ final class PublicController
      */
     public function home(): void
     {
+        $this->pageRepo->applySchedule();
         $page = $this->pageRepo->findHomepage();
 
         if ($page === null) {
@@ -166,6 +167,7 @@ final class PublicController
      */
     public function channel(string $channelSlug): void
     {
+        $this->pageRepo->applySchedule();
         $page = $this->pageRepo->findChannelHomepage($channelSlug);
 
         if ($page === null) {
@@ -202,6 +204,7 @@ final class PublicController
      */
     public function page(string $pageSlug, ?string $channelSlug = null): void
     {
+        $this->pageRepo->applySchedule();
         $requestedSlug = strtolower(trim($pageSlug));
         $lookupSlug = $requestedSlug;
         $lookupTarget = null;

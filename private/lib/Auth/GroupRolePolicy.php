@@ -71,14 +71,6 @@ final class GroupRolePolicy
     }
 
     /**
-     * @deprecated Legacy alias — use isAdminRoleSlug() instead.
-     */
-    public function isSuperAdminRoleSlug(string $slug): bool
-    {
-        return strtolower(trim($slug)) === 'super';
-    }
-
-    /**
      * @deprecated Legacy alias — 'editor' group is being removed.
      */
     public function isEditorRoleSlug(string $slug): bool

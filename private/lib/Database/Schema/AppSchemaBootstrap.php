@@ -35,6 +35,8 @@ final class AppSchemaBootstrap
                 content TEXT NOT NULL DEFAULT \'\',
                 display_title INTEGER NOT NULL DEFAULT 1,
                 status TEXT NOT NULL DEFAULT \'published\',
+                published TEXT NULL,
+                expires TEXT NULL,
                 author INTEGER NULL,
                 cover_image INTEGER NULL,
                 preview_image INTEGER NULL,
@@ -50,6 +52,7 @@ final class AppSchemaBootstrap
                 "set" INTEGER NOT NULL DEFAULT 1,
                 cover_image TEXT NULL,
                 preview_image TEXT NULL,
+                icon_image TEXT NULL,
                 created TEXT NOT NULL,
                 updated TEXT NOT NULL
             )');
@@ -62,6 +65,7 @@ final class AppSchemaBootstrap
                 "set" INTEGER NOT NULL DEFAULT 1,
                 cover_image TEXT NULL,
                 preview_image TEXT NULL,
+                icon_image TEXT NULL,
                 created TEXT NOT NULL,
                 updated TEXT NOT NULL
             )');
@@ -140,6 +144,7 @@ final class AppSchemaBootstrap
                 route INTEGER NOT NULL DEFAULT 0,
                 permissions INTEGER NOT NULL DEFAULT 0,
                 cover_image TEXT NULL,
+                icon_image TEXT NULL,
                 created TEXT NOT NULL,
                 updated TEXT NOT NULL
             )');
@@ -183,6 +188,8 @@ final class AppSchemaBootstrap
                 content MEDIUMTEXT NOT NULL,
                 display_title TINYINT(1) NOT NULL DEFAULT 1,
                 status VARCHAR(20) NOT NULL DEFAULT \'published\',
+                published DATETIME NULL,
+                expires DATETIME NULL,
                 author BIGINT UNSIGNED NULL,
                 cover_image BIGINT UNSIGNED NULL,
                 preview_image BIGINT UNSIGNED NULL,
@@ -201,6 +208,7 @@ final class AppSchemaBootstrap
                 `set` BIGINT UNSIGNED NOT NULL DEFAULT 1,
                 cover_image VARCHAR(255) NULL,
                 preview_image VARCHAR(255) NULL,
+                icon_image VARCHAR(255) NULL,
                 created DATETIME NOT NULL,
                 updated DATETIME NOT NULL,
                 INDEX idx_' . $prefix . 'categories_set (`set`)
@@ -214,6 +222,7 @@ final class AppSchemaBootstrap
                 `set` BIGINT UNSIGNED NOT NULL DEFAULT 1,
                 cover_image VARCHAR(255) NULL,
                 preview_image VARCHAR(255) NULL,
+                icon_image VARCHAR(255) NULL,
                 created DATETIME NOT NULL,
                 updated DATETIME NOT NULL,
                 INDEX idx_' . $prefix . 'tags_set (`set`)
@@ -299,6 +308,7 @@ final class AppSchemaBootstrap
                 route TINYINT(1) NOT NULL DEFAULT 0,
                 permissions BIGINT UNSIGNED NOT NULL DEFAULT 0,
                 cover_image VARCHAR(255) NULL,
+                icon_image VARCHAR(255) NULL,
                 created DATETIME NOT NULL,
                 updated DATETIME NOT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
@@ -340,6 +350,8 @@ final class AppSchemaBootstrap
             content TEXT NOT NULL,
             display_title SMALLINT NOT NULL DEFAULT 1,
             status VARCHAR(20) NOT NULL DEFAULT \'published\',
+            published TIMESTAMP NULL,
+            expires TIMESTAMP NULL,
             author BIGINT NULL,
             cover_image BIGINT NULL,
             preview_image BIGINT NULL,
@@ -355,6 +367,7 @@ final class AppSchemaBootstrap
             "set" BIGINT NOT NULL DEFAULT 1,
             cover_image VARCHAR(255) NULL,
             preview_image VARCHAR(255) NULL,
+            icon_image VARCHAR(255) NULL,
             created TIMESTAMP NOT NULL,
             updated TIMESTAMP NOT NULL
         )');
@@ -366,6 +379,7 @@ final class AppSchemaBootstrap
             "set" BIGINT NOT NULL DEFAULT 1,
             cover_image VARCHAR(255) NULL,
             preview_image VARCHAR(255) NULL,
+            icon_image VARCHAR(255) NULL,
             created TIMESTAMP NOT NULL,
             updated TIMESTAMP NOT NULL
         )');
@@ -444,6 +458,7 @@ final class AppSchemaBootstrap
             route SMALLINT NOT NULL DEFAULT 0,
             permissions BIGINT NOT NULL DEFAULT 0,
             cover_image VARCHAR(255) NULL,
+            icon_image VARCHAR(255) NULL,
             created TIMESTAMP NOT NULL,
             updated TIMESTAMP NOT NULL
         )');

@@ -46,6 +46,72 @@ final class SchemaIntrospector
         return $stmt->fetchColumn() !== null;
     }
 
+    /**
+     * Returns true when a column exists in a table, dispatching by driver.
+     */
+    public function columnExists(PDO $db, string $driver, string $table, string $column): bool
+    {
+        if ($driver === 'sqlite') {
+            return $this->appColumnExistsSqlite($db, $table, $column);
+        }
+
+        if ($driver === 'mysql') {
+            return $this->appColumnExistsMySql($db, $table, $column);
+        }
+
+        return $this->appColumnExistsPgSql($db, $table, $column);
+    }
+
+    /**
+     * Returns true when a named index exists, dispatching by driver.
+     * SQLite uses CREATE INDEX IF NOT EXISTS and does not need this check; returns false.
+     */
+    public function indexExists(PDO $db, string $driver, string $table, string $indexName): bool
+    {
+        if ($driver === 'mysql') {
+            return $this->mySqlIndexExists($db, $table, $indexName);
+        }
+
+        if ($driver === 'pgsql') {
+            return $this->pgSqlIndexExists($db, $table, $indexName);
+        }
+
+        return false;
+    }
+
+    /**
+     * Returns true when a table exists, dispatching by driver.
+     */
+    public function tableExists(PDO $db, string $driver, string $table): bool
+    {
+        if ($driver === 'sqlite') {
+            $stmt = $db->prepare(
+                'SELECT 1 FROM sqlite_master WHERE type = :type AND name = :name LIMIT 1'
+            );
+            $stmt->execute([':type' => 'table', ':name' => $table]);
+
+            return $stmt->fetchColumn() !== false;
+        }
+
+        if ($driver === 'mysql') {
+            $stmt = $db->prepare(
+                'SELECT 1
+                 FROM information_schema.tables
+                 WHERE table_schema = DATABASE()
+                   AND table_name = :table_name
+                 LIMIT 1'
+            );
+            $stmt->execute([':table_name' => $table]);
+
+            return $stmt->fetchColumn() !== false;
+        }
+
+        $stmt = $db->prepare('SELECT to_regclass(:table_name)');
+        $stmt->execute([':table_name' => $table]);
+
+        return $stmt->fetchColumn() !== null;
+    }
+
     public function authColumnExistsSqlite(PDO $db, string $table, string $column): bool
     {
         $stmt = $db->query('PRAGMA table_info(' . $table . ')');

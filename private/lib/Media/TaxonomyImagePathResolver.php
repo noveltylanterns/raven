@@ -23,6 +23,15 @@ final class TaxonomyImagePathResolver
             ];
         }
 
+        if ($slot === 'icon') {
+            return [
+                'icon_image_path',
+                'icon_image_sm_path',
+                'icon_image_md_path',
+                'icon_image_lg_path',
+            ];
+        }
+
         return [
             'preview_image_path',
             'preview_image_sm_path',
@@ -58,6 +67,7 @@ final class TaxonomyImagePathResolver
             return [
                 'cover_image' => self::normalizeFilename($record['cover_image'] ?? $record['cover_image_file'] ?? null),
                 'preview_image' => self::normalizeFilename($record['preview_image'] ?? $record['preview_image_file'] ?? null),
+                'icon_image' => self::normalizeFilename($record['icon_image'] ?? null),
             ];
         }
 
@@ -116,7 +126,7 @@ final class TaxonomyImagePathResolver
         }
 
         $paths = [];
-        foreach (['cover', 'preview'] as $slot) {
+        foreach (['cover', 'preview', 'icon'] as $slot) {
             $fileKey = $slot . '_image';
             $filename = self::normalizeFilename($storage[$fileKey] ?? null);
             $slotPaths = self::pathsForSlot($taxonomyType, $taxonomyId, $slot, $filename);

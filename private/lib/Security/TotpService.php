@@ -7,6 +7,14 @@ namespace Raven\Lib\Security;
 use RobThree\Auth\Algorithm;
 use RobThree\Auth\TwoFactorAuth;
 
+// Load robthree/twofactorauth package handler on first use.
+(static function (): void {
+    $handler = dirname(__DIR__) . '/Composer/robthree/twofactorauth.php';
+    if (is_file($handler)) {
+        require_once $handler;
+    }
+})();
+
 /**
  * Shared TOTP helpers used by panel setup and auth verification paths.
  */

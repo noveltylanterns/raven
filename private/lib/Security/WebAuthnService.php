@@ -6,6 +6,14 @@ namespace Raven\Lib\Security;
 
 use lbuchs\WebAuthn\WebAuthn;
 
+// Load lbuchs/webauthn package handler on first use.
+(static function (): void {
+    $handler = dirname(__DIR__) . '/Composer/lbuchs/webauthn.php';
+    if (is_file($handler)) {
+        require_once $handler;
+    }
+})();
+
 /**
  * Shared WebAuthn server/runtime helpers.
  */

@@ -41,26 +41,39 @@ final class AppSchemaBuilder
         $this->migratePageContentStoragePgSql($db, $pagesTable);
     }
 
+    public function ensurePageScheduleColumns(PDO $db, string $driver, string $prefix): void
+    {
+        $pagesTable = $prefix . 'pages';
+
+        // Rename from prior column names if an earlier migration run created them.
+        $this->renameColumnIfNeeded($db, $driver, $pagesTable, 'publish_at', 'published', 'DATETIME NULL');
+        $this->renameColumnIfNeeded($db, $driver, $pagesTable, 'expire_at', 'expires', 'DATETIME NULL');
+
+        if (!$this->introspector->columnExists($db, $driver, $pagesTable, 'published')) {
+            if ($driver === 'mysql') {
+                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN published DATETIME NULL');
+            } elseif ($driver === 'pgsql') {
+                $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($pagesTable) . ' ADD COLUMN published TIMESTAMP NULL');
+            } else {
+                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN published TEXT NULL');
+            }
+        }
+
+        if (!$this->introspector->columnExists($db, $driver, $pagesTable, 'expires')) {
+            if ($driver === 'mysql') {
+                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN expires DATETIME NULL');
+            } elseif ($driver === 'pgsql') {
+                $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($pagesTable) . ' ADD COLUMN expires TIMESTAMP NULL');
+            } else {
+                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN expires TEXT NULL');
+            }
+        }
+    }
+
     public function ensurePageDescriptionColumn(PDO $db, string $driver, string $prefix): void
     {
         $pagesTable = $prefix . 'pages';
-        if ($driver === 'sqlite') {
-            if (!$this->introspector->appColumnExistsSqlite($db, $pagesTable, 'description')) {
-                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN description TEXT NULL');
-            }
-
-            return;
-        }
-
-        if ($driver === 'mysql') {
-            if (!$this->introspector->appColumnExistsMySql($db, $pagesTable, 'description')) {
-                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN description TEXT NULL');
-            }
-
-            return;
-        }
-
-        if (!$this->introspector->appColumnExistsPgSql($db, $pagesTable, 'description')) {
+        if (!$this->introspector->columnExists($db, $driver, $pagesTable, 'description')) {
             $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN description TEXT NULL');
         }
     }
@@ -68,24 +81,14 @@ final class AppSchemaBuilder
     public function ensurePageDisplayTitleColumn(PDO $db, string $driver, string $prefix): void
     {
         $pagesTable = $prefix . 'pages';
-        if ($driver === 'sqlite') {
-            if (!$this->introspector->appColumnExistsSqlite($db, $pagesTable, 'display_title')) {
+        if (!$this->introspector->columnExists($db, $driver, $pagesTable, 'display_title')) {
+            if ($driver === 'mysql') {
+                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN display_title TINYINT(1) NOT NULL DEFAULT 1');
+            } elseif ($driver === 'pgsql') {
+                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN display_title SMALLINT NOT NULL DEFAULT 1');
+            } else {
                 $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN display_title INTEGER NOT NULL DEFAULT 1');
             }
-
-            return;
-        }
-
-        if ($driver === 'mysql') {
-            if (!$this->introspector->appColumnExistsMySql($db, $pagesTable, 'display_title')) {
-                $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN display_title TINYINT(1) NOT NULL DEFAULT 1');
-            }
-
-            return;
-        }
-
-        if (!$this->introspector->appColumnExistsPgSql($db, $pagesTable, 'display_title')) {
-            $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN display_title SMALLINT NOT NULL DEFAULT 1');
         }
     }
 
@@ -104,7 +107,7 @@ final class AppSchemaBuilder
         }
 
         if ($driver === 'mysql') {
-            if (!$this->introspector->mySqlIndexExists($db, $pagesTable, 'uniq_' . $prefix . 'pages_channel_slug')) {
+            if (!$this->introspector->indexExists($db, 'mysql', $pagesTable, 'uniq_' . $prefix . 'pages_channel_slug')) {
                 $db->exec(
                     'ALTER TABLE ' . $pagesTable . '
                      ADD UNIQUE INDEX uniq_' . $prefix . 'pages_channel_slug (' . $channelColumn . ', slug)'
@@ -114,7 +117,7 @@ final class AppSchemaBuilder
             return;
         }
 
-        if (!$this->introspector->pgSqlIndexExists($db, $pagesTable, 'uniq_' . $prefix . 'pages_root_slug')) {
+        if (!$this->introspector->indexExists($db, 'pgsql', $pagesTable, 'uniq_' . $prefix . 'pages_root_slug')) {
             $db->exec(
                 'CREATE UNIQUE INDEX uniq_' . $prefix . 'pages_root_slug
                  ON ' . $this->introspector->quotePgIdentifier($pagesTable) . ' (slug)
@@ -122,7 +125,7 @@ final class AppSchemaBuilder
             );
         }
 
-        if (!$this->introspector->pgSqlIndexExists($db, $pagesTable, 'uniq_' . $prefix . 'pages_channel_slug')) {
+        if (!$this->introspector->indexExists($db, 'pgsql', $pagesTable, 'uniq_' . $prefix . 'pages_channel_slug')) {
             $db->exec(
                 'CREATE UNIQUE INDEX uniq_' . $prefix . 'pages_channel_slug
                  ON ' . $this->introspector->quotePgIdentifier($pagesTable) . ' (' . $channelColumn . ', slug)
@@ -246,33 +249,33 @@ final class AppSchemaBuilder
         }
 
         if ($driver === 'mysql') {
-            $this->renameColumnIfNeededMySql($db, $imagesTable, 'page_id', 'page', 'BIGINT UNSIGNED NOT NULL');
-            $this->renameColumnIfNeededMySql($db, $imagesTable, 'hash_sha256', 'hash', 'CHAR(64) NOT NULL');
-            $this->renameColumnIfNeededMySql($db, $imagesTable, 'created_at', 'created', 'DATETIME NOT NULL');
-            $this->renameColumnIfNeededMySql($db, $imagesTable, 'updated_at', 'updated', 'DATETIME NOT NULL');
-            if ($this->introspector->appColumnExistsMySql($db, $imagesTable, 'is_cover')) {
+            $this->renameColumnIfNeeded($db, 'mysql', $imagesTable, 'page_id', 'page', 'BIGINT UNSIGNED NOT NULL');
+            $this->renameColumnIfNeeded($db, 'mysql', $imagesTable, 'hash_sha256', 'hash', 'CHAR(64) NOT NULL');
+            $this->renameColumnIfNeeded($db, 'mysql', $imagesTable, 'created_at', 'created', 'DATETIME NOT NULL');
+            $this->renameColumnIfNeeded($db, 'mysql', $imagesTable, 'updated_at', 'updated', 'DATETIME NOT NULL');
+            if ($this->introspector->columnExists($db, 'mysql', $imagesTable, 'is_cover')) {
                 $db->exec('ALTER TABLE ' . $imagesTable . ' DROP COLUMN is_cover');
             }
-            if ($this->introspector->appColumnExistsMySql($db, $imagesTable, 'is_preview')) {
+            if ($this->introspector->columnExists($db, 'mysql', $imagesTable, 'is_preview')) {
                 $db->exec('ALTER TABLE ' . $imagesTable . ' DROP COLUMN is_preview');
             }
-            $this->renameColumnIfNeededMySql($db, $variantsTable, 'image_id', 'image', 'BIGINT UNSIGNED NOT NULL');
-            $this->renameColumnIfNeededMySql($db, $variantsTable, 'created_at', 'created', 'DATETIME NOT NULL');
+            $this->renameColumnIfNeeded($db, 'mysql', $variantsTable, 'image_id', 'image', 'BIGINT UNSIGNED NOT NULL');
+            $this->renameColumnIfNeeded($db, 'mysql', $variantsTable, 'created_at', 'created', 'DATETIME NOT NULL');
             return;
         }
 
-        $this->renameColumnIfNeededPgSql($db, $imagesTable, 'page_id', 'page');
-        $this->renameColumnIfNeededPgSql($db, $imagesTable, 'hash_sha256', 'hash');
-        $this->renameColumnIfNeededPgSql($db, $imagesTable, 'created_at', 'created');
-        $this->renameColumnIfNeededPgSql($db, $imagesTable, 'updated_at', 'updated');
-        if ($this->introspector->appColumnExistsPgSql($db, $imagesTable, 'is_cover')) {
+        $this->renameColumnIfNeeded($db, 'pgsql', $imagesTable, 'page_id', 'page');
+        $this->renameColumnIfNeeded($db, 'pgsql', $imagesTable, 'hash_sha256', 'hash');
+        $this->renameColumnIfNeeded($db, 'pgsql', $imagesTable, 'created_at', 'created');
+        $this->renameColumnIfNeeded($db, 'pgsql', $imagesTable, 'updated_at', 'updated');
+        if ($this->introspector->columnExists($db, 'pgsql', $imagesTable, 'is_cover')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($imagesTable) . ' DROP COLUMN is_cover');
         }
-        if ($this->introspector->appColumnExistsPgSql($db, $imagesTable, 'is_preview')) {
+        if ($this->introspector->columnExists($db, 'pgsql', $imagesTable, 'is_preview')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($imagesTable) . ' DROP COLUMN is_preview');
         }
-        $this->renameColumnIfNeededPgSql($db, $variantsTable, 'image_id', 'image');
-        $this->renameColumnIfNeededPgSql($db, $variantsTable, 'created_at', 'created');
+        $this->renameColumnIfNeeded($db, 'pgsql', $variantsTable, 'image_id', 'image');
+        $this->renameColumnIfNeeded($db, 'pgsql', $variantsTable, 'created_at', 'created');
     }
 
     public function migratePageTaxonomyPivots(PDO $db, string $driver, string $prefix): void
@@ -284,17 +287,17 @@ final class AppSchemaBuilder
         }
 
         if ($driver === 'mysql') {
-            $this->renameColumnIfNeededMySql($db, $prefix . 'page_categories', 'page_id', 'page', 'BIGINT UNSIGNED NOT NULL');
-            $this->renameColumnIfNeededMySql($db, $prefix . 'page_categories', 'category_id', 'category', 'BIGINT UNSIGNED NOT NULL');
-            $this->renameColumnIfNeededMySql($db, $prefix . 'page_tags', 'page_id', 'page', 'BIGINT UNSIGNED NOT NULL');
-            $this->renameColumnIfNeededMySql($db, $prefix . 'page_tags', 'tag_id', 'tag', 'BIGINT UNSIGNED NOT NULL');
+            $this->renameColumnIfNeeded($db, 'mysql', $prefix . 'page_categories', 'page_id', 'page', 'BIGINT UNSIGNED NOT NULL');
+            $this->renameColumnIfNeeded($db, 'mysql', $prefix . 'page_categories', 'category_id', 'category', 'BIGINT UNSIGNED NOT NULL');
+            $this->renameColumnIfNeeded($db, 'mysql', $prefix . 'page_tags', 'page_id', 'page', 'BIGINT UNSIGNED NOT NULL');
+            $this->renameColumnIfNeeded($db, 'mysql', $prefix . 'page_tags', 'tag_id', 'tag', 'BIGINT UNSIGNED NOT NULL');
             return;
         }
 
-        $this->renameColumnIfNeededPgSql($db, $prefix . 'page_categories', 'page_id', 'page');
-        $this->renameColumnIfNeededPgSql($db, $prefix . 'page_categories', 'category_id', 'category');
-        $this->renameColumnIfNeededPgSql($db, $prefix . 'page_tags', 'page_id', 'page');
-        $this->renameColumnIfNeededPgSql($db, $prefix . 'page_tags', 'tag_id', 'tag');
+        $this->renameColumnIfNeeded($db, 'pgsql', $prefix . 'page_categories', 'page_id', 'page');
+        $this->renameColumnIfNeeded($db, 'pgsql', $prefix . 'page_categories', 'category_id', 'category');
+        $this->renameColumnIfNeeded($db, 'pgsql', $prefix . 'page_tags', 'page_id', 'page');
+        $this->renameColumnIfNeeded($db, 'pgsql', $prefix . 'page_tags', 'tag_id', 'tag');
     }
 
     public function migrateLoginFailureStorage(PDO $db, string $driver, string $prefix): void
@@ -309,29 +312,29 @@ final class AppSchemaBuilder
         }
 
         if ($driver === 'mysql') {
-            if ($this->tableExistsMySql($db, $usersLegacyTable) && !$this->tableExistsMySql($db, $table)) {
+            if ($this->introspector->tableExists($db, 'mysql', $usersLegacyTable) && !$this->introspector->tableExists($db, 'mysql', $table)) {
                 $db->exec('RENAME TABLE ' . $usersLegacyTable . ' TO ' . $table);
-            } elseif ($this->tableExistsMySql($db, $legacyTable) && !$this->tableExistsMySql($db, $table)) {
+            } elseif ($this->introspector->tableExists($db, 'mysql', $legacyTable) && !$this->introspector->tableExists($db, 'mysql', $table)) {
                 $db->exec('RENAME TABLE ' . $legacyTable . ' TO ' . $table);
             }
 
-            $this->renameLoginFailureColumnsMySql($db, $table);
+            $this->renameLoginFailureColumns($db, 'mysql', $table);
             return;
         }
 
-        if ($this->tableExistsPgSql($db, $usersLegacyTable) && !$this->tableExistsPgSql($db, $table)) {
+        if ($this->introspector->tableExists($db, 'pgsql', $usersLegacyTable) && !$this->introspector->tableExists($db, 'pgsql', $table)) {
             $db->exec(
                 'ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersLegacyTable) . '
                  RENAME TO ' . $this->introspector->quotePgIdentifier($table)
             );
-        } elseif ($this->tableExistsPgSql($db, $legacyTable) && !$this->tableExistsPgSql($db, $table)) {
+        } elseif ($this->introspector->tableExists($db, 'pgsql', $legacyTable) && !$this->introspector->tableExists($db, 'pgsql', $table)) {
             $db->exec(
                 'ALTER TABLE ' . $this->introspector->quotePgIdentifier($legacyTable) . '
                  RENAME TO ' . $this->introspector->quotePgIdentifier($table)
             );
         }
 
-        $this->renameLoginFailureColumnsPgSql($db, $table);
+        $this->renameLoginFailureColumns($db, 'pgsql', $table);
     }
 
     public function migrateUserGroupPivot(PDO $db, string $driver, string $prefix): void
@@ -344,20 +347,20 @@ final class AppSchemaBuilder
         }
 
         if ($driver === 'mysql') {
-            if ($this->introspector->appColumnExistsMySql($db, $table, 'user_id') && !$this->introspector->appColumnExistsMySql($db, $table, 'user')) {
+            if ($this->introspector->columnExists($db, 'mysql', $table, 'user_id') && !$this->introspector->columnExists($db, 'mysql', $table, 'user')) {
                 $db->exec('ALTER TABLE ' . $table . ' CHANGE user_id user BIGINT UNSIGNED NOT NULL');
             }
-            if ($this->introspector->appColumnExistsMySql($db, $table, 'group_id') && !$this->introspector->appColumnExistsMySql($db, $table, 'group')) {
+            if ($this->introspector->columnExists($db, 'mysql', $table, 'group_id') && !$this->introspector->columnExists($db, 'mysql', $table, 'group')) {
                 $db->exec('ALTER TABLE ' . $table . ' CHANGE group_id `group` BIGINT UNSIGNED NOT NULL');
             }
             return;
         }
 
         $quoted = $this->introspector->quotePgIdentifier($table);
-        if ($this->introspector->appColumnExistsPgSql($db, $table, 'user_id') && !$this->introspector->appColumnExistsPgSql($db, $table, 'user')) {
+        if ($this->introspector->columnExists($db, 'pgsql', $table, 'user_id') && !$this->introspector->columnExists($db, 'pgsql', $table, 'user')) {
             $db->exec('ALTER TABLE ' . $quoted . ' RENAME COLUMN user_id TO "user"');
         }
-        if ($this->introspector->appColumnExistsPgSql($db, $table, 'group_id') && !$this->introspector->appColumnExistsPgSql($db, $table, 'group')) {
+        if ($this->introspector->columnExists($db, 'pgsql', $table, 'group_id') && !$this->introspector->columnExists($db, 'pgsql', $table, 'group')) {
             $db->exec('ALTER TABLE ' . $quoted . ' RENAME COLUMN group_id TO "group"');
         }
     }
@@ -400,6 +403,29 @@ final class AppSchemaBuilder
         }
     }
 
+    public function ensureTaxonomyIconColumn(PDO $db, string $driver, string $prefix): void
+    {
+        $tables = ['categories', 'tags', 'groups'];
+
+        if ($driver === 'sqlite') {
+            foreach ($tables as $table) {
+                $qualifiedTable = $this->tables->resolve($driver, $prefix, $table);
+                if (!$this->introspector->appColumnExistsSqlite($db, $qualifiedTable, 'icon_image')) {
+                    $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN icon_image TEXT NULL');
+                }
+            }
+
+            return;
+        }
+
+        foreach ($tables as $table) {
+            $physicalTable = $prefix . $table;
+            if (!$this->introspector->columnExists($db, $driver, $physicalTable, 'icon_image')) {
+                $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN icon_image VARCHAR(255) NULL');
+            }
+        }
+    }
+
     public function ensureTaxonomySetColumns(PDO $db, string $driver, string $prefix): void
     {
         $taxonomyTables = ['categories', 'tags'];
@@ -431,8 +457,8 @@ final class AppSchemaBuilder
         if ($driver === 'mysql') {
             foreach ($taxonomyTables as $table) {
                 $physicalTable = $prefix . $table;
-                $hasSet = $this->introspector->appColumnExistsMySql($db, $physicalTable, 'set');
-                $hasLegacySet = $this->introspector->appColumnExistsMySql($db, $physicalTable, 'set_id');
+                $hasSet = $this->introspector->columnExists($db, 'mysql', $physicalTable, 'set');
+                $hasLegacySet = $this->introspector->columnExists($db, 'mysql', $physicalTable, 'set_id');
                 if (!$hasSet && !$hasLegacySet) {
                     $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN ' . $setColumn . ' BIGINT UNSIGNED NOT NULL DEFAULT 1 AFTER slug');
                     $hasSet = true;
@@ -441,7 +467,7 @@ final class AppSchemaBuilder
                 if ($hasSet) {
                     $db->exec('UPDATE ' . $physicalTable . ' SET ' . $setColumn . ' = 1 WHERE ' . $setColumn . ' IS NULL OR ' . $setColumn . ' = 0');
                     $indexName = 'idx_' . $prefix . $table . '_set';
-                    if (!$this->introspector->mySqlIndexExists($db, $physicalTable, $indexName)) {
+                    if (!$this->introspector->indexExists($db, 'mysql', $physicalTable, $indexName)) {
                         $db->exec('ALTER TABLE ' . $physicalTable . ' ADD INDEX ' . $indexName . ' (' . $setColumn . ')');
                     }
                     continue;
@@ -449,7 +475,7 @@ final class AppSchemaBuilder
 
                 $db->exec('UPDATE ' . $physicalTable . ' SET set_id = 1 WHERE set_id IS NULL OR set_id = 0');
                 $indexName = 'idx_' . $prefix . $table . '_set_id';
-                if (!$this->introspector->mySqlIndexExists($db, $physicalTable, $indexName)) {
+                if (!$this->introspector->indexExists($db, 'mysql', $physicalTable, $indexName)) {
                     $db->exec('ALTER TABLE ' . $physicalTable . ' ADD INDEX ' . $indexName . ' (set_id)');
                 }
             }
@@ -459,8 +485,8 @@ final class AppSchemaBuilder
 
         foreach ($taxonomyTables as $table) {
             $physicalTable = $prefix . $table;
-            $hasSet = $this->introspector->appColumnExistsPgSql($db, $physicalTable, 'set');
-            $hasLegacySet = $this->introspector->appColumnExistsPgSql($db, $physicalTable, 'set_id');
+            $hasSet = $this->introspector->columnExists($db, 'pgsql', $physicalTable, 'set');
+            $hasLegacySet = $this->introspector->columnExists($db, 'pgsql', $physicalTable, 'set_id');
             if (!$hasSet && !$hasLegacySet) {
                 $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN ' . $setColumn . ' BIGINT NOT NULL DEFAULT 1');
                 $hasSet = true;
@@ -469,7 +495,7 @@ final class AppSchemaBuilder
             if ($hasSet) {
                 $db->exec('UPDATE ' . $physicalTable . ' SET ' . $setColumn . ' = 1 WHERE ' . $setColumn . ' IS NULL OR ' . $setColumn . ' = 0');
                 $indexName = 'idx_' . $prefix . $table . '_set';
-                if (!$this->introspector->pgSqlIndexExists($db, $physicalTable, $indexName)) {
+                if (!$this->introspector->indexExists($db, 'pgsql', $physicalTable, $indexName)) {
                     $db->exec(
                         'CREATE INDEX IF NOT EXISTS ' . $indexName . '
                          ON ' . $this->introspector->quotePgIdentifier($physicalTable) . ' (' . $setColumn . ')'
@@ -480,7 +506,7 @@ final class AppSchemaBuilder
 
             $db->exec('UPDATE ' . $physicalTable . ' SET set_id = 1 WHERE set_id IS NULL OR set_id = 0');
             $indexName = 'idx_' . $prefix . $table . '_set_id';
-            if (!$this->introspector->pgSqlIndexExists($db, $physicalTable, $indexName)) {
+            if (!$this->introspector->indexExists($db, 'pgsql', $physicalTable, $indexName)) {
                 $db->exec(
                     'CREATE INDEX IF NOT EXISTS ' . $indexName . '
                      ON ' . $this->introspector->quotePgIdentifier($physicalTable) . ' (set_id)'
@@ -586,29 +612,29 @@ final class AppSchemaBuilder
         $redirectsTable = $prefix . 'redirects';
 
         if ($driver === 'mysql') {
-            $pageCategoryColumn = $this->introspector->appColumnExistsMySql($db, $pageCategoriesTable, 'category') ? 'category' : 'category_id';
-            $pageTagColumn = $this->introspector->appColumnExistsMySql($db, $pageTagsTable, 'tag') ? 'tag' : 'tag_id';
-            $pagePivotColumn = $this->introspector->appColumnExistsMySql($db, $pageCategoriesTable, 'page') ? 'page' : 'page_id';
-            $tagPivotPageColumn = $this->introspector->appColumnExistsMySql($db, $pageTagsTable, 'page') ? 'page' : 'page_id';
-            if (!$this->introspector->mySqlIndexExists($db, $pageCategoriesTable, 'idx_' . $prefix . 'page_categories_category')) {
+            $pageCategoryColumn = $this->introspector->columnExists($db, 'mysql', $pageCategoriesTable, 'category') ? 'category' : 'category_id';
+            $pageTagColumn = $this->introspector->columnExists($db, 'mysql', $pageTagsTable, 'tag') ? 'tag' : 'tag_id';
+            $pagePivotColumn = $this->introspector->columnExists($db, 'mysql', $pageCategoriesTable, 'page') ? 'page' : 'page_id';
+            $tagPivotPageColumn = $this->introspector->columnExists($db, 'mysql', $pageTagsTable, 'page') ? 'page' : 'page_id';
+            if (!$this->introspector->indexExists($db, 'mysql', $pageCategoriesTable, 'idx_' . $prefix . 'page_categories_category')) {
                 $db->exec(
                     'ALTER TABLE ' . $pageCategoriesTable . '
                      ADD INDEX idx_' . $prefix . 'page_categories_category (' . $pageCategoryColumn . ', ' . $pagePivotColumn . ')'
                 );
             }
-            if (!$this->introspector->mySqlIndexExists($db, $pageTagsTable, 'idx_' . $prefix . 'page_tags_tag')) {
+            if (!$this->introspector->indexExists($db, 'mysql', $pageTagsTable, 'idx_' . $prefix . 'page_tags_tag')) {
                 $db->exec(
                     'ALTER TABLE ' . $pageTagsTable . '
                      ADD INDEX idx_' . $prefix . 'page_tags_tag (' . $pageTagColumn . ', ' . $tagPivotPageColumn . ')'
                 );
             }
-            if (!$this->introspector->mySqlIndexExists($db, $userGroupsTable, 'idx_' . $prefix . 'user_groups_group_id')) {
+            if (!$this->introspector->indexExists($db, 'mysql', $userGroupsTable, 'idx_' . $prefix . 'user_groups_group_id')) {
                 $db->exec(
                     'ALTER TABLE ' . $userGroupsTable . '
                      ADD INDEX idx_' . $prefix . 'user_groups_group_id (`group`, user)'
                 );
             }
-            if (!$this->introspector->mySqlIndexExists($db, $redirectsTable, 'idx_' . $prefix . 'redirects_lookup')) {
+            if (!$this->introspector->indexExists($db, 'mysql', $redirectsTable, 'idx_' . $prefix . 'redirects_lookup')) {
                 $db->exec(
                     'ALTER TABLE ' . $redirectsTable . '
                      ADD INDEX idx_' . $prefix . 'redirects_lookup (slug, channel, active)'
@@ -618,29 +644,29 @@ final class AppSchemaBuilder
             return;
         }
 
-        $pageCategoryColumn = $this->introspector->appColumnExistsPgSql($db, $pageCategoriesTable, 'category') ? 'category' : 'category_id';
-        $pageTagColumn = $this->introspector->appColumnExistsPgSql($db, $pageTagsTable, 'tag') ? 'tag' : 'tag_id';
-        $pagePivotColumn = $this->introspector->appColumnExistsPgSql($db, $pageCategoriesTable, 'page') ? 'page' : 'page_id';
-        $tagPivotPageColumn = $this->introspector->appColumnExistsPgSql($db, $pageTagsTable, 'page') ? 'page' : 'page_id';
-        if (!$this->introspector->pgSqlIndexExists($db, $pageCategoriesTable, 'idx_' . $prefix . 'page_categories_category')) {
+        $pageCategoryColumn = $this->introspector->columnExists($db, 'pgsql', $pageCategoriesTable, 'category') ? 'category' : 'category_id';
+        $pageTagColumn = $this->introspector->columnExists($db, 'pgsql', $pageTagsTable, 'tag') ? 'tag' : 'tag_id';
+        $pagePivotColumn = $this->introspector->columnExists($db, 'pgsql', $pageCategoriesTable, 'page') ? 'page' : 'page_id';
+        $tagPivotPageColumn = $this->introspector->columnExists($db, 'pgsql', $pageTagsTable, 'page') ? 'page' : 'page_id';
+        if (!$this->introspector->indexExists($db, 'pgsql', $pageCategoriesTable, 'idx_' . $prefix . 'page_categories_category')) {
             $db->exec(
                 'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'page_categories_category
                  ON ' . $this->introspector->quotePgIdentifier($pageCategoriesTable) . ' (' . $pageCategoryColumn . ', ' . $pagePivotColumn . ')'
             );
         }
-        if (!$this->introspector->pgSqlIndexExists($db, $pageTagsTable, 'idx_' . $prefix . 'page_tags_tag')) {
+        if (!$this->introspector->indexExists($db, 'pgsql', $pageTagsTable, 'idx_' . $prefix . 'page_tags_tag')) {
             $db->exec(
                 'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'page_tags_tag
                  ON ' . $this->introspector->quotePgIdentifier($pageTagsTable) . ' (' . $pageTagColumn . ', ' . $tagPivotPageColumn . ')'
             );
         }
-        if (!$this->introspector->pgSqlIndexExists($db, $userGroupsTable, 'idx_' . $prefix . 'user_groups_group_id')) {
+        if (!$this->introspector->indexExists($db, 'pgsql', $userGroupsTable, 'idx_' . $prefix . 'user_groups_group_id')) {
             $db->exec(
                 'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'user_groups_group_id
                  ON ' . $this->introspector->quotePgIdentifier($userGroupsTable) . ' ("group", "user")'
             );
         }
-        if (!$this->introspector->pgSqlIndexExists($db, $redirectsTable, 'idx_' . $prefix . 'redirects_lookup')) {
+        if (!$this->introspector->indexExists($db, 'pgsql', $redirectsTable, 'idx_' . $prefix . 'redirects_lookup')) {
             $db->exec(
                 'CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'redirects_lookup
                  ON ' . $this->introspector->quotePgIdentifier($redirectsTable) . ' (slug, channel, active)'
@@ -674,7 +700,8 @@ final class AppSchemaBuilder
             }
         }
 
-        foreach (['extended', 'published', 'published_at', 'gallery_enabled', 'channel_id', 'is_published', 'author_user_id', 'created_at', 'updated_at'] as $legacyColumn) {
+        // 'published' is intentionally excluded: it is now a valid schedule datetime column, not a legacy boolean.
+        foreach (['extended', 'published_at', 'gallery_enabled', 'channel_id', 'is_published', 'author_user_id', 'created_at', 'updated_at'] as $legacyColumn) {
             if ($this->introspector->appColumnExistsSqlite($db, $pagesTable, $legacyColumn)) {
                 return false;
             }
@@ -685,15 +712,7 @@ final class AppSchemaBuilder
 
     private function pageChannelColumn(PDO $db, string $driver, string $pagesTable): string
     {
-        if ($driver === 'sqlite') {
-            return $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'channel') ? 'channel' : 'channel_id';
-        }
-
-        if ($driver === 'mysql') {
-            return $this->introspector->appColumnExistsMySql($db, $pagesTable, 'channel') ? 'channel' : 'channel_id';
-        }
-
-        return $this->introspector->appColumnExistsPgSql($db, $pagesTable, 'channel') ? 'channel' : 'channel_id';
+        return $this->introspector->columnExists($db, $driver, $pagesTable, 'channel') ? 'channel' : 'channel_id';
     }
 
     private function ensurePageSlugScopeUniquenessSqlite(PDO $db, string $pagesTable, string $channelColumn = 'channel'): void
@@ -711,7 +730,6 @@ final class AppSchemaBuilder
         $hasExtended = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'extended');
         $hasChannel = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'channel');
         $hasStatus = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'status');
-        $hasPublished = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'published');
         $hasAuthor = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'author');
         $hasCoverImage = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'cover_image');
         $hasPreviewImage = $this->introspector->appColumnExistsSqlite($db, $pagesTable, 'preview_image');
@@ -721,11 +739,10 @@ final class AppSchemaBuilder
             ? 'CASE WHEN TRIM(COALESCE(extended, \'\')) <> \'\' THEN extended ELSE content END'
             : 'content';
         $channelExpr = $hasChannel ? 'COALESCE(channel, 0)' : 'COALESCE(channel_id, 0)';
+        // 'published' is now a schedule datetime column; only 'is_published' (legacy integer) is safe to fall back to.
         $statusExpr = $hasStatus
             ? "CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'draft' THEN 'draft' ELSE 'published' END"
-            : ($hasPublished
-                ? "CASE WHEN COALESCE(published, 1) = 1 THEN 'published' ELSE 'draft' END"
-                : "CASE WHEN COALESCE(is_published, 1) = 1 THEN 'published' ELSE 'draft' END");
+            : "CASE WHEN COALESCE(is_published, 1) = 1 THEN 'published' ELSE 'draft' END";
         $authorExpr = $hasAuthor ? 'author' : 'author_user_id';
         $coverExpr = $hasCoverImage ? 'cover_image' : 'NULL';
         $previewExpr = $hasPreviewImage ? 'preview_image' : $coverExpr;
@@ -798,7 +815,7 @@ final class AppSchemaBuilder
 
     private function migratePageContentStorageMySql(PDO $db, string $pagesTable): void
     {
-        if ($this->introspector->appColumnExistsMySql($db, $pagesTable, 'extended')) {
+        if ($this->introspector->columnExists($db, 'mysql', $pagesTable, 'extended')) {
             $db->exec(
                 'UPDATE ' . $pagesTable . '
                  SET content = CASE
@@ -808,25 +825,25 @@ final class AppSchemaBuilder
             );
             $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN extended');
         }
-        $this->renameColumnIfNeededMySql($db, $pagesTable, 'channel_id', 'channel', 'BIGINT UNSIGNED NOT NULL DEFAULT 0');
-        $this->renameColumnIfNeededMySql($db, $pagesTable, 'published', 'status', 'VARCHAR(20) NOT NULL DEFAULT \'published\'');
-        $this->renameColumnIfNeededMySql($db, $pagesTable, 'is_published', 'status', 'VARCHAR(20) NOT NULL DEFAULT \'published\'');
-        $this->renameColumnIfNeededMySql($db, $pagesTable, 'author_user_id', 'author', 'BIGINT UNSIGNED NULL');
-        $this->renameColumnIfNeededMySql($db, $pagesTable, 'created_at', 'created', 'DATETIME NOT NULL');
-        $this->renameColumnIfNeededMySql($db, $pagesTable, 'updated_at', 'updated', 'DATETIME NOT NULL');
-        if ($this->introspector->appColumnExistsMySql($db, $pagesTable, 'status')) {
+        $this->renameColumnIfNeeded($db, 'mysql', $pagesTable, 'channel_id', 'channel', 'BIGINT UNSIGNED NOT NULL DEFAULT 0');
+        $this->renameColumnIfNeeded($db, 'mysql', $pagesTable, 'published', 'status', 'VARCHAR(20) NOT NULL DEFAULT \'published\'');
+        $this->renameColumnIfNeeded($db, 'mysql', $pagesTable, 'is_published', 'status', 'VARCHAR(20) NOT NULL DEFAULT \'published\'');
+        $this->renameColumnIfNeeded($db, 'mysql', $pagesTable, 'author_user_id', 'author', 'BIGINT UNSIGNED NULL');
+        $this->renameColumnIfNeeded($db, 'mysql', $pagesTable, 'created_at', 'created', 'DATETIME NOT NULL');
+        $this->renameColumnIfNeeded($db, 'mysql', $pagesTable, 'updated_at', 'updated', 'DATETIME NOT NULL');
+        if ($this->introspector->columnExists($db, 'mysql', $pagesTable, 'status')) {
             $db->exec("UPDATE " . $pagesTable . " SET status = CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'draft' THEN 'draft' ELSE 'published' END");
         }
-        if (!$this->introspector->appColumnExistsMySql($db, $pagesTable, 'cover_image')) {
+        if (!$this->introspector->columnExists($db, 'mysql', $pagesTable, 'cover_image')) {
             $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN cover_image BIGINT UNSIGNED NULL');
         }
-        if (!$this->introspector->appColumnExistsMySql($db, $pagesTable, 'preview_image')) {
+        if (!$this->introspector->columnExists($db, 'mysql', $pagesTable, 'preview_image')) {
             $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN preview_image BIGINT UNSIGNED NULL');
         }
-        if ($this->introspector->appColumnExistsMySql($db, $pagesTable, 'gallery_enabled')) {
+        if ($this->introspector->columnExists($db, 'mysql', $pagesTable, 'gallery_enabled')) {
             $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN gallery_enabled');
         }
-        if ($this->introspector->appColumnExistsMySql($db, $pagesTable, 'published_at')) {
+        if ($this->introspector->columnExists($db, 'mysql', $pagesTable, 'published_at')) {
             $db->exec('ALTER TABLE ' . $pagesTable . ' DROP COLUMN published_at');
         }
     }
@@ -834,7 +851,7 @@ final class AppSchemaBuilder
     private function migratePageContentStoragePgSql(PDO $db, string $pagesTable): void
     {
         $quoted = $this->introspector->quotePgIdentifier($pagesTable);
-        if ($this->introspector->appColumnExistsPgSql($db, $pagesTable, 'extended')) {
+        if ($this->introspector->columnExists($db, 'pgsql', $pagesTable, 'extended')) {
             $db->exec(
                 'UPDATE ' . $quoted . '
                  SET content = CASE
@@ -844,25 +861,25 @@ final class AppSchemaBuilder
             );
             $db->exec('ALTER TABLE ' . $quoted . ' DROP COLUMN extended');
         }
-        $this->renameColumnIfNeededPgSql($db, $pagesTable, 'channel_id', 'channel');
-        $this->renameColumnIfNeededPgSql($db, $pagesTable, 'published', 'status');
-        $this->renameColumnIfNeededPgSql($db, $pagesTable, 'is_published', 'status');
-        $this->renameColumnIfNeededPgSql($db, $pagesTable, 'author_user_id', 'author');
-        $this->renameColumnIfNeededPgSql($db, $pagesTable, 'created_at', 'created');
-        $this->renameColumnIfNeededPgSql($db, $pagesTable, 'updated_at', 'updated');
-        if ($this->introspector->appColumnExistsPgSql($db, $pagesTable, 'status')) {
+        $this->renameColumnIfNeeded($db, 'pgsql', $pagesTable, 'channel_id', 'channel');
+        $this->renameColumnIfNeeded($db, 'pgsql', $pagesTable, 'published', 'status');
+        $this->renameColumnIfNeeded($db, 'pgsql', $pagesTable, 'is_published', 'status');
+        $this->renameColumnIfNeeded($db, 'pgsql', $pagesTable, 'author_user_id', 'author');
+        $this->renameColumnIfNeeded($db, 'pgsql', $pagesTable, 'created_at', 'created');
+        $this->renameColumnIfNeeded($db, 'pgsql', $pagesTable, 'updated_at', 'updated');
+        if ($this->introspector->columnExists($db, 'pgsql', $pagesTable, 'status')) {
             $db->exec("UPDATE " . $quoted . " SET status = CASE WHEN LOWER(BTRIM(COALESCE(status, ''))) = 'draft' THEN 'draft' ELSE 'published' END");
         }
-        if (!$this->introspector->appColumnExistsPgSql($db, $pagesTable, 'cover_image')) {
+        if (!$this->introspector->columnExists($db, 'pgsql', $pagesTable, 'cover_image')) {
             $db->exec('ALTER TABLE ' . $quoted . ' ADD COLUMN cover_image BIGINT NULL');
         }
-        if (!$this->introspector->appColumnExistsPgSql($db, $pagesTable, 'preview_image')) {
+        if (!$this->introspector->columnExists($db, 'pgsql', $pagesTable, 'preview_image')) {
             $db->exec('ALTER TABLE ' . $quoted . ' ADD COLUMN preview_image BIGINT NULL');
         }
-        if ($this->introspector->appColumnExistsPgSql($db, $pagesTable, 'gallery_enabled')) {
+        if ($this->introspector->columnExists($db, 'pgsql', $pagesTable, 'gallery_enabled')) {
             $db->exec('ALTER TABLE ' . $quoted . ' DROP COLUMN gallery_enabled');
         }
-        if ($this->introspector->appColumnExistsPgSql($db, $pagesTable, 'published_at')) {
+        if ($this->introspector->columnExists($db, 'pgsql', $pagesTable, 'published_at')) {
             $db->exec('ALTER TABLE ' . $quoted . ' DROP COLUMN published_at');
         }
     }
@@ -937,22 +954,22 @@ final class AppSchemaBuilder
 
     private function migrateGroupStorageMySql(PDO $db, string $groupsTable, string $prefix): void
     {
-        if (!$this->introspector->appColumnExistsMySql($db, $groupsTable, 'description')) {
+        if (!$this->introspector->columnExists($db, 'mysql', $groupsTable, 'description')) {
             $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN description TEXT NULL AFTER name');
         }
-        $this->renameColumnIfNeededMySql($db, $groupsTable, 'route_enabled', 'route', 'TINYINT(1) NOT NULL DEFAULT 0');
-        $this->renameColumnIfNeededMySql($db, $groupsTable, 'permission_mask', 'permissions', 'BIGINT UNSIGNED NOT NULL DEFAULT 0');
-        $this->renameColumnIfNeededMySql($db, $groupsTable, 'created_at', 'created', 'DATETIME NOT NULL');
-        if (!$this->introspector->appColumnExistsMySql($db, $groupsTable, 'cover_image')) {
+        $this->renameColumnIfNeeded($db, 'mysql', $groupsTable, 'route_enabled', 'route', 'TINYINT(1) NOT NULL DEFAULT 0');
+        $this->renameColumnIfNeeded($db, 'mysql', $groupsTable, 'permission_mask', 'permissions', 'BIGINT UNSIGNED NOT NULL DEFAULT 0');
+        $this->renameColumnIfNeeded($db, 'mysql', $groupsTable, 'created_at', 'created', 'DATETIME NOT NULL');
+        if (!$this->introspector->columnExists($db, 'mysql', $groupsTable, 'cover_image')) {
             $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN cover_image VARCHAR(255) NULL');
         }
-        if (!$this->introspector->appColumnExistsMySql($db, $groupsTable, 'updated')) {
+        if (!$this->introspector->columnExists($db, 'mysql', $groupsTable, 'updated')) {
             $db->exec('ALTER TABLE ' . $groupsTable . ' ADD COLUMN updated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
         }
-        if ($this->introspector->appColumnExistsMySql($db, $groupsTable, 'is_stock')) {
+        if ($this->introspector->columnExists($db, 'mysql', $groupsTable, 'is_stock')) {
             $db->exec('ALTER TABLE ' . $groupsTable . ' DROP COLUMN is_stock');
         }
-        if (!$this->introspector->mySqlIndexExists($db, $groupsTable, 'idx_' . $prefix . 'groups_slug')) {
+        if (!$this->introspector->indexExists($db, 'mysql', $groupsTable, 'idx_' . $prefix . 'groups_slug')) {
             $db->exec('ALTER TABLE ' . $groupsTable . ' ADD INDEX idx_' . $prefix . 'groups_slug (slug)');
         }
     }
@@ -960,41 +977,52 @@ final class AppSchemaBuilder
     private function migrateGroupStoragePgSql(PDO $db, string $groupsTable, string $prefix): void
     {
         $quoted = $this->introspector->quotePgIdentifier($groupsTable);
-        if (!$this->introspector->appColumnExistsPgSql($db, $groupsTable, 'description')) {
+        if (!$this->introspector->columnExists($db, 'pgsql', $groupsTable, 'description')) {
             $db->exec('ALTER TABLE ' . $quoted . ' ADD COLUMN description TEXT NULL');
         }
-        $this->renameColumnIfNeededPgSql($db, $groupsTable, 'route_enabled', 'route');
-        $this->renameColumnIfNeededPgSql($db, $groupsTable, 'permission_mask', 'permissions');
-        $this->renameColumnIfNeededPgSql($db, $groupsTable, 'created_at', 'created');
-        if (!$this->introspector->appColumnExistsPgSql($db, $groupsTable, 'cover_image')) {
+        $this->renameColumnIfNeeded($db, 'pgsql', $groupsTable, 'route_enabled', 'route');
+        $this->renameColumnIfNeeded($db, 'pgsql', $groupsTable, 'permission_mask', 'permissions');
+        $this->renameColumnIfNeeded($db, 'pgsql', $groupsTable, 'created_at', 'created');
+        if (!$this->introspector->columnExists($db, 'pgsql', $groupsTable, 'cover_image')) {
             $db->exec('ALTER TABLE ' . $quoted . ' ADD COLUMN cover_image VARCHAR(255) NULL');
         }
-        if (!$this->introspector->appColumnExistsPgSql($db, $groupsTable, 'updated')) {
+        if (!$this->introspector->columnExists($db, 'pgsql', $groupsTable, 'updated')) {
             $db->exec('ALTER TABLE ' . $quoted . ' ADD COLUMN updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP');
         }
-        if ($this->introspector->appColumnExistsPgSql($db, $groupsTable, 'is_stock')) {
+        if ($this->introspector->columnExists($db, 'pgsql', $groupsTable, 'is_stock')) {
             $db->exec('ALTER TABLE ' . $quoted . ' DROP COLUMN is_stock');
         }
-        if (!$this->introspector->pgSqlIndexExists($db, $groupsTable, 'idx_' . $prefix . 'groups_slug')) {
+        if (!$this->introspector->indexExists($db, 'pgsql', $groupsTable, 'idx_' . $prefix . 'groups_slug')) {
             $db->exec('CREATE INDEX idx_' . $prefix . 'groups_slug ON ' . $quoted . ' (slug)');
         }
     }
 
-    private function renameColumnIfNeededMySql(PDO $db, string $table, string $old, string $new, string $definition): void
+    /**
+     * Renames a column if the old name exists and the new name does not, dispatching by driver.
+     * $definition is required for MySQL (the full column type + constraints string).
+     * SQLite uses RENAME COLUMN (requires SQLite 3.25+, safe on all modern PHP targets).
+     */
+    private function renameColumnIfNeeded(PDO $db, string $driver, string $table, string $old, string $new, string $definition = ''): void
     {
-        if ($this->introspector->appColumnExistsMySql($db, $table, $old) && !$this->introspector->appColumnExistsMySql($db, $table, $new)) {
-            $db->exec('ALTER TABLE ' . $table . ' CHANGE ' . $old . ' ' . $new . ' ' . $definition);
+        if (!$this->introspector->columnExists($db, $driver, $table, $old)
+            || $this->introspector->columnExists($db, $driver, $table, $new)) {
+            return;
         }
-    }
 
-    private function renameColumnIfNeededPgSql(PDO $db, string $table, string $old, string $new): void
-    {
-        if ($this->introspector->appColumnExistsPgSql($db, $table, $old) && !$this->introspector->appColumnExistsPgSql($db, $table, $new)) {
-            $db->exec(
-                'ALTER TABLE ' . $this->introspector->quotePgIdentifier($table) . '
-                 RENAME COLUMN ' . $this->introspector->quotePgIdentifier($old) . ' TO ' . $this->introspector->quotePgIdentifier($new)
-            );
+        if ($driver === 'sqlite') {
+            $db->exec('ALTER TABLE ' . $table . ' RENAME COLUMN ' . $old . ' TO ' . $new);
+            return;
         }
+
+        if ($driver === 'mysql') {
+            $db->exec('ALTER TABLE ' . $table . ' CHANGE ' . $old . ' ' . $new . ' ' . $definition);
+            return;
+        }
+
+        $db->exec(
+            'ALTER TABLE ' . $this->introspector->quotePgIdentifier($table) . '
+             RENAME COLUMN ' . $this->introspector->quotePgIdentifier($old) . ' TO ' . $this->introspector->quotePgIdentifier($new)
+        );
     }
 
     private function migratePageImageStorageSqlite(PDO $db, string $pagesTable, string $imagesTable, string $variantsTable): void
@@ -1368,61 +1396,19 @@ final class AppSchemaBuilder
         }
     }
 
-    private function renameLoginFailureColumnsMySql(PDO $db, string $table): void
+    private function renameLoginFailureColumns(PDO $db, string $driver, string $table): void
     {
         $renames = [
             'username_normalized' => ['user', 'VARCHAR(100) NOT NULL'],
-            'first_failed_at' => ['first_failed', 'BIGINT UNSIGNED NOT NULL'],
-            'last_failed_at' => ['last_failed', 'BIGINT UNSIGNED NOT NULL'],
-            'created_at' => ['created', 'DATETIME NOT NULL'],
-            'updated_at' => ['updated', 'DATETIME NOT NULL'],
+            'first_failed_at'     => ['first_failed', 'BIGINT UNSIGNED NOT NULL'],
+            'last_failed_at'      => ['last_failed', 'BIGINT UNSIGNED NOT NULL'],
+            'created_at'          => ['created', 'DATETIME NOT NULL'],
+            'updated_at'          => ['updated', 'DATETIME NOT NULL'],
         ];
 
         foreach ($renames as $old => [$new, $definition]) {
-            if ($this->introspector->appColumnExistsMySql($db, $table, $old) && !$this->introspector->appColumnExistsMySql($db, $table, $new)) {
-                $db->exec('ALTER TABLE ' . $table . ' CHANGE ' . $old . ' ' . $new . ' ' . $definition);
-            }
+            $this->renameColumnIfNeeded($db, $driver, $table, $old, $new, $definition);
         }
-    }
-
-    private function renameLoginFailureColumnsPgSql(PDO $db, string $table): void
-    {
-        $quoted = $this->introspector->quotePgIdentifier($table);
-        $renames = [
-            'username_normalized' => 'user',
-            'first_failed_at' => 'first_failed',
-            'last_failed_at' => 'last_failed',
-            'created_at' => 'created',
-            'updated_at' => 'updated',
-        ];
-
-        foreach ($renames as $old => $new) {
-            if ($this->introspector->appColumnExistsPgSql($db, $table, $old) && !$this->introspector->appColumnExistsPgSql($db, $table, $new)) {
-                $db->exec('ALTER TABLE ' . $quoted . ' RENAME COLUMN ' . $old . ' TO ' . $new);
-            }
-        }
-    }
-
-    private function tableExistsMySql(PDO $db, string $table): bool
-    {
-        $stmt = $db->prepare(
-            'SELECT 1
-             FROM information_schema.tables
-             WHERE table_schema = DATABASE()
-               AND table_name = :table_name
-             LIMIT 1'
-        );
-        $stmt->execute([':table_name' => $table]);
-
-        return $stmt->fetchColumn() !== false;
-    }
-
-    private function tableExistsPgSql(PDO $db, string $table): bool
-    {
-        $stmt = $db->prepare('SELECT to_regclass(:table_name)');
-        $stmt->execute([':table_name' => $table]);
-
-        return $stmt->fetchColumn() !== null;
     }
 
     /**
@@ -1839,15 +1825,7 @@ final class AppSchemaBuilder
 
     private function redirectColumnExists(PDO $db, string $driver, string $table, string $column): bool
     {
-        if ($driver === 'sqlite') {
-            return $this->introspector->appColumnExistsSqlite($db, $table, $column);
-        }
-
-        if ($driver === 'mysql') {
-            return $this->introspector->appColumnExistsMySql($db, $table, $column);
-        }
-
-        return $this->introspector->appColumnExistsPgSql($db, $table, $column);
+        return $this->introspector->columnExists($db, $driver, $table, $column);
     }
 
     private function redirectSourceExpr(PDO $db, string $driver, string $table, string $column): string
@@ -1874,7 +1852,7 @@ final class AppSchemaBuilder
     {
         if ($driver === 'mysql') {
             foreach (['idx_' . $this->prefixlessTableName($table) . '_channel_id', 'idx_' . $this->prefixlessTableName($table) . '_channel', 'idx_' . $this->prefixlessTableName($table) . '_lookup'] as $indexName) {
-                if ($this->introspector->mySqlIndexExists($db, $table, $indexName)) {
+                if ($this->introspector->indexExists($db, 'mysql', $table, $indexName)) {
                     $db->exec('ALTER TABLE ' . $table . ' DROP INDEX ' . $indexName);
                 }
             }
@@ -1892,13 +1870,13 @@ final class AppSchemaBuilder
         $indexPrefix = 'idx_' . $this->prefixlessTableName($table);
 
         if ($driver === 'mysql') {
-            if (!$this->introspector->mySqlIndexExists($db, $table, $indexPrefix . '_slug')) {
+            if (!$this->introspector->indexExists($db, 'mysql', $table, $indexPrefix . '_slug')) {
                 $db->exec('ALTER TABLE ' . $table . ' ADD INDEX ' . $indexPrefix . '_slug (slug)');
             }
-            if (!$this->introspector->mySqlIndexExists($db, $table, $indexPrefix . '_channel')) {
+            if (!$this->introspector->indexExists($db, 'mysql', $table, $indexPrefix . '_channel')) {
                 $db->exec('ALTER TABLE ' . $table . ' ADD INDEX ' . $indexPrefix . '_channel (channel)');
             }
-            if (!$this->introspector->mySqlIndexExists($db, $table, $indexPrefix . '_lookup')) {
+            if (!$this->introspector->indexExists($db, 'mysql', $table, $indexPrefix . '_lookup')) {
                 $db->exec('ALTER TABLE ' . $table . ' ADD INDEX ' . $indexPrefix . '_lookup (slug, channel, active)');
             }
 
@@ -1927,11 +1905,7 @@ final class AppSchemaBuilder
 
     private function taxonomyColumnExists(PDO $db, string $driver, string $table, string $column): bool
     {
-        if ($driver === 'mysql') {
-            return $this->introspector->appColumnExistsMySql($db, $table, $column);
-        }
-
-        return $this->introspector->appColumnExistsPgSql($db, $table, $column);
+        return $this->introspector->columnExists($db, $driver, $table, $column);
     }
 
     private function normalizeTaxonomyImageFilename(mixed $value): ?string
@@ -1964,14 +1938,14 @@ final class AppSchemaBuilder
         $indexName = 'idx_' . $table . '_set';
         $setColumn = $this->taxonomySetColumnSql($driver);
         if ($driver === 'mysql') {
-            if (!$this->introspector->mySqlIndexExists($db, $table, $indexName)) {
+            if (!$this->introspector->indexExists($db, 'mysql', $table, $indexName)) {
                 $db->exec('ALTER TABLE ' . $table . ' ADD INDEX ' . $indexName . ' (' . $setColumn . ')');
             }
 
             return;
         }
 
-        if (!$this->introspector->pgSqlIndexExists($db, $table, $indexName)) {
+        if (!$this->introspector->indexExists($db, 'pgsql', $table, $indexName)) {
             $db->exec(
                 'CREATE INDEX IF NOT EXISTS ' . $indexName . '
                  ON ' . $this->introspector->quotePgIdentifier($table) . ' (' . $setColumn . ')'
@@ -1983,14 +1957,14 @@ final class AppSchemaBuilder
     {
         $legacyIndex = 'idx_' . $table . '_set_id';
         if ($driver === 'mysql') {
-            if ($this->introspector->mySqlIndexExists($db, $table, $legacyIndex)) {
+            if ($this->introspector->indexExists($db, 'mysql', $table, $legacyIndex)) {
                 $db->exec('ALTER TABLE ' . $table . ' DROP INDEX ' . $legacyIndex);
             }
 
             return;
         }
 
-        if ($this->introspector->pgSqlIndexExists($db, $table, $legacyIndex)) {
+        if ($this->introspector->indexExists($db, 'pgsql', $table, $legacyIndex)) {
             $db->exec('DROP INDEX IF EXISTS ' . $legacyIndex);
         }
     }

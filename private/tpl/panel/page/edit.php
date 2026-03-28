@@ -49,6 +49,13 @@ if ($selectedAuthorUserId < 1) {
 $deleteFormId = 'delete-page-form';
 $selectedChannelSlug = (string) ($page['channel_slug'] ?? '');
 $selectedStatus = (int) ($page['is_published'] ?? 1) === 1 ? 'published' : 'draft';
+$rawPublishAt = (string) ($page['published'] ?? '');
+$rawExpireAt = (string) ($page['expires'] ?? '');
+// For display: published defaults to page created date when page is published and no published is set.
+$publishAtInputValue = $rawPublishAt !== ''
+    ? substr(str_replace(' ', 'T', $rawPublishAt), 0, 16)
+    : ($selectedStatus === 'published' ? substr(str_replace(' ', 'T', (string) ($page['created'] ?? '')), 0, 16) : '');
+$expireAtInputValue = $rawExpireAt !== '' ? substr(str_replace(' ', 'T', $rawExpireAt), 0, 16) : '';
 $displayTitle = !array_key_exists('display_title', (array) ($page ?? []))
     || (int) ($page['display_title'] ?? 1) === 1;
 $galleryEnabled = (int) ($page['gallery_enabled'] ?? 0) === 1;
@@ -539,6 +546,30 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                             <option value="published"<?= $selectedStatus === 'published' ? ' selected' : '' ?>>Published</option>
                             <option value="draft"<?= $selectedStatus === 'draft' ? ' selected' : '' ?>>Draft</option>
                         </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="published" class="form-label">Publish At</label>
+                        <input
+                            type="datetime-local"
+                            id="published"
+                            name="published"
+                            class="form-control"
+                            value="<?= e($publishAtInputValue) ?>"
+                        >
+                        <div class="form-text">When reached, status automatically changes to Published. Leave blank for no scheduled publish.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="expires" class="form-label">Expire At</label>
+                        <input
+                            type="datetime-local"
+                            id="expires"
+                            name="expires"
+                            class="form-control"
+                            value="<?= e($expireAtInputValue) ?>"
+                        >
+                        <div class="form-text">When reached, status automatically changes to Draft. Leave blank for no auto-expiry.</div>
                     </div>
 
                     <div class="form-group">

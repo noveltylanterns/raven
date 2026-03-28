@@ -44,29 +44,13 @@ return (static function (): array {
     require_once $root . '/private/sys/Core/Extension/ExtensionRegistry.php';
     $enabledExtensionDirectories = ExtensionRegistry::enabledDirectories($root, true);
 
-    // Load Composer autoloader when dependencies are installed.
-    $composerAutoload = $root . '/composer/autoload.php';
-    if (is_file($composerAutoload)) {
-        // Prevent EasyMDE's Tualo Office PHP bridge from auto-loading on every request.
-        // Raven only uses EasyMDE static assets on the page editor.
-        $composerAutoloadFiles = $root . '/composer/composer/autoload_files.php';
-        if (is_file($composerAutoloadFiles)) {
-            $autoloadFiles = require $composerAutoloadFiles;
-            if (is_array($autoloadFiles)) {
-                if (!isset($GLOBALS['__composer_autoload_files']) || !is_array($GLOBALS['__composer_autoload_files'])) {
-                    $GLOBALS['__composer_autoload_files'] = [];
-                }
-
-                foreach ($autoloadFiles as $fileIdentifier => $filePath) {
-                    $normalizedPath = str_replace('\\', '/', (string) $filePath);
-                    if (str_contains($normalizedPath, '/tualo/easymde/src/functions.php')) {
-                        $GLOBALS['__composer_autoload_files'][(string) $fileIdentifier] = true;
-                    }
-                }
-            }
-        }
-
-        require_once $composerAutoload;
+    // Load per-package handlers instead of the full Composer autoloader.
+    // Each handler registers a targeted PSR-4 autoloader for its package only.
+    // 2FA/WebAuthn/QR handlers are loaded on-demand in the controllers that need them.
+    $composerHandlerDir = $root . '/private/lib/Composer';
+    $authHandler = $composerHandlerDir . '/delight-im/auth.php';
+    if (is_file($authHandler)) {
+        require_once $authHandler;
     }
 
     // Always provide local PSR-4 fallback so app/lib/extension classes work before install.

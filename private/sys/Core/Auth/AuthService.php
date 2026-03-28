@@ -696,7 +696,7 @@ final class AuthService
         }
 
         $mask = $this->permissionMaskForUser($userId);
-        return $this->authAccessGateService->hasPanelPermissionBit($mask, $bit, $this->isSuperAdmin($userId));
+        return $this->authAccessGateService->hasPanelPermissionBit($mask, $bit, $this->isAdmin($userId));
     }
 
     /**
@@ -712,7 +712,7 @@ final class AuthService
         }
 
         $mask = $this->permissionMaskForUser($userId);
-        return $this->authAccessGateService->hasAnyPanelPermissionBit($mask, $bits, $this->isSuperAdmin($userId));
+        return $this->authAccessGateService->hasAnyPanelPermissionBit($mask, $bits, $this->isAdmin($userId));
     }
 
     /**
@@ -832,7 +832,7 @@ final class AuthService
     /**
      * Returns true when user currently belongs to the Super Admin group.
      */
-    public function isSuperAdmin(?int $userId = null): bool
+    public function isAdmin(?int $userId = null): bool
     {
         $userId ??= $this->userId();
         if ($userId === null) {
@@ -840,12 +840,21 @@ final class AuthService
         }
 
         foreach ($this->groupsForUser($userId) as $group) {
-            if (strtolower(trim((string) ($group['slug'] ?? ''))) === 'super') {
+            // ID 1 is the canonical admin group (slug 'admin').
+            if ((int) ($group['id'] ?? 0) === 1) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * @deprecated Use isAdmin() instead.
+     */
+    public function isSuperAdmin(?int $userId = null): bool
+    {
+        return $this->isAdmin($userId);
     }
 
     /**

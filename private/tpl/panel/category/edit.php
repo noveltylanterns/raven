@@ -35,8 +35,10 @@ $activeTab = in_array($requestedTab, ['basic', 'media'], true) ? $requestedTab :
 $deleteFormId = 'delete-category-form';
 $coverPath = trim((string) ($category['cover_image_path'] ?? ''));
 $previewPath = trim((string) ($category['preview_image_path'] ?? ''));
+$iconPath = trim((string) ($category['icon_image_path'] ?? ''));
 $coverUrl = $coverPath !== '' ? '/' . ltrim($coverPath, '/') : '';
 $previewUrl = $previewPath !== '' ? '/' . ltrim($previewPath, '/') : '';
+$iconUrl = $iconPath !== '' ? '/' . ltrim($iconPath, '/') : '';
 $maxFilesizeLabel = $imageMaxFilesizeKb === null
     ? 'No limit'
     : number_format((int) $imageMaxFilesizeKb) . ' KB';
@@ -56,6 +58,10 @@ if ($coverCopyUrl !== '' && $publicBase !== '') {
 $previewCopyUrl = $previewUrl;
 if ($previewCopyUrl !== '' && $publicBase !== '') {
     $previewCopyUrl = $publicBase . $previewCopyUrl;
+}
+$iconCopyUrl = $iconUrl;
+if ($iconCopyUrl !== '' && $publicBase !== '') {
+    $iconCopyUrl = $publicBase . $iconCopyUrl;
 }
 $categoryPublicUrl = null;
 if ($category !== null && $publicBase !== '' && $categorySlug !== '' && $categoryRoutePrefix !== '') {
@@ -227,7 +233,7 @@ if ($category !== null && $publicBase !== '' && $categorySlug !== '' && $categor
                 <?php endif; ?>
             </div>
 
-            <div class="form-group mb-0">
+            <div class="form-group">
                 <label for="preview_image" class="form-label">Preview Image</label>
                 <input id="preview_image" name="preview_image" type="file" class="form-control" accept=".gif,.jpg,.jpeg,.png">
                 <?php if ($previewPath !== ''): ?>
@@ -250,6 +256,33 @@ if ($category !== null && $publicBase !== '' && $categorySlug !== '' && $categor
                     <div class="form-check mt-2">
                         <input id="remove_preview_image" name="remove_preview_image" value="1" type="checkbox" class="form-check-input">
                         <label for="remove_preview_image" class="form-check-label">Remove current preview image</label>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <div class="form-group mb-0">
+                <label for="icon_image" class="form-label">Icon Image</label>
+                <input id="icon_image" name="icon_image" type="file" class="form-control" accept=".gif,.jpg,.jpeg,.png">
+                <?php if ($iconPath !== ''): ?>
+                    <div class="mt-2">
+                        <img src="<?= e($iconUrl) ?>" alt="Current category icon image" class="img-thumbnail" style="max-width: 240px;">
+                    </div>
+                    <div class="small text-muted mt-1">
+                        <button
+                            type="button"
+                            class="btn btn-link btn-sm p-0 text-muted text-decoration-none align-baseline"
+                            data-rvn-copy-url="1"
+                            data-copy-text="<?= e($iconCopyUrl) ?>"
+                            data-copy-label="<?= e($iconPath) ?>"
+                            title="Click to copy full URL"
+                            aria-label="Copy full URL for icon image"
+                        >
+                            <code><?= e($iconPath) ?></code>
+                        </button>
+                    </div>
+                    <div class="form-check mt-2">
+                        <input id="remove_icon_image" name="remove_icon_image" value="1" type="checkbox" class="form-check-input">
+                        <label for="remove_icon_image" class="form-check-label">Remove current icon image</label>
                     </div>
                 <?php endif; ?>
             </div>

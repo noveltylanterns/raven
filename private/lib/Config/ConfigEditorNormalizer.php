@@ -149,12 +149,12 @@ final class ConfigEditorNormalizer
         }
 
         $dimensionPaths = [
-            'media.small.width',
-            'media.small.height',
-            'media.med.width',
-            'media.med.height',
-            'media.large.width',
-            'media.large.height',
+            'media.thumb.sm_x',
+            'media.thumb.sm_y',
+            'media.thumb.md_x',
+            'media.thumb.md_y',
+            'media.thumb.lg_x',
+            'media.thumb.lg_y',
         ];
         if (in_array($path, $dimensionPaths, true)) {
             $dimension = $this->normalizeInt($path, $value);
