@@ -13,11 +13,11 @@ namespace Raven\Core\Extension;
 
 require_once dirname(__DIR__, 3) . '/lib/Extension/ManifestContractValidator.php';
 require_once dirname(__DIR__, 3) . '/lib/Extension/ExtensionProviderValidator.php';
-require_once dirname(__DIR__, 3) . '/lib/Extension/ExtensionStateLoader.php';
+require_once dirname(__DIR__, 3) . '/lib/Extension/ExtensionStateStore.php';
 
 use Raven\Lib\Extension\ExtensionProviderValidator;
 use Raven\Lib\Extension\ManifestContractValidator;
-use Raven\Lib\Extension\ExtensionStateLoader;
+use Raven\Lib\Extension\ExtensionStateStore;
 
 /**
  * Centralizes extension registry parsing so bootstrap/panel/public stay in sync.
@@ -26,16 +26,15 @@ final class ExtensionRegistry
 {
     private static ?ManifestContractValidator $manifestContractValidator = null;
     private static ?ExtensionProviderValidator $providerValidator = null;
-    private static ?ExtensionStateLoader $stateLoader = null;
+    private static ?ExtensionStateStore $stateStore = null;
     /**
-     * Returns enabled extension directory map from `private/dat/ext/.state.php`
-     * with a legacy fallback to `private/ext/.state.php`.
+     * Returns enabled extension directory map from `private/dat/ext/.state.php`.
      *
      * @return array<string, bool>
      */
     public static function enabledMap(string $root): array
     {
-        $state = self::stateLoader()->loadState($root);
+        $state = self::stateStore($root)->loadStateData();
         /** @var mixed $rawEnabled */
         $rawEnabled = $state['enabled'] ?? [];
         if (!is_array($rawEnabled)) {
@@ -60,15 +59,14 @@ final class ExtensionRegistry
     }
 
     /**
-     * Returns extension permission-bit map from `private/dat/ext/.state.php`
-     * with a legacy fallback to `private/ext/.state.php`.
+     * Returns extension permission-bit map from `private/dat/ext/.state.php`.
      *
      * @param array<int, int> $allowedBits
      * @return array<string, int>
      */
     public static function permissionMap(string $root, array $allowedBits = []): array
     {
-        $state = self::stateLoader()->loadState($root);
+        $state = self::stateStore($root)->loadStateData();
         /** @var mixed $rawPermissions */
         $rawPermissions = $state['permissions'] ?? [];
         if (!is_array($rawPermissions)) {
@@ -127,9 +125,7 @@ final class ExtensionRegistry
      *   type: string,
      *   panel_path: string,
      *   panel_section: string,
-     *   system_extension: bool,
-     *   local_storage: bool,
-     *   db_storage: bool
+     *   system_extension: bool
      * }|null
      */
     public static function readManifest(string $root, string $directoryName): ?array
@@ -283,12 +279,13 @@ final class ExtensionRegistry
         return self::$providerValidator;
     }
 
-    private static function stateLoader(): ExtensionStateLoader
+    private static function stateStore(string $root): ExtensionStateStore
     {
-        if (!self::$stateLoader instanceof ExtensionStateLoader) {
-            self::$stateLoader = new ExtensionStateLoader();
+        if (!self::$stateStore instanceof ExtensionStateStore) {
+            // Auto-derives stateBasePath as private/dat/ext from extensionsBasePath.
+            self::$stateStore = new ExtensionStateStore($root . '/private/ext');
         }
 
-        return self::$stateLoader;
+        return self::$stateStore;
     }
 }

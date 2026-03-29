@@ -2,6 +2,16 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### March 29, 2026 — legacy artifact sweep
+
+- Deleted `AuthService::isSuperAdmin()` deprecated pass-through alias (no callers remained).
+- Deleted three no-op private wrapper methods from `PanelController` (`normalizePublicRoutePrefix`, `normalizeEditorTab`, `panelEditorUrlWithTab`); inlined all 38 call sites to call the underlying services directly.
+- Removed unused `use` imports: `PDOException`/`RuntimeException` from `TaxonomyLookupRepository`, `TaxonomyImagePathResolver` from `RvnSchemaBuilder`.
+- Deleted `ExtensionStateLoader` class; migrated `ExtensionRegistry` to use `ExtensionStateStore` directly. Both classes were doing the same work — the loader was a narrower predecessor with no unique logic.
+- Removed `legacyStateFilePath()`, `resolveReadableStatePath()`, and the old pre-`enabled`-key format detection from `ExtensionStateStore`; the file is always at `private/dat/ext/.state.php` and always in the current format on all installs.
+- Removed `normalizePanelThemeChoice()` legacy mappings for old theme names (`light`/`raven`/`dark` → `corp`/`midnight`) and removed `'light'`/`'dark'` from the panel wrapper theme allowlist; valid themes are now `corp`, `ice`, `midnight` (+ `default` as the sentinel).
+- Removed `SmallwebService` legacy `settings.json` migration path: deleted `LEGACY_SETTINGS_FILE` constant, removed on-save JSON deletion, simplified `loadRawSettings()` to read only the current PHP settings file.
+
 ### March 29, 2026 — group column alias expunge
 
 - Removed `permissions AS permission_mask` and `route AS route_enabled` SQL aliases from all group SELECT queries across `GroupRepository`, `AuthGroupMembershipService`, `PermissionMaskService`, `UserGroupCatalogService`, `GroupPublicRouteService`, `UserRoutingDataService`, `UserPanelQueryService`, and `UserRepository`. Updated all PHP consumers (controllers, services, templates, CLI) to read `$group['permissions']` and `$group['route']` directly. Also updated `PanelAccessCatalog::stockGroups()` static data and `SeedInstaller` to use canonical key names. Cleared the Legacy Fallback Log entry for this item.

@@ -83,7 +83,7 @@ $pageNavChannel = strtolower(trim((string) ($pageNavChannel ?? '')));
 if ($pageNavChannel !== '' && preg_match('/^[a-z0-9][a-z0-9_-]{0,127}$/', $pageNavChannel) !== 1) {
     $pageNavChannel = '';
 }
-if (!in_array($userTheme, ['default', 'corp', 'ice', 'midnight', 'light', 'dark'], true)) {
+if (!in_array($userTheme, ['default', 'corp', 'ice', 'midnight'], true)) {
     // Guard against unexpected persisted values to keep class names predictable.
     $userTheme = 'default';
 }

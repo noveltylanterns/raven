@@ -22,7 +22,6 @@ final class SmallwebService
     private ?array $cachedSettings = null;
 
     private const SETTINGS_FILE = 'settings.php';
-    private const LEGACY_SETTINGS_FILE = 'settings.json';
 
     public const SUPPORTED_PROTOCOLS = ['finger', 'fingers', 'gemini', 'gopher', 'spartan'];
 
@@ -285,11 +284,6 @@ final class SmallwebService
         $this->invalidatePhpFileCache($tmpFile);
         $this->invalidatePhpFileCache($file);
 
-        $legacyFile = $this->storageDir . '/' . self::LEGACY_SETTINGS_FILE;
-        if (is_file($legacyFile)) {
-            @unlink($legacyFile);
-        }
-
         $this->cachedSettings = null;
         return true;
     }
@@ -306,32 +300,20 @@ final class SmallwebService
     private function loadRawSettings(): ?array
     {
         $phpFile = $this->storageDir . '/' . self::SETTINGS_FILE;
-        if (is_file($phpFile)) {
-            $this->invalidatePhpFileCache($phpFile);
-
-            try {
-                /** @var mixed $raw */
-                $raw = require $phpFile;
-            } catch (\Throwable) {
-                $raw = null;
-            }
-
-            return is_array($raw) ? $raw : null;
-        }
-
-        $legacyFile = $this->storageDir . '/' . self::LEGACY_SETTINGS_FILE;
-        if (!is_file($legacyFile)) {
+        if (!is_file($phpFile)) {
             return null;
         }
 
-        $raw = file_get_contents($legacyFile);
-        if ($raw === false || trim($raw) === '') {
-            return null;
+        $this->invalidatePhpFileCache($phpFile);
+
+        try {
+            /** @var mixed $raw */
+            $raw = require $phpFile;
+        } catch (\Throwable) {
+            $raw = null;
         }
 
-        /** @var mixed $decoded */
-        $decoded = json_decode($raw, true);
-        return is_array($decoded) ? $decoded : null;
+        return is_array($raw) ? $raw : null;
     }
 
     private function invalidatePhpFileCache(string $path): void

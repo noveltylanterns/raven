@@ -444,7 +444,7 @@ final class PanelController
             redirect($this->panelUrl('/page'));
         }
 
-        $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['content', 'meta', 'media'], 'content');
+        $activeTab = $this->panelEditorTabService()->normalizeEditorTab($post['tab'] ?? null, ['content', 'meta', 'media'], 'content');
         $title = $this->input->text($post['title'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
         $contentBlocks = $this->normalizeContentBlocksInput($post['content_blocks'] ?? []);
@@ -459,7 +459,7 @@ final class PanelController
         $authorUserId = $this->input->int($post['author_user_id'] ?? null, 1);
         if ($authorUserId !== null && $this->userRepo->findById($authorUserId) === null) {
             $this->flash('error', 'Selected author account was not found.');
-            redirect($this->panelEditorUrlWithTab('/page/edit', $id, $activeTab, 'meta'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/page/edit', $id, $activeTab, 'meta'));
         }
         if ($authorUserId === null) {
             $authorUserId = $this->auth->userId();
@@ -511,7 +511,7 @@ final class PanelController
             foreach ($categorySetIdsById as $setId) {
                 if (!in_array($setId, $allowedCategorySets, true)) {
                     $this->flash('error', 'One or more selected categories are outside the allowed sets for this channel.');
-                    redirect($this->panelEditorUrlWithTab('/page/edit', $id, $activeTab, 'meta'));
+                    redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/page/edit', $id, $activeTab, 'meta'));
                 }
             }
         }
@@ -521,19 +521,19 @@ final class PanelController
             foreach ($tagSetIdsById as $setId) {
                 if (!in_array($setId, $allowedTagSets, true)) {
                     $this->flash('error', 'One or more selected tags are outside the allowed sets for this channel.');
-                    redirect($this->panelEditorUrlWithTab('/page/edit', $id, $activeTab, 'meta'));
+                    redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/page/edit', $id, $activeTab, 'meta'));
                 }
             }
         }
 
         if ($title === '' || $slug === null) {
             $this->flash('error', 'Title and valid slug are required.');
-            redirect($this->panelEditorUrlWithTab('/page/edit', $id, $activeTab, 'content'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/page/edit', $id, $activeTab, 'content'));
         }
 
         if (!in_array($status, ['published', 'draft'], true)) {
             $this->flash('error', 'Status must be Published or Draft.');
-            redirect($this->panelEditorUrlWithTab('/page/edit', $id, $activeTab, 'content'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/page/edit', $id, $activeTab, 'content'));
         }
 
         // Normalize panel form input into repository payload shape.
@@ -563,11 +563,11 @@ final class PanelController
             );
         } catch (\Throwable $exception) {
             $this->flash('error', $exception->getMessage() ?: 'Failed to save page.');
-            redirect($this->panelEditorUrlWithTab('/page/edit', $id, $activeTab, 'content'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/page/edit', $id, $activeTab, 'content'));
         }
 
         $this->flash('success', 'Changes saved.');
-        redirect($this->panelEditorUrlWithTab('/page/edit', $savedId, $activeTab, 'content'));
+        redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/page/edit', $savedId, $activeTab, 'content'));
     }
 
     /**
@@ -1166,7 +1166,7 @@ final class PanelController
             redirect($this->panelUrl('/channel'));
         }
 
-        $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'meta', 'media'], 'basic');
+        $activeTab = $this->panelEditorTabService()->normalizeEditorTab($post['tab'] ?? null, ['basic', 'meta', 'media'], 'basic');
         $existingSet = $id !== null && $id > 0 ? $this->categorySetRepo->findById($id) : null;
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
@@ -1196,7 +1196,7 @@ final class PanelController
 
         if ($name === '' || $slug === null) {
             $this->flash('error', 'Channel name and valid slug are required.');
-            redirect($this->panelEditorUrlWithTab('/channel/edit', $id, $activeTab, 'basic'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/channel/edit', $id, $activeTab, 'basic'));
         }
 
         // Persist one channel record; repository handles create vs update.
@@ -1220,10 +1220,10 @@ final class PanelController
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->flash('error', $message !== '' ? $message : 'Failed to save channel. Slug may already exist.');
-            redirect($this->panelEditorUrlWithTab('/channel/edit', $id, $activeTab, 'basic'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/channel/edit', $id, $activeTab, 'basic'));
         }
 
-        $savedEditUrl = $this->panelEditorUrlWithTab('/channel/edit', $savedId, $activeTab, 'basic');
+        $savedEditUrl = $this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/channel/edit', $savedId, $activeTab, 'basic');
 
         $currentRecord = $this->channelRepo->findById($savedId);
         $currentStorage = $this->taxonomyImageStoragePayloadFromRecord('channels', $currentRecord);
@@ -1510,7 +1510,7 @@ final class PanelController
             redirect($this->panelUrl('/category'));
         }
 
-        $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
+        $activeTab = $this->panelEditorTabService()->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
         $setId = $this->input->int($post['set'] ?? null, 1);
@@ -1518,7 +1518,7 @@ final class PanelController
 
         if ($name === '' || $slug === null || $setId === null || !$this->categorySetRepo->existsId($setId)) {
             $this->flash('error', 'Category name, valid slug, and valid set are required.');
-            redirect($this->panelEditorUrlWithTab('/category/edit', $id, $activeTab, 'basic'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/category/edit', $id, $activeTab, 'basic'));
         }
 
         // Persist one category; uniqueness conflicts are surfaced by repository.
@@ -1532,10 +1532,10 @@ final class PanelController
             ]);
         } catch (\Throwable) {
             $this->flash('error', 'Failed to save category. Slug may already exist.');
-            redirect($this->panelEditorUrlWithTab('/category/edit', $id, $activeTab, 'basic'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/category/edit', $id, $activeTab, 'basic'));
         }
 
-        $savedEditUrl = $this->panelEditorUrlWithTab('/category/edit', $savedId, $activeTab, 'basic');
+        $savedEditUrl = $this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/category/edit', $savedId, $activeTab, 'basic');
 
         $currentRecord = $this->categoryRepo->findById($savedId);
         $currentStorage = $this->taxonomyImageStoragePayloadFromRecord('categories', $currentRecord);
@@ -1822,7 +1822,7 @@ final class PanelController
 
         if ($name === '' || ($id !== 0 && $slug === null)) {
             $this->flash('error', 'Set name and valid slug are required.');
-            redirect($this->panelEditorUrlWithTab('/category/set/edit', $id, 'basic', 'basic'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/category/set/edit', $id, 'basic', 'basic'));
         }
 
         try {
@@ -1835,11 +1835,11 @@ final class PanelController
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->flash('error', $message !== '' ? $message : 'Failed to save category set.');
-            redirect($this->panelEditorUrlWithTab('/category/set/edit', $id, 'basic', 'basic'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/category/set/edit', $id, 'basic', 'basic'));
         }
 
         $this->flash('success', 'Changes saved.');
-        redirect($this->panelEditorUrlWithTab('/category/set/edit', $savedId, 'basic', 'basic'));
+        redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/category/set/edit', $savedId, 'basic', 'basic'));
     }
 
     /**
@@ -2022,7 +2022,7 @@ final class PanelController
             redirect($this->panelUrl('/tag'));
         }
 
-        $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
+        $activeTab = $this->panelEditorTabService()->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
         $setId = $this->input->int($post['set'] ?? null, 1);
@@ -2030,7 +2030,7 @@ final class PanelController
 
         if ($name === '' || $slug === null || $setId === null || !$this->tagSetRepo->existsId($setId)) {
             $this->flash('error', 'Tag name, valid slug, and valid set are required.');
-            redirect($this->panelEditorUrlWithTab('/tag/edit', $id, $activeTab, 'basic'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/tag/edit', $id, $activeTab, 'basic'));
         }
 
         // Persist one tag; uniqueness conflicts are surfaced by repository.
@@ -2044,10 +2044,10 @@ final class PanelController
             ]);
         } catch (\Throwable) {
             $this->flash('error', 'Failed to save tag. Slug may already exist.');
-            redirect($this->panelEditorUrlWithTab('/tag/edit', $id, $activeTab, 'basic'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/tag/edit', $id, $activeTab, 'basic'));
         }
 
-        $savedEditUrl = $this->panelEditorUrlWithTab('/tag/edit', $savedId, $activeTab, 'basic');
+        $savedEditUrl = $this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/tag/edit', $savedId, $activeTab, 'basic');
 
         $currentRecord = $this->tagRepo->findById($savedId);
         $currentStorage = $this->taxonomyImageStoragePayloadFromRecord('tags', $currentRecord);
@@ -2329,7 +2329,7 @@ final class PanelController
 
         if ($name === '' || ($id !== 0 && $slug === null)) {
             $this->flash('error', 'Set name and valid slug are required.');
-            redirect($this->panelEditorUrlWithTab('/tag/set/edit', $id, 'basic', 'basic'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/tag/set/edit', $id, 'basic', 'basic'));
         }
 
         try {
@@ -2342,11 +2342,11 @@ final class PanelController
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->flash('error', $message !== '' ? $message : 'Failed to save tag set.');
-            redirect($this->panelEditorUrlWithTab('/tag/set/edit', $id, 'basic', 'basic'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/tag/set/edit', $id, 'basic', 'basic'));
         }
 
         $this->flash('success', 'Changes saved.');
-        redirect($this->panelEditorUrlWithTab('/tag/set/edit', $savedId, 'basic', 'basic'));
+        redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/tag/set/edit', $savedId, 'basic', 'basic'));
     }
 
     /**
@@ -2743,9 +2743,9 @@ final class PanelController
             redirect($this->panelUrl('/user'));
         }
 
-        $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['account', 'permissions', 'profile', 'security'], 'account');
+        $activeTab = $this->panelEditorTabService()->normalizeEditorTab($post['tab'] ?? null, ['account', 'permissions', 'profile', 'security'], 'account');
         $editPath = '/user/edit' . ($id !== null ? '/' . $id : '');
-        $editUrl = $this->panelEditorUrlWithTab('/user/edit', $id, $activeTab, 'account');
+        $editUrl = $this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/user/edit', $id, $activeTab, 'account');
         $loginIdentifierMode = $this->panelLoginIdentifierMode();
         $usernameSubmitted = array_key_exists('username', $post);
         $rawUsername = $this->input->text($post['username'] ?? null, 254);
@@ -2898,7 +2898,7 @@ final class PanelController
 
         if ($id === null && !hash_equals($password, $passwordConfirm)) {
             $this->flash('error', 'Password confirmation does not match.');
-            redirect($this->panelEditorUrlWithTab('/user/edit', $id, $activeTab, 'security'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/user/edit', $id, $activeTab, 'security'));
         }
 
         if ($id !== null && $password !== '' && strlen($password) < 8) {
@@ -2908,7 +2908,7 @@ final class PanelController
 
         if ($id !== null && $password !== '' && !hash_equals($password, $passwordConfirm)) {
             $this->flash('error', 'Password confirmation does not match.');
-            redirect($this->panelEditorUrlWithTab('/user/edit', $id, $activeTab, 'security'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/user/edit', $id, $activeTab, 'security'));
         }
 
         // Ensure users always have a primary group; fall back to Guest.
@@ -3187,11 +3187,11 @@ final class PanelController
 
         if ($twoFactorUpdateError !== null) {
             $this->flash('error', $twoFactorUpdateError);
-            redirect($this->panelEditorUrlWithTab('/user/edit', $savedId, $activeTab, 'security'));
+            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/user/edit', $savedId, $activeTab, 'security'));
         }
 
         $this->flash('success', 'Changes saved.');
-        redirect($this->panelEditorUrlWithTab('/user/edit', $savedId, $activeTab, 'account'));
+        redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/user/edit', $savedId, $activeTab, 'account'));
     }
 
     /**
@@ -3558,9 +3558,9 @@ final class PanelController
             redirect($this->panelUrl('/group'));
         }
 
-        $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media', 'permissions'], 'basic');
+        $activeTab = $this->panelEditorTabService()->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media', 'permissions'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 100);
-        $editUrl = $this->panelEditorUrlWithTab('/group/edit', $id, $activeTab, 'basic');
+        $editUrl = $this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/group/edit', $id, $activeTab, 'basic');
         $actorIsAdmin = $this->auth->isAdmin();
         $existingGroup = $id !== null ? $this->groupRepo->findById($id) : null;
         $isExistingStockGroup = is_array($existingGroup) && (int) ($existingGroup['is_stock'] ?? 0) === 1;
@@ -3669,7 +3669,7 @@ final class PanelController
             redirect($editUrl);
         }
 
-        $savedEditUrl = $this->panelEditorUrlWithTab('/group/edit', $savedId, $activeTab, 'basic');
+        $savedEditUrl = $this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/group/edit', $savedId, $activeTab, 'basic');
 
         // Process cover and icon image uploads (groups skip preview slot).
         $currentRecord = $this->groupRepo->findById($savedId);
@@ -3861,8 +3861,8 @@ final class PanelController
     public function preferencesSave(array $post, array $files): void
     {
         $this->requirePanelLogin();
-        $activeTab = $this->normalizeEditorTab($post['tab'] ?? null, ['account', 'profile', 'security'], 'account');
-        $preferencesUrl = $this->panelEditorUrlWithTab('/preferences', null, $activeTab, 'account');
+        $activeTab = $this->panelEditorTabService()->normalizeEditorTab($post['tab'] ?? null, ['account', 'profile', 'security'], 'account');
+        $preferencesUrl = $this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/preferences', null, $activeTab, 'account');
 
         $userId = $this->auth->userId();
         if ($userId === null) {
@@ -6808,11 +6808,10 @@ final class PanelController
     }
 
     /**
-     * Normalizes panel-theme identifiers and maps legacy values.
+     * Normalizes panel-theme identifiers to a valid theme slug.
      *
-     * Legacy compatibility:
-     * - `light`/`default` map to `corp`
-     * - `dark` maps to `midnight`
+     * Returns `'default'` when `$allowDefault` is true and the value is blank or `'default'`.
+     * Returns `null` for any unrecognized theme slug.
      */
     private function normalizePanelThemeChoice(string $theme, bool $allowDefault): ?string
     {
@@ -6827,14 +6826,6 @@ final class PanelController
 
         if (in_array($normalized, ['corp', 'ice', 'midnight'], true)) {
             return $normalized;
-        }
-
-        if (in_array($normalized, ['light', 'raven', 'default'], true)) {
-            return 'corp';
-        }
-
-        if ($normalized === 'dark') {
-            return 'midnight';
         }
 
         return null;
@@ -7302,38 +7293,6 @@ final class PanelController
         }
 
         return $slug;
-    }
-
-    /**
-     * Normalizes one configured route prefix and falls back safely.
-     */
-    private function normalizePublicRoutePrefix(string $value, string $fallback, bool $allowBlank = false): string
-    {
-        return $this->routeConfigService()->normalizeRoutePrefix($value, $fallback, $allowBlank);
-    }
-
-    /**
-     * Normalizes one tab key against an allowed editor-tab set.
-     *
-     * @param array<int, string> $allowed
-     */
-    private function normalizeEditorTab(mixed $value, array $allowed, string $default): string
-    {
-        return $this->panelEditorTabService()->normalizeEditorTab($value, $allowed, $default);
-    }
-
-    /**
-     * Builds one panel editor URL preserving selected tab.
-     */
-    private function panelEditorUrlWithTab(string $basePath, ?int $id, string $tab, string $defaultTab): string
-    {
-        return $this->panelEditorTabService()->panelEditorUrlWithTab(
-            fn (string $suffix): string => $this->panelUrl($suffix),
-            $basePath,
-            $id,
-            $tab,
-            $defaultTab
-        );
     }
 
     /**

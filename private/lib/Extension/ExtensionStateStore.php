@@ -30,11 +30,6 @@ final class ExtensionStateStore
         return $this->stateBasePath . '/.state.php';
     }
 
-    public function legacyStateFilePath(): string
-    {
-        return $this->extensionsBasePath . '/.state.php';
-    }
-
     public function ensureDirectory(): void
     {
         if (is_dir($this->extensionsBasePath)) {
@@ -66,7 +61,7 @@ final class ExtensionStateStore
      */
     public function loadStateData(): array
     {
-        $statePath = $this->resolveReadableStatePath();
+        $statePath = $this->stateFilePath();
         if (!is_file($statePath)) {
             return $this->defaultStateData();
         }
@@ -83,10 +78,7 @@ final class ExtensionStateStore
         }
 
         /** @var mixed $rawEnabled */
-        $rawEnabled = array_key_exists('enabled', $loaded) ? $loaded['enabled'] : $loaded;
-        if (!array_key_exists('enabled', $loaded) && array_key_exists('permissions', $loaded)) {
-            $rawEnabled = [];
-        }
+        $rawEnabled = $loaded['enabled'] ?? [];
         /** @var mixed $rawPermissions */
         $rawPermissions = $loaded['permissions'] ?? [];
         /** @var mixed $rawPermissionBits */
@@ -211,16 +203,6 @@ final class ExtensionStateStore
             'permissions' => [],
             'permission_bits' => [],
         ];
-    }
-
-    private function resolveReadableStatePath(): string
-    {
-        $primaryPath = $this->stateFilePath();
-        if (is_file($primaryPath)) {
-            return $primaryPath;
-        }
-
-        return $this->legacyStateFilePath();
     }
 
     /**

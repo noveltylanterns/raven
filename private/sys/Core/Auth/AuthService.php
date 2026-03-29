@@ -850,14 +850,6 @@ final class AuthService
     }
 
     /**
-     * @deprecated Use isAdmin() instead.
-     */
-    public function isSuperAdmin(?int $userId = null): bool
-    {
-        return $this->isAdmin($userId);
-    }
-
-    /**
      * Returns user's group memberships.
      *
      * @return array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>

@@ -14,11 +14,9 @@ declare(strict_types=1);
 namespace Raven\Repository;
 
 use PDO;
-use PDOException;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 use Raven\Lib\Media\TaxonomyImagePathResolver;
 use Raven\Lib\Routing\ChannelContextService;
-use RuntimeException;
 
 /**
  * Lookup repository for channel/category/tag rows and taxonomy option sets.
@@ -383,54 +381,6 @@ final class TaxonomyLookupRepository
 
         return $result;
     }
-
-    /**
-     * Returns enabled extension forms from one extension-owned table.
-     *
-     * @return array<int, array{name: string, slug: string}>
-     */
-    public function listEnabledExtensionForms(string $tableName): array
-    {
-        $normalizedTable = strtolower(trim($tableName));
-        if (preg_match('/^ext_[a-z0-9_]+$/', $normalizedTable) !== 1) {
-            return [];
-        }
-
-        $table = $this->table($normalizedTable);
-        try {
-            $stmt = $this->db->prepare(
-                'SELECT name, slug
-                 FROM ' . $table . '
-                 WHERE enabled = 1
-                 ORDER BY name ASC, id ASC'
-            );
-            $stmt->execute();
-        } catch (PDOException) {
-            return [];
-        }
-
-        /** @var array<int, array<string, mixed>> $rows */
-        $rows = $stmt->fetchAll() ?: [];
-        $forms = [];
-        foreach ($rows as $row) {
-            $name = trim((string) ($row['name'] ?? ''));
-            $slug = strtolower(trim((string) ($row['slug'] ?? '')));
-            if ($slug === '' || preg_match('/^[a-z0-9][a-z0-9_-]*$/', $slug) !== 1) {
-                continue;
-            }
-            if ($name === '') {
-                $name = $slug;
-            }
-
-            $forms[] = [
-                'name' => $name,
-                'slug' => $slug,
-            ];
-        }
-
-        return $forms;
-    }
-
 
     /**
      * @return array<int, array<string, mixed>>
