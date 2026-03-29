@@ -61,7 +61,7 @@ $formatSize = static function (int $bytes): string {
             </h1>
             <div class="d-flex flex-wrap gap-2">
                 <?php if ($extensionDocsUrl !== ''): ?>
-                    <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-secondary btn-sm" target="_blank" rel="noopener noreferrer">
+                    <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
                         <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
                     </a>
                 <?php endif; ?>

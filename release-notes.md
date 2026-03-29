@@ -2,6 +2,13 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### March 29, 2026 — super/editor stock slug purge
+
+- Removed stale `'super'` and `'editor'` entries from all `group_is_stock` CASE expressions across `GroupRepository`, `UserRoutingDataService`, `GroupPublicRouteService`, `UserGroupCatalogService`, `UserPanelQueryService`, and `UserRepository`; the only stock slugs are now `admin`, `user`, `guest`, `validating`, `banned`.
+- Removed `slugifyGroupName()` guard clause that mapped `'super'`/`'super admin'`/`'super-admin'` → slug `'super'` in both `PanelController` and `RvnSchemaBuilder`; names now flow through the standard slug pipeline.
+- Removed `$isEditorGroup` flag, `$editorStockMask` constant, and the corresponding `elseif` branch from `PanelController` group-edit permission normalization; `editor` is no longer a stock group and the branch was unreachable.
+- Removed `$groupSlug === 'super'` admin-group fallback checks from `panel/user/edit.php` (primary-group select and secondary-group checkboxes).
+
 ### March 29, 2026 — legacy artifact sweep
 
 - Deleted `AuthService::isSuperAdmin()` deprecated pass-through alias (no callers remained).

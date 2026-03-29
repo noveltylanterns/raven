@@ -30,7 +30,7 @@ final class GroupPublicRouteService
                     g.slug AS group_slug,
                     g.route AS group_route,
                     g.permissions AS group_permissions,
-                    CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
+                    CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
                     g.created AS group_created,
                     COUNT(u.id) OVER() AS member_count,
                     u.id AS user_id,

@@ -349,7 +349,7 @@ final class UserRepository
                     g.name AS group_name,
                     g.slug AS group_slug,
                     g.permissions AS group_permissions,
-                    CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
+                    CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
                     CASE WHEN ug.user IS NULL THEN 0 ELSE 1 END AS group_selected
              FROM ' . $users . ' u
              LEFT JOIN ' . $groups . ' g ON 1 = 1
@@ -357,7 +357,7 @@ final class UserRepository
                ON ug.user = u.id
               AND ug."group" = g.id
              WHERE u.id = :id
-             ORDER BY CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END DESC,
+             ORDER BY CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END DESC,
                       LOWER(g.name) ASC,
                       g.id ASC'
         );

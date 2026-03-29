@@ -71,7 +71,7 @@ final class UserGroupCatalogService
                         g.name AS group_name,
                         g.slug AS group_slug,
                         g.permissions AS group_permissions,
-                        CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock
+                        CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock
                  FROM ' . $groupsTable . ' g
                  ORDER BY g.id ASC'
             );
@@ -113,7 +113,7 @@ final class UserGroupCatalogService
                     g.name AS group_name,
                     g.slug AS group_slug,
                     g.permissions AS group_permissions,
-                    CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
+                    CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
                     ug.user
              FROM ' . $groupsTable . ' g
              LEFT JOIN ' . $userGroupsTable . ' ug

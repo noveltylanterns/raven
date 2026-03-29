@@ -3584,7 +3584,6 @@ final class PanelController
         $isGuestLikeGroup = $roleSlug === 'guest' || $roleSlug === 'validating';
         $isBannedGroup = $roleSlug === 'banned';
         $isUserGroup = $roleSlug === 'user';
-        $isEditorGroup = $roleSlug === 'editor';
         // Admin group is canonical ID 1.
         $isAdminGroup = $isExistingStockGroup && $id === 1;
         if ($isGuestLikeGroup || $isBannedGroup) {
@@ -3599,10 +3598,6 @@ final class PanelController
         foreach ($validBits as $validBit) {
             $allValidBitsMask |= (int) $validBit;
         }
-        $editorStockMask = PanelAccess::PANEL_LOGIN
-            | PanelAccess::VIEW_PUBLIC_SITE
-            | PanelAccess::VIEW_PRIVATE_SITE
-            | PanelAccess::maskFromBits(PanelAccess::contentPanelBits());
         $adminStockMask = PanelAccess::PANEL_LOGIN
             | PanelAccess::VIEW_PUBLIC_SITE
             | PanelAccess::VIEW_PRIVATE_SITE
@@ -3627,8 +3622,6 @@ final class PanelController
             $permissionMask &= PanelAccess::VIEW_PUBLIC_SITE;
         } elseif ($isUserGroup) {
             $permissionMask &= (PanelAccess::VIEW_PUBLIC_SITE | PanelAccess::VIEW_PRIVATE_SITE);
-        } elseif ($isEditorGroup) {
-            $permissionMask = $editorStockMask;
         } elseif ($isAdminGroup) {
             $permissionMask = $allValidBitsMask;
         }
@@ -7282,11 +7275,6 @@ final class PanelController
      */
     private function slugifyGroupName(string $groupName): string
     {
-        $normalized = strtolower(trim($groupName));
-        if (in_array($normalized, ['super admin', 'super-admin', 'super'], true)) {
-            return 'super';
-        }
-
         $slug = $this->input->slug($groupName);
         if ($slug === null || $slug === '') {
             return '';

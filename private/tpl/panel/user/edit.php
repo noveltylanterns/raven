@@ -366,7 +366,7 @@ $themeLabels = [
                         <?php
                         $groupId = (int) $group['id'];
                         $groupSlug = strtolower(trim((string) ($group['slug'] ?? '')));
-                        $isAdminGroup = $groupSlug === 'admin' || $groupSlug === 'super';
+                        $isAdminGroup = $groupSlug === 'admin';
                         $isConfigurationGroup = (((int) ($group['permissions'] ?? 0)) & $systemPanelBitsMask) !== 0;
                         $lockAdminAssignment = $isAdminGroup && !$canAssignSuperAdmin;
                         $lockConfigurationPromotion = !$canAssignConfigurationGroups && $isConfigurationGroup && !$isAdminGroup;
@@ -393,8 +393,7 @@ $themeLabels = [
                 <?php foreach ($groupOptions as $group): ?>
                     <?php
                     $groupId = (int) $group['id'];
-                    $isAdminGroup = strtolower(trim((string) ($group['slug'] ?? ''))) === 'admin'
-                        || strtolower(trim((string) ($group['slug'] ?? ''))) === 'super';
+                    $isAdminGroup = strtolower(trim((string) ($group['slug'] ?? ''))) === 'admin';
                     $isConfigurationGroup = (((int) ($group['permissions'] ?? 0)) & $systemPanelBitsMask) !== 0;
                     $isSelected = in_array($groupId, $secondaryGroupIds, true);
                     $lockAdminAssignment = $isAdminGroup && !$canAssignSuperAdmin;

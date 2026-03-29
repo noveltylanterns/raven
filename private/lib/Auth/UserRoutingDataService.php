@@ -44,7 +44,7 @@ final class UserRoutingDataService
                     g.slug AS group_slug,
                     g.route AS group_route,
                     g.permissions AS group_permissions,
-                    CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
+                    CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
                     COALESCE(mc.member_count, 0) AS group_member_count,
                     NULL AS user_id,
                     NULL AS username,

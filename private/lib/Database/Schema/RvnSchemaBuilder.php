@@ -425,10 +425,6 @@ final class RvnSchemaBuilder
             return '';
         }
 
-        if (in_array($value, ['super admin', 'super-admin', 'super'], true)) {
-            return 'super';
-        }
-
         $value = preg_replace('/[^a-z0-9]+/', '-', $value) ?? '';
         $value = trim($value, '-');
         $value = preg_replace('/-+/', '-', $value) ?? '';

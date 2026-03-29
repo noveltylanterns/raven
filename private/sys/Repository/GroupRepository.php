@@ -705,6 +705,6 @@ final class GroupRepository
             ? $tableAlias . '.slug'
             : 'slug';
 
-        return "CASE WHEN LOWER(" . $slugColumn . ") IN ('super', 'admin', 'editor', 'user', 'guest', 'validating', 'banned') THEN 1 ELSE 0 END";
+        return "CASE WHEN LOWER(" . $slugColumn . ") IN ('admin', 'user', 'guest', 'validating', 'banned') THEN 1 ELSE 0 END";
     }
 }
