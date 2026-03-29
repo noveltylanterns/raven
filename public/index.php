@@ -330,11 +330,21 @@ foreach ($enabledPublicExtensions as $extensionName) {
         continue;
     }
 
+    // Pre-resolve the extension tpl root so the renderPublicExtension closure
+    // does not need to reconstruct it on every invocation.
+    $extTplRoot = rtrim((string) ($rvn['root'] ?? ''), '/') . '/private/ext/' . $extensionName . '/tpl';
+
     $registrar($router, [
         'rvn' => $rvn,
         'controller' => $controller,
         'input' => $input,
         'extensionDirectory' => $extensionName,
+        // First-class render helper: renders extension templates through the site theme pipeline.
+        // Signature: renderPublicExtension(string $template, array $data = [], string|null $layout = 'wrapper'): void
+        // Templates resolve from: active theme > extension tpl/ > core tpl/ fallback.
+        'renderPublicExtension' => static function (string $template, array $data = [], ?string $layout = 'wrapper') use ($controller, $extTplRoot): void {
+            $controller->renderPublicExtensionTemplate($template, $data, $layout, $extTplRoot);
+        },
     ]);
 }
 

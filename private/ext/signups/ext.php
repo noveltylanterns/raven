@@ -62,12 +62,12 @@ return [
     $rawSignupServices['forms'] = $formsRepository;
     $rawSignupServices['submissions'] = $submissionsRepository;
     /** @var mixed $rawEmbeddedRuntimes */
-    $rawEmbeddedRuntimes = $rawSignupServices['embedded_form_runtimes'] ?? [];
+    $rawEmbeddedRuntimes = $rawSignupServices['shortcode_runtimes'] ?? [];
     if (!is_array($rawEmbeddedRuntimes)) {
         $rawEmbeddedRuntimes = [];
     }
     $rawEmbeddedRuntimes[] = $publicFormRuntime;
-    $rawSignupServices['embedded_form_runtimes'] = $rawEmbeddedRuntimes;
+    $rawSignupServices['shortcode_runtimes'] = $rawEmbeddedRuntimes;
     $rawExtensionServices['signups'] = $rawSignupServices;
     $rvn['extension_services'] = $rawExtensionServices;
     },

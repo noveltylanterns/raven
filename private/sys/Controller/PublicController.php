@@ -16,6 +16,7 @@ namespace Raven\Controller;
 use Raven\Core\Auth\AuthService;
 use Raven\Core\Config;
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
+use Raven\Core\Extension\EmbeddedShortcodeRuntimeInterface;
 use Raven\Lib\Auth\LoginAttemptPolicy;
 use Raven\Lib\Auth\LoginAttemptWorkflowService;
 use Raven\Lib\Auth\LoginChallengeWorkflowService;
@@ -73,7 +74,7 @@ final class PublicController
     private Csrf $csrf;
     private SessionFlash $publicFlash;
     private LoginIdentifierResolver $identifierResolver;
-    /** @var array<string, EmbeddedFormRuntimeInterface> */
+    /** @var array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> */
     private array $embeddedFormRuntimes = [];
     private TemplateTagEngine $templateTags;
     private bool $captchaScriptIncluded = false;
@@ -1439,6 +1440,12 @@ final class PublicController
             return;
         }
 
+        // Content-only runtimes (EmbeddedShortcodeRuntimeInterface) have no submit handler.
+        if (!$runtime instanceof EmbeddedFormRuntimeInterface) {
+            $this->notFound();
+            return;
+        }
+
         $slug = $this->input->slug($formSlug);
         if ($slug === null) {
             $this->notFound();
@@ -2392,6 +2399,54 @@ final class PublicController
             $this->registrationThrottleIdentifier(),
             $policy->clientIpAddress($_SERVER)
         );
+    }
+
+    /**
+     * Renders an extension template through the site theme pipeline.
+     *
+     * Inserts the extension's own tpl/ directory into the template lookup chain
+     * between active-theme overrides and core fallbacks, so the active theme can
+     * override extension templates while the extension's own templates take
+     * priority over any matching name in the core tpl/ fallback.
+     *
+     * This is the public entry point for the `renderPublicExtension` callable
+     * injected into extension public route context by public/index.php.
+     *
+     * @param string               $template         Template name (e.g., `public_index`).
+     * @param array<string, mixed> $data             Template variables merged into global context.
+     * @param string|null          $layout           Layout template, or null for no wrapper.
+     * @param string               $extensionTplRoot Absolute path to the extension's tpl/ directory.
+     */
+    public function renderPublicExtensionTemplate(
+        string $template,
+        array $data = [],
+        ?string $layout = 'wrapper',
+        string $extensionTplRoot = ''
+    ): void {
+        $data = $this->decorateTemplateData($data);
+        $pipeline = $this->publicTemplatePipeline();
+        $roots = $pipeline->lookupRoots(
+            $this->publicThemesRoot(),
+            $this->currentPublicThemeSlug(),
+            dirname(__DIR__, 3) . '/private/tpl'
+        );
+
+        // Insert the extension tpl root between theme roots and the core fallback so the
+        // active theme can still override extension templates while extension templates
+        // take priority over any matching name in the core tpl/ fallback.
+        if ($extensionTplRoot !== '' && is_dir($extensionTplRoot)) {
+            array_splice($roots, count($roots) - 1, 0, [$extensionTplRoot]);
+        }
+
+        $output = $pipeline->render(
+            $template,
+            $data,
+            $layout,
+            fn (string $file, array $payload): string => $this->templateTags->renderFile($file, $payload),
+            ...$roots
+        );
+
+        echo $output;
     }
 
     /**

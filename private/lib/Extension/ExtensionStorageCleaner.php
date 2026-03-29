@@ -43,7 +43,8 @@ final class ExtensionStorageCleaner
      *   tables?: array<int, string>,
      *   aux?: array<int, string>,
      *   panel?: bool,
-     *   public?: bool
+     *   public?: bool,
+     *   bin?: bool
      * } $storage
      */
     public function deleteStorageByContract(string $directoryName, array $storage): void
@@ -72,8 +73,50 @@ final class ExtensionStorageCleaner
             $this->deleteDirectory($this->projectRoot . '/public/upload/ext/' . $directoryName, 'public/upload/ext/' . $directoryName);
         }
 
+        if (!empty($storage['bin'])) {
+            $this->removeBinSymlinks($directoryName);
+        }
+
         if (!empty($storage['table']) || !empty($storage['tables'])) {
             $this->dropDatabaseTables($directoryName);
+        }
+    }
+
+    /**
+     * Removes symlinks from private/bin/ that point into the extension's bin/ directory.
+     *
+     * Only removes symlinks whose target resolves inside the extension's own bin/ directory,
+     * so there is no risk of accidentally removing unrelated entries that happen to share a name.
+     *
+     * @param string $directoryName Extension directory name.
+     */
+    private function removeBinSymlinks(string $directoryName): void
+    {
+        $targetBin = $this->projectRoot . '/private/bin';
+        $extensionBin = $this->projectRoot . '/private/ext/' . $directoryName . '/bin';
+
+        if (!is_dir($targetBin)) {
+            return;
+        }
+
+        $iterator = new \DirectoryIterator($targetBin);
+        foreach ($iterator as $item) {
+            if ($item->isDot() || !$item->isLink()) {
+                continue;
+            }
+
+            $realTarget = realpath($item->getPathname());
+            if ($realTarget === false) {
+                // Dangling symlink — check by reading the link target string instead.
+                $linkTarget = (string) readlink($item->getPathname());
+                if (!str_starts_with($linkTarget, $extensionBin . '/')) {
+                    continue;
+                }
+            } elseif (!str_starts_with($realTarget, $extensionBin . '/') && $realTarget !== $extensionBin) {
+                continue;
+            }
+
+            unlink($item->getPathname());
         }
     }
 

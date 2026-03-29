@@ -1,0 +1,15 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/bin/rvn-cron
+ * Scheduler runner — executes registered background jobs that are past due.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../lib/Shell/raven_cli.php';
+[$context, $tokens] = raven_cli_bootstrap($argv);
+exit(raven_cli_command_cron($context, $tokens));

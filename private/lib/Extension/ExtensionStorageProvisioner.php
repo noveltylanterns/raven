@@ -59,13 +59,70 @@ final class ExtensionStorageProvisioner
     }
 
     /**
+     * Creates symlinks in private/bin/ pointing to executables in the extension's bin/ directory.
+     *
+     * @param string $directoryName Extension directory name (used for path construction only; symlink names come from the bin/ contents).
+     * @throws RuntimeException If the symlink source directory exists but a symlink cannot be created.
+     */
+    public function ensureBinSymlinks(string $directoryName): void
+    {
+        if (!$this->manifestValidator->isSafeDirectoryName($directoryName)) {
+            throw new RuntimeException('Invalid extension directory name for bin storage.');
+        }
+
+        $sourceBin = $this->projectRoot . '/private/ext/' . $directoryName . '/bin';
+        if (!is_dir($sourceBin)) {
+            // No bin/ directory in the extension; nothing to link.
+            return;
+        }
+
+        $targetBin = $this->projectRoot . '/private/bin';
+        if (!is_dir($targetBin) && !mkdir($targetBin, 0775, true) && !is_dir($targetBin)) {
+            throw new RuntimeException('Failed to ensure private/bin directory for extension bin storage.');
+        }
+
+        // Create one symlink per file in the extension bin/ directory.
+        // Only files are linked; subdirectories are ignored since CLI commands are single files.
+        $iterator = new \DirectoryIterator($sourceBin);
+        foreach ($iterator as $item) {
+            if ($item->isDot() || $item->isDir()) {
+                continue;
+            }
+
+            $name = $item->getFilename();
+            // Guard against traversal via unexpected filenames.
+            if (preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/', $name) !== 1) {
+                continue;
+            }
+
+            $linkPath = $targetBin . '/' . $name;
+            $targetPath = $item->getRealPath();
+
+            if (is_link($linkPath)) {
+                // Already linked; skip (idempotent).
+                continue;
+            }
+
+            if (file_exists($linkPath)) {
+                // A real file already occupies the name; do not clobber it.
+                throw new RuntimeException('Cannot create bin symlink for "' . $name . '": a non-symlink file already exists at private/bin/' . $name . '.');
+            }
+
+            if (!symlink($targetPath, $linkPath)) {
+                throw new RuntimeException('Failed to create bin symlink for "' . $name . '" in private/bin/.');
+            }
+        }
+    }
+
+    /**
      * @param array{
      *   local?: bool,
      *   table?: bool,
      *   tables?: array<int, string>,
      *   aux?: array<int, string>,
      *   panel?: bool,
-     *   public?: bool
+     *   public?: bool,
+     *   bin?: bool
      * } $storage
      */
     public function provision(string $directoryName, array $storage): void
@@ -94,6 +151,10 @@ final class ExtensionStorageProvisioner
         if (!empty($storage['public'])) {
             $target = $this->ensurePublicStorageDirectory($directoryName);
             $this->syncBundledAssets($directoryName, 'public', $target);
+        }
+
+        if (!empty($storage['bin'])) {
+            $this->ensureBinSymlinks($directoryName);
         }
     }
 

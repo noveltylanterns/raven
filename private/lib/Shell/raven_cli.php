@@ -3017,3 +3017,120 @@ function raven_cli_command_system(RavenCliContext $context, array $tokens): int
         return 1;
     }
 }
+
+/**
+ * Scheduler command: run due background jobs or report job status.
+ *
+ * Subcommands:
+ *   run    (default) — execute all currently overdue jobs.
+ *   status           — print each registered job with last-run time and overdue flag.
+ *
+ * @param RavenCliContext $context Shared CLI context.
+ * @param array<int, string> $tokens Remaining command tokens after the binary name.
+ * @return int Exit code (0 = success, 1 = error).
+ */
+function raven_cli_command_cron(RavenCliContext $context, array $tokens): int
+{
+    $action = strtolower(trim((string) ($tokens[0] ?? 'run')));
+
+    if ($action === 'help' || raven_cli_is_help_requested($tokens)) {
+        $context->renderHelpHeader('cron');
+        $context->info('Usage: private/bin/rvn-cron [run|status]');
+        $context->info('  run    Execute all registered jobs that are currently due. (default)');
+        $context->info('  status Show each registered job with last-run time and overdue flag.');
+        return 0;
+    }
+
+    if (!in_array($action, ['run', 'status'], true)) {
+        $context->error('Unknown cron action: ' . $action . '. Use run or status.');
+        return 1;
+    }
+
+    try {
+        // Bootstrap the full app container — sets up autoloader and all extension services.
+        $rvn = $context->rvn();
+        $root = $context->root;
+
+        $scheduler = $rvn['scheduler'] ?? null;
+        if (!$scheduler instanceof \Raven\Lib\Scheduler\SchedulerRegistry) {
+            throw new RuntimeException('Scheduler registry not found in app container. Ensure private/raven.php is up to date.');
+        }
+
+        if ($action === 'status') {
+            $status = $scheduler->getStatus();
+
+            if ($context->json) {
+                $context->printJson(['ok' => true, 'jobs' => $status]);
+                return 0;
+            }
+
+            if ($status === []) {
+                $context->info('No scheduler jobs registered.');
+                return 0;
+            }
+
+            foreach ($status as $key => $entry) {
+                $lastRunLabel = $entry['last_run'] !== null
+                    ? date('Y-m-d H:i:s', $entry['last_run'])
+                    : 'never';
+                $nextDueLabel = $entry['next_due'] !== null
+                    ? date('Y-m-d H:i:s', $entry['next_due'])
+                    : 'now';
+                $overdueLabel = $entry['overdue'] ? ' [OVERDUE]' : '';
+                $context->line(
+                    $key . ': interval=' . $entry['interval'] . 's'
+                    . ', last_run=' . $lastRunLabel
+                    . ', next_due=' . $nextDueLabel
+                    . $overdueLabel
+                );
+            }
+
+            return 0;
+        }
+
+        // action === 'run'
+        $jobContext = ['root' => $root, 'rvn' => $rvn];
+        $results = $scheduler->runDue($jobContext);
+
+        $ranCount = 0;
+        $skippedCount = 0;
+        $errorCount = 0;
+        $resultRows = [];
+
+        foreach ($results as $key => $entry) {
+            if ($entry['ran']) {
+                $ranCount++;
+                $resultRows[$key] = ['ran' => true, 'error' => null];
+            } elseif ($entry['error'] !== null) {
+                $errorCount++;
+                $resultRows[$key] = ['ran' => false, 'error' => $entry['error']];
+            } else {
+                $skippedCount++;
+                $resultRows[$key] = ['ran' => false, 'skipped' => true];
+            }
+        }
+
+        if ($context->json) {
+            $context->printJson([
+                'ok' => $errorCount === 0,
+                'ran' => $ranCount,
+                'skipped' => $skippedCount,
+                'errors' => $errorCount,
+                'jobs' => $resultRows,
+            ]);
+            return $errorCount > 0 ? 1 : 0;
+        }
+
+        $context->info('Scheduler run complete: ' . $ranCount . ' ran, ' . $skippedCount . ' skipped, ' . $errorCount . ' failed.');
+        foreach ($resultRows as $key => $entry) {
+            if (!empty($entry['error'])) {
+                $context->error('Job "' . $key . '" failed: ' . (string) $entry['error']);
+            }
+        }
+
+        return $errorCount > 0 ? 1 : 0;
+    } catch (Throwable $exception) {
+        $context->error($exception->getMessage(), $exception);
+        return 1;
+    }
+}

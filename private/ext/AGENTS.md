@@ -1,6 +1,6 @@
 # Raven Extension Agent Guide
 
-UPDATED: 2026-03-27
+UPDATED: 2026-03-29
 NOTE: All paths relative to project root. (../ from the perspective of this directory)
 
 ## Scope
@@ -13,6 +13,8 @@ NOTE: All paths relative to project root. (../ from the perspective of this dire
 - Use `private/bin/rvn-ext` for extension lifecycle tasks (list/enable/disable/create/import/uninstall). Legacy `delete` remains accepted as an alias for `uninstall`.
 - Use `private/bin/rvn-sys extensions` for enabled-extension status snapshots.
 - Use `private/bin/rvn-theme list` / `enable` when validating extension-provided public views against active public-theme selection.
+- Use `private/bin/rvn-cron run` to execute all registered background scheduler jobs that are past due.
+- Use `private/bin/rvn-cron status` to inspect last-run times and overdue flags for all registered jobs.
 
 ## Mandatory First Step: Scaffold, Do Not Hand-Roll
 - Do not start a new extension by manually copying folders, mimicking stock extensions, or inventing a directory layout from memory.
@@ -41,8 +43,9 @@ NOTE: All paths relative to project root. (../ from the perspective of this dire
 6. Implement `lib/routes_public.php` and `tpl/public_*.php` only for `module` extensions.
 7. Implement `lib/shortcodes.php` only for `content` or `module` types.
 8. Implement `lib/fields.php` only for `content` or `module` types.
-9. Run validation checks (`php -l`, manifest validation) before enabling the extension.
-10. Only after files are valid, enable the extension from Extension Manager or `rvn-ext enable`.
+9. Implement `lib/cron.php` only when the extension needs scheduled background jobs (requires `scheduler: true` in `ext.php`).
+10. Run validation checks (`php -l`, manifest validation) before enabling the extension.
+11. Only after files are valid, enable the extension from Extension Manager or `rvn-ext enable`.
 
 ## Canonical Minimal `ext.json` Templates
 - `framework`:
@@ -126,11 +129,16 @@ return [
         // 'tables' => ['items'],
         // 'aux' => ['finger'],
         // 'panel' => true,
-        // 'public' => true,
+        // 'public' => true,  // module only
+        // 'bin' => true,     // symlinks private/bin/ -> private/ext/{slug}/bin/
     ],
+    // Set to true to declare that this extension provides lib/cron.php.
+    // Core registers extension as a scheduler source; rvn-cron loads lib/cron.php at run time.
+    // 'scheduler' => true,
     'boot' => static function (array &$rvn): void {
         // Use $rvn['extension_storage']['{slug}'] for resolved storage roots.
         // Register extension services into $rvn['extension_services'] when needed.
+        // To register a shortcode runtime: $rvn['extension_services']['{slug}']['shortcode_runtimes'][] = $runtime;
     },
 ];
 ```
@@ -198,6 +206,30 @@ return static function (array $context = []): array {
     return [];
 };
 ```
+- `lib/cron.php` (optional, requires `scheduler: true` in `ext.php`):
+```php
+<?php
+/**
+ * RAVEN CMS
+ * ~/private/ext/{slug}/lib/cron.php
+ * Extension scheduler job provider.
+ * docs: /private/ext/AGENTS.md
+ */
+declare(strict_types=1);
+
+return [
+    [
+        // Job name slug (^[a-z0-9][a-z0-9_-]{0,63}$).
+        'name' => 'my-job',
+        // Minimum seconds between runs. rvn-cron skips this job until the interval elapses.
+        'interval' => 3600,
+        // Called when the job is due. $context keys: 'root' (string), 'rvn' (array).
+        'run' => static function (array $context): void {
+            // Access the app container: $context['rvn']['db'], $context['rvn']['config'], etc.
+        },
+    ],
+];
+```
 - `tpl/panel_index.php` (all extension types):
 ```php
 <?php
@@ -227,6 +259,10 @@ declare(strict_types=1);
 - `lib/shortcodes.php` (when present) returns valid universal rows: `array<int, array{label: string, shortcode: string}>` or callable returning that shape.
 - `lib/fields.php` (when present) returns valid universal rows: `array<int, array{slug: string, label: string, editor: string}>` or callable returning that shape.
 - `lib/fields.php` `editor` values are only: `tinymce`, `plaintext`, `autobr`, `markdown`, `markdown_file`.
+- `lib/cron.php` is only present when `scheduler: true` is set in `ext.php`.
+- `lib/cron.php` (when present) returns an array of job definition maps, each with `name` (slug), `interval` (int ≥ 1), and `run` (callable).
+- `scheduler: true` in `ext.php` without a valid `lib/cron.php` is allowed (no jobs will be loaded); but `lib/cron.php` without `scheduler: true` in `ext.php` is a dead file and will never be loaded.
+- `bin/` directory is only present when `bin: true` is in `ext.php` storage. Filenames in `bin/` must match `^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$`.
 - Every PHP file in the extension directory passes `php -l`.
 - No extension change depends on edits in `private/sys/*`, `panel/index.php`, or `public/index.php`.
 - Any state-changing route uses CSRF validation.
@@ -256,8 +292,11 @@ declare(strict_types=1);
 - Optional panel routes registrar: `private/ext/{directory_name}/lib/routes_panel.php`
 - Optional public routes registrar: `private/ext/{directory_name}/lib/routes_public.php`
 - Optional page-editor shortcode provider: `private/ext/{directory_name}/lib/shortcodes.php`
+- Optional scheduler job provider: `private/ext/{directory_name}/lib/cron.php` (requires `scheduler: true` in `ext.php`)
 - Optional extension-local state file(s) when needed by your extension
 - Optional extension-owned panel templates: `private/ext/{directory_name}/tpl/*.php`
+- Optional extension-owned public templates: `private/ext/{directory_name}/tpl/public_*.php` (module only)
+- Optional bin directory: `private/ext/{directory_name}/bin/` (requires `bin: true` in `ext.php` storage)
 
 ## Extension Autoloading
 - Enabled extensions may autoload PHP classes from `private/ext/{slug}/src/`.
@@ -334,13 +373,22 @@ declare(strict_types=1);
 - `controller` => public controller instance
 - `input` => input sanitizer instance
 - `extensionDirectory` => enabled extension folder name
+- `renderPublicExtension` => `callable(string $template, array $data = [], string|null $layout = 'wrapper'): void`
+  - Renders an extension template through the site theme pipeline.
+  - `$template`: template name relative to a tpl root (e.g., `public_index`).
+  - `$data`: template variables merged with global site context.
+  - `$layout`: wrapper layout name (`'wrapper'` by default; pass `null` for raw output).
+  - Lookup order: active theme tpl > extension `tpl/` > core `private/tpl/` fallback.
+  - Extension templates live at `private/ext/{slug}/tpl/{template}.php`.
 - Registration happens during `public/index.php` route bootstrap before fallback page/channel routes.
 
 ## Extension Service Bootstrap Contract
 - If enabled, Raven attempts to load `private/ext/{name}/ext.php` during `private/raven.php`.
-- File must return a callable:
-- `function (array &$rvn): void`
-- Provider should register extension services into the shared app container (for example repositories/controllers/helpers required by extension routes/runtime).
+- File must return an array with these optional top-level keys:
+- `storage` => array of storage options (see Extension Storage Contract)
+- `scheduler` => bool — set `true` to declare this extension provides `lib/cron.php` scheduler jobs
+- `boot` => callable `function (array &$rvn): void`
+- `boot` callable should register extension services into the shared app container (repositories, controllers, shortcode runtimes, etc.).
 - Bootstrap providers are loaded only for enabled extensions listed in `private/dat/ext/.state.php` with valid directory names.
 - Extension source autoloading (`private/ext/{name}/src/`) is also enabled only for extensions marked enabled in `.state.php`.
 
@@ -387,8 +435,9 @@ declare(strict_types=1);
 - `tags`
 - `taxonomy`
 - `users`
+- `scheduler` => `Raven\Lib\Scheduler\SchedulerRegistry` — system-wide scheduler registry (core + extension jobs)
 - `extension_services` (recommended extension-owned service map keyed by extension directory and service name)
-- `extension_services.{extension}.embedded_form_runtimes` (optional list of embedded shortcode runtimes implementing `Raven\Core\Extension\EmbeddedFormRuntimeInterface`)
+- `extension_services.{extension}.shortcode_runtimes` (optional list of shortcode runtimes; accepts `EmbeddedShortcodeRuntimeInterface` for content-only and `EmbeddedFormRuntimeInterface` for form-capable runtimes)
 - `contact_forms`
 - `contact_submissions`
 - `signup_forms`
@@ -397,17 +446,26 @@ declare(strict_types=1);
 - Legacy top-level keys (for example `contact_forms`) remain for compatibility during migration and should be considered transitional.
 - Use `isset(...)` and strict instance checks before assuming any service.
 
-### Embedded Form Runtime Contract
-- Extensions may register embedded shortcode runtimes through their bootstrap provider:
-- `extension_services.{extension}.embedded_form_runtimes[] = <EmbeddedFormRuntimeInterface>`
-- Core `PublicController` now discovers these runtimes generically for shortcode rendering and submit dispatch.
-- Runtime interface location: `private/sys/Core/Extension/EmbeddedFormRuntimeInterface.php`.
-- Required runtime capabilities:
-- shortcode type token (`type()`)
-- owning extension key (`extensionKey()`)
-- enabled definition listing (`listEnabledForms()`)
-- render markup (`render(...)`)
-- submit handler (`submit(...)`)
+### Shortcode Runtime Contract
+- Extensions may register two kinds of shortcode runtime through their bootstrap `boot` callable:
+- **Content runtime** (`EmbeddedShortcodeRuntimeInterface`) — renders embedded content blocks; no form submit handling.
+- **Form runtime** (`EmbeddedFormRuntimeInterface`) — form-capable variant with submit handling.
+- Register under `extension_services.{extension}.shortcode_runtimes[]` (canonical key):
+  ```php
+  $rvn['extension_services']['{slug}']['shortcode_runtimes'][] = $myRuntime;
+  ```
+- Core also accepts the legacy key `embedded_form_runtimes` for backwards compatibility; prefer `shortcode_runtimes` for new code.
+- Interface locations:
+  - `private/sys/Core/Extension/EmbeddedShortcodeRuntimeInterface.php` (content-only)
+  - `private/sys/Core/Extension/EmbeddedFormRuntimeInterface.php` (form-capable)
+- `EmbeddedShortcodeRuntimeInterface` required methods:
+  - `type(): string` — shortcode type token (e.g., `gallery`)
+  - `extensionKey(): string` — owning extension directory name
+  - `render(array $context): string` — `$context` keys: `slug`, `raw_args`
+- `EmbeddedFormRuntimeInterface` additional required methods beyond content runtime:
+  - `listEnabledForms(): array` — returns enabled form definitions (each with a `slug` key)
+  - `render(array $definition, string $returnPath, string $csrfField, string $captchaMarkup): string`
+  - `submit(string $slug, string $returnPath, callable $captchaValidator): void`
 
 ## Panel UI Integration Pattern
 - Extensions generally render via shared panel layout: `private/tpl/panel/wrapper.php`.
@@ -512,6 +570,7 @@ declare(strict_types=1);
 - `aux` => one or more sanctioned root-level folders such as `/{name}`
 - `panel` => panel-served assets at `panel/ext/{slug}/`
 - `public` => public-served assets at `public/upload/ext/{slug}/` (`module` only)
+- `bin` => symlinks in `private/bin/` pointing to files in `private/ext/{slug}/bin/`; links are created on enable and removed on disable/uninstall
 - `framework` may not request `panel` or `public`.
 - `lib/schema.php` receives resolved storage roots in `$context['storage']`, plus:
 - `$context['storage']['aux']` for resolved root-level aux directories (`name => absolute path`)
@@ -524,12 +583,29 @@ declare(strict_types=1);
 
 ## Public Runtime Integration (Current Reality)
 - Public routes can now be registered by enabled `module` extensions via `lib/routes_public.php`.
+- Use `$context['renderPublicExtension']($template, $data, $layout)` in public route closures to render templates through the site theme pipeline without hand-assembling the site context payload.
 - Embedded form submit behavior is extension-agnostic:
-- Core public submit endpoint is `POST /forms/submit` and dispatches by runtime type + slug.
-- `contact` and `signups` do not require extension-owned public route files for form submit handling.
-- Contact/Signup configuration is file-backed under `private/dat/ext/{slug}/forms.php`.
+  - Core public submit endpoint is `POST /forms/submit` and dispatches by runtime type + slug.
+  - `contact` and `signups` do not require extension-owned public route files for form submit handling.
+  - Contact/Signup configuration is file-backed under `private/dat/ext/{slug}/forms.php`.
+- Shortcode rendering supports both content runtimes (`EmbeddedShortcodeRuntimeInterface`) and form runtimes (`EmbeddedFormRuntimeInterface`). Register both under `shortcode_runtimes` in `ext.php` boot.
 - Core public runtime still owns shortcode rendering and site-wide access/routing fallback policy.
 - Do not hard-patch core for one-off extension behavior unless explicitly planned and accepted as a core change.
+
+## Extension Scheduler Contract
+- Extensions opt in to background scheduling by setting `scheduler: true` in `ext.php`.
+- When opted in, core registers the extension as a scheduler source during `private/raven.php` bootstrap.
+- The scheduler lazily loads `private/ext/{name}/lib/cron.php` the first time `rvn-cron run` or `rvn-cron status` is invoked.
+- `lib/cron.php` must return an array of job definition maps. Each entry requires:
+  - `name` (string) — job name slug (`^[a-z0-9][a-z0-9_-]{0,63}$`).
+  - `interval` (int) — minimum seconds between runs (must be ≥ 1).
+  - `run` (callable) — called with `array $context` when the job is due.
+    - Context keys available to the callable: `root` (project root string), `rvn` (full app container array).
+- Last-run timestamps are stored in `.tmp/cron/{extension}/{job-name}.ts`.
+- On failure the timestamp is not updated, so the job retries on the next `rvn-cron run`.
+- To run jobs automatically: add `php private/bin/rvn-cron run` to the server crontab (e.g., every minute for high-frequency jobs).
+- `rvn-cron run --json` emits a structured JSON result for scripted/CI use.
+- Core also registers built-in jobs (e.g., `core::page-schedule` for publish/draft flipping); these run every cycle just like extension jobs.
 
 ## Debugging Extension Issues
 - First check the PHP error log when an enabled extension page 404s or silently disappears.

@@ -17,6 +17,7 @@ use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Media\PageImageManager;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
+use Raven\Lib\Scheduler\SchedulerRegistry;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Session\SessionCookiePolicy;
 use Raven\Lib\Security\Csrf;
@@ -165,6 +166,8 @@ return (static function (): array {
     $extensionBootstrapResolver = new ExtensionBootstrapContractResolver();
 
     // Load service providers from enabled extensions.
+    // Also collect scheduler-opted-in extension directory names for SchedulerRegistry wiring below.
+    $schedulerExtensions = [];
     foreach ($enabledExtensionDirectories as $directory) {
         $manifest = ExtensionRegistry::readManifest($root, $directory);
         if (!is_array($manifest)) {
@@ -175,6 +178,11 @@ return (static function (): array {
         if (!$bootstrap['valid']) {
             error_log('Raven extension bootstrap is invalid for extension "' . $directory . '": ' . (string) ($bootstrap['error'] ?? 'Unknown error.'));
             continue;
+        }
+
+        // Track extensions that opted in to the scheduler so they are wired below.
+        if (!empty($bootstrap['scheduler'])) {
+            $schedulerExtensions[] = $directory;
         }
 
         $provider = $bootstrap['boot'] ?? null;
@@ -194,6 +202,8 @@ return (static function (): array {
             'aux' => [],
             'panel' => !empty($storage['panel']) ? ($root . '/panel/ext/' . $directory) : '',
             'public' => !empty($storage['public']) ? ($root . '/public/upload/ext/' . $directory) : '',
+            // bin storage resolves to the extension's own bin/ directory; private/bin/ contains the symlinks.
+            'bin' => !empty($storage['bin']) ? ($root . '/private/ext/' . $directory . '/bin') : '',
         ];
         foreach ((array) ($storage['aux'] ?? []) as $auxDirectory) {
             if (!is_string($auxDirectory) || $auxDirectory === '') {
@@ -210,6 +220,29 @@ return (static function (): array {
             error_log('Raven extension bootstrap failed for extension "' . $directory . '": ' . $exception->getMessage());
         }
     }
+
+    // Wire the system-wide scheduler.
+    // Both core jobs and extension-declared jobs (from lib/cron.php) run through this registry.
+    // The scheduler is passive at bootstrap time — jobs only execute when rvn-cron triggers runDue().
+    $scheduler = new SchedulerRegistry($root);
+
+    // Built-in core job: flip page publish/draft status based on scheduled publish/expires columns.
+    // Interval of 60 s means rvn-cron running every minute covers all scheduled posts promptly.
+    // Note: PublicController also calls applySchedule() on each public request as a safety net for
+    // installs that have not yet set up rvn-cron; both paths are idempotent.
+    $scheduler->registerJob('core', 'page-schedule', 60, static function (array $context): void {
+        $page = $context['rvn']['page'] ?? null;
+        if ($page instanceof PageRepository) {
+            $page->applySchedule();
+        }
+    });
+
+    // Register extension sources; lib/cron.php files are loaded lazily on first runDue()/getStatus().
+    foreach ($schedulerExtensions as $schedulerDirectory) {
+        $scheduler->addExtensionSource($schedulerDirectory);
+    }
+
+    $rvn['scheduler'] = $scheduler;
 
     return $rvn;
 })();

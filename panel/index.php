@@ -12,6 +12,7 @@ declare(strict_types=1);
 use Raven\Controller\AuthController;
 use Raven\Controller\PanelController;
 use Raven\Core\Auth\PanelAccess;
+use Raven\Lib\Auth\PanelSessionGuard;
 use Raven\Core\Diagnostics\DebugToolbarRenderer;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Config\ConfigValueParser;
@@ -263,39 +264,11 @@ foreach (array_keys($enabledState) as $directoryName) {
 
 /**
  * Synchronizes lightweight identity data for the personalized welcome heading.
+ * Delegates to PanelSessionGuard so this path and the core panel route path
+ * always write the same session shape from the same preferences keys.
  */
 $syncPanelIdentity = static function () use ($rvn): void {
-    $userId = $rvn['auth']->userId();
-    if ($userId === null) {
-        unset($_SESSION['rvn-panel-identity']);
-        unset($_SESSION['_raven_can_manage_content']);
-        unset($_SESSION['_raven_can_manage_taxonomy']);
-        unset($_SESSION['_raven_can_manage_users']);
-        unset($_SESSION['_raven_can_manage_groups']);
-        unset($_SESSION['_raven_can_manage_configuration']);
-        return;
-    }
-
-    $preferences = $rvn['auth']->userPreferences($userId);
-    if ($preferences === null) {
-        unset($_SESSION['rvn-panel-identity']);
-        unset($_SESSION['_raven_can_manage_content']);
-        unset($_SESSION['_raven_can_manage_taxonomy']);
-        unset($_SESSION['_raven_can_manage_users']);
-        unset($_SESSION['_raven_can_manage_groups']);
-        unset($_SESSION['_raven_can_manage_configuration']);
-        return;
-    }
-
-    $_SESSION['rvn-panel-identity'] = [
-        'display_name' => trim((string) ($preferences['display_name'] ?? '')),
-        'username' => trim((string) ($preferences['username'] ?? '')),
-    ];
-    $_SESSION['_raven_can_manage_content'] = $rvn['auth']->canManageContent();
-    $_SESSION['_raven_can_manage_taxonomy'] = $rvn['auth']->canManageTaxonomy();
-    $_SESSION['_raven_can_manage_users'] = $rvn['auth']->canManageUsers();
-    $_SESSION['_raven_can_manage_groups'] = $rvn['auth']->canManageGroups();
-    $_SESSION['_raven_can_manage_configuration'] = $rvn['auth']->canManageConfiguration();
+    (new PanelSessionGuard())->syncPanelIdentityInSession($rvn['auth']);
 };
 
 /**

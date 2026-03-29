@@ -19,20 +19,22 @@ final class ExtensionBootstrapContractResolver
     /**
      * Loads and validates an extension bootstrap provider from `ext.php`.
      *
-     * @param string               $root          Project root path.
-     * @param string               $directoryName Extension directory name.
-     * @param array<string, mixed>|null $manifest  Pre-loaded manifest array, or null to read from disk.
+     * @param string                    $root          Project root path.
+     * @param string                    $directoryName Extension directory name.
+     * @param array<string, mixed>|null $manifest      Pre-loaded manifest array, or null to read from disk.
      * @return array{
      *   valid: bool,
      *   error: string,
      *   boot: callable|null,
+     *   scheduler: bool,
      *   storage: array{
      *     local: bool,
      *     table: bool,
      *     tables: array<int, string>,
      *     aux: array<int, string>,
      *     panel: bool,
-     *     public: bool
+     *     public: bool,
+     *     bin: bool
      *   }
      * }
      */
@@ -43,6 +45,7 @@ final class ExtensionBootstrapContractResolver
                 'valid' => false,
                 'error' => 'Invalid extension directory name.',
                 'boot' => null,
+                'scheduler' => false,
                 'storage' => $this->emptyStorage(),
             ];
         }
@@ -57,6 +60,7 @@ final class ExtensionBootstrapContractResolver
                 'valid' => true,
                 'error' => '',
                 'boot' => null,
+                'scheduler' => false,
                 'storage' => $this->emptyStorage(),
             ];
         }
@@ -69,6 +73,7 @@ final class ExtensionBootstrapContractResolver
                 'valid' => false,
                 'error' => 'ext.php threw an error while loading.',
                 'boot' => null,
+                'scheduler' => false,
                 'storage' => $this->emptyStorage(),
             ];
         }
@@ -78,6 +83,7 @@ final class ExtensionBootstrapContractResolver
                 'valid' => false,
                 'error' => 'ext.php must return an array contract.',
                 'boot' => null,
+                'scheduler' => false,
                 'storage' => $this->emptyStorage(),
             ];
         }
@@ -88,9 +94,13 @@ final class ExtensionBootstrapContractResolver
                 'valid' => false,
                 'error' => 'ext.php "boot" must be callable when present.',
                 'boot' => null,
+                'scheduler' => false,
                 'storage' => $this->emptyStorage(),
             ];
         }
+
+        // Whether this extension opts in to the scheduler (causes core to load lib/cron.php via rvn-cron).
+        $scheduler = $this->boolish($provider['scheduler'] ?? false);
 
         $storage = $this->normalizeStorageRequest($provider['storage'] ?? null, $type);
         if (!$storage['valid']) {
@@ -98,6 +108,7 @@ final class ExtensionBootstrapContractResolver
                 'valid' => false,
                 'error' => (string) ($storage['error'] ?? 'Invalid extension storage contract.'),
                 'boot' => is_callable($boot) ? $boot : null,
+                'scheduler' => false,
                 'storage' => $this->emptyStorage(),
             ];
         }
@@ -106,6 +117,7 @@ final class ExtensionBootstrapContractResolver
             'valid' => true,
             'error' => '',
             'boot' => is_callable($boot) ? $boot : null,
+            'scheduler' => $scheduler,
             'storage' => $storage['storage'],
         ];
     }
@@ -124,7 +136,8 @@ final class ExtensionBootstrapContractResolver
      *     tables: array<int, string>,
      *     aux: array<int, string>,
      *     panel: bool,
-     *     public: bool
+     *     public: bool,
+     *     bin: bool
      *   }
      * }
      */
@@ -146,7 +159,7 @@ final class ExtensionBootstrapContractResolver
             ];
         }
 
-        $allowedKeys = ['local', 'table', 'tables', 'aux', 'panel', 'public'];
+        $allowedKeys = ['local', 'table', 'tables', 'aux', 'panel', 'public', 'bin'];
         foreach (array_keys($rawStorage) as $key) {
             if (!is_string($key) || !in_array($key, $allowedKeys, true)) {
                 return [
@@ -162,6 +175,7 @@ final class ExtensionBootstrapContractResolver
         $aux = $this->normalizeAuxDirectories($rawStorage['aux'] ?? []);
         $panel = $this->boolish($rawStorage['panel'] ?? false);
         $public = $this->boolish($rawStorage['public'] ?? false);
+        $bin = $this->boolish($rawStorage['bin'] ?? false);
         $tables = $this->normalizeTableSuffixes($rawStorage['tables'] ?? []);
         if ($tables === null) {
             return [
@@ -220,6 +234,7 @@ final class ExtensionBootstrapContractResolver
                 'aux' => $aux,
                 'panel' => $panel,
                 'public' => $public,
+                'bin' => $bin,
             ],
         ];
     }
@@ -227,7 +242,7 @@ final class ExtensionBootstrapContractResolver
     /**
      * Returns an all-false storage contract for use in error/no-storage cases.
      *
-     * @return array{local: bool, table: bool, tables: array<int, string>, aux: array<int, string>, panel: bool, public: bool}
+     * @return array{local: bool, table: bool, tables: array<int, string>, aux: array<int, string>, panel: bool, public: bool, bin: bool}
      */
     private function emptyStorage(): array
     {
@@ -238,6 +253,7 @@ final class ExtensionBootstrapContractResolver
             'aux' => [],
             'panel' => false,
             'public' => false,
+            'bin' => false,
         ];
     }
 
