@@ -126,7 +126,7 @@ final class PageImageRepository
                     RETURNING id'
                 );
                 $insert->execute([
-                    ':page' => (int) ($image['page'] ?? $image['page_id'] ?? 0),
+                    ':page' => (int) ($image['page'] ?? 0),
                     ':storage_target' => (string) ($image['storage_target'] ?? 'local'),
                     ':original_filename' => (string) ($image['original_filename'] ?? ''),
                     ':stored_filename' => (string) ($image['stored_filename'] ?? ''),
@@ -136,7 +136,7 @@ final class PageImageRepository
                     ':byte_size' => (int) ($image['byte_size'] ?? 0),
                     ':width' => (int) ($image['width'] ?? 0),
                     ':height' => (int) ($image['height'] ?? 0),
-                    ':hash' => (string) ($image['hash'] ?? $image['hash_sha256'] ?? ''),
+                    ':hash' => (string) ($image['hash'] ?? ''),
                     ':status' => (string) ($image['status'] ?? 'ready'),
                     ':sort_order' => (int) ($image['sort_order'] ?? 1),
                     ':include_in_gallery' => array_key_exists('include_in_gallery', $image) && empty($image['include_in_gallery']) ? 0 : 1,
@@ -167,7 +167,7 @@ final class PageImageRepository
                     )'
                 );
                 $insert->execute([
-                    ':page' => (int) ($image['page'] ?? $image['page_id'] ?? 0),
+                    ':page' => (int) ($image['page'] ?? 0),
                     ':storage_target' => (string) ($image['storage_target'] ?? 'local'),
                     ':original_filename' => (string) ($image['original_filename'] ?? ''),
                     ':stored_filename' => (string) ($image['stored_filename'] ?? ''),
@@ -177,7 +177,7 @@ final class PageImageRepository
                     ':byte_size' => (int) ($image['byte_size'] ?? 0),
                     ':width' => (int) ($image['width'] ?? 0),
                     ':height' => (int) ($image['height'] ?? 0),
-                    ':hash' => (string) ($image['hash'] ?? $image['hash_sha256'] ?? ''),
+                    ':hash' => (string) ($image['hash'] ?? ''),
                     ':status' => (string) ($image['status'] ?? 'ready'),
                     ':sort_order' => (int) ($image['sort_order'] ?? 1),
                     ':include_in_gallery' => array_key_exists('include_in_gallery', $image) && empty($image['include_in_gallery']) ? 0 : 1,
@@ -246,7 +246,7 @@ final class PageImageRepository
         $stmt = $this->db->prepare(
             'SELECT
                 i.id,
-                i.page AS page_id,
+                i.page,
                 i.storage_target,
                 i.original_filename,
                 i.stored_filename,
@@ -256,7 +256,7 @@ final class PageImageRepository
                 i.byte_size,
                 i.width,
                 i.height,
-                i.hash AS hash_sha256,
+                i.hash,
                 i.status,
                 i.sort_order,
                 CASE WHEN p.cover_image IS NOT NULL AND p.cover_image = i.id THEN 1 ELSE 0 END AS is_cover,
@@ -303,7 +303,7 @@ final class PageImageRepository
                 $storedPath = (string) ($row['image_stored_path'] ?? '');
                 $imagesById[$imageId] = [
                     'id' => $imageId,
-                    'page_id' => (int) ($row['page_id'] ?? 0),
+                    'page' => (int) ($row['page'] ?? 0),
                     'storage_target' => (string) ($row['storage_target'] ?? ''),
                     'original_filename' => (string) ($row['original_filename'] ?? ''),
                     'stored_filename' => (string) ($row['stored_filename'] ?? ''),
@@ -314,7 +314,7 @@ final class PageImageRepository
                     'byte_size' => (int) ($row['byte_size'] ?? 0),
                     'width' => (int) ($row['width'] ?? 0),
                     'height' => (int) ($row['height'] ?? 0),
-                    'hash_sha256' => (string) ($row['hash_sha256'] ?? ''),
+                    'hash' => (string) ($row['hash'] ?? ''),
                     'status' => (string) ($row['status'] ?? ''),
                     'sort_order' => (int) ($row['sort_order'] ?? 0),
                     'is_cover' => (int) ($row['is_cover'] ?? 0) === 1,

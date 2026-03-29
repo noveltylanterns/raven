@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace Raven\Lib\Database\Schema;
 
 use PDO;
-use Raven\Lib\Auth\UserStringService;
 use RuntimeException;
 
 /**
@@ -21,12 +20,10 @@ use RuntimeException;
 final class AuthSchemaBuilder
 {
     private SchemaIntrospector $introspector;
-    private UserStringService $userStringService;
 
     public function __construct(SchemaIntrospector $introspector)
     {
         $this->introspector = $introspector;
-        $this->userStringService = new UserStringService();
     }
 
     /**
@@ -167,7 +164,7 @@ final class AuthSchemaBuilder
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN "group" INTEGER NULL');
             }
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $usersTable . '_string ON ' . $usersTable . ' (string)');
-            $this->ensureAuthUserStrings($db, $usersTable);
+
             $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
             return;
         }
@@ -203,7 +200,7 @@ final class AuthSchemaBuilder
             if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'group')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN `group` BIGINT UNSIGNED NULL');
             }
-            $this->ensureAuthUserStrings($db, $usersTable);
+
             $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
             return;
         }
@@ -239,60 +236,7 @@ final class AuthSchemaBuilder
         if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'group')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN "group" BIGINT NULL');
         }
-        $this->ensureAuthUserStrings($db, $usersTable);
         $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
-    }
-
-    /**
-     * Backfills the `string` column for any user rows that are missing a unique handle.
-     *
-     * @param PDO    $db         Auth database connection.
-     * @param string $usersTable Fully-qualified users table name (with prefix).
-     */
-    private function ensureAuthUserStrings(PDO $db, string $usersTable): void
-    {
-        $select = $db->prepare(
-            'SELECT id
-             FROM ' . $usersTable . '
-             WHERE string IS NULL OR TRIM(COALESCE(string, \'\')) = \'\'
-             ORDER BY id ASC'
-        );
-        $select->execute();
-        $rows = $select->fetchAll() ?: [];
-        if ($rows === []) {
-            return;
-        }
-
-        $exists = $db->prepare(
-            'SELECT 1
-             FROM ' . $usersTable . '
-             WHERE string = :string
-             LIMIT 1'
-        );
-        $update = $db->prepare(
-            'UPDATE ' . $usersTable . '
-             SET string = :string
-             WHERE id = :id'
-        );
-
-        foreach ($rows as $row) {
-            $userId = (int) ($row['id'] ?? 0);
-            if ($userId < 1) {
-                continue;
-            }
-
-            $value = $this->userStringService->generateUnique(
-                28,
-                function (string $candidate) use ($exists): bool {
-                    $exists->execute([':string' => $candidate]);
-                    return $exists->fetchColumn() !== false;
-                }
-            );
-            $update->execute([
-                ':id' => $userId,
-                ':string' => $value,
-            ]);
-        }
     }
 
     /**

@@ -552,7 +552,7 @@ $formPlaceholders = [
     'pgsql_dbname' => trim((string) ($defaultConfig['database']['pgsql']['name'] ?? ($defaultConfig['database']['pgsql']['dbname'] ?? 'raven'))),
     'pgsql_user' => trim((string) ($defaultConfig['database']['pgsql']['user'] ?? 'raven')),
     'admin_username' => 'optional',
-    'admin_display_name' => 'Super Admin',
+    'admin_display_name' => 'Admin',
     'admin_email' => 'admin@example.com',
 ];
 
@@ -756,9 +756,12 @@ if ($isPost) {
             }
 
             $groups = new GroupRepository($rvnDb, $driverName, $prefix);
-            $superAdminGroupId = $groups->idBySlug('super');
-            if ($superAdminGroupId === null) {
-                throw new RuntimeException('Stock groups were not created correctly.');
+
+            // Raven now uses the canonical `admin` stock group for the first installed operator.
+            // The legacy `super` slug no longer exists in fresh installs.
+            $adminGroupId = $groups->idBySlug('admin');
+            if ($adminGroupId === null) {
+                throw new RuntimeException('Stock admin group was not created correctly.');
             }
 
             $users->save([
@@ -768,7 +771,7 @@ if ($isPost) {
                 'email' => $adminEmail,
                 'theme' => 'default',
                 'password' => $adminPassword,
-                'group_ids' => [$superAdminGroupId],
+                'group_ids' => [$adminGroupId],
                 'string_length' => (int) (($nextConfig['user']['string'] ?? 28)),
             ]);
 
@@ -991,7 +994,7 @@ if ($isPost) {
         </div>
 
         <div class="card">
-            <h2>First Super Admin</h2>
+            <h2>First Admin</h2>
             <div class="grid">
                 <div class="field full">
                     <label for="enable_usernames" style="display:flex;align-items:center;gap:0.45rem;">

@@ -152,8 +152,6 @@ final class ExtensionCatalogService
      *   author: string,
      *   author_url: string,
      *   homepage: string,
-     *   local_storage: bool,
-     *   db_storage: bool,
      *   permission_levels: array<int, array{key: string, label: string}>,
      *   default_permission_level: string
      * }
@@ -180,8 +178,6 @@ final class ExtensionCatalogService
                 'author' => '',
                 'author_url' => '',
                 'homepage' => '',
-                'local_storage' => false,
-                'db_storage' => false,
                 'permission_levels' => $defaultPermissionLevels,
                 'default_permission_level' => $defaultPermissionLevel,
             ];
@@ -200,8 +196,6 @@ final class ExtensionCatalogService
                 'author' => '',
                 'author_url' => '',
                 'homepage' => '',
-                'local_storage' => false,
-                'db_storage' => false,
                 'permission_levels' => $defaultPermissionLevels,
                 'default_permission_level' => $defaultPermissionLevel,
             ];
@@ -221,8 +215,6 @@ final class ExtensionCatalogService
                 'author' => '',
                 'author_url' => '',
                 'homepage' => '',
-                'local_storage' => false,
-                'db_storage' => false,
                 'permission_levels' => $defaultPermissionLevels,
                 'default_permission_level' => $defaultPermissionLevel,
             ];
@@ -241,8 +233,6 @@ final class ExtensionCatalogService
                 'author' => '',
                 'author_url' => '',
                 'homepage' => '',
-                'local_storage' => false,
-                'db_storage' => false,
                 'permission_levels' => $defaultPermissionLevels,
                 'default_permission_level' => $defaultPermissionLevel,
             ];
@@ -261,52 +251,12 @@ final class ExtensionCatalogService
                 'author' => '',
                 'author_url' => '',
                 'homepage' => '',
-                'local_storage' => false,
-                'db_storage' => false,
                 'permission_levels' => $defaultPermissionLevels,
                 'default_permission_level' => $defaultPermissionLevel,
             ];
         }
 
         $type = $this->manifestValidator->normalizeType((string) ($decoded['type'] ?? 'content'));
-        $localStorage = $this->manifestValidator->storageEnabled($decoded['local_storage'] ?? null);
-        if ($localStorage === null) {
-            return [
-                'valid' => false,
-                'invalid_reason' => 'ext.json "local_storage" must be "on" or "off" when present.',
-                'type' => $type,
-                'panel_path' => '',
-                'name' => $name,
-                'version' => $this->input->text((string) ($decoded['version'] ?? ''), 80),
-                'description' => $this->input->text((string) ($decoded['description'] ?? ''), 1000),
-                'author' => '',
-                'author_url' => '',
-                'homepage' => '',
-                'local_storage' => false,
-                'db_storage' => false,
-                'permission_levels' => $defaultPermissionLevels,
-                'default_permission_level' => $defaultPermissionLevel,
-            ];
-        }
-        $dbStorage = $this->manifestValidator->storageEnabled($decoded['db_storage'] ?? null);
-        if ($dbStorage === null) {
-            return [
-                'valid' => false,
-                'invalid_reason' => 'ext.json "db_storage" must be "on" or "off" when present.',
-                'type' => $type,
-                'panel_path' => '',
-                'name' => $name,
-                'version' => $this->input->text((string) ($decoded['version'] ?? ''), 80),
-                'description' => $this->input->text((string) ($decoded['description'] ?? ''), 1000),
-                'author' => '',
-                'author_url' => '',
-                'homepage' => '',
-                'local_storage' => false,
-                'db_storage' => false,
-                'permission_levels' => $defaultPermissionLevels,
-                'default_permission_level' => $defaultPermissionLevel,
-            ];
-        }
         $permissionLevels = $this->normalizePermissionLevels($decoded['panel_permissions'] ?? null, $name);
         $defaultPermissionLevel = (string) ($permissionLevels[0]['key'] ?? 'access');
         $panelPath = $directorySlug;
@@ -341,8 +291,6 @@ final class ExtensionCatalogService
                 'author' => $author,
                 'author_url' => $authorUrl,
                 'homepage' => $homepage,
-                'local_storage' => $localStorage,
-                'db_storage' => $dbStorage,
                 'permission_levels' => $permissionLevels,
                 'default_permission_level' => $defaultPermissionLevel,
             ];
@@ -351,8 +299,6 @@ final class ExtensionCatalogService
         if ($directorySlug !== '') {
             $bootstrapContract = $this->bootstrapContractResolver->resolve($this->projectRoot, $directorySlug, [
                 'type' => $type,
-                'local_storage' => $localStorage,
-                'db_storage' => $dbStorage,
             ]);
             if (!$bootstrapContract['valid']) {
                 return [
@@ -366,8 +312,6 @@ final class ExtensionCatalogService
                     'author' => $author,
                     'author_url' => $authorUrl,
                     'homepage' => $homepage,
-                    'local_storage' => $localStorage,
-                    'db_storage' => $dbStorage,
                     'permission_levels' => $permissionLevels,
                     'default_permission_level' => $defaultPermissionLevel,
                 ];
@@ -396,8 +340,6 @@ final class ExtensionCatalogService
                     'author' => $author,
                     'author_url' => $authorUrl,
                     'homepage' => $homepage,
-                    'local_storage' => $localStorage,
-                    'db_storage' => $dbStorage,
                     'permission_levels' => $permissionLevels,
                     'default_permission_level' => $defaultPermissionLevel,
                 ];
@@ -422,8 +364,6 @@ final class ExtensionCatalogService
                     'author' => $author,
                     'author_url' => $authorUrl,
                     'homepage' => $homepage,
-                    'local_storage' => $localStorage,
-                    'db_storage' => $dbStorage,
                     'permission_levels' => $permissionLevels,
                     'default_permission_level' => $defaultPermissionLevel,
                 ];
@@ -441,8 +381,6 @@ final class ExtensionCatalogService
             'author' => $author,
             'author_url' => $authorUrl,
             'homepage' => $homepage,
-            'local_storage' => $localStorage,
-            'db_storage' => $dbStorage,
             'permission_levels' => $permissionLevels,
             'default_permission_level' => $defaultPermissionLevel,
         ];

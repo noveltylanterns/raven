@@ -75,14 +75,7 @@ final class ExtensionSchemaRunner
 
                     $storageAuxPaths[$auxDirectory] = $root . '/' . $auxDirectory;
                 }
-                $tableResolver = function (?string $legacyTable = null) use ($driver, $prefix, $tableStem): string {
-                    $legacyTable = strtolower(trim((string) $legacyTable));
-                    if ($legacyTable !== '') {
-                        return $this->tables->resolve($driver, $prefix, $legacyTable);
-                    }
-
-                    return $tableStem;
-                };
+                $tableResolver = static fn (): string => $tableStem;
                 $tablesResolver = function (string $suffix) use ($driver, $prefix, $directory, $storage): string {
                     $normalized = strtolower(trim($suffix));
                     if (preg_match('/^[a-z0-9][a-z0-9_]{0,63}$/', $normalized) !== 1) {

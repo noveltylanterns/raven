@@ -210,11 +210,6 @@ final class ChannelFileStoreService
         $normalizedId = max(ChannelRecordPolicy::ROOT_CHANNEL_ID, $id);
         $paths = [];
 
-        $legacyIdPath = $this->channelDirectory . '/' . $normalizedId . '.php';
-        if (is_file($legacyIdPath)) {
-            $paths[] = $legacyIdPath;
-        }
-
         foreach (glob($this->channelDirectory . '/' . $normalizedId . '_*.php') ?: [] as $path) {
             $paths[] = $path;
         }
@@ -245,11 +240,6 @@ final class ChannelFileStoreService
         $normalizedSlug = strtolower(trim($slug));
         if (!ChannelRecordPolicy::isValidSlug($normalizedSlug)) {
             return null;
-        }
-
-        $legacyPath = $this->channelDirectory . '/' . $normalizedSlug . '.php';
-        if (is_file($legacyPath)) {
-            return $legacyPath;
         }
 
         foreach ($this->rawChannelFilePaths() as $path) {

@@ -883,7 +883,7 @@ final class PageRepository
         if (!in_array($status, ['published', 'draft'], true)) {
             $status = 'draft';
         }
-        $author = isset($data['author_user_id']) ? (int) $data['author_user_id'] : 0;
+        $author = isset($data['author']) ? (int) $data['author'] : 0;
         if ($author < 1) {
             $author = null;
         }
@@ -1338,10 +1338,6 @@ final class PageRepository
      */
     private function hydratePageRow(array $row): array
     {
-        if (!array_key_exists('author_user_id', $row) && array_key_exists('author', $row)) {
-            $author = (int) ($row['author'] ?? 0);
-            $row['author_user_id'] = $author > 0 ? $author : null;
-        }
         if (!array_key_exists('gallery_enabled', $row)) {
             $row['gallery_enabled'] = 0;
         }

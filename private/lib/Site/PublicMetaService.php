@@ -211,7 +211,7 @@ final class PublicMetaService
         array $profileOptions
     ): string {
         $fallback = trim($fallback);
-        $authorUserId = (int) ($page['author_user_id'] ?? 0);
+        $authorUserId = (int) ($page['author'] ?? 0);
         if ($authorUserId < 1) {
             return $fallback;
         }

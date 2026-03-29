@@ -38,7 +38,7 @@ return [
         return;
     }
 
-    $formsRepository = new ContactFormRepository($rvn['db'], $driver, $prefix, $formsPath . '/forms.php');
+    $formsRepository = new ContactFormRepository($formsPath . '/forms.php');
     $submissionsRepository = new ContactSubmissionRepository($rvn['db'], $driver, $prefix);
     $publicFormRuntime = new ContactPublicFormRuntime(
         $rvn['input'],

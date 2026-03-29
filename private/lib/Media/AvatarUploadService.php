@@ -144,7 +144,6 @@ final class AvatarUploadService
 
         $directories = [
             rtrim($projectRoot, '/\\') . '/public/uploads/user/avatar',
-            rtrim($projectRoot, '/\\') . '/public/uploads/avatars',
         ];
 
         foreach ($directories as $avatarsDir) {

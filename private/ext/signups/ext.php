@@ -38,7 +38,7 @@ return [
         return;
     }
 
-    $formsRepository = new SignupFormRepository($rvn['db'], $driver, $prefix, $formsPath . '/forms.php');
+    $formsRepository = new SignupFormRepository($formsPath . '/forms.php');
     $submissionsRepository = new SignupSubmissionRepository($rvn['db'], $driver, $prefix);
     $publicFormRuntime = new SignupPublicFormRuntime(
         $rvn['input'],

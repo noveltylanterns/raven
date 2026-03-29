@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Media;
 
 /**
- * Resolves canonical and legacy user-media storage paths and public URLs.
+ * Resolves user-media storage paths and public URLs.
  */
 final class UserMediaPathService
 {
@@ -51,18 +51,11 @@ final class UserMediaPathService
 
         $avatarBase = (string) pathinfo($avatarFilename, PATHINFO_FILENAME);
         $avatarThumbFilename = $avatarBase !== '' ? $avatarBase . '_thumb.jpg' : $avatarFilename;
-        $storageDirectory = $this->avatarStorageDirectory($projectRoot);
-        $legacyDirectory = rtrim($projectRoot, '/\\') . '/public/uploads/avatars';
-
-        $useLegacyOriginal = is_file($legacyDirectory . '/' . $avatarFilename)
-            && !is_file($storageDirectory . '/' . $avatarFilename);
-        $useLegacyThumb = is_file($legacyDirectory . '/' . $avatarThumbFilename)
-            && !is_file($storageDirectory . '/' . $avatarThumbFilename);
 
         return [
             'filename' => $avatarFilename,
-            'url' => ($useLegacyOriginal ? '/uploads/avatars/' : '/uploads/user/avatar/') . rawurlencode($avatarFilename),
-            'thumb_url' => ($useLegacyThumb ? '/uploads/avatars/' : '/uploads/user/avatar/') . rawurlencode($avatarThumbFilename),
+            'url' => '/uploads/user/avatar/' . rawurlencode($avatarFilename),
+            'thumb_url' => '/uploads/user/avatar/' . rawurlencode($avatarThumbFilename),
         ];
     }
 
@@ -78,11 +71,7 @@ final class UserMediaPathService
         }
 
         $filename = basename($normalized);
-        $storageDirectory = $this->coverStorageDirectory($projectRoot);
-        $legacyDirectory = rtrim($projectRoot, '/\\') . '/public/uploads/users/cover';
-        $useLegacy = is_file($legacyDirectory . '/' . $filename) && !is_file($storageDirectory . '/' . $filename);
-
-        return ($useLegacy ? '/uploads/users/cover/' : '/uploads/user/cover/') . rawurlencode($filename);
+        return '/uploads/user/cover/' . rawurlencode($filename);
     }
 
     public function deleteAvatarFile(string $projectRoot, string $filename): void
@@ -94,7 +83,6 @@ final class UserMediaPathService
 
         $directories = [
             $this->avatarStorageDirectory($projectRoot),
-            rtrim($projectRoot, '/\\') . '/public/uploads/avatars',
         ];
         $thumbFilename = $this->thumbnailFilename($safeName);
 
@@ -120,7 +108,7 @@ final class UserMediaPathService
 
         if (str_starts_with($normalized, '/uploads/')) {
             $relative = ltrim($normalized, '/');
-            if (!preg_match('#^uploads/(?:user/cover|users/cover)/#', $relative)) {
+            if (!str_starts_with($relative, 'uploads/user/cover/')) {
                 return;
             }
 
@@ -139,7 +127,6 @@ final class UserMediaPathService
 
         $directories = [
             $this->coverStorageDirectory($projectRoot),
-            rtrim($projectRoot, '/\\') . '/public/uploads/users/cover',
         ];
         foreach ($directories as $directory) {
             $path = $directory . '/' . $safeName;

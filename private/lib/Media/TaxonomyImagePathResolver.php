@@ -65,8 +65,8 @@ final class TaxonomyImagePathResolver
     {
         if (self::supportsFilenameStorage($taxonomyType)) {
             return [
-                'cover_image' => self::normalizeFilename($record['cover_image'] ?? $record['cover_image_file'] ?? null),
-                'preview_image' => self::normalizeFilename($record['preview_image'] ?? $record['preview_image_file'] ?? null),
+                'cover_image' => self::normalizeFilename($record['cover_image'] ?? null),
+                'preview_image' => self::normalizeFilename($record['preview_image'] ?? null),
                 'icon_image' => self::normalizeFilename($record['icon_image'] ?? null),
             ];
         }

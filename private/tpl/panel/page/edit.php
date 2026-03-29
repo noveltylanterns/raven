@@ -42,7 +42,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
 $pageId = (int) ($page['id'] ?? 0);
 $hasPersistedPage = $pageId > 0;
 $currentUserId = max(0, (int) ($currentUserId ?? 0));
-$selectedAuthorUserId = (int) ($page['author_user_id'] ?? 0);
+$selectedAuthorUserId = (int) ($page['author'] ?? 0);
 if ($selectedAuthorUserId < 1) {
     $selectedAuthorUserId = $currentUserId;
 }

@@ -68,7 +68,6 @@ return static function (Router $router, array $context): void {
     $extensionManifestFile = $extensionRoot . '/ext.json';
     $extensionEntrypoint = $extensionRoot . '/adminer.php';
     $extensionViewFile = $extensionRoot . '/tpl/panel_index.php';
-    $adminerSelectorViewFile = $extensionRoot . '/tpl/panel_adminer_selector.php';
     $extensionPublicRoot = rtrim((string) $rvn['root'], '/') . '/panel/ext/database';
     $extensionMeta = [
         'name' => 'Database Manager',
@@ -436,7 +435,7 @@ return static function (Router $router, array $context): void {
      * - `externals/jush/{file}`
      * - `externals/jush/modules/{file}`
      */
-    $serveAdminerAssetByQuery = static function () use ($rvn, $extensionPublicRoot, $streamAssetFile, $requireDatabaseManagerAccess): void {
+    $serveAdminerAssetByQuery = static function () use ($extensionPublicRoot, $streamAssetFile, $requireDatabaseManagerAccess): void {
         if (!$requireDatabaseManagerAccess()) {
             return;
         }
@@ -455,35 +454,22 @@ return static function (Router $router, array $context): void {
             return;
         }
 
-        $composerBase = rtrim((string) $rvn['root'], '/');
-        $composerAssetPath = null;
         $extensionAssetPath = null;
 
         if (preg_match('#^adminer/static/([a-z0-9._-]+)$#i', $requested, $match) === 1) {
-            $file = (string) $match[1];
-            $composerAssetPath = $composerBase . '/composer/vrana/adminer/adminer/static/' . $file;
-            $extensionAssetPath = $extensionPublicRoot . '/adminer/static/' . $file;
+            $extensionAssetPath = $extensionPublicRoot . '/adminer/static/' . (string) $match[1];
         } elseif (preg_match('#^externals/jush/modules/([a-z0-9._-]+)$#i', $requested, $match) === 1) {
-            $file = (string) $match[1];
-            $composerAssetPath = $composerBase . '/composer/vrana/adminer/externals/jush/modules/' . $file;
-            $extensionAssetPath = $extensionPublicRoot . '/externals/jush/modules/' . $file;
+            $extensionAssetPath = $extensionPublicRoot . '/externals/jush/modules/' . (string) $match[1];
         } elseif (preg_match('#^externals/jush/([a-z0-9._-]+)$#i', $requested, $match) === 1) {
-            $file = (string) $match[1];
-            $composerAssetPath = $composerBase . '/composer/vrana/adminer/externals/jush/' . $file;
-            $extensionAssetPath = $extensionPublicRoot . '/externals/jush/' . $file;
+            $extensionAssetPath = $extensionPublicRoot . '/externals/jush/' . (string) $match[1];
         } else {
             http_response_code(404);
             echo 'Not Found';
             return;
         }
 
-        // Prefer extension-public copy first, then composer source as fallback.
-        if (is_string($extensionAssetPath) && is_file($extensionAssetPath)) {
+        if ($extensionAssetPath !== null && is_file($extensionAssetPath)) {
             $streamAssetFile($extensionAssetPath);
-            return;
-        }
-        if (is_string($composerAssetPath) && is_file($composerAssetPath)) {
-            $streamAssetFile($composerAssetPath);
             return;
         }
 
@@ -558,48 +544,6 @@ return static function (Router $router, array $context): void {
             'selectorError' => is_string($targetData['selector_error'] ?? null) ? (string) $targetData['selector_error'] : null,
             'extensionMeta' => $extensionMeta,
         ]);
-    });
-
-    $router->add('GET', '/database/adminer/select', static function () use (
-        $rvn,
-        $panelUrl,
-        $requirePanelLogin,
-        $resolveAdminerEntrypoint,
-        $extensionEntrypoint,
-        $renderExtensionView,
-        $renderPublicNotFound,
-        $extensionMeta,
-        $adminerSelectorViewFile,
-        $buildAdminerLaunchTargets
-    ): void {
-        $requirePanelLogin();
-
-        $canManageConfiguration = $rvn['auth']->canManageConfiguration();
-        if (!$canManageConfiguration) {
-            $renderPublicNotFound();
-            return;
-        }
-
-        $databaseConfig = (array) $rvn['config']->get('database', []);
-        $targetData = $buildAdminerLaunchTargets($databaseConfig);
-        $driver = strtolower((string) ($targetData['driver'] ?? 'sqlite'));
-        $targets = is_array($targetData['targets'] ?? null) ? (array) $targetData['targets'] : [];
-        $selectorError = is_string($targetData['selector_error'] ?? null) ? (string) $targetData['selector_error'] : null;
-
-        $renderExtensionView(
-            [
-                'canManageConfiguration' => $canManageConfiguration,
-                'adminerInstalled' => $resolveAdminerEntrypoint() !== null,
-                'extensionEntrypointExists' => is_file($extensionEntrypoint),
-                'extensionsPath' => $panelUrl('/extensions'),
-                'databasePath' => $panelUrl('/database'),
-                'driver' => $driver,
-                'targets' => $targets,
-                'selectorError' => $selectorError,
-                'extensionMeta' => $extensionMeta,
-            ],
-            $adminerSelectorViewFile
-        );
     });
 
     // Primary Adminer runtime route (GET + POST) inside extension-owned panel routes.
