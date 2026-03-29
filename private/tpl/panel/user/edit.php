@@ -15,7 +15,7 @@
 /** @var string $profileRoutePrefix */
 /** @var bool $profileRoutesEnabled */
 /** @var string $profileRouteSegment */
-/** @var array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}> $groupOptions */
+/** @var array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}> $groupOptions */
 /** @var int $primaryGroupId */
 /** @var array<int> $secondaryGroupIds */
 /** @var bool $canAssignSuperAdmin */
@@ -367,7 +367,7 @@ $themeLabels = [
                         $groupId = (int) $group['id'];
                         $groupSlug = strtolower(trim((string) ($group['slug'] ?? '')));
                         $isAdminGroup = $groupSlug === 'admin' || $groupSlug === 'super';
-                        $isConfigurationGroup = (((int) ($group['permission_mask'] ?? 0)) & $systemPanelBitsMask) !== 0;
+                        $isConfigurationGroup = (((int) ($group['permissions'] ?? 0)) & $systemPanelBitsMask) !== 0;
                         $lockAdminAssignment = $isAdminGroup && !$canAssignSuperAdmin;
                         $lockConfigurationPromotion = !$canAssignConfigurationGroups && $isConfigurationGroup && !$isAdminGroup;
                         $optionDisabled = $lockAdminAssignment || $lockConfigurationPromotion;
@@ -395,7 +395,7 @@ $themeLabels = [
                     $groupId = (int) $group['id'];
                     $isAdminGroup = strtolower(trim((string) ($group['slug'] ?? ''))) === 'admin'
                         || strtolower(trim((string) ($group['slug'] ?? ''))) === 'super';
-                    $isConfigurationGroup = (((int) ($group['permission_mask'] ?? 0)) & $systemPanelBitsMask) !== 0;
+                    $isConfigurationGroup = (((int) ($group['permissions'] ?? 0)) & $systemPanelBitsMask) !== 0;
                     $isSelected = in_array($groupId, $secondaryGroupIds, true);
                     $lockAdminAssignment = $isAdminGroup && !$canAssignSuperAdmin;
                     $lockConfigurationPromotion = !$canAssignConfigurationGroups && $isConfigurationGroup && !$isSelected && !$isAdminGroup;

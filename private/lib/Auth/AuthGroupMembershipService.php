@@ -17,7 +17,7 @@ final class AuthGroupMembershipService
     private string $prefix;
 
     /**
-     * @var array<int, array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>>
+     * @var array<int, array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>>
      */
     private array $groupsForUserCache = [];
 
@@ -29,7 +29,7 @@ final class AuthGroupMembershipService
     }
 
     /**
-     * @return array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>
+     * @return array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
      */
     public function groupsForUser(int $userId): array
     {
@@ -44,7 +44,7 @@ final class AuthGroupMembershipService
             'SELECT g.id,
                     g.name,
                     g.slug,
-                    g.permissions AS permission_mask,
+                    g.permissions,
                     CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS is_stock
              FROM ' . $groupsTable . ' g
              INNER JOIN ' . $userGroupsTable . ' ug ON ug."group" = g.id
@@ -61,7 +61,7 @@ final class AuthGroupMembershipService
                 'id' => (int) $row['id'],
                 'name' => (string) $row['name'],
                 'slug' => (string) ($row['slug'] ?? ''),
-                'permission_mask' => (int) $row['permission_mask'],
+                'permissions' => (int) $row['permissions'],
                 'is_stock' => (int) $row['is_stock'],
             ];
         }

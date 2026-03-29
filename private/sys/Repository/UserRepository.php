@@ -102,7 +102,7 @@ final class UserRepository
                     u.avatar,
                     u.cover_image,
                     g.name AS group_name,
-                    g.permissions AS group_permission_mask
+                    g.permissions AS group_permissions
              FROM ' . $users . ' u
              LEFT JOIN ' . $userGroups . ' ug ON ug.user = u.id
              LEFT JOIN ' . $groups . ' g ON g.id = ug."group"
@@ -115,7 +115,7 @@ final class UserRepository
         }
 
         $usersById = [];
-        /** @var array<int, array<int, array{name: string, permission_mask: int}>> $groupMap */
+        /** @var array<int, array<int, array{name: string, permissions: int}>> $groupMap */
         $groupMap = [];
         foreach ($rows as $row) {
             $userId = (int) ($row['id'] ?? 0);
@@ -148,7 +148,7 @@ final class UserRepository
             $groupMap[$userId] ??= [];
             $groupMap[$userId][] = [
                 'name' => $groupName,
-                'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
+                'permissions' => (int) ($row['group_permissions'] ?? 0),
             ];
         }
 
@@ -233,7 +233,7 @@ final class UserRepository
      * @return array{
      *   rows: array<int, array<string, mixed>>,
      *   total: int,
-     *   group_options: array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>
+     *   group_options: array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
      * }
      */
     public function listPageForPanel(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
@@ -316,7 +316,7 @@ final class UserRepository
      *
      * @return array{
      *   user: array<string, mixed>|null,
-     *   group_options: array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>
+     *   group_options: array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
      * }
      */
     public function editFormData(?int $id): array
@@ -348,7 +348,7 @@ final class UserRepository
                     g.id AS group_id,
                     g.name AS group_name,
                     g.slug AS group_slug,
-                    g.permissions AS group_permission_mask,
+                    g.permissions AS group_permissions,
                     CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
                     CASE WHEN ug.user IS NULL THEN 0 ELSE 1 END AS group_selected
              FROM ' . $users . ' u
@@ -384,7 +384,7 @@ final class UserRepository
                 'id' => $groupId,
                 'name' => (string) ($row['group_name'] ?? ''),
                 'slug' => (string) ($row['group_slug'] ?? ''),
-                'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
+                'permissions' => (int) ($row['group_permissions'] ?? 0),
                 'is_stock' => (int) ($row['group_is_stock'] ?? 0),
             ];
 
@@ -779,7 +779,7 @@ final class UserRepository
      * Builds map: user_id => list of group rows.
      *
      * @param array<int> $userIds
-     * @return array<int, array<int, array{name: string, permission_mask: int}>>
+     * @return array<int, array<int, array{name: string, permissions: int}>>
      */
     private function groupEntriesByUserId(array $userIds = []): array
     {
@@ -796,8 +796,8 @@ final class UserRepository
      *
      * @param array<int> $userIds
      * @return array{
-     *   group_map: array<int, array<int, array{name: string, permission_mask: int}>>,
-     *   group_options: array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>
+     *   group_map: array<int, array<int, array{name: string, permissions: int}>>,
+     *   group_options: array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
      * }
      */
     private function groupEntriesAndOptionsForUserIds(array $userIds): array
@@ -814,7 +814,7 @@ final class UserRepository
      * Hydrates panel-facing user rows with group display metadata.
      *
      * @param array<int, array<string, mixed>> $users
-     * @param array<int, array<int, array{name: string, permission_mask: int}>> $groupMap
+     * @param array<int, array<int, array{name: string, permissions: int}>> $groupMap
      * @return array<int, array<string, mixed>>
      */
     private function hydratePanelUsers(array $users, array $groupMap): array

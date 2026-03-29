@@ -13,7 +13,7 @@ final class UserGroupCatalogService
 {
     /**
      * @param array<int> $userIds
-     * @return array<int, array<int, array{name: string, permission_mask: int}>>
+     * @return array<int, array<int, array{name: string, permissions: int}>>
      */
     public function groupEntriesByUserId(PDO $rvnDb, string $groupsTable, string $userGroupsTable, array $userIds = []): array
     {
@@ -32,7 +32,7 @@ final class UserGroupCatalogService
         }
 
         $stmt = $rvnDb->prepare(
-            'SELECT ug.user, g.name, g.permissions AS permission_mask
+            'SELECT ug.user, g.name, g.permissions
              FROM ' . $userGroupsTable . ' ug
              INNER JOIN ' . $groupsTable . ' g ON g.id = ug."group"
              ' . $where . '
@@ -47,7 +47,7 @@ final class UserGroupCatalogService
             $map[$userId] ??= [];
             $map[$userId][] = [
                 'name' => (string) ($row['name'] ?? ''),
-                'permission_mask' => (int) ($row['permission_mask'] ?? 0),
+                'permissions' => (int) ($row['permissions'] ?? 0),
             ];
         }
 
@@ -57,8 +57,8 @@ final class UserGroupCatalogService
     /**
      * @param array<int> $userIds
      * @return array{
-     *   group_map: array<int, array<int, array{name: string, permission_mask: int}>>,
-     *   group_options: array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>
+     *   group_map: array<int, array<int, array{name: string, permissions: int}>>,
+     *   group_options: array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
      * }
      */
     public function groupEntriesAndOptionsForUserIds(PDO $rvnDb, string $groupsTable, string $userGroupsTable, array $userIds): array
@@ -70,7 +70,7 @@ final class UserGroupCatalogService
                 'SELECT g.id AS group_id,
                         g.name AS group_name,
                         g.slug AS group_slug,
-                        g.permissions AS group_permission_mask,
+                        g.permissions AS group_permissions,
                         CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock
                  FROM ' . $groupsTable . ' g
                  ORDER BY g.id ASC'
@@ -89,7 +89,7 @@ final class UserGroupCatalogService
                     'id' => $groupId,
                     'name' => (string) ($row['group_name'] ?? ''),
                     'slug' => (string) ($row['group_slug'] ?? ''),
-                    'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
+                    'permissions' => (int) ($row['group_permissions'] ?? 0),
                     'is_stock' => (int) ($row['group_is_stock'] ?? 0),
                 ];
             }
@@ -112,7 +112,7 @@ final class UserGroupCatalogService
             'SELECT g.id AS group_id,
                     g.name AS group_name,
                     g.slug AS group_slug,
-                    g.permissions AS group_permission_mask,
+                    g.permissions AS group_permissions,
                     CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
                     ug.user
              FROM ' . $groupsTable . ' g
@@ -138,7 +138,7 @@ final class UserGroupCatalogService
                     'id' => $groupId,
                     'name' => (string) ($row['group_name'] ?? ''),
                     'slug' => (string) ($row['group_slug'] ?? ''),
-                    'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
+                    'permissions' => (int) ($row['group_permissions'] ?? 0),
                     'is_stock' => (int) ($row['group_is_stock'] ?? 0),
                 ];
             }
@@ -151,7 +151,7 @@ final class UserGroupCatalogService
             $groupMap[$userId] ??= [];
             $groupMap[$userId][] = [
                 'name' => (string) ($row['group_name'] ?? ''),
-                'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
+                'permissions' => (int) ($row['group_permissions'] ?? 0),
             ];
         }
 
@@ -162,8 +162,8 @@ final class UserGroupCatalogService
     }
 
     /**
-     * @param array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}> $groupOptions
-     * @return array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>
+     * @param array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}> $groupOptions
+     * @return array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
      */
     private function sortGroupOptions(array $groupOptions): array
     {

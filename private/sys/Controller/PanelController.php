@@ -546,7 +546,7 @@ final class PanelController
                 'description' => $description,
                 'display_title' => $displayTitle ? 1 : 0,
                 'gallery_enabled' => $galleryEnabled ? 1 : 0,
-                'author_user_id' => $authorUserId,
+                'author' => $authorUserId,
                 'channel_slug' => $channelSlug,
                 'category_ids' => $categoryIds,
                 'tag_ids' => $tagIds,
@@ -2821,7 +2821,7 @@ final class PanelController
 
         $groupPermissionMasks = [];
         foreach ($groupOptions as $groupOption) {
-            $groupPermissionMasks[(int) ($groupOption['id'] ?? 0)] = (int) ($groupOption['permission_mask'] ?? 0);
+            $groupPermissionMasks[(int) ($groupOption['id'] ?? 0)] = (int) ($groupOption['permissions'] ?? 0);
         }
 
         // Only Admin actors may assign users into the Admin group (ID 1).
@@ -3636,7 +3636,7 @@ final class PanelController
         $systemBitsMask = PanelAccess::maskFromBits(PanelAccess::systemPanelBits());
         $requestedSystemBits = $permissionMask & $systemBitsMask;
         $existingSystemBits = is_array($existingGroup)
-            ? (((int) ($existingGroup['permission_mask'] ?? 0)) & $systemBitsMask)
+            ? (((int) ($existingGroup['permissions'] ?? 0)) & $systemBitsMask)
             : 0;
         if (!$actorIsAdmin && $requestedSystemBits !== $existingSystemBits) {
             $this->flash('error', 'Only Admin users can change system administration permissions.');
@@ -3661,8 +3661,8 @@ final class PanelController
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
-                'route_enabled' => $routeEnabled ? 1 : 0,
-                'permission_mask' => $permissionMask,
+                'route' => $routeEnabled ? 1 : 0,
+                'permissions' => $permissionMask,
             ]);
         } catch (\Throwable $exception) {
             $this->flash('error', $exception->getMessage() ?: 'Failed to save group.');
@@ -6316,7 +6316,7 @@ final class PanelController
             }
         }
 
-        return $this->taxonomyLookupRepo->listEnabledExtensionForms($extensionKey);
+        return [];
     }
 
     /**

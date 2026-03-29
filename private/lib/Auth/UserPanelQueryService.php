@@ -12,8 +12,8 @@ use PDO;
 final class UserPanelQueryService
 {
     /**
-     * @param callable(array<int>): array<int, array<int, array{name: string, permission_mask: int}>> $groupEntriesByUserId
-     * @param callable(array<int, array<string, mixed>>, array<int, array<int, array{name: string, permission_mask: int}>>): array<int, array<string, mixed>> $hydratePanelUsers
+     * @param callable(array<int>): array<int, array<int, array{name: string, permissions: int}>> $groupEntriesByUserId
+     * @param callable(array<int, array<string, mixed>>, array<int, array<int, array{name: string, permissions: int}>>): array<int, array<string, mixed>> $hydratePanelUsers
      * @return array<int, array<string, mixed>>
      */
     public function listForPanel(
@@ -96,11 +96,11 @@ final class UserPanelQueryService
 
     /**
      * @param callable(?string): int $countForPanel
-     * @param callable(array<int, array<string, mixed>>, array<int, array<int, array{name: string, permission_mask: int}>>): array<int, array<string, mixed>> $hydratePanelUsers
+     * @param callable(array<int, array<string, mixed>>, array<int, array<int, array{name: string, permissions: int}>>): array<int, array<string, mixed>> $hydratePanelUsers
      * @return array{
      *   rows: array<int, array<string, mixed>>,
      *   total: int,
-     *   group_options: array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>
+     *   group_options: array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
      * }
      */
     public function listPageForPanel(
@@ -145,7 +145,7 @@ final class UserPanelQueryService
                         g.id AS group_id,
                         g.name AS group_name,
                         g.slug AS group_slug,
-                        g.permissions AS group_permission_mask,
+                        g.permissions AS group_permissions,
                         CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
                         CASE WHEN ug.user IS NULL THEN 0 ELSE 1 END AS group_selected
                  FROM ' . $groupsTable . ' g
@@ -190,7 +190,7 @@ final class UserPanelQueryService
                         g.id AS group_id,
                         g.name AS group_name,
                         g.slug AS group_slug,
-                        g.permissions AS group_permission_mask,
+                        g.permissions AS group_permissions,
                         CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
                         CASE WHEN ug.user IS NULL THEN 0 ELSE 1 END AS group_selected
                  FROM ' . $groupsTable . ' g
@@ -209,7 +209,7 @@ final class UserPanelQueryService
         $rows = $stmt->fetchAll() ?: [];
 
         $usersById = [];
-        /** @var array<int, array<int, array{name: string, permission_mask: int}>> $groupMap */
+        /** @var array<int, array<int, array{name: string, permissions: int}>> $groupMap */
         $groupMap = [];
         $groupOptionsById = [];
         foreach ($rows as $row) {
@@ -219,7 +219,7 @@ final class UserPanelQueryService
                     'id' => $groupId,
                     'name' => (string) ($row['group_name'] ?? ''),
                     'slug' => (string) ($row['group_slug'] ?? ''),
-                    'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
+                    'permissions' => (int) ($row['group_permissions'] ?? 0),
                     'is_stock' => (int) ($row['group_is_stock'] ?? 0),
                 ];
             }
@@ -251,7 +251,7 @@ final class UserPanelQueryService
                 $groupMap[$userId] ??= [];
                 $groupMap[$userId][] = [
                     'name' => (string) ($row['group_name'] ?? ''),
-                    'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
+                    'permissions' => (int) ($row['group_permissions'] ?? 0),
                 ];
             }
         }

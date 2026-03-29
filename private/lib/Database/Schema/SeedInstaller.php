@@ -52,7 +52,7 @@ final class SeedInstaller
                     ':name' => (string) ($group['name'] ?? ''),
                     ':description' => null,
                     ':route' => 0,
-                    ':permissions' => (int) ($group['permission_mask'] ?? 0),
+                    ':permissions' => (int) ($group['permissions'] ?? 0),
                     ':created' => $now,
                     ':updated' => $now,
                 ]);
@@ -76,7 +76,7 @@ final class SeedInstaller
                 continue;
             }
 
-            $stockMaskBySlug[$slug] = (int) ($stockGroup['permission_mask'] ?? 0);
+            $stockMaskBySlug[$slug] = (int) ($stockGroup['permissions'] ?? 0);
         }
 
         $syncStockMask = $db->prepare(

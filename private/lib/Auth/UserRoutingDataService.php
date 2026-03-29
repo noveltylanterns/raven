@@ -12,7 +12,7 @@ use PDO;
 final class UserRoutingDataService
 {
     /**
-     * @param callable(array<int, array<string, mixed>>, array<int, array<int, array{name: string, permission_mask: int}>>): array<int, array<string, mixed>> $hydratePanelUsers
+     * @param callable(array<int, array<string, mixed>>, array<int, array<int, array{name: string, permissions: int}>>): array<int, array<string, mixed>> $hydratePanelUsers
      * @return array{
      *   group_rows: array<int, array<string, mixed>>,
      *   user_rows: array<int, array<string, mixed>>
@@ -42,8 +42,8 @@ final class UserRoutingDataService
                     g.id AS group_id,
                     g.name AS group_name,
                     g.slug AS group_slug,
-                    g.route AS group_route_enabled,
-                    g.permissions AS group_permission_mask,
+                    g.route AS group_route,
+                    g.permissions AS group_permissions,
                     CASE WHEN LOWER(g.slug) IN (\'super\', \'admin\', \'editor\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
                     COALESCE(mc.member_count, 0) AS group_member_count,
                     NULL AS user_id,
@@ -54,7 +54,7 @@ final class UserRoutingDataService
                     NULL AS theme,
                     NULL AS avatar,
                     NULL AS user_group_name,
-                    NULL AS user_group_permission_mask
+                    NULL AS user_group_permissions
                  FROM ' . $groupsTable . ' g
                  LEFT JOIN (
                     SELECT "group" AS group_id, COUNT(*) AS member_count
@@ -69,8 +69,8 @@ final class UserRoutingDataService
                     NULL AS group_id,
                     NULL AS group_name,
                     NULL AS group_slug,
-                    NULL AS group_route_enabled,
-                    NULL AS group_permission_mask,
+                    NULL AS group_route,
+                    NULL AS group_permissions,
                     NULL AS group_is_stock,
                     NULL AS group_member_count,
                     u.id AS user_id,
@@ -81,7 +81,7 @@ final class UserRoutingDataService
                     u.theme AS theme,
                     u.avatar AS avatar,
                     g.name AS user_group_name,
-                    g.permissions AS user_group_permission_mask
+                    g.permissions AS user_group_permissions
                  FROM ' . $usersTable . ' u
                  LEFT JOIN ' . $userGroupsTable . ' ug ON ug.user = u.id
                  LEFT JOIN ' . $groupsTable . ' g ON g.id = ug."group"';
@@ -93,8 +93,8 @@ final class UserRoutingDataService
                 group_id,
                 group_name,
                 group_slug,
-                group_route_enabled,
-                group_permission_mask,
+                group_route,
+                group_permissions,
                 group_is_stock,
                 group_member_count,
                 user_id,
@@ -105,7 +105,7 @@ final class UserRoutingDataService
                 theme,
                 avatar,
                 user_group_name,
-                user_group_permission_mask
+                user_group_permissions
              FROM (
                  ' . implode(' UNION ALL ', $unionParts) . '
              ) routing_auth_rows
@@ -120,7 +120,7 @@ final class UserRoutingDataService
 
         $groupRows = [];
         $usersById = [];
-        /** @var array<int, array<int, array{name: string, permission_mask: int}>> $groupMap */
+        /** @var array<int, array<int, array{name: string, permissions: int}>> $groupMap */
         $groupMap = [];
 
         foreach ($rows as $row) {
@@ -135,8 +135,8 @@ final class UserRoutingDataService
                     'id' => $groupId,
                     'name' => (string) ($row['group_name'] ?? ''),
                     'slug' => (string) ($row['group_slug'] ?? ''),
-                    'route_enabled' => (int) ($row['group_route_enabled'] ?? 0),
-                    'permission_mask' => (int) ($row['group_permission_mask'] ?? 0),
+                    'route' => (int) ($row['group_route'] ?? 0),
+                    'permissions' => (int) ($row['group_permissions'] ?? 0),
                     'is_stock' => (int) ($row['group_is_stock'] ?? 0),
                     'member_count' => (int) ($row['group_member_count'] ?? 0),
                 ];
@@ -174,7 +174,7 @@ final class UserRoutingDataService
             $groupMap[$userId] ??= [];
             $groupMap[$userId][] = [
                 'name' => $groupName,
-                'permission_mask' => (int) ($row['user_group_permission_mask'] ?? 0),
+                'permissions' => (int) ($row['user_group_permissions'] ?? 0),
             ];
         }
 

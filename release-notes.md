@@ -2,6 +2,19 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### March 29, 2026 — group column alias expunge
+
+- Removed `permissions AS permission_mask` and `route AS route_enabled` SQL aliases from all group SELECT queries across `GroupRepository`, `AuthGroupMembershipService`, `PermissionMaskService`, `UserGroupCatalogService`, `GroupPublicRouteService`, `UserRoutingDataService`, `UserPanelQueryService`, and `UserRepository`. Updated all PHP consumers (controllers, services, templates, CLI) to read `$group['permissions']` and `$group['route']` directly. Also updated `PanelAccessCatalog::stockGroups()` static data and `SeedInstaller` to use canonical key names. Cleared the Legacy Fallback Log entry for this item.
+
+### March 29, 2026 — legacy shim expunge (extension contracts, form repos, DB adminer, auth schema)
+
+- Removed `local_storage`/`db_storage` manifest keys from `ManifestContractValidator::readManifest()` and `ExtensionCatalogService::readManifest()`: both the reading/validation logic and all return-array entries; removed the now-dead `normalizeStorageFlag()` and `storageEnabled()` methods from `ManifestContractValidator`; updated `ExtensionRegistry` docblock to match. Fixed `'plugin'` legacy default in `ManifestContractValidator::readManifest()` to `'content'`.
+- Simplified `ExtensionSchemaRunner` `$tableResolver` closure: removed optional `?string $legacyTable` parameter that allowed calling `$context['table']('old_name')` to resolve arbitrary legacy table names; closure now unconditionally returns `$tableStem`. The current contract (`$context['table']()` with no args) is unchanged.
+- Removed DB-table fallback from `PanelController::listEnabledExtensionForms()`: the method now returns `[]` when `extension_services[key]['forms']` is not available (extension disabled/unloaded), instead of falling back to `TaxonomyLookupRepository::listEnabledExtensionForms()`. Deleted `listEnabledExtensionForms()` from `TaxonomyLookupRepository` entirely.
+- Stripped unused DB constructor parameters (`PDO $db`, `string $driver`, `string $prefix`) from `ContactFormRepository` and `SignupFormRepository` — both are file-backed and never used those params; updated constructor calls in `contact/ext.php` and `signups/ext.php`.
+- Removed `/database/adminer/select` legacy selector route from `ext/database/lib/routes_panel.php`; deleted `$adminerSelectorViewFile` variable and `private/ext/database/tpl/panel_adminer_selector.php` template. Removed composer-source fallback from `$serveAdminerAssetByQuery` — extension-provisioned panel assets are now the sole source.
+- Removed `ensureAuthUserStrings()` from `AuthSchemaBuilder` — it was a per-boot SELECT+UPDATE backfill for NULL `users.string` rows, a no-op on all current installs; removed `UserStringService` dependency and all three call sites.
+
 ### March 28, 2026 (batch 3) — legacy alias & migration path expunge
 
 - Deleted all dead schema migration methods from `RvnSchemaBuilder` (8 public methods: `migratePageContentStorage`, `ensurePageImageDisplayColumns`, `migratePageImageStorage`, `migratePageTaxonomyPivots`, `migrateLoginFailureStorage`, `migrateUserGroupPivot`, `dropLegacyChannelTable`, `migrateUserPrimaryGroup`; plus 14+ private helpers they depended on); removed corresponding calls from `SchemaEnsurePipeline`.

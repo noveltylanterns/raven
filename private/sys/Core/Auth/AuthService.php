@@ -860,7 +860,7 @@ final class AuthService
     /**
      * Returns user's group memberships.
      *
-     * @return array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>
+     * @return array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
      */
     public function groupsForUser(int $userId): array
     {

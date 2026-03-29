@@ -126,7 +126,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                         $groupName = (string) ($group['name'] ?? '');
                         $memberCount = (int) ($group['member_count'] ?? 0);
                         $isStock = (int) ($group['is_stock'] ?? 0) === 1;
-                        $isRouted = (int) ($group['route_enabled'] ?? 0) === 1;
+                        $isRouted = (int) ($group['route'] ?? 0) === 1;
                         $routedLabel = $isRouted ? 'Yes' : 'No';
                         $typeLabel = $isStock ? 'Stock' : 'Custom';
                         $typeBadgeClass = $isStock ? 'text-bg-secondary' : 'text-bg-info';

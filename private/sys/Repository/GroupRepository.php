@@ -60,8 +60,8 @@ final class GroupRepository
                     g.name,
                     g.slug,
                     g.description,
-                    g.route AS route_enabled,
-                    g.permissions AS permission_mask,
+                    g.route,
+                    g.permissions,
                     ' . $stockCase . ' AS is_stock,
                     g.cover_image,
                     g.icon_image,
@@ -116,8 +116,8 @@ final class GroupRepository
                     g.name,
                     g.slug,
                     g.description,
-                    g.route AS route_enabled,
-                    g.permissions AS permission_mask,
+                    g.route,
+                    g.permissions,
                     ' . $stockCase . ' AS is_stock,
                     g.cover_image,
                     g.icon_image,
@@ -164,8 +164,8 @@ final class GroupRepository
                     page_rows.name,
                     page_rows.slug,
                     page_rows.description,
-                    page_rows.route_enabled,
-                    page_rows.permission_mask,
+                    page_rows.route,
+                    page_rows.permissions,
                     page_rows.is_stock,
                     page_rows.cover_image,
                     page_rows.icon_image,
@@ -178,8 +178,8 @@ final class GroupRepository
                         g.name,
                         g.slug,
                         g.description,
-                        g.route AS route_enabled,
-                        g.permissions AS permission_mask,
+                        g.route,
+                        g.permissions,
                         ' . $stockCase . ' AS is_stock,
                         g.cover_image,
                         g.icon_image,
@@ -230,7 +230,7 @@ final class GroupRepository
     /**
      * Returns minimal group options for user assignment forms.
      *
-     * @return array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}>
+     * @return array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
      */
     public function listOptions(): array
     {
@@ -241,7 +241,7 @@ final class GroupRepository
             'SELECT id,
                     name,
                     slug,
-                    permissions AS permission_mask,
+                    permissions,
                     ' . $stockCase . ' AS is_stock
              FROM ' . $groups . '
              ORDER BY is_stock DESC, name ASC'
@@ -256,7 +256,7 @@ final class GroupRepository
                 'id' => (int) $row['id'],
                 'name' => (string) $row['name'],
                 'slug' => (string) ($row['slug'] ?? ''),
-                'permission_mask' => (int) ($row['permission_mask'] ?? 0),
+                'permissions' => (int) ($row['permissions'] ?? 0),
                 'is_stock' => (int) $row['is_stock'],
             ];
         }
@@ -279,8 +279,8 @@ final class GroupRepository
                     name,
                     slug,
                     description,
-                    route AS route_enabled,
-                    permissions AS permission_mask,
+                    route,
+                    permissions,
                     ' . $stockCase . ' AS is_stock,
                     cover_image,
                     icon_image,
@@ -365,7 +365,7 @@ final class GroupRepository
      * Stock-group slugs are immutable; stock names are editable.
      * Stock flag cannot be changed through normal save flow.
      *
-     * @param array{id: int|null, name: string, slug?: string, description?: string, route_enabled?: int|bool, permission_mask?: int, permissions?: int} $data
+     * @param array{id: int|null, name: string, slug?: string, description?: string, route?: int|bool, permissions?: int} $data
      */
     public function save(array $data): int
     {
@@ -376,8 +376,8 @@ final class GroupRepository
         $description = trim((string) ($data['description'] ?? ''));
         $slugInput = trim((string) ($data['slug'] ?? ''));
         $slug = $this->rolePolicy->normalizeSlug($slugInput !== '' ? $slugInput : $name);
-        $mask = (int) ($data['permissions'] ?? $data['permission_mask'] ?? 0);
-        $routeEnabled = !empty($data['route_enabled']) ? 1 : 0;
+        $mask = (int) ($data['permissions'] ?? 0);
+        $routeEnabled = !empty($data['route']) ? 1 : 0;
         $now = gmdate('Y-m-d H:i:s');
 
         if ($id !== null && $id > 0) {
@@ -670,12 +670,12 @@ final class GroupRepository
     private function hydrateGroupRow(array $row): array
     {
         if ($this->rolePolicy->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
-            $row['route_enabled'] = 0;
+            $row['route'] = 0;
         } else {
-            $row['route_enabled'] = (int) ($row['route_enabled'] ?? 0);
+            $row['route'] = (int) ($row['route'] ?? 0);
         }
 
-        $row['permission_mask'] = (int) ($row['permission_mask'] ?? 0);
+        $row['permissions'] = (int) ($row['permissions'] ?? 0);
         $row['is_stock'] = !empty($row['is_stock']) ? 1 : 0;
         $row['created'] = (string) ($row['created'] ?? '');
         $row['updated'] = (string) ($row['updated'] ?? $row['created'] ?? '');

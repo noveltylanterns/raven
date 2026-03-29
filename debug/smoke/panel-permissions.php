@@ -309,8 +309,8 @@ PHP;
             'id' => null,
             'name' => 'Nav Smoke ' . $suffix . ' ' . $this->runId,
             'slug' => $groupSlug,
-            'route_enabled' => 0,
-            'permission_mask' => $mask,
+            'route' => 0,
+            'permissions' => $mask,
         ]);
         $this->assert($groupId > 0, 'Failed to create temp group for ' . $suffix . '.');
         $this->createdGroups[] = $groupId;

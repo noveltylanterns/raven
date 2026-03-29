@@ -26,7 +26,7 @@ final class PermissionMaskService
     }
 
     /**
-     * @param array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}> $groups
+     * @param array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}> $groups
      */
     public function maskForUser(int $userId, array $groups): int
     {
@@ -45,7 +45,7 @@ final class PermissionMaskService
                 return 0;
             }
 
-            $mask |= (int) ($group['permission_mask'] ?? 0);
+            $mask |= (int) ($group['permissions'] ?? 0);
         }
 
         if ($userId > 0) {
@@ -64,7 +64,7 @@ final class PermissionMaskService
         $groupsTable = $this->groupTable('groups');
 
         $stmt = $this->rvnDb->prepare(
-            'SELECT permissions AS permission_mask
+            'SELECT permissions
              FROM ' . $groupsTable . '
              WHERE LOWER(slug) = :slug
              LIMIT 1'

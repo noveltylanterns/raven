@@ -11,7 +11,7 @@ final class UserPanelHydrator
 {
     /**
      * @param array<int, array<string, mixed>> $users
-     * @param array<int, array<int, array{name: string, permission_mask: int}>> $groupMap
+     * @param array<int, array<int, array{name: string, permissions: int}>> $groupMap
      * @return array<int, array<string, mixed>>
      */
     public function hydrate(array $users, array $groupMap): array
@@ -19,7 +19,7 @@ final class UserPanelHydrator
         $result = [];
         foreach ($users as $row) {
             $userId = (int) ($row['id'] ?? 0);
-            /** @var array<int, array{name: string, permission_mask: int}> $groupEntries */
+            /** @var array<int, array{name: string, permissions: int}> $groupEntries */
             $groupEntries = $groupMap[$userId] ?? [];
             $groupNames = array_map(
                 static fn (array $entry): string => (string) ($entry['name'] ?? ''),

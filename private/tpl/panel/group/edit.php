@@ -32,7 +32,7 @@ $groupName = trim((string) ($group['name'] ?? ''));
 $groupId = (int) ($group['id'] ?? 0);
 $hasPersistedGroup = $groupId > 0;
 $deleteFormId = 'delete-group-form';
-$permissionMask = (int) ($group['permission_mask'] ?? 0);
+$permissionMask = (int) ($group['permissions'] ?? 0);
 $viewPublicSiteBit = PanelAccess::VIEW_PUBLIC_SITE;
 $viewPrivateSiteBit = PanelAccess::VIEW_PRIVATE_SITE;
 $viewDisabledSiteBit = PanelAccess::VIEW_DISABLED_SITE;
@@ -43,7 +43,7 @@ if ($groupSlug === '' && $groupName !== '') {
     $groupSlug = trim($groupSlug, '-');
     $groupSlug = preg_replace('/-+/', '-', $groupSlug) ?? '';
 }
-$routeEnabledChecked = (int) ($group['route_enabled'] ?? 0) === 1;
+$routeEnabledChecked = (int) ($group['route'] ?? 0) === 1;
 if (!$groupRoutingEnabledSystemWide) {
     $routeEnabledChecked = false;
 }

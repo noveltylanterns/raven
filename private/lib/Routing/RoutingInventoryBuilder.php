@@ -397,7 +397,7 @@ final class RoutingInventoryBuilder
                     continue;
                 }
 
-                $routeEnabled = (int) ($group['route_enabled'] ?? 0) === 1;
+                $routeEnabled = (int) ($group['route'] ?? 0) === 1;
                 if (!$routeEnabled) {
                     continue;
                 }

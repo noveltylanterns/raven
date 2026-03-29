@@ -11,7 +11,7 @@
 
 /** @var array<string, string> $site */
 /** @var array<int, array<string, mixed>> $users */
-/** @var array<int, array{id: int, name: string, slug: string, permission_mask: int, is_stock: int}> $groupOptions */
+/** @var array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}> $groupOptions */
 /** @var string|null $loginIdentifierMode */
 /** @var string|null $registrationMode */
 /** @var string $prefilterGroup */
@@ -173,7 +173,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
 
                                 $groupEntries[] = [
                                     'name' => $groupName,
-                                    'permission_mask' => (int) ($rawGroupEntry['permission_mask'] ?? 0),
+                                    'permissions' => (int) ($rawGroupEntry['permissions'] ?? 0),
                                 ];
                             }
                         }
@@ -187,7 +187,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
 
                                 $groupEntries[] = [
                                     'name' => $groupName,
-                                    'permission_mask' => 0,
+                                    'permissions' => 0,
                                 ];
                             }
                         }
@@ -241,7 +241,7 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
                                         <?php foreach ($groupEntries as $groupEntry): ?>
                                             <?php
                                             $groupName = (string) ($groupEntry['name'] ?? '');
-                                            $groupPermissionMask = (int) ($groupEntry['permission_mask'] ?? 0);
+                                            $groupPermissionMask = (int) ($groupEntry['permissions'] ?? 0);
                                             $groupBadgeClass = 'text-bg-success';
                                             if (PanelAccess::canManageConfiguration($groupPermissionMask)) {
                                                 $groupBadgeClass = 'text-bg-danger';

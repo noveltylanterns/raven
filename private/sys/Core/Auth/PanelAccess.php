@@ -119,7 +119,7 @@ final class PanelAccess
     /**
      * Returns required stock groups.
      *
-     * @return array<int, array{name: string, slug: string, permission_mask: int, is_stock: int}>
+     * @return array<int, array{name: string, slug: string, permissions: int, is_stock: int}>
      */
     public static function stockGroups(): array
     {

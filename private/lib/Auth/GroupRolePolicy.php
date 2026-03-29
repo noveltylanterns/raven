@@ -72,7 +72,7 @@ final class GroupRolePolicy
      * admin always receives the full permission mask).
      *
      * @param string $roleSlug     The group slug to evaluate.
-     * @param int    $routeEnabled Caller-supplied route_enabled value (0 or 1).
+     * @param int    $routeEnabled Caller-supplied route value (0 or 1).
      * @param int    $mask         Caller-supplied permissions bitmask.
      * @return array{route: int, permissions: int}
      */

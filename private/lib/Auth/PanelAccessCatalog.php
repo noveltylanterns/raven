@@ -173,7 +173,7 @@ final class PanelAccessCatalog
     }
 
     /**
-     * @return array<int, array{name: string, slug: string, permission_mask: int, is_stock: int}>
+     * @return array<int, array{name: string, slug: string, permissions: int, is_stock: int}>
      */
     public static function stockGroups(): array
     {
@@ -183,7 +183,7 @@ final class PanelAccessCatalog
             [
                 'name' => 'Admin',
                 'slug' => 'admin',
-                'permission_mask' => PanelAccess::PANEL_LOGIN
+                'permissions' => PanelAccess::PANEL_LOGIN
                     | PanelAccess::VIEW_PUBLIC_SITE
                     | PanelAccess::VIEW_PRIVATE_SITE
                     | PanelAccess::VIEW_DISABLED_SITE
@@ -198,25 +198,25 @@ final class PanelAccessCatalog
             [
                 'name' => 'Guest',
                 'slug' => 'guest',
-                'permission_mask' => PanelAccess::VIEW_PUBLIC_SITE,
+                'permissions' => PanelAccess::VIEW_PUBLIC_SITE,
                 'is_stock' => 1,
             ],
             [
                 'name' => 'Validating',
                 'slug' => 'validating',
-                'permission_mask' => PanelAccess::VIEW_PUBLIC_SITE,
+                'permissions' => PanelAccess::VIEW_PUBLIC_SITE,
                 'is_stock' => 1,
             ],
             [
                 'name' => 'User',
                 'slug' => 'user',
-                'permission_mask' => PanelAccess::VIEW_PUBLIC_SITE | PanelAccess::VIEW_PRIVATE_SITE,
+                'permissions' => PanelAccess::VIEW_PUBLIC_SITE | PanelAccess::VIEW_PRIVATE_SITE,
                 'is_stock' => 1,
             ],
             [
                 'name' => 'Banned',
                 'slug' => 'banned',
-                'permission_mask' => 0,
+                'permissions' => 0,
                 'is_stock' => 1,
             ],
         ];

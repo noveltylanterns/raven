@@ -1676,7 +1676,7 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
                     continue;
                 }
                 $enriched = $row;
-                $enriched['permission_names'] = $maskNames((int) ($row['permission_mask'] ?? 0));
+                $enriched['permission_names'] = $maskNames((int) ($row['permissions'] ?? 0));
                 $items[] = $enriched;
             }
 
@@ -1690,8 +1690,8 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
                         . (string) ($row['slug'] ?? '')
                         . ' | '
                         . (string) ($row['name'] ?? '')
-                        . ' | route=' . ((int) ($row['route_enabled'] ?? 0) === 1 ? '1' : '0')
-                        . ' | mask=' . (string) ((int) ($row['permission_mask'] ?? 0))
+                        . ' | route=' . ((int) ($row['route'] ?? 0) === 1 ? '1' : '0')
+                        . ' | mask=' . (string) ((int) ($row['permissions'] ?? 0))
                     );
                 }
                 $context->ok('Listed ' . count($items) . ' groups.');
@@ -1705,7 +1705,7 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
                 throw new RuntimeException('Group not found.');
             }
 
-            $row['permission_names'] = $maskNames((int) ($row['permission_mask'] ?? 0));
+            $row['permission_names'] = $maskNames((int) ($row['permissions'] ?? 0));
             if ($context->json) {
                 $context->printJson(['ok' => true, 'item' => $row]);
             } else {
@@ -1743,28 +1743,28 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
                 $slug = raven_cli_slug_from_text($rvn, $slugInput, 'Group slug');
             }
 
-            $routeEnabledDefault = is_array($existing) && ((int) ($existing['route_enabled'] ?? 0) === 1);
+            $routeEnabledDefault = is_array($existing) && ((int) ($existing['route'] ?? 0) === 1);
             $routeEnabled = raven_cli_bool_option($options, 'route-enabled', $routeEnabledDefault, 'r');
 
-            $permissionMaskDefault = is_array($existing) ? (int) ($existing['permission_mask'] ?? 0) : 0;
+            $permissionMaskDefault = is_array($existing) ? (int) ($existing['permissions'] ?? 0) : 0;
             $permissionMask = $parsePermissionMask($options, $permissionMaskDefault);
 
             $id = $repo->save([
                 'id' => is_array($existing) ? (int) ($existing['id'] ?? 0) : null,
                 'name' => $name,
                 'slug' => $slug,
-                'route_enabled' => $routeEnabled ? 1 : 0,
-                'permission_mask' => $permissionMask,
+                'route' => $routeEnabled ? 1 : 0,
+                'permissions' => $permissionMask,
             ]);
 
             $saved = $repo->findById($id);
-            $savedMask = is_array($saved) ? (int) ($saved['permission_mask'] ?? 0) : $permissionMask;
+            $savedMask = is_array($saved) ? (int) ($saved['permissions'] ?? 0) : $permissionMask;
             if ($context->json) {
                 $context->printJson([
                     'ok' => true,
                     'id' => $id,
                     'action' => $action,
-                    'permission_mask' => $savedMask,
+                    'permissions' => $savedMask,
                     'permission_names' => $maskNames($savedMask),
                 ]);
             } else {
