@@ -334,11 +334,15 @@ final class UpdateWorkflowService
 
         $pathUniverse = array_values(array_unique(array_merge(array_keys($sourceFiles), array_keys($localFiles))));
         $ignoredPaths = $this->ignoredPathsMap($pathUniverse);
+        $extensionBinAliases = $this->extensionBinAliasesMap(
+            $this->root . '/private/bin',
+            'private/bin'
+        );
         $dirtyPaths = $this->dirtyPathsMap();
 
         $actions = [];
         foreach ($sourceFiles as $relativePath => $sourcePath) {
-            $protectedReason = $this->protectedPathReason($relativePath, $ignoredPaths, $customThemeRoots, $customExtensionRoots);
+            $protectedReason = $this->protectedPathReason($relativePath, $ignoredPaths, $customThemeRoots, $customExtensionRoots, $extensionBinAliases);
             $localPath = $localFiles[$relativePath] ?? null;
             $localModified = isset($dirtyPaths[$relativePath]);
 
@@ -370,7 +374,7 @@ final class UpdateWorkflowService
                 continue;
             }
 
-            $protectedReason = $this->protectedPathReason($relativePath, $ignoredPaths, $customThemeRoots, $customExtensionRoots);
+            $protectedReason = $this->protectedPathReason($relativePath, $ignoredPaths, $customThemeRoots, $customExtensionRoots, $extensionBinAliases);
             $localModified = isset($dirtyPaths[$relativePath]);
             if ($protectedReason !== null) {
                 $actions[] = $this->planAction($relativePath, 'skip', $protectedReason, false, false);
@@ -796,15 +800,55 @@ final class UpdateWorkflowService
     }
 
     /**
+     * Returns a map of relative paths for symlinks present in private/bin/.
+     *
+     * Extension bin commands are symlinks created by ExtensionStorageProvisioner::ensureBinSymlinks().
+     * Stock CLI scripts are regular files shipped in the source tree. Scanning for symlinks here
+     * lets the updater distinguish between the two without any extension-registry coupling.
+     *
+     * @param string $absoluteBinDir Absolute path to the private/bin directory.
+     * @param string $relativeBinDir Relative prefix to use when building result keys (e.g. "private/bin").
+     * @return array<string, bool> Map of relative path => true for each symlink found.
+     */
+    private function extensionBinAliasesMap(string $absoluteBinDir, string $relativeBinDir): array
+    {
+        if (!is_dir($absoluteBinDir)) {
+            return [];
+        }
+
+        $aliases = [];
+        $entries = scandir($absoluteBinDir) ?: [];
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            // Only symlinks are extension aliases; regular files are stock scripts.
+            if (!is_link($absoluteBinDir . '/' . $entry)) {
+                continue;
+            }
+
+            $relative = $this->normalizeRelativePath($relativeBinDir . '/' . $entry);
+            if ($relative !== '') {
+                $aliases[$relative] = true;
+            }
+        }
+
+        return $aliases;
+    }
+
+    /**
      * @param array<string, bool> $ignoredPaths
      * @param array<int, string> $customThemeRoots
      * @param array<int, string> $customExtensionRoots
+     * @param array<string, bool> $extensionBinAliases Pre-computed map of extension bin symlink paths.
      */
     private function protectedPathReason(
         string $path,
         array $ignoredPaths,
         array $customThemeRoots,
-        array $customExtensionRoots
+        array $customExtensionRoots,
+        array $extensionBinAliases
     ): ?string {
         if (isset($ignoredPaths[$path])) {
             return 'Protected by .gitignore.';
@@ -820,6 +864,10 @@ final class UpdateWorkflowService
             if ($path === $root || str_starts_with($path, $root . '/')) {
                 return 'Protected custom extension path.';
             }
+        }
+
+        if (isset($extensionBinAliases[$path])) {
+            return 'Protected extension bin alias.';
         }
 
         return null;

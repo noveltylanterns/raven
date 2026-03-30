@@ -2,6 +2,10 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### March 29, 2026 — updater preserves extension bin aliases
+
+- **`UpdateWorkflowService::protectedPathReason()`**: Added a guard for files under `private/bin/` that are symlinks. The extension system (`ExtensionStorageProvisioner::ensureBinSymlinks()`) creates symlinks there for each CLI command in an enabled extension's `bin/` directory. Since these symlinks are not in the upstream source tree, the updater was planning to delete them as "local files absent from source." Stock CLI scripts are regular files — extension aliases are always symlinks — so `is_link()` cleanly distinguishes the two. Extension bin aliases are now skipped with reason "Protected extension bin alias."
+
 ### March 29, 2026 — panel UX fixes (timezone dropdowns, panel-wrapped error views)
 
 - **Config editor timezone field**: Added `site.timezone` key to both `config.php` and `config.php.dist`. Config editor Basic tab renders a grouped `<select>` of all PHP timezone identifiers with a "Use Server Default" empty option at the top. `PanelConfigFieldPolicyService` validates the submitted value against `DateTimeZone::listIdentifiers()` and accepts empty string as "server default". `ConfigEditorSchemaService` sets the label to "Timezone".
