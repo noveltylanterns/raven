@@ -91,6 +91,15 @@ final class PanelConfigFieldPolicyService
             return $protocol;
         }
 
+        if ($path === 'site.scheduler') {
+            $mode = strtolower(trim($value));
+            if (!in_array($mode, ['off', 'panel', 'always'], true)) {
+                throw new \RuntimeException('site.scheduler must be off, panel, or always.');
+            }
+
+            return $mode;
+        }
+
         if ($path === 'site.timezone') {
             $tz = trim($value);
             // Empty string means "use server default" — valid and intentional.

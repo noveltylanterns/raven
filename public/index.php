@@ -570,3 +570,21 @@ $dispatchResult = $router->dispatch(new RouteRequest($method, $path));
 if (!$dispatchResult->isHandled()) {
     $controller->notFound();
 }
+
+// Fallback scheduler: runs all due jobs (core + extensions) non-blocking after the response
+// is delivered, so visitors never wait on scheduler overhead. Throttled to one attempt per
+// 60 s via a .tmp timestamp file shared across both public and panel entrypoints.
+// Operators who prefer to manage their own server crontab can disable this via site.scheduler.
+if ($rvn['config']->get('site.scheduler', 'always') === 'always') {
+    $schedulerStampFile = dirname(__DIR__) . '/.tmp/scheduler_last_run';
+    $lastRun = is_file($schedulerStampFile) ? (int) @file_get_contents($schedulerStampFile) : 0;
+    if (time() - $lastRun >= 60) {
+        @file_put_contents($schedulerStampFile, (string) time());
+        // On PHP-FPM, finish_request flushes the response before running jobs.
+        // On other SAPIs this runs synchronously after output — still correct, just not async.
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        }
+        $rvn['scheduler']->runDue();
+    }
+}

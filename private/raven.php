@@ -228,8 +228,10 @@ return (static function (): array {
 
     // Built-in core job: flip page publish/draft status based on scheduled publish/expires columns.
     // Interval of 60 s means rvn-cron running every minute covers all scheduled posts promptly.
-    // Note: PublicController also calls applySchedule() on each public request as a safety net for
-    // installs that have not yet set up rvn-cron; both paths are idempotent.
+    // The fallback scheduler in public/index.php and panel/index.php fires runDue() non-blocking
+    // after each response (throttled to 60 s) when site.scheduler is true, so this job runs on
+    // request traffic without a server crontab. Operators may disable site.scheduler and point
+    // their own crontab at rvn-cron instead.
     $scheduler->registerJob('core', 'page-schedule', 60, static function (array $context): void {
         $page = $context['rvn']['page'] ?? null;
         if ($page instanceof PageRepository) {

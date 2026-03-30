@@ -2,6 +2,11 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### March 29, 2026 — fallback scheduler
+
+- **`site.scheduler` config key** (string, default `always`): controls the request-based fallback scheduler. `always` — fires `SchedulerRegistry::runDue()` after every response on both public and panel routes; `panel` — fires on panel routes only; `off` — disables the fallback entirely (manual crontab required). Non-blocking on PHP-FPM via `fastcgi_finish_request()`, synchronous-after-output on other SAPIs. Throttled to one attempt per 60 s via a shared `.tmp/scheduler_last_run` timestamp file. Config editor Basic tab shows a dropdown with a warning note when set to Off.
+- **Removed inline `applySchedule()` calls** from `PublicController::home()`, `channel()`, and `page()`: page scheduling is now handled exclusively by the `core::page-schedule` scheduler job (60 s interval) that `runDue()` triggers — one unified path for all scheduled work instead of a per-route safety-net call.
+
 ### March 29, 2026 — updater preserves extension bin aliases
 
 - **`UpdateWorkflowService::protectedPathReason()`**: Added a guard for files under `private/bin/` that are symlinks. The extension system (`ExtensionStorageProvisioner::ensureBinSymlinks()`) creates symlinks there for each CLI command in an enabled extension's `bin/` directory. Since these symlinks are not in the upstream source tree, the updater was planning to delete them as "local files absent from source." Stock CLI scripts are regular files — extension aliases are always symlinks — so `is_link()` cleanly distinguishes the two. Extension bin aliases are now skipped with reason "Protected extension bin alias."

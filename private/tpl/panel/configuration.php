@@ -189,6 +189,7 @@ if ($basicSiteConfigFields !== []) {
         'site.protocol' => 30,
         'site.visibility' => 40,
         'site.timezone' => 50,
+        'site.scheduler' => 60,
     ];
 
     usort(
@@ -571,6 +572,7 @@ $renderConfigField = static function (array $field) use (
     $isSiteEnabledField = $path === 'site.visibility';
     $isSiteProtocolField = $path === 'site.protocol';
     $isSiteTimezoneField = $path === 'site.timezone';
+    $isSiteSchedulerField = $path === 'site.scheduler';
     $isPanelDefaultThemeField = $path === 'panel.theme';
     $isPublicProfilesModeField = $path === 'user.visibility';
     $isShowGroupsField = $path === 'group.visibility';
@@ -816,6 +818,22 @@ $renderConfigField = static function (array $field) use (
                 <option value="https"<?= (string) $field['value'] === 'https' ? ' selected' : '' ?>>https</option>
                 <option value="http"<?= (string) $field['value'] === 'http' ? ' selected' : '' ?>>http</option>
             </select>
+        <?php elseif ($isSiteSchedulerField): ?>
+            <select
+                class="form-select font-monospace"
+                id="<?= e($inputId) ?>"
+                name="<?= e($fieldName) ?>"
+                required
+            >
+                <option value="always"<?= (string) $field['value'] === 'always' ? ' selected' : '' ?>>Run Always</option>
+                <option value="panel"<?= (string) $field['value'] === 'panel' ? ' selected' : '' ?>>Run on Panel Routes</option>
+                <option value="off"<?= (string) $field['value'] === 'off' ? ' selected' : '' ?>>Off</option>
+            </select>
+            <?php if ((string) $field['value'] === 'off'): ?>
+            <div class="form-text text-warning">Manual crontab setup is required when Off. Scheduled tasks will not run without it.</div>
+            <?php else: ?>
+            <div class="form-text">Set to Off and point your server crontab at <code>rvn-cron run</code> to handle scheduling externally.</div>
+            <?php endif; ?>
         <?php elseif ($isSiteTimezoneField): ?>
             <?php
             // Build grouped timezone list: group by the first segment (continent/region).
