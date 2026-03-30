@@ -1629,7 +1629,7 @@ $themeLabels = [
                 >
             </div>
 
-            <div class="form-group mb-0">
+            <div class="form-group">
                 <label class="form-label" for="theme">Panel Theme</label>
                 <select class="form-select" id="theme" name="theme" required>
                     <?php foreach ($themeOptions as $option): ?>
@@ -1640,6 +1640,33 @@ $themeLabels = [
                     <?php endforeach; ?>
                 </select>
                 <div class="form-text"><code>&lt;Default&gt;</code> follows the system's configured default admin theme.</div>
+            </div>
+
+            <div class="form-group mb-0">
+                <label class="form-label" for="timezone">Timezone</label>
+                <?php
+                // Build grouped timezone list for the select: group by first segment (continent/region).
+                $prefTzSelected = (string) ($preferences['timezone'] ?? '');
+                $prefTzGroups = [];
+                foreach (\DateTimeZone::listIdentifiers(\DateTimeZone::ALL_WITH_BC) as $prefTzId) {
+                    $prefTzSlash = strpos($prefTzId, '/');
+                    $prefTzGroup = $prefTzSlash !== false ? substr($prefTzId, 0, $prefTzSlash) : 'Other';
+                    $prefTzGroups[$prefTzGroup][] = $prefTzId;
+                }
+                ksort($prefTzGroups);
+                ?>
+                <select class="form-select font-monospace" id="timezone" name="timezone">
+                    <!-- Empty value means "use site/server default" — never defaults to UTC. -->
+                    <option value=""<?= $prefTzSelected === '' ? ' selected' : '' ?>>— Use Site Default —</option>
+                    <?php foreach ($prefTzGroups as $prefTzGroupName => $prefTzIds): ?>
+                        <optgroup label="<?= e($prefTzGroupName) ?>">
+                            <?php foreach ($prefTzIds as $prefTzId): ?>
+                                <option value="<?= e($prefTzId) ?>"<?= $prefTzSelected === $prefTzId ? ' selected' : '' ?>><?= e($prefTzId) ?></option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    <?php endforeach; ?>
+                </select>
+                <div class="form-text">Your personal timezone override. Leave blank to follow the site default.</div>
             </div>
         </div>
 

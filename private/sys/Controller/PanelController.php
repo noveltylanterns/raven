@@ -1387,7 +1387,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->categoryEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
         if (!$this->requireRoutePermissionOrForbidden('category', 'view')) {
@@ -1451,7 +1451,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->categoryEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
         $requiredAction = $id === null ? 'create' : 'edit';
@@ -1496,7 +1496,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->categoryEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
         $id = $this->input->int($post['id'] ?? null, 1);
@@ -1640,7 +1640,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->categoryEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
         if (!$this->requireRoutePermissionOrForbidden('category', 'delete')) {
@@ -1723,7 +1723,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->categoryEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
         if (!$this->requireRoutePermissionOrForbidden('category', 'view')) {
@@ -1758,7 +1758,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->categoryEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
         $requiredAction = $id === null ? 'create' : 'edit';
@@ -1796,7 +1796,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->categoryEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
 
@@ -1851,7 +1851,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->categoryEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
         if (!$this->requireRoutePermissionOrForbidden('category', 'delete')) {
@@ -1899,7 +1899,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->tagEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
         if (!$this->requireRoutePermissionOrForbidden('tag', 'view')) {
@@ -1963,7 +1963,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->tagEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
         $requiredAction = $id === null ? 'create' : 'edit';
@@ -2008,7 +2008,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->tagEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
         $id = $this->input->int($post['id'] ?? null, 1);
@@ -2152,7 +2152,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->tagEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
         if (!$this->requireRoutePermissionOrForbidden('tag', 'delete')) {
@@ -2235,7 +2235,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->tagEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
         if (!$this->requireRoutePermissionOrForbidden('tag', 'view')) {
@@ -2270,7 +2270,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->tagEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
         $requiredAction = $id === null ? 'create' : 'edit';
@@ -2308,7 +2308,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->tagEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
 
@@ -2358,7 +2358,7 @@ final class PanelController
     {
         $this->requirePanelLogin();
         if (!$this->tagEnabled()) {
-            $this->renderPublicNotFound();
+            $this->renderPanelNotFound();
             return;
         }
         if (!$this->requireRoutePermissionOrForbidden('tag', 'delete')) {
@@ -3883,6 +3883,7 @@ final class PanelController
         $email = $this->input->email($post['email'] ?? null);
         $themeRaw = $this->input->text($post['theme'] ?? null, 50);
         $theme = $this->normalizePanelThemeChoice((string) $themeRaw, true);
+        $timezoneRaw = trim((string) $this->input->text($post['timezone'] ?? null, 64));
         $newPassword = $this->input->text($post['new_password'] ?? null, 255);
         $confirmNewPassword = $this->input->text($post['confirm_new_password'] ?? null, 255);
         $profileContactOptions = $this->profileContactOptions();
@@ -3897,6 +3898,16 @@ final class PanelController
         $currentCoverImage = isset($current['cover_image']) && is_string($current['cover_image'])
             ? (string) $current['cover_image']
             : null;
+
+        // Validate timezone before collecting all errors; empty is allowed (use site/server default).
+        $timezone = '';
+        if ($timezoneRaw !== '') {
+            if (!in_array($timezoneRaw, \DateTimeZone::listIdentifiers(\DateTimeZone::ALL_WITH_BC), true)) {
+                $timezone = '';
+            } else {
+                $timezone = $timezoneRaw;
+            }
+        }
 
         $errors = [];
         $usernameRequired = $loginIdentifierMode === 'username';
@@ -3920,6 +3931,10 @@ final class PanelController
 
         if (!is_string($theme)) {
             $errors[] = 'Theme selection is invalid.';
+        }
+
+        if ($timezoneRaw !== '' && $timezone === '') {
+            $errors[] = 'Timezone selection is invalid.';
         }
 
         $errors = array_merge(
@@ -4036,6 +4051,7 @@ final class PanelController
             'email' => (string) $email,
             'bio' => $bio,
             'theme' => $theme,
+            'timezone' => $timezone,
             'password' => $newPassword !== '' ? $newPassword : null,
             'contact_profiles' => $contactProfiles,
             'two_factor_methods' => $twoFactorMethods,
@@ -6044,18 +6060,57 @@ final class PanelController
     }
 
     /**
-     * Renders a themed public not-found page for denied panel routes.
+     * Renders a panel-wrapped permission-denied page for authenticated panel routes.
+     *
+     * Called when a logged-in user lacks the required permission bit; the panel
+     * wrapper is shown so the user sees consistent chrome instead of a raw error.
      */
     private function forbidden(string $_message): void
     {
-        $this->renderPublicNotFound();
+        $this->renderPanelDenied();
+    }
+
+    /**
+     * Renders the panel-wrapped not-found view for authenticated panel routes.
+     *
+     * Used when a feature is disabled or a resource is missing within the panel.
+     * The panel sidebar and wrapper remain visible so the user can navigate away.
+     */
+    public function renderPanelNotFound(): void
+    {
+        http_response_code(404);
+        $this->view->render('panel/status/404', [
+            'site' => $this->siteData(),
+            'showSidebar' => true,
+            'section' => null,
+            'csrfField' => $this->csrf->field(),
+            'userTheme' => $this->currentUserTheme(),
+        ], 'panel/wrapper');
+    }
+
+    /**
+     * Renders the panel-wrapped permission-denied view for authenticated panel routes.
+     *
+     * Returns HTTP 403. The panel sidebar and wrapper remain visible so the user
+     * can navigate to sections they are allowed to access.
+     */
+    private function renderPanelDenied(): void
+    {
+        http_response_code(403);
+        $this->view->render('panel/status/denied', [
+            'site' => $this->siteData(),
+            'showSidebar' => true,
+            'section' => null,
+            'csrfField' => $this->csrf->field(),
+            'userTheme' => $this->currentUserTheme(),
+        ], 'panel/wrapper');
     }
 
     /**
      * Renders active public theme `status/404` with wrapper layout.
      *
-     * This is used for denied panel pages and can be called by extension routes
-     * so unauthorized requests do not reveal panel URL inventory.
+     * Used for unauthenticated panel access so the panel URL structure is not
+     * revealed to guests. Extension routes may also call this directly.
      */
     public function renderPublicNotFound(): void
     {

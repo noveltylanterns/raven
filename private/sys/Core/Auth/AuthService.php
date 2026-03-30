@@ -499,6 +499,7 @@ final class AuthService
                     email,
                     bio,
                     theme,
+                    timezone,
                     avatar,
                     cover_image,
                     contact,
@@ -538,6 +539,7 @@ final class AuthService
      *   email: string,
      *   bio?: string,
      *   theme: string,
+     *   timezone?: string,
      *   password: string|null,
      *   contact_profiles?: array<int, array{type: string, value: string}>,
      *   two_factor_methods?: array<int, array<string, mixed>>,
@@ -556,6 +558,7 @@ final class AuthService
         $email = (string) ($normalized['email'] ?? '');
         $bio = (string) ($normalized['bio'] ?? '');
         $theme = (string) ($normalized['theme'] ?? 'default');
+        $timezone = (string) ($normalized['timezone'] ?? '');
         $password = $normalized['password'] ?? null;
         $contactProfilesEncoded = $normalized['contact_profiles_encoded'] ?? null;
         $twoFactorMethodsEncoded = $normalized['two_factor_methods_encoded'] ?? null;
@@ -580,6 +583,7 @@ final class AuthService
             'email = :email',
             'bio = :bio',
             'theme = :theme',
+            'timezone = :timezone',
             'cover_image = :cover_image',
             'contact = :contact_profiles',
             'two_factor = :two_factor_methods',
@@ -591,6 +595,7 @@ final class AuthService
             ':email' => $email,
             ':bio' => $bio,
             ':theme' => $theme,
+            ':timezone' => $timezone,
             ':cover_image' => $coverImage,
             ':contact_profiles' => $contactProfilesEncoded,
             ':two_factor_methods' => $twoFactorMethodsEncoded,

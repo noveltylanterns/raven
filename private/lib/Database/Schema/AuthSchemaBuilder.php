@@ -163,6 +163,9 @@ final class AuthSchemaBuilder
             if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'group')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN "group" INTEGER NULL');
             }
+            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'timezone')) {
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN timezone TEXT NOT NULL DEFAULT \'\'');
+            }
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $usersTable . '_string ON ' . $usersTable . ' (string)');
 
             $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
@@ -200,6 +203,9 @@ final class AuthSchemaBuilder
             if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'group')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN `group` BIGINT UNSIGNED NULL');
             }
+            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'timezone')) {
+                $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT \'\'');
+            }
 
             $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
             return;
@@ -235,6 +241,9 @@ final class AuthSchemaBuilder
         }
         if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'group')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN "group" BIGINT NULL');
+        }
+        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'timezone')) {
+            $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT \'\'');
         }
         $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
     }

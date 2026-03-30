@@ -2,6 +2,13 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### March 29, 2026 — panel UX fixes (timezone dropdowns, panel-wrapped error views)
+
+- **Config editor timezone field**: Added `site.timezone` key to both `config.php` and `config.php.dist`. Config editor Basic tab renders a grouped `<select>` of all PHP timezone identifiers with a "Use Server Default" empty option at the top. `PanelConfigFieldPolicyService` validates the submitted value against `DateTimeZone::listIdentifiers()` and accepts empty string as "server default". `ConfigEditorSchemaService` sets the label to "Timezone".
+- **User preferences timezone field**: Added `timezone` column (`TEXT/VARCHAR(64) NOT NULL DEFAULT ''`) to `rvn_users` via `AuthSchemaBuilder::ensureAuthUserPreferenceColumns()` for SQLite, MySQL, and PostgreSQL. `AuthService::userPreferences()` now SELECTs the column; `updateUserPreferences()` writes it. `UserSecurityProfileService::decodeUserPreferencesRow()` and `normalizePreferenceUpdatePayload()` include `timezone`. `PanelController::preferencesSave()` reads and validates the submission. Preferences Account tab shows a grouped timezone `<select>` with "Use Site Default" empty option. Empty value is always "inherit from site/server" — never UTC.
+- **Panel-wrapped error views**: Created `private/tpl/panel/status/404.php` and `private/tpl/panel/status/denied.php` — card-wrapped status templates rendered inside the panel layout. Added `PanelController::renderPanelNotFound()` (public, HTTP 404) and `renderPanelDenied()` (private, HTTP 403). `forbidden()` now calls `renderPanelDenied()` instead of the public 404 page. All 16 feature-disabled not-found responses inside authenticated panel routes (category/tag disabled checks) switched to `renderPanelNotFound()`. The unauthenticated guest path in `requirePanelLogin()` intentionally retains `renderPublicNotFound()` to avoid leaking panel URL structure.
+- **Sidebar/mobile nav drop shadow**: Already present in compiled CSS (`box-shadow: var(--raven-shadow)` on `#rvnp-sidebar` and `#rvnp-mobile`); no changes needed.
+
 ### March 29, 2026 — extensions overhaul (shortcodes, scheduler, bin storage, public render helper)
 
 - **Welcome Back display name fix**: `panel/index.php` `$syncPanelIdentity` closure now delegates to `PanelSessionGuard::syncPanelIdentityInSession()` instead of reading `$preferences['display_name']` (nonexistent key); eliminates username-fallback behavior in extension panel views.

@@ -34,6 +34,7 @@ final class ConfigEditorSchemaService
         'panel.brand_logo' => 'Branded Panel Logo',
         'site.protocol' => 'Protocol',
         'site.theme' => 'Default Site Theme',
+        'site.timezone' => 'Timezone',
         'site.visibility' => 'Visibility',
         'mail.agent' => 'Mail Agent',
         'mail.sender_address' => 'Mail Sender Address',

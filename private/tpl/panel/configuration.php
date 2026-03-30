@@ -188,6 +188,7 @@ if ($basicSiteConfigFields !== []) {
         'site.domain' => 20,
         'site.protocol' => 30,
         'site.visibility' => 40,
+        'site.timezone' => 50,
     ];
 
     usort(
@@ -569,6 +570,7 @@ $renderConfigField = static function (array $field) use (
     $isTagDefaultSetField = $path === 'tag.set';
     $isSiteEnabledField = $path === 'site.visibility';
     $isSiteProtocolField = $path === 'site.protocol';
+    $isSiteTimezoneField = $path === 'site.timezone';
     $isPanelDefaultThemeField = $path === 'panel.theme';
     $isPublicProfilesModeField = $path === 'user.visibility';
     $isShowGroupsField = $path === 'group.visibility';
@@ -813,6 +815,33 @@ $renderConfigField = static function (array $field) use (
             >
                 <option value="https"<?= (string) $field['value'] === 'https' ? ' selected' : '' ?>>https</option>
                 <option value="http"<?= (string) $field['value'] === 'http' ? ' selected' : '' ?>>http</option>
+            </select>
+        <?php elseif ($isSiteTimezoneField): ?>
+            <?php
+            // Build grouped timezone list: group by the first segment (continent/region).
+            $tzSelected = (string) $field['value'];
+            $tzGroups = [];
+            foreach (\DateTimeZone::listIdentifiers(\DateTimeZone::ALL_WITH_BC) as $tzId) {
+                $slash = strpos($tzId, '/');
+                $tzGroup = $slash !== false ? substr($tzId, 0, $slash) : 'Other';
+                $tzGroups[$tzGroup][] = $tzId;
+            }
+            ksort($tzGroups);
+            ?>
+            <select
+                class="form-select font-monospace"
+                id="<?= e($inputId) ?>"
+                name="<?= e($fieldName) ?>"
+            >
+                <!-- Empty value means "use the server's default PHP timezone". -->
+                <option value=""<?= $tzSelected === '' ? ' selected' : '' ?>>— Use Server Default —</option>
+                <?php foreach ($tzGroups as $tzGroupName => $tzIds): ?>
+                    <optgroup label="<?= e($tzGroupName) ?>">
+                        <?php foreach ($tzIds as $tzId): ?>
+                            <option value="<?= e($tzId) ?>"<?= $tzSelected === $tzId ? ' selected' : '' ?>><?= e($tzId) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endforeach; ?>
             </select>
         <?php elseif ($isPanelDefaultThemeField): ?>
             <!-- Default panel theme is constrained to supported panel variants. -->

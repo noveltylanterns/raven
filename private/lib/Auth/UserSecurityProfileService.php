@@ -25,6 +25,7 @@ final class UserSecurityProfileService
      *   email: string,
      *   bio: string,
      *   theme: string,
+     *   timezone: string,
      *   avatar: string|null,
      *   cover_image: string|null,
      *   contact: array<int, array{type: string, value: string}>,
@@ -41,6 +42,8 @@ final class UserSecurityProfileService
             'email' => (string) ($row['email'] ?? ''),
             'bio' => (string) ($row['bio'] ?? ''),
             'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
+            // Empty string means "inherit from site/server default"; never default to UTC.
+            'timezone' => (string) ($row['timezone'] ?? ''),
             'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
                 ? (string) $row['avatar']
                 : null,
@@ -59,6 +62,7 @@ final class UserSecurityProfileService
      *   email: string,
      *   bio?: string,
      *   theme: string,
+     *   timezone?: string,
      *   password: string|null,
      *   contact_profiles?: array<int, array{type: string, value: string}>,
      *   two_factor_methods?: array<int, array<string, mixed>>,
@@ -72,6 +76,7 @@ final class UserSecurityProfileService
      *   email: string,
      *   bio: string,
      *   theme: string,
+     *   timezone: string,
      *   password: string|null,
      *   contact_profiles: array<int, array{type: string, value: string}>,
      *   contact_profiles_encoded: ?string,
@@ -93,6 +98,8 @@ final class UserSecurityProfileService
             'email' => trim((string) ($payload['email'] ?? '')),
             'bio' => trim((string) ($payload['bio'] ?? '')),
             'theme' => trim((string) ($payload['theme'] ?? 'default')),
+            // Empty string is valid and means "inherit from site/server default".
+            'timezone' => trim((string) ($payload['timezone'] ?? '')),
             'password' => $payload['password'] ?? null,
             'contact_profiles' => $contactProfiles,
             'contact_profiles_encoded' => $codec->encodeContactProfiles($contactProfiles),

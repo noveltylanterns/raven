@@ -91,6 +91,21 @@ final class PanelConfigFieldPolicyService
             return $protocol;
         }
 
+        if ($path === 'site.timezone') {
+            $tz = trim($value);
+            // Empty string means "use server default" — valid and intentional.
+            if ($tz === '') {
+                return '';
+            }
+
+            // Reject anything that is not a recognized PHP timezone identifier.
+            if (!in_array($tz, \DateTimeZone::listIdentifiers(\DateTimeZone::ALL_WITH_BC), true)) {
+                throw new \RuntimeException('site.timezone must be a valid timezone identifier or empty.');
+            }
+
+            return $tz;
+        }
+
         if ($path === 'database.driver') {
             $driver = strtolower($value);
             if (!in_array($driver, ['sqlite', 'mysql', 'pgsql'], true)) {

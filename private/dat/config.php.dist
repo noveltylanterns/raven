@@ -22,6 +22,7 @@ return array (
     'name' => 'Raven CMS',
     'visibility' => 'public',
     'theme' => 'raven',
+    'timezone' => '',
   ),
   'meta' =>
   array (
