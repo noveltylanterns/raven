@@ -32,7 +32,7 @@ final class ConfigEditorSchemaService
         'panel.theme' => 'Default Panel Theme',
         'panel.brand_name' => 'Branded Panel Name',
         'panel.brand_logo' => 'Branded Panel Logo',
-        'site.scheduler' => 'Fallback Scheduler',
+        'site.scheduler' => 'Scheduler',
         'site.protocol' => 'Protocol',
         'site.theme' => 'Default Site Theme',
         'site.timezone' => 'Timezone',

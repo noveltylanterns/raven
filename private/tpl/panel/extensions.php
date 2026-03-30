@@ -24,8 +24,8 @@ declare(strict_types=1);
  *   version: string,
  *   description: string,
  *   author: string,
- *   author_url: string,
  *   homepage: string,
+ *   docs: string,
  *   valid: bool,
  *   invalid_reason: string,
  *   enabled: bool,
@@ -121,8 +121,8 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                         $name = (string) ($extension['name'] ?? $directory);
                         $description = (string) ($extension['description'] ?? '');
                         $author = (string) ($extension['author'] ?? '');
-                        $authorUrl = (string) ($extension['author_url'] ?? '');
                         $homepage = (string) ($extension['homepage'] ?? '');
+                        $docs = (string) ($extension['docs'] ?? '');
                         $valid = (bool) ($extension['valid'] ?? false);
                         $invalidReason = (string) ($extension['invalid_reason'] ?? '');
                         $enabled = (bool) ($extension['enabled'] ?? false);
@@ -153,13 +153,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                             data-sort-slug="<?= e($directory) ?>"
                             data-sort-description="<?= e($descriptionLabel) ?>"
                         >
-                            <td>
-                                <?php if ($homepage !== ''): ?>
-                                    <a href="<?= e($homepage) ?>" target="_blank" rel="noopener noreferrer"><?= e($nameLabel) ?></a>
-                                <?php else: ?>
-                                    <?= e($nameLabel) ?>
-                                <?php endif; ?>
-                            </td>
+                            <td><strong><?= e($nameLabel) ?></strong></td>
                             <td><span class="<?= e($typeBadgeClass) ?>"><?= e($typeLabel) ?></span></td>
                             <td><code><?= e($directory) ?></code></td>
                             <td>
@@ -170,6 +164,19 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                             </td>
                             <td class="text-center">
                                 <div class="d-inline-flex align-items-center gap-1">
+                                    <?php if ($docs !== ''): ?>
+                                        <a
+                                            href="<?= e($docs) ?>"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="btn btn-secondary btn-sm"
+                                            aria-label="Read Documentation"
+                                            title="Read Documentation"
+                                        >
+                                            <i class="bi bi-journal-text" aria-hidden="true"></i>
+                                            <span class="visually-hidden">Read Documentation</span>
+                                        </a>
+                                    <?php endif; ?>
                                     <?php if ($canOpenSettings): ?>
                                         <a
                                             href="<?= e($panelTarget) ?>"
@@ -341,22 +348,22 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                             >
                         </div>
                         <div class="col-md-5">
-                            <label for="extension_author_url" class="form-label">Author URL</label>
+                            <label for="extension_homepage" class="form-label">Author URL</label>
                             <input
-                                id="extension_author_url"
+                                id="extension_homepage"
                                 type="url"
-                                name="author_url"
+                                name="homepage"
                                 class="form-control"
                                 maxlength="400"
                                 placeholder="https://example.com/about"
                             >
                         </div>
                         <div class="col-12">
-                            <label for="extension_docs_url" class="form-label">Documentation URL</label>
+                            <label for="extension_docs" class="form-label">Documentation URL</label>
                             <input
-                                id="extension_docs_url"
+                                id="extension_docs"
                                 type="url"
-                                name="docs_url"
+                                name="docs"
                                 class="form-control"
                                 maxlength="400"
                                 placeholder="https://example.com"

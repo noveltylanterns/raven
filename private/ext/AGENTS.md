@@ -1,6 +1,6 @@
 # Raven Extension Agent Guide
 
-UPDATED: 2026-03-29
+UPDATED: 2026-03-30
 NOTE: All paths relative to project root. (../ from the perspective of this directory)
 
 ## Scope
@@ -332,7 +332,8 @@ declare(strict_types=1);
 - `description` (string)
 - `type` (`helper`, `content`, `framework`, `module`, or `system`)
 - `author` (string; displayed in Extension Manager)
-- `homepage` (URL; used for Extension Manager author links)
+- `homepage` (URL; author/publisher link, shown in the extension's own panel header)
+- `docs` (URL; documentation link, shown as an icon-only button in Extension Manager Actions column and in the extension's own panel header)
 - `panel_path` and `panel_section` are legacy keys and are ignored in current routing/nav behavior.
 - Extension panel route/nav identity is derived from extension directory slug.
 - `system_extension` (bool; hides extension from Extensions nav category)
@@ -518,7 +519,7 @@ declare(strict_types=1);
 - sortable headers on data columns where practical
 - `Actions` column present and non-sortable
 - `Actions` column center-aligned
-- Extension Manager columns are currently: `Name`, `Author` (links to `homepage` when provided), `Version`, `Actions`.
+- Extension Manager columns are currently: `Name` (bold plaintext), `Type`, `Slug`, `Description`, `Actions`. The `Actions` column includes (in order): `docs` link (`bi-journal-text`, when `docs` URL is set), Settings, Enable/Disable, Export, Uninstall.
 
 ## Permission And Security Requirements
 - All extension routes must enforce login/access by calling `requirePanelLogin`.

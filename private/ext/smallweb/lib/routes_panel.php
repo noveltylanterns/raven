@@ -92,7 +92,7 @@ return static function (Router $router, array $context): void {
         'version' => '',
         'author' => '',
         'description' => '',
-        'docs_url' => 'https://raven.lanterns.io',
+        'docs' => 'https://raven.lanterns.io',
     ];
     if (is_file($extensionManifestFile)) {
         $manifestRaw = file_get_contents($extensionManifestFile);
@@ -108,11 +108,12 @@ return static function (Router $router, array $context): void {
                 $extensionMeta['author'] = trim((string) ($manifestDecoded['author'] ?? ''));
                 $extensionMeta['description'] = trim((string) ($manifestDecoded['description'] ?? ''));
 
-                $docsUrlRaw = trim((string) ($manifestDecoded['docs_url'] ?? ($manifestDecoded['homepage'] ?? '')));
-                if ($docsUrlRaw !== '' && filter_var($docsUrlRaw, FILTER_VALIDATE_URL) !== false) {
-                    $docsScheme = strtolower((string) parse_url($docsUrlRaw, PHP_URL_SCHEME));
+                // "docs" is the canonical ext.json key; fall back to legacy "docs_url" for old manifests.
+                $docsRaw = trim((string) ($manifestDecoded['docs'] ?? ($manifestDecoded['docs_url'] ?? '')));
+                if ($docsRaw !== '' && filter_var($docsRaw, FILTER_VALIDATE_URL) !== false) {
+                    $docsScheme = strtolower((string) parse_url($docsRaw, PHP_URL_SCHEME));
                     if (in_array($docsScheme, ['http', 'https'], true)) {
-                        $extensionMeta['docs_url'] = $docsUrlRaw;
+                        $extensionMeta['docs'] = $docsRaw;
                     }
                 }
             }

@@ -1,9 +1,9 @@
 {
-  "slug": "smallweb",
-  "name": "Smallweb",
-  "description": "Manage plaintext webroots for finger, gopher, and gemini protocols.",
-  "type": "helper",
-  "author": "Novelty Lanterns",
-  "author_url": "https://raven.lanterns.io",
-  "docs_url": "https://raven.lanterns.io"
+    "slug": "smallweb",
+    "name": "Smallweb",
+    "description": "Manage plaintext webroots for finger, gopher, and gemini protocols.",
+    "type": "helper",
+    "author": "Novelty Lanterns",
+    "homepage": "https://raven.lanterns.io",
+    "docs": "https://raven.lanterns.io"
 }

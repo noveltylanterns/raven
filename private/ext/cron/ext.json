@@ -4,6 +4,6 @@
     "description": "Deploy automated background tasks through Raven's built-in scheduling service.",
     "type": "system",
     "author": "Novelty Lanterns",
-    "author_url": "https://raven.lanterns.io",
-    "docs_url": "https://raven.lanterns.io"
+    "homepage": "https://raven.lanterns.io",
+    "docs": "https://raven.lanterns.io"
 }

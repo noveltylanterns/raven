@@ -5519,38 +5519,40 @@ final class PanelController
         $description = $this->input->text($post['description'] ?? null, 1000);
         $author = $this->input->text($post['author'] ?? null, 120);
 
-        $docsUrlRaw = trim($this->input->text($post['docs_url'] ?? ($post['homepage'] ?? null), 400));
+        // homepage = author/publisher URL (form field: "homepage"; legacy fallback: "author_url")
+        $homepageRaw = trim($this->input->text($post['homepage'] ?? ($post['author_url'] ?? null), 400));
         $homepage = '';
-        if ($docsUrlRaw !== '') {
-            if (filter_var($docsUrlRaw, FILTER_VALIDATE_URL) === false) {
-                $this->flash('error', 'Documentation URL must be a valid absolute URL.');
-                redirect($this->panelUrl('/extensions'));
-            }
-
-            $scheme = strtolower((string) parse_url($docsUrlRaw, PHP_URL_SCHEME));
-            if (!in_array($scheme, ['http', 'https'], true)) {
-                $this->flash('error', 'Documentation URL must use http or https.');
-                redirect($this->panelUrl('/extensions'));
-            }
-
-            $homepage = $docsUrlRaw;
-        }
-
-        $authorUrlRaw = trim($this->input->text($post['author_url'] ?? null, 400));
-        $authorUrl = '';
-        if ($authorUrlRaw !== '') {
-            if (filter_var($authorUrlRaw, FILTER_VALIDATE_URL) === false) {
+        if ($homepageRaw !== '') {
+            if (filter_var($homepageRaw, FILTER_VALIDATE_URL) === false) {
                 $this->flash('error', 'Author URL must be a valid absolute URL.');
                 redirect($this->panelUrl('/extensions'));
             }
 
-            $scheme = strtolower((string) parse_url($authorUrlRaw, PHP_URL_SCHEME));
+            $scheme = strtolower((string) parse_url($homepageRaw, PHP_URL_SCHEME));
             if (!in_array($scheme, ['http', 'https'], true)) {
                 $this->flash('error', 'Author URL must use http or https.');
                 redirect($this->panelUrl('/extensions'));
             }
 
-            $authorUrl = $authorUrlRaw;
+            $homepage = $homepageRaw;
+        }
+
+        // docs = documentation URL (form field: "docs"; legacy fallback: "docs_url")
+        $docsRaw = trim($this->input->text($post['docs'] ?? ($post['docs_url'] ?? null), 400));
+        $docs = '';
+        if ($docsRaw !== '') {
+            if (filter_var($docsRaw, FILTER_VALIDATE_URL) === false) {
+                $this->flash('error', 'Documentation URL must be a valid absolute URL.');
+                redirect($this->panelUrl('/extensions'));
+            }
+
+            $scheme = strtolower((string) parse_url($docsRaw, PHP_URL_SCHEME));
+            if (!in_array($scheme, ['http', 'https'], true)) {
+                $this->flash('error', 'Documentation URL must use http or https.');
+                redirect($this->panelUrl('/extensions'));
+            }
+
+            $docs = $docsRaw;
         }
 
         $generateAgentsFile = isset($post['generate_agents']) && (string) $post['generate_agents'] === '1';
@@ -5578,7 +5580,7 @@ final class PanelController
                 'type' => $type,
                 'author' => $author,
                 'homepage' => $homepage,
-                'author_url' => $authorUrl,
+                'docs' => $docs,
             ], $generateAgentsFile, $generateComposerFile);
         } catch (\Throwable $exception) {
             // Roll back partial writes so failed scaffold attempts do not leave broken extensions.
@@ -6379,8 +6381,8 @@ final class PanelController
      *   version: string,
      *   description: string,
      *   author: string,
-     *   author_url: string,
      *   homepage: string,
+     *   docs: string,
      *   valid: bool,
      *   invalid_reason: string,
      *   enabled: bool,
@@ -6408,8 +6410,8 @@ final class PanelController
      *   version: string,
      *   description: string,
      *   author: string,
-     *   author_url: string,
      *   homepage: string,
+     *   docs: string,
      *   permission_levels: array<int, array{key: string, label: string}>,
      *   default_permission_level: string
      * }
@@ -6652,7 +6654,7 @@ final class PanelController
      *   type: string,
      *   author: string,
      *   homepage: string,
-     *   author_url: string
+     *   docs: string
      * } $meta
      */
     private function createExtensionSkeleton(

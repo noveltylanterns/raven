@@ -2,6 +2,13 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### March 30, 2026 — extension manifest key rename + Extension Manager UI
+
+- **`ext.json` manifest keys renamed**: `author_url` → `homepage` (author/publisher URL); `docs_url` → `docs` (documentation URL). Legacy keys remain readable as fallbacks in all extension route bootstraps and `ExtensionCatalogService`. All seven stock extension manifests updated.
+- **Extension Manager name column**: Changed from a hyperlink to bold plaintext. Extension names no longer link to `homepage`.
+- **Extension Manager docs button**: Added an icon-only `bi-journal-text` button at the start of the Actions column. Visible only when the extension's `docs` URL is set. Opens docs in a new tab.
+- **Create Extension modal**: Form field names updated to match new keys (`homepage` for Author URL, `docs` for Documentation URL). Controller reads new names with legacy fallback.
+
 ### March 29, 2026 — fallback scheduler
 
 - **`site.scheduler` config key** (string, default `always`): controls the request-based fallback scheduler. `always` — fires `SchedulerRegistry::runDue()` after every response on both public and panel routes; `panel` — fires on panel routes only; `off` — disables the fallback entirely (manual crontab required). Non-blocking on PHP-FPM via `fastcgi_finish_request()`, synchronous-after-output on other SAPIs. Throttled to one attempt per 60 s via a shared `.tmp/scheduler_last_run` timestamp file. Config editor Basic tab shows a dropdown with a warning note when set to Off.

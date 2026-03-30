@@ -14,7 +14,7 @@ use function Raven\Core\Support\e;
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Scheduled Tasks'));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
-$extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.lanterns.io'));
+$extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lanterns.io'));
 $taskCount = 0;
 $enabledCount = 0;
 $dueCount = 0;
@@ -89,14 +89,18 @@ $taskTemplateId = 'cron-task-template';
                 <div class="col-md-4"><strong>Due Now</strong><br><?= e((string) $dueCount) ?></div>
             </div>
 
-            <div class="alert alert-info small">
-                <?php if (($schedulerMode ?? 'always') === 'always'): ?>
-                    Raven's fallback scheduler is active for both public and panel traffic. A server cron pointed at <code>php private/bin/rvn-cron run</code> is still recommended for low-traffic installs.
-                <?php elseif (($schedulerMode ?? 'always') === 'panel'): ?>
-                    Raven's fallback scheduler is active on panel traffic only. If panel visits are irregular, point server cron at <code>php private/bin/rvn-cron run</code>.
-                <?php else: ?>
-                    These tasks will only run when you invoke <code>php private/bin/rvn-cron run</code> manually or from server cron, unless you re-enable <code>site.scheduler</code>.
-                <?php endif; ?>
+            <p class="small"><b>Important Note:</b> Raven has a scheduling service which is run whenever someone loads the site. It is useful for quick scaffolding, but it leaves a lot to be desired in production environments. If your traffic is slow or irregular, your tasks may not execute on-time. In high-traffic environments, this is a lot of extra CPU load.</p>
+
+            <p class="small">To solve this issue, point your host's built-in crontab service at <code>php private/bin/rvn-cron run</code> and turn the Scheduler "Off" in your System Configuration.</p>
+
+            <div class="alert alert-info">
+            <?php if (($schedulerMode ?? 'always') === 'always'): ?>
+                <b>Status:</b> Fallback scheduler is active for both public and panel traffic.
+            <?php elseif (($schedulerMode ?? 'always') === 'panel'): ?>
+                <b>Status:</b> Fallback scheduler is active on panel traffic only.
+            <?php else: ?>
+                <b>Status:</b> Fallback scheduler is inactive.
+            <?php endif; ?>
             </div>
 
             <div id="<?= e($taskListId) ?>">

@@ -14,7 +14,7 @@ use function Raven\Core\Support\e;
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Repositories'));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
-$extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.lanterns.io'));
+$extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lanterns.io'));
 ?>
 <header class="card mb-3">
     <div class="card-body">

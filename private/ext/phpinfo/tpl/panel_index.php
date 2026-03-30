@@ -12,7 +12,7 @@
 declare(strict_types=1);
 
 /** @var array<string, string> $site */
-/** @var array{name?: string, version?: string, author?: string, description?: string, docs_url?: string} $extensionMeta */
+/** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string} $extensionMeta */
 /** @var string $csrfField */
 /** @var string $phpInfoHtml */
 /** @var string $phpInfoCss */
@@ -23,7 +23,7 @@ $extensionName = trim((string) ($extensionMeta['name'] ?? 'PHP Info'));
 $extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
-$extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.lanterns.io'));
+$extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lanterns.io'));
 ?>
 <header class="card">
     <div class="card-body">

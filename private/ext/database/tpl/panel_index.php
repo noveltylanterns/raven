@@ -25,7 +25,7 @@ declare(strict_types=1);
  *   mysql: array<string, string>,
  *   pgsql: array<string, string>
  * } $databaseSummary */
-/** @var array{name?: string, version?: string, author?: string, description?: string, docs_url?: string} $extensionMeta */
+/** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string} $extensionMeta */
 
 use function Raven\Core\Support\e;
 
@@ -34,7 +34,7 @@ $extensionName = trim((string) ($extensionMeta['name'] ?? 'Database Manager'));
 $extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
-$extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.lanterns.io'));
+$extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lanterns.io'));
 $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
 $adminerPath = trim((string) ($adminerPath ?? ''));
 ?>
@@ -98,64 +98,64 @@ $adminerPath = trim((string) ($adminerPath ?? ''));
                 <table class="table table-sm align-middle mb-0">
                     <tbody>
                     <tr>
-                        <th scope="row" style="width: 220px;">Active Driver</th>
+                        <th scope="row" class="h5" style="width: 220px;">Active Driver</th>
                         <td><code><?= e($driver) ?></code></td>
                     </tr>
                     <tr>
-                        <th scope="row">Table Prefix</th>
+                        <th scope="row" class="h5">Table Prefix</th>
                         <td><code><?= e((string) ($databaseSummary['prefix'] ?? '')) ?></code></td>
                     </tr>
 
                     <?php if ($driver === 'sqlite'): ?>
                         <tr>
-                            <th scope="row">SQLite Path</th>
+                            <th scope="row" class="h5">SQLite Path</th>
                             <td><code><?= e((string) ($databaseSummary['sqlite_path'] ?? '')) ?></code></td>
                         </tr>
                         <tr>
-                            <th scope="row">SQLite Database</th>
+                            <th scope="row" class="h5">SQLite Database</th>
                             <td>
                                 <?php $sqliteFile = trim((string) ($databaseSummary['sqlite_file'] ?? '')); ?>
                                 <?php if ($sqliteFile === ''): ?>
                                     <span class="text-muted">&lt;none&gt;</span>
                                 <?php else: ?>
-                                    <div><code><?= e($sqliteFile) ?></code> <span class="text-muted">(core + extension tables)</span></div>
+                                    <div><code><?= e($sqliteFile) ?></code></div>
                                 <?php endif; ?>
                             </td>
                         </tr>
                     <?php elseif ($driver === 'mysql'): ?>
                         <?php $mysql = (array) ($databaseSummary['mysql'] ?? []); ?>
                         <tr>
-                            <th scope="row">MySQL Host</th>
+                            <th scope="row" class="h5">MySQL Host</th>
                             <td><code><?= e((string) ($mysql['host'] ?? '')) ?></code></td>
                         </tr>
                         <tr>
-                            <th scope="row">MySQL Port</th>
+                            <th scope="row" class="h5">MySQL Port</th>
                             <td><code><?= e((string) ($mysql['port'] ?? '')) ?></code></td>
                         </tr>
                         <tr>
-                            <th scope="row">MySQL Database</th>
+                            <th scope="row" class="h5">MySQL Database</th>
                             <td><code><?= e((string) ($mysql['name'] ?? '')) ?></code></td>
                         </tr>
                         <tr>
-                            <th scope="row">MySQL User</th>
+                            <th scope="row" class="h5">MySQL User</th>
                             <td><code><?= e((string) ($mysql['user'] ?? '')) ?></code></td>
                         </tr>
                     <?php elseif ($driver === 'pgsql'): ?>
                         <?php $pgsql = (array) ($databaseSummary['pgsql'] ?? []); ?>
                         <tr>
-                            <th scope="row">PostgreSQL Host</th>
+                            <th scope="row" class="h5">PostgreSQL Host</th>
                             <td><code><?= e((string) ($pgsql['host'] ?? '')) ?></code></td>
                         </tr>
                         <tr>
-                            <th scope="row">PostgreSQL Port</th>
+                            <th scope="row" class="h5">PostgreSQL Port</th>
                             <td><code><?= e((string) ($pgsql['port'] ?? '')) ?></code></td>
                         </tr>
                         <tr>
-                            <th scope="row">PostgreSQL Database</th>
+                            <th scope="row" class="h5">PostgreSQL Database</th>
                             <td><code><?= e((string) ($pgsql['name'] ?? '')) ?></code></td>
                         </tr>
                         <tr>
-                            <th scope="row">PostgreSQL User</th>
+                            <th scope="row" class="h5">PostgreSQL User</th>
                             <td><code><?= e((string) ($pgsql['user'] ?? '')) ?></code></td>
                         </tr>
                     <?php endif; ?>

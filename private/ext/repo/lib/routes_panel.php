@@ -100,7 +100,7 @@ return static function (Router $router, array $context): void {
         'version' => '',
         'author' => '',
         'description' => '',
-        'docs_url' => 'https://raven.lanterns.io',
+        'docs' => 'https://raven.lanterns.io',
     ];
     if (is_file($manifestPath)) {
         $manifestRaw = file_get_contents($manifestPath);
@@ -112,9 +112,10 @@ return static function (Router $router, array $context): void {
                 $extensionMeta['version'] = trim((string) ($manifestDecoded['version'] ?? ''));
                 $extensionMeta['author'] = trim((string) ($manifestDecoded['author'] ?? ''));
                 $extensionMeta['description'] = trim((string) ($manifestDecoded['description'] ?? ''));
-                $docsUrl = trim((string) ($manifestDecoded['docs_url'] ?? ''));
+                // "docs" is the canonical ext.json key; fall back to legacy "docs_url" for old manifests.
+                $docsUrl = trim((string) ($manifestDecoded['docs'] ?? ($manifestDecoded['docs_url'] ?? '')));
                 if ($docsUrl !== '') {
-                    $extensionMeta['docs_url'] = $docsUrl;
+                    $extensionMeta['docs'] = $docsUrl;
                 }
             }
         }

@@ -20,7 +20,7 @@ final class ExtensionScaffoldService
      *   type: string,
      *   author: string,
      *   homepage: string,
-     *   author_url: string
+     *   docs: string
      * } $meta
      */
     public function createSkeleton(
@@ -165,7 +165,7 @@ final class ExtensionScaffoldService
      *   type: string,
      *   author: string,
      *   homepage: string,
-     *   author_url: string
+     *   docs: string
      * } $meta
      */
     private function renderExtensionManifestJson(array $meta): string
@@ -191,12 +191,12 @@ final class ExtensionScaffoldService
             $manifest['author'] = $meta['author'];
         }
 
-        if ($meta['author_url'] !== '') {
-            $manifest['author_url'] = $meta['author_url'];
+        if ($meta['homepage'] !== '') {
+            $manifest['homepage'] = $meta['homepage'];
         }
 
-        if ($meta['homepage'] !== '') {
-            $manifest['docs_url'] = $meta['homepage'];
+        if ($meta['docs'] !== '') {
+            $manifest['docs'] = $meta['docs'];
         }
 
         $encoded = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
@@ -215,7 +215,7 @@ final class ExtensionScaffoldService
      *   name: string,
      *   description: string,
      *   author: string,
-     *   author_url: string
+     *   homepage: string
      * } $meta
      */
     private function renderExtensionComposerSkeleton(array $meta): string
@@ -237,14 +237,14 @@ final class ExtensionScaffoldService
         ];
 
         $authorName = trim((string) ($meta['author'] ?? ''));
-        $authorUrl = trim((string) ($meta['author_url'] ?? ''));
-        if ($authorName !== '' || $authorUrl !== '') {
+        $authorHomepage = trim((string) ($meta['homepage'] ?? ''));
+        if ($authorName !== '' || $authorHomepage !== '') {
             $author = [];
             if ($authorName !== '') {
                 $author['name'] = $authorName;
             }
-            if ($authorUrl !== '') {
-                $author['homepage'] = $authorUrl;
+            if ($authorHomepage !== '') {
+                $author['homepage'] = $authorHomepage;
             }
             $composer['authors'] = [$author];
         }
@@ -404,7 +404,7 @@ return static function (Router $router, array $context): void {
         'version' => '',
         'author' => '',
         'description' => '',
-        'docs_url' => 'https://raven.lanterns.io',
+        'docs' => 'https://raven.lanterns.io',
     ];
     if (is_file($extensionManifestFile)) {
         $manifestRaw = file_get_contents($extensionManifestFile);
@@ -421,11 +421,12 @@ return static function (Router $router, array $context): void {
                 $extensionMeta['author'] = trim((string) ($manifestDecoded['author'] ?? ''));
                 $extensionMeta['description'] = trim((string) ($manifestDecoded['description'] ?? ''));
 
-                $docsUrlRaw = trim((string) ($manifestDecoded['docs_url'] ?? ($manifestDecoded['homepage'] ?? '')));
-                if ($docsUrlRaw !== '' && filter_var($docsUrlRaw, FILTER_VALIDATE_URL) !== false) {
-                    $docsScheme = strtolower((string) parse_url($docsUrlRaw, PHP_URL_SCHEME));
+                // "docs" is the canonical ext.json key; fall back to legacy "docs_url" for old manifests.
+                $docsRaw = trim((string) ($manifestDecoded['docs'] ?? ($manifestDecoded['docs_url'] ?? '')));
+                if ($docsRaw !== '' && filter_var($docsRaw, FILTER_VALIDATE_URL) !== false) {
+                    $docsScheme = strtolower((string) parse_url($docsRaw, PHP_URL_SCHEME));
                     if (in_array($docsScheme, ['http', 'https'], true)) {
-                        $extensionMeta['docs_url'] = $docsUrlRaw;
+                        $extensionMeta['docs'] = $docsRaw;
                     }
                 }
             }
@@ -829,7 +830,7 @@ PHP;
 declare(strict_types=1);
 
 /** @var array<string, string> $site */
-/** @var array{name?: string, version?: string, author?: string, description?: string, docs_url?: string, directory?: string} $extensionMeta */
+/** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string, directory?: string} $extensionMeta */
 /** @var string $csrfField */
 
 use function Raven\Core\Support\e;
@@ -838,7 +839,7 @@ $extensionName = trim((string) ($extensionMeta['name'] ?? 'Extension'));
 $extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
-$extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.lanterns.io'));
+$extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lanterns.io'));
 ?>
 <div class="card mb-3">
     <div class="card-body">

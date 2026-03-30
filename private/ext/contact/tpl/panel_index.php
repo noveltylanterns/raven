@@ -21,7 +21,7 @@ declare(strict_types=1);
 /** @var string $savePath */
 /** @var string $deletePath */
 /** @var string $csrfField */
-/** @var array{name?: string, version?: string, author?: string, description?: string, docs_url?: string} $extensionMeta */
+/** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string} $extensionMeta */
 
 use function Raven\Core\Support\e;
 
@@ -29,7 +29,7 @@ $extensionName = trim((string) ($extensionMeta['name'] ?? 'Contact Forms'));
 $extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
-$extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.lanterns.io'));
+$extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lanterns.io'));
 ?>
 <header class="card">
     <div class="card-body">

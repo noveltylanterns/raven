@@ -18,7 +18,7 @@ declare(strict_types=1);
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 /** @var string $csrfField */
-/** @var array{name?: string, version?: string, author?: string, description?: string, docs_url?: string} $extensionMeta */
+/** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string} $extensionMeta */
 /** @var string $subdir */
 /** @var \Raven\Smallweb\SmallwebService $svc */
 

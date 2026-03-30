@@ -23,7 +23,7 @@ $formatTimestamp = static function (?string $value): string {
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Repositories'));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
-$extensionDocsUrl = trim((string) ($extensionMeta['docs_url'] ?? 'https://raven.lanterns.io'));
+$extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lanterns.io'));
 $selectedPublicBranch = trim((string) ($repo['public_branch'] ?? ''));
 if ($selectedPublicBranch === '') {
     $selectedPublicBranch = trim((string) ($repo['default_branch'] ?? ''));
