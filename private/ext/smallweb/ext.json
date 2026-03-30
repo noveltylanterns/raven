@@ -1,7 +1,6 @@
 {
   "slug": "smallweb",
   "name": "Smallweb",
-  "version": "0.1.0",
   "description": "Manage plaintext webroots for finger, gopher, and gemini protocols.",
   "type": "helper",
   "author": "Novelty Lanterns",

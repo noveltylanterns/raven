@@ -107,7 +107,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                     <tr>
                         <th scope="col" data-sort-key="name" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Name</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="type" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Type</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="author" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Author</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+                        <th scope="col" data-sort-key="slug" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Slug</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" data-sort-key="description" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Description</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
                         <th scope="col" class="text-center">Actions</th>
                     </tr>
@@ -134,16 +134,23 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                             : 'Uninstall this extension and remove its opted-in data? This cannot be undone.';
                         $nameLabel = $name !== '' ? $name : $directory;
                         $typeLabel = $type !== '' ? $type : 'content';
+                        $typeBadgeClass = match ($typeLabel) {
+                            'content'   => 'badge text-bg-primary',
+                            'module'    => 'badge text-bg-success',
+                            'system'    => 'badge text-bg-danger',
+                            'framework' => 'badge text-bg-warning',
+                            'helper'    => 'badge text-bg-info',
+                            default     => 'badge text-bg-secondary',
+                        };
                         $panelTarget = $extensionPanelPath !== '' ? ($panelBase . '/' . ltrim($extensionPanelPath, '/')) : '';
                         $canOpenSettings = $enabled && $panelTarget !== '';
-                        $authorLabel = $author !== '' ? $author : '<none>';
                         $descriptionLabel = $description !== '' ? $description : '<none>';
                         ?>
                         <tr
                             data-extensions-row="1"
                             data-sort-name="<?= e($nameLabel) ?>"
                             data-sort-type="<?= e($typeLabel) ?>"
-                            data-sort-author="<?= e($authorLabel) ?>"
+                            data-sort-slug="<?= e($directory) ?>"
                             data-sort-description="<?= e($descriptionLabel) ?>"
                         >
                             <td>
@@ -153,16 +160,8 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                     <?= e($nameLabel) ?>
                                 <?php endif; ?>
                             </td>
-                            <td><span class="fw-normal"><?= e($typeLabel) ?></span></td>
-                            <td>
-                                <?php if ($author !== '' && $authorUrl !== ''): ?>
-                                    <a href="<?= e($authorUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e($author) ?></a>
-                                <?php elseif ($author !== ''): ?>
-                                    <?= e($author) ?>
-                                <?php else: ?>
-                                    <?= e('<none>') ?>
-                                <?php endif; ?>
-                            </td>
+                            <td><span class="<?= e($typeBadgeClass) ?>"><?= e($typeLabel) ?></span></td>
+                            <td><code><?= e($directory) ?></code></td>
                             <td>
                                 <?= e($descriptionLabel) ?>
                                 <?php if (!$valid && $invalidReason !== ''): ?>
@@ -450,7 +449,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
         var sortAttrByKey = {
             name: 'data-sort-name',
             type: 'data-sort-type',
-            author: 'data-sort-author',
+            slug: 'data-sort-slug',
             description: 'data-sort-description'
         };
         function sortValue(row, key) {

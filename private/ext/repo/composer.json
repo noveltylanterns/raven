@@ -1,0 +1,6 @@
+{
+    "name": "raven/repo",
+    "description": "Repositories extension for Raven CMS.",
+    "type": "library",
+    "require": {}
+}

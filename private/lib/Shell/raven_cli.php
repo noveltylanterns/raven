@@ -2257,7 +2257,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 throw new RuntimeException('Extension slug is invalid.');
             }
 
-            if (in_array($slug, ['contact', 'database', 'phpinfo', 'signups', 'smallweb'], true)) {
+            if (in_array($slug, ['contact', 'cron', 'database', 'phpinfo', 'repo', 'signups', 'smallweb'], true)) {
                 throw new RuntimeException('Stock extension cannot be uninstalled: ' . $slug);
             }
 

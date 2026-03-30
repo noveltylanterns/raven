@@ -1,0 +1,6 @@
+{
+    "name": "raven/cron",
+    "description": "Scheduled Tasks extension for Raven CMS.",
+    "type": "library",
+    "require": {}
+}

@@ -1,0 +1,135 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/ext/repo/bin/rvn-repo
+ * CLI companion for the Repositories extension.
+ * Docs: /private/ext/repo/AGENTS.md
+ */
+
+declare(strict_types=1);
+
+use Raven\Repo\RepoService;
+
+// Resolve the real script location first, then walk upward until Raven's bootstrap
+// file is found so the tool works both from `private/ext/repo/bin/` and from the
+// `private/bin/` symlink provisioned by extension `bin` storage.
+$scriptPath = realpath(__FILE__) ?: __FILE__;
+$root = '';
+$search = dirname($scriptPath);
+for ($depth = 0; $depth < 8; $depth += 1) {
+    if (is_file($search . '/private/raven.php')) {
+        $root = $search;
+        break;
+    }
+
+    $parent = dirname($search);
+    if ($parent === $search) {
+        break;
+    }
+    $search = $parent;
+}
+
+if ($root === '') {
+    fwrite(STDERR, "Could not locate the Raven project root.\n");
+    exit(1);
+}
+$rvn = require $root . '/private/raven.php';
+
+/** @var mixed $rawExtensionServices */
+$rawExtensionServices = $rvn['extension_services'] ?? [];
+/** @var mixed $rawRepoServices */
+$rawRepoServices = is_array($rawExtensionServices) ? ($rawExtensionServices['repo'] ?? []) : [];
+/** @var mixed $repoServiceRaw */
+$repoServiceRaw = is_array($rawRepoServices) ? ($rawRepoServices['service'] ?? null) : null;
+if (!$repoServiceRaw instanceof RepoService) {
+    fwrite(STDERR, "Repo extension service is unavailable. Ensure the extension is enabled before using this tool.\n");
+    exit(1);
+}
+
+$service = $repoServiceRaw;
+$args = array_slice($_SERVER['argv'] ?? [], 1);
+$command = strtolower(trim((string) ($args[0] ?? 'help')));
+$options = [];
+foreach ($args as $argument) {
+    if (!is_string($argument) || !str_starts_with($argument, '--')) {
+        continue;
+    }
+
+    $pair = explode('=', substr($argument, 2), 2);
+    $options[strtolower(trim($pair[0]))] = isset($pair[1]) ? trim($pair[1]) : '1';
+}
+
+$printHelp = static function (): void {
+    echo "Repo extension CLI\n\n";
+    echo "Commands:\n";
+    echo "  list\n";
+    echo "  sync --slug=<repo-slug>\n";
+    echo "  sync --all\n";
+    echo "  logs [--slug=<repo-slug>]\n";
+    echo "  help\n";
+};
+
+switch ($command) {
+    case 'list':
+        foreach ($service->repoList() as $repo) {
+            $slug = (string) ($repo['slug'] ?? '');
+            $label = (string) ($repo['label'] ?? $slug);
+            $updated = (string) ($repo['last_successful_sync_at'] ?? 'never');
+            echo $slug . "\t" . $label . "\t" . $updated . "\n";
+        }
+        exit(0);
+
+    case 'sync':
+        if (!empty($options['all'])) {
+            $exitCode = 0;
+            foreach ($service->repoList() as $repo) {
+                $slug = (string) ($repo['slug'] ?? '');
+                if ($slug === '') {
+                    continue;
+                }
+
+                try {
+                    $service->syncRepo($slug);
+                    echo "synced\t" . $slug . "\n";
+                } catch (Throwable $exception) {
+                    fwrite(STDERR, "failed\t" . $slug . "\t" . $exception->getMessage() . "\n");
+                    $exitCode = 1;
+                }
+            }
+            exit($exitCode);
+        }
+
+        $slug = trim((string) ($options['slug'] ?? ''));
+        if ($slug === '') {
+            fwrite(STDERR, "Missing required option: --slug=<repo-slug>\n");
+            exit(1);
+        }
+
+        try {
+            $service->syncRepo($slug);
+            echo "synced\t" . $slug . "\n";
+            exit(0);
+        } catch (Throwable $exception) {
+            fwrite(STDERR, "failed\t" . $slug . "\t" . $exception->getMessage() . "\n");
+            exit(1);
+        }
+
+    case 'logs':
+        $slug = trim((string) ($options['slug'] ?? ''));
+        foreach ($service->logs($slug !== '' ? $slug : null, 100) as $row) {
+            echo (string) ($row['time'] ?? '')
+                . "\t" . (string) ($row['level'] ?? '')
+                . "\t" . (string) ($row['slug'] ?? '')
+                . "\t" . (string) ($row['event'] ?? '')
+                . "\t" . (string) ($row['message'] ?? '')
+                . "\n";
+        }
+        exit(0);
+
+    case 'help':
+    default:
+        $printHelp();
+        exit($command === 'help' ? 0 : 1);
+}

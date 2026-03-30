@@ -1,0 +1,9 @@
+{
+    "slug": "repo",
+    "name": "Repositories",
+    "description": "Mirror Git repositories into Raven with optional public browsing.",
+    "type": "module",
+    "author": "Novelty Lanterns",
+    "author_url": "https://raven.lanterns.io",
+    "docs_url": "https://raven.lanterns.io"
+}

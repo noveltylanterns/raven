@@ -499,7 +499,7 @@ declare(strict_types=1);
 
 ## Deletion/Protection Rules
 - Stock extension directories are protected from file removal during uninstall.
-- Current stock list: `contact`, `database`, `phpinfo`, `signups`.
+- Current stock list: `contact`, `cron`, `database`, `phpinfo`, `repo`, `signups`, `smallweb`.
 - Enabled extensions must be disabled before uninstall.
 
 ## Extension Storage Contract

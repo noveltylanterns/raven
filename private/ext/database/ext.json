@@ -5,6 +5,5 @@
     "type": "system",
     "author": "Novelty Lanterns",
     "author_url": "https://raven.lanterns.io",
-    "docs_url": "https://raven.lanterns.io",
-    "entrypoint": "adminer.php"
+    "docs_url": "https://raven.lanterns.io"
 }
