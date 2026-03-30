@@ -576,7 +576,7 @@ if (!$dispatchResult->isHandled()) {
 // 60 s via a .tmp timestamp file shared across both public and panel entrypoints.
 // Operators who prefer to manage their own server crontab can disable this via site.scheduler.
 if ($rvn['config']->get('site.scheduler', 'always') === 'always') {
-    $schedulerStampFile = dirname(__DIR__) . '/.tmp/scheduler_last_run';
+    $schedulerStampFile = dirname(__DIR__) . '/private/dat/scheduler_last_run';
     $lastRun = is_file($schedulerStampFile) ? (int) @file_get_contents($schedulerStampFile) : 0;
     if (time() - $lastRun >= 60) {
         @file_put_contents($schedulerStampFile, (string) time());
@@ -585,6 +585,6 @@ if ($rvn['config']->get('site.scheduler', 'always') === 'always') {
         if (function_exists('fastcgi_finish_request')) {
             fastcgi_finish_request();
         }
-        $rvn['scheduler']->runDue();
+        $rvn['scheduler']->runDue(['root' => dirname(__DIR__), 'rvn' => $rvn]);
     }
 }

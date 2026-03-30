@@ -1205,13 +1205,13 @@ if (!$dispatchResult->isHandled()) {
 // Shared timestamp file means whichever entrypoint receives the next request after the
 // 60 s window fires the scheduler — no double-runs between public and panel traffic.
 if (in_array($rvn['config']->get('site.scheduler', 'always'), ['always', 'panel'], true)) {
-    $schedulerStampFile = dirname(__DIR__) . '/.tmp/scheduler_last_run';
+    $schedulerStampFile = dirname(__DIR__) . '/private/dat/scheduler_last_run';
     $lastRun = is_file($schedulerStampFile) ? (int) @file_get_contents($schedulerStampFile) : 0;
     if (time() - $lastRun >= 60) {
         @file_put_contents($schedulerStampFile, (string) time());
         if (function_exists('fastcgi_finish_request')) {
             fastcgi_finish_request();
         }
-        $rvn['scheduler']->runDue();
+        $rvn['scheduler']->runDue(['root' => dirname(__DIR__), 'rvn' => $rvn]);
     }
 }
