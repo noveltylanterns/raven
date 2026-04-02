@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Routing;
+namespace Raven\Lib\Http;
 
 /**
  * Shared redirect-target allowlist policy.

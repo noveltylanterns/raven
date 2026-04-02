@@ -6,6 +6,7 @@ namespace Raven\Lib\Routing;
 
 use Raven\Core\Config;
 use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Panel\PanelUrl;
 use Raven\Lib\Security\InputSanitizer;
 
 /**

@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Routing;
+namespace Raven\Lib\Channel;
 
+use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Taxonomy\TaxonomySetRecordPolicy;
 
 /**

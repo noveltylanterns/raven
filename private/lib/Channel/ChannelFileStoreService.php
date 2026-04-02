@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Channel;
 
-use Raven\Lib\Routing\ChannelRecordPolicy;
+use Raven\Lib\Channel\ChannelRecordPolicy;
 use RuntimeException;
 
 /**

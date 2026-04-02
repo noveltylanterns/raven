@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Routing;
+namespace Raven\Lib\Panel;
 
 use Raven\Core\Config;
+use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\ThemeCatalogService;
 

@@ -18,7 +18,7 @@ use Raven\Lib\Auth\LoginChallengeWorkflowService;
 use Raven\Lib\Auth\LoginUiStateService;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\SessionFlash;
-use Raven\Lib\Routing\PanelUrl;
+use Raven\Lib\Panel\PanelUrl;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;

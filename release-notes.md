@@ -2,6 +2,14 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 1, 2026 — lib/ domain cleanup: Routing/ misfits moved
+
+- **`ChannelRecordPolicy` + `ChannelContextService`** moved from `private/lib/Routing/` to `private/lib/Channel/` (`Raven\Lib\Channel`). These classes own channel content-domain policy (root channel constants, slug validation, editor override normalization, channel row context hydration) — not URL dispatch logic.
+- **`PanelEditorTabService` + `PanelUrl` + `PanelRoutingPreviewService`** moved from `private/lib/Routing/` to `private/lib/Panel/` (`Raven\Lib\Panel`). These own panel UI navigation concerns (tab normalization, tab-preserving URL builders, panel path resolution, routing-preview derivations).
+- **`RedirectTargetValidator`** moved from `private/lib/Routing/` to `private/lib/Http/` (`Raven\Lib\Http`). This owns HTTP URL allowlist policy, not URL dispatch.
+- All callers updated (`ChannelRepository`, `ChannelFileStoreService`, `PageRepository`, `RedirectRepository`, `TaxonomyLookupRepository`, `PanelController`, `PublicController`, `AuthController`). Same-namespace callers in `Routing/` (`RoutingInventoryBuilder`, `RouteConfigService`) received explicit `use` statements for the moved classes.
+- `docs/Filetree.md` updated: `Channel/`, `Panel/`, and `Http/` subsections added; `Routing/` description narrowed to URL dispatch only.
+
 ### April 1, 2026 — bug sweep: form visibility, code blocks, template tags, storage path
 
 - **Contact/Signups form save visibility fix**: `ContactFormRepository::persistForms()` and `SignupFormRepository::persistForms()` now call `opcache_invalidate()` after writing `forms.php`. PHP's opcode cache was serving stale bytecode on the redirect following a save, causing newly created forms to be invisible until a manual page reload. Same fix applied to the schema init writes in both extensions' `lib/schema.php`.

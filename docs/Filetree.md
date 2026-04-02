@@ -91,14 +91,20 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 
 - `private/lib/Auth/`
   - Auth, permission masks, login/2FA, panel ACL catalogs, and related user/group helpers.
+- `private/lib/Channel/`
+  - Channel record normalization policy, root channel constants, slug validation, and channel-context hydration helpers. (`ChannelRecordPolicy`, `ChannelContextService`, `ChannelFileStoreService`.)
 - `private/lib/Config/`
   - Config parsing, validation, editor schema/defaults, and config file persistence.
 - `private/lib/Database/`
   - DB connection, table resolution, schema ensure, introspection, and profiling helpers.
 - `private/lib/Extension/`
   - Extension cataloging, manifests, state, storage provisioning, and scaffolding.
+- `private/lib/Http/`
+  - HTTP-layer helpers: response dispatch, session flash, request context resolution, upload normalization, and redirect-target validation. (`RedirectTargetValidator` enforces the http/https/root-path allowlist.)
+- `private/lib/Panel/`
+  - Panel UI helpers: tab normalization, tab-preserving URL builders, panel path resolution, and routing-preview derivations. (`PanelUrl`, `PanelEditorTabService`, `PanelRoutingPreviewService`, `PanelPageAuthorOptionBuilder`.)
 - `private/lib/Routing/`
-  - Route config, channel/page routing policy, routing inventory, and URL helpers.
+  - URL dispatch policy: channel/page route modes and segment builders, routing inventory, and route-config helpers. Does not own channel domain policy or panel navigation — those live in `Channel/` and `Panel/`.
 - `private/lib/Taxonomy/`
   - File-backed taxonomy-set policies and persistence helpers shared by channels/categories/tags.
 - `private/lib/View/`

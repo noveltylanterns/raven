@@ -19,8 +19,8 @@ use Raven\Lib\Content\PageTaxonomyAssignmentService;
 use Raven\Lib\Content\PageTaxonomyQueryService;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 use Raven\Lib\Media\PageEditorGalleryHydrator;
-use Raven\Lib\Routing\ChannelRecordPolicy;
-use Raven\Lib\Routing\ChannelContextService;
+use Raven\Lib\Channel\ChannelContextService;
+use Raven\Lib\Channel\ChannelRecordPolicy;
 use Raven\Lib\Routing\PathScopeLookupService;
 use RuntimeException;
 

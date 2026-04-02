@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Routing;
 
+use Raven\Lib\Channel\ChannelRecordPolicy;
 use Raven\Lib\Security\InputSanitizer;
 
 /**

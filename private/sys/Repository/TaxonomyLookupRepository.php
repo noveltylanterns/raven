@@ -16,7 +16,7 @@ namespace Raven\Repository;
 use PDO;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 use Raven\Lib\Media\TaxonomyImagePathResolver;
-use Raven\Lib\Routing\ChannelContextService;
+use Raven\Lib\Channel\ChannelContextService;
 
 /**
  * Lookup repository for channel/category/tag rows and taxonomy option sets.

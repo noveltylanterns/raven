@@ -14,7 +14,7 @@ namespace Raven\Repository;
 use PDO;
 use Raven\Lib\Channel\ChannelFileStoreService;
 use Raven\Lib\Database\Runtime\TableNameResolver;
-use Raven\Lib\Routing\ChannelRecordPolicy;
+use Raven\Lib\Channel\ChannelRecordPolicy;
 use RuntimeException;
 
 /**

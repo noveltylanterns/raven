@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Routing;
+namespace Raven\Lib\Panel;
 
 use Raven\Lib\Security\InputSanitizer;
 
