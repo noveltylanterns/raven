@@ -26,9 +26,9 @@ final class PublicPageBodyRenderer
         $content = str_replace("\0", '', $content);
 
         return match ($editorMode) {
-            'plaintext' => '<div class="raven-page-body-plaintext" style="white-space: pre-wrap;">'
-                . $this->escapeHtml($content)
-                . '</div>',
+            // Plaintext blocks use a raw textarea in the editor; their content is authored HTML
+            // and must render the same way TinyMCE blocks do — not escaped to literal text.
+            'plaintext' => $renderEmbeddedForms($content),
             'autobr' => '<div class="raven-page-body-autobr">'
                 . $this->escapeNewlinesAsBreaks($content)
                 . '</div>',

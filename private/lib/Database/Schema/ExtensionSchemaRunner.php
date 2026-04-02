@@ -66,7 +66,7 @@ final class ExtensionSchemaRunner
                 $tableStem = $this->tables->resolve($driver, $prefix, 'ext_' . $directory);
                 $storageLocalPath = $root . '/private/dat/ext/' . $directory;
                 $storagePanelPath = $root . '/panel/ext/' . $directory;
-                $storagePublicPath = $root . '/public/upload/ext/' . $directory;
+                $storagePublicPath = $root . '/public/uploads/ext/' . $directory;
                 $storageAuxPaths = [];
                 foreach ((array) ($storage['aux'] ?? []) as $auxDirectory) {
                     if (!is_string($auxDirectory) || $auxDirectory === '') {

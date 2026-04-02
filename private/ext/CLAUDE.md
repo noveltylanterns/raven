@@ -511,7 +511,7 @@ declare(strict_types=1);
 - `tables` => one or more DB tables at `{prefix}ext_{slug}_{suffix}`
 - `aux` => one or more sanctioned root-level folders such as `/{name}`
 - `panel` => panel-served assets at `panel/ext/{slug}/`
-- `public` => public-served assets at `public/upload/ext/{slug}/` (`module` only)
+- `public` => public-served assets at `public/uploads/ext/{slug}/` (`module` only)
 - `framework` may not request `panel` or `public`.
 - `lib/schema.php` receives resolved storage roots in `$context['storage']`, plus:
 - `$context['storage']['aux']` for resolved root-level aux directories (`name => absolute path`)

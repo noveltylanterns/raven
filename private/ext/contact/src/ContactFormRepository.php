@@ -325,5 +325,11 @@ final class ContactFormRepository
         if (@file_put_contents($path, $payload, LOCK_EX) === false) {
             throw new RuntimeException('Failed to save contact form definitions.');
         }
+
+        // Flush the opcode cache so the next require() reads the freshly written file
+        // instead of serving stale bytecode from before the save.
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($path, true);
+        }
     }
 }

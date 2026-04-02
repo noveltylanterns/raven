@@ -1449,7 +1449,7 @@ final class RepoService
      */
     private function publicRepositoryWebPath(string $slug): string
     {
-        return '/upload/ext/repo/repositories/' . rawurlencode($slug) . '.git';
+        return '/uploads/ext/repo/repositories/' . rawurlencode($slug) . '.git';
     }
 
     /**

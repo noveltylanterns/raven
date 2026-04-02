@@ -99,6 +99,20 @@ final class TemplateTagEngine
     }
 
     /**
+     * Evaluates a comparison expression for `{if path op value}` template tags.
+     *
+     * @param string $path Tag path to resolve (e.g. 'page:id').
+     * @param string $operator Comparison operator: ==, !=, <, >, <=, >=.
+     * @param string $rhs Right-hand side literal from the compiled template.
+     * @param array<int, array<string, mixed>> $scope Template scope stack.
+     * @return bool True when the comparison holds.
+     */
+    public function compare(string $path, string $operator, string $rhs, array $scope): bool
+    {
+        return $this->paths->compare($path, $operator, $rhs, $scope);
+    }
+
+    /**
      * Resolves one iterable path for `{each ...}` loops.
      *
      * @param array<int, array<string, mixed>> $scope

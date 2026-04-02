@@ -75,6 +75,51 @@ final class TemplateTagPathResolver
     }
 
     /**
+     * Compares a resolved path value against a literal right-hand side using the given operator.
+     *
+     * @param string $path Colon-delimited tag path to resolve (e.g. 'page:id').
+     * @param string $operator Comparison operator: ==, !=, <, >, <=, >=.
+     * @param string $rhs Right-hand side literal from the template — a quoted string ('value'/"value") or a bare number.
+     * @param array<int, array<string, mixed>> $scope Template scope stack.
+     * @return bool True when the comparison holds.
+     */
+    public function compare(string $path, string $operator, string $rhs, array $scope): bool
+    {
+        $value = $this->resolve($path, $scope);
+
+        // Detect quoted string literals and compare as strings after stripping the surrounding quotes.
+        $isStringRhs = $rhs !== '' && ($rhs[0] === '\'' || $rhs[0] === '"');
+        if ($isStringRhs) {
+            $rhsUnquoted = substr($rhs, 1, -1);
+            $lhs = $value !== null ? (string) $value : '';
+            return match ($operator) {
+                '=='    => $lhs === $rhsUnquoted,
+                '!='    => $lhs !== $rhsUnquoted,
+                '<'     => $lhs < $rhsUnquoted,
+                '>'     => $lhs > $rhsUnquoted,
+                '<='    => $lhs <= $rhsUnquoted,
+                '>='    => $lhs >= $rhsUnquoted,
+                default => false,
+            };
+        }
+
+        // Numeric comparison: coerce both sides to float for consistent behaviour with integer IDs.
+        $rhsFloat = is_numeric($rhs) ? (float) $rhs : 0.0;
+        $lhsFloat = is_int($value) || is_float($value)
+            ? (float) $value
+            : (is_string($value) && is_numeric($value) ? (float) $value : 0.0);
+        return match ($operator) {
+            '=='    => $lhsFloat == $rhsFloat,
+            '!='    => $lhsFloat != $rhsFloat,
+            '<'     => $lhsFloat < $rhsFloat,
+            '>'     => $lhsFloat > $rhsFloat,
+            '<='    => $lhsFloat <= $rhsFloat,
+            '>='    => $lhsFloat >= $rhsFloat,
+            default => false,
+        };
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $scope
      * @return array<int|string, mixed>
      */

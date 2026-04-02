@@ -18,7 +18,7 @@ Updated: 2026-03-29
 - Type: `module`
 - Requested storage buckets in `ext.php`:
   - `local` => `private/dat/ext/repo/`
-  - `public` => `public/upload/ext/repo/`
+  - `public` => `public/uploads/ext/repo/`
   - `bin` => `private/bin/rvn-repo` symlink lifecycle for the extension CLI
 
 ## Current Build Direction

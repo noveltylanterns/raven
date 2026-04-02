@@ -150,6 +150,11 @@ return static function (array $context): void {
         if (@file_put_contents($dataFile, $payload, LOCK_EX) === false) {
             throw new \RuntimeException('Failed to write signup forms data.');
         }
+
+        // Flush opcode cache so any same-request require() picks up the new file.
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($dataFile, true);
+        }
     }
 
     // Ensure submissions table exists.

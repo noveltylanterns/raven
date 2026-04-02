@@ -32,7 +32,7 @@ final class ExtensionStorageProvisioner
 
     public function ensurePublicStorageDirectory(string $directoryName): string
     {
-        return $this->ensureDirectory($this->projectRoot . '/public/upload/ext', $directoryName, 'public/upload/ext');
+        return $this->ensureDirectory($this->projectRoot . '/public/uploads/ext', $directoryName, 'public/uploads/ext');
     }
 
     public function ensureAuxStorageDirectory(string $directoryName): string

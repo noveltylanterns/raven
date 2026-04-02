@@ -70,7 +70,7 @@ final class ExtensionStorageCleaner
         }
 
         if (!empty($storage['public'])) {
-            $this->deleteDirectory($this->projectRoot . '/public/upload/ext/' . $directoryName, 'public/upload/ext/' . $directoryName);
+            $this->deleteDirectory($this->projectRoot . '/public/uploads/ext/' . $directoryName, 'public/uploads/ext/' . $directoryName);
         }
 
         if (!empty($storage['bin'])) {

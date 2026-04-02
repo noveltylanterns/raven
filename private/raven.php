@@ -201,7 +201,7 @@ return (static function (): array {
             'local' => !empty($storage['local']) ? ($root . '/private/dat/ext/' . $directory) : '',
             'aux' => [],
             'panel' => !empty($storage['panel']) ? ($root . '/panel/ext/' . $directory) : '',
-            'public' => !empty($storage['public']) ? ($root . '/public/upload/ext/' . $directory) : '',
+            'public' => !empty($storage['public']) ? ($root . '/public/uploads/ext/' . $directory) : '',
             // bin storage resolves to the extension's own bin/ directory; private/bin/ contains the symlinks.
             'bin' => !empty($storage['bin']) ? ($root . '/private/ext/' . $directory . '/bin') : '',
         ];

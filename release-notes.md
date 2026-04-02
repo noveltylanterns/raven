@@ -2,6 +2,13 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 1, 2026 — bug sweep: form visibility, code blocks, template tags, storage path
+
+- **Contact/Signups form save visibility fix**: `ContactFormRepository::persistForms()` and `SignupFormRepository::persistForms()` now call `opcache_invalidate()` after writing `forms.php`. PHP's opcode cache was serving stale bytecode on the redirect following a save, causing newly created forms to be invisible until a manual page reload. Same fix applied to the schema init writes in both extensions' `lib/schema.php`.
+- **Plaintext (Code) block rendering fix**: `PublicPageBodyRenderer` no longer `htmlspecialchars()`-escapes the content of `plaintext` editor-mode blocks. Content is now rendered as HTML the same way TinyMCE blocks are, making raw-HTML code blocks functional.
+- **Template `{if}` comparison operators**: `TemplateTagCompiler` and `TemplateTagPathResolver`/`TemplateTagEngine` now support explicit comparison operators in `{if}` and `{ifelse}` conditions — e.g. `{if page:id == 42}`, `{if page:slug != "home"}`, `{if item:count > 0}`. `{if not}` remains a pure truthy-negation form; use `!=` for negated equality checks. Bare-path truthy checks are unchanged.
+- **Extension public storage path corrected**: All extension storage provisioning, cleanup, schema runner, and `raven.php` bootstrap now resolve the public bucket to `public/uploads/ext/{slug}/` (plural) instead of `public/upload/ext/{slug}/`. Matching fixes applied to `docs/Extensions.md`, `private/ext/AGENTS.md`, `private/ext/CLAUDE.md`, and `private/ext/repo/AGENTS.md`.
+
 ### March 30, 2026 — extension manifest key rename + Extension Manager UI
 
 - **`ext.json` manifest keys renamed**: `author_url` → `homepage` (author/publisher URL); `docs_url` → `docs` (documentation URL). Legacy keys remain readable as fallbacks in all extension route bootstraps and `ExtensionCatalogService`. All seven stock extension manifests updated.
