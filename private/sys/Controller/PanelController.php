@@ -89,6 +89,7 @@ use Raven\Repository\TagRepository;
 use Raven\Repository\TaxonomyLookupRepository;
 use Raven\Repository\TaxonomySetRepository;
 use Raven\Repository\UserRepository;
+use Raven\Lib\Log\EventLogger;
 
 use function Raven\Core\Support\redirect;
 
@@ -119,6 +120,7 @@ final class PanelController
     private TaxonomyLookupRepository $taxonomyLookupRepo;
     private UserRepository $userRepo;
     private InviteTokenRepository $inviteTokens;
+    private EventLogger $logger;
     /** @var array<string, array{label: string, editor: string}>|null */
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
     private ?ArchivePackageService $archivePackages = null;
@@ -182,7 +184,8 @@ final class PanelController
         TaxonomySetRepository $tagSetRepo,
         TaxonomyLookupRepository $taxonomyLookupRepo,
         UserRepository $userRepo,
-        InviteTokenRepository $inviteTokens
+        InviteTokenRepository $inviteTokens,
+        EventLogger $logger
     ) {
         $this->view = $view;
         $this->config = $config;
@@ -205,6 +208,7 @@ final class PanelController
         $this->taxonomyLookupRepo = $taxonomyLookupRepo;
         $this->userRepo = $userRepo;
         $this->inviteTokens = $inviteTokens;
+        $this->logger = $logger;
     }
 
     /**
@@ -8103,5 +8107,154 @@ final class PanelController
 
         $this->config->replace($nextConfig);
         $this->config->save();
+    }
+
+    /**
+     * Event log viewer page (GET /logs).
+     *
+     * Displays a paginated, filterable view of the event log. Supports
+     * severity and free-text search filters passed as query parameters.
+     * Requires the same permission bit as viewing configuration.
+     */
+    public function logs(): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->requireRoutePermissionOrForbidden('logs', 'view')) {
+            return;
+        }
+
+        // Sanitize filter inputs from query string.
+        $severity = $this->input->text($_GET['severity'] ?? null, 10) ?? '';
+        $severity = in_array($severity, ['error', 'warn', 'info'], true) ? $severity : '';
+        $search   = $this->input->text($_GET['search'] ?? null, 200) ?? '';
+
+        $filters = [];
+        if ($severity !== '') {
+            $filters['severity'] = $severity;
+        }
+        if ($search !== '') {
+            $filters['search'] = $search;
+        }
+
+        $perPage       = 50;
+        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
+        $totalItems    = $this->logger->count($filters);
+        $pagination    = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
+
+        // Re-clamp page if the requested page is out of range.
+        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
+            $requestedPage = $pagination['current'];
+        }
+
+        $rows = $this->logger->query($filters, $perPage, $pagination['offset']);
+
+        // Build query array for pagination link generation (preserve active filters).
+        $paginationQuery = [];
+        if ($severity !== '') {
+            $paginationQuery['severity'] = $severity;
+        }
+        if ($search !== '') {
+            $paginationQuery['search'] = $search;
+        }
+
+        $this->view->render('panel/logs', [
+            'site'               => $this->siteData(),
+            'rows'               => $rows,
+            'filters'            => ['severity' => $severity, 'search' => $search],
+            'pagination'         => $this->panelPaginationViewData('/logs', $pagination, $paginationQuery),
+            'totalItems'         => $totalItems,
+            'loggingEnabled'     => $this->logger->isEnabled('error') || $this->logger->isEnabled('warn') || $this->logger->isEnabled('info'),
+            'csrfField'          => $this->csrf->field(),
+            'flashSuccess'       => $this->pullFlash('success'),
+            'flashError'         => $this->pullFlash('error'),
+            'section'            => 'logs',
+            'pageTitle'          => 'Event Log',
+            'showSidebar'        => true,
+            'userTheme'          => $this->currentUserTheme(),
+            'canClear'           => $this->auth->hasPanelPermissionBit(PanelAccess::CONFIGURATION_DELETE),
+        ], 'panel/wrapper');
+    }
+
+    /**
+     * Exports the event log as a CSV download (GET /logs/export).
+     *
+     * Applies the same severity/search filters as the viewer so the operator
+     * can export exactly what they see. Requires view permission on the logs route.
+     */
+    public function logsExport(): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->requireRoutePermissionOrForbidden('logs', 'view')) {
+            return;
+        }
+
+        $severity = $this->input->text($_GET['severity'] ?? null, 10) ?? '';
+        $severity = in_array($severity, ['error', 'warn', 'info'], true) ? $severity : '';
+        $search   = $this->input->text($_GET['search'] ?? null, 200) ?? '';
+
+        $filters = [];
+        if ($severity !== '') {
+            $filters['severity'] = $severity;
+        }
+        if ($search !== '') {
+            $filters['search'] = $search;
+        }
+
+        $rows     = $this->logger->allForExport($filters);
+        $filename = 'event-log-' . gmdate('Ymd-His') . '.csv';
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+
+        $stream = fopen('php://output', 'wb');
+        if (!is_resource($stream)) {
+            http_response_code(500);
+            echo 'Failed to open export stream.';
+            return;
+        }
+
+        fputcsv($stream, ['ID', 'Logged At', 'Severity', 'Channel', 'Message', 'Context']);
+        foreach ($rows as $row) {
+            fputcsv($stream, [
+                (string) ($row['id'] ?? ''),
+                (string) ($row['logged_at'] ?? ''),
+                (string) ($row['severity'] ?? ''),
+                (string) ($row['channel'] ?? ''),
+                (string) ($row['message'] ?? ''),
+                (string) ($row['context'] ?? ''),
+            ]);
+        }
+
+        fclose($stream);
+    }
+
+    /**
+     * Clears all event log entries (POST /logs/clear).
+     *
+     * CSRF-protected. Requires delete permission on the logs route (mapped to
+     * CONFIGURATION_DELETE). Redirects back to /logs with a success or error flash.
+     */
+    public function logsClear(): void
+    {
+        $this->requirePanelLogin();
+        if (!$this->requireRoutePermissionOrForbidden('logs', 'delete')) {
+            return;
+        }
+
+        $post = $_POST;
+        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
+            $this->flash('error', 'Invalid CSRF token.');
+            redirect($this->panelUrl('/logs'));
+        }
+
+        $deleted = $this->logger->clear();
+        $this->flash('success', 'Event log cleared (' . $deleted . ' ' . ($deleted === 1 ? 'entry' : 'entries') . ' removed).');
+        redirect($this->panelUrl('/logs'));
     }
 }

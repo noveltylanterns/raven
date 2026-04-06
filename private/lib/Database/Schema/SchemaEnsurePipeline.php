@@ -39,6 +39,7 @@ final class SchemaEnsurePipeline
         $rvnSchemaBuilder->ensureTaxonomyImageColumns($rvnDb, $driver, $prefix);
         $rvnSchemaBuilder->ensureTaxonomyIconColumn($rvnDb, $driver, $prefix);
         $rvnSchemaBuilder->ensurePanelPerformanceIndexes($rvnDb, $driver, $prefix);
+        $rvnSchemaBuilder->ensureEventLogTable($rvnDb, $driver, $prefix);
         $components->extensionSchemaRunner()->ensureEnabledExtensionSchemas($rvnDb, $driver, $prefix);
 
         // Auth schema must exist before user/group relationship seeding.

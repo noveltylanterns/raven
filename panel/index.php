@@ -18,7 +18,7 @@ use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
 use Raven\Lib\Diagnostics\RequestProfiler;
-use Raven\Lib\Routing\PanelUrl;
+use Raven\Lib\Panel\PanelUrl;
 use Raven\Lib\Routing\RouteRequest;
 use Raven\Lib\Routing\Router;
 
@@ -56,7 +56,8 @@ $panelController = new PanelController(
     $rvn['tag_set'],
     $rvn['taxonomy_lookup'],
     $rvn['user'],
-    $rvn['invite_tokens']
+    $rvn['invite_tokens'],
+    $rvn['logger']
 );
 
 $categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', true), true);
@@ -418,6 +419,7 @@ $_SESSION['_raven_nav_stock'] = [
     ],
     'system' => [
         'configuration' => $hasPanelPermissionBit(PanelAccess::CONFIGURATION_VIEW),
+        'logs' => $hasPanelPermissionBit(PanelAccess::CONFIGURATION_VIEW),
         'themes' => $hasPanelPermissionBit(PanelAccess::THEMES_VIEW),
         'extensions' => $hasPanelPermissionBit(PanelAccess::EXTENSIONS_VIEW),
         'update' => $hasPanelPermissionBit(PanelAccess::MANAGE_CONFIGURATION),
@@ -912,6 +914,19 @@ $router->add('GET', '/routing', static function () use ($panelController): void 
 
 $router->add('GET', '/routing/export', static function () use ($panelController): void {
     $panelController->routingExport();
+});
+
+// Event log routes.
+$router->add('GET', '/logs', static function () use ($panelController): void {
+    $panelController->logs();
+});
+
+$router->add('GET', '/logs/export', static function () use ($panelController): void {
+    $panelController->logsExport();
+});
+
+$router->add('POST', '/logs/clear', static function () use ($panelController): void {
+    $panelController->logsClear();
 });
 
 // Public Theme manager routes.

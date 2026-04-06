@@ -2,6 +2,18 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 6, 2026 — event logger
+
+- **`private/lib/Log/EventLogger`**: New DB-backed logger. Severity-gated (error/warn/info), syslog mirror optional. API: `log()`, `error()`, `warn()`, `info()`, `isEnabled()`, `query()`, `count()`, `pruneOlderThan()`, `allForExport()`, `clear()`.
+- **`{prefix}event_log` table**: Created via `RvnSchemaBuilder::ensureEventLogTable()` at bootstrap. Columns: `id`, `logged_at`, `severity`, `channel`, `message`, `context` (JSON). Indexed on `logged_at` and `severity`.
+- **PHP error handler hook**: `set_error_handler()` in `raven.php` routes runtime PHP errors and warnings into the event log automatically. Non-fatal PHP notices still pass through to PHP's own handler.
+- **Scheduled prune job**: `core::event-log-prune` registered at 86400 s interval — deletes entries older than the configured retention period without touching the log write path.
+- **`logging.*` config section**: `errors` (default `true`), `warnings` (`false`), `info` (`false`), `retention_days` (30), `syslog` (`false`). Fields appear in the Config Editor Debug tab with labels and validation. Both `config.php` and `config.php.dist` updated.
+- **Panel event log viewer** (`GET /logs`): Paginated table (50/page, newest first) with server-side severity dropdown and free-text search filters. Context column collapses/expands JSON metadata inline. Disabled-logging notice links to Config Editor.
+- **Panel CSV export** (`GET /logs/export`): Streams all matching rows (honoring active filters) as `event-log-{timestamp}.csv`. No page limit.
+- **Panel clear action** (`POST /logs/clear`): CSRF-protected. Requires `CONFIGURATION_DELETE` permission. Triggered from a Bootstrap confirmation modal.
+- **System nav**: "Event Log" link appears in the System section for users with `CONFIGURATION_VIEW` permission. Route key `logs` added to `PanelAccessCatalog` reusing Configuration permission bits.
+
 ### April 1, 2026 — lib/ domain cleanup: Routing/ misfits moved
 
 - **`ChannelRecordPolicy` + `ChannelContextService`** moved from `private/lib/Routing/` to `private/lib/Channel/` (`Raven\Lib\Channel`). These classes own channel content-domain policy (root channel constants, slug validation, editor override normalization, channel row context hydration) — not URL dispatch logic.

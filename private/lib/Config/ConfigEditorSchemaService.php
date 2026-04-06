@@ -91,6 +91,11 @@ final class ConfigEditorSchemaService
         'debug.show_trace' => 'Render Stack Trace',
         'debug.show_request' => 'Request Data',
         'debug.show_environment' => 'Environment',
+        'logging.errors' => 'Log Errors',
+        'logging.warnings' => 'Log Warnings',
+        'logging.info' => 'Log Info Events',
+        'logging.retention_days' => 'Log Retention (Days)',
+        'logging.syslog' => 'Mirror to System Syslog',
     ];
 
     private InputSanitizer $input;

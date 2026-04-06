@@ -641,6 +641,19 @@ final class PanelConfigFieldPolicyService
             return $this->defaults->normalizeBool($path, $value);
         }
 
+        if ($path === 'logging.retention_days') {
+            $days = $this->defaults->normalizeInt($path, $value);
+            if ($days < 1) {
+                throw new \RuntimeException('logging.retention_days must be at least 1.');
+            }
+
+            return $days;
+        }
+
+        if (str_starts_with($path, 'logging.')) {
+            return $this->defaults->normalizeBool($path, $value);
+        }
+
         if ($path === 'user.avatar.max_filesize_kb') {
             $size = $this->defaults->normalizeInt($path, $value);
             if ($size < 0) {

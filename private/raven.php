@@ -17,6 +17,7 @@ use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Media\PageImageManager;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
+use Raven\Lib\Log\EventLogger;
 use Raven\Lib\Scheduler\SchedulerRegistry;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Session\SessionCookiePolicy;
@@ -134,6 +135,36 @@ return (static function (): array {
     $categoryEnabled = ConfigValueParser::bool($config->get('category.enabled', false), false);
     $tagEnabled = ConfigValueParser::bool($config->get('tag.enabled', false), false);
     $siteContextBuilder = new SiteContextBuilder();
+    // Build EventLogger from the logging.* config section.
+    // Errors are logged by default; warnings and info are opt-in.
+    $loggingConfig = (array) $config->get('logging', []);
+    $logger = new EventLogger($rvnDb, $driver, $prefix, $loggingConfig);
+
+    // Hook into PHP's error handler to capture runtime errors/warnings into the event log.
+    // Returns false so PHP's own default handler still runs (stderr/error_log output continues).
+    set_error_handler(static function (int $errno, string $errstr, string $errfile, int $errline) use ($logger): bool {
+        if (!($errno & error_reporting())) {
+            // Error is suppressed by the current error_reporting level — skip it.
+            return false;
+        }
+
+        $severity = in_array($errno, [E_ERROR, E_USER_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)
+            ? 'error'
+            : 'warn';
+
+        try {
+            $logger->log($severity, $errstr, 'system', [
+                'errno' => $errno,
+                'file'  => $errfile,
+                'line'  => $errline,
+            ]);
+        } catch (\Throwable) {
+            // Logger failures must never cascade into another error handler call.
+        }
+
+        return false;
+    });
+
     $rvn = [
         'root' => $root,
         'config' => $config,
@@ -161,6 +192,7 @@ return (static function (): array {
         'tag_set' => $tagSetRepo,
         'taxonomy_lookup' => new TaxonomyLookupRepository($rvnDb, $driver, $prefix, $channelRepo),
         'user' => new UserRepository($authDb, $rvnDb, $driver, $prefix),
+        'logger' => $logger,
     ];
 
     $extensionBootstrapResolver = new ExtensionBootstrapContractResolver();
@@ -237,6 +269,12 @@ return (static function (): array {
         if ($page instanceof PageRepository) {
             $page->applySchedule();
         }
+    });
+
+    // Built-in core job: prune event log entries older than the configured retention period.
+    // Runs once per day (86400 s). Pruning is deferred to a job so the logger's hot path stays fast.
+    $scheduler->registerJob('core', 'event-log-prune', 86400, static function (array $context) use ($logger): void {
+        $logger->pruneOlderThan($logger->retentionDays());
     });
 
     // Register extension sources; lib/cron.php files are loaded lazily on first runDue()/getStatus().

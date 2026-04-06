@@ -85,6 +85,14 @@ return array (
     'show_request' => true,
     'show_environment' => true,
   ),
+  'logging' =>
+  array (
+    'errors' => true,
+    'warnings' => false,
+    'info' => false,
+    'retention_days' => 30,
+    'syslog' => false,
+  ),
   'category' =>
   array (
     'enabled' => false,

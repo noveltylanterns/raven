@@ -155,6 +155,13 @@ foreach ($configFields as $field) {
         continue;
     }
 
+    // Logging settings live in their own config section but appear in the Debug tab
+    // so all diagnostic controls are in one place.
+    if (str_starts_with($path, 'logging.')) {
+        $debugConfigFields[] = $field;
+        continue;
+    }
+
     if (str_starts_with($path, 'media.')) {
         if (
             str_starts_with($path, 'media.small.')
@@ -218,6 +225,12 @@ if ($debugConfigFields !== []) {
         'debug.show_trace' => 50,
         'debug.show_request' => 60,
         'debug.show_environment' => 70,
+        // Logging settings follow the profiler section in the same tab.
+        'logging.errors' => 100,
+        'logging.warnings' => 110,
+        'logging.info' => 120,
+        'logging.retention_days' => 130,
+        'logging.syslog' => 140,
     ];
 
     usort(

@@ -101,6 +101,8 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Extension cataloging, manifests, state, storage provisioning, and scaffolding.
 - `private/lib/Http/`
   - HTTP-layer helpers: response dispatch, session flash, request context resolution, upload normalization, and redirect-target validation. (`RedirectTargetValidator` enforces the http/https/root-path allowlist.)
+- `private/lib/Log/`
+  - Event logging subsystem. `EventLogger` writes severity-gated entries (error/warn/info) to the `{prefix}event_log` table, supports syslog mirroring, and exposes query/count/prune/export/clear APIs consumed by the panel log viewer and the scheduled prune job.
 - `private/lib/Panel/`
   - Panel UI helpers: tab normalization, tab-preserving URL builders, panel path resolution, and routing-preview derivations. (`PanelUrl`, `PanelEditorTabService`, `PanelRoutingPreviewService`, `PanelPageAuthorOptionBuilder`.)
 - `private/lib/Routing/`

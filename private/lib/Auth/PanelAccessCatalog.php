@@ -94,6 +94,13 @@ final class PanelAccessCatalog
                 'edit' => PanelAccess::CONFIGURATION_EDIT,
                 'delete' => PanelAccess::CONFIGURATION_DELETE,
             ],
+            'logs' => [
+                'label' => 'Event Log',
+                // View and clear (delete) reuse the Configuration permission bits — the event log
+                // is a system-level diagnostic tool, not a content-management surface.
+                'view' => PanelAccess::CONFIGURATION_VIEW,
+                'delete' => PanelAccess::CONFIGURATION_DELETE,
+            ],
             'update' => [
                 'label' => 'Update Raven',
                 'view' => PanelAccess::MANAGE_CONFIGURATION,

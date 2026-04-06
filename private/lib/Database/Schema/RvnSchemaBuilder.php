@@ -401,6 +401,74 @@ final class RvnSchemaBuilder
         $db->exec('CREATE INDEX IF NOT EXISTS ' . $indexPrefix . '_lookup ON ' . $quotedTable . ' (slug, channel, active)');
     }
 
+    /**
+     * Creates the event_log table and its indexes when they do not yet exist.
+     *
+     * The table stores panel event log entries written by EventLogger. Each row captures
+     * a timestamp, severity (error/warn/info), a freeform channel label, the message, and
+     * an optional JSON context blob. Indexes on logged_at and severity support the two most
+     * common panel-query access patterns: time-range pruning and severity filtering.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
+    public function ensureEventLogTable(PDO $db, string $driver, string $prefix): void
+    {
+        $table = $prefix . 'event_log';
+
+        if ($this->introspector->tableExists($db, $driver, $table)) {
+            return;
+        }
+
+        if ($driver === 'mysql') {
+            $db->exec(
+                'CREATE TABLE IF NOT EXISTS ' . $table . ' (
+                    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    logged_at DATETIME NOT NULL,
+                    severity VARCHAR(10) NOT NULL,
+                    channel VARCHAR(64) NOT NULL DEFAULT \'system\',
+                    message TEXT NOT NULL,
+                    context TEXT NULL,
+                    INDEX idx_' . $prefix . 'event_log_logged_at (logged_at),
+                    INDEX idx_' . $prefix . 'event_log_severity (severity)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+            );
+            return;
+        }
+
+        if ($driver === 'pgsql') {
+            $quoted = $this->introspector->quotePgIdentifier($table);
+            $db->exec(
+                'CREATE TABLE IF NOT EXISTS ' . $quoted . ' (
+                    id BIGSERIAL PRIMARY KEY,
+                    logged_at TIMESTAMP NOT NULL,
+                    severity VARCHAR(10) NOT NULL,
+                    channel VARCHAR(64) NOT NULL DEFAULT \'system\',
+                    message TEXT NOT NULL,
+                    context TEXT NULL
+                )'
+            );
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'event_log_logged_at ON ' . $quoted . ' (logged_at)');
+            $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'event_log_severity ON ' . $quoted . ' (severity)');
+            return;
+        }
+
+        // SQLite: CREATE TABLE IF NOT EXISTS + separate index statements.
+        $db->exec(
+            'CREATE TABLE IF NOT EXISTS ' . $table . ' (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                logged_at TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                channel TEXT NOT NULL DEFAULT \'system\',
+                message TEXT NOT NULL,
+                context TEXT NULL
+            )'
+        );
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_logged_at ON ' . $table . ' (logged_at)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_severity ON ' . $table . ' (severity)');
+    }
+
     private function prefixlessTableName(string $table): string
     {
         return preg_replace('/[^a-zA-Z0-9_]/', '', $table) ?? $table;

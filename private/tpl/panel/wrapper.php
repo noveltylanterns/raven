@@ -210,6 +210,7 @@ $showRedirectsLink = !empty($stockNav['taxonomy']['redirects']);
 $showRoutingLink = !empty($stockNav['taxonomy']['routing']);
 $showTagsLink = $tagEnabled && !empty($stockNav['taxonomy']['tags']);
 $showConfigurationLink = !empty($stockNav['system']['configuration']);
+$showLogsLink = !empty($stockNav['system']['logs']);
 $showThemesLink = !empty($stockNav['system']['themes']);
 $showExtensionsManagerLink = !empty($stockNav['system']['extensions']);
 $showUpdateSystemLink = !empty($stockNav['system']['update']);
@@ -219,6 +220,9 @@ $showTaxonomyCategory = $showCategoriesLink || $showChannelsLink || $showRedirec
 $systemNavItems = [];
 if ($showConfigurationLink) {
     $systemNavItems[] = ['label' => 'Configuration', 'path' => $panelBase . '/configuration', 'section' => 'configuration'];
+}
+if ($showLogsLink) {
+    $systemNavItems[] = ['label' => 'Event Log', 'path' => $panelBase . '/logs', 'section' => 'logs'];
 }
 if ($showThemesLink) {
     $systemNavItems[] = ['label' => 'Theme Manager', 'path' => $panelBase . '/themes', 'section' => 'themes'];
