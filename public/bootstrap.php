@@ -18,12 +18,6 @@ use Raven\Controller\PublicController;
  * @return array<string, mixed>
  */
 return static function (array $rvn): array {
-    if (is_callable($rvn['boot_extensions'] ?? null)) {
-        /** @var callable(): array<string, mixed> $bootExtensions */
-        $bootExtensions = $rvn['boot_extensions'];
-        $rvn = $bootExtensions();
-    }
-
     /** @var mixed $service */
     $service = $rvn['service'] ?? null;
     if (
@@ -34,11 +28,34 @@ return static function (array $rvn): array {
     }
 
     $publicController = null;
+    $extensionServices = null;
+
+    /**
+     * Boots extension providers only when public runtime code needs extension services.
+     *
+     * @return array<string, mixed>
+     */
+    $extensionServicesProvider = static function () use (&$extensionServices, &$rvn): array {
+        if (is_array($extensionServices)) {
+            return $extensionServices;
+        }
+
+        if (is_callable($rvn['boot_extensions'] ?? null)) {
+            /** @var callable(): array<string, mixed> $bootExtensions */
+            $bootExtensions = $rvn['boot_extensions'];
+            $rvn = $bootExtensions();
+        }
+
+        /** @var mixed $rawExtensionServices */
+        $rawExtensionServices = $rvn['extension_services'] ?? [];
+        $extensionServices = is_array($rawExtensionServices) ? $rawExtensionServices : [];
+        return $extensionServices;
+    };
 
     /**
      * Builds the public controller on first use so route registration stays light.
      */
-    $rvn['public_controller'] = static function () use (&$publicController, $rvn, $service): PublicController {
+    $rvn['public_controller'] = static function () use (&$publicController, $rvn, $service, $extensionServicesProvider): PublicController {
         if ($publicController instanceof PublicController) {
             return $publicController;
         }
@@ -56,11 +73,13 @@ return static function (array $rvn): array {
             $service('invite_tokens'),
             $rvn['input'],
             $rvn['csrf'],
-            is_array($rvn['extension_services'] ?? null) ? (array) $rvn['extension_services'] : []
+            $extensionServicesProvider
         );
 
         return $publicController;
     };
+
+    $rvn['public_extension_services'] = $extensionServicesProvider;
 
     return $rvn;
 };

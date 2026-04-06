@@ -18,6 +18,7 @@ use Raven\Repo\RepoService;
  * @param array{
  *   rvn: array<string, mixed>,
  *   notFound?: callable(): void,
+ *   extensionServices?: callable(): array<string, mixed>,
  *   input?: mixed,
  *   extensionDirectory?: string,
  *   renderPublicExtension?: callable(string, array<string, mixed>, string|null): void
@@ -28,23 +29,29 @@ return static function (Router $router, array $context): void {
     $rvn = (array) ($context['rvn'] ?? []);
     $renderPublicExtension = $context['renderPublicExtension'] ?? null;
     $notFoundHandler = $context['notFound'] ?? null;
+    $extensionServicesProvider = $context['extensionServices'] ?? null;
 
     if (!isset($rvn['config']) || !is_callable($renderPublicExtension)) {
         return;
     }
 
-    /** @var mixed $rawExtensionServices */
-    $rawExtensionServices = $rvn['extension_services'] ?? [];
-    /** @var mixed $rawRepoServices */
-    $rawRepoServices = is_array($rawExtensionServices) ? ($rawExtensionServices['repo'] ?? []) : [];
-    /** @var mixed $repoServiceRaw */
-    $repoServiceRaw = is_array($rawRepoServices) ? ($rawRepoServices['service'] ?? null) : null;
-    if (!$repoServiceRaw instanceof RepoService) {
-        return;
-    }
+    /**
+     * Resolves the repo service lazily so unrelated public routes do not boot repo services.
+     */
+    $repoService = static function () use ($extensionServicesProvider): ?RepoService {
+        if (!is_callable($extensionServicesProvider)) {
+            return null;
+        }
 
-    $svc = $repoServiceRaw;
-    $indexUrl = rtrim($svc->baseUrl(), '/') . '/repo';
+        /** @var mixed $rawExtensionServices */
+        $rawExtensionServices = $extensionServicesProvider();
+        /** @var mixed $rawRepoServices */
+        $rawRepoServices = is_array($rawExtensionServices) ? ($rawExtensionServices['repo'] ?? []) : [];
+        /** @var mixed $repoServiceRaw */
+        $repoServiceRaw = is_array($rawRepoServices) ? ($rawRepoServices['service'] ?? null) : null;
+        return $repoServiceRaw instanceof RepoService ? $repoServiceRaw : null;
+    };
+    $indexUrl = '/repo';
 
     $normalizeRepoSlug = static function (mixed $value): string {
         $candidate = strtolower(trim(is_scalar($value) ? (string) $value : ''));
@@ -61,16 +68,19 @@ return static function (Router $router, array $context): void {
         echo 'Not Found';
     };
 
-    $siteData = static function (string $currentUrl) use ($rvn, $svc): array {
+    $siteData = static function (string $currentUrl) use ($rvn, $repoService, $indexUrl): array {
         $domain = trim((string) $rvn['config']->get('site.domain', 'localhost'));
         $protocol = trim((string) $rvn['config']->get('site.protocol', 'https'));
         if (!in_array($protocol, ['http', 'https'], true)) {
             $protocol = 'https';
         }
 
+        $resolvedRepoService = $repoService();
+        $baseUrl = $resolvedRepoService instanceof RepoService ? $resolvedRepoService->baseUrl() : $indexUrl;
+
         return [
             'name' => (string) $rvn['config']->get('site.name', 'Raven CMS'),
-            'url' => $svc->baseUrl(),
+            'url' => $baseUrl,
             'domain' => $domain !== '' ? $domain : 'localhost',
             'protocol' => $protocol,
             'feed_rss_url' => '',
@@ -118,7 +128,13 @@ return static function (Router $router, array $context): void {
         @unlink($path);
     };
 
-    $router->add('GET', '/repo', static function () use ($svc, $renderPage, $indexUrl): void {
+    $router->add('GET', '/repo', static function () use ($repoService, $renderPage, $indexUrl, $notFound): void {
+        $svc = $repoService();
+        if (!$svc instanceof RepoService) {
+            $notFound();
+            return;
+        }
+
         $renderPage(
             'public_index',
             [
@@ -133,11 +149,17 @@ return static function (Router $router, array $context): void {
 
     $router->add('GET', '/repo/{slug}', static function (array $params) use (
         $normalizeRepoSlug,
-        $svc,
+        $repoService,
         $notFound,
         $renderPage,
         $indexUrl
     ): void {
+        $svc = $repoService();
+        if (!$svc instanceof RepoService) {
+            $notFound();
+            return;
+        }
+
         $slug = $normalizeRepoSlug($params['slug'] ?? null);
         $repo = $slug !== '' ? $svc->getRepo($slug) : null;
         if ($repo === null || empty($repo['is_public_listed'])) {
@@ -188,7 +210,13 @@ return static function (Router $router, array $context): void {
         );
     });
 
-    $router->add('GET', '/repo/{slug}/raw', static function (array $params) use ($normalizeRepoSlug, $svc, $notFound, $streamFile): void {
+    $router->add('GET', '/repo/{slug}/raw', static function (array $params) use ($normalizeRepoSlug, $repoService, $notFound, $streamFile): void {
+        $svc = $repoService();
+        if (!$svc instanceof RepoService) {
+            $notFound();
+            return;
+        }
+
         $slug = $normalizeRepoSlug($params['slug'] ?? null);
         if ($slug === '') {
             $notFound();
@@ -214,7 +242,13 @@ return static function (Router $router, array $context): void {
         );
     });
 
-    $router->add('GET', '/repo/{slug}/download', static function (array $params) use ($normalizeRepoSlug, $svc, $notFound, $streamFile): void {
+    $router->add('GET', '/repo/{slug}/download', static function (array $params) use ($normalizeRepoSlug, $repoService, $notFound, $streamFile): void {
+        $svc = $repoService();
+        if (!$svc instanceof RepoService) {
+            $notFound();
+            return;
+        }
+
         $slug = $normalizeRepoSlug($params['slug'] ?? null);
         if ($slug === '') {
             $notFound();
@@ -240,7 +274,13 @@ return static function (Router $router, array $context): void {
         );
     });
 
-    $router->add('GET', '/repo/{slug}/archive', static function (array $params) use ($normalizeRepoSlug, $svc, $notFound, $streamFile): void {
+    $router->add('GET', '/repo/{slug}/archive', static function (array $params) use ($normalizeRepoSlug, $repoService, $notFound, $streamFile): void {
+        $svc = $repoService();
+        if (!$svc instanceof RepoService) {
+            $notFound();
+            return;
+        }
+
         $slug = $normalizeRepoSlug($params['slug'] ?? null);
         if ($slug === '') {
             $notFound();

@@ -293,8 +293,9 @@ $router->add('POST', '/forms/submit', static function () use ($publicController,
 //   function (Router $router, array $context): void
 //
 // Context keys:
-// - app: container array from bootstrap
+// - rvn: container array from bootstrap
 // - notFound: callable(): void Raven public 404 responder
+// - extensionServices: callable(): array lazy extension-services resolver
 // - input: InputSanitizer instance
 // - extensionDirectory: enabled extension folder name
 /** @var array<string, array<string, mixed>> $enabledPublicExtensionManifests */
@@ -327,6 +328,9 @@ foreach ($enabledPublicExtensionManifests as $extensionName => $manifest) {
         'rvn' => $rvn,
         'input' => $input,
         'extensionDirectory' => $extensionName,
+        'extensionServices' => is_callable($rvn['public_extension_services'] ?? null)
+            ? $rvn['public_extension_services']
+            : static fn (): array => [],
         'notFound' => static function () use ($publicController): void {
             $publicController()->notFound();
         },

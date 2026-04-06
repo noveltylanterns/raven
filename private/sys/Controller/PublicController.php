@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Raven\Controller;
 
+use Closure;
 use Raven\Core\Auth\AuthService;
 use Raven\Core\Config;
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
@@ -74,8 +75,10 @@ final class PublicController
     private Csrf $csrf;
     private SessionFlash $publicFlash;
     private LoginIdentifierResolver $identifierResolver;
+    private ?Closure $extensionServicesProvider = null;
     /** @var array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> */
     private array $embeddedFormRuntimes = [];
+    private bool $embeddedFormRuntimesLoaded = false;
     private TemplateTagEngine $templateTags;
     private bool $captchaScriptIncluded = false;
     /** @var array<string, array{label: string, editor: string}>|null */
@@ -101,6 +104,25 @@ final class PublicController
     private ?PublicPageBodyRenderer $pageBodyRenderer = null;
     private ?PublicRouteRenderService $publicRouteRenderService = null;
     private ?PublicChannelPageRouteService $publicChannelPageRouteService = null;
+
+    /**
+     * Initializes the public controller with core repositories and lazy extension access.
+     *
+     * @param View $view Shared view renderer for public templates.
+     * @param Config $config Runtime configuration reader for route and theme behavior.
+     * @param AuthService $auth Auth/session service used by login and gated public helpers.
+     * @param GroupRepository $groupRepo Group repository for public group-route lookups.
+     * @param PageImageRepository $pageImages Page image repository for cover/gallery public rendering.
+     * @param PageRepository $pageRepo Page repository for homepage/page/feed queries.
+     * @param RedirectRepository $redirectRepo Redirect repository for public redirect fallbacks.
+     * @param TaxonomyLookupRepository $taxonomyLookupRepo Taxonomy lookup repository for channel/category/tag route resolution.
+     * @param UserRepository $userRepo User repository for registration and public profile routes.
+     * @param InviteTokenRepository $inviteTokens Invite-token repository for invite-only registration flows.
+     * @param InputSanitizer $input Shared request input sanitizer for all public actions.
+     * @param Csrf $csrf CSRF helper used by public auth and embedded-form submissions.
+     * @param callable(): array<string, mixed>|null $extensionServicesProvider Lazy extension-services resolver used only when embedded runtimes are needed.
+     * @return void
+     */
     public function __construct(
         View $view,
         Config $config,
@@ -114,7 +136,7 @@ final class PublicController
         InviteTokenRepository $inviteTokens,
         InputSanitizer $input,
         Csrf $csrf,
-        array $extensionServices = []
+        ?callable $extensionServicesProvider = null
     )
     {
         $this->view = $view;
@@ -131,7 +153,9 @@ final class PublicController
         $this->csrf = $csrf;
         $this->publicFlash = new SessionFlash('_raven_public_flash');
         $this->identifierResolver = new LoginIdentifierResolver();
-        $this->embeddedFormRuntimes = $this->embeddedFormRuntimeService()->discoverRuntimes($extensionServices);
+        $this->extensionServicesProvider = is_callable($extensionServicesProvider)
+            ? Closure::fromCallable($extensionServicesProvider)
+            : null;
         $this->templateTags = new TemplateTagEngine(dirname(__DIR__, 3) . '/.tmp/template_tag_cache');
     }
 
@@ -1426,7 +1450,7 @@ final class PublicController
      */
     public function submitEmbeddedForm(string $type, string $formSlug): void
     {
-        $runtime = $this->embeddedFormRuntimeService()->runtime($type, $this->embeddedFormRuntimes);
+        $runtime = $this->embeddedFormRuntimeService()->runtime($type, $this->embeddedFormRuntimes());
         if ($runtime === null) {
             $this->notFound();
             return;
@@ -2094,6 +2118,37 @@ final class PublicController
         return $this->embeddedFormRuntimeService;
     }
 
+    /**
+     * Returns the extension-services map, booting extensions only when form runtimes are needed.
+     *
+     * @return array<string, mixed>
+     */
+    private function extensionServices(): array
+    {
+        if (!$this->extensionServicesProvider instanceof Closure) {
+            return [];
+        }
+
+        /** @var mixed $services */
+        $services = ($this->extensionServicesProvider)();
+        return is_array($services) ? $services : [];
+    }
+
+    /**
+     * Returns the discovered embedded shortcode/form runtimes for the current public request.
+     *
+     * @return array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface>
+     */
+    private function embeddedFormRuntimes(): array
+    {
+        if (!$this->embeddedFormRuntimesLoaded) {
+            $this->embeddedFormRuntimes = $this->embeddedFormRuntimeService()->discoverRuntimes($this->extensionServices());
+            $this->embeddedFormRuntimesLoaded = true;
+        }
+
+        return $this->embeddedFormRuntimes;
+    }
+
     private function profileContactService(): ProfileContactService
     {
         if (!$this->profileContactService instanceof ProfileContactService) {
@@ -2453,7 +2508,7 @@ final class PublicController
     {
         return $this->embeddedFormRuntimeService()->renderShortcodesForPublicRoute(
             $html,
-            $this->embeddedFormRuntimes,
+            $this->embeddedFormRuntimes(),
             (string) ($_SERVER['REQUEST_URI'] ?? '/'),
             $this->csrf->field(),
             fn (): string => $this->publicCaptchaMarkup()

@@ -999,7 +999,7 @@ $router->add('POST', '/extensions/permission', static function () use ($panelCon
 //   function (Router $router, array $context): void
 //
 // Context keys:
-// - app: container array from bootstrap
+// - rvn: container array from bootstrap
 // - panelUrl: callable(string): string for building panel-prefixed links
 // - requirePanelLogin: callable(): void guard for panel access
 // - currentUserTheme: callable(): string current panel theme slug
