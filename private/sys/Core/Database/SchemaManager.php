@@ -20,6 +20,7 @@ require_once dirname(__DIR__, 3) . '/lib/Database/Schema/SeedInstaller.php';
 require_once dirname(__DIR__, 3) . '/lib/Database/Schema/ExtensionSchemaRunner.php';
 require_once dirname(__DIR__, 3) . '/lib/Database/Schema/SchemaComponentFactory.php';
 require_once dirname(__DIR__, 3) . '/lib/Database/Schema/SchemaEnsurePipeline.php';
+require_once dirname(__DIR__, 3) . '/lib/Database/Schema/SchemaEnsureStateStore.php';
 require_once dirname(__DIR__, 3) . '/lib/Database/Schema/SchemaManager.php';
 
 use PDO;

@@ -104,6 +104,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Config parsing, validation, editor schema/defaults, and config file persistence.
 - `private/lib/Database/`
   - DB connection, table resolution, schema ensure, introspection, and profiling helpers.
+  - Includes schema-ensure state gating so hot-path bootstraps can skip repeated no-op schema walks until core or enabled-extension schema inputs change.
 - `private/lib/Extension/`
   - Extension cataloging, manifests, state, storage provisioning, and scaffolding.
 - `private/lib/Http/`
