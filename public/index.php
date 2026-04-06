@@ -295,7 +295,7 @@ $router->add('POST', '/forms/submit', static function () use ($publicController,
 // Context keys:
 // - rvn: container array from bootstrap
 // - notFound: callable(): void Raven public 404 responder
-// - extensionServices: callable(): array lazy extension-services resolver
+// - extensionServices: callable(?string $extensionDirectory = null): array lazy extension-services resolver
 // - input: InputSanitizer instance
 // - extensionDirectory: enabled extension folder name
 /** @var array<string, array<string, mixed>> $enabledPublicExtensionManifests */

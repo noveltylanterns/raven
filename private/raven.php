@@ -284,25 +284,51 @@ return (static function (): array {
         'extension_services' => [],
     ];
 
-    // CLI/debug tooling still reads legacy container keys directly after requiring
-    // `private/raven.php`. Keep those aliases available for non-web runtimes while
-    // the entrypoint split is rolled through the local tooling.
-    if (PHP_SAPI === 'cli') {
-        $rvn['category'] = $service('category');
-        $rvn['category_set'] = $service('category_set');
-        $rvn['channel'] = $service('channel');
-        $rvn['group'] = $service('group');
-        $rvn['invite_tokens'] = $service('invite_tokens');
-        $rvn['page_images'] = $service('page_images');
-        $rvn['page_image_manager'] = $service('page_image_manager');
-        $rvn['page'] = $service('page');
-        $rvn['redirect'] = $service('redirect');
-        $rvn['tag'] = $service('tag');
-        $rvn['tag_set'] = $service('tag_set');
-        $rvn['taxonomy_lookup'] = $service('taxonomy_lookup');
-        $rvn['user'] = $service('user');
-        $rvn['logger'] = $service('logger');
-    }
+    $bootedExtensionDirectories = [];
+    $rvn['boot_extension'] = static function (string $directory) use (&$rvn, &$bootedExtensionDirectories, $extensionBootProviders): array {
+        $directory = trim($directory);
+        if ($directory === '' || isset($bootedExtensionDirectories[$directory])) {
+            return $rvn;
+        }
+
+        $bootedExtensionDirectories[$directory] = true;
+        $provider = $extensionBootProviders[$directory] ?? null;
+        if (!is_callable($provider)) {
+            return $rvn;
+        }
+
+        try {
+            $provider($rvn);
+        } catch (\Throwable $exception) {
+            error_log('Raven extension bootstrap failed for extension "' . $directory . '": ' . $exception->getMessage());
+        }
+
+        return $rvn;
+    };
+
+    /**
+     * Resolves one extension's service map on demand without booting unrelated extensions.
+     *
+     * @return array<string, mixed>
+     */
+    $rvn['extension_services_for'] = static function (string $directory) use (&$rvn): array {
+        $directory = trim($directory);
+        if ($directory === '') {
+            return [];
+        }
+
+        if (is_callable($rvn['boot_extension'] ?? null)) {
+            /** @var callable(string): array<string, mixed> $bootExtension */
+            $bootExtension = $rvn['boot_extension'];
+            $rvn = $bootExtension($directory);
+        }
+
+        /** @var mixed $rawExtensionServices */
+        $rawExtensionServices = $rvn['extension_services'] ?? [];
+        /** @var mixed $rawServices */
+        $rawServices = is_array($rawExtensionServices) ? ($rawExtensionServices[$directory] ?? []) : [];
+        return is_array($rawServices) ? $rawServices : [];
+    };
 
     $extensionsBooted = false;
     $rvn['boot_extensions'] = static function () use (&$extensionsBooted, &$rvn, $extensionBootProviders): array {
@@ -311,11 +337,11 @@ return (static function (): array {
         }
 
         $extensionsBooted = true;
-        foreach ($extensionBootProviders as $directory => $provider) {
-            try {
-                $provider($rvn);
-            } catch (\Throwable $exception) {
-                error_log('Raven extension bootstrap failed for extension "' . $directory . '": ' . $exception->getMessage());
+        foreach (array_keys($extensionBootProviders) as $directory) {
+            if (is_callable($rvn['boot_extension'] ?? null)) {
+                /** @var callable(string): array<string, mixed> $bootExtension */
+                $bootExtension = $rvn['boot_extension'];
+                $rvn = $bootExtension($directory);
             }
         }
 

@@ -173,15 +173,17 @@ final class ConfigurationDocsSmokeRunner
     private function createTempSuperUser(): void
     {
         $rvn = require $this->root . '/private/raven.php';
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
 
         // Admin group is canonical ID 1; slug lookup kept as fallback.
-        $superGroupId = $rvn['group']->idBySlug('admin') ?? 1;
+        $superGroupId = $service('group')->idBySlug('admin') ?? 1;
 
         $this->tempUsername = 'codex_docs_' . $this->runId;
         $this->tempEmail = $this->tempUsername . '@example.test';
         $this->tempPassword = 'CodexDocs!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $rvn['user']->save([
+        $this->tempUserId = (int) $service('user')->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Docs ' . $this->runId,
@@ -207,7 +209,9 @@ final class ConfigurationDocsSmokeRunner
         }
 
         $rvn = require $this->root . '/private/raven.php';
-        $rvn['user']->deleteById($this->tempUserId);
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
+        $service('user')->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }
 

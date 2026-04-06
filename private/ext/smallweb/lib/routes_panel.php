@@ -22,6 +22,7 @@ use function Raven\Core\Support\redirect;
  *   panelUrl: callable(string): string,
  *   requirePanelLogin: callable(): void,
  *   currentUserTheme: callable(): string,
+ *   extensionServices?: callable(?string=): array<string, mixed>,
  *   extensionDirectory?: string
  * } $context
  */
@@ -54,25 +55,63 @@ return static function (Router $router, array $context): void {
             return $site;
         };
 
-    // ── Resolve extension services ──
-
-    /** @var mixed $rawExtensionServices */
-    $rawExtensionServices = $rvn['extension_services'] ?? [];
-    /** @var mixed $rawSmallwebServices */
-    $rawSmallwebServices = is_array($rawExtensionServices) ? ($rawExtensionServices['smallweb'] ?? []) : [];
-    /** @var mixed $smallwebServiceRaw */
-    $smallwebServiceRaw = is_array($rawSmallwebServices) ? ($rawSmallwebServices['service'] ?? null) : null;
-
     if (!isset($rvn['root'], $rvn['view'], $rvn['config'], $rvn['csrf'], $rvn['input'])) {
         return;
     }
 
-    if (!$smallwebServiceRaw instanceof SmallwebService) {
-        return;
-    }
-
-    $svc = $smallwebServiceRaw;
     $input = $rvn['input'];
+    /** @var callable(?string=): array<string, mixed> $extensionServices */
+    $extensionServices = is_callable($context['extensionServices'] ?? null)
+        ? $context['extensionServices']
+        : static function (?string $extensionDirectory = null) use ($rvn): array {
+            $directory = is_string($extensionDirectory) && trim($extensionDirectory) !== '' ? trim($extensionDirectory) : 'smallweb';
+            /** @var mixed $rawExtensionServices */
+            $rawExtensionServices = $rvn['extension_services'] ?? [];
+            /** @var mixed $rawServices */
+            $rawServices = is_array($rawExtensionServices) ? ($rawExtensionServices[$directory] ?? []) : [];
+            return is_array($rawServices) ? $rawServices : [];
+        };
+
+    /**
+     * Resolves Smallweb services only when one Smallweb route is actually used.
+     */
+    $requireSmallwebService = static function () use ($extensionServices): SmallwebService {
+        $services = $extensionServices('smallweb');
+        $service = $services['service'] ?? null;
+        if (!$service instanceof SmallwebService) {
+            http_response_code(404);
+            echo 'Not Found';
+            exit;
+        }
+
+        return $service;
+    };
+
+    $svc = new class($requireSmallwebService) {
+        /** @var \Closure(): SmallwebService */
+        private \Closure $resolver;
+
+        /**
+         * @param callable(): SmallwebService $resolver
+         */
+        public function __construct(callable $resolver)
+        {
+            $this->resolver = \Closure::fromCallable($resolver);
+        }
+
+        /**
+         * Proxies Smallweb service calls through the lazy extension resolver.
+         *
+         * @param string $name Repository method name.
+         * @param array<int, mixed> $arguments Repository call arguments.
+         * @return mixed
+         */
+        public function __call(string $name, array $arguments): mixed
+        {
+            $service = ($this->resolver)();
+            return $service->$name(...$arguments);
+        }
+    };
 
     // ── Paths ──
 

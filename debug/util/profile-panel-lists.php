@@ -64,6 +64,11 @@ final class PanelListProfilerRunner
     {
         $this->enablePanelDebugToolbar();
         $rvn = require $this->root . '/private/raven.php';
+        if (is_callable($rvn['boot_extensions'] ?? null)) {
+            /** @var callable(): array<string, mixed> $bootExtensions */
+            $bootExtensions = $rvn['boot_extensions'];
+            $rvn = $bootExtensions();
+        }
         $this->createTempSuperUser($rvn);
 
         try {
@@ -146,15 +151,16 @@ final class PanelListProfilerRunner
      */
     private function createTempSuperUser(array $rvn): void
     {
-        $superGroupId = $rvn['group']->idBySlug('super');
-        if ($superGroupId === null) {
-            throw new RuntimeException('Unable to resolve super group for profiling user.');
-        }
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
+        // Admin group is canonical ID 1; keep slug lookup fallback so older local
+        // installs that renamed stock labels still resolve the profiling user role.
+        $superGroupId = $service('group')->idBySlug('admin') ?? 1;
 
         $this->tempUsername = 'codex_profile_' . $this->runId;
         $this->tempPassword = 'CodexProfile!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $rvn['user']->save([
+        $this->tempUserId = (int) $service('user')->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Profile ' . $this->runId,
@@ -179,7 +185,9 @@ final class PanelListProfilerRunner
         }
 
         $rvn = require $this->root . '/private/raven.php';
-        $rvn['user']->deleteById($this->tempUserId);
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
+        $service('user')->deleteById($this->tempUserId);
         $this->events[] = 'temp_user_deleted=' . $this->tempUserId;
     }
 
@@ -217,6 +225,16 @@ final class PanelListProfilerRunner
      */
     private function captureHttpPanelListTraces(array $rvn): void
     {
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
+        $channelRepo = $service('channel');
+        $categoryRepo = $service('category');
+        $tagRepo = $service('tag');
+        $pageRepo = $service('page');
+        $redirectRepo = $service('redirect');
+        $groupRepo = $service('group');
+        $userRepo = $service('user');
+
         $routes = [
             'dashboard' => '/' . $this->panelPath,
             'page' => '/' . $this->panelPath . '/page',
@@ -233,7 +251,7 @@ final class PanelListProfilerRunner
             'updates' => '/' . $this->panelPath . '/updates',
         ];
 
-        $channelOptions = $rvn['channel']->listOptions();
+        $channelOptions = $channelRepo->listOptions();
         if ($channelOptions !== []) {
             $channelSlug = trim((string) ($channelOptions[0]['slug'] ?? ''));
             if ($channelSlug !== '') {
@@ -241,7 +259,7 @@ final class PanelListProfilerRunner
             }
         }
 
-        $categoryOptions = $rvn['category']->listOptions();
+        $categoryOptions = $categoryRepo->listOptions();
         if ($categoryOptions !== []) {
             $categoryId = (int) ($categoryOptions[0]['id'] ?? 0);
             if ($categoryId > 0) {
@@ -249,7 +267,7 @@ final class PanelListProfilerRunner
             }
         }
 
-        $tagOptions = $rvn['tag']->listOptions();
+        $tagOptions = $tagRepo->listOptions();
         if ($tagOptions !== []) {
             $tagId = (int) ($tagOptions[0]['id'] ?? 0);
             if ($tagId > 0) {
@@ -257,7 +275,7 @@ final class PanelListProfilerRunner
             }
         }
 
-        $pageRows = $rvn['page']->listForPanel(1, 0);
+        $pageRows = $pageRepo->listForPanel(1, 0);
         if ($pageRows !== []) {
             $firstPageId = (int) ($pageRows[0]['id'] ?? 0);
             if ($firstPageId > 0) {
@@ -265,7 +283,7 @@ final class PanelListProfilerRunner
             }
         }
 
-        $redirectRows = $rvn['redirect']->listForPanel(1, 0);
+        $redirectRows = $redirectRepo->listForPanel(1, 0);
         if ($redirectRows !== []) {
             $firstRedirectId = (int) ($redirectRows[0]['id'] ?? 0);
             if ($firstRedirectId > 0) {
@@ -273,7 +291,7 @@ final class PanelListProfilerRunner
             }
         }
 
-        $groupOptions = $rvn['group']->listOptions();
+        $groupOptions = $groupRepo->listOptions();
         if ($groupOptions !== []) {
             $groupName = strtolower(trim((string) ($groupOptions[0]['name'] ?? '')));
             if ($groupName !== '') {
@@ -281,7 +299,7 @@ final class PanelListProfilerRunner
             }
         }
 
-        $userRows = $rvn['user']->listForPanel(1, 0, null);
+        $userRows = $userRepo->listForPanel(1, 0, null);
         if ($userRows !== []) {
             $firstUserId = (int) ($userRows[0]['id'] ?? 0);
             if ($firstUserId > 0) {
@@ -342,33 +360,43 @@ final class PanelListProfilerRunner
      */
     private function captureFlowComparisons(array $rvn): void
     {
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
+        $channelRepo = $service('channel');
+        $categoryRepo = $service('category');
+        $tagRepo = $service('tag');
+        $pageRepo = $service('page');
+        $redirectRepo = $service('redirect');
+        $groupRepo = $service('group');
+        $userRepo = $service('user');
+
         $channelSlug = null;
         $categoryId = null;
         $tagId = null;
         $groupName = null;
 
-        $channelOptions = $rvn['channel']->listOptions();
+        $channelOptions = $channelRepo->listOptions();
         if ($channelOptions !== []) {
             $value = trim((string) ($channelOptions[0]['slug'] ?? ''));
             if ($value !== '') {
                 $channelSlug = $value;
             }
         }
-        $categoryOptions = $rvn['category']->listOptions();
+        $categoryOptions = $categoryRepo->listOptions();
         if ($categoryOptions !== []) {
             $value = (int) ($categoryOptions[0]['id'] ?? 0);
             if ($value > 0) {
                 $categoryId = $value;
             }
         }
-        $tagOptions = $rvn['tag']->listOptions();
+        $tagOptions = $tagRepo->listOptions();
         if ($tagOptions !== []) {
             $value = (int) ($tagOptions[0]['id'] ?? 0);
             if ($value > 0) {
                 $tagId = $value;
             }
         }
-        $groupOptions = $rvn['group']->listOptions();
+        $groupOptions = $groupRepo->listOptions();
         if ($groupOptions !== []) {
             $value = strtolower(trim((string) ($groupOptions[0]['name'] ?? '')));
             if ($value !== '') {
@@ -377,75 +405,75 @@ final class PanelListProfilerRunner
         }
 
         $legacyFlows = [
-            'pages' => static function () use ($rvn): void {
-                $rows = $rvn['page']->listForPanel(100, 0);
+            'pages' => static function () use ($pageRepo): void {
+                $rows = $pageRepo->listForPanel(100, 0);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
-                $rvn['page']->taxonomyAssignmentIdsByPage($pageIds);
+                $pageRepo->taxonomyAssignmentIdsByPage($pageIds);
             },
-            'channel' => static fn () => $rvn['channel']->listAll(),
-            'category' => static fn () => $rvn['category']->listAll(),
-            'tag' => static fn () => $rvn['tag']->listAll(),
-            'redirect' => static fn () => $rvn['redirect']->listAll(),
-            'groups' => static fn () => $rvn['group']->listAll(),
-            'users' => static fn () => $rvn['user']->listAll(),
+            'channel' => static fn () => $channelRepo->listAll(),
+            'category' => static fn () => $categoryRepo->listAll(),
+            'tag' => static fn () => $tagRepo->listAll(),
+            'redirect' => static fn () => $redirectRepo->listAll(),
+            'groups' => static fn () => $groupRepo->listAll(),
+            'users' => static fn () => $userRepo->listAll(),
         ];
 
         if ($channelSlug !== null || $categoryId !== null || $tagId !== null) {
-            $legacyFlows['pages_prefiltered'] = static function () use ($rvn): void {
-                $rows = $rvn['page']->listForPanel(1000, 0);
+            $legacyFlows['pages_prefiltered'] = static function () use ($pageRepo): void {
+                $rows = $pageRepo->listForPanel(1000, 0);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
-                $rvn['page']->taxonomyAssignmentIdsByPage($pageIds);
+                $pageRepo->taxonomyAssignmentIdsByPage($pageIds);
             };
         }
         if ($groupName !== null) {
-            $legacyFlows['users_prefiltered'] = static fn () => $rvn['user']->listAll();
+            $legacyFlows['users_prefiltered'] = static fn () => $userRepo->listAll();
         }
 
         $currentFlows = [
-            'pages' => static function () use ($rvn): void {
-                $rvn['page']->countForPanel();
-                $rows = $rvn['page']->listForPanel(50, 0);
+            'pages' => static function () use ($pageRepo): void {
+                $pageRepo->countForPanel();
+                $rows = $pageRepo->listForPanel(50, 0);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
-                $rvn['page']->taxonomyAssignmentIdsByPage($pageIds);
+                $pageRepo->taxonomyAssignmentIdsByPage($pageIds);
             },
-            'channels' => static function () use ($rvn): void {
-                $rvn['channel']->countForPanel();
-                $rvn['channel']->listForPanel(50, 0);
+            'channels' => static function () use ($channelRepo): void {
+                $channelRepo->countForPanel();
+                $channelRepo->listForPanel(50, 0);
             },
-            'categories' => static function () use ($rvn): void {
-                $rvn['category']->countForPanel();
-                $rvn['category']->listForPanel(50, 0);
+            'categories' => static function () use ($categoryRepo): void {
+                $categoryRepo->countForPanel();
+                $categoryRepo->listForPanel(50, 0);
             },
-            'tags' => static function () use ($rvn): void {
-                $rvn['tag']->countForPanel();
-                $rvn['tag']->listForPanel(50, 0);
+            'tags' => static function () use ($tagRepo): void {
+                $tagRepo->countForPanel();
+                $tagRepo->listForPanel(50, 0);
             },
-            'redirects' => static function () use ($rvn): void {
-                $rvn['redirect']->countForPanel();
-                $rvn['redirect']->listForPanel(50, 0);
+            'redirects' => static function () use ($redirectRepo): void {
+                $redirectRepo->countForPanel();
+                $redirectRepo->listForPanel(50, 0);
             },
-            'groups' => static function () use ($rvn): void {
-                $rvn['group']->countForPanel();
-                $rvn['group']->listForPanel(50, 0);
+            'groups' => static function () use ($groupRepo): void {
+                $groupRepo->countForPanel();
+                $groupRepo->listForPanel(50, 0);
             },
-            'users' => static function () use ($rvn): void {
-                $rvn['user']->countForPanel(null);
-                $rvn['user']->listForPanel(50, 0, null);
+            'users' => static function () use ($userRepo): void {
+                $userRepo->countForPanel(null);
+                $userRepo->listForPanel(50, 0, null);
             },
         ];
 
         if ($channelSlug !== null || $categoryId !== null || $tagId !== null) {
-            $currentFlows['pages_prefiltered'] = static function () use ($rvn, $channelSlug, $categoryId, $tagId): void {
-                $rvn['page']->countForPanel($channelSlug, $categoryId, $tagId);
-                $rows = $rvn['page']->listForPanel(50, 0, $channelSlug, $categoryId, $tagId);
+            $currentFlows['pages_prefiltered'] = static function () use ($pageRepo, $channelSlug, $categoryId, $tagId): void {
+                $pageRepo->countForPanel($channelSlug, $categoryId, $tagId);
+                $rows = $pageRepo->listForPanel(50, 0, $channelSlug, $categoryId, $tagId);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
-                $rvn['page']->taxonomyAssignmentIdsByPage($pageIds);
+                $pageRepo->taxonomyAssignmentIdsByPage($pageIds);
             };
         }
         if ($groupName !== null) {
-            $currentFlows['users_prefiltered'] = static function () use ($rvn, $groupName): void {
-                $rvn['user']->countForPanel($groupName);
-                $rvn['user']->listForPanel(50, 0, $groupName);
+            $currentFlows['users_prefiltered'] = static function () use ($userRepo, $groupName): void {
+                $userRepo->countForPanel($groupName);
+                $userRepo->listForPanel(50, 0, $groupName);
             };
         }
 

@@ -22,7 +22,8 @@ use function Raven\Core\Support\redirect;
  *   rvn: array<string, mixed>,
  *   panelUrl: callable(string): string,
  *   requirePanelLogin: callable(): void,
- *   currentUserTheme: callable(): string
+ *   currentUserTheme: callable(): string,
+ *   extensionServices?: callable(?string=): array<string, mixed>
  * } $context
  */
 return static function (Router $router, array $context): void {
@@ -58,16 +59,58 @@ return static function (Router $router, array $context): void {
         return;
     }
 
-    /** @var mixed $rawExtensionServices */
-    $rawExtensionServices = $rvn['extension_services'] ?? [];
-    /** @var mixed $rawCronServices */
-    $rawCronServices = is_array($rawExtensionServices) ? ($rawExtensionServices['cron'] ?? []) : [];
-    /** @var mixed $serviceRaw */
-    $serviceRaw = is_array($rawCronServices) ? ($rawCronServices['service'] ?? null) : null;
-    if (!$serviceRaw instanceof CronTaskService) {
-        return;
-    }
-    $service = $serviceRaw;
+    /** @var callable(?string=): array<string, mixed> $extensionServices */
+    $extensionServices = is_callable($context['extensionServices'] ?? null)
+        ? $context['extensionServices']
+        : static function (?string $extensionDirectory = null) use ($rvn): array {
+            $directory = is_string($extensionDirectory) && trim($extensionDirectory) !== '' ? trim($extensionDirectory) : 'cron';
+            /** @var mixed $rawExtensionServices */
+            $rawExtensionServices = $rvn['extension_services'] ?? [];
+            /** @var mixed $rawServices */
+            $rawServices = is_array($rawExtensionServices) ? ($rawExtensionServices[$directory] ?? []) : [];
+            return is_array($rawServices) ? $rawServices : [];
+        };
+
+    /**
+     * Resolves Scheduled Tasks services only when one cron route is actually used.
+     */
+    $requireCronService = static function () use ($extensionServices): CronTaskService {
+        $services = $extensionServices('cron');
+        $service = $services['service'] ?? null;
+        if (!$service instanceof CronTaskService) {
+            http_response_code(404);
+            echo 'Not Found';
+            exit;
+        }
+
+        return $service;
+    };
+
+    $service = new class($requireCronService) {
+        /** @var \Closure(): CronTaskService */
+        private \Closure $resolver;
+
+        /**
+         * @param callable(): CronTaskService $resolver
+         */
+        public function __construct(callable $resolver)
+        {
+            $this->resolver = \Closure::fromCallable($resolver);
+        }
+
+        /**
+         * Proxies cron-service calls through the lazy extension resolver.
+         *
+         * @param string $name Repository method name.
+         * @param array<int, mixed> $arguments Repository call arguments.
+         * @return mixed
+         */
+        public function __call(string $name, array $arguments): mixed
+        {
+            $resolvedService = ($this->resolver)();
+            return $resolvedService->$name(...$arguments);
+        }
+    };
 
     $extensionRoot = rtrim((string) $rvn['root'], '/') . '/private/ext/cron';
     $extensionManifestFile = $extensionRoot . '/ext.json';

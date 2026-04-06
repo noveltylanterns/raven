@@ -92,14 +92,16 @@ final class PublicRouteProfilerRunner
     private function buildScenarios(): array
     {
         $rvn = $this->bootstrapApp('/');
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
         /** @var PageRepository $pages */
-        $pages = $rvn['page'];
+        $pages = $service('page');
         /** @var TaxonomyLookupRepository $taxonomyLookup */
-        $taxonomyLookup = $rvn['taxonomy_lookup'];
+        $taxonomyLookup = $service('taxonomy_lookup');
         /** @var UserRepository $users */
-        $users = $rvn['user'];
+        $users = $service('user');
         /** @var GroupRepository $groups */
-        $groups = $rvn['group'];
+        $groups = $service('group');
         /** @var array<string, mixed> $configSnapshot */
         $configSnapshot = $rvn['config']->all();
 
@@ -395,21 +397,9 @@ final class PublicRouteProfilerRunner
      */
     private function newPublicController(array $rvn): PublicController
     {
-        return new PublicController(
-            $rvn['view'],
-            $rvn['config'],
-            $rvn['auth'],
-            $rvn['group'],
-            $rvn['page_images'],
-            $rvn['page'],
-            $rvn['redirect'],
-            $rvn['taxonomy_lookup'],
-            $rvn['user'],
-            $rvn['invite_tokens'],
-            $rvn['input'],
-            $rvn['csrf'],
-            is_array($rvn['extension_services'] ?? null) ? (array) $rvn['extension_services'] : []
-        );
+        /** @var callable(): PublicController $publicControllerFactory */
+        $publicControllerFactory = $rvn['public_controller'];
+        return $publicControllerFactory();
     }
 
     /**
@@ -426,6 +416,11 @@ final class PublicRouteProfilerRunner
 
         /** @var array<string, mixed> $rvn */
         $rvn = require $this->root . '/private/raven.php';
+        $publicBootstrap = require $this->root . '/public/bootstrap.php';
+        if (is_callable($publicBootstrap)) {
+            /** @var callable(array<string, mixed>): array<string, mixed> $publicBootstrap */
+            $rvn = $publicBootstrap($rvn);
+        }
 
         return $rvn;
     }

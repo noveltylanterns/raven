@@ -23,6 +23,7 @@ use function Raven\Core\Support\redirect;
  *   panelUrl: callable(string): string,
  *   requirePanelLogin: callable(): void,
  *   currentUserTheme: callable(): string,
+ *   extensionServices?: callable(?string=): array<string, mixed>,
  *   extensionDirectory?: string
  * } $context
  */
@@ -55,27 +56,71 @@ return static function (Router $router, array $context): void {
             return $site;
         };
 
-    /** @var mixed $rawExtensionServices */
-    $rawExtensionServices = $rvn['extension_services'] ?? [];
-    /** @var mixed $rawSignupServices */
-    $rawSignupServices = is_array($rawExtensionServices) ? ($rawExtensionServices['signups'] ?? []) : [];
-    /** @var mixed $signupFormsService */
-    $signupFormsService = is_array($rawSignupServices) ? ($rawSignupServices['forms'] ?? null) : null;
-    /** @var mixed $signupSubmissionsService */
-    $signupSubmissionsService = is_array($rawSignupServices) ? ($rawSignupServices['submissions'] ?? null) : null;
-
     if (!isset($rvn['root'], $rvn['view'], $rvn['config'], $rvn['csrf'])) {
         return;
     }
 
-    if (
-        !$signupFormsService instanceof SignupFormRepository
-        || !$signupSubmissionsService instanceof SignupSubmissionRepository
-    ) {
-        return;
-    }
-    $signupFormsRepository = $signupFormsService;
-    $signupsRepository = $signupSubmissionsService;
+    /** @var callable(?string=): array<string, mixed> $extensionServices */
+    $extensionServices = is_callable($context['extensionServices'] ?? null)
+        ? $context['extensionServices']
+        : static function (?string $extensionDirectory = null) use ($rvn): array {
+            $directory = is_string($extensionDirectory) && trim($extensionDirectory) !== '' ? trim($extensionDirectory) : 'signups';
+            /** @var mixed $rawExtensionServices */
+            $rawExtensionServices = $rvn['extension_services'] ?? [];
+            /** @var mixed $rawServices */
+            $rawServices = is_array($rawExtensionServices) ? ($rawExtensionServices[$directory] ?? []) : [];
+            return is_array($rawServices) ? $rawServices : [];
+        };
+
+    /**
+     * Resolves Signup Sheets repositories only when one signup route is actually used.
+     *
+     * @return array{forms: SignupFormRepository, submissions: SignupSubmissionRepository}
+     */
+    $requireSignupRepositories = static function () use ($extensionServices): array {
+        $services = $extensionServices('signups');
+        $formsService = $services['forms'] ?? null;
+        $submissionsService = $services['submissions'] ?? null;
+        if (
+            !$formsService instanceof SignupFormRepository
+            || !$submissionsService instanceof SignupSubmissionRepository
+        ) {
+            http_response_code(404);
+            echo 'Not Found';
+            exit;
+        }
+
+        return [
+            'forms' => $formsService,
+            'submissions' => $submissionsService,
+        ];
+    };
+
+    $signupsRepository = new class($requireSignupRepositories) {
+        /** @var \Closure(): array{forms: SignupFormRepository, submissions: SignupSubmissionRepository} */
+        private \Closure $resolver;
+
+        /**
+         * @param callable(): array{forms: SignupFormRepository, submissions: SignupSubmissionRepository} $resolver
+         */
+        public function __construct(callable $resolver)
+        {
+            $this->resolver = \Closure::fromCallable($resolver);
+        }
+
+        /**
+         * Proxies signup-submission repository calls through the lazy extension resolver.
+         *
+         * @param string $name Repository method name.
+         * @param array<int, mixed> $arguments Repository call arguments.
+         * @return mixed
+         */
+        public function __call(string $name, array $arguments): mixed
+        {
+            $repositories = ($this->resolver)();
+            return $repositories['submissions']->$name(...$arguments);
+        }
+    };
 
     $extensionRoot = rtrim((string) $rvn['root'], '/') . '/private/ext/signups';
     $extensionManifestFile = $extensionRoot . '/ext.json';
@@ -162,8 +207,9 @@ return static function (Router $router, array $context): void {
      *   }>
      * }>
      */
-    $loadForms = static function () use ($signupFormsRepository): array {
-        return $signupFormsRepository->listAll();
+    $loadForms = static function () use ($requireSignupRepositories): array {
+        $repositories = $requireSignupRepositories();
+        return $repositories['forms']->listAll();
     };
 
     /**
@@ -182,8 +228,9 @@ return static function (Router $router, array $context): void {
      *   }>
      * }> $forms
      */
-    $saveForms = static function (array $forms) use ($signupFormsRepository): void {
-        $signupFormsRepository->replaceAll($forms);
+    $saveForms = static function (array $forms) use ($requireSignupRepositories): void {
+        $repositories = $requireSignupRepositories();
+        $repositories['forms']->replaceAll($forms);
     };
 
     /**

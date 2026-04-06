@@ -35,7 +35,17 @@ return static function (array $rvn): array {
      *
      * @return array<string, mixed>
      */
-    $extensionServicesProvider = static function () use (&$extensionServices, &$rvn): array {
+    $extensionServicesProvider = static function (?string $extensionDirectory = null) use (&$extensionServices, &$rvn): array {
+        $extensionDirectory = is_string($extensionDirectory) ? trim($extensionDirectory) : '';
+        if (
+            $extensionDirectory !== ''
+            && is_callable($rvn['extension_services_for'] ?? null)
+        ) {
+            /** @var callable(string): array<string, mixed> $extensionServicesFor */
+            $extensionServicesFor = $rvn['extension_services_for'];
+            return $extensionServicesFor($extensionDirectory);
+        }
+
         if (is_array($extensionServices)) {
             return $extensionServices;
         }

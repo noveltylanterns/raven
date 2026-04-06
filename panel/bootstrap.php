@@ -63,12 +63,6 @@ return static function (array $rvn): array {
             return $rvn + $panelRuntime;
         }
 
-        if (is_callable($rvn['boot_extensions'] ?? null)) {
-            /** @var callable(): array<string, mixed> $bootExtensions */
-            $bootExtensions = $rvn['boot_extensions'];
-            $rvn = $bootExtensions();
-        }
-
         $rvn['category'] = $service('category');
         $rvn['category_set'] = $service('category_set');
         $rvn['channel'] = $service('channel');

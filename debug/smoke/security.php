@@ -309,7 +309,9 @@ final class SecuritySmokeRunner
     private function groupsCount(): int
     {
         $rvn = require $this->root . '/private/raven.php';
-        $rows = $rvn['group']->listAll();
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
+        $rows = $service('group')->listAll();
         return is_array($rows) ? count($rows) : 0;
     }
 
@@ -319,7 +321,9 @@ final class SecuritySmokeRunner
     private function findRedirectBySlug(string $slug): ?array
     {
         $rvn = require $this->root . '/private/raven.php';
-        $rows = $rvn['redirect']->listAll();
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
+        $rows = $service('redirect')->listAll();
         if (!is_array($rows)) {
             return null;
         }
@@ -357,20 +361,24 @@ final class SecuritySmokeRunner
         }
 
         $rvn = require $this->root . '/private/raven.php';
-        $rvn['redirect']->deleteById($id);
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
+        $service('redirect')->deleteById($id);
     }
 
     private function createTempSuperUser(): void
     {
         $rvn = require $this->root . '/private/raven.php';
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
 
         // Admin group is canonical ID 1; slug lookup kept as fallback.
-        $superGroupId = $rvn['group']->idBySlug('admin') ?? 1;
+        $superGroupId = $service('group')->idBySlug('admin') ?? 1;
 
         $this->tempUsername = 'codex_security_' . $this->runId;
         $this->tempPassword = 'CodexSecurity!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $rvn['user']->save([
+        $this->tempUserId = (int) $service('user')->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Security ' . $this->runId,
@@ -396,7 +404,9 @@ final class SecuritySmokeRunner
         }
 
         $rvn = require $this->root . '/private/raven.php';
-        $rvn['user']->deleteById($this->tempUserId);
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
+        $service('user')->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }
 

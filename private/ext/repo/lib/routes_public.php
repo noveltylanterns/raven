@@ -44,11 +44,9 @@ return static function (Router $router, array $context): void {
         }
 
         /** @var mixed $rawExtensionServices */
-        $rawExtensionServices = $extensionServicesProvider();
-        /** @var mixed $rawRepoServices */
-        $rawRepoServices = is_array($rawExtensionServices) ? ($rawExtensionServices['repo'] ?? []) : [];
+        $rawExtensionServices = $extensionServicesProvider('repo');
         /** @var mixed $repoServiceRaw */
-        $repoServiceRaw = is_array($rawRepoServices) ? ($rawRepoServices['service'] ?? null) : null;
+        $repoServiceRaw = is_array($rawExtensionServices) ? ($rawExtensionServices['service'] ?? null) : null;
         return $repoServiceRaw instanceof RepoService ? $repoServiceRaw : null;
     };
     $indexUrl = '/repo';

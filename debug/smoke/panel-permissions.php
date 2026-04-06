@@ -304,8 +304,10 @@ PHP;
     private function createUserWithMask(string $suffix, int $mask): array
     {
         $rvn = require $this->root . '/private/raven.php';
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
         $groupSlug = 'nav-smoke-' . $suffix . '-' . $this->runId;
-        $groupId = (int) $rvn['group']->save([
+        $groupId = (int) $service('group')->save([
             'id' => null,
             'name' => 'Nav Smoke ' . $suffix . ' ' . $this->runId,
             'slug' => $groupSlug,
@@ -319,7 +321,7 @@ PHP;
         $email = $username . '@example.test';
         $password = 'NavSmoke!' . $this->runId . 'Aa';
 
-        $userId = (int) $rvn['user']->save([
+        $userId = (int) $service('user')->save([
             'id' => null,
             'username' => $username,
             'display_name' => 'Nav Smoke ' . $suffix,
@@ -800,9 +802,11 @@ PHP;
         }
 
         $rvn = require $this->root . '/private/raven.php';
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
         foreach (array_reverse($this->createdUsers) as $userId) {
             try {
-                $rvn['user']->deleteById((int) $userId);
+                $service('user')->deleteById((int) $userId);
             } catch (\Throwable) {
             }
         }
@@ -815,9 +819,11 @@ PHP;
         }
 
         $rvn = require $this->root . '/private/raven.php';
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
         foreach (array_reverse($this->createdGroups) as $groupId) {
             try {
-                $rvn['group']->deleteById((int) $groupId);
+                $service('group')->deleteById((int) $groupId);
             } catch (\Throwable) {
             }
         }

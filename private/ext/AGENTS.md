@@ -438,12 +438,14 @@ declare(strict_types=1);
 - `users`
 - `scheduler` => `Raven\Lib\Scheduler\SchedulerRegistry` — system-wide scheduler registry (core + extension jobs)
 - `extension_services` (recommended extension-owned service map keyed by extension directory and service name)
+- `extension_services_for` => callable `fn(string $extensionDirectory): array<string, mixed>` that boots and returns one extension's service map without touching unrelated extensions
 - `extension_services.{extension}.shortcode_runtimes` (optional list of shortcode runtimes; accepts `EmbeddedShortcodeRuntimeInterface` for content-only and `EmbeddedFormRuntimeInterface` for form-capable runtimes)
 - `contact_forms`
 - `contact_submissions`
 - `signup_forms`
 - `signup_submissions`
 - Note: extension-owned service keys are optional and depend on whether the extension is enabled and whether its `ext.php` registered them.
+- Prefer `extension_services_for('{slug}')` or the route-context `extensionServices('{slug}')` helper when a route only needs one extension's services.
 - Legacy top-level keys (for example `contact_forms`) remain for compatibility during migration and should be considered transitional.
 - Use `isset(...)` and strict instance checks before assuming any service.
 

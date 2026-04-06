@@ -23,6 +23,7 @@ use function Raven\Core\Support\redirect;
  *   panelUrl: callable(string): string,
  *   requirePanelLogin: callable(): void,
  *   currentUserTheme: callable(): string,
+ *   extensionServices?: callable(?string=): array<string, mixed>,
  *   extensionDirectory?: string
  * } $context
  */
@@ -55,27 +56,71 @@ return static function (Router $router, array $context): void {
             return $site;
         };
 
-    /** @var mixed $rawExtensionServices */
-    $rawExtensionServices = $rvn['extension_services'] ?? [];
-    /** @var mixed $rawContactServices */
-    $rawContactServices = is_array($rawExtensionServices) ? ($rawExtensionServices['contact'] ?? []) : [];
-    /** @var mixed $contactFormsService */
-    $contactFormsService = is_array($rawContactServices) ? ($rawContactServices['forms'] ?? null) : null;
-    /** @var mixed $contactSubmissionsService */
-    $contactSubmissionsService = is_array($rawContactServices) ? ($rawContactServices['submissions'] ?? null) : null;
-
     if (!isset($rvn['root'], $rvn['view'], $rvn['config'], $rvn['csrf'])) {
         return;
     }
 
-    if (
-        !$contactFormsService instanceof ContactFormRepository
-        || !$contactSubmissionsService instanceof ContactSubmissionRepository
-    ) {
-        return;
-    }
-    $contactFormsRepository = $contactFormsService;
-    $contactSubmissionsRepository = $contactSubmissionsService;
+    /** @var callable(?string=): array<string, mixed> $extensionServices */
+    $extensionServices = is_callable($context['extensionServices'] ?? null)
+        ? $context['extensionServices']
+        : static function (?string $extensionDirectory = null) use ($rvn): array {
+            $directory = is_string($extensionDirectory) && trim($extensionDirectory) !== '' ? trim($extensionDirectory) : 'contact';
+            /** @var mixed $rawExtensionServices */
+            $rawExtensionServices = $rvn['extension_services'] ?? [];
+            /** @var mixed $rawServices */
+            $rawServices = is_array($rawExtensionServices) ? ($rawExtensionServices[$directory] ?? []) : [];
+            return is_array($rawServices) ? $rawServices : [];
+        };
+
+    /**
+     * Resolves Contact extension repositories only when one Contact route is actually used.
+     *
+     * @return array{forms: ContactFormRepository, submissions: ContactSubmissionRepository}
+     */
+    $requireContactRepositories = static function () use ($extensionServices): array {
+        $services = $extensionServices('contact');
+        $formsService = $services['forms'] ?? null;
+        $submissionsService = $services['submissions'] ?? null;
+        if (
+            !$formsService instanceof ContactFormRepository
+            || !$submissionsService instanceof ContactSubmissionRepository
+        ) {
+            http_response_code(404);
+            echo 'Not Found';
+            exit;
+        }
+
+        return [
+            'forms' => $formsService,
+            'submissions' => $submissionsService,
+        ];
+    };
+
+    $contactSubmissionsRepository = new class($requireContactRepositories) {
+        /** @var \Closure(): array{forms: ContactFormRepository, submissions: ContactSubmissionRepository} */
+        private \Closure $resolver;
+
+        /**
+         * @param callable(): array{forms: ContactFormRepository, submissions: ContactSubmissionRepository} $resolver
+         */
+        public function __construct(callable $resolver)
+        {
+            $this->resolver = \Closure::fromCallable($resolver);
+        }
+
+        /**
+         * Proxies submission-repository calls through the per-request lazy extension resolver.
+         *
+         * @param string $name      Repository method name.
+         * @param array<int, mixed> $arguments Repository call arguments.
+         * @return mixed
+         */
+        public function __call(string $name, array $arguments): mixed
+        {
+            $repositories = ($this->resolver)();
+            return $repositories['submissions']->$name(...$arguments);
+        }
+    };
 
     $extensionRoot = rtrim((string) $rvn['root'], '/') . '/private/ext/contact';
     $extensionManifestFile = $extensionRoot . '/ext.json';
@@ -165,8 +210,9 @@ return static function (Router $router, array $context): void {
      *   }>
      * }>
      */
-    $loadForms = static function () use ($contactFormsRepository): array {
-        return $contactFormsRepository->listAll();
+    $loadForms = static function () use ($requireContactRepositories): array {
+        $repositories = $requireContactRepositories();
+        return $repositories['forms']->listAll();
     };
 
     /**
@@ -189,8 +235,9 @@ return static function (Router $router, array $context): void {
      *   }>
      * }> $forms
      */
-    $saveForms = static function (array $forms) use ($contactFormsRepository): void {
-        $contactFormsRepository->replaceAll($forms);
+    $saveForms = static function (array $forms) use ($requireContactRepositories): void {
+        $repositories = $requireContactRepositories();
+        $repositories['forms']->replaceAll($forms);
     };
 
     /**

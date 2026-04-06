@@ -23,6 +23,7 @@ use function Raven\Core\Support\redirect;
  *   requirePanelLogin: callable(): void,
  *   currentUserTheme: callable(): string,
  *   renderPublicNotFound?: callable(): void,
+ *   extensionServices?: callable(?string=): array<string, mixed>,
  *   extensionDirectory?: string
  * } $context
  */
@@ -49,18 +50,58 @@ return static function (Router $router, array $context): void {
         return;
     }
 
-    /** @var mixed $rawExtensionServices */
-    $rawExtensionServices = $rvn['extension_services'] ?? [];
-    /** @var mixed $rawRepoServices */
-    $rawRepoServices = is_array($rawExtensionServices) ? ($rawExtensionServices['repo'] ?? []) : [];
-    /** @var mixed $repoServiceRaw */
-    $repoServiceRaw = is_array($rawRepoServices) ? ($rawRepoServices['service'] ?? null) : null;
-    if (!$repoServiceRaw instanceof RepoService) {
-        return;
-    }
-
-    $svc = $repoServiceRaw;
     $input = $rvn['input'];
+    /** @var callable(?string=): array<string, mixed> $extensionServices */
+    $extensionServices = is_callable($context['extensionServices'] ?? null)
+        ? $context['extensionServices']
+        : static function (?string $extensionDirectory = null) use ($rvn): array {
+            $directory = is_string($extensionDirectory) && trim($extensionDirectory) !== '' ? trim($extensionDirectory) : 'repo';
+            /** @var mixed $rawExtensionServices */
+            $rawExtensionServices = $rvn['extension_services'] ?? [];
+            /** @var mixed $rawServices */
+            $rawServices = is_array($rawExtensionServices) ? ($rawExtensionServices[$directory] ?? []) : [];
+            return is_array($rawServices) ? $rawServices : [];
+        };
+
+    /**
+     * Resolves Repo extension services only when one repo route is actually used.
+     */
+    $requireRepoService = static function () use ($extensionServices, $renderNotFound): RepoService {
+        $services = $extensionServices('repo');
+        $repoService = $services['service'] ?? null;
+        if (!$repoService instanceof RepoService) {
+            $renderNotFound();
+            exit;
+        }
+
+        return $repoService;
+    };
+
+    $svc = new class($requireRepoService) {
+        /** @var \Closure(): RepoService */
+        private \Closure $resolver;
+
+        /**
+         * @param callable(): RepoService $resolver
+         */
+        public function __construct(callable $resolver)
+        {
+            $this->resolver = \Closure::fromCallable($resolver);
+        }
+
+        /**
+         * Proxies repo-service calls through the lazy extension resolver.
+         *
+         * @param string $name Repository method name.
+         * @param array<int, mixed> $arguments Repository call arguments.
+         * @return mixed
+         */
+        public function __call(string $name, array $arguments): mixed
+        {
+            $service = ($this->resolver)();
+            return $service->$name(...$arguments);
+        }
+    };
 
     $extensionRoot = rtrim((string) $rvn['root'], '/') . '/private/ext/repo';
     $indexViewFile = $extensionRoot . '/tpl/panel_index.php';
@@ -77,7 +118,9 @@ return static function (Router $router, array $context): void {
     $syncBasePath = $panelUrl('/repo/sync');
     $deleteBasePath = $panelUrl('/repo/delete');
     $configurationPath = $panelUrl('/configuration');
-    $schedulerMode = $svc->schedulerMode();
+    $schedulerMode = static function () use ($svc): string {
+        return $svc->schedulerMode();
+    };
 
     /** @var callable(bool=): array<string, mixed> $panelSiteData */
     $panelSiteData = is_callable($rvn['panel_site_data'] ?? null)
@@ -225,7 +268,7 @@ return static function (Router $router, array $context): void {
 
         $viewData += [
             'schedulerAvailable' => $svc->schedulerAvailable(),
-            'schedulerMode' => $schedulerMode,
+            'schedulerMode' => $schedulerMode(),
             'configurationPath' => $configurationPath,
         ];
         $csrfField = $rvn['csrf']->field();

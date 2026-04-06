@@ -1070,7 +1070,9 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
 
     try {
         $rvn = $context->rvn();
-        $repo = $rvn['category'];
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
+        $repo = $service('category');
 
         if ($action === 'list') {
             $rows = $repo->listAll();
@@ -1226,7 +1228,9 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
 
     try {
         $rvn = $context->rvn();
-        $repo = $rvn['tag'];
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
+        $repo = $service('tag');
 
         if ($action === 'list') {
             $rows = $repo->listAll();
@@ -1382,7 +1386,9 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
 
     try {
         $rvn = $context->rvn();
-        $repo = $rvn['channel'];
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
+        $repo = $service('channel');
 
         if ($action === 'list') {
             $rows = $repo->listAll();
@@ -1545,7 +1551,9 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
 
     try {
         $rvn = $context->rvn();
-        $repo = $rvn['group'];
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
+        $repo = $service('group');
 
         $orderedPermissions = [
             'view_public' => PanelAccess::VIEW_PUBLIC_SITE,
@@ -1820,7 +1828,9 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
 
     try {
         $rvn = $context->rvn();
-        $repo = $rvn['redirect'];
+        /** @var callable(string): mixed $service */
+        $service = $rvn['service'];
+        $repo = $service('redirect');
 
         $findRedirect = static function (array $options) use ($repo): ?array {
             $idRaw = raven_cli_option($options, 'id', null);

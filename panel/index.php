@@ -1005,6 +1005,7 @@ $router->add('POST', '/extensions/permission', static function () use ($panelCon
 // - currentUserTheme: callable(): string current panel theme slug
 // - renderPublicNotFound: callable(): void themed public 404 responder
 // - extensionDirectory: enabled extension folder name
+// - extensionServices: callable(?string $extensionDirectory = null): array lazy resolver for one extension's service map
 // - extensionRequiredPermissionBit: required default extension permission bit
 // - extensionPermissionOptions: extension-level permission options map (`bit => label`)
 // - extensionPermissionBits: extension-level bit map (`key => bit`)
@@ -1128,6 +1129,9 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
         'renderPublicNotFound' => static function () use ($panelController): void {
             $panelController()->renderPublicNotFound();
         },
+        'extensionServices' => is_callable($rvn['extension_services_for'] ?? null)
+            ? $rvn['extension_services_for']
+            : static fn (?string $extensionDirectory = null): array => [],
         'extensionDirectory' => $extensionName,
         'extensionRequiredPermissionBit' => $requiredPermissionBit,
         'extensionPermissionOptions' => $extensionPermissionOptions,
