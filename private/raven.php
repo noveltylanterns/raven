@@ -283,6 +283,27 @@ return (static function (): array {
         'extension_storage' => $extensionStorage,
         'extension_services' => [],
     ];
+
+    // CLI/debug tooling still reads legacy container keys directly after requiring
+    // `private/raven.php`. Keep those aliases available for non-web runtimes while
+    // the entrypoint split is rolled through the local tooling.
+    if (PHP_SAPI === 'cli') {
+        $rvn['category'] = $service('category');
+        $rvn['category_set'] = $service('category_set');
+        $rvn['channel'] = $service('channel');
+        $rvn['group'] = $service('group');
+        $rvn['invite_tokens'] = $service('invite_tokens');
+        $rvn['page_images'] = $service('page_images');
+        $rvn['page_image_manager'] = $service('page_image_manager');
+        $rvn['page'] = $service('page');
+        $rvn['redirect'] = $service('redirect');
+        $rvn['tag'] = $service('tag');
+        $rvn['tag_set'] = $service('tag_set');
+        $rvn['taxonomy_lookup'] = $service('taxonomy_lookup');
+        $rvn['user'] = $service('user');
+        $rvn['logger'] = $service('logger');
+    }
+
     $extensionsBooted = false;
     $rvn['boot_extensions'] = static function () use (&$extensionsBooted, &$rvn, $extensionBootProviders): array {
         if ($extensionsBooted) {
