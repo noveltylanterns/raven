@@ -70,7 +70,8 @@ final class PublicController
     private RedirectRepository $redirectRepo;
     private TaxonomyLookupRepository $taxonomyLookupRepo;
     private UserRepository $userRepo;
-    private InviteTokenRepository $inviteTokens;
+    private ?InviteTokenRepository $inviteTokens = null;
+    private ?Closure $inviteTokensResolver = null;
     private InputSanitizer $input;
     private Csrf $csrf;
     private SessionFlash $publicFlash;
@@ -117,7 +118,7 @@ final class PublicController
      * @param RedirectRepository $redirectRepo Redirect repository for public redirect fallbacks.
      * @param TaxonomyLookupRepository $taxonomyLookupRepo Taxonomy lookup repository for channel/category/tag route resolution.
      * @param UserRepository $userRepo User repository for registration and public profile routes.
-     * @param InviteTokenRepository $inviteTokens Invite-token repository for invite-only registration flows.
+     * @param callable(): InviteTokenRepository $inviteTokensResolver Invite-token repository resolver for invite-only registration flows.
      * @param InputSanitizer $input Shared request input sanitizer for all public actions.
      * @param Csrf $csrf CSRF helper used by public auth and embedded-form submissions.
      * @param callable(): array<string, mixed>|null $extensionServicesProvider Lazy extension-services resolver used only when embedded runtimes are needed.
@@ -133,7 +134,7 @@ final class PublicController
         RedirectRepository $redirectRepo,
         TaxonomyLookupRepository $taxonomyLookupRepo,
         UserRepository $userRepo,
-        InviteTokenRepository $inviteTokens,
+        callable $inviteTokensResolver,
         InputSanitizer $input,
         Csrf $csrf,
         ?callable $extensionServicesProvider = null
@@ -148,7 +149,7 @@ final class PublicController
         $this->redirectRepo = $redirectRepo;
         $this->taxonomyLookupRepo = $taxonomyLookupRepo;
         $this->userRepo = $userRepo;
-        $this->inviteTokens = $inviteTokens;
+        $this->inviteTokensResolver = Closure::fromCallable($inviteTokensResolver);
         $this->input = $input;
         $this->csrf = $csrf;
         $this->publicFlash = new SessionFlash('_raven_public_flash');
@@ -157,6 +158,31 @@ final class PublicController
             ? Closure::fromCallable($extensionServicesProvider)
             : null;
         $this->templateTags = new TemplateTagEngine(dirname(__DIR__, 3) . '/.tmp/template_tag_cache');
+    }
+
+    /**
+     * Returns the invite-token repository on first use so ordinary public page
+     * traffic does not instantiate registration-only storage.
+     *
+     * @return InviteTokenRepository Invite-token repository for registration flows.
+     */
+    private function inviteTokens(): InviteTokenRepository
+    {
+        if ($this->inviteTokens instanceof InviteTokenRepository) {
+            return $this->inviteTokens;
+        }
+
+        if (!$this->inviteTokensResolver instanceof Closure) {
+            throw new \RuntimeException('Public invite-token repository resolver is unavailable.');
+        }
+
+        $inviteTokens = ($this->inviteTokensResolver)();
+        if (!$inviteTokens instanceof InviteTokenRepository) {
+            throw new \RuntimeException('Public invite-token repository resolver returned an invalid value.');
+        }
+
+        $this->inviteTokens = $inviteTokens;
+        return $this->inviteTokens;
     }
 
     /**
@@ -1334,7 +1360,7 @@ final class PublicController
             if ($inviteToken === '') {
                 $errors[] = 'Invite token is required in invite-only mode.';
             } else {
-                $usableInvite = $this->inviteTokens->findUsableByToken($inviteToken, $now);
+                $usableInvite = $this->inviteTokens()->findUsableByToken($inviteToken, $now);
                 if ($usableInvite === null) {
                     $errors[] = 'Invite token is invalid, expired, or already used.';
                 }
@@ -1371,7 +1397,7 @@ final class PublicController
             if (is_array($usableInvite)) {
                 $inviteId = (int) ($usableInvite['id'] ?? 0);
                 $isReusable = (int) ($usableInvite['reusable'] ?? 0) === 1;
-                if ($inviteId < 1 || !$this->inviteTokens->consume($inviteId, $isReusable, $now)) {
+                if ($inviteId < 1 || !$this->inviteTokens()->consume($inviteId, $isReusable, $now)) {
                     if (is_int($savedUserId) && $savedUserId > 0) {
                         try {
                             $this->userRepo->deleteById($savedUserId);

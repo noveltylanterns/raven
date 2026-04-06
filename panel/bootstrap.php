@@ -11,8 +11,12 @@ declare(strict_types=1);
 
 use Raven\Controller\AuthController;
 use Raven\Controller\PanelController;
+use Raven\Core\Media\PageImageManager;
 use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Log\EventLogger;
 use Raven\Lib\Site\SiteContextBuilder;
+use Raven\Repository\InviteTokenRepository;
+use Raven\Repository\TaxonomySetRepository;
 
 /**
  * Enriches the shared core container with panel-runtime factories.
@@ -33,6 +37,85 @@ return static function (array $rvn): array {
     $authController = null;
     $panelController = null;
     $panelRuntime = null;
+    $categorySetRepository = null;
+    $tagSetRepository = null;
+    $inviteTokenRepository = null;
+    $pageImageManager = null;
+    $logger = null;
+
+    /**
+     * Builds the file-backed category set repository only for panel taxonomy editors.
+     */
+    $categorySetFactory = static function () use (&$categorySetRepository, $rvn): TaxonomySetRepository {
+        if ($categorySetRepository instanceof TaxonomySetRepository) {
+            return $categorySetRepository;
+        }
+
+        $categorySetRepository = new TaxonomySetRepository('category', (string) $rvn['root'] . '/private/dat/category-set');
+        return $categorySetRepository;
+    };
+
+    /**
+     * Builds the file-backed tag set repository only for panel taxonomy editors.
+     */
+    $tagSetFactory = static function () use (&$tagSetRepository, $rvn): TaxonomySetRepository {
+        if ($tagSetRepository instanceof TaxonomySetRepository) {
+            return $tagSetRepository;
+        }
+
+        $tagSetRepository = new TaxonomySetRepository('tag', (string) $rvn['root'] . '/private/dat/tag-set');
+        return $tagSetRepository;
+    };
+
+    /**
+     * Builds invite-token storage only for panel invite management.
+     */
+    $inviteTokenFactory = static function () use (&$inviteTokenRepository, $rvn): InviteTokenRepository {
+        if ($inviteTokenRepository instanceof InviteTokenRepository) {
+            return $inviteTokenRepository;
+        }
+
+        $inviteTokenRepository = new InviteTokenRepository(
+            $rvn['auth_db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix']
+        );
+
+        return $inviteTokenRepository;
+    };
+
+    /**
+     * Builds the panel page-image helper only when page editing enters media flows.
+     */
+    $pageImageManagerFactory = static function () use (&$pageImageManager, $rvn, $service): PageImageManager {
+        if ($pageImageManager instanceof PageImageManager) {
+            return $pageImageManager;
+        }
+
+        /** @var \Raven\Repository\PageImageRepository $pageImages */
+        $pageImages = $service('page_images');
+        $pageImageManager = new PageImageManager($rvn['config'], $rvn['input'], $pageImages, (string) $rvn['root']);
+
+        return $pageImageManager;
+    };
+
+    /**
+     * Builds panel log storage only for routes that touch the event log UI.
+     */
+    $loggerFactory = static function () use (&$logger, $rvn): EventLogger {
+        if ($logger instanceof EventLogger) {
+            return $logger;
+        }
+
+        $logger = new EventLogger(
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix'],
+            (array) $rvn['config']->get('logging', [])
+        );
+
+        return $logger;
+    };
 
     /**
      * Builds the auth controller on first use so login routes avoid panel-only dependencies.
@@ -58,25 +141,30 @@ return static function (array $rvn): array {
      *
      * @return array<string, mixed>
      */
-    $rvn['initialize_panel_runtime'] = static function () use (&$panelRuntime, &$panelController, &$rvn, $service): array {
+    $rvn['initialize_panel_runtime'] = static function () use (
+        &$panelRuntime,
+        &$panelController,
+        &$rvn,
+        $service,
+        $categorySetFactory,
+        $tagSetFactory,
+        $inviteTokenFactory,
+        $pageImageManagerFactory,
+        $loggerFactory
+    ): array {
         if (is_array($panelRuntime)) {
             return $rvn + $panelRuntime;
         }
 
         $rvn['category'] = $service('category');
-        $rvn['category_set'] = $service('category_set');
         $rvn['channel'] = $service('channel');
         $rvn['group'] = $service('group');
-        $rvn['invite_tokens'] = $service('invite_tokens');
         $rvn['page_images'] = $service('page_images');
-        $rvn['page_image_manager'] = $service('page_image_manager');
         $rvn['page'] = $service('page');
         $rvn['redirect'] = $service('redirect');
         $rvn['tag'] = $service('tag');
-        $rvn['tag_set'] = $service('tag_set');
         $rvn['taxonomy_lookup'] = $service('taxonomy_lookup');
         $rvn['user'] = $service('user');
-        $rvn['logger'] = $service('logger');
 
         $categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', true), true);
         $tagEnabled = ConfigValueParser::bool($rvn['config']->get('tag.enabled', true), true);
@@ -94,19 +182,19 @@ return static function (array $rvn): array {
             $rvn['input'],
             $rvn['csrf'],
             $rvn['page_images'],
-            $rvn['page_image_manager'],
+            $pageImageManagerFactory,
             $rvn['category'],
-            $rvn['category_set'],
+            $categorySetFactory,
             $rvn['channel'],
             $rvn['group'],
             $rvn['page'],
             $rvn['redirect'],
             $rvn['tag'],
-            $rvn['tag_set'],
+            $tagSetFactory,
             $rvn['taxonomy_lookup'],
             $rvn['user'],
-            $rvn['invite_tokens'],
-            $rvn['logger']
+            $inviteTokenFactory,
+            $loggerFactory
         );
 
         $enabledExtensionManifests = is_array($rvn['enabled_extension_manifests'] ?? null)

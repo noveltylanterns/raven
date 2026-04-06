@@ -10,6 +10,7 @@
 declare(strict_types=1);
 
 use Raven\Controller\PublicController;
+use Raven\Repository\InviteTokenRepository;
 
 /**
  * Enriches the shared core container with public-runtime factories.
@@ -29,6 +30,24 @@ return static function (array $rvn): array {
 
     $publicController = null;
     $extensionServices = null;
+    $inviteTokens = null;
+
+    /**
+     * Builds invite-token storage only for the registration flows that need it.
+     */
+    $inviteTokenRepository = static function () use (&$inviteTokens, $rvn): InviteTokenRepository {
+        if ($inviteTokens instanceof InviteTokenRepository) {
+            return $inviteTokens;
+        }
+
+        $inviteTokens = new InviteTokenRepository(
+            $rvn['auth_db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix']
+        );
+
+        return $inviteTokens;
+    };
 
     /**
      * Boots extension providers only when public runtime code needs extension services.
@@ -66,7 +85,7 @@ return static function (array $rvn): array {
     /**
      * Builds the public controller on first use so route registration stays light.
      */
-    $rvn['public_controller'] = static function () use (&$publicController, $rvn, $service, $extensionServicesProvider): PublicController {
+    $rvn['public_controller'] = static function () use (&$publicController, $rvn, $service, $extensionServicesProvider, $inviteTokenRepository): PublicController {
         if ($publicController instanceof PublicController) {
             return $publicController;
         }
@@ -81,7 +100,7 @@ return static function (array $rvn): array {
             $service('redirect'),
             $service('taxonomy_lookup'),
             $service('user'),
-            $service('invite_tokens'),
+            $inviteTokenRepository,
             $rvn['input'],
             $rvn['csrf'],
             $extensionServicesProvider

@@ -14,10 +14,10 @@ use Raven\Core\Config;
 use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\SchemaManager;
 use Raven\Core\Extension\ExtensionRegistry;
-use Raven\Core\Media\PageImageManager;
 use Raven\Core\View;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
+use Raven\Lib\Extension\ExtensionRuntimeRegistry;
 use Raven\Lib\Log\EventLogger;
 use Raven\Lib\Scheduler\SchedulerRegistry;
 use Raven\Lib\Session\SessionCookiePolicy;
@@ -26,12 +26,10 @@ use Raven\Lib\Security\InputSanitizer;
 use Raven\Repository\CategoryRepository;
 use Raven\Repository\ChannelRepository;
 use Raven\Repository\GroupRepository;
-use Raven\Repository\InviteTokenRepository;
 use Raven\Repository\PageImageRepository;
 use Raven\Repository\PageRepository;
 use Raven\Repository\RedirectRepository;
 use Raven\Repository\TagRepository;
-use Raven\Repository\TaxonomySetRepository;
 use Raven\Repository\TaxonomyLookupRepository;
 use Raven\Repository\UserRepository;
 
@@ -135,20 +133,9 @@ return (static function (): array {
     $serviceCache = [];
     $serviceFactories = [
         'category' => static fn (): CategoryRepository => new CategoryRepository($rvnDb, $driver, $prefix),
-        'category_set' => static fn (): TaxonomySetRepository => new TaxonomySetRepository('category', $root . '/private/dat/category-set'),
         'channel' => static fn (): ChannelRepository => new ChannelRepository($rvnDb, $driver, $prefix, $root . '/private/dat/channel'),
         'group' => static fn (): GroupRepository => new GroupRepository($rvnDb, $driver, $prefix),
-        'invite_tokens' => static fn (): InviteTokenRepository => new InviteTokenRepository($authDb, $driver, $prefix),
         'page_images' => static fn (): PageImageRepository => new PageImageRepository($rvnDb, $driver, $prefix),
-        'page_image_manager' => static function () use ($config, $input, &$serviceFactories, &$serviceCache, $root): PageImageManager {
-            if (!isset($serviceCache['page_images'])) {
-                $serviceCache['page_images'] = $serviceFactories['page_images']();
-            }
-
-            /** @var PageImageRepository $pageImages */
-            $pageImages = $serviceCache['page_images'];
-            return new PageImageManager($config, $input, $pageImages, $root);
-        },
         'page' => static function () use ($rvnDb, $driver, $prefix, $categoryEnabled, $tagEnabled, &$serviceFactories, &$serviceCache): PageRepository {
             if (!isset($serviceCache['channel'])) {
                 $serviceCache['channel'] = $serviceFactories['channel']();
@@ -168,7 +155,6 @@ return (static function (): array {
             return new RedirectRepository($rvnDb, $driver, $prefix, $channelRepo);
         },
         'tag' => static fn (): TagRepository => new TagRepository($rvnDb, $driver, $prefix),
-        'tag_set' => static fn (): TaxonomySetRepository => new TaxonomySetRepository('tag', $root . '/private/dat/tag-set'),
         'taxonomy_lookup' => static function () use ($rvnDb, $driver, $prefix, &$serviceFactories, &$serviceCache): TaxonomyLookupRepository {
             if (!isset($serviceCache['channel'])) {
                 $serviceCache['channel'] = $serviceFactories['channel']();
@@ -179,8 +165,6 @@ return (static function (): array {
             return new TaxonomyLookupRepository($rvnDb, $driver, $prefix, $channelRepo);
         },
         'user' => static fn (): UserRepository => new UserRepository($authDb, $rvnDb, $driver, $prefix),
-        // The logger is lazy so quiet requests do not pay for log-repository wiring.
-        'logger' => static fn (): EventLogger => new EventLogger($rvnDb, $driver, $prefix, $loggingConfig),
     ];
     $service = static function (string $name) use (&$serviceCache, $serviceFactories): mixed {
         if (!array_key_exists($name, $serviceFactories)) {
@@ -193,10 +177,20 @@ return (static function (): array {
 
         return $serviceCache[$name];
     };
+    $logger = null;
+    $loggerResolver = static function () use (&$logger, $rvnDb, $driver, $prefix, $loggingConfig): EventLogger {
+        if (!$logger instanceof EventLogger) {
+            // Keep logger wiring local to core bootstrap internals so rare panel/log
+            // consumers do not expand the shared repo service contract.
+            $logger = new EventLogger($rvnDb, $driver, $prefix, $loggingConfig);
+        }
+
+        return $logger;
+    };
 
     // Hook into PHP's error handler to capture runtime errors/warnings into the event log.
     // Returns false so PHP's own default handler still runs (stderr/error_log output continues).
-    set_error_handler(static function (int $errno, string $errstr, string $errfile, int $errline) use ($service): bool {
+    set_error_handler(static function (int $errno, string $errstr, string $errfile, int $errline) use ($loggerResolver): bool {
         if (!($errno & error_reporting())) {
             // Error is suppressed by the current error_reporting level — skip it.
             return false;
@@ -207,9 +201,7 @@ return (static function (): array {
             : 'warn';
 
         try {
-            /** @var EventLogger $logger */
-            $logger = $service('logger');
-            $logger->log($severity, $errstr, 'system', [
+            $loggerResolver()->log($severity, $errstr, 'system', [
                 'errno' => $errno,
                 'file'  => $errfile,
                 'line'  => $errline,
@@ -221,50 +213,14 @@ return (static function (): array {
         return false;
     });
 
-    $extensionManifests = [];
-    $extensionStorage = [];
-    $extensionBootProviders = [];
-    $schedulerExtensions = [];
-    foreach ($enabledExtensionDirectories as $directory) {
-        $manifest = ExtensionRegistry::readManifest($root, $directory);
-        if (!is_array($manifest)) {
-            continue;
-        }
-
-        $extensionManifests[$directory] = $manifest;
-
-        $bootstrap = $extensionBootstrapResolver->resolve($root, $directory, $manifest);
-        if (!$bootstrap['valid']) {
-            error_log('Raven extension bootstrap is invalid for extension "' . $directory . '": ' . (string) ($bootstrap['error'] ?? 'Unknown error.'));
-            continue;
-        }
-
-        if (!empty($bootstrap['scheduler'])) {
-            $schedulerExtensions[] = $directory;
-        }
-
-        $storage = is_array($bootstrap['storage'] ?? null) ? (array) $bootstrap['storage'] : [];
-        $extensionStorage[$directory] = [
-            'local' => !empty($storage['local']) ? ($root . '/private/dat/ext/' . $directory) : '',
-            'aux' => [],
-            'panel' => !empty($storage['panel']) ? ($root . '/panel/ext/' . $directory) : '',
-            'public' => !empty($storage['public']) ? ($root . '/public/uploads/ext/' . $directory) : '',
-            // Bin storage resolves to the extension's own bin/ directory; private/bin/ contains the symlinks.
-            'bin' => !empty($storage['bin']) ? ($root . '/private/ext/' . $directory . '/bin') : '',
-        ];
-        foreach ((array) ($storage['aux'] ?? []) as $auxDirectory) {
-            if (!is_string($auxDirectory) || $auxDirectory === '') {
-                continue;
-            }
-
-            $extensionStorage[$directory]['aux'][$auxDirectory] = $root . '/' . $auxDirectory;
-        }
-
-        $provider = $bootstrap['boot'] ?? null;
-        if (is_callable($provider)) {
-            $extensionBootProviders[$directory] = $provider;
-        }
-    }
+    $extensionRuntimeRegistry = new ExtensionRuntimeRegistry(
+        $root,
+        $enabledExtensionDirectories,
+        $extensionBootstrapResolver
+    );
+    $extensionManifests = $extensionRuntimeRegistry->manifests();
+    $extensionStorage = $extensionRuntimeRegistry->storageMap();
+    $schedulerExtensions = $extensionRuntimeRegistry->schedulerDirectories();
 
     $rvn = [
         'root' => $root,
@@ -284,50 +240,8 @@ return (static function (): array {
         'extension_services' => [],
     ];
 
-    /**
-     * Resolves nested extension-service values lazily and memoizes the result back
-     * into the shared extension-services map so later lookups stay cheap.
-     */
-    $materializeExtensionValue = null;
-    $materializeExtensionValue = static function (mixed &$value) use (&$materializeExtensionValue): mixed {
-        if ($value instanceof \Closure) {
-            $value = $value();
-        }
-
-        if (!is_array($value)) {
-            return $value;
-        }
-
-        foreach ($value as $key => &$childValue) {
-            $materializeExtensionValue($childValue);
-            $value[$key] = $childValue;
-        }
-        unset($childValue);
-
-        return $value;
-    };
-
-    $bootedExtensionDirectories = [];
-    $extensionServiceResolutionStates = [];
-    $rvn['boot_extension'] = static function (string $directory) use (&$rvn, &$bootedExtensionDirectories, $extensionBootProviders): array {
-        $directory = trim($directory);
-        if ($directory === '' || isset($bootedExtensionDirectories[$directory])) {
-            return $rvn;
-        }
-
-        $bootedExtensionDirectories[$directory] = true;
-        $provider = $extensionBootProviders[$directory] ?? null;
-        if (!is_callable($provider)) {
-            return $rvn;
-        }
-
-        try {
-            $provider($rvn);
-        } catch (\Throwable $exception) {
-            error_log('Raven extension bootstrap failed for extension "' . $directory . '": ' . $exception->getMessage());
-        }
-
-        return $rvn;
+    $rvn['boot_extension'] = static function (string $directory) use (&$rvn, $extensionRuntimeRegistry): array {
+        return $extensionRuntimeRegistry->bootExtension($rvn, $directory);
     };
 
     /**
@@ -335,68 +249,8 @@ return (static function (): array {
      *
      * @return array<string, mixed>
      */
-    $rvn['extension_services_for'] = static function (string $directory) use (&$rvn, $materializeExtensionValue, &$extensionServiceResolutionStates): array {
-        $directory = trim($directory);
-        if ($directory === '') {
-            return [];
-        }
-
-        if (is_callable($rvn['boot_extension'] ?? null)) {
-            /** @var callable(string): array<string, mixed> $bootExtension */
-            $bootExtension = $rvn['boot_extension'];
-            $rvn = $bootExtension($directory);
-        }
-
-        /** @var mixed $rawExtensionServices */
-        $rawExtensionServices = $rvn['extension_services'] ?? [];
-        if (!is_array($rawExtensionServices)) {
-            return [];
-        }
-
-        if (!array_key_exists($directory, $rawExtensionServices) || !is_array($rawExtensionServices[$directory])) {
-            return [];
-        }
-
-        $resolutionState = $extensionServiceResolutionStates[$directory] ?? null;
-        if (is_array($resolutionState)) {
-            $cachedServices = $resolutionState['services'] ?? [];
-            if (in_array((string) ($resolutionState['state'] ?? ''), ['resolving', 'resolved'], true) && is_array($cachedServices)) {
-                return $cachedServices;
-            }
-        }
-
-        /** @var array<string, mixed> $services */
-        $services = $rawExtensionServices[$directory];
-        $resolver = $materializeExtensionValue ?? static fn (mixed &$value): mixed => $value;
-
-        $extensionServiceResolutionStates[$directory] = [
-            'state' => 'resolving',
-            'services' => $services,
-        ];
-
-        try {
-            foreach ($services as $serviceKey => &$serviceValue) {
-                $resolver($serviceValue);
-                $services[$serviceKey] = $serviceValue;
-                $extensionServiceResolutionStates[$directory] = [
-                    'state' => 'resolving',
-                    'services' => $services,
-                ];
-            }
-            unset($serviceValue);
-        } catch (\Throwable $exception) {
-            unset($extensionServiceResolutionStates[$directory]);
-            throw $exception;
-        }
-
-        $rawExtensionServices[$directory] = $services;
-        $rvn['extension_services'] = $rawExtensionServices;
-        $extensionServiceResolutionStates[$directory] = [
-            'state' => 'resolved',
-            'services' => $services,
-        ];
-
-        return $services;
+    $rvn['extension_services_for'] = static function (string $directory) use (&$rvn, $extensionRuntimeRegistry): array {
+        return $extensionRuntimeRegistry->resolveExtensionServices($rvn, $directory);
     };
 
     /**
@@ -404,19 +258,8 @@ return (static function (): array {
      *
      * @return array<string, array<string, mixed>>
      */
-    $rvn['extension_services_all'] = static function () use (&$rvn, $extensionBootProviders): array {
-        $services = [];
-        foreach (array_keys($extensionBootProviders) as $directory) {
-            if (!is_callable($rvn['extension_services_for'] ?? null)) {
-                continue;
-            }
-
-            /** @var callable(string): array<string, mixed> $extensionServicesFor */
-            $extensionServicesFor = $rvn['extension_services_for'];
-            $services[$directory] = $extensionServicesFor($directory);
-        }
-
-        return $services;
+    $rvn['extension_services_all'] = static function () use (&$rvn, $extensionRuntimeRegistry): array {
+        return $extensionRuntimeRegistry->resolveAllExtensionServices($rvn);
     };
 
     /**
@@ -430,57 +273,18 @@ return (static function (): array {
      * @return array<string, mixed>
      */
     $coreContainerKeys = [];
-    $rvn['extension_context_for'] = static function (string $directory) use (&$rvn, &$coreContainerKeys): array {
-        $directory = trim($directory);
-        if ($directory === '') {
-            return [];
-        }
-
-        if (is_callable($rvn['extension_services_for'] ?? null)) {
-            /** @var callable(string): array<string, mixed> $extensionServicesFor */
-            $extensionServicesFor = $rvn['extension_services_for'];
-            $extensionServicesFor($directory);
-        } elseif (is_callable($rvn['boot_extension'] ?? null)) {
-            /** @var callable(string): array<string, mixed> $bootExtension */
-            $bootExtension = $rvn['boot_extension'];
-            $rvn = $bootExtension($directory);
-        }
-
-        $overlay = [];
-        foreach ($rvn as $key => $value) {
-            if ($key === 'extension_services') {
-                if (is_array($value) && array_key_exists($directory, $value)) {
-                    $overlay[$key] = $value;
-                }
-                continue;
-            }
-
-            if (isset($coreContainerKeys[$key])) {
-                continue;
-            }
-
-            $overlay[$key] = $value;
-        }
-
-        return $overlay;
+    $rvn['extension_context_for'] = static function (string $directory) use (&$rvn, &$coreContainerKeys, $extensionRuntimeRegistry): array {
+        return $extensionRuntimeRegistry->extensionContext($rvn, $directory, $coreContainerKeys);
     };
 
     $extensionsBooted = false;
-    $rvn['boot_extensions'] = static function () use (&$extensionsBooted, &$rvn, $extensionBootProviders): array {
+    $rvn['boot_extensions'] = static function () use (&$extensionsBooted, &$rvn, $extensionRuntimeRegistry): array {
         if ($extensionsBooted) {
             return $rvn;
         }
 
         $extensionsBooted = true;
-        foreach (array_keys($extensionBootProviders) as $directory) {
-            if (is_callable($rvn['boot_extension'] ?? null)) {
-                /** @var callable(string): array<string, mixed> $bootExtension */
-                $bootExtension = $rvn['boot_extension'];
-                $rvn = $bootExtension($directory);
-            }
-        }
-
-        return $rvn;
+        return $extensionRuntimeRegistry->bootAllExtensions($rvn);
     };
 
     // Wire the system-wide scheduler.
@@ -502,9 +306,8 @@ return (static function (): array {
 
     // Built-in core job: prune event log entries older than the configured retention period.
     // Runs once per day (86400 s). Pruning is deferred to a job so the logger's hot path stays fast.
-    $scheduler->registerJob('core', 'event-log-prune', 86400, static function () use ($service): void {
-        /** @var EventLogger $logger */
-        $logger = $service('logger');
+    $scheduler->registerJob('core', 'event-log-prune', 86400, static function () use ($loggerResolver): void {
+        $logger = $loggerResolver();
         $logger->pruneOlderThan($logger->retentionDays());
     });
 

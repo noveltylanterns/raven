@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Controller;
 
+use Closure;
 use ZipArchive;
 use lbuchs\WebAuthn\WebAuthn;
 use lbuchs\WebAuthn\WebAuthnException;
@@ -108,19 +109,24 @@ final class PanelController
     private SessionFlash $flashList;
     private LoginIdentifierResolver $identifierResolver;
     private PageImageRepository $pageImages;
-    private PageImageManager $pageImageManager;
+    private ?PageImageManager $pageImageManager = null;
+    private Closure $pageImageManagerResolver;
     private CategoryRepository $categoryRepo;
-    private TaxonomySetRepository $categorySetRepo;
+    private ?TaxonomySetRepository $categorySetRepo = null;
+    private Closure $categorySetRepoResolver;
     private ChannelRepository $channelRepo;
     private GroupRepository $groupRepo;
     private PageRepository $pageRepo;
     private RedirectRepository $redirectRepo;
     private TagRepository $tagRepo;
-    private TaxonomySetRepository $tagSetRepo;
+    private ?TaxonomySetRepository $tagSetRepo = null;
+    private Closure $tagSetRepoResolver;
     private TaxonomyLookupRepository $taxonomyLookupRepo;
     private UserRepository $userRepo;
-    private InviteTokenRepository $inviteTokens;
-    private EventLogger $logger;
+    private ?InviteTokenRepository $inviteTokens = null;
+    private Closure $inviteTokensResolver;
+    private ?EventLogger $logger = null;
+    private Closure $loggerResolver;
     /** @var array<string, array{label: string, editor: string}>|null */
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
     private ?ArchivePackageService $archivePackages = null;
@@ -173,19 +179,19 @@ final class PanelController
         InputSanitizer $input,
         Csrf $csrf,
         PageImageRepository $pageImages,
-        PageImageManager $pageImageManager,
+        callable $pageImageManagerResolver,
         CategoryRepository $categoryRepo,
-        TaxonomySetRepository $categorySetRepo,
+        callable $categorySetRepoResolver,
         ChannelRepository $channelRepo,
         GroupRepository $groupRepo,
         PageRepository $pageRepo,
         RedirectRepository $redirectRepo,
         TagRepository $tagRepo,
-        TaxonomySetRepository $tagSetRepo,
+        callable $tagSetRepoResolver,
         TaxonomyLookupRepository $taxonomyLookupRepo,
         UserRepository $userRepo,
-        InviteTokenRepository $inviteTokens,
-        EventLogger $logger
+        callable $inviteTokensResolver,
+        callable $loggerResolver
     ) {
         $this->view = $view;
         $this->config = $config;
@@ -196,19 +202,124 @@ final class PanelController
         $this->flashList = new SessionFlash('_raven_flash_list');
         $this->identifierResolver = new LoginIdentifierResolver();
         $this->pageImages = $pageImages;
-        $this->pageImageManager = $pageImageManager;
+        $this->pageImageManagerResolver = Closure::fromCallable($pageImageManagerResolver);
         $this->categoryRepo = $categoryRepo;
-        $this->categorySetRepo = $categorySetRepo;
+        $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
         $this->channelRepo = $channelRepo;
         $this->groupRepo = $groupRepo;
         $this->pageRepo = $pageRepo;
         $this->redirectRepo = $redirectRepo;
         $this->tagRepo = $tagRepo;
-        $this->tagSetRepo = $tagSetRepo;
+        $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
         $this->taxonomyLookupRepo = $taxonomyLookupRepo;
         $this->userRepo = $userRepo;
+        $this->inviteTokensResolver = Closure::fromCallable($inviteTokensResolver);
+        $this->loggerResolver = Closure::fromCallable($loggerResolver);
+    }
+
+    /**
+     * Returns the page-image manager on first use so non-media panel routes do
+     * not instantiate upload/storage helpers.
+     *
+     * @return PageImageManager Shared page-image manager.
+     */
+    private function pageImageManager(): PageImageManager
+    {
+        if ($this->pageImageManager instanceof PageImageManager) {
+            return $this->pageImageManager;
+        }
+
+        $pageImageManager = ($this->pageImageManagerResolver)();
+        if (!$pageImageManager instanceof PageImageManager) {
+            throw new \RuntimeException('Panel page-image manager resolver returned an invalid value.');
+        }
+
+        $this->pageImageManager = $pageImageManager;
+        return $this->pageImageManager;
+    }
+
+    /**
+     * Returns the category-set repository on first use so non-taxonomy routes
+     * do not instantiate file-backed taxonomy set storage.
+     *
+     * @return TaxonomySetRepository Category-set repository.
+     */
+    private function categorySetRepo(): TaxonomySetRepository
+    {
+        if ($this->categorySetRepo instanceof TaxonomySetRepository) {
+            return $this->categorySetRepo;
+        }
+
+        $categorySetRepo = ($this->categorySetRepoResolver)();
+        if (!$categorySetRepo instanceof TaxonomySetRepository) {
+            throw new \RuntimeException('Panel category-set repository resolver returned an invalid value.');
+        }
+
+        $this->categorySetRepo = $categorySetRepo;
+        return $this->categorySetRepo;
+    }
+
+    /**
+     * Returns the tag-set repository on first use so non-taxonomy routes do not
+     * instantiate file-backed taxonomy set storage.
+     *
+     * @return TaxonomySetRepository Tag-set repository.
+     */
+    private function tagSetRepo(): TaxonomySetRepository
+    {
+        if ($this->tagSetRepo instanceof TaxonomySetRepository) {
+            return $this->tagSetRepo;
+        }
+
+        $tagSetRepo = ($this->tagSetRepoResolver)();
+        if (!$tagSetRepo instanceof TaxonomySetRepository) {
+            throw new \RuntimeException('Panel tag-set repository resolver returned an invalid value.');
+        }
+
+        $this->tagSetRepo = $tagSetRepo;
+        return $this->tagSetRepo;
+    }
+
+    /**
+     * Returns the invite-token repository on first use so non-invite panel
+     * routes do not instantiate registration token storage.
+     *
+     * @return InviteTokenRepository Invite-token repository.
+     */
+    private function inviteTokens(): InviteTokenRepository
+    {
+        if ($this->inviteTokens instanceof InviteTokenRepository) {
+            return $this->inviteTokens;
+        }
+
+        $inviteTokens = ($this->inviteTokensResolver)();
+        if (!$inviteTokens instanceof InviteTokenRepository) {
+            throw new \RuntimeException('Panel invite-token repository resolver returned an invalid value.');
+        }
+
         $this->inviteTokens = $inviteTokens;
+        return $this->inviteTokens;
+    }
+
+    /**
+     * Returns the event logger on first use so ordinary panel routes do not
+     * instantiate log storage/query helpers.
+     *
+     * @return EventLogger Event logger for panel log management.
+     */
+    private function logger(): EventLogger
+    {
+        if ($this->logger instanceof EventLogger) {
+            return $this->logger;
+        }
+
+        $logger = ($this->loggerResolver)();
+        if (!$logger instanceof EventLogger) {
+            throw new \RuntimeException('Panel event logger resolver returned an invalid value.');
+        }
+
         $this->logger = $logger;
+        return $this->logger;
     }
 
     /**
@@ -738,7 +849,7 @@ final class PanelController
     {
         $isTag = strtolower(trim($kind)) === 'tag';
         $path = $isTag ? 'tag.set' : 'category.set';
-        $repo = $isTag ? $this->tagSetRepo : $this->categorySetRepo;
+        $repo = $isTag ? $this->tagSetRepo() : $this->categorySetRepo();
         $configuredId = $this->input->int($this->config->get($path, TaxonomySetRecordPolicy::DEFAULT_SET_ID), TaxonomySetRecordPolicy::DEFAULT_SET_ID);
         if ($configuredId === null || !$repo->existsId($configuredId)) {
             return TaxonomySetRecordPolicy::DEFAULT_SET_ID;
@@ -902,7 +1013,7 @@ final class PanelController
         $errors = [];
 
         foreach ($uploads as $upload) {
-            $result = $this->pageImageManager->uploadForPage($pageId, $upload);
+            $result = $this->pageImageManager()->uploadForPage($pageId, $upload);
             if ((bool) ($result['ok'] ?? false)) {
                 $successCount++;
                 continue;
@@ -953,7 +1064,7 @@ final class PanelController
 
         // Single-row delete action has priority when explicit image id is posted.
         if ($imageId !== null) {
-            if (!$this->pageImageManager->deleteImageForPage($pageId, $imageId)) {
+            if (!$this->pageImageManager()->deleteImageForPage($pageId, $imageId)) {
                 $this->flash('error', 'Image not found or already deleted.');
                 redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
             }
@@ -972,7 +1083,7 @@ final class PanelController
         $failedCount = 0;
 
         foreach ($selectedImageIds as $selectedImageId) {
-            if ($this->pageImageManager->deleteImageForPage($pageId, $selectedImageId)) {
+            if ($this->pageImageManager()->deleteImageForPage($pageId, $selectedImageId)) {
                 $deletedCount++;
             } else {
                 $failedCount++;
@@ -1013,7 +1124,7 @@ final class PanelController
         if ($id !== null) {
             // Single-row delete path (row action button).
             try {
-                $this->pageImageManager->deleteAllForPage($id);
+                $this->pageImageManager()->deleteAllForPage($id);
                 $this->pageRepo->deleteById($id);
             } catch (\Throwable) {
                 $this->flash('error', 'Failed to delete page.');
@@ -1037,7 +1148,7 @@ final class PanelController
         foreach ($selectedIds as $selectedId) {
             try {
                 // Keep processing all selected ids even when one delete fails.
-                $this->pageImageManager->deleteAllForPage($selectedId);
+                $this->pageImageManager()->deleteAllForPage($selectedId);
                 $this->pageRepo->deleteById($selectedId);
                 $deletedCount++;
             } catch (\Throwable) {
@@ -1134,8 +1245,8 @@ final class PanelController
             'feedsEnabled' => $this->routeConfigService()->feedEnabled(),
             'categoryEnabled' => $this->categoryEnabled(),
             'tagEnabled' => $this->tagEnabled(),
-            'categorySetOptions' => $this->categorySetRepo->listOptions(),
-            'tagSetOptions' => $this->tagSetRepo->listOptions(),
+            'categorySetOptions' => $this->categorySetRepo()->listOptions(),
+            'tagSetOptions' => $this->tagSetRepo()->listOptions(),
             'rssFeedRoute' => $this->routeConfigService()->rssFeedRoute(),
             'atomFeedRoute' => $this->routeConfigService()->atomFeedRoute(),
             'imageAllowedExtensions' => $this->taxonomyAllowedImageExtensionsLabel(),
@@ -1171,7 +1282,7 @@ final class PanelController
         }
 
         $activeTab = $this->panelEditorTabService()->normalizeEditorTab($post['tab'] ?? null, ['basic', 'meta', 'media'], 'basic');
-        $existingSet = $id !== null && $id > 0 ? $this->categorySetRepo->findById($id) : null;
+        $existingSet = $id !== null && $id > 0 ? $this->categorySetRepo()->findById($id) : null;
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
         if ($slug === null && is_array($existingSet)) {
@@ -1191,11 +1302,11 @@ final class PanelController
         $feedsEnabled = $this->routeConfigService()->feedEnabled();
         $categorySetSelection = $this->normalizeSubmittedSetSelection(
             $post['category_sets'] ?? [],
-            $this->categorySetRepo->listOptions()
+            $this->categorySetRepo()->listOptions()
         );
         $tagSetSelection = $this->normalizeSubmittedSetSelection(
             $post['tag_sets'] ?? [],
-            $this->tagSetRepo->listOptions()
+            $this->tagSetRepo()->listOptions()
         );
 
         if ($name === '' || $slug === null) {
@@ -1403,7 +1514,7 @@ final class PanelController
         if (
             $selectedSetId !== null
             && (
-                !$this->categorySetRepo->existsId($selectedSetId)
+                !$this->categorySetRepo()->existsId($selectedSetId)
                 || (int) ($categoryCountsBySetId[$selectedSetId] ?? 0) < 1
             )
         ) {
@@ -1422,7 +1533,7 @@ final class PanelController
         }
 
         $setOptions = [];
-        foreach ($this->categorySetRepo->listOptions() as $setOption) {
+        foreach ($this->categorySetRepo()->listOptions() as $setOption) {
             $setId = (int) ($setOption['id'] ?? 0);
             if ((int) ($categoryCountsBySetId[$setId] ?? 0) < 1) {
                 continue;
@@ -1476,7 +1587,7 @@ final class PanelController
         $this->view->render('panel/category/edit', [
             'site' => $this->siteData(),
             'category' => $category,
-            'setOptions' => $this->categorySetRepo->listOptions(),
+            'setOptions' => $this->categorySetRepo()->listOptions(),
             'categoryRoutePrefix' => $this->categoryRoutePrefix(),
             'imageAllowedExtensions' => $this->taxonomyAllowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyMaxImageFilesizeKb(),
@@ -1520,7 +1631,7 @@ final class PanelController
         $setId = $this->input->int($post['set'] ?? null, 1);
         $description = $this->input->text($post['description'] ?? null, 2000);
 
-        if ($name === '' || $slug === null || $setId === null || !$this->categorySetRepo->existsId($setId)) {
+        if ($name === '' || $slug === null || $setId === null || !$this->categorySetRepo()->existsId($setId)) {
             $this->flash('error', 'Category name, valid slug, and valid set are required.');
             redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/category/edit', $id, $activeTab, 'basic'));
         }
@@ -1736,7 +1847,7 @@ final class PanelController
 
         $countsBySetId = $this->categoryRepo->countsBySetId();
         $setRows = [];
-        foreach ($this->categorySetRepo->listAll() as $setRow) {
+        foreach ($this->categorySetRepo()->listAll() as $setRow) {
             $setId = (int) ($setRow['id'] ?? 0);
             $setRow['category_count'] = (int) ($countsBySetId[$setId] ?? 0);
             $setRow['channel_count'] = $this->channelRepo->countExplicitTaxonomySetAssignments('category', $setId);
@@ -1772,7 +1883,7 @@ final class PanelController
 
         $set = null;
         if ($id !== null) {
-            $set = $this->categorySetRepo->findById($id);
+            $set = $this->categorySetRepo()->findById($id);
             if ($set === null) {
                 $this->flash('error', 'Category set not found.');
                 redirect($this->panelUrl('/category/set'));
@@ -1830,7 +1941,7 @@ final class PanelController
         }
 
         try {
-            $savedId = $this->categorySetRepo->save([
+            $savedId = $this->categorySetRepo()->save([
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug ?? '',
@@ -1885,7 +1996,7 @@ final class PanelController
         }
 
         try {
-            $this->categorySetRepo->deleteById($id);
+            $this->categorySetRepo()->deleteById($id);
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->flash('error', $message !== '' ? $message : 'Failed to delete category set.');
@@ -1915,7 +2026,7 @@ final class PanelController
         if (
             $selectedSetId !== null
             && (
-                !$this->tagSetRepo->existsId($selectedSetId)
+                !$this->tagSetRepo()->existsId($selectedSetId)
                 || (int) ($tagCountsBySetId[$selectedSetId] ?? 0) < 1
             )
         ) {
@@ -1934,7 +2045,7 @@ final class PanelController
         }
 
         $setOptions = [];
-        foreach ($this->tagSetRepo->listOptions() as $setOption) {
+        foreach ($this->tagSetRepo()->listOptions() as $setOption) {
             $setId = (int) ($setOption['id'] ?? 0);
             if ((int) ($tagCountsBySetId[$setId] ?? 0) < 1) {
                 continue;
@@ -1988,7 +2099,7 @@ final class PanelController
         $this->view->render('panel/tag/edit', [
             'site' => $this->siteData(),
             'tag' => $tag,
-            'setOptions' => $this->tagSetRepo->listOptions(),
+            'setOptions' => $this->tagSetRepo()->listOptions(),
             'tagRoutePrefix' => $this->tagRoutePrefix(),
             'imageAllowedExtensions' => $this->taxonomyAllowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyMaxImageFilesizeKb(),
@@ -2032,7 +2143,7 @@ final class PanelController
         $setId = $this->input->int($post['set'] ?? null, 1);
         $description = $this->input->text($post['description'] ?? null, 2000);
 
-        if ($name === '' || $slug === null || $setId === null || !$this->tagSetRepo->existsId($setId)) {
+        if ($name === '' || $slug === null || $setId === null || !$this->tagSetRepo()->existsId($setId)) {
             $this->flash('error', 'Tag name, valid slug, and valid set are required.');
             redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/tag/edit', $id, $activeTab, 'basic'));
         }
@@ -2248,7 +2359,7 @@ final class PanelController
 
         $countsBySetId = $this->tagRepo->countsBySetId();
         $setRows = [];
-        foreach ($this->tagSetRepo->listAll() as $setRow) {
+        foreach ($this->tagSetRepo()->listAll() as $setRow) {
             $setId = (int) ($setRow['id'] ?? 0);
             $setRow['tag_count'] = (int) ($countsBySetId[$setId] ?? 0);
             $setRow['channel_count'] = $this->channelRepo->countExplicitTaxonomySetAssignments('tag', $setId);
@@ -2284,7 +2395,7 @@ final class PanelController
 
         $set = null;
         if ($id !== null) {
-            $set = $this->tagSetRepo->findById($id);
+            $set = $this->tagSetRepo()->findById($id);
             if ($set === null) {
                 $this->flash('error', 'Tag set not found.');
                 redirect($this->panelUrl('/tag/set'));
@@ -2337,7 +2448,7 @@ final class PanelController
         }
 
         try {
-            $savedId = $this->tagSetRepo->save([
+            $savedId = $this->tagSetRepo()->save([
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug ?? '',
@@ -2392,7 +2503,7 @@ final class PanelController
         }
 
         try {
-            $this->tagSetRepo->deleteById($id);
+            $this->tagSetRepo()->deleteById($id);
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->flash('error', $message !== '' ? $message : 'Failed to delete tag set.');
@@ -3298,7 +3409,7 @@ final class PanelController
 
         $this->view->render('panel/user/invites', [
             'site' => $this->siteData(),
-            'inviteRows' => $this->inviteTokens->listForPanel(),
+            'inviteRows' => $this->inviteTokens()->listForPanel(),
             'inviteCreatorMap' => $this->inviteCreatorMap(),
             'inviteGeneratedTokens' => $this->pullFlashList('generated_invites'),
             'inviteRegistrationMode' => $this->registrationMode(),
@@ -3380,7 +3491,7 @@ final class PanelController
         }
 
         try {
-            $token = $this->inviteTokens->createToken($isReusable, $expiresAt, $this->auth->userId(), $manualToken);
+            $token = $this->inviteTokens()->createToken($isReusable, $expiresAt, $this->auth->userId(), $manualToken);
         } catch (\Throwable $exception) {
             $this->flash('error', 'Failed to create invite token: ' . ($exception->getMessage() ?: 'Unknown error.'));
             redirect($this->panelUrl('/user/invites'));
@@ -3421,7 +3532,7 @@ final class PanelController
         }
 
         try {
-            $tokens = $this->inviteTokens->createSingleUseBatch($count, $expiresAt, $this->auth->userId());
+            $tokens = $this->inviteTokens()->createSingleUseBatch($count, $expiresAt, $this->auth->userId());
         } catch (\Throwable $exception) {
             $this->flash('error', 'Failed to generate invite tokens: ' . ($exception->getMessage() ?: 'Unknown error.'));
             redirect($this->panelUrl('/user/invites'));
@@ -3458,7 +3569,7 @@ final class PanelController
             redirect($this->panelUrl('/user/invites'));
         }
 
-        if (!$this->inviteTokens->deleteById($id)) {
+        if (!$this->inviteTokens()->deleteById($id)) {
             $this->flash('error', 'Invite token was not found.');
             redirect($this->panelUrl('/user/invites'));
         }
@@ -4361,8 +4472,8 @@ final class PanelController
         $configSnapshot = $this->applyConfigEditorDefaults($configSnapshot);
         $activeConfigTab = $this->normalizeConfigEditorTab($_GET['tab'] ?? 'basic');
         $channelOptions = $this->channelRepo->listRoutingOptions();
-        $categorySetOptions = $this->categorySetRepo->listOptions();
-        $tagSetOptions = $this->tagSetRepo->listOptions();
+        $categorySetOptions = $this->categorySetRepo()->listOptions();
+        $tagSetOptions = $this->tagSetRepo()->listOptions();
 
         $this->view->render('panel/configuration', [
             'site' => $this->siteData(),
@@ -5726,8 +5837,8 @@ final class PanelController
             fn (string $theme, bool $allowDefault): ?string => $this->normalizePanelThemeChoice($theme, $allowDefault),
             $this->publicThemeOptions(),
             $this->channelRepo->listRoutingOptions(),
-            $this->categorySetRepo->listOptions(),
-            $this->tagSetRepo->listOptions()
+            $this->categorySetRepo()->listOptions(),
+            $this->tagSetRepo()->listOptions()
         );
     }
 
@@ -8136,7 +8247,7 @@ final class PanelController
 
         $perPage       = 50;
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $totalItems    = $this->logger->count($filters);
+        $totalItems    = $this->logger()->count($filters);
         $pagination    = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
 
         // Re-clamp page if the requested page is out of range.
@@ -8144,7 +8255,7 @@ final class PanelController
             $requestedPage = $pagination['current'];
         }
 
-        $rows = $this->logger->query($filters, $perPage, $pagination['offset']);
+        $rows = $this->logger()->query($filters, $perPage, $pagination['offset']);
 
         // Build query array for pagination link generation (preserve active filters).
         $paginationQuery = [];
@@ -8161,7 +8272,7 @@ final class PanelController
             'filters'            => ['severity' => $severity, 'search' => $search],
             'pagination'         => $this->panelPaginationViewData('/logs', $pagination, $paginationQuery),
             'totalItems'         => $totalItems,
-            'loggingEnabled'     => $this->logger->isEnabled('error') || $this->logger->isEnabled('warn') || $this->logger->isEnabled('info'),
+            'loggingEnabled'     => $this->logger()->isEnabled('error') || $this->logger()->isEnabled('warn') || $this->logger()->isEnabled('info'),
             'csrfField'          => $this->csrf->field(),
             'flashSuccess'       => $this->pullFlash('success'),
             'flashError'         => $this->pullFlash('error'),
@@ -8198,7 +8309,7 @@ final class PanelController
             $filters['search'] = $search;
         }
 
-        $rows     = $this->logger->allForExport($filters);
+        $rows     = $this->logger()->allForExport($filters);
         $filename = 'event-log-' . gmdate('Ymd-His') . '.csv';
 
         while (ob_get_level() > 0) {
@@ -8251,7 +8362,7 @@ final class PanelController
             redirect($this->panelUrl('/logs'));
         }
 
-        $deleted = $this->logger->clear();
+        $deleted = $this->logger()->clear();
         $this->flash('success', 'Event log cleared (' . $deleted . ' ' . ($deleted === 1 ? 'entry' : 'entries') . ' removed).');
         redirect($this->panelUrl('/logs'));
     }
