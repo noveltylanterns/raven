@@ -138,6 +138,8 @@ return [
     'boot' => static function (array &$rvn): void {
         // Use $rvn['extension_storage']['{slug}'] for resolved storage roots.
         // Register extension services into $rvn['extension_services'] when needed.
+        // Values may be concrete service objects or lazy zero-arg closures that
+        // Raven resolves through extension_services_for('{slug}') on first use.
         // To register a shortcode runtime: $rvn['extension_services']['{slug}']['shortcode_runtimes'][] = $runtime;
     },
 ];
@@ -445,6 +447,7 @@ declare(strict_types=1);
 - `signup_forms`
 - `signup_submissions`
 - Note: extension-owned service keys are optional and depend on whether the extension is enabled and whether its `ext.php` registered them.
+- During route registration, Raven syncs the current extension's boot overlay back into `$context['rvn']` so legacy route files that read `$rvn['extension_services'][$slug]` or extension-added top-level aliases still work.
 - Prefer `extension_services_for('{slug}')` or the route-context `extensionServices('{slug}')` helper when a route only needs one extension's services.
 - Legacy top-level keys (for example `contact_forms`) remain for compatibility during migration and should be considered transitional.
 - Use `isset(...)` and strict instance checks before assuming any service.

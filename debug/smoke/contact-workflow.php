@@ -447,8 +447,8 @@ final class ContactWorkflowSmokeRunner
      */
     private function contactRepositories(array $rvn): array
     {
-        $rawExtensionServices = is_array($rvn['extension_services'] ?? null) ? (array) $rvn['extension_services'] : [];
-        $rawContactServices = is_array($rawExtensionServices['contact'] ?? null) ? (array) $rawExtensionServices['contact'] : [];
+        $resolver = $rvn['extension_services_for'] ?? null;
+        $rawContactServices = is_callable($resolver) ? $resolver('contact') : [];
         $formsRepository = $rawContactServices['forms'] ?? null;
         $submissionsRepository = $rawContactServices['submissions'] ?? null;
 

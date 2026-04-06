@@ -307,9 +307,9 @@ final class PanelListProfilerRunner
             }
         }
 
-        $rawExtensionServices = is_array($rvn['extension_services'] ?? null) ? (array) $rvn['extension_services'] : [];
-        $rawContactServices = is_array($rawExtensionServices['contact'] ?? null) ? (array) $rawExtensionServices['contact'] : [];
-        $rawSignupServices = is_array($rawExtensionServices['signups'] ?? null) ? (array) $rawExtensionServices['signups'] : [];
+        $servicesFor = $rvn['extension_services_for'] ?? null;
+        $rawContactServices = is_callable($servicesFor) ? $servicesFor('contact') : [];
+        $rawSignupServices = is_callable($servicesFor) ? $servicesFor('signups') : [];
 
         $contactFormsRepository = $rawContactServices['forms'] ?? null;
         if ($contactFormsRepository instanceof \Raven\Repository\ContactFormRepository) {

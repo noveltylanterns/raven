@@ -50,10 +50,11 @@ return static function (array $rvn): array {
             return $extensionServices;
         }
 
-        if (is_callable($rvn['boot_extensions'] ?? null)) {
-            /** @var callable(): array<string, mixed> $bootExtensions */
-            $bootExtensions = $rvn['boot_extensions'];
-            $rvn = $bootExtensions();
+        if (is_callable($rvn['extension_services_all'] ?? null)) {
+            /** @var callable(): array<string, array<string, mixed>> $extensionServicesAll */
+            $extensionServicesAll = $rvn['extension_services_all'];
+            $extensionServices = $extensionServicesAll();
+            return $extensionServices;
         }
 
         /** @var mixed $rawExtensionServices */

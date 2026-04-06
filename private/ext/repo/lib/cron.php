@@ -21,10 +21,9 @@ return [
             $rawRvn = $context['rvn'] ?? [];
             $rvn = is_array($rawRvn) ? $rawRvn : [];
 
-            /** @var mixed $rawExtensionServices */
-            $rawExtensionServices = $rvn['extension_services'] ?? [];
-            /** @var mixed $rawRepoServices */
-            $rawRepoServices = is_array($rawExtensionServices) ? ($rawExtensionServices['repo'] ?? []) : [];
+            /** @var mixed $resolver */
+            $resolver = $rvn['extension_services_for'] ?? null;
+            $rawRepoServices = is_callable($resolver) ? $resolver('repo') : [];
             /** @var mixed $repoServiceRaw */
             $repoServiceRaw = is_array($rawRepoServices) ? ($rawRepoServices['service'] ?? null) : null;
             if (!$repoServiceRaw instanceof RepoService) {

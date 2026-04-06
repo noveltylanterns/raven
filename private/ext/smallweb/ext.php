@@ -30,8 +30,6 @@ return [
     if ($storageDir === '') {
         return;
     }
-    $service = new SmallwebService($root, $storageDir, $rvn['config']);
-
     /** @var mixed $rawExtensionServices */
     $rawExtensionServices = $rvn['extension_services'] ?? [];
     if (!is_array($rawExtensionServices)) {
@@ -44,7 +42,7 @@ return [
         $rawSmallwebServices = [];
     }
 
-    $rawSmallwebServices['service'] = $service;
+    $rawSmallwebServices['service'] = static fn (): SmallwebService => new SmallwebService($root, $storageDir, $rvn['config']);
     $rawExtensionServices['smallweb'] = $rawSmallwebServices;
     $rvn['extension_services'] = $rawExtensionServices;
     },

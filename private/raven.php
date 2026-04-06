@@ -284,7 +284,31 @@ return (static function (): array {
         'extension_services' => [],
     ];
 
+    /**
+     * Resolves nested extension-service values lazily and memoizes the result back
+     * into the shared extension-services map so later lookups stay cheap.
+     */
+    $materializeExtensionValue = null;
+    $materializeExtensionValue = static function (mixed &$value) use (&$materializeExtensionValue): mixed {
+        if ($value instanceof \Closure) {
+            $value = $value();
+        }
+
+        if (!is_array($value)) {
+            return $value;
+        }
+
+        foreach ($value as $key => &$childValue) {
+            $materializeExtensionValue($childValue);
+            $value[$key] = $childValue;
+        }
+        unset($childValue);
+
+        return $value;
+    };
+
     $bootedExtensionDirectories = [];
+    $extensionServiceResolutionStates = [];
     $rvn['boot_extension'] = static function (string $directory) use (&$rvn, &$bootedExtensionDirectories, $extensionBootProviders): array {
         $directory = trim($directory);
         if ($directory === '' || isset($bootedExtensionDirectories[$directory])) {
@@ -311,7 +335,7 @@ return (static function (): array {
      *
      * @return array<string, mixed>
      */
-    $rvn['extension_services_for'] = static function (string $directory) use (&$rvn): array {
+    $rvn['extension_services_for'] = static function (string $directory) use (&$rvn, $materializeExtensionValue, &$extensionServiceResolutionStates): array {
         $directory = trim($directory);
         if ($directory === '') {
             return [];
@@ -325,9 +349,120 @@ return (static function (): array {
 
         /** @var mixed $rawExtensionServices */
         $rawExtensionServices = $rvn['extension_services'] ?? [];
-        /** @var mixed $rawServices */
-        $rawServices = is_array($rawExtensionServices) ? ($rawExtensionServices[$directory] ?? []) : [];
-        return is_array($rawServices) ? $rawServices : [];
+        if (!is_array($rawExtensionServices)) {
+            return [];
+        }
+
+        if (!array_key_exists($directory, $rawExtensionServices) || !is_array($rawExtensionServices[$directory])) {
+            return [];
+        }
+
+        $resolutionState = $extensionServiceResolutionStates[$directory] ?? null;
+        if (is_array($resolutionState)) {
+            $cachedServices = $resolutionState['services'] ?? [];
+            if (in_array((string) ($resolutionState['state'] ?? ''), ['resolving', 'resolved'], true) && is_array($cachedServices)) {
+                return $cachedServices;
+            }
+        }
+
+        /** @var array<string, mixed> $services */
+        $services = $rawExtensionServices[$directory];
+        $resolver = $materializeExtensionValue ?? static fn (mixed &$value): mixed => $value;
+
+        $extensionServiceResolutionStates[$directory] = [
+            'state' => 'resolving',
+            'services' => $services,
+        ];
+
+        try {
+            foreach ($services as $serviceKey => &$serviceValue) {
+                $resolver($serviceValue);
+                $services[$serviceKey] = $serviceValue;
+                $extensionServiceResolutionStates[$directory] = [
+                    'state' => 'resolving',
+                    'services' => $services,
+                ];
+            }
+            unset($serviceValue);
+        } catch (\Throwable $exception) {
+            unset($extensionServiceResolutionStates[$directory]);
+            throw $exception;
+        }
+
+        $rawExtensionServices[$directory] = $services;
+        $rvn['extension_services'] = $rawExtensionServices;
+        $extensionServiceResolutionStates[$directory] = [
+            'state' => 'resolved',
+            'services' => $services,
+        ];
+
+        return $services;
+    };
+
+    /**
+     * Resolves all extension service maps, booting each extension only when needed.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    $rvn['extension_services_all'] = static function () use (&$rvn, $extensionBootProviders): array {
+        $services = [];
+        foreach (array_keys($extensionBootProviders) as $directory) {
+            if (!is_callable($rvn['extension_services_for'] ?? null)) {
+                continue;
+            }
+
+            /** @var callable(string): array<string, mixed> $extensionServicesFor */
+            $extensionServicesFor = $rvn['extension_services_for'];
+            $services[$directory] = $extensionServicesFor($directory);
+        }
+
+        return $services;
+    };
+
+    /**
+     * Returns the booted extension overlay that route registrars should see in
+     * their local `$rvn` context.
+     *
+     * This preserves compatibility for extensions that still read their own
+     * boot-provided top-level aliases or `$rvn['extension_services'][$slug]`
+     * directly during route registration, while keeping unrelated extensions lazy.
+     *
+     * @return array<string, mixed>
+     */
+    $coreContainerKeys = [];
+    $rvn['extension_context_for'] = static function (string $directory) use (&$rvn, &$coreContainerKeys): array {
+        $directory = trim($directory);
+        if ($directory === '') {
+            return [];
+        }
+
+        if (is_callable($rvn['extension_services_for'] ?? null)) {
+            /** @var callable(string): array<string, mixed> $extensionServicesFor */
+            $extensionServicesFor = $rvn['extension_services_for'];
+            $extensionServicesFor($directory);
+        } elseif (is_callable($rvn['boot_extension'] ?? null)) {
+            /** @var callable(string): array<string, mixed> $bootExtension */
+            $bootExtension = $rvn['boot_extension'];
+            $rvn = $bootExtension($directory);
+        }
+
+        $overlay = [];
+        foreach ($rvn as $key => $value) {
+            if ($key === 'extension_services') {
+                if (is_array($value) && array_key_exists($directory, $value)) {
+                    $overlay[$key] = $value;
+                }
+                continue;
+            }
+
+            if (isset($coreContainerKeys[$key])) {
+                continue;
+            }
+
+            $overlay[$key] = $value;
+        }
+
+        return $overlay;
     };
 
     $extensionsBooted = false;
@@ -379,6 +514,7 @@ return (static function (): array {
     }
 
     $rvn['scheduler'] = $scheduler;
+    $coreContainerKeys = array_fill_keys(array_keys($rvn), true);
 
     return $rvn;
 })();

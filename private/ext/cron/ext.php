@@ -35,13 +35,6 @@ return [
             return;
         }
 
-        $store = new CronTaskStore($localRoot . '/crontab.json');
-        $service = new CronTaskService(
-            (string) $rvn['root'],
-            $store,
-            new CronShellRunner()
-        );
-
         /** @var mixed $rawExtensionServices */
         $rawExtensionServices = $rvn['extension_services'] ?? [];
         if (!is_array($rawExtensionServices)) {
@@ -54,8 +47,22 @@ return [
             $rawCronServices = [];
         }
 
-        $rawCronServices['store'] = $store;
-        $rawCronServices['service'] = $service;
+        $rawCronServices['store'] = static fn (): CronTaskStore => new CronTaskStore($localRoot . '/crontab.json');
+        $rawCronServices['service'] = static function () use (&$rvn): CronTaskService {
+            /** @var mixed $resolver */
+            $resolver = $rvn['extension_services_for'] ?? null;
+            $services = is_callable($resolver) ? $resolver('cron') : [];
+            $store = $services['store'] ?? null;
+            if (!$store instanceof CronTaskStore) {
+                throw new RuntimeException('Scheduled Tasks store is unavailable.');
+            }
+
+            return new CronTaskService(
+                (string) $rvn['root'],
+                $store,
+                new CronShellRunner()
+            );
+        };
 
         $rawExtensionServices['cron'] = $rawCronServices;
         $rvn['extension_services'] = $rawExtensionServices;

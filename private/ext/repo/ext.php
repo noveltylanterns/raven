@@ -42,22 +42,6 @@ return [
             return;
         }
 
-        $settingsStore = new RepoSettingsStore($localRoot . '/.settings.json');
-        $registryStore = new RepoRegistryStore($localRoot . '/.registry.json');
-        $logStore = new RepoLogStore($localRoot . '/.log.json');
-        $service = new RepoService(
-            (string) $rvn['root'],
-            $rvn['config'],
-            $settingsStore,
-            $registryStore,
-            $logStore,
-            new GitCommandRunner(),
-            new DirectoryTreeService(),
-            $localRoot,
-            $publicRoot
-        );
-        $shortcodeRuntime = new RepoShortcodeRuntime($service);
-
         /** @var mixed $rawExtensionServices */
         $rawExtensionServices = $rvn['extension_services'] ?? [];
         if (!is_array($rawExtensionServices)) {
@@ -70,17 +54,53 @@ return [
             $rawRepoServices = [];
         }
 
-        $rawRepoServices['settings'] = $settingsStore;
-        $rawRepoServices['registry'] = $registryStore;
-        $rawRepoServices['logs'] = $logStore;
-        $rawRepoServices['service'] = $service;
+        $rawRepoServices['settings'] = static fn (): RepoSettingsStore => new RepoSettingsStore($localRoot . '/.settings.json');
+        $rawRepoServices['registry'] = static fn (): RepoRegistryStore => new RepoRegistryStore($localRoot . '/.registry.json');
+        $rawRepoServices['logs'] = static fn (): RepoLogStore => new RepoLogStore($localRoot . '/.log.json');
+        $rawRepoServices['service'] = static function () use (&$rvn, $localRoot, $publicRoot): RepoService {
+            /** @var mixed $resolver */
+            $resolver = $rvn['extension_services_for'] ?? null;
+            $services = is_callable($resolver) ? $resolver('repo') : [];
+            $settingsStore = $services['settings'] ?? null;
+            $registryStore = $services['registry'] ?? null;
+            $logStore = $services['logs'] ?? null;
+            if (
+                !$settingsStore instanceof RepoSettingsStore
+                || !$registryStore instanceof RepoRegistryStore
+                || !$logStore instanceof RepoLogStore
+            ) {
+                throw new RuntimeException('Repo extension stores are unavailable.');
+            }
+
+            return new RepoService(
+                (string) $rvn['root'],
+                $rvn['config'],
+                $settingsStore,
+                $registryStore,
+                $logStore,
+                new GitCommandRunner(),
+                new DirectoryTreeService(),
+                $localRoot,
+                $publicRoot
+            );
+        };
 
         /** @var mixed $rawShortcodeRuntimes */
         $rawShortcodeRuntimes = $rawRepoServices['shortcode_runtimes'] ?? [];
         if (!is_array($rawShortcodeRuntimes)) {
             $rawShortcodeRuntimes = [];
         }
-        $rawShortcodeRuntimes[] = $shortcodeRuntime;
+        $rawShortcodeRuntimes[] = static function () use (&$rvn): RepoShortcodeRuntime {
+            /** @var mixed $resolver */
+            $resolver = $rvn['extension_services_for'] ?? null;
+            $services = is_callable($resolver) ? $resolver('repo') : [];
+            $service = $services['service'] ?? null;
+            if (!$service instanceof RepoService) {
+                throw new RuntimeException('Repo extension service is unavailable.');
+            }
+
+            return new RepoShortcodeRuntime($service);
+        };
         $rawRepoServices['shortcode_runtimes'] = $rawShortcodeRuntimes;
 
         $rawExtensionServices['repo'] = $rawRepoServices;

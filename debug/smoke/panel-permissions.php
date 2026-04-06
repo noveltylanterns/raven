@@ -54,6 +54,7 @@ final class PanelPermissionsSmokeRunner
     private string $pluginSlug = '';
     private string $moduleSlug = '';
     private string $systemSlug = '';
+    private string $pluginMarker = '';
     private int $pluginAccessBit = 0;
     private int $pluginManageBit = 0;
     private int $moduleAccessBit = 0;
@@ -215,8 +216,144 @@ PHP;
         $this->pluginSlug = (string) $definitions[0]['slug'];
         $this->moduleSlug = (string) $definitions[1]['slug'];
         $this->systemSlug = (string) $definitions[2]['slug'];
+        $this->pluginMarker = (string) $definitions[0]['marker'];
+
+        $this->writeCompatPluginFixture($this->pluginSlug, $this->pluginMarker);
 
         $this->events[] = 'debug_extensions_seeded=' . implode(',', $this->createdExtensions);
+    }
+
+    /**
+     * Rewrites the debug plugin fixture so route registration depends on the
+     * legacy extension-service container shape that third-party extensions may
+     * still read directly from `$context['rvn']`.
+     */
+    private function writeCompatPluginFixture(string $slug, string $marker): void
+    {
+        $path = $this->root . '/private/ext/' . $slug;
+        $aliasKey = $slug . '_legacy_alias';
+        $aliasValue = $slug . '-alias-ok';
+        $serviceValue = $slug . '-service-ok';
+
+        $extPath = $path . '/ext.php';
+        $extContent = <<<PHP
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/ext/{$slug}/ext.php
+ * Debug plugin smoke fixture for extension bootstrap compatibility.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+return [
+    'boot' => static function (array &\$rvn): void {
+        /** @var mixed \$rawExtensionServices */
+        \$rawExtensionServices = \$rvn['extension_services'] ?? [];
+        if (!is_array(\$rawExtensionServices)) {
+            \$rawExtensionServices = [];
+        }
+
+        /** @var mixed \$rawPluginServices */
+        \$rawPluginServices = \$rawExtensionServices['{$slug}'] ?? [];
+        if (!is_array(\$rawPluginServices)) {
+            \$rawPluginServices = [];
+        }
+
+        \$rawPluginServices['marker'] = static fn (): string => '{$serviceValue}';
+        \$rawExtensionServices['{$slug}'] = \$rawPluginServices;
+        \$rvn['extension_services'] = \$rawExtensionServices;
+        \$rvn['{$aliasKey}'] = '{$aliasValue}';
+    },
+];
+PHP;
+        file_put_contents($extPath, $extContent . "\n", LOCK_EX);
+
+        $routesPath = $path . '/lib/routes_panel.php';
+        $routesContent = <<<PHP
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/ext/{$slug}/lib/routes_panel.php
+ * Debug plugin smoke route registrar for extension bootstrap compatibility.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+use Raven\Lib\Routing\Router;
+
+/**
+ * Registers the debug plugin route only when legacy bootstrap aliases are visible.
+ *
+ * @param array{
+ *   rvn: array<string, mixed>,
+ *   requirePanelLogin: callable(): void,
+ *   currentUserTheme: callable(): string
+ * } \$context
+ */
+return static function (Router \$router, array \$context): void {
+    /** @var array<string, mixed> \$rvn */
+    \$rvn = (array) (\$context['rvn'] ?? []);
+
+    /** @var callable(): void \$requirePanelLogin */
+    \$requirePanelLogin = \$context['requirePanelLogin'] ?? static function (): void {};
+
+    /** @var callable(): string \$currentUserTheme */
+    \$currentUserTheme = \$context['currentUserTheme'] ?? static fn (): string => 'default';
+
+    /** @var mixed \$rawExtensionServices */
+    \$rawExtensionServices = \$rvn['extension_services'] ?? [];
+    \$extensionServices = is_array(\$rawExtensionServices) ? \$rawExtensionServices : [];
+    \$pluginServices = is_array(\$extensionServices['{$slug}'] ?? null)
+        ? \$extensionServices['{$slug}']
+        : [];
+    \$serviceMarker = \$pluginServices['marker'] ?? null;
+    \$legacyAlias = \$rvn['{$aliasKey}'] ?? null;
+
+    if (\$serviceMarker !== '{$serviceValue}' || \$legacyAlias !== '{$aliasValue}') {
+        return;
+    }
+
+    if (!isset(\$rvn['view'], \$rvn['config'], \$rvn['csrf'])) {
+        return;
+    }
+
+    /** @var callable(bool=): array<string, mixed> \$panelSiteData */
+    \$panelSiteData = is_callable(\$rvn['panel_site_data'] ?? null)
+        ? \$rvn['panel_site_data']
+        : static function (bool \$includeDomain = true) use (\$rvn): array {
+            \$site = [
+                'name' => (string) \$rvn['config']->get('site.name', 'Raven CMS'),
+                'panel_path' => (string) \$rvn['config']->get('panel.path', 'panel'),
+                'panel_brand_name' => (string) \$rvn['config']->get('panel.brand_name', ''),
+                'panel_brand_logo' => (string) \$rvn['config']->get('panel.brand_logo', ''),
+            ];
+            if (\$includeDomain) {
+                \$site['domain'] = (string) \$rvn['config']->get('site.domain', 'localhost');
+            }
+            return \$site;
+        };
+
+    \$router->add('GET', '/{$slug}', static function () use (\$requirePanelLogin, \$rvn, \$panelSiteData, \$currentUserTheme): void {
+        \$requirePanelLogin();
+
+        \$content = '<div class=\"card\"><div class=\"card-body\"><p>{$marker}</p></div></div>';
+        \$rvn['view']->render('panel/wrapper', [
+            'site' => \$panelSiteData(),
+            'csrfField' => \$rvn['csrf']->field(),
+            'section' => '{$slug}',
+            'showSidebar' => true,
+            'userTheme' => \$currentUserTheme(),
+            'content' => \$content,
+        ]);
+    });
+};
+PHP;
+        file_put_contents($routesPath, $routesContent . "\n", LOCK_EX);
     }
 
     private function enableDebugExtensions(): void
@@ -510,6 +647,7 @@ PHP;
 
         $pluginRoute = $this->requestPanel($client, 'GET', '/' . $this->panelPath . '/' . $this->pluginSlug);
         $this->assert($pluginRoute['status'] === 200, 'Plugin-manage user should access debug plugin route.');
+        $this->assert(str_contains($pluginRoute['body'], $this->pluginMarker), 'Plugin-manage user should receive compat plugin marker body.');
 
         $moduleRoute = $this->requestPanel($client, 'GET', '/' . $this->panelPath . '/' . $this->moduleSlug);
         $this->assert($moduleRoute['status'] === 404, 'Plugin-manage user must not access debug module route.');

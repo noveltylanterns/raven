@@ -6333,39 +6333,37 @@ final class PanelController
     private function listEnabledExtensionForms(string $extensionKey): array
     {
         $normalized = strtolower(trim($extensionKey));
-        $services = $this->app['extension_services'] ?? [];
-        if (is_array($services)) {
-            $extensionServices = $services[$normalized] ?? null;
-            if (is_array($extensionServices)) {
-                $formsRepository = $extensionServices['forms'] ?? null;
-                if (is_object($formsRepository) && method_exists($formsRepository, 'listAll')) {
-                    /** @var mixed $rows */
-                    $rows = $formsRepository->listAll();
-                    if (is_array($rows)) {
-                        $items = [];
-                        foreach ($rows as $row) {
-                            if (!is_array($row) || empty($row['enabled'])) {
-                                continue;
-                            }
-
-                            $slug = strtolower(trim((string) ($row['slug'] ?? '')));
-                            if ($slug === '' || preg_match('/^[a-z0-9][a-z0-9_-]*$/', $slug) !== 1) {
-                                continue;
-                            }
-
-                            $name = trim((string) ($row['name'] ?? ''));
-                            if ($name === '') {
-                                $name = $slug;
-                            }
-
-                            $items[] = [
-                                'name' => $name,
-                                'slug' => $slug,
-                            ];
+        $servicesFor = $this->app['extension_services_for'] ?? null;
+        $extensionServices = is_callable($servicesFor) ? $servicesFor($normalized) : [];
+        if (is_array($extensionServices)) {
+            $formsRepository = $extensionServices['forms'] ?? null;
+            if (is_object($formsRepository) && method_exists($formsRepository, 'listAll')) {
+                /** @var mixed $rows */
+                $rows = $formsRepository->listAll();
+                if (is_array($rows)) {
+                    $items = [];
+                    foreach ($rows as $row) {
+                        if (!is_array($row) || empty($row['enabled'])) {
+                            continue;
                         }
 
-                        return $items;
+                        $slug = strtolower(trim((string) ($row['slug'] ?? '')));
+                        if ($slug === '' || preg_match('/^[a-z0-9][a-z0-9_-]*$/', $slug) !== 1) {
+                            continue;
+                        }
+
+                        $name = trim((string) ($row['name'] ?? ''));
+                        if ($name === '') {
+                            $name = $slug;
+                        }
+
+                        $items[] = [
+                            'name' => $name,
+                            'slug' => $slug,
+                        ];
                     }
+
+                    return $items;
                 }
             }
         }

@@ -38,16 +38,6 @@ return [
         return;
     }
 
-    $formsRepository = new ContactFormRepository($formsPath . '/forms.php');
-    $submissionsRepository = new ContactSubmissionRepository($rvn['db'], $driver, $prefix);
-    $publicFormRuntime = new ContactPublicFormRuntime(
-        $rvn['input'],
-        $rvn['csrf'],
-        $rvn['config'],
-        $formsRepository,
-        $submissionsRepository
-    );
-
     /** @var mixed $rawExtensionServices */
     $rawExtensionServices = $rvn['extension_services'] ?? [];
     if (!is_array($rawExtensionServices)) {
@@ -60,14 +50,34 @@ return [
         $rawContactServices = [];
     }
 
-    $rawContactServices['forms'] = $formsRepository;
-    $rawContactServices['submissions'] = $submissionsRepository;
+    $rawContactServices['forms'] = static fn (): ContactFormRepository => new ContactFormRepository($formsPath . '/forms.php');
+    $rawContactServices['submissions'] = static fn (): ContactSubmissionRepository => new ContactSubmissionRepository($rvn['db'], $driver, $prefix);
     /** @var mixed $rawEmbeddedRuntimes */
     $rawEmbeddedRuntimes = $rawContactServices['shortcode_runtimes'] ?? [];
     if (!is_array($rawEmbeddedRuntimes)) {
         $rawEmbeddedRuntimes = [];
     }
-    $rawEmbeddedRuntimes[] = $publicFormRuntime;
+    $rawEmbeddedRuntimes[] = static function () use (&$rvn): ContactPublicFormRuntime {
+        /** @var mixed $resolver */
+        $resolver = $rvn['extension_services_for'] ?? null;
+        $services = is_callable($resolver) ? $resolver('contact') : [];
+        $formsRepository = $services['forms'] ?? null;
+        $submissionsRepository = $services['submissions'] ?? null;
+        if (
+            !$formsRepository instanceof ContactFormRepository
+            || !$submissionsRepository instanceof ContactSubmissionRepository
+        ) {
+            throw new RuntimeException('Contact extension services are unavailable.');
+        }
+
+        return new ContactPublicFormRuntime(
+            $rvn['input'],
+            $rvn['csrf'],
+            $rvn['config'],
+            $formsRepository,
+            $submissionsRepository
+        );
+    };
     $rawContactServices['shortcode_runtimes'] = $rawEmbeddedRuntimes;
     $rawExtensionServices['contact'] = $rawContactServices;
     $rvn['extension_services'] = $rawExtensionServices;

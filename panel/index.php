@@ -293,40 +293,15 @@ $requirePanelLoginForExtension = static function () use (
     $isGuestPanelLoginEntryInternalPath,
     $panelController
 ): void {
-    if (!$rvn['auth']->isLoggedIn()) {
-        if ($isGuestPanelLoginEntryInternalPath()) {
-            redirect($panelUrl('/login'));
+    (new PanelSessionGuard())->requirePanelLogin(
+        $rvn['auth'],
+        $isGuestPanelLoginEntryInternalPath(),
+        $panelUrl('/login'),
+        $panelUrl('/login/2fa'),
+        static function () use ($panelController): void {
+            $panelController()->renderPublicNotFound();
         }
-
-        $panelController()->renderPublicNotFound();
-        exit;
-    }
-
-    if (!$rvn['auth']->canAccessPanel()) {
-        $rvn['auth']->logout();
-        if ($isGuestPanelLoginEntryInternalPath()) {
-            redirect($panelUrl('/login'));
-        }
-
-        $panelController()->renderPublicNotFound();
-        exit;
-    }
-
-    $userId = $rvn['auth']->userId();
-    if ($userId !== null && !$rvn['auth']->isTwoFactorVerifiedForUser($userId)) {
-        if ($rvn['auth']->pendingTwoFactorUserId() === $userId) {
-            redirect($panelUrl('/login/2fa'));
-        }
-
-        $rvn['auth']->logout();
-        if ($isGuestPanelLoginEntryInternalPath()) {
-            redirect($panelUrl('/login'));
-        }
-
-        $panelController()->renderPublicNotFound();
-        exit;
-    }
-
+    );
     $syncPanelIdentity();
 };
 
@@ -1024,6 +999,16 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
         continue;
     }
 
+    $extensionRouteRvn = $rvn;
+    if (is_callable($rvn['extension_context_for'] ?? null)) {
+        /** @var callable(string): array<string, mixed> $extensionContextFor */
+        $extensionContextFor = $rvn['extension_context_for'];
+        $extensionContext = $extensionContextFor($extensionName);
+        if ($extensionContext !== []) {
+            $extensionRouteRvn = array_replace($extensionRouteRvn, $extensionContext);
+        }
+    }
+
     $manifest = $enabledExtensionManifests[$extensionName] ?? null;
     if (!is_array($manifest)) {
         $manifest = [
@@ -1121,7 +1106,7 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
     };
 
     $registrar($router, [
-        'rvn' => $rvn,
+        'rvn' => $extensionRouteRvn,
         'panelUrl' => $panelUrl,
         'requirePanelLogin' => $extensionRequirePanelAccess,
         'requireExtensionPermission' => $requireExtensionPermission,

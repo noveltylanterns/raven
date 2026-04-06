@@ -320,12 +320,22 @@ foreach ($enabledPublicExtensionManifests as $extensionName => $manifest) {
         continue;
     }
 
+    $extensionRouteRvn = $rvn;
+    if (is_callable($rvn['extension_context_for'] ?? null)) {
+        /** @var callable(string): array<string, mixed> $extensionContextFor */
+        $extensionContextFor = $rvn['extension_context_for'];
+        $extensionContext = $extensionContextFor($extensionName);
+        if ($extensionContext !== []) {
+            $extensionRouteRvn = array_replace($extensionRouteRvn, $extensionContext);
+        }
+    }
+
     // Pre-resolve the extension tpl root so the renderPublicExtension closure
     // does not need to reconstruct it on every invocation.
     $extTplRoot = rtrim((string) ($rvn['root'] ?? ''), '/') . '/private/ext/' . $extensionName . '/tpl';
 
     $registrar($router, [
-        'rvn' => $rvn,
+        'rvn' => $extensionRouteRvn,
         'input' => $input,
         'extensionDirectory' => $extensionName,
         'extensionServices' => is_callable($rvn['public_extension_services'] ?? null)

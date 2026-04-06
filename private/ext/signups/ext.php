@@ -38,15 +38,6 @@ return [
         return;
     }
 
-    $formsRepository = new SignupFormRepository($formsPath . '/forms.php');
-    $submissionsRepository = new SignupSubmissionRepository($rvn['db'], $driver, $prefix);
-    $publicFormRuntime = new SignupPublicFormRuntime(
-        $rvn['input'],
-        $rvn['csrf'],
-        $formsRepository,
-        $submissionsRepository
-    );
-
     /** @var mixed $rawExtensionServices */
     $rawExtensionServices = $rvn['extension_services'] ?? [];
     if (!is_array($rawExtensionServices)) {
@@ -59,14 +50,33 @@ return [
         $rawSignupServices = [];
     }
 
-    $rawSignupServices['forms'] = $formsRepository;
-    $rawSignupServices['submissions'] = $submissionsRepository;
+    $rawSignupServices['forms'] = static fn (): SignupFormRepository => new SignupFormRepository($formsPath . '/forms.php');
+    $rawSignupServices['submissions'] = static fn (): SignupSubmissionRepository => new SignupSubmissionRepository($rvn['db'], $driver, $prefix);
     /** @var mixed $rawEmbeddedRuntimes */
     $rawEmbeddedRuntimes = $rawSignupServices['shortcode_runtimes'] ?? [];
     if (!is_array($rawEmbeddedRuntimes)) {
         $rawEmbeddedRuntimes = [];
     }
-    $rawEmbeddedRuntimes[] = $publicFormRuntime;
+    $rawEmbeddedRuntimes[] = static function () use (&$rvn): SignupPublicFormRuntime {
+        /** @var mixed $resolver */
+        $resolver = $rvn['extension_services_for'] ?? null;
+        $services = is_callable($resolver) ? $resolver('signups') : [];
+        $formsRepository = $services['forms'] ?? null;
+        $submissionsRepository = $services['submissions'] ?? null;
+        if (
+            !$formsRepository instanceof SignupFormRepository
+            || !$submissionsRepository instanceof SignupSubmissionRepository
+        ) {
+            throw new RuntimeException('Signup Sheets extension services are unavailable.');
+        }
+
+        return new SignupPublicFormRuntime(
+            $rvn['input'],
+            $rvn['csrf'],
+            $formsRepository,
+            $submissionsRepository
+        );
+    };
     $rawSignupServices['shortcode_runtimes'] = $rawEmbeddedRuntimes;
     $rawExtensionServices['signups'] = $rawSignupServices;
     $rvn['extension_services'] = $rawExtensionServices;
