@@ -4,6 +4,10 @@
 
 ### April 6, 2026 — event logger
 
+- **Bootstrap split start**: `private/raven.php` is now the shared core bootstrap instead of the all-in-one web runtime assembler. Public-only and panel-only controller wiring moved into new `public/bootstrap.php` and `panel/bootstrap.php` layers.
+- **Lazy bootstrap services**: `private/raven.php` now exposes a memoized service resolver for core repositories/services and defers extension provider execution behind a `boot_extensions` hook instead of instantiating all scope-specific services up front.
+- **Public controller assembly**: `public/index.php` now pulls a lazy `public_controller` factory from `public/bootstrap.php`. Public extension route registration uses the shared enabled-manifest map and a `notFound` closure instead of forcing a controller instance at route-registration time.
+- **Panel auth-path optimization**: `panel/index.php` now uses `panel/bootstrap.php` factories so auth routes build `AuthController` without instantiating the full `PanelController` graph. Full panel runtime assembly, nav/session extension wiring, and extension route registration are deferred until non-auth panel requests.
 - **`private/lib/Log/EventLogger`**: New DB-backed logger. Severity-gated (error/warn/info), syslog mirror optional. API: `log()`, `error()`, `warn()`, `info()`, `isEnabled()`, `query()`, `count()`, `pruneOlderThan()`, `allForExport()`, `clear()`.
 - **`{prefix}event_log` table**: Created via `RvnSchemaBuilder::ensureEventLogTable()` at bootstrap. Columns: `id`, `logged_at`, `severity`, `channel`, `message`, `context` (JSON). Indexed on `logged_at` and `severity`.
 - **PHP error handler hook**: `set_error_handler()` in `raven.php` routes runtime PHP errors and warnings into the event log automatically. Non-fatal PHP notices still pass through to PHP's own handler.

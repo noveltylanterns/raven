@@ -9,11 +9,9 @@
 
 declare(strict_types=1);
 
-use Raven\Controller\PublicController;
 use Raven\Core\Diagnostics\DebugToolbarRenderer;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
 use Raven\Lib\Diagnostics\RequestProfiler;
-use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Routing\RouteRequest;
 use Raven\Lib\Routing\Router;
 use Raven\Lib\Routing\RouteConfigService;
@@ -73,6 +71,8 @@ if ($configuredPanelPath !== '' && ($requestPath === $configuredPanelPrefix || s
 }
 
 $rvn = require dirname(__DIR__) . '/private/raven.php';
+$publicBootstrap = require __DIR__ . '/bootstrap.php';
+$rvn = $publicBootstrap($rvn);
 
 $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 $debugToolbarSettings = DebugToolbarConfigResolver::fromConfig($rvn['config']);
@@ -156,21 +156,12 @@ if ($debugToolbarEnabled) {
     });
 }
 
-$controller = new PublicController(
-    $rvn['view'],
-    $rvn['config'],
-    $rvn['auth'],
-    $rvn['group'],
-    $rvn['page_images'],
-    $rvn['page'],
-    $rvn['redirect'],
-    $rvn['taxonomy_lookup'],
-    $rvn['user'],
-    $rvn['invite_tokens'],
-    $rvn['input'],
-    $rvn['csrf'],
-    is_array($rvn['extension_services'] ?? null) ? (array) $rvn['extension_services'] : []
-);
+/** @var callable(): object $publicController */
+$publicController = is_callable($rvn['public_controller'] ?? null)
+    ? $rvn['public_controller']
+    : static function (): object {
+        throw new RuntimeException('Public controller factory is unavailable.');
+    };
 
 $input = $rvn['input'];
 $routeConfig = new RouteConfigService($rvn['config'], $input);
@@ -243,56 +234,56 @@ $reservedPrefixes = array_values(array_unique(array_filter([
 $router = new Router();
 
 // Homepage route.
-$router->add('GET', '/', static function () use ($controller): void {
-    $controller->home();
+$router->add('GET', '/', static function () use ($publicController): void {
+    $publicController()->home();
 });
 
-$router->add('GET', '/login', static function () use ($controller): void {
-    $controller->login();
+$router->add('GET', '/login', static function () use ($publicController): void {
+    $publicController()->login();
 });
 
-$router->add('POST', '/login', static function () use ($controller): void {
-    $controller->loginSubmit($_POST);
+$router->add('POST', '/login', static function () use ($publicController): void {
+    $publicController()->loginSubmit($_POST);
 });
 
-$router->add('GET', '/login/2fa', static function () use ($controller): void {
-    $controller->loginTwoFactor();
+$router->add('GET', '/login/2fa', static function () use ($publicController): void {
+    $publicController()->loginTwoFactor();
 });
 
-$router->add('POST', '/login/2fa', static function () use ($controller): void {
-    $controller->loginTwoFactorSubmit($_POST);
+$router->add('POST', '/login/2fa', static function () use ($publicController): void {
+    $publicController()->loginTwoFactorSubmit($_POST);
 });
 
-$router->add('POST', '/login/2fa/select', static function () use ($controller): void {
-    $controller->loginTwoFactorSelect($_POST);
+$router->add('POST', '/login/2fa/select', static function () use ($publicController): void {
+    $publicController()->loginTwoFactorSelect($_POST);
 });
 
-$router->add('POST', '/login/2fa/webauthn/options', static function () use ($controller): void {
-    $controller->loginTwoFactorWebauthnOptions($_POST);
+$router->add('POST', '/login/2fa/webauthn/options', static function () use ($publicController): void {
+    $publicController()->loginTwoFactorWebauthnOptions($_POST);
 });
 
-$router->add('POST', '/login/2fa/webauthn/verify', static function () use ($controller): void {
-    $controller->loginTwoFactorWebauthnVerify($_POST);
+$router->add('POST', '/login/2fa/webauthn/verify', static function () use ($publicController): void {
+    $publicController()->loginTwoFactorWebauthnVerify($_POST);
 });
 
-$router->add('GET', '/register', static function () use ($controller): void {
-    $controller->register();
+$router->add('GET', '/register', static function () use ($publicController): void {
+    $publicController()->register();
 });
 
-$router->add('POST', '/register', static function () use ($controller): void {
-    $controller->registerSubmit($_POST);
+$router->add('POST', '/register', static function () use ($publicController): void {
+    $publicController()->registerSubmit($_POST);
 });
 
 // Extension-agnostic embedded form submit endpoint.
-$router->add('POST', '/forms/submit', static function () use ($controller, $input): void {
+$router->add('POST', '/forms/submit', static function () use ($publicController, $input): void {
     $type = $input->slug((string) ($_POST['_rvn_form_type'] ?? ''));
     $slug = $input->slug((string) ($_POST['_rvn_form_slug'] ?? ''));
     if ($type === null || $slug === null) {
-        $controller->notFound();
+        $publicController()->notFound();
         return;
     }
 
-    $controller->submitEmbeddedForm($type, $slug);
+    $publicController()->submitEmbeddedForm($type, $slug);
 });
 
 // Extension public route registration.
@@ -303,16 +294,14 @@ $router->add('POST', '/forms/submit', static function () use ($controller, $inpu
 //
 // Context keys:
 // - app: container array from bootstrap
-// - controller: PublicController instance
+// - notFound: callable(): void Raven public 404 responder
 // - input: InputSanitizer instance
 // - extensionDirectory: enabled extension folder name
-$enabledPublicExtensions = ExtensionRegistry::enabledDirectories((string) ($rvn['root'] ?? dirname(__DIR__)), true);
-foreach ($enabledPublicExtensions as $extensionName) {
-    $manifest = ExtensionRegistry::readManifest((string) ($rvn['root'] ?? dirname(__DIR__)), $extensionName);
-    if (!is_array($manifest)) {
-        continue;
-    }
-
+/** @var array<string, array<string, mixed>> $enabledPublicExtensionManifests */
+$enabledPublicExtensionManifests = is_array($rvn['enabled_extension_manifests'] ?? null)
+    ? (array) $rvn['enabled_extension_manifests']
+    : [];
+foreach ($enabledPublicExtensionManifests as $extensionName => $manifest) {
     $type = strtolower(trim((string) ($manifest['type'] ?? 'plugin')));
     $isSystemType = $type === 'system' || !empty($manifest['system_extension']);
     if ($isSystemType || $type !== 'module') {
@@ -336,100 +325,102 @@ foreach ($enabledPublicExtensions as $extensionName) {
 
     $registrar($router, [
         'rvn' => $rvn,
-        'controller' => $controller,
         'input' => $input,
         'extensionDirectory' => $extensionName,
+        'notFound' => static function () use ($publicController): void {
+            $publicController()->notFound();
+        },
         // First-class render helper: renders extension templates through the site theme pipeline.
         // Signature: renderPublicExtension(string $template, array $data = [], string|null $layout = 'wrapper'): void
         // Templates resolve from: active theme > extension tpl/ > core tpl/ fallback.
-        'renderPublicExtension' => static function (string $template, array $data = [], ?string $layout = 'wrapper') use ($controller, $extTplRoot): void {
-            $controller->renderPublicExtensionTemplate($template, $data, $layout, $extTplRoot);
+        'renderPublicExtension' => static function (string $template, array $data = [], ?string $layout = 'wrapper') use ($publicController, $extTplRoot): void {
+            $publicController()->renderPublicExtensionTemplate($template, $data, $layout, $extTplRoot);
         },
     ]);
 }
 
 if ($feedsEnabled && $rssFeedRoute !== '') {
-    $router->add('GET', '/' . $rssFeedRoute, static function () use ($controller): void {
-        $controller->rssFeed();
+    $router->add('GET', '/' . $rssFeedRoute, static function () use ($publicController): void {
+        $publicController()->rssFeed();
     });
 
-    $router->add('GET', '/' . $rssFeedRoute . '/{channel}', static function (array $params) use ($controller, $input, $reservedPrefixes): void {
+    $router->add('GET', '/' . $rssFeedRoute . '/{channel}', static function (array $params) use ($publicController, $input, $reservedPrefixes): void {
         $channel = $input->slug($params['channel'] ?? null);
 
         if ($channel === null || in_array($channel, $reservedPrefixes, true)) {
-            $controller->notFound();
+            $publicController()->notFound();
             return;
         }
 
-        $controller->rssFeed($channel);
+        $publicController()->rssFeed($channel);
     });
 
     if ($categoryPrefix !== '') {
-        $router->add('GET', '/' . $rssFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($controller, $input): void {
+        $router->add('GET', '/' . $rssFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($publicController, $input): void {
             $slug = $input->slug($params['slug'] ?? null);
 
             if ($slug === null) {
-                $controller->notFound();
+                $publicController()->notFound();
                 return;
             }
 
-            $controller->rssCategoryFeed($slug);
+            $publicController()->rssCategoryFeed($slug);
         });
     }
 
     if ($tagPrefix !== '') {
-        $router->add('GET', '/' . $rssFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($controller, $input): void {
+        $router->add('GET', '/' . $rssFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($publicController, $input): void {
             $slug = $input->slug($params['slug'] ?? null);
 
             if ($slug === null) {
-                $controller->notFound();
+                $publicController()->notFound();
                 return;
             }
 
-            $controller->rssTagFeed($slug);
+            $publicController()->rssTagFeed($slug);
         });
     }
 }
 
 if ($feedsEnabled && $atomFeedRoute !== '') {
-    $router->add('GET', '/' . $atomFeedRoute, static function () use ($controller): void {
-        $controller->atomFeed();
+    $router->add('GET', '/' . $atomFeedRoute, static function () use ($publicController): void {
+        $publicController()->atomFeed();
     });
 
-    $router->add('GET', '/' . $atomFeedRoute . '/{channel}', static function (array $params) use ($controller, $input, $reservedPrefixes): void {
+    $router->add('GET', '/' . $atomFeedRoute . '/{channel}', static function (array $params) use ($publicController, $input, $reservedPrefixes): void {
         $channel = $input->slug($params['channel'] ?? null);
 
         if ($channel === null || in_array($channel, $reservedPrefixes, true)) {
-            $controller->notFound();
+            $publicController()->notFound();
             return;
         }
 
-        $controller->atomFeed($channel);
+        $publicController()->atomFeed($channel);
     });
 
     if ($categoryPrefix !== '') {
-        $router->add('GET', '/' . $atomFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($controller, $input): void {
+        $router->add('GET', '/' . $atomFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($publicController, $input): void {
             $slug = $input->slug($params['slug'] ?? null);
 
             if ($slug === null) {
-                $controller->notFound();
+                $publicController()->notFound();
                 return;
             }
 
-            $controller->atomCategoryFeed($slug);
+            $publicController()->atomCategoryFeed($slug);
         });
     }
 
     if ($tagPrefix !== '') {
-        $router->add('GET', '/' . $atomFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($controller, $input): void {
+        $router->add('GET', '/' . $atomFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($publicController, $input): void {
             $slug = $input->slug($params['slug'] ?? null);
 
             if ($slug === null) {
-                $controller->notFound();
+                $publicController()->notFound();
                 return;
             }
 
-            $controller->atomTagFeed($slug);
+            $publicController()->atomTagFeed($slug);
         });
     }
 }
@@ -437,101 +428,101 @@ if ($feedsEnabled && $atomFeedRoute !== '') {
 // Category routes with optional page number path segment.
 if ($categoryPrefix !== '') {
     $categoryRouteBase = '/' . $categoryPrefix;
-    $router->add('GET', $categoryRouteBase . '/{slug}', static function (array $params) use ($controller, $input): void {
+    $router->add('GET', $categoryRouteBase . '/{slug}', static function (array $params) use ($publicController, $input): void {
         $slug = $input->slug($params['slug'] ?? null);
 
         if ($slug === null) {
-            $controller->notFound();
+            $publicController()->notFound();
             return;
         }
 
-        $controller->category($slug, 1);
+        $publicController()->category($slug, 1);
     });
 
-    $router->add('GET', $categoryRouteBase . '/{slug}/{page}', static function (array $params) use ($controller, $input): void {
+    $router->add('GET', $categoryRouteBase . '/{slug}/{page}', static function (array $params) use ($publicController, $input): void {
         $slug = $input->slug($params['slug'] ?? null);
         $page = $input->int($params['page'] ?? null, 1);
 
         if ($slug === null || $page === null) {
-            $controller->notFound();
+            $publicController()->notFound();
             return;
         }
 
-        $controller->category($slug, $page);
+        $publicController()->category($slug, $page);
     });
 }
 
 // Tag routes with optional page number path segment.
 if ($tagPrefix !== '') {
     $tagRouteBase = '/' . $tagPrefix;
-    $router->add('GET', $tagRouteBase . '/{slug}', static function (array $params) use ($controller, $input): void {
+    $router->add('GET', $tagRouteBase . '/{slug}', static function (array $params) use ($publicController, $input): void {
         $slug = $input->slug($params['slug'] ?? null);
 
         if ($slug === null) {
-            $controller->notFound();
+            $publicController()->notFound();
             return;
         }
 
-        $controller->tag($slug, 1);
+        $publicController()->tag($slug, 1);
     });
 
-    $router->add('GET', $tagRouteBase . '/{slug}/{page}', static function (array $params) use ($controller, $input): void {
+    $router->add('GET', $tagRouteBase . '/{slug}/{page}', static function (array $params) use ($publicController, $input): void {
         $slug = $input->slug($params['slug'] ?? null);
         $page = $input->int($params['page'] ?? null, 1);
 
         if ($slug === null || $page === null) {
-            $controller->notFound();
+            $publicController()->notFound();
             return;
         }
 
-        $controller->tag($slug, $page);
+        $publicController()->tag($slug, $page);
     });
 }
 
 // Public profile route when a profile URL prefix is configured.
 if ($profilePrefix !== '') {
     $profileRouteBase = '/' . $profilePrefix;
-    $router->add('GET', $profileRouteBase . '/{username}', static function (array $params) use ($controller, $input): void {
+    $router->add('GET', $profileRouteBase . '/{username}', static function (array $params) use ($publicController, $input): void {
         $username = $input->text(rawurldecode((string) ($params['username'] ?? '')), 254);
 
         if ($username === '') {
-            $controller->notFound();
+            $publicController()->notFound();
             return;
         }
 
-        $controller->profile($username);
+        $publicController()->profile($username);
     });
 }
 
 // Public group route when a group URL prefix is configured.
 if ($groupPrefix !== '') {
     $groupRouteBase = '/' . $groupPrefix;
-    $router->add('GET', $groupRouteBase . '/{slug}', static function (array $params) use ($controller, $input): void {
+    $router->add('GET', $groupRouteBase . '/{slug}', static function (array $params) use ($publicController, $input): void {
         $slug = $input->slug($params['slug'] ?? null);
 
         if ($slug === null) {
-            $controller->notFound();
+            $publicController()->notFound();
             return;
         }
 
-        $controller->group($slug);
+        $publicController()->group($slug);
     });
 }
 
 // Single-segment route: channel landing first, then root page/redirect fallback.
-$router->add('GET', '/{slug}', static function (array $params) use ($controller, $input, $reservedPrefixes): void {
+$router->add('GET', '/{slug}', static function (array $params) use ($publicController, $input, $reservedPrefixes): void {
     $slug = $input->slug($params['slug'] ?? null);
 
     if ($slug === null || in_array($slug, $reservedPrefixes, true)) {
-        $controller->notFound();
+        $publicController()->notFound();
         return;
     }
 
-    $controller->channel($slug);
+    $publicController()->channel($slug);
 });
 
 // Channel + page route for pages assigned to channels.
-$router->add('GET', '/{channel}/{slug}', static function (array $params) use ($controller, $input, $reservedPrefixes): void {
+$router->add('GET', '/{channel}/{slug}', static function (array $params) use ($publicController, $input, $reservedPrefixes): void {
     $channel = $input->slug($params['channel'] ?? null);
     $slugRaw = strtolower(trim((string) ($params['slug'] ?? '')));
 
@@ -541,11 +532,11 @@ $router->add('GET', '/{channel}/{slug}', static function (array $params) use ($c
         || preg_match('/^[a-z0-9][a-z0-9_-]*$/', $slugRaw) !== 1
         || in_array($channel, $reservedPrefixes, true)
     ) {
-        $controller->notFound();
+        $publicController()->notFound();
         return;
     }
 
-    $controller->page($slugRaw, $channel);
+    $publicController()->page($slugRaw, $channel);
 });
 
 $method = $requestMethod;
@@ -562,13 +553,13 @@ if (!in_array($method, ['GET', 'POST'], true)) {
 $bypassAvailabilityPaths = ['/login', '/register'];
 $bypassAvailability = in_array($path, $bypassAvailabilityPaths, true);
 
-if (!$bypassAvailability && !$controller->enforceSiteAvailability()) {
+if (!$bypassAvailability && !$publicController()->enforceSiteAvailability()) {
     exit;
 }
 
 $dispatchResult = $router->dispatch(new RouteRequest($method, $path));
 if (!$dispatchResult->isHandled()) {
-    $controller->notFound();
+    $publicController()->notFound();
 }
 
 // Fallback scheduler: runs all due jobs (core + extensions) non-blocking after the response

@@ -9,12 +9,9 @@
 
 declare(strict_types=1);
 
-use Raven\Controller\AuthController;
-use Raven\Controller\PanelController;
 use Raven\Core\Auth\PanelAccess;
 use Raven\Lib\Auth\PanelSessionGuard;
 use Raven\Core\Diagnostics\DebugToolbarRenderer;
-use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
 use Raven\Lib\Diagnostics\RequestProfiler;
@@ -29,41 +26,29 @@ use function Raven\Core\Support\redirect;
  * Panel front controller for https://{domain}/{panel_path}/
  */
 $rvn = require dirname(__DIR__) . '/private/raven.php';
+$panelBootstrap = require __DIR__ . '/bootstrap.php';
+$rvn = $panelBootstrap($rvn);
 
-$authController = new AuthController(
-    $rvn['view'],
-    $rvn['config'],
-    $rvn['auth'],
-    $rvn['input'],
-    $rvn['csrf']
-);
+/** @var callable(): object $authController */
+$authController = is_callable($rvn['auth_controller'] ?? null)
+    ? $rvn['auth_controller']
+    : static function (): object {
+        throw new RuntimeException('Panel auth controller factory is unavailable.');
+    };
 
-$panelController = new PanelController(
-    $rvn['view'],
-    $rvn['config'],
-    $rvn['auth'],
-    $rvn['input'],
-    $rvn['csrf'],
-    $rvn['page_images'],
-    $rvn['page_image_manager'],
-    $rvn['category'],
-    $rvn['category_set'],
-    $rvn['channel'],
-    $rvn['group'],
-    $rvn['page'],
-    $rvn['redirect'],
-    $rvn['tag'],
-    $rvn['tag_set'],
-    $rvn['taxonomy_lookup'],
-    $rvn['user'],
-    $rvn['invite_tokens'],
-    $rvn['logger']
-);
+/** @var callable(): object $panelController */
+$panelController = is_callable($rvn['panel_controller'] ?? null)
+    ? $rvn['panel_controller']
+    : static function (): object {
+        throw new RuntimeException('Panel controller factory is unavailable.');
+    };
 
-$categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', true), true);
-$tagEnabled = ConfigValueParser::bool($rvn['config']->get('tag.enabled', true), true);
-$_SESSION['_raven_category_enabled'] = $categoryEnabled;
-$_SESSION['_raven_tag_enabled'] = $tagEnabled;
+/** @var callable(): array<string, mixed> $initializePanelRuntime */
+$initializePanelRuntime = is_callable($rvn['initialize_panel_runtime'] ?? null)
+    ? $rvn['initialize_panel_runtime']
+    : static function (): array {
+        throw new RuntimeException('Panel runtime initializer is unavailable.');
+    };
 
 /**
  * Normalizes request path into panel-internal path.
@@ -78,6 +63,27 @@ if ($requestedPath === $configuredPanelPrefix) {
 } elseif (str_starts_with($requestedPath, $configuredPanelPrefix . '/')) {
     $internalPath = substr($requestedPath, strlen($configuredPanelPrefix));
 }
+
+$isPanelAuthHelperInternalPath = static function (string $path) use ($internalPath): bool {
+    $normalized = trim($path !== '' ? $path : $internalPath);
+    $normalized = '/' . ltrim($normalized, '/');
+    if ($normalized !== '/') {
+        $normalized = rtrim($normalized, '/');
+    }
+
+    return in_array($normalized, [
+        '/login',
+        '/login/2fa',
+        '/login/2fa/select',
+        '/login/2fa/webauthn/options',
+        '/login/2fa/webauthn/verify',
+    ], true);
+};
+
+$categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', true), true);
+$tagEnabled = ConfigValueParser::bool($rvn['config']->get('tag.enabled', true), true);
+$_SESSION['_raven_category_enabled'] = $categoryEnabled;
+$_SESSION['_raven_tag_enabled'] = $tagEnabled;
 
 /**
  * Streams one static file from `~/panel/theme/` when panel rewrites route all
@@ -243,24 +249,17 @@ if ($servePanelThemeAsset($internalPath, $requestMethod)) {
 $panelUrl = static function (string $suffix = '') use ($rvn): string {
     return PanelUrl::fromConfig($rvn['config'], $suffix);
 };
-
-$enabledState = ExtensionRegistry::enabledMap((string) $rvn['root']);
-
-// Compute enabled, manifest-valid extensions once for panel nav and route registration.
+$shouldInitializeFullPanelRuntime = !$isPanelAuthHelperInternalPath($internalPath);
 $enabledExtensions = [];
 $enabledExtensionManifests = [];
-foreach (array_keys($enabledState) as $directoryName) {
-    if (!is_dir($rvn['root'] . '/private/ext/' . $directoryName)) {
-        continue;
-    }
-
-    $manifest = ExtensionRegistry::readManifest((string) $rvn['root'], $directoryName);
-    if ($manifest === null) {
-        continue;
-    }
-
-    $enabledExtensions[$directoryName] = true;
-    $enabledExtensionManifests[$directoryName] = $manifest;
+if ($shouldInitializeFullPanelRuntime) {
+    $rvn = $initializePanelRuntime();
+    $categoryEnabled = !empty($rvn['category_enabled']);
+    $tagEnabled = !empty($rvn['tag_enabled']);
+    $enabledExtensions = is_array($rvn['enabled_extensions'] ?? null) ? (array) $rvn['enabled_extensions'] : [];
+    $enabledExtensionManifests = is_array($rvn['enabled_extension_manifests'] ?? null)
+        ? (array) $rvn['enabled_extension_manifests']
+        : [];
 }
 
 /**
@@ -299,7 +298,7 @@ $requirePanelLoginForExtension = static function () use (
             redirect($panelUrl('/login'));
         }
 
-        $panelController->renderPublicNotFound();
+        $panelController()->renderPublicNotFound();
         exit;
     }
 
@@ -309,7 +308,7 @@ $requirePanelLoginForExtension = static function () use (
             redirect($panelUrl('/login'));
         }
 
-        $panelController->renderPublicNotFound();
+        $panelController()->renderPublicNotFound();
         exit;
     }
 
@@ -324,7 +323,7 @@ $requirePanelLoginForExtension = static function () use (
             redirect($panelUrl('/login'));
         }
 
-        $panelController->renderPublicNotFound();
+        $panelController()->renderPublicNotFound();
         exit;
     }
 
@@ -427,110 +426,120 @@ $_SESSION['_raven_nav_stock'] = [
     ],
 ];
 
-// Resolve extension permission levels/bit assignments from controller-managed state.
-$extensionPermissionCatalog = $panelController->extensionPanelPermissionMapForDirectories(array_keys($enabledExtensionManifests));
+$extensionPermissionCatalog = [];
+if ($shouldInitializeFullPanelRuntime) {
+    // Resolve extension permission levels/bit assignments from controller-managed state.
+    $extensionPermissionCatalog = $panelController()->extensionPanelPermissionMapForDirectories(array_keys($enabledExtensionManifests));
 
-$_SESSION['_raven_extension_permission_masks'] = $extensionPermissionCatalog;
-$_SESSION['_raven_enabled_extensions'] = array_keys($enabledExtensions);
+    $_SESSION['_raven_extension_permission_masks'] = $extensionPermissionCatalog;
+    $_SESSION['_raven_enabled_extensions'] = array_keys($enabledExtensions);
 
-// Build dedicated nav links by extension type.
-$extensionNavItems = [];
-$moduleNavItems = [];
-$systemExtensionNavItems = [];
-$canViewSystemExtensions = !empty(($_SESSION['_raven_nav_stock']['system']['system_extensions'] ?? false));
-foreach ($enabledExtensionManifests as $directoryName => $manifest) {
-    $type = strtolower(trim((string) ($manifest['type'] ?? 'plugin')));
-    if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
-        $type = 'plugin';
-    }
-
-    $panelRoutesFile = $rvn['root'] . '/private/ext/' . $directoryName . '/lib/routes_panel.php';
-    if (!is_file($panelRoutesFile)) {
-        continue;
-    }
-
-    $isSystemType = $type === 'system'
-        || !empty($manifest['system_extension']);
-    $permissionMeta = $extensionPermissionCatalog[$directoryName] ?? null;
-    $requiredPermissionBit = 0;
-    if (is_array($permissionMeta)) {
-        $defaultLevel = strtolower(trim((string) ($permissionMeta['default_level'] ?? '')));
-        $levelRows = is_array($permissionMeta['levels'] ?? null) ? $permissionMeta['levels'] : [];
-        foreach ($levelRows as $levelRow) {
-            if (!is_array($levelRow)) {
-                continue;
-            }
-
-            $levelKey = strtolower(trim((string) ($levelRow['key'] ?? '')));
-            if ($defaultLevel !== '' && $levelKey !== $defaultLevel) {
-                continue;
-            }
-
-            $requiredPermissionBit = (int) ($levelRow['bit'] ?? 0);
-            break;
+    // Build dedicated nav links by extension type.
+    $extensionNavItems = [];
+    $moduleNavItems = [];
+    $systemExtensionNavItems = [];
+    $canViewSystemExtensions = !empty(($_SESSION['_raven_nav_stock']['system']['system_extensions'] ?? false));
+    foreach ($enabledExtensionManifests as $directoryName => $manifest) {
+        $type = strtolower(trim((string) ($manifest['type'] ?? 'plugin')));
+        if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
+            $type = 'plugin';
         }
-    }
 
-    $item = [
-        'label' => (string) $manifest['name'],
-        'path' => $panelUrl('/' . ltrim($directoryName, '/')),
-        'section' => $directoryName,
-    ];
-
-    if ($isSystemType) {
-        if ($canViewSystemExtensions) {
-            $systemExtensionNavItems[] = $item;
-        }
-        continue;
-    }
-
-    if ($requiredPermissionBit <= 0 || !$hasPanelPermissionBit($requiredPermissionBit)) {
-        continue;
-    }
-
-    if ($type === 'module') {
-        $moduleNavItems[] = $item;
-        continue;
-    }
-
-    $extensionNavItems[] = $item;
-}
-
-usort($extensionNavItems, static function (array $a, array $b): int {
-    return strcasecmp((string) ($a['label'] ?? ''), (string) ($b['label'] ?? ''));
-});
-usort($moduleNavItems, static function (array $a, array $b): int {
-    return strcasecmp((string) ($a['label'] ?? ''), (string) ($b['label'] ?? ''));
-});
-usort($systemExtensionNavItems, static function (array $a, array $b): int {
-    return strcasecmp((string) ($a['label'] ?? ''), (string) ($b['label'] ?? ''));
-});
-
-$_SESSION['_raven_nav_extensions'] = $extensionNavItems;
-$_SESSION['_raven_nav_modules'] = $moduleNavItems;
-$_SESSION['_raven_nav_system_extensions'] = $systemExtensionNavItems;
-
-// Provide channel-aware shortcuts for Create Page sidebar/mobile accordion sublinks.
-$pageCreateChannelItems = [];
-if ($hasPanelPermissionBit(PanelAccess::PAGES_CREATE)) {
-    foreach ($rvn['channel']->listOptions() as $channelOption) {
-        if (!is_array($channelOption)) {
+        $panelRoutesFile = $rvn['root'] . '/private/ext/' . $directoryName . '/lib/routes_panel.php';
+        if (!is_file($panelRoutesFile)) {
             continue;
         }
 
-        $channelName = trim((string) ($channelOption['name'] ?? ''));
-        $channelSlug = strtolower(trim((string) ($channelOption['slug'] ?? '')));
-        if ($channelName === '' || $channelSlug === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,127}$/', $channelSlug) !== 1) {
-            continue;
+        $isSystemType = $type === 'system'
+            || !empty($manifest['system_extension']);
+        $permissionMeta = $extensionPermissionCatalog[$directoryName] ?? null;
+        $requiredPermissionBit = 0;
+        if (is_array($permissionMeta)) {
+            $defaultLevel = strtolower(trim((string) ($permissionMeta['default_level'] ?? '')));
+            $levelRows = is_array($permissionMeta['levels'] ?? null) ? $permissionMeta['levels'] : [];
+            foreach ($levelRows as $levelRow) {
+                if (!is_array($levelRow)) {
+                    continue;
+                }
+
+                $levelKey = strtolower(trim((string) ($levelRow['key'] ?? '')));
+                if ($defaultLevel !== '' && $levelKey !== $defaultLevel) {
+                    continue;
+                }
+
+                $requiredPermissionBit = (int) ($levelRow['bit'] ?? 0);
+                break;
+            }
         }
 
-        $pageCreateChannelItems[] = [
-            'label' => $channelName,
-            'slug' => $channelSlug,
+        $item = [
+            'label' => (string) $manifest['name'],
+            'path' => $panelUrl('/' . ltrim($directoryName, '/')),
+            'section' => $directoryName,
         ];
+
+        if ($isSystemType) {
+            if ($canViewSystemExtensions) {
+                $systemExtensionNavItems[] = $item;
+            }
+            continue;
+        }
+
+        if ($requiredPermissionBit <= 0 || !$hasPanelPermissionBit($requiredPermissionBit)) {
+            continue;
+        }
+
+        if ($type === 'module') {
+            $moduleNavItems[] = $item;
+            continue;
+        }
+
+        $extensionNavItems[] = $item;
     }
+
+    usort($extensionNavItems, static function (array $a, array $b): int {
+        return strcasecmp((string) ($a['label'] ?? ''), (string) ($b['label'] ?? ''));
+    });
+    usort($moduleNavItems, static function (array $a, array $b): int {
+        return strcasecmp((string) ($a['label'] ?? ''), (string) ($b['label'] ?? ''));
+    });
+    usort($systemExtensionNavItems, static function (array $a, array $b): int {
+        return strcasecmp((string) ($a['label'] ?? ''), (string) ($b['label'] ?? ''));
+    });
+
+    $_SESSION['_raven_nav_extensions'] = $extensionNavItems;
+    $_SESSION['_raven_nav_modules'] = $moduleNavItems;
+    $_SESSION['_raven_nav_system_extensions'] = $systemExtensionNavItems;
+
+    // Provide channel-aware shortcuts for Create Page sidebar/mobile accordion sublinks.
+    $pageCreateChannelItems = [];
+    if ($hasPanelPermissionBit(PanelAccess::PAGES_CREATE)) {
+        foreach ($rvn['channel']->listOptions() as $channelOption) {
+            if (!is_array($channelOption)) {
+                continue;
+            }
+
+            $channelName = trim((string) ($channelOption['name'] ?? ''));
+            $channelSlug = strtolower(trim((string) ($channelOption['slug'] ?? '')));
+            if ($channelName === '' || $channelSlug === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,127}$/', $channelSlug) !== 1) {
+                continue;
+            }
+
+            $pageCreateChannelItems[] = [
+                'label' => $channelName,
+                'slug' => $channelSlug,
+            ];
+        }
+    }
+    $_SESSION['_raven_nav_page_create_channels'] = $pageCreateChannelItems;
+} else {
+    $_SESSION['_raven_extension_permission_masks'] = [];
+    $_SESSION['_raven_enabled_extensions'] = [];
+    $_SESSION['_raven_nav_extensions'] = [];
+    $_SESSION['_raven_nav_modules'] = [];
+    $_SESSION['_raven_nav_system_extensions'] = [];
+    $_SESSION['_raven_nav_page_create_channels'] = [];
 }
-$_SESSION['_raven_nav_page_create_channels'] = $pageCreateChannelItems;
 
 $router = new Router();
 
@@ -538,51 +547,51 @@ $router = new Router();
 // These remain intentionally small wrappers so auth logic stays centralized
 // inside AuthController and can be reused by any future panel entrypoints.
 $router->add('GET', '/login', static function () use ($authController): void {
-    $authController->showLogin();
+    $authController()->showLogin();
 });
 
 $router->add('POST', '/login', static function () use ($authController): void {
-    $authController->login($_POST);
+    $authController()->login($_POST);
 });
 
 $router->add('GET', '/login/2fa', static function () use ($authController): void {
-    $authController->showLoginTwoFactor();
+    $authController()->showLoginTwoFactor();
 });
 
 $router->add('POST', '/login/2fa', static function () use ($authController): void {
-    $authController->loginTwoFactor($_POST);
+    $authController()->loginTwoFactor($_POST);
 });
 
 $router->add('POST', '/login/2fa/select', static function () use ($authController): void {
-    $authController->loginTwoFactorSelect($_POST);
+    $authController()->loginTwoFactorSelect($_POST);
 });
 
 $router->add('POST', '/login/2fa/webauthn/options', static function () use ($authController): void {
-    $authController->loginTwoFactorWebauthnOptions($_POST);
+    $authController()->loginTwoFactorWebauthnOptions($_POST);
 });
 
 $router->add('POST', '/login/2fa/webauthn/verify', static function () use ($authController): void {
-    $authController->loginTwoFactorWebauthnVerify($_POST);
+    $authController()->loginTwoFactorWebauthnVerify($_POST);
 });
 
 $router->add('POST', '/logout', static function () use ($authController): void {
-    $authController->logout($_POST);
+    $authController()->logout($_POST);
 });
 
 // Dashboard route.
 // Serves the panel landing page after access checks.
 $router->add('GET', '/', static function () use ($panelController): void {
-    $panelController->dashboard();
+    $panelController()->dashboard();
 });
 
 // Page routes.
 // Includes list/create/edit/save plus gallery media and delete actions.
 $router->add('GET', '/page', static function () use ($panelController): void {
-    $panelController->pageList();
+    $panelController()->pageList();
 });
 
 $router->add('GET', '/page/edit', static function () use ($panelController): void {
-    $panelController->pageEdit(null);
+    $panelController()->pageEdit(null);
 });
 
 $router->add('GET', '/page/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
@@ -594,36 +603,36 @@ $router->add('GET', '/page/edit/{id}', static function (array $params) use ($pan
         return;
     }
 
-    $panelController->pageEdit($id);
+    $panelController()->pageEdit($id);
 });
 
 $router->add('POST', '/page/save', static function () use ($panelController): void {
-    $panelController->pageSave($_POST);
+    $panelController()->pageSave($_POST);
 });
 
 // Uploads one image into a page gallery (Media tab action).
 $router->add('POST', '/page/gallery/upload', static function () use ($panelController): void {
-    $panelController->pageGalleryUpload($_POST, $_FILES);
+    $panelController()->pageGalleryUpload($_POST, $_FILES);
 });
 
 // Deletes one gallery image from a page (Media tab action).
 $router->add('POST', '/page/gallery/delete', static function () use ($panelController): void {
-    $panelController->pageGalleryDelete($_POST);
+    $panelController()->pageGalleryDelete($_POST);
 });
 
 // Deletes one page from the Pages index action column.
 $router->add('POST', '/page/delete', static function () use ($panelController): void {
-    $panelController->pageDelete($_POST);
+    $panelController()->pageDelete($_POST);
 });
 
 // Channel routes (list + edit + save + delete).
 // Channel CRUD remains in the panel controller while routing stays declarative.
 $router->add('GET', '/channel', static function () use ($panelController): void {
-    $panelController->channelList();
+    $panelController()->channelList();
 });
 
 $router->add('GET', '/channel/edit', static function () use ($panelController): void {
-    $panelController->channelEdit(null);
+    $panelController()->channelEdit(null);
 });
 
 $router->add('GET', '/channel/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
@@ -635,15 +644,15 @@ $router->add('GET', '/channel/edit/{id}', static function (array $params) use ($
         return;
     }
 
-    $panelController->channelEdit($id);
+    $panelController()->channelEdit($id);
 });
 
 $router->add('POST', '/channel/save', static function () use ($panelController): void {
-    $panelController->channelSave($_POST, $_FILES);
+    $panelController()->channelSave($_POST, $_FILES);
 });
 
 $router->add('POST', '/channel/delete', static function () use ($panelController): void {
-    $panelController->channelDelete($_POST);
+    $panelController()->channelDelete($_POST);
 });
 
 // Category/Tag/Redirect/User/Group routes.
@@ -651,11 +660,11 @@ $router->add('POST', '/channel/delete', static function () use ($panelController
 
 if ($categoryEnabled) {
     $router->add('GET', '/category', static function () use ($panelController): void {
-        $panelController->categoryList();
+        $panelController()->categoryList();
     });
 
     $router->add('GET', '/category/edit', static function () use ($panelController): void {
-        $panelController->categoryEdit(null);
+        $panelController()->categoryEdit(null);
     });
 
     $router->add('GET', '/category/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
@@ -667,23 +676,23 @@ if ($categoryEnabled) {
             return;
         }
 
-        $panelController->categoryEdit($id);
+        $panelController()->categoryEdit($id);
     });
 
     $router->add('POST', '/category/save', static function () use ($panelController): void {
-        $panelController->categorySave($_POST, $_FILES);
+        $panelController()->categorySave($_POST, $_FILES);
     });
 
     $router->add('POST', '/category/delete', static function () use ($panelController): void {
-        $panelController->categoryDelete($_POST);
+        $panelController()->categoryDelete($_POST);
     });
 
     $router->add('GET', '/category/set', static function () use ($panelController): void {
-        $panelController->categorySetList();
+        $panelController()->categorySetList();
     });
 
     $router->add('GET', '/category/set/edit', static function () use ($panelController): void {
-        $panelController->categorySetEdit(null);
+        $panelController()->categorySetEdit(null);
     });
 
     $router->add('GET', '/category/set/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
@@ -695,25 +704,25 @@ if ($categoryEnabled) {
             return;
         }
 
-        $panelController->categorySetEdit($id);
+        $panelController()->categorySetEdit($id);
     });
 
     $router->add('POST', '/category/set/save', static function () use ($panelController): void {
-        $panelController->categorySetSave($_POST);
+        $panelController()->categorySetSave($_POST);
     });
 
     $router->add('POST', '/category/set/delete', static function () use ($panelController): void {
-        $panelController->categorySetDelete($_POST);
+        $panelController()->categorySetDelete($_POST);
     });
 }
 
 if ($tagEnabled) {
     $router->add('GET', '/tag', static function () use ($panelController): void {
-        $panelController->tagList();
+        $panelController()->tagList();
     });
 
     $router->add('GET', '/tag/edit', static function () use ($panelController): void {
-        $panelController->tagEdit(null);
+        $panelController()->tagEdit(null);
     });
 
     $router->add('GET', '/tag/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
@@ -725,23 +734,23 @@ if ($tagEnabled) {
             return;
         }
 
-        $panelController->tagEdit($id);
+        $panelController()->tagEdit($id);
     });
 
     $router->add('POST', '/tag/save', static function () use ($panelController): void {
-        $panelController->tagSave($_POST, $_FILES);
+        $panelController()->tagSave($_POST, $_FILES);
     });
 
     $router->add('POST', '/tag/delete', static function () use ($panelController): void {
-        $panelController->tagDelete($_POST);
+        $panelController()->tagDelete($_POST);
     });
 
     $router->add('GET', '/tag/set', static function () use ($panelController): void {
-        $panelController->tagSetList();
+        $panelController()->tagSetList();
     });
 
     $router->add('GET', '/tag/set/edit', static function () use ($panelController): void {
-        $panelController->tagSetEdit(null);
+        $panelController()->tagSetEdit(null);
     });
 
     $router->add('GET', '/tag/set/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
@@ -753,24 +762,24 @@ if ($tagEnabled) {
             return;
         }
 
-        $panelController->tagSetEdit($id);
+        $panelController()->tagSetEdit($id);
     });
 
     $router->add('POST', '/tag/set/save', static function () use ($panelController): void {
-        $panelController->tagSetSave($_POST);
+        $panelController()->tagSetSave($_POST);
     });
 
     $router->add('POST', '/tag/set/delete', static function () use ($panelController): void {
-        $panelController->tagSetDelete($_POST);
+        $panelController()->tagSetDelete($_POST);
     });
 }
 
 $router->add('GET', '/redirect', static function () use ($panelController): void {
-    $panelController->redirectList();
+    $panelController()->redirectList();
 });
 
 $router->add('GET', '/redirect/edit', static function () use ($panelController): void {
-    $panelController->redirectEdit(null);
+    $panelController()->redirectEdit(null);
 });
 
 $router->add('GET', '/redirect/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
@@ -782,23 +791,23 @@ $router->add('GET', '/redirect/edit/{id}', static function (array $params) use (
         return;
     }
 
-    $panelController->redirectEdit($id);
+    $panelController()->redirectEdit($id);
 });
 
 $router->add('POST', '/redirect/save', static function () use ($panelController): void {
-    $panelController->redirectSave($_POST);
+    $panelController()->redirectSave($_POST);
 });
 
 $router->add('POST', '/redirect/delete', static function () use ($panelController): void {
-    $panelController->redirectDelete($_POST);
+    $panelController()->redirectDelete($_POST);
 });
 
 $router->add('GET', '/user', static function () use ($panelController): void {
-    $panelController->userList();
+    $panelController()->userList();
 });
 
 $router->add('GET', '/user/edit', static function () use ($panelController): void {
-    $panelController->userEdit(null);
+    $panelController()->userEdit(null);
 });
 
 $router->add('GET', '/user/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
@@ -810,39 +819,39 @@ $router->add('GET', '/user/edit/{id}', static function (array $params) use ($pan
         return;
     }
 
-    $panelController->userEdit($id);
+    $panelController()->userEdit($id);
 });
 
 $router->add('POST', '/user/save', static function () use ($panelController): void {
-    $panelController->userSave($_POST, $_FILES);
+    $panelController()->userSave($_POST, $_FILES);
 });
 
 $router->add('POST', '/user/delete', static function () use ($panelController): void {
-    $panelController->userDelete($_POST);
+    $panelController()->userDelete($_POST);
 });
 
 $router->add('GET', '/user/invites', static function () use ($panelController): void {
-    $panelController->userInvites();
+    $panelController()->userInvites();
 });
 
 $router->add('POST', '/user/invites/create', static function () use ($panelController): void {
-    $panelController->userInvitesCreate($_POST);
+    $panelController()->userInvitesCreate($_POST);
 });
 
 $router->add('POST', '/user/invites/generate', static function () use ($panelController): void {
-    $panelController->userInvitesGenerate($_POST);
+    $panelController()->userInvitesGenerate($_POST);
 });
 
 $router->add('POST', '/user/invites/delete', static function () use ($panelController): void {
-    $panelController->userInvitesDelete($_POST);
+    $panelController()->userInvitesDelete($_POST);
 });
 
 $router->add('GET', '/group', static function () use ($panelController): void {
-    $panelController->groupList();
+    $panelController()->groupList();
 });
 
 $router->add('GET', '/group/edit', static function () use ($panelController): void {
-    $panelController->groupEdit(null);
+    $panelController()->groupEdit(null);
 });
 
 $router->add('GET', '/group/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
@@ -854,133 +863,133 @@ $router->add('GET', '/group/edit/{id}', static function (array $params) use ($pa
         return;
     }
 
-    $panelController->groupEdit($id);
+    $panelController()->groupEdit($id);
 });
 
 $router->add('POST', '/group/save', static function () use ($panelController): void {
-    $panelController->groupSave($_POST, $_FILES);
+    $panelController()->groupSave($_POST, $_FILES);
 });
 
 $router->add('POST', '/group/delete', static function () use ($panelController): void {
-    $panelController->groupDelete($_POST);
+    $panelController()->groupDelete($_POST);
 });
 
 $router->add('GET', '/preferences', static function () use ($panelController): void {
-    $panelController->preferences();
+    $panelController()->preferences();
 });
 
 $router->add('POST', '/preferences/save', static function () use ($panelController): void {
-    $panelController->preferencesSave($_POST, $_FILES);
+    $panelController()->preferencesSave($_POST, $_FILES);
 });
 
 $router->add('POST', '/preferences/2fa/totp/setup', static function () use ($panelController): void {
-    $panelController->preferencesTotpSetup($_POST);
+    $panelController()->preferencesTotpSetup($_POST);
 });
 
 $router->add('POST', '/preferences/2fa/recovery/generate', static function () use ($panelController): void {
-    $panelController->preferencesRecoveryCodeGenerate($_POST);
+    $panelController()->preferencesRecoveryCodeGenerate($_POST);
 });
 
 $router->add('POST', '/preferences/2fa/webauthn/options', static function () use ($panelController): void {
-    $panelController->preferencesWebauthnCreateOptions($_POST);
+    $panelController()->preferencesWebauthnCreateOptions($_POST);
 });
 
 $router->add('POST', '/preferences/2fa/webauthn/register', static function () use ($panelController): void {
-    $panelController->preferencesWebauthnRegister($_POST);
+    $panelController()->preferencesWebauthnRegister($_POST);
 });
 
 // Configuration routes.
 // Configuration editing is restricted to Super Admin capability.
 $router->add('GET', '/configuration', static function () use ($panelController): void {
-    $panelController->configuration();
+    $panelController()->configuration();
 });
 
 $router->add('GET', '/update', static function () use ($panelController): void {
-    $panelController->update();
+    $panelController()->update();
 });
 
 $router->add('POST', '/update/action', static function () use ($panelController): void {
-    $panelController->updateAction($_POST);
+    $panelController()->updateAction($_POST);
 });
 
 $router->add('POST', '/configuration/save', static function () use ($panelController): void {
-    $panelController->configurationSave($_POST);
+    $panelController()->configurationSave($_POST);
 });
 
 // Routing inventory route.
 $router->add('GET', '/routing', static function () use ($panelController): void {
-    $panelController->routing();
+    $panelController()->routing();
 });
 
 $router->add('GET', '/routing/export', static function () use ($panelController): void {
-    $panelController->routingExport();
+    $panelController()->routingExport();
 });
 
 // Event log routes.
 $router->add('GET', '/logs', static function () use ($panelController): void {
-    $panelController->logs();
+    $panelController()->logs();
 });
 
 $router->add('GET', '/logs/export', static function () use ($panelController): void {
-    $panelController->logsExport();
+    $panelController()->logsExport();
 });
 
 $router->add('POST', '/logs/clear', static function () use ($panelController): void {
-    $panelController->logsClear();
+    $panelController()->logsClear();
 });
 
 // Public Theme manager routes.
 $router->add('GET', '/themes', static function () use ($panelController): void {
-    $panelController->themes();
+    $panelController()->themes();
 });
 
 $router->add('POST', '/themes/enable', static function () use ($panelController): void {
-    $panelController->themesEnable($_POST);
+    $panelController()->themesEnable($_POST);
 });
 
 $router->add('POST', '/themes/create', static function () use ($panelController): void {
-    $panelController->themesCreate($_POST);
+    $panelController()->themesCreate($_POST);
 });
 
 $router->add('POST', '/themes/upload', static function () use ($panelController): void {
-    $panelController->themesUpload($_POST, $_FILES);
+    $panelController()->themesUpload($_POST, $_FILES);
 });
 
 $router->add('GET', '/themes/export', static function () use ($panelController): void {
-    $panelController->themesExport($_GET);
+    $panelController()->themesExport($_GET);
 });
 
 $router->add('POST', '/themes/uninstall', static function () use ($panelController): void {
-    $panelController->themesUninstall($_POST);
+    $panelController()->themesUninstall($_POST);
 });
 
 // Extensions management routes (placeholder system foundation for future plugin runtime wiring).
 $router->add('GET', '/extensions', static function () use ($panelController): void {
-    $panelController->extensions();
+    $panelController()->extensions();
 });
 
 $router->add('POST', '/extensions/toggle', static function () use ($panelController): void {
-    $panelController->extensionsToggle($_POST);
+    $panelController()->extensionsToggle($_POST);
 });
 
 $router->add('POST', '/extensions/upload', static function () use ($panelController): void {
-    $panelController->extensionsUpload($_POST, $_FILES);
+    $panelController()->extensionsUpload($_POST, $_FILES);
 });
 
 $router->add('GET', '/extensions/export', static function () use ($panelController): void {
-    $panelController->extensionsExport($_GET);
+    $panelController()->extensionsExport($_GET);
 });
 
 $router->add('POST', '/extensions/create', static function () use ($panelController): void {
-    $panelController->extensionsCreate($_POST);
+    $panelController()->extensionsCreate($_POST);
 });
 
 $router->add('POST', '/extensions/uninstall', static function () use ($panelController): void {
-    $panelController->extensionsUninstall($_POST);
+    $panelController()->extensionsUninstall($_POST);
 });
 
 $router->add('POST', '/extensions/permission', static function () use ($panelController): void {
-    $panelController->extensionsPermission($_POST);
+    $panelController()->extensionsPermission($_POST);
 });
 
 // Extension route registration.
@@ -1068,7 +1077,7 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
         $extensionRequirePanelAccess = static function () use ($requirePanelLoginForExtension, $rvn, $panelController): void {
             $requirePanelLoginForExtension();
             if (!$rvn['auth']->hasPanelPermissionBit(PanelAccess::CONFIGURATION_VIEW)) {
-                $panelController->renderPublicNotFound();
+                $panelController()->renderPublicNotFound();
                 exit;
             }
         };
@@ -1081,7 +1090,7 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
         ): void {
             $requirePanelLoginForExtension();
             if ($requiredPermissionBit <= 0 || !$hasPanelPermissionBit($requiredPermissionBit)) {
-                $panelController->renderPublicNotFound();
+                $panelController()->renderPublicNotFound();
                 exit;
             }
         };
@@ -1105,7 +1114,7 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
         }
 
         if ($targetBit <= 0 || !$hasPanelPermissionBit($targetBit)) {
-            $panelController->renderPublicNotFound();
+            $panelController()->renderPublicNotFound();
             exit;
         }
     };
@@ -1117,7 +1126,7 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
         'requireExtensionPermission' => $requireExtensionPermission,
         'currentUserTheme' => $currentUserTheme,
         'renderPublicNotFound' => static function () use ($panelController): void {
-            $panelController->renderPublicNotFound();
+            $panelController()->renderPublicNotFound();
         },
         'extensionDirectory' => $extensionName,
         'extensionRequiredPermissionBit' => $requiredPermissionBit,
@@ -1132,21 +1141,6 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
 $method = $requestMethod;
 $debugToolbarSettings = DebugToolbarConfigResolver::fromConfig($rvn['config']);
 $debugToolbarEnabled = false;
-$isPanelAuthHelperInternalPath = static function (string $path) use ($internalPath): bool {
-    $normalized = trim($path !== '' ? $path : $internalPath);
-    $normalized = '/' . ltrim($normalized, '/');
-    if ($normalized !== '/') {
-        $normalized = rtrim($normalized, '/');
-    }
-
-    return in_array($normalized, [
-        '/login',
-        '/login/2fa',
-        '/login/2fa/select',
-        '/login/2fa/webauthn/options',
-        '/login/2fa/webauthn/verify',
-    ], true);
-};
 $canRenderPanelDebugToolbar = static function () use ($rvn, $isPanelAuthHelperInternalPath, $internalPath): bool {
     if (!isset($rvn['auth']) || $isPanelAuthHelperInternalPath($internalPath)) {
         return false;
@@ -1213,7 +1207,12 @@ if ($debugToolbarEnabled) {
 // Unknown panel routes intentionally render the public themed 404 response.
 $dispatchResult = $router->dispatch(new RouteRequest($method, $internalPath));
 if (!$dispatchResult->isHandled()) {
-    $panelController->renderPublicNotFound();
+    if ($shouldInitializeFullPanelRuntime) {
+        $panelController()->renderPublicNotFound();
+    } else {
+        http_response_code(404);
+        echo 'Not Found';
+    }
 }
 
 // Fallback scheduler: mirrors the public entrypoint trigger.
@@ -1223,6 +1222,11 @@ if (in_array($rvn['config']->get('site.scheduler', 'always'), ['always', 'panel'
     $schedulerStampFile = dirname(__DIR__) . '/private/dat/scheduler_last_run';
     $lastRun = is_file($schedulerStampFile) ? (int) @file_get_contents($schedulerStampFile) : 0;
     if (time() - $lastRun >= 60) {
+        if (is_callable($rvn['boot_extensions'] ?? null)) {
+            /** @var callable(): array<string, mixed> $bootExtensions */
+            $bootExtensions = $rvn['boot_extensions'];
+            $rvn = $bootExtensions();
+        }
         @file_put_contents($schedulerStampFile, (string) time());
         if (function_exists('fastcgi_finish_request')) {
             fastcgi_finish_request();

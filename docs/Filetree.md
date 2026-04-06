@@ -25,12 +25,19 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 
 - `public/index.php`
   - Public frontend controller.
+- `public/bootstrap.php`
+  - Public-runtime bootstrap assembly.
+  - Owns public-only controller wiring on top of the shared core bootstrap.
 - `public/install.php`
   - First-run installer.
 - `panel/index.php`
   - Panel/dashboard controller.
+- `panel/bootstrap.php`
+  - Panel-runtime bootstrap assembly.
+  - Owns panel/auth controller wiring on top of the shared core bootstrap.
 - `private/raven.php`
-  - Shared bootstrap/container wiring used by Raven runtime flows.
+  - Shared core bootstrap/container wiring used by both web roots.
+  - Owns autoloading, config/session/database/auth startup, lazy service registration, extension metadata, and scheduler wiring.
 
 ## Core Ownership
 

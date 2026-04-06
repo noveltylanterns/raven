@@ -17,7 +17,7 @@ use Raven\Repo\RepoService;
  *
  * @param array{
  *   rvn: array<string, mixed>,
- *   controller?: object,
+ *   notFound?: callable(): void,
  *   input?: mixed,
  *   extensionDirectory?: string,
  *   renderPublicExtension?: callable(string, array<string, mixed>, string|null): void
@@ -26,8 +26,8 @@ use Raven\Repo\RepoService;
 return static function (Router $router, array $context): void {
     /** @var array<string, mixed> $rvn */
     $rvn = (array) ($context['rvn'] ?? []);
-    $controller = $context['controller'] ?? null;
     $renderPublicExtension = $context['renderPublicExtension'] ?? null;
+    $notFoundHandler = $context['notFound'] ?? null;
 
     if (!isset($rvn['config']) || !is_callable($renderPublicExtension)) {
         return;
@@ -51,9 +51,9 @@ return static function (Router $router, array $context): void {
         return preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $candidate) === 1 ? $candidate : '';
     };
 
-    $notFound = static function () use ($controller): void {
-        if (is_object($controller) && method_exists($controller, 'notFound')) {
-            $controller->notFound();
+    $notFound = static function () use ($notFoundHandler): void {
+        if (is_callable($notFoundHandler)) {
+            $notFoundHandler();
             return;
         }
 

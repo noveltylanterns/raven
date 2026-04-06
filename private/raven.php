@@ -15,15 +15,14 @@ use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\SchemaManager;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Media\PageImageManager;
+use Raven\Core\View;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
 use Raven\Lib\Log\EventLogger;
 use Raven\Lib\Scheduler\SchedulerRegistry;
-use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Session\SessionCookiePolicy;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Core\View;
 use Raven\Repository\CategoryRepository;
 use Raven\Repository\ChannelRepository;
 use Raven\Repository\GroupRepository;
@@ -128,21 +127,76 @@ return (static function (): array {
     $auth = new AuthService($authDb, $rvnDb, $driver, $prefix);
 
     $input = new InputSanitizer();
-    $pageImages = new PageImageRepository($rvnDb, $driver, $prefix);
-    $channelRepo = new ChannelRepository($rvnDb, $driver, $prefix, $root . '/private/dat/channel');
-    $categorySetRepo = new TaxonomySetRepository('category', $root . '/private/dat/category-set');
-    $tagSetRepo = new TaxonomySetRepository('tag', $root . '/private/dat/tag-set');
     $categoryEnabled = ConfigValueParser::bool($config->get('category.enabled', false), false);
     $tagEnabled = ConfigValueParser::bool($config->get('tag.enabled', false), false);
-    $siteContextBuilder = new SiteContextBuilder();
-    // Build EventLogger from the logging.* config section.
-    // Errors are logged by default; warnings and info are opt-in.
     $loggingConfig = (array) $config->get('logging', []);
-    $logger = new EventLogger($rvnDb, $driver, $prefix, $loggingConfig);
+    $extensionBootstrapResolver = new ExtensionBootstrapContractResolver();
+
+    $serviceCache = [];
+    $serviceFactories = [
+        'category' => static fn (): CategoryRepository => new CategoryRepository($rvnDb, $driver, $prefix),
+        'category_set' => static fn (): TaxonomySetRepository => new TaxonomySetRepository('category', $root . '/private/dat/category-set'),
+        'channel' => static fn (): ChannelRepository => new ChannelRepository($rvnDb, $driver, $prefix, $root . '/private/dat/channel'),
+        'group' => static fn (): GroupRepository => new GroupRepository($rvnDb, $driver, $prefix),
+        'invite_tokens' => static fn (): InviteTokenRepository => new InviteTokenRepository($authDb, $driver, $prefix),
+        'page_images' => static fn (): PageImageRepository => new PageImageRepository($rvnDb, $driver, $prefix),
+        'page_image_manager' => static function () use ($config, $input, &$serviceFactories, &$serviceCache, $root): PageImageManager {
+            if (!isset($serviceCache['page_images'])) {
+                $serviceCache['page_images'] = $serviceFactories['page_images']();
+            }
+
+            /** @var PageImageRepository $pageImages */
+            $pageImages = $serviceCache['page_images'];
+            return new PageImageManager($config, $input, $pageImages, $root);
+        },
+        'page' => static function () use ($rvnDb, $driver, $prefix, $categoryEnabled, $tagEnabled, &$serviceFactories, &$serviceCache): PageRepository {
+            if (!isset($serviceCache['channel'])) {
+                $serviceCache['channel'] = $serviceFactories['channel']();
+            }
+
+            /** @var ChannelRepository $channelRepo */
+            $channelRepo = $serviceCache['channel'];
+            return new PageRepository($rvnDb, $driver, $prefix, $channelRepo, $categoryEnabled, $tagEnabled);
+        },
+        'redirect' => static function () use ($rvnDb, $driver, $prefix, &$serviceFactories, &$serviceCache): RedirectRepository {
+            if (!isset($serviceCache['channel'])) {
+                $serviceCache['channel'] = $serviceFactories['channel']();
+            }
+
+            /** @var ChannelRepository $channelRepo */
+            $channelRepo = $serviceCache['channel'];
+            return new RedirectRepository($rvnDb, $driver, $prefix, $channelRepo);
+        },
+        'tag' => static fn (): TagRepository => new TagRepository($rvnDb, $driver, $prefix),
+        'tag_set' => static fn (): TaxonomySetRepository => new TaxonomySetRepository('tag', $root . '/private/dat/tag-set'),
+        'taxonomy_lookup' => static function () use ($rvnDb, $driver, $prefix, &$serviceFactories, &$serviceCache): TaxonomyLookupRepository {
+            if (!isset($serviceCache['channel'])) {
+                $serviceCache['channel'] = $serviceFactories['channel']();
+            }
+
+            /** @var ChannelRepository $channelRepo */
+            $channelRepo = $serviceCache['channel'];
+            return new TaxonomyLookupRepository($rvnDb, $driver, $prefix, $channelRepo);
+        },
+        'user' => static fn (): UserRepository => new UserRepository($authDb, $rvnDb, $driver, $prefix),
+        // The logger is lazy so quiet requests do not pay for log-repository wiring.
+        'logger' => static fn (): EventLogger => new EventLogger($rvnDb, $driver, $prefix, $loggingConfig),
+    ];
+    $service = static function (string $name) use (&$serviceCache, $serviceFactories): mixed {
+        if (!array_key_exists($name, $serviceFactories)) {
+            throw new InvalidArgumentException('Unknown Raven bootstrap service "' . $name . '".');
+        }
+
+        if (!array_key_exists($name, $serviceCache)) {
+            $serviceCache[$name] = $serviceFactories[$name]();
+        }
+
+        return $serviceCache[$name];
+    };
 
     // Hook into PHP's error handler to capture runtime errors/warnings into the event log.
     // Returns false so PHP's own default handler still runs (stderr/error_log output continues).
-    set_error_handler(static function (int $errno, string $errstr, string $errfile, int $errline) use ($logger): bool {
+    set_error_handler(static function (int $errno, string $errstr, string $errfile, int $errline) use ($service): bool {
         if (!($errno & error_reporting())) {
             // Error is suppressed by the current error_reporting level — skip it.
             return false;
@@ -153,6 +207,8 @@ return (static function (): array {
             : 'warn';
 
         try {
+            /** @var EventLogger $logger */
+            $logger = $service('logger');
             $logger->log($severity, $errstr, 'system', [
                 'errno' => $errno,
                 'file'  => $errfile,
@@ -165,6 +221,51 @@ return (static function (): array {
         return false;
     });
 
+    $extensionManifests = [];
+    $extensionStorage = [];
+    $extensionBootProviders = [];
+    $schedulerExtensions = [];
+    foreach ($enabledExtensionDirectories as $directory) {
+        $manifest = ExtensionRegistry::readManifest($root, $directory);
+        if (!is_array($manifest)) {
+            continue;
+        }
+
+        $extensionManifests[$directory] = $manifest;
+
+        $bootstrap = $extensionBootstrapResolver->resolve($root, $directory, $manifest);
+        if (!$bootstrap['valid']) {
+            error_log('Raven extension bootstrap is invalid for extension "' . $directory . '": ' . (string) ($bootstrap['error'] ?? 'Unknown error.'));
+            continue;
+        }
+
+        if (!empty($bootstrap['scheduler'])) {
+            $schedulerExtensions[] = $directory;
+        }
+
+        $storage = is_array($bootstrap['storage'] ?? null) ? (array) $bootstrap['storage'] : [];
+        $extensionStorage[$directory] = [
+            'local' => !empty($storage['local']) ? ($root . '/private/dat/ext/' . $directory) : '',
+            'aux' => [],
+            'panel' => !empty($storage['panel']) ? ($root . '/panel/ext/' . $directory) : '',
+            'public' => !empty($storage['public']) ? ($root . '/public/uploads/ext/' . $directory) : '',
+            // Bin storage resolves to the extension's own bin/ directory; private/bin/ contains the symlinks.
+            'bin' => !empty($storage['bin']) ? ($root . '/private/ext/' . $directory . '/bin') : '',
+        ];
+        foreach ((array) ($storage['aux'] ?? []) as $auxDirectory) {
+            if (!is_string($auxDirectory) || $auxDirectory === '') {
+                continue;
+            }
+
+            $extensionStorage[$directory]['aux'][$auxDirectory] = $root . '/' . $auxDirectory;
+        }
+
+        $provider = $bootstrap['boot'] ?? null;
+        if (is_callable($provider)) {
+            $extensionBootProviders[$directory] = $provider;
+        }
+    }
+
     $rvn = [
         'root' => $root,
         'config' => $config,
@@ -176,82 +277,29 @@ return (static function (): array {
         'view' => new View($root . '/private/tpl'),
         'input' => $input,
         'csrf' => new Csrf(),
-        'panel_site_data' => static function (bool $includeDomain = true) use ($siteContextBuilder, $config, $categoryEnabled, $tagEnabled): array {
-            return $siteContextBuilder->panel($config, $categoryEnabled, $tagEnabled, $includeDomain);
-        },
-        'category' => new CategoryRepository($rvnDb, $driver, $prefix),
-        'category_set' => $categorySetRepo,
-        'channel' => $channelRepo,
-        'group' => new GroupRepository($rvnDb, $driver, $prefix),
-        'invite_tokens' => new InviteTokenRepository($authDb, $driver, $prefix),
-        'page_images' => $pageImages,
-        'page_image_manager' => new PageImageManager($config, $input, $pageImages, $root),
-        'page' => new PageRepository($rvnDb, $driver, $prefix, $channelRepo, $categoryEnabled, $tagEnabled),
-        'redirect' => new RedirectRepository($rvnDb, $driver, $prefix, $channelRepo),
-        'tag' => new TagRepository($rvnDb, $driver, $prefix),
-        'tag_set' => $tagSetRepo,
-        'taxonomy_lookup' => new TaxonomyLookupRepository($rvnDb, $driver, $prefix, $channelRepo),
-        'user' => new UserRepository($authDb, $rvnDb, $driver, $prefix),
-        'logger' => $logger,
+        'service' => $service,
+        'enabled_extension_directories' => array_keys($extensionManifests),
+        'enabled_extension_manifests' => $extensionManifests,
+        'extension_storage' => $extensionStorage,
+        'extension_services' => [],
     ];
-
-    $extensionBootstrapResolver = new ExtensionBootstrapContractResolver();
-
-    // Load service providers from enabled extensions.
-    // Also collect scheduler-opted-in extension directory names for SchedulerRegistry wiring below.
-    $schedulerExtensions = [];
-    foreach ($enabledExtensionDirectories as $directory) {
-        $manifest = ExtensionRegistry::readManifest($root, $directory);
-        if (!is_array($manifest)) {
-            continue;
+    $extensionsBooted = false;
+    $rvn['boot_extensions'] = static function () use (&$extensionsBooted, &$rvn, $extensionBootProviders): array {
+        if ($extensionsBooted) {
+            return $rvn;
         }
 
-        $bootstrap = $extensionBootstrapResolver->resolve($root, $directory, $manifest);
-        if (!$bootstrap['valid']) {
-            error_log('Raven extension bootstrap is invalid for extension "' . $directory . '": ' . (string) ($bootstrap['error'] ?? 'Unknown error.'));
-            continue;
-        }
-
-        // Track extensions that opted in to the scheduler so they are wired below.
-        if (!empty($bootstrap['scheduler'])) {
-            $schedulerExtensions[] = $directory;
-        }
-
-        $provider = $bootstrap['boot'] ?? null;
-        if (!is_callable($provider)) {
-            continue;
-        }
-
-        /** @var mixed $rawExtensionStorage */
-        $rawExtensionStorage = $rvn['extension_storage'] ?? [];
-        if (!is_array($rawExtensionStorage)) {
-            $rawExtensionStorage = [];
-        }
-
-        $storage = is_array($bootstrap['storage'] ?? null) ? (array) $bootstrap['storage'] : [];
-        $rawExtensionStorage[$directory] = [
-            'local' => !empty($storage['local']) ? ($root . '/private/dat/ext/' . $directory) : '',
-            'aux' => [],
-            'panel' => !empty($storage['panel']) ? ($root . '/panel/ext/' . $directory) : '',
-            'public' => !empty($storage['public']) ? ($root . '/public/uploads/ext/' . $directory) : '',
-            // bin storage resolves to the extension's own bin/ directory; private/bin/ contains the symlinks.
-            'bin' => !empty($storage['bin']) ? ($root . '/private/ext/' . $directory . '/bin') : '',
-        ];
-        foreach ((array) ($storage['aux'] ?? []) as $auxDirectory) {
-            if (!is_string($auxDirectory) || $auxDirectory === '') {
-                continue;
+        $extensionsBooted = true;
+        foreach ($extensionBootProviders as $directory => $provider) {
+            try {
+                $provider($rvn);
+            } catch (\Throwable $exception) {
+                error_log('Raven extension bootstrap failed for extension "' . $directory . '": ' . $exception->getMessage());
             }
-
-            $rawExtensionStorage[$directory]['aux'][$auxDirectory] = $root . '/' . $auxDirectory;
         }
-        $rvn['extension_storage'] = $rawExtensionStorage;
 
-        try {
-            $provider($rvn);
-        } catch (\Throwable $exception) {
-            error_log('Raven extension bootstrap failed for extension "' . $directory . '": ' . $exception->getMessage());
-        }
-    }
+        return $rvn;
+    };
 
     // Wire the system-wide scheduler.
     // Both core jobs and extension-declared jobs (from lib/cron.php) run through this registry.
@@ -264,16 +312,17 @@ return (static function (): array {
     // after each response (throttled to 60 s) when site.scheduler is true, so this job runs on
     // request traffic without a server crontab. Operators may disable site.scheduler and point
     // their own crontab at rvn-cron instead.
-    $scheduler->registerJob('core', 'page-schedule', 60, static function (array $context): void {
-        $page = $context['rvn']['page'] ?? null;
-        if ($page instanceof PageRepository) {
-            $page->applySchedule();
-        }
+    $scheduler->registerJob('core', 'page-schedule', 60, static function () use ($service): void {
+        /** @var PageRepository $page */
+        $page = $service('page');
+        $page->applySchedule();
     });
 
     // Built-in core job: prune event log entries older than the configured retention period.
     // Runs once per day (86400 s). Pruning is deferred to a job so the logger's hot path stays fast.
-    $scheduler->registerJob('core', 'event-log-prune', 86400, static function (array $context) use ($logger): void {
+    $scheduler->registerJob('core', 'event-log-prune', 86400, static function () use ($service): void {
+        /** @var EventLogger $logger */
+        $logger = $service('logger');
         $logger->pruneOlderThan($logger->retentionDays());
     });
 
