@@ -6,7 +6,7 @@ This document explains Raven's Routing Table screen for both panel users and dev
 
 Maintenance note: keep this file updated whenever Routing Table routes, row-building/conflict logic, export behavior, or Routing Table panel views change (`private/tpl/panel/routing.php`, `SystemController::routing*`, or routing inventory composition helpers).
 
-Public-routing note: public route bootstrap lives in `public/index.php`, and public route handlers live in `private/sys/Controller/PublicController.php`. Keep those files and `public/theme/AGENTS.md` in sync when public route families such as feeds are added or changed.
+Public-routing note: public route bootstrap lives in `public/index.php`; split public auth handlers now live under `private/sys/Controller/Public/`, and the remaining public route handlers still live in `private/sys/Controller/PublicController.php`. Keep those files and `public/theme/AGENTS.md` in sync when public route families such as feeds are added or changed.
 
 ## 1) Panel Guide (Routing Table)
 
@@ -81,7 +81,9 @@ Export fields include:
   - `private/sys/Controller/Panel/SystemController.php`
 - Public route bootstrap:
   - `public/index.php`
-- Public route controller:
+- Public auth controller:
+  - `private/sys/Controller/Public/AuthController.php`
+- Remaining public route controller:
   - `private/sys/Controller/PublicController.php`
 
 ### Panel Routes

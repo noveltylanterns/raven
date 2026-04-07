@@ -6,6 +6,7 @@
 
 - **Panel split completed on the panel side**: removed `private/sys/Controller/PanelController.php`, deleted the last dead legacy capture from `panel/bootstrap.php`, and confirmed `panel/index.php` dispatch stays on the split `DashboardController`, `ContentController`, `TaxonomyController`, `RedirectController`, `UserController`, `GroupController`, `PreferencesController`, and `SystemController` factories.
 - **Panel behavior docs repointed**: channel/category/tag routes now document `TaxonomyController`, redirects document `RedirectController`, groups document `GroupController`, and user/group notes now reflect the current Admin-group permission wording instead of the older Super Admin naming.
+- **Public auth split started**: added `private/sys/Controller/Public/RequestContext.php` and `private/sys/Controller/Public/AuthController.php`, wired `public_request_context` / `public_auth_controller` factories in `public/bootstrap.php`, and moved `/login*` plus `/register*` dispatch in `public/index.php` off the monolithic `PublicController`.
 
 ### April 6, 2026 — event logger
 

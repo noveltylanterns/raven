@@ -111,7 +111,9 @@ Group assignment notes:
   - `private/tpl/auth/register.php`
 - Panel controller:
   - `private/sys/Controller/Panel/UserController.php`
-- Public controller:
+- Public auth controller:
+  - `private/sys/Controller/Public/AuthController.php`
+- Remaining public route controller:
   - `private/sys/Controller/PublicController.php`
 - Shared login workflow:
   - `private/lib/Auth/LoginAttemptWorkflowService.php`
@@ -185,7 +187,14 @@ Public routes (declared in `public/index.php`):
   - Renders invite token admin/list view.
 - `userInvitesCreate(array $post)` / `userInvitesGenerate(array $post)` / `userInvitesDelete(array $post)`
   - Validate CSRF and mutate invite-token rows through `InviteTokenRepository`.
-- `PublicController::registerSubmit(array $post)`
+- `Public\AuthController::login()` / `loginSubmit(array $post)` / `loginTwoFactor()` / `loginTwoFactorSubmit(array $post)` / `loginTwoFactorSelect(array $post)`
+  - Render and process the public login + login-time 2FA screens.
+  - Persist a sanitized post-login redirect target in `LoginUiStateService`.
+  - Reuse shared login-attempt throttling and challenge workflow services.
+- `Public\AuthController::loginTwoFactorWebauthnOptions(array $post)` / `loginTwoFactorWebauthnVerify(array $post)`
+  - Provide JSON WebAuthn assertion options and verification for public login-time 2FA.
+- `Public\AuthController::register()` / `registerSubmit(array $post)`
+  - Render and process the public registration screen.
   - Enforces `user.auth.registration` mode (`open|invite|closed`).
   - Applies configured public captcha validation before user creation when `captcha.provider` is enabled.
   - Reuses the shared brute-force policy window/lock settings to temporarily lock repeated failed registration attempts per client IP.

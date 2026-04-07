@@ -163,6 +163,13 @@ $publicController = is_callable($rvn['public_controller'] ?? null)
         throw new RuntimeException('Public controller factory is unavailable.');
     };
 
+/** @var callable(): object $publicAuthController */
+$publicAuthController = is_callable($rvn['public_auth_controller'] ?? null)
+    ? $rvn['public_auth_controller']
+    : static function (): object {
+        throw new RuntimeException('Public auth controller factory is unavailable.');
+    };
+
 $input = $rvn['input'];
 $routeConfig = new RouteConfigService($rvn['config'], $input);
 
@@ -238,40 +245,40 @@ $router->add('GET', '/', static function () use ($publicController): void {
     $publicController()->home();
 });
 
-$router->add('GET', '/login', static function () use ($publicController): void {
-    $publicController()->login();
+$router->add('GET', '/login', static function () use ($publicAuthController): void {
+    $publicAuthController()->login();
 });
 
-$router->add('POST', '/login', static function () use ($publicController): void {
-    $publicController()->loginSubmit($_POST);
+$router->add('POST', '/login', static function () use ($publicAuthController): void {
+    $publicAuthController()->loginSubmit($_POST);
 });
 
-$router->add('GET', '/login/2fa', static function () use ($publicController): void {
-    $publicController()->loginTwoFactor();
+$router->add('GET', '/login/2fa', static function () use ($publicAuthController): void {
+    $publicAuthController()->loginTwoFactor();
 });
 
-$router->add('POST', '/login/2fa', static function () use ($publicController): void {
-    $publicController()->loginTwoFactorSubmit($_POST);
+$router->add('POST', '/login/2fa', static function () use ($publicAuthController): void {
+    $publicAuthController()->loginTwoFactorSubmit($_POST);
 });
 
-$router->add('POST', '/login/2fa/select', static function () use ($publicController): void {
-    $publicController()->loginTwoFactorSelect($_POST);
+$router->add('POST', '/login/2fa/select', static function () use ($publicAuthController): void {
+    $publicAuthController()->loginTwoFactorSelect($_POST);
 });
 
-$router->add('POST', '/login/2fa/webauthn/options', static function () use ($publicController): void {
-    $publicController()->loginTwoFactorWebauthnOptions($_POST);
+$router->add('POST', '/login/2fa/webauthn/options', static function () use ($publicAuthController): void {
+    $publicAuthController()->loginTwoFactorWebauthnOptions($_POST);
 });
 
-$router->add('POST', '/login/2fa/webauthn/verify', static function () use ($publicController): void {
-    $publicController()->loginTwoFactorWebauthnVerify($_POST);
+$router->add('POST', '/login/2fa/webauthn/verify', static function () use ($publicAuthController): void {
+    $publicAuthController()->loginTwoFactorWebauthnVerify($_POST);
 });
 
-$router->add('GET', '/register', static function () use ($publicController): void {
-    $publicController()->register();
+$router->add('GET', '/register', static function () use ($publicAuthController): void {
+    $publicAuthController()->register();
 });
 
-$router->add('POST', '/register', static function () use ($publicController): void {
-    $publicController()->registerSubmit($_POST);
+$router->add('POST', '/register', static function () use ($publicAuthController): void {
+    $publicAuthController()->registerSubmit($_POST);
 });
 
 // Extension-agnostic embedded form submit endpoint.

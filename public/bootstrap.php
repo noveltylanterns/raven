@@ -9,6 +9,8 @@
 
 declare(strict_types=1);
 
+use Raven\Controller\Public\AuthController as PublicAuthController;
+use Raven\Controller\Public\RequestContext;
 use Raven\Controller\PublicController;
 use Raven\Core\View;
 use Raven\Lib\Config\ConfigValueParser;
@@ -33,6 +35,8 @@ return static function (array $rvn): array {
     }
 
     $publicController = null;
+    $publicAuthController = null;
+    $publicRequestContext = null;
     $extensionServices = null;
     $inviteTokens = null;
     $taxonomyLookup = null;
@@ -272,6 +276,45 @@ return static function (array $rvn): array {
     $rvn['public_domain_auth'] = $publicAuthDomain;
     $rvn['public_domain_profile'] = $publicAuthDomain;
     $rvn['public_domain_form'] = $publicFormDomain;
+
+    /**
+     * Builds the shared request context for split public sub-controllers.
+     */
+    $rvn['public_request_context'] = static function () use (&$publicRequestContext, $rvn): RequestContext {
+        if ($publicRequestContext instanceof RequestContext) {
+            return $publicRequestContext;
+        }
+
+        $publicRequestContext = new RequestContext(
+            $rvn['config'],
+            $rvn['auth'],
+            $rvn['input'],
+            $rvn['csrf']
+        );
+
+        return $publicRequestContext;
+    };
+
+    /**
+     * Builds the split public auth controller on first use.
+     */
+    $rvn['public_auth_controller'] = static function () use (&$publicAuthController, &$rvn, $publicAuthDomain): PublicAuthController {
+        if ($publicAuthController instanceof PublicAuthController) {
+            return $publicAuthController;
+        }
+
+        /** @var callable(): RequestContext $requestContextFactory */
+        $requestContextFactory = $rvn['public_request_context'];
+        $authDomain = $publicAuthDomain();
+        $publicAuthController = new PublicAuthController(
+            $requestContextFactory(),
+            $authDomain['group'],
+            $authDomain['user'],
+            $authDomain['invite_tokens']
+        );
+
+        return $publicAuthController;
+    };
 
     /**
      * Builds the public controller on first use so route registration stays light.
