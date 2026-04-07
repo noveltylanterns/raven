@@ -230,6 +230,40 @@ final class RequestContext
     }
 
     /**
+     * Enforces global frontend availability mode before route handling.
+     *
+     * @return bool True when the current request may proceed.
+     */
+    public function enforceSiteAvailability(): bool
+    {
+        $mode = strtolower(trim((string) $this->config->get('site.visibility', 'public')));
+        if (!in_array($mode, ['public', 'private', 'disabled'], true)) {
+            $mode = 'public';
+        }
+
+        $isLoggedIn = $this->auth->isLoggedIn();
+        $payload = $this->publicRouteRenderService()->availabilityGatePayload(
+            $mode,
+            $isLoggedIn,
+            $isLoggedIn && $this->auth->canViewDisabledSite(),
+            $isLoggedIn && $this->auth->canViewPrivateSite(),
+            $this->auth->canViewPublicSite(),
+            $this->siteData()
+        );
+        if ((bool) ($payload['allowed'] ?? false)) {
+            return true;
+        }
+
+        http_response_code((int) ($payload['status'] ?? 403));
+        $this->renderPublic(
+            (string) ($payload['template'] ?? 'status/denied'),
+            is_array($payload['data'] ?? null) ? $payload['data'] : [],
+            (string) ($payload['layout'] ?? 'wrapper')
+        );
+        return false;
+    }
+
+    /**
      * Renders one public template with theme-aware lookup and core fallback.
      *
      * @param string $template Template path relative to one lookup root.

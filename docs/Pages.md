@@ -144,7 +144,7 @@ Behavior notes:
 - Panel controller:
   - `private/sys/Controller/Panel/ContentController.php`
 - Public controller:
-  - `private/sys/Controller/PublicController.php`
+  - `private/sys/Controller/Public/ContentController.php`
 - Page persistence:
   - `private/sys/Repository/PageRepository.php`
 - Gallery persistence:
@@ -230,7 +230,7 @@ Content blocks persistence model:
 
 ### Public Rendering Behavior
 
-Main page rendering path in `PublicController`:
+Main page rendering path in `ContentController`:
 
 - homepage: `findHomepage()` with slug priority `home` -> `index`
 - channel landing: `findChannelHomepage()` with same `home` -> `index` priority

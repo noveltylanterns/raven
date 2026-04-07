@@ -10,11 +10,11 @@
 declare(strict_types=1);
 
 use Raven\Controller\Public\AuthController as PublicAuthController;
+use Raven\Controller\Public\ContentController as PublicContentController;
 use Raven\Controller\Public\FeedController as PublicFeedController;
 use Raven\Controller\Public\FormController as PublicFormController;
 use Raven\Controller\Public\ProfileController as PublicProfileController;
 use Raven\Controller\Public\RequestContext;
-use Raven\Controller\PublicController;
 use Raven\Core\View;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Repository\ChannelRepository;
@@ -37,8 +37,8 @@ return static function (array $rvn): array {
         return $rvn;
     }
 
-    $publicController = null;
     $publicAuthController = null;
+    $publicContentController = null;
     $publicFeedController = null;
     $publicFormController = null;
     $publicProfileController = null;
@@ -383,41 +383,29 @@ return static function (array $rvn): array {
     };
 
     /**
-     * Builds the public controller on first use so route registration stays light.
+     * Builds the split public content controller on first use.
      */
-    $rvn['public_controller'] = static function () use (
-        &$publicController,
-        $rvn,
-        $publicContentDomain,
-        $publicAuthDomain,
-        $publicFormDomain
-    ): PublicController {
-        if ($publicController instanceof PublicController) {
-            return $publicController;
+    $rvn['public_content_controller'] = static function () use (&$publicContentController, &$rvn, $publicContentDomain, $publicAuthDomain, $publicFormDomain): PublicContentController {
+        if ($publicContentController instanceof PublicContentController) {
+            return $publicContentController;
         }
 
+        /** @var callable(): RequestContext $requestContextFactory */
+        $requestContextFactory = $rvn['public_request_context'];
         $contentDomain = $publicContentDomain();
         $authDomain = $publicAuthDomain();
         $formDomain = $publicFormDomain();
-
-        $publicController = new PublicController(
-            $rvn['view'],
-            $rvn['config'],
-            $rvn['auth'],
+        $publicContentController = new PublicContentController(
+            $requestContextFactory(),
             $contentDomain['channel'],
-            $authDomain['group'],
             $contentDomain['page_images'],
             $contentDomain['page'],
             $contentDomain['redirect'],
-            $contentDomain['taxonomy_lookup'],
             $authDomain['user'],
-            $authDomain['invite_tokens'],
-            $rvn['input'],
-            $rvn['csrf'],
             $formDomain['extension_services']
         );
 
-        return $publicController;
+        return $publicContentController;
     };
 
     $rvn['public_extension_services'] = $extensionServicesProvider;

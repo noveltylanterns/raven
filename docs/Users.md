@@ -115,8 +115,8 @@ Group assignment notes:
   - `private/sys/Controller/Public/AuthController.php`
 - Public profile controller:
   - `private/sys/Controller/Public/ProfileController.php`
-- Remaining public homepage/content controller:
-  - `private/sys/Controller/PublicController.php`
+- Public content controller:
+  - `private/sys/Controller/Public/ContentController.php`
 - Shared login workflow:
   - `private/lib/Auth/LoginAttemptWorkflowService.php`
   - `private/lib/Auth/LoginChallengeWorkflowService.php`

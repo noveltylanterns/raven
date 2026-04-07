@@ -122,7 +122,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/sys/Controller/`
   - Public/panel/auth controllers and request flow coordination.
   - Split panel sub-controllers now live under `private/sys/Controller/Panel/` with a shared `RequestContext`; `DashboardController`, `ContentController`, `TaxonomyController`, `RedirectController`, `UserController`, `GroupController`, `PreferencesController`, and `SystemController` own the `/`, `/page*`, `/channel*`, `/category*`, `/tag*`, `/redirect*`, `/user*`, `/group*`, `/preferences*`, `/configuration*`, `/update*`, `/routing*`, `/logs*`, `/themes*`, and `/extensions*` seams.
-  - Public split work has started under `private/sys/Controller/Public/` with its own shared `RequestContext`; `AuthController` owns the `/login*` and `/register*` seams, `ProfileController` owns profile/group routes, `FormController` owns `/forms/submit`, and `FeedController` owns feed plus category/tag listing routes. `PublicController.php` now only owns the remaining homepage/content routes plus shared availability/not-found helpers during the final migration.
+  - Public split controllers now live under `private/sys/Controller/Public/` with their own shared `RequestContext`; `AuthController`, `ProfileController`, `FormController`, `FeedController`, and `ContentController` own the `/login*`, `/register*`, profile/group, `/forms/submit`, feed/category/tag, homepage, channel, and page-routing seams, while `RequestContext` owns shared availability, not-found, and public extension-template rendering helpers.
 - `private/sys/Repository/`
   - Core content/taxonomy/auth-facing persistence repositories.
 
