@@ -14,7 +14,6 @@ use Raven\Core\Config;
 use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\SchemaManager;
 use Raven\Core\Extension\ExtensionRegistry;
-use Raven\Core\View;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
 use Raven\Lib\Extension\ExtensionRuntimeRegistry;
@@ -216,7 +215,6 @@ return (static function (): array {
         'db' => $rvnDb,
         'auth_db' => $authDb,
         'auth' => $auth,
-        'view' => new View($root . '/private/tpl'),
         'input' => $input,
         'csrf' => new Csrf(),
         'service' => $service,

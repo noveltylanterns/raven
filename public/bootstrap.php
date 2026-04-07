@@ -10,9 +10,16 @@
 declare(strict_types=1);
 
 use Raven\Controller\PublicController;
+use Raven\Core\View;
+use Raven\Lib\Config\ConfigValueParser;
 use Raven\Repository\ChannelRepository;
+use Raven\Repository\GroupRepository;
 use Raven\Repository\InviteTokenRepository;
+use Raven\Repository\PageImageRepository;
+use Raven\Repository\PageRepository;
+use Raven\Repository\RedirectRepository;
 use Raven\Repository\TaxonomyLookupRepository;
+use Raven\Repository\UserRepository;
 
 /**
  * Enriches the shared core container with public-runtime factories.
@@ -21,12 +28,7 @@ use Raven\Repository\TaxonomyLookupRepository;
  * @return array<string, mixed>
  */
 return static function (array $rvn): array {
-    /** @var mixed $service */
-    $service = $rvn['service'] ?? null;
-    if (
-        !is_callable($service)
-        || !isset($rvn['view'], $rvn['config'], $rvn['auth'], $rvn['input'], $rvn['csrf'])
-    ) {
+    if (!isset($rvn['root'], $rvn['db'], $rvn['auth_db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], $rvn['auth'], $rvn['input'], $rvn['csrf'])) {
         return $rvn;
     }
 
@@ -34,15 +36,127 @@ return static function (array $rvn): array {
     $extensionServices = null;
     $inviteTokens = null;
     $taxonomyLookup = null;
+    $channelRepository = null;
+    $groupRepository = null;
+    $pageImageRepository = null;
+    $pageRepository = null;
+    $redirectRepository = null;
+    $userRepository = null;
+
+    $rvn['view'] = new View((string) $rvn['root'] . '/private/tpl');
+    $categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', false), false);
+    $tagEnabled = ConfigValueParser::bool($rvn['config']->get('tag.enabled', false), false);
+
+    /**
+     * Request-scoped memoization keeps bootstrap factories lightweight while
+     * avoiding repeated repo construction within one request.
+     *
+     * @param callable(): mixed $builder Builder for one runtime value.
+     * @return Closure Memoized factory that resolves the value once per request.
+     */
+    $memoize = static function (callable $builder): Closure {
+        $resolved = false;
+        $value = null;
+
+        return static function () use (&$resolved, &$value, $builder): mixed {
+            if ($resolved) {
+                return $value;
+            }
+
+            $value = $builder();
+            $resolved = true;
+            return $value;
+        };
+    };
+
+    /**
+     * Builds channel storage for public routing/content flows.
+     */
+    $channelRepositoryFactory = $memoize(static function () use (&$channelRepository, $rvn): ChannelRepository {
+        $channelRepository = new ChannelRepository(
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix'],
+            (string) $rvn['root'] . '/private/dat/channel'
+        );
+
+        return $channelRepository;
+    });
+
+    /**
+     * Builds group storage for public auth/profile flows.
+     */
+    $groupRepositoryFactory = $memoize(static function () use (&$groupRepository, $rvn): GroupRepository {
+        $groupRepository = new GroupRepository(
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix']
+        );
+
+        return $groupRepository;
+    });
+
+    /**
+     * Builds page-image storage only when public rendering needs media rows.
+     */
+    $pageImageRepositoryFactory = $memoize(static function () use (&$pageImageRepository, $rvn): PageImageRepository {
+        $pageImageRepository = new PageImageRepository(
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix']
+        );
+
+        return $pageImageRepository;
+    });
+
+    /**
+     * Builds page storage for public content routes without leaning on shared bootstrap wiring.
+     */
+    $pageRepositoryFactory = $memoize(static function () use (&$pageRepository, $rvn, $channelRepositoryFactory, $categoryEnabled, $tagEnabled): PageRepository {
+        $pageRepository = new PageRepository(
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix'],
+            $channelRepositoryFactory(),
+            $categoryEnabled,
+            $tagEnabled
+        );
+
+        return $pageRepository;
+    });
+
+    /**
+     * Builds redirect storage for public redirect fallbacks and routing helpers.
+     */
+    $redirectRepositoryFactory = $memoize(static function () use (&$redirectRepository, $rvn, $channelRepositoryFactory): RedirectRepository {
+        $redirectRepository = new RedirectRepository(
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix'],
+            $channelRepositoryFactory()
+        );
+
+        return $redirectRepository;
+    });
+
+    /**
+     * Builds user storage for public login/register/profile flows.
+     */
+    $userRepositoryFactory = $memoize(static function () use (&$userRepository, $rvn): UserRepository {
+        $userRepository = new UserRepository(
+            $rvn['auth_db'],
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix']
+        );
+
+        return $userRepository;
+    });
 
     /**
      * Builds invite-token storage only for the registration flows that need it.
      */
-    $inviteTokenRepository = static function () use (&$inviteTokens, $rvn): InviteTokenRepository {
-        if ($inviteTokens instanceof InviteTokenRepository) {
-            return $inviteTokens;
-        }
-
+    $inviteTokenRepository = $memoize(static function () use (&$inviteTokens, $rvn): InviteTokenRepository {
         $inviteTokens = new InviteTokenRepository(
             $rvn['auth_db'],
             (string) $rvn['driver'],
@@ -50,28 +164,22 @@ return static function (array $rvn): array {
         );
 
         return $inviteTokens;
-    };
+    });
 
     /**
      * Builds taxonomy lookup storage only for public routes that actually
      * resolve channel/category/tag slugs.
      */
-    $taxonomyLookupRepository = static function () use (&$taxonomyLookup, $rvn, $service): TaxonomyLookupRepository {
-        if ($taxonomyLookup instanceof TaxonomyLookupRepository) {
-            return $taxonomyLookup;
-        }
-
-        /** @var ChannelRepository $channelRepository */
-        $channelRepository = $service('channel');
+    $taxonomyLookupRepository = $memoize(static function () use (&$taxonomyLookup, $rvn, $channelRepositoryFactory): TaxonomyLookupRepository {
         $taxonomyLookup = new TaxonomyLookupRepository(
             $rvn['db'],
             (string) $rvn['driver'],
             (string) $rvn['prefix'],
-            $channelRepository
+            $channelRepositoryFactory()
         );
 
         return $taxonomyLookup;
-    };
+    });
 
     /**
      * Boots extension providers only when public runtime code needs extension services.
@@ -107,28 +215,97 @@ return static function (array $rvn): array {
     };
 
     /**
+     * Public content/feed routes share the same page/channel/redirect runtime
+     * dependencies, so expose them as one clustered factory ahead of the later
+     * sub-controller split.
+     *
+     * @return array<string, mixed>
+     */
+    $publicContentDomain = $memoize(static function () use (
+        $channelRepositoryFactory,
+        $pageImageRepositoryFactory,
+        $pageRepositoryFactory,
+        $redirectRepositoryFactory,
+        $taxonomyLookupRepository
+    ): array {
+        return [
+            'channel' => $channelRepositoryFactory(),
+            'page_images' => $pageImageRepositoryFactory(),
+            'page' => $pageRepositoryFactory(),
+            'redirect' => $redirectRepositoryFactory(),
+            'taxonomy_lookup' => $taxonomyLookupRepository,
+        ];
+    });
+
+    /**
+     * Public auth/profile routes share account-facing repositories; keep that
+     * seam visible now so login/register/profile can split cleanly later.
+     *
+     * @return array<string, mixed>
+     */
+    $publicAuthDomain = $memoize(static function () use (
+        $groupRepositoryFactory,
+        $userRepositoryFactory,
+        $inviteTokenRepository
+    ): array {
+        return [
+            'group' => $groupRepositoryFactory(),
+            'user' => $userRepositoryFactory(),
+            'invite_tokens' => $inviteTokenRepository,
+        ];
+    });
+
+    /**
+     * Embedded-form and shortcode routes depend on extension services but
+     * should stay lazy on ordinary public page requests.
+     *
+     * @return array<string, mixed>
+     */
+    $publicFormDomain = $memoize(static function () use ($extensionServicesProvider): array {
+        return [
+            'extension_services' => $extensionServicesProvider,
+        ];
+    });
+
+    $rvn['public_domain_content'] = $publicContentDomain;
+    $rvn['public_domain_feed'] = $publicContentDomain;
+    $rvn['public_domain_auth'] = $publicAuthDomain;
+    $rvn['public_domain_profile'] = $publicAuthDomain;
+    $rvn['public_domain_form'] = $publicFormDomain;
+
+    /**
      * Builds the public controller on first use so route registration stays light.
      */
-    $rvn['public_controller'] = static function () use (&$publicController, $rvn, $service, $extensionServicesProvider, $inviteTokenRepository, $taxonomyLookupRepository): PublicController {
+    $rvn['public_controller'] = static function () use (
+        &$publicController,
+        $rvn,
+        $publicContentDomain,
+        $publicAuthDomain,
+        $publicFormDomain
+    ): PublicController {
         if ($publicController instanceof PublicController) {
             return $publicController;
         }
+
+        $contentDomain = $publicContentDomain();
+        $authDomain = $publicAuthDomain();
+        $formDomain = $publicFormDomain();
 
         $publicController = new PublicController(
             $rvn['view'],
             $rvn['config'],
             $rvn['auth'],
-            $service('channel'),
-            $service('group'),
-            $service('page_images'),
-            $service('page'),
-            $service('redirect'),
-            $taxonomyLookupRepository,
-            $service('user'),
-            $inviteTokenRepository,
+            $contentDomain['channel'],
+            $authDomain['group'],
+            $contentDomain['page_images'],
+            $contentDomain['page'],
+            $contentDomain['redirect'],
+            $contentDomain['taxonomy_lookup'],
+            $authDomain['user'],
+            $authDomain['invite_tokens'],
             $rvn['input'],
             $rvn['csrf'],
-            $extensionServicesProvider
+            $formDomain['extension_services']
         );
 
         return $publicController;
