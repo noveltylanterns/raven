@@ -57,6 +57,13 @@ $panelTaxonomyController = is_callable($rvn['panel_taxonomy_controller'] ?? null
         throw new RuntimeException('Panel taxonomy controller factory is unavailable.');
     };
 
+/** @var callable(): object $panelRedirectController */
+$panelRedirectController = is_callable($rvn['panel_redirect_controller'] ?? null)
+    ? $rvn['panel_redirect_controller']
+    : static function (): object {
+        throw new RuntimeException('Panel redirect controller factory is unavailable.');
+    };
+
 /** @var callable(): object $panelUserController */
 $panelUserController = is_callable($rvn['panel_user_controller'] ?? null)
     ? $rvn['panel_user_controller']
@@ -636,16 +643,15 @@ $router->add('POST', '/page/delete', static function () use ($panelController): 
 });
 
 // Channel routes (list + edit + save + delete).
-// Channel CRUD remains in the panel controller while routing stays declarative.
-$router->add('GET', '/channel', static function () use ($panelController): void {
-    $panelController()->channelList();
+$router->add('GET', '/channel', static function () use ($panelTaxonomyController): void {
+    $panelTaxonomyController()->channelList();
 });
 
-$router->add('GET', '/channel/edit', static function () use ($panelController): void {
-    $panelController()->channelEdit(null);
+$router->add('GET', '/channel/edit', static function () use ($panelTaxonomyController): void {
+    $panelTaxonomyController()->channelEdit(null);
 });
 
-$router->add('GET', '/channel/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+$router->add('GET', '/channel/edit/{id}', static function (array $params) use ($panelTaxonomyController, $rvn): void {
     $id = $rvn['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
@@ -654,30 +660,30 @@ $router->add('GET', '/channel/edit/{id}', static function (array $params) use ($
         return;
     }
 
-    $panelController()->channelEdit($id);
+    $panelTaxonomyController()->channelEdit($id);
 });
 
-$router->add('POST', '/channel/save', static function () use ($panelController): void {
-    $panelController()->channelSave($_POST, $_FILES);
+$router->add('POST', '/channel/save', static function () use ($panelTaxonomyController): void {
+    $panelTaxonomyController()->channelSave($_POST, $_FILES);
 });
 
-$router->add('POST', '/channel/delete', static function () use ($panelController): void {
-    $panelController()->channelDelete($_POST);
+$router->add('POST', '/channel/delete', static function () use ($panelTaxonomyController): void {
+    $panelTaxonomyController()->channelDelete($_POST);
 });
 
 // Category/Tag/Redirect/User/Group routes.
 // Kept explicit (instead of dynamic routing) for clarity and predictable auth gates.
 
 if ($categoryEnabled) {
-    $router->add('GET', '/category', static function () use ($panelController): void {
-        $panelController()->categoryList();
+    $router->add('GET', '/category', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->categoryList();
     });
 
-    $router->add('GET', '/category/edit', static function () use ($panelController): void {
-        $panelController()->categoryEdit(null);
+    $router->add('GET', '/category/edit', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->categoryEdit(null);
     });
 
-    $router->add('GET', '/category/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+    $router->add('GET', '/category/edit/{id}', static function (array $params) use ($panelTaxonomyController, $rvn): void {
         $id = $rvn['input']->int($params['id'] ?? null, 1);
 
         if ($id === null) {
@@ -686,26 +692,26 @@ if ($categoryEnabled) {
             return;
         }
 
-        $panelController()->categoryEdit($id);
+        $panelTaxonomyController()->categoryEdit($id);
     });
 
-    $router->add('POST', '/category/save', static function () use ($panelController): void {
-        $panelController()->categorySave($_POST, $_FILES);
+    $router->add('POST', '/category/save', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->categorySave($_POST, $_FILES);
     });
 
-    $router->add('POST', '/category/delete', static function () use ($panelController): void {
-        $panelController()->categoryDelete($_POST);
+    $router->add('POST', '/category/delete', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->categoryDelete($_POST);
     });
 
-    $router->add('GET', '/category/set', static function () use ($panelController): void {
-        $panelController()->categorySetList();
+    $router->add('GET', '/category/set', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->categorySetList();
     });
 
-    $router->add('GET', '/category/set/edit', static function () use ($panelController): void {
-        $panelController()->categorySetEdit(null);
+    $router->add('GET', '/category/set/edit', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->categorySetEdit(null);
     });
 
-    $router->add('GET', '/category/set/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+    $router->add('GET', '/category/set/edit/{id}', static function (array $params) use ($panelTaxonomyController, $rvn): void {
         $id = $rvn['input']->int($params['id'] ?? null, 0);
 
         if ($id === null) {
@@ -714,28 +720,28 @@ if ($categoryEnabled) {
             return;
         }
 
-        $panelController()->categorySetEdit($id);
+        $panelTaxonomyController()->categorySetEdit($id);
     });
 
-    $router->add('POST', '/category/set/save', static function () use ($panelController): void {
-        $panelController()->categorySetSave($_POST);
+    $router->add('POST', '/category/set/save', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->categorySetSave($_POST);
     });
 
-    $router->add('POST', '/category/set/delete', static function () use ($panelController): void {
-        $panelController()->categorySetDelete($_POST);
+    $router->add('POST', '/category/set/delete', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->categorySetDelete($_POST);
     });
 }
 
 if ($tagEnabled) {
-    $router->add('GET', '/tag', static function () use ($panelController): void {
-        $panelController()->tagList();
+    $router->add('GET', '/tag', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->tagList();
     });
 
-    $router->add('GET', '/tag/edit', static function () use ($panelController): void {
-        $panelController()->tagEdit(null);
+    $router->add('GET', '/tag/edit', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->tagEdit(null);
     });
 
-    $router->add('GET', '/tag/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+    $router->add('GET', '/tag/edit/{id}', static function (array $params) use ($panelTaxonomyController, $rvn): void {
         $id = $rvn['input']->int($params['id'] ?? null, 1);
 
         if ($id === null) {
@@ -744,26 +750,26 @@ if ($tagEnabled) {
             return;
         }
 
-        $panelController()->tagEdit($id);
+        $panelTaxonomyController()->tagEdit($id);
     });
 
-    $router->add('POST', '/tag/save', static function () use ($panelController): void {
-        $panelController()->tagSave($_POST, $_FILES);
+    $router->add('POST', '/tag/save', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->tagSave($_POST, $_FILES);
     });
 
-    $router->add('POST', '/tag/delete', static function () use ($panelController): void {
-        $panelController()->tagDelete($_POST);
+    $router->add('POST', '/tag/delete', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->tagDelete($_POST);
     });
 
-    $router->add('GET', '/tag/set', static function () use ($panelController): void {
-        $panelController()->tagSetList();
+    $router->add('GET', '/tag/set', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->tagSetList();
     });
 
-    $router->add('GET', '/tag/set/edit', static function () use ($panelController): void {
-        $panelController()->tagSetEdit(null);
+    $router->add('GET', '/tag/set/edit', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->tagSetEdit(null);
     });
 
-    $router->add('GET', '/tag/set/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+    $router->add('GET', '/tag/set/edit/{id}', static function (array $params) use ($panelTaxonomyController, $rvn): void {
         $id = $rvn['input']->int($params['id'] ?? null, 0);
 
         if ($id === null) {
@@ -772,27 +778,27 @@ if ($tagEnabled) {
             return;
         }
 
-        $panelController()->tagSetEdit($id);
+        $panelTaxonomyController()->tagSetEdit($id);
     });
 
-    $router->add('POST', '/tag/set/save', static function () use ($panelController): void {
-        $panelController()->tagSetSave($_POST);
+    $router->add('POST', '/tag/set/save', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->tagSetSave($_POST);
     });
 
-    $router->add('POST', '/tag/set/delete', static function () use ($panelController): void {
-        $panelController()->tagSetDelete($_POST);
+    $router->add('POST', '/tag/set/delete', static function () use ($panelTaxonomyController): void {
+        $panelTaxonomyController()->tagSetDelete($_POST);
     });
 }
 
-$router->add('GET', '/redirect', static function () use ($panelTaxonomyController): void {
-    $panelTaxonomyController()->redirectList();
+$router->add('GET', '/redirect', static function () use ($panelRedirectController): void {
+    $panelRedirectController()->redirectList();
 });
 
-$router->add('GET', '/redirect/edit', static function () use ($panelTaxonomyController): void {
-    $panelTaxonomyController()->redirectEdit(null);
+$router->add('GET', '/redirect/edit', static function () use ($panelRedirectController): void {
+    $panelRedirectController()->redirectEdit(null);
 });
 
-$router->add('GET', '/redirect/edit/{id}', static function (array $params) use ($panelTaxonomyController, $rvn): void {
+$router->add('GET', '/redirect/edit/{id}', static function (array $params) use ($panelRedirectController, $rvn): void {
     $id = $rvn['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
@@ -801,15 +807,15 @@ $router->add('GET', '/redirect/edit/{id}', static function (array $params) use (
         return;
     }
 
-    $panelTaxonomyController()->redirectEdit($id);
+    $panelRedirectController()->redirectEdit($id);
 });
 
-$router->add('POST', '/redirect/save', static function () use ($panelTaxonomyController): void {
-    $panelTaxonomyController()->redirectSave($_POST);
+$router->add('POST', '/redirect/save', static function () use ($panelRedirectController): void {
+    $panelRedirectController()->redirectSave($_POST);
 });
 
-$router->add('POST', '/redirect/delete', static function () use ($panelTaxonomyController): void {
-    $panelTaxonomyController()->redirectDelete($_POST);
+$router->add('POST', '/redirect/delete', static function () use ($panelRedirectController): void {
+    $panelRedirectController()->redirectDelete($_POST);
 });
 
 $router->add('GET', '/user', static function () use ($panelUserController): void {

@@ -13,6 +13,7 @@ use Raven\Controller\AuthController;
 use Raven\Controller\Panel\DashboardController;
 use Raven\Controller\Panel\GroupController;
 use Raven\Controller\Panel\PreferencesController;
+use Raven\Controller\Panel\RedirectController;
 use Raven\Controller\Panel\RequestContext;
 use Raven\Controller\Panel\TaxonomyController;
 use Raven\Controller\Panel\UserController;
@@ -66,6 +67,7 @@ return static function (array $rvn): array {
     $preferencesController = null;
     $panelRequestContext = null;
     $panelRuntime = null;
+    $redirectController = null;
     $taxonomyController = null;
     $userController = null;
     $categorySetRepository = null;
@@ -486,7 +488,30 @@ return static function (array $rvn): array {
     };
 
     /**
+     * Builds the split redirect controller on first use.
+     * Redirect CRUD only needs channel validation and redirect storage.
+     */
+    $rvn['panel_redirect_controller'] = static function () use (&$redirectController, &$rvn, $panelTaxonomyDomain): RedirectController {
+        if ($redirectController instanceof RedirectController) {
+            return $redirectController;
+        }
+
+        /** @var callable(): RequestContext $requestContextFactory */
+        $requestContextFactory = $rvn['panel_request_context'];
+        $taxonomyDomain = $panelTaxonomyDomain();
+        $redirectController = new RedirectController(
+            $requestContextFactory(),
+            $rvn['input'],
+            $taxonomyDomain['channel'],
+            $taxonomyDomain['redirect']
+        );
+
+        return $redirectController;
+    };
+
+    /**
      * Builds the split taxonomy controller on first use.
+     * Owns channel, category, category-set, tag, and tag-set management routes.
      */
     $rvn['panel_taxonomy_controller'] = static function () use (&$taxonomyController, &$rvn, $panelTaxonomyDomain): TaxonomyController {
         if ($taxonomyController instanceof TaxonomyController) {
@@ -500,7 +525,16 @@ return static function (array $rvn): array {
             $requestContextFactory(),
             $rvn['input'],
             $taxonomyDomain['channel'],
-            $taxonomyDomain['redirect']
+            $taxonomyDomain['category'],
+            $taxonomyDomain['category_set'],
+            $taxonomyDomain['tag'],
+            $taxonomyDomain['tag_set'],
+            $taxonomyDomain['category_enabled'],
+            $taxonomyDomain['tag_enabled'],
+            new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
+            new RouteConfigService($rvn['config'], $rvn['input']),
+            new PanelEditorTabService($rvn['input']),
+            new UploadFileSetNormalizer()
         );
 
         return $taxonomyController;
