@@ -121,6 +121,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Theme discovery/inheritance and public template rendering helpers.
 - `private/sys/Controller/`
   - Public/panel/auth controllers and request flow coordination.
+  - Split panel sub-controllers now live under `private/sys/Controller/Panel/` with a shared `RequestContext`; the legacy flat `PanelController.php` still owns unsplit panel routes during the migration.
 - `private/sys/Repository/`
   - Core content/taxonomy/auth-facing persistence repositories.
 

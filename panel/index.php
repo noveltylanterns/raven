@@ -43,6 +43,20 @@ $panelController = is_callable($rvn['panel_controller'] ?? null)
         throw new RuntimeException('Panel controller factory is unavailable.');
     };
 
+/** @var callable(): object $panelDashboardController */
+$panelDashboardController = is_callable($rvn['panel_dashboard_controller'] ?? null)
+    ? $rvn['panel_dashboard_controller']
+    : static function (): object {
+        throw new RuntimeException('Panel dashboard controller factory is unavailable.');
+    };
+
+/** @var callable(): object $panelTaxonomyController */
+$panelTaxonomyController = is_callable($rvn['panel_taxonomy_controller'] ?? null)
+    ? $rvn['panel_taxonomy_controller']
+    : static function (): object {
+        throw new RuntimeException('Panel taxonomy controller factory is unavailable.');
+    };
+
 /** @var callable(): array<string, mixed> $initializePanelRuntime */
 $initializePanelRuntime = is_callable($rvn['initialize_panel_runtime'] ?? null)
     ? $rvn['initialize_panel_runtime']
@@ -555,8 +569,8 @@ $router->add('POST', '/logout', static function () use ($authController): void {
 
 // Dashboard route.
 // Serves the panel landing page after access checks.
-$router->add('GET', '/', static function () use ($panelController): void {
-    $panelController()->dashboard();
+$router->add('GET', '/', static function () use ($panelDashboardController): void {
+    $panelDashboardController()->dashboard();
 });
 
 // Page routes.
@@ -749,15 +763,15 @@ if ($tagEnabled) {
     });
 }
 
-$router->add('GET', '/redirect', static function () use ($panelController): void {
-    $panelController()->redirectList();
+$router->add('GET', '/redirect', static function () use ($panelTaxonomyController): void {
+    $panelTaxonomyController()->redirectList();
 });
 
-$router->add('GET', '/redirect/edit', static function () use ($panelController): void {
-    $panelController()->redirectEdit(null);
+$router->add('GET', '/redirect/edit', static function () use ($panelTaxonomyController): void {
+    $panelTaxonomyController()->redirectEdit(null);
 });
 
-$router->add('GET', '/redirect/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+$router->add('GET', '/redirect/edit/{id}', static function (array $params) use ($panelTaxonomyController, $rvn): void {
     $id = $rvn['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
@@ -766,15 +780,15 @@ $router->add('GET', '/redirect/edit/{id}', static function (array $params) use (
         return;
     }
 
-    $panelController()->redirectEdit($id);
+    $panelTaxonomyController()->redirectEdit($id);
 });
 
-$router->add('POST', '/redirect/save', static function () use ($panelController): void {
-    $panelController()->redirectSave($_POST);
+$router->add('POST', '/redirect/save', static function () use ($panelTaxonomyController): void {
+    $panelTaxonomyController()->redirectSave($_POST);
 });
 
-$router->add('POST', '/redirect/delete', static function () use ($panelController): void {
-    $panelController()->redirectDelete($_POST);
+$router->add('POST', '/redirect/delete', static function () use ($panelTaxonomyController): void {
+    $panelTaxonomyController()->redirectDelete($_POST);
 });
 
 $router->add('GET', '/user', static function () use ($panelController): void {

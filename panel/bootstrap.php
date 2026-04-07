@@ -10,10 +10,14 @@
 declare(strict_types=1);
 
 use Raven\Controller\AuthController;
+use Raven\Controller\Panel\DashboardController;
+use Raven\Controller\Panel\RequestContext;
+use Raven\Controller\Panel\TaxonomyController;
 use Raven\Controller\PanelController;
 use Raven\Core\Media\PageImageManager;
 use Raven\Core\View;
 use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Log\EventLogger;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Repository\CategoryRepository;
@@ -40,8 +44,11 @@ return static function (array $rvn): array {
     }
 
     $authController = null;
+    $dashboardController = null;
     $panelController = null;
+    $panelRequestContext = null;
     $panelRuntime = null;
+    $taxonomyController = null;
     $categorySetRepository = null;
     $tagSetRepository = null;
     $inviteTokenRepository = null;
@@ -382,6 +389,77 @@ return static function (array $rvn): array {
         );
 
         return $authController;
+    };
+
+    /**
+     * Builds the shared request context for split panel sub-controllers.
+     */
+    $rvn['panel_request_context'] = static function () use (&$panelRequestContext, &$panelController, &$rvn, $categoryEnabled, $tagEnabled): RequestContext {
+        if ($panelRequestContext instanceof RequestContext) {
+            return $panelRequestContext;
+        }
+
+        $panelRequestContext = new RequestContext(
+            $rvn['view'],
+            $rvn['config'],
+            $rvn['auth'],
+            $rvn['csrf'],
+            new SessionFlash('_raven_flash'),
+            $categoryEnabled,
+            $tagEnabled,
+            static function () use (&$panelController, &$rvn): void {
+                if ($panelController instanceof PanelController) {
+                    $panelController->renderPublicNotFound();
+                    return;
+                }
+
+                $panelControllerFactory = $rvn['panel_controller'] ?? null;
+                if (is_callable($panelControllerFactory)) {
+                    $panelControllerFactory()->renderPublicNotFound();
+                    return;
+                }
+
+                http_response_code(404);
+                echo 'Not Found';
+            }
+        );
+
+        return $panelRequestContext;
+    };
+
+    /**
+     * Builds the split dashboard controller on first use.
+     */
+    $rvn['panel_dashboard_controller'] = static function () use (&$dashboardController, &$rvn): DashboardController {
+        if ($dashboardController instanceof DashboardController) {
+            return $dashboardController;
+        }
+
+        /** @var callable(): RequestContext $requestContextFactory */
+        $requestContextFactory = $rvn['panel_request_context'];
+        $dashboardController = new DashboardController($requestContextFactory());
+        return $dashboardController;
+    };
+
+    /**
+     * Builds the split taxonomy controller on first use.
+     */
+    $rvn['panel_taxonomy_controller'] = static function () use (&$taxonomyController, &$rvn, $panelTaxonomyDomain): TaxonomyController {
+        if ($taxonomyController instanceof TaxonomyController) {
+            return $taxonomyController;
+        }
+
+        /** @var callable(): RequestContext $requestContextFactory */
+        $requestContextFactory = $rvn['panel_request_context'];
+        $taxonomyDomain = $panelTaxonomyDomain();
+        $taxonomyController = new TaxonomyController(
+            $requestContextFactory(),
+            $rvn['input'],
+            $taxonomyDomain['channel'],
+            $taxonomyDomain['redirect']
+        );
+
+        return $taxonomyController;
     };
 
     /**
