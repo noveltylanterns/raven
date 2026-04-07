@@ -1,0 +1,1289 @@
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/sys/Controller/Panel/UserController.php
+ * Split panel user controller for user-management routes.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+namespace Raven\Controller\Panel;
+
+use Closure;
+use Raven\Core\Config;
+use Raven\Core\Security\AvatarValidator;
+use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Auth\PanelInvitePolicyService;
+use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
+use Raven\Lib\Config\PanelMediaConfigService;
+use Raven\Lib\Http\SessionFlash;
+use Raven\Lib\Media\AvatarUploadService;
+use Raven\Lib\Media\AvatarValidationPolicy;
+use Raven\Lib\Media\UserMediaPathService;
+use Raven\Lib\Panel\PanelEditorTabService;
+use Raven\Lib\Profile\ProfileContactService;
+use Raven\Lib\Routing\RouteConfigService;
+use Raven\Lib\Security\InputSanitizer;
+use Raven\Repository\GroupRepository;
+use Raven\Repository\InviteTokenRepository;
+use Raven\Repository\UserRepository;
+
+use function Raven\Core\Support\redirect;
+
+/**
+ * Handles split user-management routes.
+ *
+ * The whole panel user seam lives here: list/edit/save/delete plus invite
+ * management. Session/auth state still stays in RequestContext/bootstrap.
+ */
+final class UserController
+{
+    private RequestContext $context;
+    private Config $config;
+    private InputSanitizer $input;
+    private string $root;
+    private GroupRepository $groupRepo;
+    private UserRepository $userRepo;
+    private Closure $inviteTokensResolver;
+    private ?InviteTokenRepository $inviteTokens = null;
+    private SessionFlash $flashList;
+    private RouteConfigService $routeConfigService;
+    private PanelInvitePolicyService $panelInvitePolicyService;
+    private LoginIdentifierResolver $loginIdentifierResolver;
+    private PanelEditorTabService $panelEditorTabService;
+    private PanelMediaConfigService $panelMediaConfigService;
+    private ProfileContactService $profileContactService;
+    private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
+    private AvatarUploadService $avatarUploadService;
+    private UserMediaPathService $userMediaPathService;
+
+    /**
+     * @param RequestContext $context Shared panel request context.
+     * @param Config $config Runtime configuration reader.
+     * @param InputSanitizer $input Shared request input sanitizer.
+     * @param string $root Project root path for user-media storage helpers.
+     * @param GroupRepository $groupRepo Group repository for assignment filters and fallbacks.
+     * @param UserRepository $userRepo User repository for panel user CRUD.
+     * @param callable(): InviteTokenRepository $inviteTokensResolver Lazy invite-token repository resolver.
+     * @param SessionFlash $flashList List-style flash store for generated token batches.
+     * @param RouteConfigService $routeConfigService Shared route-configuration helper.
+     * @param PanelInvitePolicyService $panelInvitePolicyService Shared invite-form parsing helper.
+     * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
+     * @param PanelEditorTabService $panelEditorTabService Shared editor-tab normalization helper.
+     * @param PanelMediaConfigService $panelMediaConfigService Shared media-limit helper.
+     * @param ProfileContactService $profileContactService Shared profile-contact normalizer.
+     * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA list normalizer.
+     * @param AvatarUploadService $avatarUploadService Shared sanitized avatar/cover upload helper.
+     * @param UserMediaPathService $userMediaPathService Shared user-media path resolver.
+     * @return void
+     */
+    public function __construct(
+        RequestContext $context,
+        Config $config,
+        InputSanitizer $input,
+        string $root,
+        GroupRepository $groupRepo,
+        UserRepository $userRepo,
+        callable $inviteTokensResolver,
+        SessionFlash $flashList,
+        RouteConfigService $routeConfigService,
+        PanelInvitePolicyService $panelInvitePolicyService,
+        LoginIdentifierResolver $loginIdentifierResolver,
+        PanelEditorTabService $panelEditorTabService,
+        PanelMediaConfigService $panelMediaConfigService,
+        ProfileContactService $profileContactService,
+        PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,
+        AvatarUploadService $avatarUploadService,
+        UserMediaPathService $userMediaPathService
+    ) {
+        $this->context = $context;
+        $this->config = $config;
+        $this->input = $input;
+        $this->root = rtrim($root, '/\\');
+        $this->groupRepo = $groupRepo;
+        $this->userRepo = $userRepo;
+        $this->inviteTokensResolver = Closure::fromCallable($inviteTokensResolver);
+        $this->flashList = $flashList;
+        $this->routeConfigService = $routeConfigService;
+        $this->panelInvitePolicyService = $panelInvitePolicyService;
+        $this->loginIdentifierResolver = $loginIdentifierResolver;
+        $this->panelEditorTabService = $panelEditorTabService;
+        $this->panelMediaConfigService = $panelMediaConfigService;
+        $this->profileContactService = $profileContactService;
+        $this->panelTwoFactorPreferencesService = $panelTwoFactorPreferencesService;
+        $this->avatarUploadService = $avatarUploadService;
+        $this->userMediaPathService = $userMediaPathService;
+    }
+
+    /**
+     * Lists users for the User management section.
+     *
+     * @return void
+     */
+    public function userList(): void
+    {
+        $this->context->requirePanelLogin();
+        if (!$this->context->requireRoutePermissionOrForbidden('user', 'view')) {
+            return;
+        }
+
+        $prefilterGroup = strtolower(trim((string) ($this->input->text($_GET['group'] ?? null, 120) ?? '')));
+        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
+        $perPage = 50;
+        $pageResult = $this->userRepo->listPageForPanel(
+            $perPage,
+            ($requestedPage - 1) * $perPage,
+            $prefilterGroup !== '' ? $prefilterGroup : null
+        );
+        $totalItems = (int) ($pageResult['total'] ?? 0);
+        $userRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
+        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
+            $pageResult = $this->userRepo->listPageForPanel(
+                $perPage,
+                $pagination['offset'],
+                $prefilterGroup !== '' ? $prefilterGroup : null
+            );
+            $userRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        }
+
+        $groupOptions = is_array($pageResult['group_options'] ?? null)
+            ? $pageResult['group_options']
+            : $this->groupRepo->listOptions();
+
+        $this->context->renderPanel('panel/user/list', [
+            'users' => $userRows,
+            'prefilterGroup' => $prefilterGroup,
+            'groupOptions' => $groupOptions,
+            'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
+            'registrationMode' => $this->registrationMode(),
+            'pagination' => $this->context->panelPaginationViewData('/user', $pagination, ['group' => $prefilterGroup]),
+            'csrfField' => $this->context->csrfField(),
+            'flashSuccess' => $this->context->pullFlash('success'),
+            'flashError' => $this->context->pullFlash('error'),
+            'section' => 'user',
+        ]);
+    }
+
+    /**
+     * Shows the panel user create/edit form.
+     *
+     * @param int|null $id User id in edit mode, or null in create mode.
+     * @return void
+     */
+    public function userEdit(?int $id = null): void
+    {
+        $this->context->requirePanelLogin();
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->context->requireRoutePermissionOrForbidden('user', $requiredAction)) {
+            return;
+        }
+
+        $editData = $this->userRepo->editFormData($id);
+        $user = is_array($editData['user'] ?? null) ? $editData['user'] : null;
+        if (is_array($user)) {
+            $normalizedTheme = $this->normalizePanelThemeChoice((string) ($user['theme'] ?? 'default'), true);
+            $user['theme'] = $normalizedTheme ?? 'default';
+
+            if ($id !== null) {
+                $preferences = $this->context->auth()->userPreferences($id);
+                $user['two_factor'] = is_array($preferences['two_factor'] ?? null)
+                    ? array_values((array) $preferences['two_factor'])
+                    : [];
+            } else {
+                $user['two_factor'] = [];
+            }
+        }
+
+        if ($id !== null && $user === null) {
+            $this->context->flash('error', 'User not found.');
+            redirect($this->context->panelUrl('/user'));
+        }
+
+        $groupOptions = is_array($editData['group_options'] ?? null) ? $editData['group_options'] : [];
+        $actorIsAdmin = $this->context->auth()->isAdmin();
+        $primaryGroupId = (int) ($user['primary_group_id'] ?? 0);
+        $secondaryGroupIds = array_map('intval', (array) ($user['secondary_group_ids'] ?? []));
+        $bioMaxLength = max(1, (int) $this->config->get('user.bio', 500));
+
+        $this->context->renderPanel('panel/user/edit', [
+            'userRow' => $user,
+            'bioMaxLength' => $bioMaxLength,
+            'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
+            'profileContactOptions' => $this->profileContactOptions(),
+            'twoFactorTypeOptions' => $this->twoFactorTypeOptions(),
+            'profileRoutePrefix' => $this->profileRoutePrefix(),
+            'profileRoutesEnabled' => $this->profileRoutesEnabledForRoutingTable(),
+            'profileRouteSegment' => is_array($user) ? ($this->publicProfileRouteSegmentForUser($user) ?? '') : '',
+            'avatarTemplateData' => is_array($user) ? $this->avatarTemplateData((string) ($user['avatar'] ?? '')) : ['filename' => '', 'url' => '', 'thumb_url' => ''],
+            'avatarUploadLimitsNote' => $this->avatarUploadLimitsNote(),
+            'coverImageUrl' => is_array($user) ? $this->coverPublicUrl((string) ($user['cover_image'] ?? '')) : '',
+            'groupOptions' => $groupOptions,
+            'primaryGroupId' => $primaryGroupId,
+            'secondaryGroupIds' => $secondaryGroupIds,
+            'canAssignAdmin' => $actorIsAdmin,
+            'canAssignConfigurationGroups' => $actorIsAdmin,
+            'themeOptions' => ['default', 'corp', 'ice', 'midnight'],
+            'csrfField' => $this->context->csrfField(),
+            'flashSuccess' => $this->context->pullFlash('success'),
+            'error' => $this->context->pullFlash('error'),
+            'section' => 'user',
+        ]);
+    }
+
+    /**
+     * Saves one user and its group memberships.
+     *
+     * @param array<string, mixed> $post Submitted form payload.
+     * @param array<string, mixed> $files Uploaded file payload.
+     * @return void
+     */
+    public function userSave(array $post, array $files): void
+    {
+        $this->context->requirePanelLogin();
+        $id = $this->input->int($post['id'] ?? null, 1);
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->context->requireRoutePermissionOrForbidden('user', $requiredAction)) {
+            return;
+        }
+
+        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
+            $this->context->flash('error', 'Invalid CSRF token.');
+            redirect($this->context->panelUrl('/user'));
+        }
+
+        $activeTab = $this->panelEditorTabService->normalizeEditorTab($post['tab'] ?? null, ['account', 'permissions', 'profile', 'security'], 'account');
+        $editUrl = $this->userEditUrlWithTab($id, $activeTab, 'account');
+        $securityTabUrl = $this->userEditUrlWithTab($id, $activeTab, 'security');
+        $loginIdentifierMode = $this->panelLoginIdentifierMode();
+        $usernameSubmitted = array_key_exists('username', $post);
+        $rawUsername = $this->input->text($post['username'] ?? null, 254);
+        $username = $this->normalizeUserIdentifierValue($rawUsername);
+        $displayName = $this->input->text($post['display_name'] ?? null, 160);
+        $bioMaxLength = max(1, (int) $this->config->get('user.bio', 500));
+        $bio = $this->input->text($post['bio'] ?? null, $bioMaxLength);
+        $email = $this->input->email($post['email'] ?? null);
+        $themeRaw = $this->input->text($post['theme'] ?? null, 50);
+        $theme = $this->normalizePanelThemeChoice((string) $themeRaw, true);
+        $password = $this->input->text($post['password'] ?? null, 255);
+        $passwordConfirm = $this->input->text($post['password_confirm'] ?? null, 255);
+        $profileContactOptions = $this->profileContactOptions();
+        $contactProfiles = $this->normalizeSubmittedContactProfiles($post['contact_profiles'] ?? null, $profileContactOptions);
+        $submittedTwoFactorMethodsPresent = isset($post['two_factor_methods_present'])
+            && (string) ($post['two_factor_methods_present'] ?? '') === '1';
+        $submittedTwoFactorMethodIndices = $this->normalizeSubmittedTwoFactorExistingIndices($post['two_factor_methods'] ?? null);
+        $removeAvatar = isset($post['remove_avatar']) && (string) $post['remove_avatar'] === '1';
+        $removeCover = isset($post['remove_cover_image']) && (string) $post['remove_cover_image'] === '1';
+
+        $existingUser = null;
+        $existingTwoFactorMethods = [];
+        $canUpdateTwoFactorMethods = false;
+        if ($id !== null) {
+            $existingUser = $this->userRepo->findById($id);
+            if ($existingUser === null) {
+                $this->context->flash('error', 'User not found.');
+                redirect($this->context->panelUrl('/user'));
+            }
+
+            $existingPreferences = $this->context->auth()->userPreferences($id);
+            if (is_array($existingPreferences)) {
+                $existingTwoFactorMethods = is_array($existingPreferences['two_factor'] ?? null)
+                    ? array_values($existingPreferences['two_factor'])
+                    : [];
+                $canUpdateTwoFactorMethods = true;
+            }
+        }
+
+        $currentAvatarPath = is_array($existingUser) && isset($existingUser['avatar']) && is_string($existingUser['avatar'])
+            ? (string) $existingUser['avatar']
+            : null;
+        $currentCoverImage = is_array($existingUser) && isset($existingUser['cover_image']) && is_string($existingUser['cover_image'])
+            ? (string) $existingUser['cover_image']
+            : null;
+        $currentUserString = $this->currentUserString($existingUser);
+
+        $primaryGroupId = $this->input->int($post['primary_group_id'] ?? null, 1) ?? 0;
+        /** @var mixed $secondaryGroupIdsRaw */
+        $secondaryGroupIdsRaw = $post['secondary_group_ids'] ?? [];
+        $secondaryGroupIds = [];
+        if (is_array($secondaryGroupIdsRaw)) {
+            foreach ($secondaryGroupIdsRaw as $raw) {
+                $parsed = $this->input->int($raw, 1);
+                if ($parsed !== null) {
+                    $secondaryGroupIds[] = $parsed;
+                }
+            }
+        }
+
+        $groupIds = $primaryGroupId > 0
+            ? array_values(array_unique(array_merge([$primaryGroupId], $secondaryGroupIds)))
+            : array_values(array_unique($secondaryGroupIds));
+
+        $groupOptions = $this->groupRepo->listOptions();
+        $validGroupIds = array_map(static fn (array $group): int => (int) $group['id'], $groupOptions);
+        $groupIds = array_values(array_intersect($groupIds, $validGroupIds));
+
+        $groupPermissionMasks = [];
+        foreach ($groupOptions as $groupOption) {
+            $groupPermissionMasks[(int) ($groupOption['id'] ?? 0)] = (int) ($groupOption['permissions'] ?? 0);
+        }
+
+        $actorIsAdmin = $this->context->auth()->isAdmin();
+        if (!$actorIsAdmin) {
+            $targetAlreadyHasAdmin = false;
+            if (is_array($existingUser)) {
+                $existingGroupIds = array_map('intval', (array) ($existingUser['group_ids'] ?? []));
+                $targetAlreadyHasAdmin = in_array(1, $existingGroupIds, true);
+            }
+
+            $requestedAdmin = in_array(1, $groupIds, true);
+            if ($requestedAdmin && !$targetAlreadyHasAdmin) {
+                $this->context->flash('error', 'Only Admin users can assign the Admin group.');
+                redirect($editUrl);
+            }
+
+            if ($targetAlreadyHasAdmin && !in_array(1, $groupIds, true)) {
+                $groupIds[] = 1;
+            }
+        }
+
+        if (!$actorIsAdmin) {
+            $configurationGroupIds = [];
+            $systemPanelBitsMask = \Raven\Core\Auth\PanelAccess::maskFromBits(\Raven\Core\Auth\PanelAccess::systemPanelBits());
+            foreach ($groupPermissionMasks as $groupIdKey => $mask) {
+                if (($mask & $systemPanelBitsMask) !== 0) {
+                    $configurationGroupIds[] = $groupIdKey;
+                }
+            }
+
+            if ($configurationGroupIds !== []) {
+                $existingGroupIds = is_array($existingUser)
+                    ? array_map('intval', (array) ($existingUser['group_ids'] ?? []))
+                    : [];
+                $existingConfigurationGroupIds = array_values(array_intersect($existingGroupIds, $configurationGroupIds));
+                $requestedConfigurationGroupIds = array_values(array_intersect($groupIds, $configurationGroupIds));
+                $newConfigurationAssignments = array_values(array_diff($requestedConfigurationGroupIds, $existingConfigurationGroupIds));
+
+                if ($newConfigurationAssignments !== []) {
+                    $this->context->flash('error', 'Only Admin users can assign groups with Manage System Configuration.');
+                    redirect($editUrl);
+                }
+            }
+        }
+
+        $usernameRequired = $loginIdentifierMode === 'username';
+        if (!$usernameRequired && !$usernameSubmitted && is_array($existingUser)) {
+            $username = trim((string) ($existingUser['username'] ?? ''));
+            $rawUsername = $username;
+        }
+        $usernameInvalid = $usernameRequired
+            ? !is_string($username)
+            : ($rawUsername !== '' && !is_string($username));
+        if ($usernameInvalid || $email === null || !is_string($theme)) {
+            $this->context->flash(
+                'error',
+                $usernameRequired
+                    ? 'Valid username, email, and theme are required.'
+                    : 'Valid optional username, email, and theme are required.'
+            );
+            redirect($editUrl);
+        }
+
+        if ($id === null && strlen($password) < 8) {
+            $this->context->flash('error', 'New users require a password of at least 8 characters.');
+            redirect($editUrl);
+        }
+
+        if ($id === null && !hash_equals($password, $passwordConfirm)) {
+            $this->context->flash('error', 'Password confirmation does not match.');
+            redirect($securityTabUrl);
+        }
+
+        if ($id !== null && $password !== '' && strlen($password) < 8) {
+            $this->context->flash('error', 'Password must be at least 8 characters.');
+            redirect($editUrl);
+        }
+
+        if ($id !== null && $password !== '' && !hash_equals($password, $passwordConfirm)) {
+            $this->context->flash('error', 'Password confirmation does not match.');
+            redirect($securityTabUrl);
+        }
+
+        if ($primaryGroupId < 1) {
+            $fallbackGroupId = $this->groupRepo->idBySlug('guest') ?? 0;
+            if ($fallbackGroupId > 0) {
+                $primaryGroupId = $fallbackGroupId;
+                if (!in_array($primaryGroupId, $groupIds, true)) {
+                    $groupIds = array_merge([$primaryGroupId], $groupIds);
+                }
+            }
+        }
+
+        if ($primaryGroupId < 1 || $groupIds === []) {
+            $this->context->flash('error', 'At least one user group is required.');
+            redirect($editUrl);
+        }
+
+        $avatarSet = false;
+        $avatarFilename = null;
+        $uploadedAvatarFilename = null;
+        $pendingAvatarUpload = null;
+        $pendingAvatarExtension = null;
+        $coverImage = $currentCoverImage;
+        $uploadedCoverFilename = null;
+        $pendingCoverUpload = null;
+        $pendingCoverExtension = null;
+        if ($removeAvatar) {
+            $avatarSet = true;
+            $avatarFilename = null;
+        }
+        if ($removeCover) {
+            $coverImage = null;
+        }
+
+        $avatarUpload = $files['avatar'] ?? null;
+        $hasAvatarUpload = is_array($avatarUpload)
+            && (($avatarUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+        if ($hasAvatarUpload) {
+            $avatarMaxSizeBytes = $this->panelMediaConfigService->resolveMediaMaxFilesizeBytes('avatars', 1048576);
+            $avatarMaxWidth = (int) $this->config->get('user.avatar.max_width', 500);
+            $avatarMaxHeight = (int) $this->config->get('user.avatar.max_height', 500);
+            $avatarAllowedExtensions = $this->panelMediaConfigService->resolveAvatarAllowedExtensionsCsv();
+
+            $validator = new AvatarValidator($avatarMaxSizeBytes, $avatarMaxWidth, $avatarMaxHeight, $avatarAllowedExtensions);
+            /** @var array<string, mixed> $avatarUpload */
+            $result = $validator->validate($avatarUpload);
+
+            if (!(bool) $result['ok']) {
+                $this->context->flash('error', (string) ($result['error'] ?? 'Avatar upload failed.'));
+                redirect($editUrl);
+            }
+
+            $normalizedExtension = $this->avatarUploadService->normalizeExtension((string) ($result['extension'] ?? ''));
+            if ($normalizedExtension === null) {
+                $this->context->flash('error', 'Avatar upload format is not supported.');
+                redirect($editUrl);
+            }
+
+            if ($id !== null) {
+                if ($currentUserString === null) {
+                    $this->context->flash('error', 'User string is missing for this account.');
+                    redirect($editUrl);
+                }
+
+                $avatarsDir = $this->userMediaPathService->avatarStorageDirectory($this->root);
+                $avatarFilename = $this->userMediaPathService->avatarFilenameForString($currentUserString, $normalizedExtension);
+                $destination = $avatarsDir . '/' . $avatarFilename;
+
+                $storeError = $this->avatarUploadService->storeSanitizedUpload($avatarUpload, $destination);
+                if ($storeError !== null) {
+                    $this->context->flash('error', $storeError);
+                    redirect($editUrl);
+                }
+
+                $avatarSet = true;
+                $uploadedAvatarFilename = $avatarFilename;
+            } else {
+                $pendingAvatarUpload = $avatarUpload;
+                $pendingAvatarExtension = $normalizedExtension;
+            }
+        }
+
+        $coverUpload = $files['cover_image'] ?? null;
+        $hasCoverUpload = is_array($coverUpload)
+            && (($coverUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+        if ($hasCoverUpload) {
+            /** @var array<string, mixed> $coverUpload */
+            $coverResult = $this->validateUserCoverUpload($coverUpload);
+            if (!(bool) $coverResult['ok']) {
+                $this->context->flash('error', (string) ($coverResult['error'] ?? 'Cover image upload failed.'));
+                redirect($editUrl);
+            }
+
+            $normalizedExtension = $this->avatarUploadService->normalizeExtension((string) ($coverResult['extension'] ?? ''));
+            if ($normalizedExtension === null) {
+                $this->context->flash('error', 'Cover image upload format is not supported.');
+                redirect($editUrl);
+            }
+
+            if ($id !== null) {
+                if ($currentUserString === null) {
+                    $this->context->flash('error', 'User string is missing for this account.');
+                    redirect($editUrl);
+                }
+
+                $coversDir = $this->userMediaPathService->coverStorageDirectory($this->root);
+                $coverImage = $this->userMediaPathService->coverFilenameForString($currentUserString, $normalizedExtension);
+                $destination = $coversDir . '/' . $coverImage;
+
+                $storeError = $this->avatarUploadService->storeSanitizedImageUpload($coverUpload, $destination);
+                if ($storeError !== null) {
+                    $this->context->flash('error', $storeError);
+                    redirect($editUrl);
+                }
+
+                $uploadedCoverFilename = $coverImage;
+            } else {
+                $pendingCoverUpload = $coverUpload;
+                $pendingCoverExtension = $normalizedExtension;
+            }
+        }
+
+        $createdUserId = null;
+        try {
+            $savedId = $this->userRepo->save([
+                'id' => $id,
+                'username' => is_string($username) ? $username : '',
+                'display_name' => $displayName,
+                'email' => (string) $email,
+                'bio' => $bio,
+                'theme' => $theme,
+                'password' => $password !== '' ? $password : null,
+                'primary_group_id' => $primaryGroupId,
+                'group_ids' => $groupIds,
+                'contact_profiles' => $contactProfiles,
+                'set_avatar' => $avatarSet,
+                'avatar_path' => $avatarFilename,
+                'cover_image' => $coverImage,
+                'string_length' => (int) $this->config->get('user.string', 28),
+            ]);
+
+            if ($id === null) {
+                $this->userRepo->save([
+                    'id' => $savedId,
+                    'username' => is_string($username) ? $username : '',
+                    'display_name' => $displayName,
+                    'email' => (string) $email,
+                    'bio' => $bio,
+                    'theme' => $theme,
+                    'password' => null,
+                    'primary_group_id' => $primaryGroupId,
+                    'group_ids' => $groupIds,
+                    'contact_profiles' => $contactProfiles,
+                    'set_avatar' => false,
+                    'avatar_path' => null,
+                    'cover_image' => $coverImage,
+                    'string_length' => (int) $this->config->get('user.string', 28),
+                ]);
+
+                $createdUserId = $savedId;
+                $createdUserString = $this->userRepo->userStringById($savedId);
+                if ($createdUserString === null) {
+                    throw new \RuntimeException('Failed to resolve generated user string.');
+                }
+
+                if (is_array($pendingAvatarUpload) && is_string($pendingAvatarExtension)) {
+                    $avatarsDir = $this->userMediaPathService->avatarStorageDirectory($this->root);
+                    $avatarFilename = $this->userMediaPathService->avatarFilenameForString($createdUserString, $pendingAvatarExtension);
+                    $destination = $avatarsDir . '/' . $avatarFilename;
+
+                    $storeError = $this->avatarUploadService->storeSanitizedUpload($pendingAvatarUpload, $destination);
+                    if ($storeError !== null) {
+                        throw new \RuntimeException($storeError);
+                    }
+
+                    $avatarSet = true;
+                    $uploadedAvatarFilename = $avatarFilename;
+                }
+
+                if (is_array($pendingCoverUpload) && is_string($pendingCoverExtension)) {
+                    $coversDir = $this->userMediaPathService->coverStorageDirectory($this->root);
+                    $coverImage = $this->userMediaPathService->coverFilenameForString($createdUserString, $pendingCoverExtension);
+                    $destination = $coversDir . '/' . $coverImage;
+
+                    $storeError = $this->avatarUploadService->storeSanitizedImageUpload($pendingCoverUpload, $destination);
+                    if ($storeError !== null) {
+                        throw new \RuntimeException($storeError);
+                    }
+
+                    $uploadedCoverFilename = $coverImage;
+                }
+
+                if ($avatarSet || $uploadedCoverFilename !== null) {
+                    $this->userRepo->save([
+                        'id' => $savedId,
+                        'username' => is_string($username) ? $username : '',
+                        'display_name' => $displayName,
+                        'email' => (string) $email,
+                        'bio' => $bio,
+                        'theme' => $theme,
+                        'password' => null,
+                        'primary_group_id' => $primaryGroupId,
+                        'group_ids' => $groupIds,
+                        'contact_profiles' => $contactProfiles,
+                        'set_avatar' => $avatarSet,
+                        'avatar_path' => $avatarFilename,
+                        'cover_image' => $coverImage,
+                        'string_length' => (int) $this->config->get('user.string', 28),
+                    ]);
+                }
+            }
+        } catch (\Throwable $exception) {
+            if ($uploadedAvatarFilename !== null) {
+                $this->userMediaPathService->deleteAvatarFile($this->root, $uploadedAvatarFilename);
+            }
+            if ($uploadedCoverFilename !== null) {
+                $this->userMediaPathService->deleteCoverFile($this->root, $uploadedCoverFilename);
+            }
+
+            if ($id === null && $createdUserId !== null) {
+                try {
+                    $this->userRepo->deleteById($createdUserId);
+                } catch (\Throwable) {
+                    // Preserve the original save failure when cleanup also fails.
+                }
+            }
+
+            $this->context->flash('error', $exception->getMessage() ?: 'Failed to save user.');
+            redirect($editUrl);
+        }
+
+        $twoFactorUpdateError = null;
+        if ($id !== null && $canUpdateTwoFactorMethods && $submittedTwoFactorMethodsPresent) {
+            $retainedTwoFactorMethods = [];
+            foreach ($submittedTwoFactorMethodIndices as $methodIndex) {
+                $method = $existingTwoFactorMethods[$methodIndex] ?? null;
+                if (!is_array($method)) {
+                    continue;
+                }
+
+                $retainedTwoFactorMethods[] = $method;
+            }
+
+            $twoFactorUpdate = $this->context->auth()->updateUserTwoFactorMethods($savedId, $retainedTwoFactorMethods);
+            if (!(bool) ($twoFactorUpdate['ok'] ?? false)) {
+                $rawErrors = is_array($twoFactorUpdate['errors'] ?? null) ? $twoFactorUpdate['errors'] : [];
+                $messages = array_map(static fn (mixed $value): string => trim((string) $value), $rawErrors);
+                $messages = array_values(array_filter($messages, static fn (string $value): bool => $value !== ''));
+                $twoFactorUpdateError = $messages !== []
+                    ? implode(' ', $messages)
+                    : 'User saved, but 2FA methods could not be updated.';
+            }
+        }
+
+        if ($avatarSet && is_string($currentAvatarPath) && $currentAvatarPath !== '' && $currentAvatarPath !== $avatarFilename) {
+            $this->userMediaPathService->deleteAvatarFile($this->root, $currentAvatarPath);
+        }
+        if ($currentCoverImage !== null && $currentCoverImage !== '' && $currentCoverImage !== $coverImage) {
+            $this->userMediaPathService->deleteCoverFile($this->root, $currentCoverImage);
+        }
+
+        if ($twoFactorUpdateError !== null) {
+            $this->context->flash('error', $twoFactorUpdateError);
+            redirect($this->userEditUrlWithTab($savedId, $activeTab, 'security'));
+        }
+
+        $this->context->flash('success', 'Changes saved.');
+        redirect($this->userEditUrlWithTab($savedId, $activeTab, 'account'));
+    }
+
+    /**
+     * Deletes one user or a set of selected users.
+     *
+     * @param array<string, mixed> $post Submitted form payload.
+     * @return void
+     */
+    public function userDelete(array $post): void
+    {
+        $this->context->requirePanelLogin();
+        if (!$this->context->requireRoutePermissionOrForbidden('user', 'delete')) {
+            return;
+        }
+
+        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
+            $this->context->flash('error', 'Invalid CSRF token.');
+            redirect($this->context->panelUrl('/user'));
+        }
+
+        $id = $this->input->int($post['id'] ?? null, 1);
+        $currentUserId = $this->context->auth()->userId();
+
+        if ($id !== null) {
+            if ($currentUserId === $id) {
+                $this->context->flash('error', 'You cannot delete your currently logged-in account.');
+                redirect($this->context->panelUrl('/user'));
+            }
+
+            try {
+                $this->userRepo->deleteById($id);
+            } catch (\Throwable $exception) {
+                $this->context->flash('error', $exception->getMessage() ?: 'Failed to delete user.');
+                redirect($this->context->panelUrl('/user'));
+            }
+
+            $this->context->flash('success', 'User deleted.');
+            redirect($this->context->panelUrl('/user'));
+        }
+
+        $selectedIds = $this->selectedIdsFromPost($post);
+        if ($selectedIds === []) {
+            $this->context->flash('error', 'No users selected.');
+            redirect($this->context->panelUrl('/user'));
+        }
+
+        $deletedCount = 0;
+        $failedCount = 0;
+        $skippedCurrentCount = 0;
+
+        foreach ($selectedIds as $selectedId) {
+            if ($currentUserId !== null && $selectedId === $currentUserId) {
+                $skippedCurrentCount++;
+                continue;
+            }
+
+            try {
+                $this->userRepo->deleteById($selectedId);
+                $deletedCount++;
+            } catch (\Throwable) {
+                $failedCount++;
+            }
+        }
+
+        if ($deletedCount > 0) {
+            $message = 'Deleted ' . $deletedCount . ' user' . ($deletedCount === 1 ? '' : 's') . '.';
+            if ($skippedCurrentCount > 0) {
+                $message .= ' Skipped your currently logged-in account.';
+            }
+            if ($failedCount > 0) {
+                $message .= ' Failed to delete ' . $failedCount . ' selected user' . ($failedCount === 1 ? '' : 's') . '.';
+            }
+            $this->context->flash('success', $message);
+        } else {
+            if ($skippedCurrentCount > 0 && $failedCount === 0) {
+                $this->context->flash('error', 'No users deleted because your currently logged-in account cannot be deleted.');
+            } else {
+                $this->context->flash('error', 'Failed to delete selected users.');
+            }
+        }
+
+        redirect($this->context->panelUrl('/user'));
+    }
+
+    /**
+     * Lists registration invite tokens for user onboarding.
+     *
+     * @return void
+     */
+    public function userInvites(): void
+    {
+        $this->context->requirePanelLogin();
+        if (!$this->context->requireRoutePermissionOrForbidden('user', 'view')) {
+            return;
+        }
+        if (!$this->ensureInviteRegistrationMode()) {
+            return;
+        }
+
+        $this->context->renderPanel('panel/user/invites', [
+            'inviteRows' => $this->inviteTokens()->listForPanel(),
+            'inviteCreatorMap' => $this->inviteCreatorMap(),
+            'inviteGeneratedTokens' => $this->pullFlashList('generated_invites'),
+            'inviteRegistrationMode' => $this->registrationMode(),
+            'inviteNowTs' => time(),
+            'csrfField' => $this->context->csrfField(),
+            'flashSuccess' => $this->context->pullFlash('success'),
+            'flashError' => $this->context->pullFlash('error'),
+            'section' => 'user',
+        ]);
+    }
+
+    /**
+     * Creates one invite token from panel form input.
+     *
+     * @param array<string, mixed> $post Submitted form payload.
+     * @return void
+     */
+    public function userInvitesCreate(array $post): void
+    {
+        $this->context->requirePanelLogin();
+        if (!$this->context->requireRoutePermissionOrForbidden('user', 'create')) {
+            return;
+        }
+        if (!$this->ensureInviteRegistrationMode()) {
+            return;
+        }
+
+        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
+            $this->context->flash('error', 'Invalid CSRF token.');
+            redirect($this->context->panelUrl('/user/invites'));
+        }
+
+        $isReusable = $this->panelInvitePolicyService->isReusableInviteType($post['invite_type'] ?? 'single');
+        $manualToken = null;
+        if (!$isReusable) {
+            $manualToken = trim((string) $this->input->text($post['token_slug'] ?? null, 255));
+            if ($manualToken === '') {
+                $manualToken = null;
+            }
+        }
+
+        try {
+            $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
+        } catch (\RuntimeException $exception) {
+            $this->context->flash('error', $exception->getMessage());
+            redirect($this->context->panelUrl('/user/invites'));
+        }
+
+        try {
+            $token = $this->inviteTokens()->createToken($isReusable, $expiresAt, $this->context->auth()->userId(), $manualToken);
+        } catch (\Throwable $exception) {
+            $this->context->flash('error', 'Failed to create invite token: ' . ($exception->getMessage() ?: 'Unknown error.'));
+            redirect($this->context->panelUrl('/user/invites'));
+        }
+
+        $this->context->flash('success', $isReusable ? 'Reusable invite token created.' : 'Single-use invite token created.');
+        $this->flashList('generated_invites', [$token]);
+        redirect($this->context->panelUrl('/user/invites'));
+    }
+
+    /**
+     * Generates a batch of single-use invite tokens from panel form input.
+     *
+     * @param array<string, mixed> $post Submitted form payload.
+     * @return void
+     */
+    public function userInvitesGenerate(array $post): void
+    {
+        $this->context->requirePanelLogin();
+        if (!$this->context->requireRoutePermissionOrForbidden('user', 'create')) {
+            return;
+        }
+        if (!$this->ensureInviteRegistrationMode()) {
+            return;
+        }
+
+        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
+            $this->context->flash('error', 'Invalid CSRF token.');
+            redirect($this->context->panelUrl('/user/invites'));
+        }
+
+        $count = $this->panelInvitePolicyService->normalizeBatchCount($post['count'] ?? null, 10, 1, 100);
+
+        try {
+            $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
+        } catch (\RuntimeException $exception) {
+            $this->context->flash('error', $exception->getMessage());
+            redirect($this->context->panelUrl('/user/invites'));
+        }
+
+        try {
+            $tokens = $this->inviteTokens()->createSingleUseBatch($count, $expiresAt, $this->context->auth()->userId());
+        } catch (\Throwable $exception) {
+            $this->context->flash('error', 'Failed to generate invite tokens: ' . ($exception->getMessage() ?: 'Unknown error.'));
+            redirect($this->context->panelUrl('/user/invites'));
+        }
+
+        $this->context->flash('success', 'Generated ' . count($tokens) . ' single-use invite token' . (count($tokens) === 1 ? '' : 's') . '.');
+        $this->flashList('generated_invites', $tokens);
+        redirect($this->context->panelUrl('/user/invites'));
+    }
+
+    /**
+     * Deletes one invite token.
+     *
+     * @param array<string, mixed> $post Submitted form payload.
+     * @return void
+     */
+    public function userInvitesDelete(array $post): void
+    {
+        $this->context->requirePanelLogin();
+        if (!$this->context->requireRoutePermissionOrForbidden('user', 'delete')) {
+            return;
+        }
+        if (!$this->ensureInviteRegistrationMode()) {
+            return;
+        }
+
+        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
+            $this->context->flash('error', 'Invalid CSRF token.');
+            redirect($this->context->panelUrl('/user/invites'));
+        }
+
+        $id = $this->input->int($post['id'] ?? null, 1);
+        if ($id === null) {
+            $this->context->flash('error', 'Invite token id is required.');
+            redirect($this->context->panelUrl('/user/invites'));
+        }
+
+        if (!$this->inviteTokens()->deleteById($id)) {
+            $this->context->flash('error', 'Invite token was not found.');
+            redirect($this->context->panelUrl('/user/invites'));
+        }
+
+        $this->context->flash('success', 'Invite token deleted.');
+        redirect($this->context->panelUrl('/user/invites'));
+    }
+
+    /**
+     * Builds one user-id keyed label/edit-url map for invite-token creator rendering.
+     *
+     * @return array<int, array{label: string, edit_url: string}>
+     */
+    private function inviteCreatorMap(): array
+    {
+        $rows = $this->userRepo->listAll();
+        $map = [];
+        foreach ($rows as $row) {
+            $userId = (int) ($row['id'] ?? 0);
+            if ($userId < 1) {
+                continue;
+            }
+
+            $displayName = trim((string) ($row['name'] ?? ''));
+            $username = trim((string) ($row['username'] ?? ''));
+            $email = trim((string) ($row['email'] ?? ''));
+            $label = $displayName !== ''
+                ? $displayName
+                : ($username !== '' ? $username : ($email !== '' ? $email : ('User #' . $userId)));
+
+            $map[$userId] = [
+                'label' => $label,
+                'edit_url' => $this->context->panelUrl('/user/edit/' . $userId),
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
+     * Stores one flash-list payload in session after sanitizing the items.
+     *
+     * @param string $key Flash-list storage key.
+     * @param array<int, string> $values Flash-list values to store.
+     * @return void
+     */
+    private function flashList(string $key, array $values): void
+    {
+        $normalized = [];
+        foreach ($values as $value) {
+            $item = trim($value);
+            if ($item === '') {
+                continue;
+            }
+
+            $normalized[] = $this->input->text($item, 400);
+        }
+
+        if ($normalized === []) {
+            return;
+        }
+
+        $this->flashList->putList($key, $normalized);
+    }
+
+    /**
+     * Pulls and removes one flash-list payload from session.
+     *
+     * @param string $key Flash-list storage key.
+     * @return array<int, string>|null Sanitized stored values, or null when none exist.
+     */
+    private function pullFlashList(string $key): ?array
+    {
+        $value = $this->flashList->pullList($key);
+        if (!is_array($value)) {
+            return null;
+        }
+
+        $normalized = [];
+        foreach ($value as $item) {
+            $stringItem = is_string($item) ? trim($item) : '';
+            if ($stringItem === '') {
+                continue;
+            }
+
+            $normalized[] = $this->input->text($stringItem, 400);
+        }
+
+        return $normalized === [] ? null : $normalized;
+    }
+
+    /**
+     * Resolves configured public registration mode.
+     *
+     * @return string Normalized public registration mode.
+     */
+    private function registrationMode(): string
+    {
+        return $this->routeConfigService->registrationMode();
+    }
+
+    /**
+     * Restricts invite-token management to invite-only registration mode.
+     *
+     * @return bool True when invite-token management is allowed.
+     */
+    private function ensureInviteRegistrationMode(): bool
+    {
+        if ($this->registrationMode() === 'invite') {
+            return true;
+        }
+
+        $this->context->flash('error', 'User invite tokens are available only when public registration mode is set to Invite.');
+        redirect($this->context->panelUrl('/user'));
+        return false;
+    }
+
+    /**
+     * Parses one optional invite-expiration datetime into a unix timestamp.
+     *
+     * @param mixed $rawValue User-submitted expiration value.
+     * @return int|null Parsed timestamp, or null when blank.
+     * @throws \RuntimeException When the submitted value is invalid or not in the future.
+     */
+    private function parseInviteExpirationTimestamp(mixed $rawValue): ?int
+    {
+        return $this->panelInvitePolicyService->parseExpirationTimestamp($rawValue);
+    }
+
+    /**
+     * Resolves the configured panel login identifier mode.
+     *
+     * @return string `email` or `username`.
+     */
+    private function panelLoginIdentifierMode(): string
+    {
+        return $this->loginIdentifierResolver->modeFromConfig($this->config);
+    }
+
+    /**
+     * Normalizes one persisted/user-submitted identifier column value.
+     *
+     * @param string $rawValue User-submitted identifier candidate.
+     * @return string|null Canonical username/email value, or null when invalid.
+     */
+    private function normalizeUserIdentifierValue(string $rawValue): ?string
+    {
+        return $this->loginIdentifierResolver->normalizeUsernameOrEmail($this->input, $rawValue);
+    }
+
+    /**
+     * Returns configured public profile route prefix.
+     *
+     * @return string Public profile route prefix.
+     */
+    private function profileRoutePrefix(): string
+    {
+        return $this->routeConfigService->profileRoutePrefix();
+    }
+
+    /**
+     * Returns true when public profile URLs are enabled for routing inventory.
+     *
+     * @return bool True when profile routes are enabled.
+     */
+    private function profileRoutesEnabledForRoutingTable(): bool
+    {
+        return $this->routeConfigService->profileRoutesEnabledForRoutingTable();
+    }
+
+    /**
+     * Returns one current persisted user string when available.
+     *
+     * @param array<string, mixed>|null $user User row payload.
+     * @return string|null Canonical user string, or null when unavailable.
+     */
+    private function currentUserString(?array $user): ?string
+    {
+        $userString = preg_replace('/[^a-zA-Z0-9]/', '', trim((string) ($user['string'] ?? ''))) ?? '';
+        return $userString !== '' ? $userString : null;
+    }
+
+    /**
+     * Returns one public profile route segment for a user row.
+     *
+     * @param array<string, mixed> $user User row payload.
+     * @return string|null Public route segment, or null when unavailable.
+     */
+    private function publicProfileRouteSegmentForUser(array $user): ?string
+    {
+        $userId = (int) ($user['id'] ?? 0);
+        if ($userId <= 0) {
+            return null;
+        }
+
+        return match ($this->routeConfigService->profileSelector()) {
+            'string' => $this->currentUserString($user),
+            'username' => $this->normalizeUserIdentifierValue((string) ($user['username'] ?? '')),
+            default => (string) $userId,
+        };
+    }
+
+    /**
+     * Returns normalized profile-contact option map from runtime config.
+     *
+     * @return array<string, array{label: string, prefix: string}>
+     */
+    private function profileContactOptions(): array
+    {
+        return $this->profileContactService->normalizeOptionsConfig(
+            $this->config->get('user.contact', $this->profileContactService->defaultOptions())
+        );
+    }
+
+    /**
+     * Normalizes submitted profile-contact rows from panel forms.
+     *
+     * @param mixed $rawProfiles Submitted profile-contact payload.
+     * @param array<string, array{label: string, prefix: string}> $allowedOptions Allowed option map.
+     * @return array<int, array{type: string, value: string}> Normalized contact-profile rows.
+     */
+    private function normalizeSubmittedContactProfiles(mixed $rawProfiles, array $allowedOptions): array
+    {
+        return $this->profileContactService->normalizeSubmittedProfiles($rawProfiles, $allowedOptions);
+    }
+
+    /**
+     * Returns 2FA type options for the panel user editor.
+     *
+     * @return array<string, string>
+     */
+    private function twoFactorTypeOptions(): array
+    {
+        return $this->panelTwoFactorPreferencesService->typeOptions();
+    }
+
+    /**
+     * Normalizes retained 2FA method indices from the user editor.
+     *
+     * @param mixed $rawMethods Submitted 2FA payload.
+     * @return array<int, int> Existing method indices to retain.
+     */
+    private function normalizeSubmittedTwoFactorExistingIndices(mixed $rawMethods): array
+    {
+        return $this->panelTwoFactorPreferencesService->normalizeSubmittedExistingIndices($rawMethods);
+    }
+
+    /**
+     * Returns one config-driven avatar upload note for panel forms.
+     *
+     * @return string Human-readable avatar upload limit note.
+     */
+    private function avatarUploadLimitsNote(): string
+    {
+        return $this->panelMediaConfigService->avatarUploadLimitsNote();
+    }
+
+    /**
+     * Returns one cover-image public URL for the panel editor preview.
+     *
+     * @param string $coverValue Stored cover-image value.
+     * @return string Public URL or empty string.
+     */
+    private function coverPublicUrl(string $coverValue): string
+    {
+        return $this->userMediaPathService->coverPublicUrl($this->root, $coverValue);
+    }
+
+    /**
+     * Returns avatar display metadata for panel templates.
+     *
+     * @param string $avatarPath Stored avatar path value.
+     * @return array{filename: string, url: string, thumb_url: string}
+     */
+    private function avatarTemplateData(string $avatarPath): array
+    {
+        return $this->userMediaPathService->avatarTemplateData($this->root, $avatarPath);
+    }
+
+    /**
+     * Validates one cover-image upload using the shared image policy.
+     *
+     * @param array<string, mixed> $upload Uploaded cover payload.
+     * @return array{ok: bool, error: string|null, extension: string|null}
+     */
+    private function validateUserCoverUpload(array $upload): array
+    {
+        $maxBytes = $this->panelMediaConfigService->resolveMediaMaxFilesizeBytes('images', 10485760);
+        $allowedExtensions = (string) $this->config->get('media.allowed_extensions', 'gif,jpg,jpeg,png');
+        $policy = new AvatarValidationPolicy($maxBytes, 10000, 10000, $allowedExtensions);
+        return $policy->validate($upload);
+    }
+
+    /**
+     * Normalizes panel-theme identifiers to a valid theme slug.
+     *
+     * @param string $theme Submitted theme identifier.
+     * @param bool $allowDefault Whether the sentinel `default` value is allowed.
+     * @return string|null Canonical theme slug, or null when invalid.
+     */
+    private function normalizePanelThemeChoice(string $theme, bool $allowDefault): ?string
+    {
+        $normalized = strtolower(trim($theme));
+        if ($normalized === '') {
+            return $allowDefault ? 'default' : 'corp';
+        }
+
+        if ($allowDefault && $normalized === 'default') {
+            return 'default';
+        }
+
+        if (in_array($normalized, ['corp', 'ice', 'midnight'], true)) {
+            return $normalized;
+        }
+
+        return null;
+    }
+
+    /**
+     * Builds one user-edit URL while preserving the active editor tab.
+     *
+     * @param int|null $id User id in edit mode, or null in create mode.
+     * @param string $tab Active tab.
+     * @param string $defaultTab Default tab slug.
+     * @return string Panel user-editor URL.
+     */
+    private function userEditUrlWithTab(?int $id, string $tab, string $defaultTab): string
+    {
+        return $this->panelEditorTabService->panelEditorUrlWithTab(
+            fn (string $suffix): string => $this->context->panelUrl($suffix),
+            '/user/edit',
+            $id,
+            $tab,
+            $defaultTab
+        );
+    }
+
+    /**
+     * Normalizes selected checkbox ids from one bulk-action form payload.
+     *
+     * @param array<string, mixed> $post Submitted form payload.
+     * @param string $key Form key holding selected ids.
+     * @return array<int, int> Normalized selected ids.
+     */
+    private function selectedIdsFromPost(array $post, string $key = 'selected_ids'): array
+    {
+        $raw = $post[$key] ?? [];
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $selected = [];
+        foreach ($raw as $candidate) {
+            $id = $this->input->int($candidate, 1);
+            if ($id !== null) {
+                $selected[$id] = $id;
+            }
+        }
+
+        return array_values($selected);
+    }
+
+    /**
+     * Resolves the invite-token repository only when invite routes are hit.
+     *
+     * @return InviteTokenRepository Invite-token repository for panel invite CRUD.
+     */
+    private function inviteTokens(): InviteTokenRepository
+    {
+        if ($this->inviteTokens instanceof InviteTokenRepository) {
+            return $this->inviteTokens;
+        }
+
+        /** @var callable(): InviteTokenRepository $resolver */
+        $resolver = $this->inviteTokensResolver;
+        $this->inviteTokens = $resolver();
+        return $this->inviteTokens;
+    }
+}

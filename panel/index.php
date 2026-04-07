@@ -57,6 +57,13 @@ $panelTaxonomyController = is_callable($rvn['panel_taxonomy_controller'] ?? null
         throw new RuntimeException('Panel taxonomy controller factory is unavailable.');
     };
 
+/** @var callable(): object $panelUserController */
+$panelUserController = is_callable($rvn['panel_user_controller'] ?? null)
+    ? $rvn['panel_user_controller']
+    : static function (): object {
+        throw new RuntimeException('Panel user controller factory is unavailable.');
+    };
+
 /** @var callable(): array<string, mixed> $initializePanelRuntime */
 $initializePanelRuntime = is_callable($rvn['initialize_panel_runtime'] ?? null)
     ? $rvn['initialize_panel_runtime']
@@ -791,15 +798,15 @@ $router->add('POST', '/redirect/delete', static function () use ($panelTaxonomyC
     $panelTaxonomyController()->redirectDelete($_POST);
 });
 
-$router->add('GET', '/user', static function () use ($panelController): void {
-    $panelController()->userList();
+$router->add('GET', '/user', static function () use ($panelUserController): void {
+    $panelUserController()->userList();
 });
 
-$router->add('GET', '/user/edit', static function () use ($panelController): void {
-    $panelController()->userEdit(null);
+$router->add('GET', '/user/edit', static function () use ($panelUserController): void {
+    $panelUserController()->userEdit(null);
 });
 
-$router->add('GET', '/user/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+$router->add('GET', '/user/edit/{id}', static function (array $params) use ($panelUserController, $rvn): void {
     $id = $rvn['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
@@ -808,31 +815,31 @@ $router->add('GET', '/user/edit/{id}', static function (array $params) use ($pan
         return;
     }
 
-    $panelController()->userEdit($id);
+    $panelUserController()->userEdit($id);
 });
 
-$router->add('POST', '/user/save', static function () use ($panelController): void {
-    $panelController()->userSave($_POST, $_FILES);
+$router->add('POST', '/user/save', static function () use ($panelUserController): void {
+    $panelUserController()->userSave($_POST, $_FILES);
 });
 
-$router->add('POST', '/user/delete', static function () use ($panelController): void {
-    $panelController()->userDelete($_POST);
+$router->add('POST', '/user/delete', static function () use ($panelUserController): void {
+    $panelUserController()->userDelete($_POST);
 });
 
-$router->add('GET', '/user/invites', static function () use ($panelController): void {
-    $panelController()->userInvites();
+$router->add('GET', '/user/invites', static function () use ($panelUserController): void {
+    $panelUserController()->userInvites();
 });
 
-$router->add('POST', '/user/invites/create', static function () use ($panelController): void {
-    $panelController()->userInvitesCreate($_POST);
+$router->add('POST', '/user/invites/create', static function () use ($panelUserController): void {
+    $panelUserController()->userInvitesCreate($_POST);
 });
 
-$router->add('POST', '/user/invites/generate', static function () use ($panelController): void {
-    $panelController()->userInvitesGenerate($_POST);
+$router->add('POST', '/user/invites/generate', static function () use ($panelUserController): void {
+    $panelUserController()->userInvitesGenerate($_POST);
 });
 
-$router->add('POST', '/user/invites/delete', static function () use ($panelController): void {
-    $panelController()->userInvitesDelete($_POST);
+$router->add('POST', '/user/invites/delete', static function () use ($panelUserController): void {
+    $panelUserController()->userInvitesDelete($_POST);
 });
 
 $router->add('GET', '/group', static function () use ($panelController): void {

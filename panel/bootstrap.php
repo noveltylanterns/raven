@@ -13,12 +13,22 @@ use Raven\Controller\AuthController;
 use Raven\Controller\Panel\DashboardController;
 use Raven\Controller\Panel\RequestContext;
 use Raven\Controller\Panel\TaxonomyController;
+use Raven\Controller\Panel\UserController;
 use Raven\Controller\PanelController;
 use Raven\Core\Media\PageImageManager;
 use Raven\Core\View;
+use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Auth\PanelInvitePolicyService;
+use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
 use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Config\PanelMediaConfigService;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Log\EventLogger;
+use Raven\Lib\Media\AvatarUploadService;
+use Raven\Lib\Media\UserMediaPathService;
+use Raven\Lib\Panel\PanelEditorTabService;
+use Raven\Lib\Profile\ProfileContactService;
+use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Repository\CategoryRepository;
 use Raven\Repository\ChannelRepository;
@@ -49,6 +59,7 @@ return static function (array $rvn): array {
     $panelRequestContext = null;
     $panelRuntime = null;
     $taxonomyController = null;
+    $userController = null;
     $categorySetRepository = null;
     $tagSetRepository = null;
     $inviteTokenRepository = null;
@@ -460,6 +471,40 @@ return static function (array $rvn): array {
         );
 
         return $taxonomyController;
+    };
+
+    /**
+     * Builds the split user controller on first use.
+     */
+    $rvn['panel_user_controller'] = static function () use (&$userController, &$rvn, $panelUserDomain): UserController {
+        if ($userController instanceof UserController) {
+            return $userController;
+        }
+
+        /** @var callable(): RequestContext $requestContextFactory */
+        $requestContextFactory = $rvn['panel_request_context'];
+        $userDomain = $panelUserDomain();
+        $userController = new UserController(
+            $requestContextFactory(),
+            $rvn['config'],
+            $rvn['input'],
+            (string) $rvn['root'],
+            $userDomain['group'],
+            $userDomain['user'],
+            $userDomain['invite_tokens'],
+            new SessionFlash('_raven_flash_list'),
+            new RouteConfigService($rvn['config'], $rvn['input']),
+            new PanelInvitePolicyService($rvn['input']),
+            new LoginIdentifierResolver(),
+            new PanelEditorTabService($rvn['input']),
+            new PanelMediaConfigService($rvn['config']),
+            new ProfileContactService($rvn['input']),
+            new PanelTwoFactorPreferencesService($rvn['input']),
+            new AvatarUploadService(),
+            new UserMediaPathService()
+        );
+
+        return $userController;
     };
 
     /**
