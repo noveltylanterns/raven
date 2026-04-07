@@ -107,8 +107,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Includes schema-ensure state gating so hot-path bootstraps can skip repeated no-op schema walks until core or enabled-extension schema inputs change.
 - `private/lib/Extension/`
   - Extension cataloging, manifests, state, storage provisioning, scaffolding, and lazy runtime bootstrap/service resolution.
-  - `ExtensionRegistry` — canonical static registry for manifest parsing, enabled-directory discovery, shortcode/field validation, and permission maps. Manifests are cached in a static array so the triple-read pattern (autoloader setup → runtime registry → schema state store) collapses to one filesystem hit per extension per process.
-  - `ExtensionRuntimeRegistry` — per-request instance tracking which extensions have been booted and their lazy service maps.
+  - `ExtensionRegistry` — unified registry with two surfaces: a static metadata API (manifest parsing, enabled-directory discovery, shortcode/field validation, permission maps; callable before the autoloader is registered) and a per-request instance API (boot providers, lazy service resolution, storage, scheduler discovery). Manifests are cached in a static array so repeated calls within the same process pay for one filesystem hit per extension.
   - `ExtensionStorageProvisioner`, `ExtensionStorageCleaner` — storage lifecycle helpers.
   - `private/sys/Core/Extension/ExtensionRegistry.php` is a legacy redirect shim only; prefer `Raven\Lib\Extension\ExtensionRegistry` in all new code.
 - `private/lib/Http/`

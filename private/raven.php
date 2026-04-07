@@ -15,8 +15,6 @@ use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\SchemaManager;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Config\ConfigValueParser;
-use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
-use Raven\Lib\Extension\ExtensionRuntimeRegistry;
 use Raven\Lib\Log\EventLogger;
 use Raven\Lib\Scheduler\SchedulerRegistry;
 use Raven\Lib\Session\SessionCookiePolicy;
@@ -120,8 +118,6 @@ return (static function (): array {
     $categoryEnabled = ConfigValueParser::bool($config->get('category.enabled', false), false);
     $tagEnabled = ConfigValueParser::bool($config->get('tag.enabled', false), false);
     $loggingConfig = (array) $config->get('logging', []);
-    $extensionBootstrapResolver = new ExtensionBootstrapContractResolver();
-
     $logger = null;
     $loggerResolver = static function () use (&$logger, $rvnDb, $driver, $prefix, $loggingConfig): EventLogger {
         if (!$logger instanceof EventLogger) {
@@ -158,14 +154,10 @@ return (static function (): array {
         return false;
     });
 
-    $extensionRuntimeRegistry = new ExtensionRuntimeRegistry(
-        $root,
-        $enabledExtensionDirectories,
-        $extensionBootstrapResolver
-    );
-    $extensionManifests = $extensionRuntimeRegistry->manifests();
-    $extensionStorage = $extensionRuntimeRegistry->storageMap();
-    $schedulerExtensions = $extensionRuntimeRegistry->schedulerDirectories();
+    $extensionRegistry = new ExtensionRegistry($root, $enabledExtensionDirectories);
+    $extensionManifests = $extensionRegistry->manifests();
+    $extensionStorage = $extensionRegistry->storageMap();
+    $schedulerExtensions = $extensionRegistry->schedulerDirectories();
 
     $rvn = [
         'root' => $root,
@@ -183,8 +175,8 @@ return (static function (): array {
         'extension_services' => [],
     ];
 
-    $rvn['boot_extension'] = static function (string $directory) use (&$rvn, $extensionRuntimeRegistry): array {
-        return $extensionRuntimeRegistry->bootExtension($rvn, $directory);
+    $rvn['boot_extension'] = static function (string $directory) use (&$rvn, $extensionRegistry): array {
+        return $extensionRegistry->bootExtension($rvn, $directory);
     };
 
     /**
@@ -192,8 +184,8 @@ return (static function (): array {
      *
      * @return array<string, mixed>
      */
-    $rvn['extension_services_for'] = static function (string $directory) use (&$rvn, $extensionRuntimeRegistry): array {
-        return $extensionRuntimeRegistry->resolveExtensionServices($rvn, $directory);
+    $rvn['extension_services_for'] = static function (string $directory) use (&$rvn, $extensionRegistry): array {
+        return $extensionRegistry->resolveExtensionServices($rvn, $directory);
     };
 
     /**
@@ -201,8 +193,8 @@ return (static function (): array {
      *
      * @return array<string, array<string, mixed>>
      */
-    $rvn['extension_services_all'] = static function () use (&$rvn, $extensionRuntimeRegistry): array {
-        return $extensionRuntimeRegistry->resolveAllExtensionServices($rvn);
+    $rvn['extension_services_all'] = static function () use (&$rvn, $extensionRegistry): array {
+        return $extensionRegistry->resolveAllExtensionServices($rvn);
     };
 
     /**
@@ -216,18 +208,18 @@ return (static function (): array {
      * @return array<string, mixed>
      */
     $coreContainerKeys = [];
-    $rvn['extension_context_for'] = static function (string $directory) use (&$rvn, &$coreContainerKeys, $extensionRuntimeRegistry): array {
-        return $extensionRuntimeRegistry->extensionContext($rvn, $directory, $coreContainerKeys);
+    $rvn['extension_context_for'] = static function (string $directory) use (&$rvn, &$coreContainerKeys, $extensionRegistry): array {
+        return $extensionRegistry->extensionContext($rvn, $directory, $coreContainerKeys);
     };
 
     $extensionsBooted = false;
-    $rvn['boot_extensions'] = static function () use (&$extensionsBooted, &$rvn, $extensionRuntimeRegistry): array {
+    $rvn['boot_extensions'] = static function () use (&$extensionsBooted, &$rvn, $extensionRegistry): array {
         if ($extensionsBooted) {
             return $rvn;
         }
 
         $extensionsBooted = true;
-        return $extensionRuntimeRegistry->bootAllExtensions($rvn);
+        return $extensionRegistry->bootAllExtensions($rvn);
     };
 
     // Wire the system-wide scheduler.
