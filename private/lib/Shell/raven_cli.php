@@ -14,6 +14,9 @@ use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Repository\CategoryRepository;
+use Raven\Repository\ChannelRepository;
+use Raven\Repository\GroupRepository;
+use Raven\Repository\RedirectRepository;
 use Raven\Repository\TagRepository;
 
 final class RavenCliContext
@@ -1392,9 +1395,7 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
 
     try {
         $rvn = $context->rvn();
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
-        $repo = $service('channel');
+        $repo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
 
         if ($action === 'list') {
             $rows = $repo->listAll();
@@ -1557,9 +1558,7 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
 
     try {
         $rvn = $context->rvn();
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
-        $repo = $service('group');
+        $repo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
 
         $orderedPermissions = [
             'view_public' => PanelAccess::VIEW_PUBLIC_SITE,
@@ -1834,9 +1833,9 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
 
     try {
         $rvn = $context->rvn();
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
-        $repo = $service('redirect');
+        // RedirectRepository depends on ChannelRepository for channel-slug validation.
+        $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+        $repo = new RedirectRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
 
         $findRedirect = static function (array $options) use ($repo): ?array {
             $idRaw = raven_cli_option($options, 'id', null);

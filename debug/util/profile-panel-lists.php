@@ -12,7 +12,12 @@ declare(strict_types=1);
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Diagnostics\RequestProfiler;
 use Raven\Repository\CategoryRepository;
+use Raven\Repository\ChannelRepository;
+use Raven\Repository\GroupRepository;
+use Raven\Repository\PageRepository;
+use Raven\Repository\RedirectRepository;
 use Raven\Repository\TagRepository;
+use Raven\Repository\UserRepository;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
@@ -197,16 +202,16 @@ final class PanelListProfilerRunner
      */
     private function createTempSuperUser(array $rvn): void
     {
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
+        $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         // Admin group is canonical ID 1; keep slug lookup fallback so older local
         // installs that renamed stock labels still resolve the profiling user role.
-        $superGroupId = $service('group')->idBySlug('admin') ?? 1;
+        $superGroupId = $groupRepo->idBySlug('admin') ?? 1;
 
         $this->tempUsername = 'codex_profile_' . $this->runId;
         $this->tempPassword = 'CodexProfile!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $service('user')->save([
+        $this->tempUserId = (int) $userRepo->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Profile ' . $this->runId,
@@ -231,9 +236,8 @@ final class PanelListProfilerRunner
         }
 
         $rvn = require $this->root . '/private/raven.php';
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
-        $service('user')->deleteById($this->tempUserId);
+        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo->deleteById($this->tempUserId);
         $this->events[] = 'temp_user_deleted=' . $this->tempUserId;
     }
 
@@ -271,15 +275,14 @@ final class PanelListProfilerRunner
      */
     private function captureHttpPanelListTraces(array $rvn): void
     {
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
-        $channelRepo = $service('channel');
-        $pageRepo = $service('page');
-        $redirectRepo = $service('redirect');
-        $groupRepo = $service('group');
-        $userRepo = $service('user');
         $categoryEnabled = $this->featureEnabled($rvn, 'category.enabled', true);
         $tagEnabled = $this->featureEnabled($rvn, 'tag.enabled', true);
+        // Build repos directly; the shared bootstrap service map was removed.
+        $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+        $pageRepo = new PageRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo, $categoryEnabled, $tagEnabled);
+        $redirectRepo = new RedirectRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
+        $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $categoryRepo = $categoryEnabled ? $this->categoryRepository($rvn) : null;
         $tagRepo = $tagEnabled ? $this->tagRepository($rvn) : null;
 
@@ -413,15 +416,14 @@ final class PanelListProfilerRunner
      */
     private function captureFlowComparisons(array $rvn): void
     {
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
-        $channelRepo = $service('channel');
-        $pageRepo = $service('page');
-        $redirectRepo = $service('redirect');
-        $groupRepo = $service('group');
-        $userRepo = $service('user');
         $categoryEnabled = $this->featureEnabled($rvn, 'category.enabled', true);
         $tagEnabled = $this->featureEnabled($rvn, 'tag.enabled', true);
+        // Build repos directly; the shared bootstrap service map was removed.
+        $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+        $pageRepo = new PageRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo, $categoryEnabled, $tagEnabled);
+        $redirectRepo = new RedirectRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
+        $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $categoryRepo = $categoryEnabled ? $this->categoryRepository($rvn) : null;
         $tagRepo = $tagEnabled ? $this->tagRepository($rvn) : null;
 

@@ -23,11 +23,7 @@ use Raven\Lib\Session\SessionCookiePolicy;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Repository\ChannelRepository;
-use Raven\Repository\GroupRepository;
-use Raven\Repository\PageImageRepository;
 use Raven\Repository\PageRepository;
-use Raven\Repository\RedirectRepository;
-use Raven\Repository\UserRepository;
 
 /**
  * Shared bootstrap for both web roots.
@@ -126,42 +122,6 @@ return (static function (): array {
     $loggingConfig = (array) $config->get('logging', []);
     $extensionBootstrapResolver = new ExtensionBootstrapContractResolver();
 
-    $serviceCache = [];
-    $serviceFactories = [
-        'channel' => static fn (): ChannelRepository => new ChannelRepository($rvnDb, $driver, $prefix, $root . '/private/dat/channel'),
-        'group' => static fn (): GroupRepository => new GroupRepository($rvnDb, $driver, $prefix),
-        'page_images' => static fn (): PageImageRepository => new PageImageRepository($rvnDb, $driver, $prefix),
-        'page' => static function () use ($rvnDb, $driver, $prefix, $categoryEnabled, $tagEnabled, &$serviceFactories, &$serviceCache): PageRepository {
-            if (!isset($serviceCache['channel'])) {
-                $serviceCache['channel'] = $serviceFactories['channel']();
-            }
-
-            /** @var ChannelRepository $channelRepo */
-            $channelRepo = $serviceCache['channel'];
-            return new PageRepository($rvnDb, $driver, $prefix, $channelRepo, $categoryEnabled, $tagEnabled);
-        },
-        'redirect' => static function () use ($rvnDb, $driver, $prefix, &$serviceFactories, &$serviceCache): RedirectRepository {
-            if (!isset($serviceCache['channel'])) {
-                $serviceCache['channel'] = $serviceFactories['channel']();
-            }
-
-            /** @var ChannelRepository $channelRepo */
-            $channelRepo = $serviceCache['channel'];
-            return new RedirectRepository($rvnDb, $driver, $prefix, $channelRepo);
-        },
-        'user' => static fn (): UserRepository => new UserRepository($authDb, $rvnDb, $driver, $prefix),
-    ];
-    $service = static function (string $name) use (&$serviceCache, $serviceFactories): mixed {
-        if (!array_key_exists($name, $serviceFactories)) {
-            throw new InvalidArgumentException('Unknown Raven bootstrap service "' . $name . '".');
-        }
-
-        if (!array_key_exists($name, $serviceCache)) {
-            $serviceCache[$name] = $serviceFactories[$name]();
-        }
-
-        return $serviceCache[$name];
-    };
     $logger = null;
     $loggerResolver = static function () use (&$logger, $rvnDb, $driver, $prefix, $loggingConfig): EventLogger {
         if (!$logger instanceof EventLogger) {
@@ -217,7 +177,6 @@ return (static function (): array {
         'auth' => $auth,
         'input' => $input,
         'csrf' => new Csrf(),
-        'service' => $service,
         'enabled_extension_directories' => array_keys($extensionManifests),
         'enabled_extension_manifests' => $extensionManifests,
         'extension_storage' => $extensionStorage,
@@ -282,10 +241,12 @@ return (static function (): array {
     // after each response (throttled to 60 s) when site.scheduler is true, so this job runs on
     // request traffic without a server crontab. Operators may disable site.scheduler and point
     // their own crontab at rvn-cron instead.
-    $scheduler->registerJob('core', 'page-schedule', 60, static function () use ($service): void {
-        /** @var PageRepository $page */
-        $page = $service('page');
-        $page->applySchedule();
+    $scheduler->registerJob('core', 'page-schedule', 60, static function () use ($rvnDb, $driver, $prefix, $root, $categoryEnabled, $tagEnabled): void {
+        // Build repos directly here — the shared bootstrap service map was removed,
+        // so scheduler jobs own their own lightweight repo construction.
+        $channelRepo = new ChannelRepository($rvnDb, $driver, $prefix, $root . '/private/dat/channel');
+        $pageRepo = new PageRepository($rvnDb, $driver, $prefix, $channelRepo, $categoryEnabled, $tagEnabled);
+        $pageRepo->applySchedule();
     });
 
     // Built-in core job: prune event log entries older than the configured retention period.

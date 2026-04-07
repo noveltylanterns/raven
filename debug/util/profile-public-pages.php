@@ -93,18 +93,18 @@ final class PublicRouteProfilerRunner
     private function buildScenarios(): array
     {
         $rvn = $this->bootstrapApp('/');
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
-        /** @var ChannelRepository $channelRepo */
-        $channelRepo = $service('channel');
-        /** @var PageRepository $pages */
-        $pages = $service('page');
-        /** @var UserRepository $users */
-        $users = $service('user');
-        /** @var GroupRepository $groups */
-        $groups = $service('group');
         /** @var array<string, mixed> $configSnapshot */
         $configSnapshot = $rvn['config']->all();
+        // Build repos directly; the shared bootstrap service map was removed.
+        $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+        $categoryEnabled = (bool) ($configSnapshot['category']['enabled'] ?? false);
+        $tagEnabled = (bool) ($configSnapshot['tag']['enabled'] ?? false);
+        /** @var PageRepository $pages */
+        $pages = new PageRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo, $categoryEnabled, $tagEnabled);
+        /** @var UserRepository $users */
+        $users = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        /** @var GroupRepository $groups */
+        $groups = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
 
         $categoryPrefix = $this->normalizedOptionalPrefix(
             (string) (($configSnapshot['category']['prefix'] ?? 'cat')),

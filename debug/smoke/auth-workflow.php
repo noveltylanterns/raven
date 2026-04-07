@@ -9,6 +9,9 @@
 
 declare(strict_types=1);
 
+use Raven\Repository\GroupRepository;
+use Raven\Repository\UserRepository;
+
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
 
@@ -261,17 +264,17 @@ final class AuthWorkflowSmokeRunner
     private function createTempTwoFactorUser(): void
     {
         $rvn = require $this->root . '/private/raven.php';
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
+        $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
 
         // Admin group is canonical ID 1; slug lookup kept as fallback.
-        $superGroupId = $service('group')->idBySlug('admin') ?? 1;
+        $superGroupId = $groupRepo->idBySlug('admin') ?? 1;
 
         $this->tempUsername = 'codex_auth_' . $this->runId;
         $this->tempEmail = $this->tempUsername . '@example.test';
         $this->tempPassword = 'CodexAuth!' . $this->runId . 'Aa';
 
-        $this->tempUserId = (int) $service('user')->save([
+        $this->tempUserId = (int) $userRepo->save([
             'id' => null,
             'username' => $this->tempUsername,
             'display_name' => 'Codex Auth ' . $this->runId,
@@ -322,9 +325,8 @@ final class AuthWorkflowSmokeRunner
         }
 
         $rvn = require $this->root . '/private/raven.php';
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
-        $service('user')->deleteById($this->tempUserId);
+        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }
 

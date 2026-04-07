@@ -2,6 +2,14 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 7, 2026 — raven.php service map removal
+
+- **`$rvn['service']` compatibility lane pruned**: removed `$serviceCache`, `$serviceFactories`, `$service` closure, and the `'service'` container key from `private/raven.php`. The generic service map was the last compatibility shim from before the web bootstrap split.
+- **CLI commands migrated**: all three repository consumers in `private/lib/Shell/raven_cli.php` (`rvn-chan`, `rvn-group`, `rvn-redir`) now construct `ChannelRepository`, `GroupRepository`, and `RedirectRepository` directly from the core container instead of going through the generic service resolver.
+- **Scheduler job inlined**: the `page-schedule` core job in `private/raven.php` now builds its own `ChannelRepository` + `PageRepository` directly instead of calling through `$service('page')`.
+- **Debug tooling migrated**: eight debug smoke/util files (`debug-toolbar`, `auth-workflow`, `security`, `security-aggressive`, `panel-permissions`, `docs`, `contact-workflow`, `profile-panel-lists`, `profile-public-pages`) updated to direct repo construction using `$rvn['db']`, `$rvn['auth_db']`, `$rvn['driver']`, `$rvn['prefix']`.
+- **Unused imports removed**: `GroupRepository`, `PageImageRepository`, `RedirectRepository`, `UserRepository` dropped from `private/raven.php`; `ChannelRepository` and `PageRepository` kept for the scheduler job.
+
 ### April 7, 2026 — panel controller removal
 
 - **Panel split completed on the panel side**: removed `private/sys/Controller/PanelController.php`, deleted the last dead legacy capture from `panel/bootstrap.php`, and confirmed `panel/index.php` dispatch stays on the split `DashboardController`, `ContentController`, `TaxonomyController`, `RedirectController`, `UserController`, `GroupController`, `PreferencesController`, and `SystemController` factories.

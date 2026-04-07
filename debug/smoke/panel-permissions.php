@@ -31,6 +31,8 @@ use Raven\Lib\Extension\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionScaffoldService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Repository\GroupRepository;
+use Raven\Repository\UserRepository;
 
 final class PanelPermissionsSmokeRunner
 {
@@ -441,10 +443,10 @@ PHP;
     private function createUserWithMask(string $suffix, int $mask): array
     {
         $rvn = require $this->root . '/private/raven.php';
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
+        $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $groupSlug = 'nav-smoke-' . $suffix . '-' . $this->runId;
-        $groupId = (int) $service('group')->save([
+        $groupId = (int) $groupRepo->save([
             'id' => null,
             'name' => 'Nav Smoke ' . $suffix . ' ' . $this->runId,
             'slug' => $groupSlug,
@@ -458,7 +460,7 @@ PHP;
         $email = $username . '@example.test';
         $password = 'NavSmoke!' . $this->runId . 'Aa';
 
-        $userId = (int) $service('user')->save([
+        $userId = (int) $userRepo->save([
             'id' => null,
             'username' => $username,
             'display_name' => 'Nav Smoke ' . $suffix,
@@ -940,11 +942,10 @@ PHP;
         }
 
         $rvn = require $this->root . '/private/raven.php';
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
+        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         foreach (array_reverse($this->createdUsers) as $userId) {
             try {
-                $service('user')->deleteById((int) $userId);
+                $userRepo->deleteById((int) $userId);
             } catch (\Throwable) {
             }
         }
@@ -957,11 +958,10 @@ PHP;
         }
 
         $rvn = require $this->root . '/private/raven.php';
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
+        $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         foreach (array_reverse($this->createdGroups) as $groupId) {
             try {
-                $service('group')->deleteById((int) $groupId);
+                $groupRepo->deleteById((int) $groupId);
             } catch (\Throwable) {
             }
         }
