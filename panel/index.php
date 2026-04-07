@@ -64,6 +64,13 @@ $panelUserController = is_callable($rvn['panel_user_controller'] ?? null)
         throw new RuntimeException('Panel user controller factory is unavailable.');
     };
 
+/** @var callable(): object $panelGroupController */
+$panelGroupController = is_callable($rvn['panel_group_controller'] ?? null)
+    ? $rvn['panel_group_controller']
+    : static function (): object {
+        throw new RuntimeException('Panel group controller factory is unavailable.');
+    };
+
 /** @var callable(): array<string, mixed> $initializePanelRuntime */
 $initializePanelRuntime = is_callable($rvn['initialize_panel_runtime'] ?? null)
     ? $rvn['initialize_panel_runtime']
@@ -842,15 +849,15 @@ $router->add('POST', '/user/invites/delete', static function () use ($panelUserC
     $panelUserController()->userInvitesDelete($_POST);
 });
 
-$router->add('GET', '/group', static function () use ($panelController): void {
-    $panelController()->groupList();
+$router->add('GET', '/group', static function () use ($panelGroupController): void {
+    $panelGroupController()->groupList();
 });
 
-$router->add('GET', '/group/edit', static function () use ($panelController): void {
-    $panelController()->groupEdit(null);
+$router->add('GET', '/group/edit', static function () use ($panelGroupController): void {
+    $panelGroupController()->groupEdit(null);
 });
 
-$router->add('GET', '/group/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+$router->add('GET', '/group/edit/{id}', static function (array $params) use ($panelGroupController, $rvn): void {
     $id = $rvn['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
@@ -859,15 +866,15 @@ $router->add('GET', '/group/edit/{id}', static function (array $params) use ($pa
         return;
     }
 
-    $panelController()->groupEdit($id);
+    $panelGroupController()->groupEdit($id);
 });
 
-$router->add('POST', '/group/save', static function () use ($panelController): void {
-    $panelController()->groupSave($_POST, $_FILES);
+$router->add('POST', '/group/save', static function () use ($panelGroupController): void {
+    $panelGroupController()->groupSave($_POST, $_FILES);
 });
 
-$router->add('POST', '/group/delete', static function () use ($panelController): void {
-    $panelController()->groupDelete($_POST);
+$router->add('POST', '/group/delete', static function () use ($panelGroupController): void {
+    $panelGroupController()->groupDelete($_POST);
 });
 
 $router->add('GET', '/preferences', static function () use ($panelController): void {

@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 use Raven\Controller\AuthController;
 use Raven\Controller\Panel\DashboardController;
+use Raven\Controller\Panel\GroupController;
 use Raven\Controller\Panel\RequestContext;
 use Raven\Controller\Panel\TaxonomyController;
 use Raven\Controller\Panel\UserController;
@@ -19,12 +20,15 @@ use Raven\Core\Media\PageImageManager;
 use Raven\Core\View;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelInvitePolicyService;
+use Raven\Lib\Auth\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Config\PanelMediaConfigService;
 use Raven\Lib\Http\SessionFlash;
+use Raven\Lib\Http\UploadFileSetNormalizer;
 use Raven\Lib\Log\EventLogger;
 use Raven\Lib\Media\AvatarUploadService;
+use Raven\Lib\Media\TaxonomyImageService;
 use Raven\Lib\Media\UserMediaPathService;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Profile\ProfileContactService;
@@ -55,6 +59,7 @@ return static function (array $rvn): array {
 
     $authController = null;
     $dashboardController = null;
+    $groupController = null;
     $panelController = null;
     $panelRequestContext = null;
     $panelRuntime = null;
@@ -384,6 +389,31 @@ return static function (array $rvn): array {
     $rvn['panel_domain_system'] = $panelSystemDomain;
 
     /**
+     * Builds a session-scoped extension permission map for the current panel user.
+     *
+     * Guests and unauthenticated requests keep the immutable stock/guest-only
+     * permission surface, so extension permission metadata resolves to empty.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    $rvn['panel_permission_map_provider'] = static function () use (&$panelController, &$rvn): array {
+        if (($rvn['auth']->userId() ?? null) === null) {
+            return [];
+        }
+
+        if ($panelController instanceof PanelController) {
+            return $panelController->extensionPanelPermissionMapForDirectories();
+        }
+
+        $panelControllerFactory = $rvn['panel_controller'] ?? null;
+        if (is_callable($panelControllerFactory)) {
+            return $panelControllerFactory()->extensionPanelPermissionMapForDirectories();
+        }
+
+        return [];
+    };
+
+    /**
      * Builds the auth controller on first use so login routes avoid panel-only dependencies.
      */
     $rvn['auth_controller'] = static function () use (&$authController, $rvn): AuthController {
@@ -505,6 +535,40 @@ return static function (array $rvn): array {
         );
 
         return $userController;
+    };
+
+    /**
+     * Builds the split group controller on first use.
+     */
+    $rvn['panel_group_controller'] = static function () use (&$groupController, &$rvn, $panelUserDomain): GroupController {
+        if ($groupController instanceof GroupController) {
+            return $groupController;
+        }
+
+        /** @var callable(): RequestContext $requestContextFactory */
+        $requestContextFactory = $rvn['panel_request_context'];
+        $groupDomain = $panelUserDomain();
+        $groupController = new GroupController(
+            $requestContextFactory(),
+            $rvn['input'],
+            $groupDomain['group'],
+            new RouteConfigService($rvn['config'], $rvn['input']),
+            new PanelEditorTabService($rvn['input']),
+            new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
+            new PanelPermissionDefinitionCatalog(),
+            new UploadFileSetNormalizer(),
+            static function () use (&$rvn): array {
+                $provider = $rvn['panel_permission_map_provider'] ?? null;
+                if (!is_callable($provider)) {
+                    return [];
+                }
+
+                $map = $provider();
+                return is_array($map) ? $map : [];
+            }
+        );
+
+        return $groupController;
     };
 
     /**
