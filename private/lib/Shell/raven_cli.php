@@ -13,6 +13,8 @@ use Raven\Core\Config;
 use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Extension\ExtensionRegistry;
 use Raven\Core\Theme\PublicThemeRegistry;
+use Raven\Repository\CategoryRepository;
+use Raven\Repository\TagRepository;
 
 final class RavenCliContext
 {
@@ -1070,9 +1072,11 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
 
     try {
         $rvn = $context->rvn();
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
-        $repo = $service('category');
+        $repo = new CategoryRepository(
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix']
+        );
 
         if ($action === 'list') {
             $rows = $repo->listAll();
@@ -1228,9 +1232,11 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
 
     try {
         $rvn = $context->rvn();
-        /** @var callable(string): mixed $service */
-        $service = $rvn['service'];
-        $repo = $service('tag');
+        $repo = new TagRepository(
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix']
+        );
 
         if ($action === 'list') {
             $rows = $repo->listAll();

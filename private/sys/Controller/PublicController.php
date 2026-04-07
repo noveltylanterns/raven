@@ -48,6 +48,7 @@ use Raven\Lib\View\PublicTemplatePipeline;
 use Raven\Lib\View\PublicTemplateResolver;
 use Raven\Core\View;
 use Raven\Core\View\TemplateTagEngine;
+use Raven\Repository\ChannelRepository;
 use Raven\Repository\GroupRepository;
 use Raven\Repository\InviteTokenRepository;
 use Raven\Repository\PageImageRepository;
@@ -64,11 +65,13 @@ final class PublicController
     private View $view;
     private Config $config;
     private AuthService $auth;
+    private ChannelRepository $channelRepo;
     private GroupRepository $groupRepo;
     private PageImageRepository $pageImages;
     private PageRepository $pageRepo;
     private RedirectRepository $redirectRepo;
-    private TaxonomyLookupRepository $taxonomyLookupRepo;
+    private ?TaxonomyLookupRepository $taxonomyLookupRepo = null;
+    private Closure $taxonomyLookupRepoResolver;
     private UserRepository $userRepo;
     private ?InviteTokenRepository $inviteTokens = null;
     private ?Closure $inviteTokensResolver = null;
@@ -112,11 +115,12 @@ final class PublicController
      * @param View $view Shared view renderer for public templates.
      * @param Config $config Runtime configuration reader for route and theme behavior.
      * @param AuthService $auth Auth/session service used by login and gated public helpers.
+     * @param ChannelRepository $channelRepo Channel repository used for channel-route slug lookups without loading taxonomy stacks.
      * @param GroupRepository $groupRepo Group repository for public group-route lookups.
      * @param PageImageRepository $pageImages Page image repository for cover/gallery public rendering.
      * @param PageRepository $pageRepo Page repository for homepage/page/feed queries.
      * @param RedirectRepository $redirectRepo Redirect repository for public redirect fallbacks.
-     * @param TaxonomyLookupRepository $taxonomyLookupRepo Taxonomy lookup repository for channel/category/tag route resolution.
+     * @param callable(): TaxonomyLookupRepository $taxonomyLookupRepoResolver Taxonomy lookup repository resolver for channel/category/tag route resolution.
      * @param UserRepository $userRepo User repository for registration and public profile routes.
      * @param callable(): InviteTokenRepository $inviteTokensResolver Invite-token repository resolver for invite-only registration flows.
      * @param InputSanitizer $input Shared request input sanitizer for all public actions.
@@ -128,11 +132,12 @@ final class PublicController
         View $view,
         Config $config,
         AuthService $auth,
+        ChannelRepository $channelRepo,
         GroupRepository $groupRepo,
         PageImageRepository $pageImages,
         PageRepository $pageRepo,
         RedirectRepository $redirectRepo,
-        TaxonomyLookupRepository $taxonomyLookupRepo,
+        callable $taxonomyLookupRepoResolver,
         UserRepository $userRepo,
         callable $inviteTokensResolver,
         InputSanitizer $input,
@@ -143,11 +148,12 @@ final class PublicController
         $this->view = $view;
         $this->config = $config;
         $this->auth = $auth;
+        $this->channelRepo = $channelRepo;
         $this->groupRepo = $groupRepo;
         $this->pageImages = $pageImages;
         $this->pageRepo = $pageRepo;
         $this->redirectRepo = $redirectRepo;
-        $this->taxonomyLookupRepo = $taxonomyLookupRepo;
+        $this->taxonomyLookupRepoResolver = Closure::fromCallable($taxonomyLookupRepoResolver);
         $this->userRepo = $userRepo;
         $this->inviteTokensResolver = Closure::fromCallable($inviteTokensResolver);
         $this->input = $input;
@@ -158,6 +164,27 @@ final class PublicController
             ? Closure::fromCallable($extensionServicesProvider)
             : null;
         $this->templateTags = new TemplateTagEngine(dirname(__DIR__, 3) . '/.tmp/template_tag_cache');
+    }
+
+    /**
+     * Returns the taxonomy lookup repository on first use so ordinary public
+     * pages do not instantiate category/tag lookup storage unless routing needs it.
+     *
+     * @return TaxonomyLookupRepository Taxonomy lookup repository.
+     */
+    private function taxonomyLookupRepo(): TaxonomyLookupRepository
+    {
+        if ($this->taxonomyLookupRepo instanceof TaxonomyLookupRepository) {
+            return $this->taxonomyLookupRepo;
+        }
+
+        $taxonomyLookupRepo = ($this->taxonomyLookupRepoResolver)();
+        if (!$taxonomyLookupRepo instanceof TaxonomyLookupRepository) {
+            throw new \RuntimeException('Public taxonomy lookup repository resolver returned an invalid value.');
+        }
+
+        $this->taxonomyLookupRepo = $taxonomyLookupRepo;
+        return $this->taxonomyLookupRepo;
     }
 
     /**
@@ -224,7 +251,7 @@ final class PublicController
             return;
         }
 
-        $channel = $this->taxonomyLookupRepo->findChannelBySlug($channelSlug);
+        $channel = $this->channelRepo->findBySlug($channelSlug);
 
         $page = $this->renderPageContentBlocks($page);
         $page = $this->decoratePageForTemplate($page);
@@ -261,7 +288,7 @@ final class PublicController
         $channelWordSeparator = 'inherit';
 
         if ($channelSlug !== null) {
-            $channel = $this->taxonomyLookupRepo->findChannelBySlug($channelSlug);
+            $channel = $this->channelRepo->findBySlug($channelSlug);
             if ($channel === null) {
                 if ($this->tryRedirect($requestedSlug, $channelSlug)) {
                     return;
@@ -462,7 +489,7 @@ final class PublicController
                 return;
             }
 
-            $channel = $this->taxonomyLookupRepo->findChannelBySlug($normalizedChannelSlug);
+            $channel = $this->channelRepo->findBySlug($normalizedChannelSlug);
             if (!is_array($channel) || !$this->channelFeedEnabled($channel)) {
                 $this->notFound();
                 return;
@@ -554,7 +581,7 @@ final class PublicController
                 return;
             }
 
-            $category = $this->taxonomyLookupRepo->findCategoryBySlug($normalizedSlug);
+            $category = $this->taxonomyLookupRepo()->findCategoryBySlug($normalizedSlug);
             if (!is_array($category)) {
                 $this->notFound();
                 return;
@@ -571,7 +598,7 @@ final class PublicController
                 return;
             }
 
-            $tag = $this->taxonomyLookupRepo->findTagBySlug($normalizedSlug);
+            $tag = $this->taxonomyLookupRepo()->findTagBySlug($normalizedSlug);
             if (!is_array($tag)) {
                 $this->notFound();
                 return;
@@ -725,7 +752,7 @@ final class PublicController
             return 'Root';
         }
 
-        $channel = $this->taxonomyLookupRepo->findChannelBySlug($normalized);
+        $channel = $this->channelRepo->findBySlug($normalized);
         if (!is_array($channel)) {
             return $normalized;
         }
@@ -805,7 +832,7 @@ final class PublicController
             return;
         }
 
-        $category = $this->taxonomyLookupRepo->findCategoryBySlug($categorySlug);
+        $category = $this->taxonomyLookupRepo()->findCategoryBySlug($categorySlug);
 
         if ($category === null) {
             $this->notFound();
@@ -860,7 +887,7 @@ final class PublicController
             return;
         }
 
-        $tag = $this->taxonomyLookupRepo->findTagBySlug($tagSlug);
+        $tag = $this->taxonomyLookupRepo()->findTagBySlug($tagSlug);
 
         if ($tag === null) {
             $this->notFound();

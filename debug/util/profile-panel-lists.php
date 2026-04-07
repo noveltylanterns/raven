@@ -9,7 +9,10 @@
 
 declare(strict_types=1);
 
+use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Diagnostics\RequestProfiler;
+use Raven\Repository\CategoryRepository;
+use Raven\Repository\TagRepository;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
@@ -147,6 +150,49 @@ final class PanelListProfilerRunner
     }
 
     /**
+     * Builds category storage only when profiler routes actually need category data.
+     *
+     * @param array<string, mixed> $rvn
+     * @return CategoryRepository
+     */
+    private function categoryRepository(array $rvn): CategoryRepository
+    {
+        return new CategoryRepository(
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix']
+        );
+    }
+
+    /**
+     * Builds tag storage only when profiler routes actually need tag data.
+     *
+     * @param array<string, mixed> $rvn
+     * @return TagRepository
+     */
+    private function tagRepository(array $rvn): TagRepository
+    {
+        return new TagRepository(
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix']
+        );
+    }
+
+    /**
+     * Reads one boolean feature flag using the same config parsing as runtime bootstrap.
+     *
+     * @param array<string, mixed> $rvn
+     * @param string $key Dot-notated config path.
+     * @param bool $default Default when the key is missing.
+     * @return bool
+     */
+    private function featureEnabled(array $rvn, string $key, bool $default = true): bool
+    {
+        return ConfigValueParser::bool($rvn['config']->get($key, $default), $default);
+    }
+
+    /**
      * @param array<string, mixed> $rvn
      */
     private function createTempSuperUser(array $rvn): void
@@ -228,20 +274,20 @@ final class PanelListProfilerRunner
         /** @var callable(string): mixed $service */
         $service = $rvn['service'];
         $channelRepo = $service('channel');
-        $categoryRepo = $service('category');
-        $tagRepo = $service('tag');
         $pageRepo = $service('page');
         $redirectRepo = $service('redirect');
         $groupRepo = $service('group');
         $userRepo = $service('user');
+        $categoryEnabled = $this->featureEnabled($rvn, 'category.enabled', true);
+        $tagEnabled = $this->featureEnabled($rvn, 'tag.enabled', true);
+        $categoryRepo = $categoryEnabled ? $this->categoryRepository($rvn) : null;
+        $tagRepo = $tagEnabled ? $this->tagRepository($rvn) : null;
 
         $routes = [
             'dashboard' => '/' . $this->panelPath,
             'page' => '/' . $this->panelPath . '/page',
             'page_create' => '/' . $this->panelPath . '/page/edit',
             'channel' => '/' . $this->panelPath . '/channel',
-            'category' => '/' . $this->panelPath . '/category',
-            'tag' => '/' . $this->panelPath . '/tag',
             'redirect' => '/' . $this->panelPath . '/redirect',
             'group' => '/' . $this->panelPath . '/group',
             'user' => '/' . $this->panelPath . '/user',
@@ -251,6 +297,13 @@ final class PanelListProfilerRunner
             'updates' => '/' . $this->panelPath . '/updates',
         ];
 
+        if ($categoryEnabled) {
+            $routes['category'] = '/' . $this->panelPath . '/category';
+        }
+        if ($tagEnabled) {
+            $routes['tag'] = '/' . $this->panelPath . '/tag';
+        }
+
         $channelOptions = $channelRepo->listOptions();
         if ($channelOptions !== []) {
             $channelSlug = trim((string) ($channelOptions[0]['slug'] ?? ''));
@@ -259,7 +312,7 @@ final class PanelListProfilerRunner
             }
         }
 
-        $categoryOptions = $categoryRepo->listOptions();
+        $categoryOptions = $categoryRepo instanceof CategoryRepository ? $categoryRepo->listOptions() : [];
         if ($categoryOptions !== []) {
             $categoryId = (int) ($categoryOptions[0]['id'] ?? 0);
             if ($categoryId > 0) {
@@ -267,7 +320,7 @@ final class PanelListProfilerRunner
             }
         }
 
-        $tagOptions = $tagRepo->listOptions();
+        $tagOptions = $tagRepo instanceof TagRepository ? $tagRepo->listOptions() : [];
         if ($tagOptions !== []) {
             $tagId = (int) ($tagOptions[0]['id'] ?? 0);
             if ($tagId > 0) {
@@ -363,12 +416,14 @@ final class PanelListProfilerRunner
         /** @var callable(string): mixed $service */
         $service = $rvn['service'];
         $channelRepo = $service('channel');
-        $categoryRepo = $service('category');
-        $tagRepo = $service('tag');
         $pageRepo = $service('page');
         $redirectRepo = $service('redirect');
         $groupRepo = $service('group');
         $userRepo = $service('user');
+        $categoryEnabled = $this->featureEnabled($rvn, 'category.enabled', true);
+        $tagEnabled = $this->featureEnabled($rvn, 'tag.enabled', true);
+        $categoryRepo = $categoryEnabled ? $this->categoryRepository($rvn) : null;
+        $tagRepo = $tagEnabled ? $this->tagRepository($rvn) : null;
 
         $channelSlug = null;
         $categoryId = null;
@@ -382,14 +437,14 @@ final class PanelListProfilerRunner
                 $channelSlug = $value;
             }
         }
-        $categoryOptions = $categoryRepo->listOptions();
+        $categoryOptions = $categoryRepo instanceof CategoryRepository ? $categoryRepo->listOptions() : [];
         if ($categoryOptions !== []) {
             $value = (int) ($categoryOptions[0]['id'] ?? 0);
             if ($value > 0) {
                 $categoryId = $value;
             }
         }
-        $tagOptions = $tagRepo->listOptions();
+        $tagOptions = $tagRepo instanceof TagRepository ? $tagRepo->listOptions() : [];
         if ($tagOptions !== []) {
             $value = (int) ($tagOptions[0]['id'] ?? 0);
             if ($value > 0) {
@@ -411,12 +466,17 @@ final class PanelListProfilerRunner
                 $pageRepo->taxonomyAssignmentIdsByPage($pageIds);
             },
             'channel' => static fn () => $channelRepo->listAll(),
-            'category' => static fn () => $categoryRepo->listAll(),
-            'tag' => static fn () => $tagRepo->listAll(),
             'redirect' => static fn () => $redirectRepo->listAll(),
             'groups' => static fn () => $groupRepo->listAll(),
             'users' => static fn () => $userRepo->listAll(),
         ];
+
+        if ($categoryRepo instanceof CategoryRepository) {
+            $legacyFlows['category'] = static fn () => $categoryRepo->listAll();
+        }
+        if ($tagRepo instanceof TagRepository) {
+            $legacyFlows['tag'] = static fn () => $tagRepo->listAll();
+        }
 
         if ($channelSlug !== null || $categoryId !== null || $tagId !== null) {
             $legacyFlows['pages_prefiltered'] = static function () use ($pageRepo): void {
@@ -440,14 +500,6 @@ final class PanelListProfilerRunner
                 $channelRepo->countForPanel();
                 $channelRepo->listForPanel(50, 0);
             },
-            'categories' => static function () use ($categoryRepo): void {
-                $categoryRepo->countForPanel();
-                $categoryRepo->listForPanel(50, 0);
-            },
-            'tags' => static function () use ($tagRepo): void {
-                $tagRepo->countForPanel();
-                $tagRepo->listForPanel(50, 0);
-            },
             'redirects' => static function () use ($redirectRepo): void {
                 $redirectRepo->countForPanel();
                 $redirectRepo->listForPanel(50, 0);
@@ -461,6 +513,19 @@ final class PanelListProfilerRunner
                 $userRepo->listForPanel(50, 0, null);
             },
         ];
+
+        if ($categoryRepo instanceof CategoryRepository) {
+            $currentFlows['categories'] = static function () use ($categoryRepo): void {
+                $categoryRepo->countForPanel();
+                $categoryRepo->listForPanel(50, 0);
+            };
+        }
+        if ($tagRepo instanceof TagRepository) {
+            $currentFlows['tags'] = static function () use ($tagRepo): void {
+                $tagRepo->countForPanel();
+                $tagRepo->listForPanel(50, 0);
+            };
+        }
 
         if ($channelSlug !== null || $categoryId !== null || $tagId !== null) {
             $currentFlows['pages_prefiltered'] = static function () use ($pageRepo, $channelSlug, $categoryId, $tagId): void {

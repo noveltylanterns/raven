@@ -23,14 +23,11 @@ use Raven\Lib\Scheduler\SchedulerRegistry;
 use Raven\Lib\Session\SessionCookiePolicy;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Repository\CategoryRepository;
 use Raven\Repository\ChannelRepository;
 use Raven\Repository\GroupRepository;
 use Raven\Repository\PageImageRepository;
 use Raven\Repository\PageRepository;
 use Raven\Repository\RedirectRepository;
-use Raven\Repository\TagRepository;
-use Raven\Repository\TaxonomyLookupRepository;
 use Raven\Repository\UserRepository;
 
 /**
@@ -132,7 +129,6 @@ return (static function (): array {
 
     $serviceCache = [];
     $serviceFactories = [
-        'category' => static fn (): CategoryRepository => new CategoryRepository($rvnDb, $driver, $prefix),
         'channel' => static fn (): ChannelRepository => new ChannelRepository($rvnDb, $driver, $prefix, $root . '/private/dat/channel'),
         'group' => static fn (): GroupRepository => new GroupRepository($rvnDb, $driver, $prefix),
         'page_images' => static fn (): PageImageRepository => new PageImageRepository($rvnDb, $driver, $prefix),
@@ -153,16 +149,6 @@ return (static function (): array {
             /** @var ChannelRepository $channelRepo */
             $channelRepo = $serviceCache['channel'];
             return new RedirectRepository($rvnDb, $driver, $prefix, $channelRepo);
-        },
-        'tag' => static fn (): TagRepository => new TagRepository($rvnDb, $driver, $prefix),
-        'taxonomy_lookup' => static function () use ($rvnDb, $driver, $prefix, &$serviceFactories, &$serviceCache): TaxonomyLookupRepository {
-            if (!isset($serviceCache['channel'])) {
-                $serviceCache['channel'] = $serviceFactories['channel']();
-            }
-
-            /** @var ChannelRepository $channelRepo */
-            $channelRepo = $serviceCache['channel'];
-            return new TaxonomyLookupRepository($rvnDb, $driver, $prefix, $channelRepo);
         },
         'user' => static fn (): UserRepository => new UserRepository($authDb, $rvnDb, $driver, $prefix),
     ];

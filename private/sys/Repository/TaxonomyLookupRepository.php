@@ -37,16 +37,6 @@ final class TaxonomyLookupRepository
     }
 
     /**
-     * Finds channel row by slug.
-     *
-     * @return array<string, mixed>|null
-     */
-    public function findChannelBySlug(string $slug): ?array
-    {
-        return $this->channelRepo->findBySlug($slug);
-    }
-
-    /**
      * Finds category row by slug.
      *
      * @return array<string, mixed>|null

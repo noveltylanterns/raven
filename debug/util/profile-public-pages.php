@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 use Raven\Controller\PublicController;
 use Raven\Lib\Diagnostics\RequestProfiler;
+use Raven\Repository\ChannelRepository;
 use Raven\Repository\GroupRepository;
 use Raven\Repository\PageRepository;
 use Raven\Repository\TaxonomyLookupRepository;
@@ -94,10 +95,10 @@ final class PublicRouteProfilerRunner
         $rvn = $this->bootstrapApp('/');
         /** @var callable(string): mixed $service */
         $service = $rvn['service'];
+        /** @var ChannelRepository $channelRepo */
+        $channelRepo = $service('channel');
         /** @var PageRepository $pages */
         $pages = $service('page');
-        /** @var TaxonomyLookupRepository $taxonomyLookup */
-        $taxonomyLookup = $service('taxonomy_lookup');
         /** @var UserRepository $users */
         $users = $service('user');
         /** @var GroupRepository $groups */
@@ -126,10 +127,20 @@ final class PublicRouteProfilerRunner
         $profileRoutesEnabled = $profilePrefix !== '' && in_array($profileMode, ['public_full', 'public_limited', 'private'], true);
         $groupRoutesEnabled = $groupPrefix !== '' && in_array($groupMode, ['public', 'private'], true);
 
-        $taxonomyRouteOptionSets = $taxonomyLookup->listRoutingInventoryData($categoryPrefix !== '', $tagPrefix !== '', true);
-        $channels = is_array($taxonomyRouteOptionSets['channel_options'] ?? null) ? $taxonomyRouteOptionSets['channel_options'] : [];
-        $categories = is_array($taxonomyRouteOptionSets['category_options_all'] ?? null) ? $taxonomyRouteOptionSets['category_options_all'] : [];
-        $tags = is_array($taxonomyRouteOptionSets['tag_options_all'] ?? null) ? $taxonomyRouteOptionSets['tag_options_all'] : [];
+        $channels = $channelRepo->listRoutingOptions();
+        $categories = [];
+        $tags = [];
+        if ($categoryPrefix !== '' || $tagPrefix !== '') {
+            $taxonomyLookup = new TaxonomyLookupRepository(
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix'],
+                $channelRepo
+            );
+            $taxonomyRouteOptionSets = $taxonomyLookup->listRoutingInventoryData($categoryPrefix !== '', $tagPrefix !== '', false);
+            $categories = is_array($taxonomyRouteOptionSets['category_options_all'] ?? null) ? $taxonomyRouteOptionSets['category_options_all'] : [];
+            $tags = is_array($taxonomyRouteOptionSets['tag_options_all'] ?? null) ? $taxonomyRouteOptionSets['tag_options_all'] : [];
+        }
         $pagesForRouting = $pages->listAllForRouting();
         $channelSlugById = [];
         foreach ($channels as $channel) {

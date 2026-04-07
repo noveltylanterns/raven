@@ -111,17 +111,20 @@ final class PanelController
     private PageImageRepository $pageImages;
     private ?PageImageManager $pageImageManager = null;
     private Closure $pageImageManagerResolver;
-    private CategoryRepository $categoryRepo;
+    private ?CategoryRepository $categoryRepo = null;
+    private Closure $categoryRepoResolver;
     private ?TaxonomySetRepository $categorySetRepo = null;
     private Closure $categorySetRepoResolver;
     private ChannelRepository $channelRepo;
     private GroupRepository $groupRepo;
     private PageRepository $pageRepo;
     private RedirectRepository $redirectRepo;
-    private TagRepository $tagRepo;
+    private ?TagRepository $tagRepo = null;
+    private Closure $tagRepoResolver;
     private ?TaxonomySetRepository $tagSetRepo = null;
     private Closure $tagSetRepoResolver;
-    private TaxonomyLookupRepository $taxonomyLookupRepo;
+    private ?TaxonomyLookupRepository $taxonomyLookupRepo = null;
+    private Closure $taxonomyLookupRepoResolver;
     private UserRepository $userRepo;
     private ?InviteTokenRepository $inviteTokens = null;
     private Closure $inviteTokensResolver;
@@ -172,6 +175,31 @@ final class PanelController
     private ?UpdateSourceResolver $updateSourceResolver = null;
     private ?UpdateWorkflowService $updateWorkflowService = null;
 
+    /**
+     * Initializes the panel controller with shared request services plus lazy
+     * repository resolvers for route-scoped panel features.
+     *
+     * @param View $view Shared panel view renderer.
+     * @param Config $config Runtime configuration reader for panel behavior.
+     * @param AuthService $auth Auth/session service for panel access gates.
+     * @param InputSanitizer $input Shared input sanitizer for panel requests.
+     * @param Csrf $csrf CSRF helper for panel forms and actions.
+     * @param PageImageRepository $pageImages Page-image repository for gallery persistence.
+     * @param callable $pageImageManagerResolver Lazy page-image manager resolver for media flows only.
+     * @param callable $categoryRepoResolver Lazy category repository resolver for category-aware routes only.
+     * @param callable $categorySetRepoResolver Lazy category-set repository resolver for set editors only.
+     * @param ChannelRepository $channelRepo Channel repository for routing/content panel flows.
+     * @param GroupRepository $groupRepo Group repository for account/group management routes.
+     * @param PageRepository $pageRepo Page repository for content management routes.
+     * @param RedirectRepository $redirectRepo Redirect repository for routing management routes.
+     * @param callable $tagRepoResolver Lazy tag repository resolver for tag-aware routes only.
+     * @param callable $tagSetRepoResolver Lazy tag-set repository resolver for set editors only.
+     * @param callable $taxonomyLookupRepoResolver Lazy taxonomy lookup resolver for routing/page-editor option sets.
+     * @param UserRepository $userRepo User repository for account routes.
+     * @param callable $inviteTokensResolver Lazy invite-token repository resolver for invite management only.
+     * @param callable $loggerResolver Lazy event logger resolver for log screens only.
+     * @return void
+     */
     public function __construct(
         View $view,
         Config $config,
@@ -180,15 +208,15 @@ final class PanelController
         Csrf $csrf,
         PageImageRepository $pageImages,
         callable $pageImageManagerResolver,
-        CategoryRepository $categoryRepo,
+        callable $categoryRepoResolver,
         callable $categorySetRepoResolver,
         ChannelRepository $channelRepo,
         GroupRepository $groupRepo,
         PageRepository $pageRepo,
         RedirectRepository $redirectRepo,
-        TagRepository $tagRepo,
+        callable $tagRepoResolver,
         callable $tagSetRepoResolver,
-        TaxonomyLookupRepository $taxonomyLookupRepo,
+        callable $taxonomyLookupRepoResolver,
         UserRepository $userRepo,
         callable $inviteTokensResolver,
         callable $loggerResolver
@@ -203,15 +231,15 @@ final class PanelController
         $this->identifierResolver = new LoginIdentifierResolver();
         $this->pageImages = $pageImages;
         $this->pageImageManagerResolver = Closure::fromCallable($pageImageManagerResolver);
-        $this->categoryRepo = $categoryRepo;
+        $this->categoryRepoResolver = Closure::fromCallable($categoryRepoResolver);
         $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
         $this->channelRepo = $channelRepo;
         $this->groupRepo = $groupRepo;
         $this->pageRepo = $pageRepo;
         $this->redirectRepo = $redirectRepo;
-        $this->tagRepo = $tagRepo;
+        $this->tagRepoResolver = Closure::fromCallable($tagRepoResolver);
         $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
-        $this->taxonomyLookupRepo = $taxonomyLookupRepo;
+        $this->taxonomyLookupRepoResolver = Closure::fromCallable($taxonomyLookupRepoResolver);
         $this->userRepo = $userRepo;
         $this->inviteTokensResolver = Closure::fromCallable($inviteTokensResolver);
         $this->loggerResolver = Closure::fromCallable($loggerResolver);
@@ -260,6 +288,27 @@ final class PanelController
     }
 
     /**
+     * Returns the category repository on first use so non-category panel flows
+     * avoid constructing taxonomy storage helpers entirely.
+     *
+     * @return CategoryRepository Category repository.
+     */
+    private function categoryRepo(): CategoryRepository
+    {
+        if ($this->categoryRepo instanceof CategoryRepository) {
+            return $this->categoryRepo;
+        }
+
+        $categoryRepo = ($this->categoryRepoResolver)();
+        if (!$categoryRepo instanceof CategoryRepository) {
+            throw new \RuntimeException('Panel category repository resolver returned an invalid value.');
+        }
+
+        $this->categoryRepo = $categoryRepo;
+        return $this->categoryRepo;
+    }
+
+    /**
      * Returns the tag-set repository on first use so non-taxonomy routes do not
      * instantiate file-backed taxonomy set storage.
      *
@@ -278,6 +327,109 @@ final class PanelController
 
         $this->tagSetRepo = $tagSetRepo;
         return $this->tagSetRepo;
+    }
+
+    /**
+     * Returns the tag repository on first use so non-tag panel flows avoid
+     * constructing taxonomy storage helpers entirely.
+     *
+     * @return TagRepository Tag repository.
+     */
+    private function tagRepo(): TagRepository
+    {
+        if ($this->tagRepo instanceof TagRepository) {
+            return $this->tagRepo;
+        }
+
+        $tagRepo = ($this->tagRepoResolver)();
+        if (!$tagRepo instanceof TagRepository) {
+            throw new \RuntimeException('Panel tag repository resolver returned an invalid value.');
+        }
+
+        $this->tagRepo = $tagRepo;
+        return $this->tagRepo;
+    }
+
+    /**
+     * Returns the taxonomy lookup repository on first use so category/tag
+     * option lookups stay off requests that do not touch taxonomy-aware UI.
+     *
+     * @return TaxonomyLookupRepository Taxonomy lookup repository.
+     */
+    private function taxonomyLookupRepo(): TaxonomyLookupRepository
+    {
+        if ($this->taxonomyLookupRepo instanceof TaxonomyLookupRepository) {
+            return $this->taxonomyLookupRepo;
+        }
+
+        $taxonomyLookupRepo = ($this->taxonomyLookupRepoResolver)();
+        if (!$taxonomyLookupRepo instanceof TaxonomyLookupRepository) {
+            throw new \RuntimeException('Panel taxonomy lookup repository resolver returned an invalid value.');
+        }
+
+        $this->taxonomyLookupRepo = $taxonomyLookupRepo;
+        return $this->taxonomyLookupRepo;
+    }
+
+    /**
+     * Returns page-editor taxonomy option sets, but skips taxonomy lookup
+     * storage entirely when both category and tag features are disabled.
+     *
+     * @param int $pageId Page id for selected taxonomy assignments, or 0 in create mode.
+     * @param bool $categoryEnabled Whether category UI is enabled for this request.
+     * @param bool $tagEnabled Whether tag UI is enabled for this request.
+     * @return array{
+     *   channel_options: array<int, array<string, mixed>>,
+     *   category_options_all: array<int, array<string, mixed>>,
+     *   tag_options_all: array<int, array<string, mixed>>,
+     *   category_options_selected: array<int, array<string, mixed>>,
+     *   tag_options_selected: array<int, array<string, mixed>>
+     * }
+     */
+    private function pageEditorTaxonomyOptionSets(int $pageId, bool $categoryEnabled, bool $tagEnabled): array
+    {
+        if (!$categoryEnabled && !$tagEnabled) {
+            return [
+                'channel_options' => $this->channelRepo->listOptions(),
+                'category_options_all' => [],
+                'tag_options_all' => [],
+                'category_options_selected' => [],
+                'tag_options_selected' => [],
+            ];
+        }
+
+        return $this->taxonomyLookupRepo()->listPageEditorOptionSets($pageId, $categoryEnabled, $tagEnabled);
+    }
+
+    /**
+     * Returns routing inventory taxonomy data, but avoids taxonomy lookup
+     * storage when category and tag public routes are both disabled.
+     *
+     * @param string $categoryPrefix Effective category route prefix for this request.
+     * @param string $tagPrefix Effective tag route prefix for this request.
+     * @return array{
+     *   channel_options: array<int, array<string, mixed>>,
+     *   category_options_all: array<int, array<string, mixed>>,
+     *   tag_options_all: array<int, array<string, mixed>>,
+     *   redirect_rows: array<int, array<string, mixed>>
+     * }
+     */
+    private function routingInventoryTaxonomyOptionSets(string $categoryPrefix, string $tagPrefix): array
+    {
+        $includeCategories = trim($categoryPrefix) !== '';
+        $includeTags = trim($tagPrefix) !== '';
+        if (!$includeCategories && !$includeTags) {
+            return [
+                'channel_options' => $this->channelRepo->listRoutingOptions(),
+                'category_options_all' => [],
+                'tag_options_all' => [],
+                // RedirectRepository already decorates rows with channel context, so
+                // routing inventory can skip the taxonomy lookup layer in this branch.
+                'redirect_rows' => $this->redirectRepo->listAll(),
+            ];
+        }
+
+        return $this->taxonomyLookupRepo()->listRoutingInventoryData($includeCategories, $includeTags, true);
     }
 
     /**
@@ -455,7 +607,7 @@ final class PanelController
         // Load channel/category/tag options and page assignments in one query.
         $categoryEnabled = $this->categoryEnabled();
         $tagEnabled = $this->tagEnabled();
-        $taxonomyOptionSets = $this->taxonomyLookupRepo->listPageEditorOptionSets($id ?? 0, $categoryEnabled, $tagEnabled);
+        $taxonomyOptionSets = $this->pageEditorTaxonomyOptionSets($id ?? 0, $categoryEnabled, $tagEnabled);
         $channelOptions = is_array($taxonomyOptionSets['channel_options'] ?? null) ? $taxonomyOptionSets['channel_options'] : [];
         foreach ($channelOptions as &$channelOption) {
             if (!is_array($channelOption)) {
@@ -613,8 +765,8 @@ final class PanelController
         }
 
         // Only keep ids that currently exist, preventing stale/manual post values.
-        $categoryIds = $categoryEnabled ? $this->categoryRepo->existingIds($categoryIds) : [];
-        $tagIds = $tagEnabled ? $this->tagRepo->existingIds($tagIds) : [];
+        $categoryIds = $categoryEnabled ? $this->categoryRepo()->existingIds($categoryIds) : [];
+        $tagIds = $tagEnabled ? $this->tagRepo()->existingIds($tagIds) : [];
         $channelRecord = $channelSlug !== null && $channelSlug !== ''
             ? $this->channelRepo->findBySlug($channelSlug)
             : null;
@@ -622,7 +774,7 @@ final class PanelController
         $allowedTagSets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'tag');
 
         if ($categoryEnabled && !$this->selectionAllowsAllSets($allowedCategorySets)) {
-            $categorySetIdsById = $this->categoryRepo->setIdsByIds($categoryIds);
+            $categorySetIdsById = $this->categoryRepo()->setIdsByIds($categoryIds);
             foreach ($categorySetIdsById as $setId) {
                 if (!in_array($setId, $allowedCategorySets, true)) {
                     $this->flash('error', 'One or more selected categories are outside the allowed sets for this channel.');
@@ -632,7 +784,7 @@ final class PanelController
         }
 
         if ($tagEnabled && !$this->selectionAllowsAllSets($allowedTagSets)) {
-            $tagSetIdsById = $this->tagRepo->setIdsByIds($tagIds);
+            $tagSetIdsById = $this->tagRepo()->setIdsByIds($tagIds);
             foreach ($tagSetIdsById as $setId) {
                 if (!in_array($setId, $allowedTagSets, true)) {
                     $this->flash('error', 'One or more selected tags are outside the allowed sets for this channel.');
@@ -1509,7 +1661,7 @@ final class PanelController
             return;
         }
 
-        $categoryCountsBySetId = $this->categoryRepo->countsBySetId();
+        $categoryCountsBySetId = $this->categoryRepo()->countsBySetId();
         $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
         if (
             $selectedSetId !== null
@@ -1523,12 +1675,12 @@ final class PanelController
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->categoryRepo->listPageForPanel($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
+        $pageResult = $this->categoryRepo()->listPageForPanel($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->categoryRepo->listPageForPanel($perPage, $pagination['offset'], $selectedSetId);
+            $pageResult = $this->categoryRepo()->listPageForPanel($perPage, $pagination['offset'], $selectedSetId);
             $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
@@ -1576,7 +1728,7 @@ final class PanelController
 
         $category = null;
         if ($id !== null) {
-            $category = $this->categoryRepo->findById($id);
+            $category = $this->categoryRepo()->findById($id);
 
             if ($category === null) {
                 $this->flash('error', 'Category not found.');
@@ -1638,7 +1790,7 @@ final class PanelController
 
         // Persist one category; uniqueness conflicts are surfaced by repository.
         try {
-            $savedId = $this->categoryRepo->save([
+            $savedId = $this->categoryRepo()->save([
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
@@ -1652,7 +1804,7 @@ final class PanelController
 
         $savedEditUrl = $this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/category/edit', $savedId, $activeTab, 'basic');
 
-        $currentRecord = $this->categoryRepo->findById($savedId);
+        $currentRecord = $this->categoryRepo()->findById($savedId);
         $currentStorage = $this->taxonomyImageStoragePayloadFromRecord('categories', $currentRecord);
         $currentPaths = $this->taxonomyImagePathsFromStoragePayload('categories', $savedId, $currentStorage);
         $nextStorage = $currentStorage;
@@ -1730,7 +1882,7 @@ final class PanelController
         }
 
         try {
-            $this->categoryRepo->updateImageFiles($savedId, $nextStorage);
+            $this->categoryRepo()->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
             // Keep DB and filesystem in sync when image-path persistence fails.
             $this->cleanupTaxonomyImagePathSets('categories', $savedId, $newPathSets);
@@ -1769,10 +1921,10 @@ final class PanelController
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id !== null) {
-            $record = $this->categoryRepo->findById($id);
+            $record = $this->categoryRepo()->findById($id);
             // Single-row delete path (row action button).
             try {
-                $this->categoryRepo->deleteById($id);
+                $this->categoryRepo()->deleteById($id);
             } catch (\Throwable) {
                 $this->flash('error', 'Failed to delete category.');
                 redirect($this->panelUrl('/category'));
@@ -1801,10 +1953,10 @@ final class PanelController
         $failedCount = 0;
 
         foreach ($selectedIds as $selectedId) {
-            $record = $this->categoryRepo->findById($selectedId);
+            $record = $this->categoryRepo()->findById($selectedId);
             try {
                 // Continue deleting remaining ids even if one operation throws.
-                $this->categoryRepo->deleteById($selectedId);
+                $this->categoryRepo()->deleteById($selectedId);
                 if ($record !== null) {
                     $this->deleteTaxonomyStoredPaths(
                         'categories',
@@ -1845,7 +1997,7 @@ final class PanelController
             return;
         }
 
-        $countsBySetId = $this->categoryRepo->countsBySetId();
+        $countsBySetId = $this->categoryRepo()->countsBySetId();
         $setRows = [];
         foreach ($this->categorySetRepo()->listAll() as $setRow) {
             $setId = (int) ($setRow['id'] ?? 0);
@@ -1990,9 +2142,9 @@ final class PanelController
         }
 
         // Reassign any remaining categories in this set to the default set before deleting.
-        $categoryCount = (int) ($this->categoryRepo->countsBySetId()[$id] ?? 0);
+        $categoryCount = (int) ($this->categoryRepo()->countsBySetId()[$id] ?? 0);
         if ($categoryCount > 0) {
-            $this->categoryRepo->reassignSetToDefault($id, TaxonomySetRecordPolicy::DEFAULT_SET_ID);
+            $this->categoryRepo()->reassignSetToDefault($id, TaxonomySetRecordPolicy::DEFAULT_SET_ID);
         }
 
         try {
@@ -2021,7 +2173,7 @@ final class PanelController
             return;
         }
 
-        $tagCountsBySetId = $this->tagRepo->countsBySetId();
+        $tagCountsBySetId = $this->tagRepo()->countsBySetId();
         $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
         if (
             $selectedSetId !== null
@@ -2035,12 +2187,12 @@ final class PanelController
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->tagRepo->listPageForPanel($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
+        $pageResult = $this->tagRepo()->listPageForPanel($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->tagRepo->listPageForPanel($perPage, $pagination['offset'], $selectedSetId);
+            $pageResult = $this->tagRepo()->listPageForPanel($perPage, $pagination['offset'], $selectedSetId);
             $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
@@ -2088,7 +2240,7 @@ final class PanelController
 
         $tag = null;
         if ($id !== null) {
-            $tag = $this->tagRepo->findById($id);
+            $tag = $this->tagRepo()->findById($id);
 
             if ($tag === null) {
                 $this->flash('error', 'Tag not found.');
@@ -2150,7 +2302,7 @@ final class PanelController
 
         // Persist one tag; uniqueness conflicts are surfaced by repository.
         try {
-            $savedId = $this->tagRepo->save([
+            $savedId = $this->tagRepo()->save([
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
@@ -2164,7 +2316,7 @@ final class PanelController
 
         $savedEditUrl = $this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/tag/edit', $savedId, $activeTab, 'basic');
 
-        $currentRecord = $this->tagRepo->findById($savedId);
+        $currentRecord = $this->tagRepo()->findById($savedId);
         $currentStorage = $this->taxonomyImageStoragePayloadFromRecord('tags', $currentRecord);
         $currentPaths = $this->taxonomyImagePathsFromStoragePayload('tags', $savedId, $currentStorage);
         $nextStorage = $currentStorage;
@@ -2242,7 +2394,7 @@ final class PanelController
         }
 
         try {
-            $this->tagRepo->updateImageFiles($savedId, $nextStorage);
+            $this->tagRepo()->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
             // Keep DB and filesystem in sync when image-path persistence fails.
             $this->cleanupTaxonomyImagePathSets('tags', $savedId, $newPathSets);
@@ -2281,10 +2433,10 @@ final class PanelController
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id !== null) {
-            $record = $this->tagRepo->findById($id);
+            $record = $this->tagRepo()->findById($id);
             // Single-row delete path (row action button).
             try {
-                $this->tagRepo->deleteById($id);
+                $this->tagRepo()->deleteById($id);
             } catch (\Throwable) {
                 $this->flash('error', 'Failed to delete tag.');
                 redirect($this->panelUrl('/tag'));
@@ -2313,10 +2465,10 @@ final class PanelController
         $failedCount = 0;
 
         foreach ($selectedIds as $selectedId) {
-            $record = $this->tagRepo->findById($selectedId);
+            $record = $this->tagRepo()->findById($selectedId);
             try {
                 // Continue deleting remaining ids even if one operation throws.
-                $this->tagRepo->deleteById($selectedId);
+                $this->tagRepo()->deleteById($selectedId);
                 if ($record !== null) {
                     $this->deleteTaxonomyStoredPaths(
                         'tags',
@@ -2357,7 +2509,7 @@ final class PanelController
             return;
         }
 
-        $countsBySetId = $this->tagRepo->countsBySetId();
+        $countsBySetId = $this->tagRepo()->countsBySetId();
         $setRows = [];
         foreach ($this->tagSetRepo()->listAll() as $setRow) {
             $setId = (int) ($setRow['id'] ?? 0);
@@ -2497,9 +2649,9 @@ final class PanelController
         }
 
         // Reassign any remaining tags in this set to the default set before deleting.
-        $tagCount = (int) ($this->tagRepo->countsBySetId()[$id] ?? 0);
+        $tagCount = (int) ($this->tagRepo()->countsBySetId()[$id] ?? 0);
         if ($tagCount > 0) {
-            $this->tagRepo->reassignSetToDefault($id, TaxonomySetRecordPolicy::DEFAULT_SET_ID);
+            $this->tagRepo()->reassignSetToDefault($id, TaxonomySetRecordPolicy::DEFAULT_SET_ID);
         }
 
         try {
@@ -7099,11 +7251,7 @@ final class PanelController
         $routingGroups = is_array($routingAuthData['group_rows'] ?? null) ? $routingAuthData['group_rows'] : [];
         $routingUsers = is_array($routingAuthData['user_rows'] ?? null) ? $routingAuthData['user_rows'] : [];
 
-        $taxonomyRoutingOptionSets = $this->taxonomyLookupRepo->listRoutingInventoryData(
-            $categoryPrefix !== '',
-            $tagPrefix !== '',
-            true
-        );
+        $taxonomyRoutingOptionSets = $this->routingInventoryTaxonomyOptionSets($categoryPrefix, $tagPrefix);
 
         return $this->routingInventoryBuilder()->buildRows([
             'reserved_prefixes' => $this->reservedPublicPrefixes(),

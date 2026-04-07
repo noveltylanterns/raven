@@ -10,7 +10,9 @@
 declare(strict_types=1);
 
 use Raven\Controller\PublicController;
+use Raven\Repository\ChannelRepository;
 use Raven\Repository\InviteTokenRepository;
+use Raven\Repository\TaxonomyLookupRepository;
 
 /**
  * Enriches the shared core container with public-runtime factories.
@@ -31,6 +33,7 @@ return static function (array $rvn): array {
     $publicController = null;
     $extensionServices = null;
     $inviteTokens = null;
+    $taxonomyLookup = null;
 
     /**
      * Builds invite-token storage only for the registration flows that need it.
@@ -47,6 +50,27 @@ return static function (array $rvn): array {
         );
 
         return $inviteTokens;
+    };
+
+    /**
+     * Builds taxonomy lookup storage only for public routes that actually
+     * resolve channel/category/tag slugs.
+     */
+    $taxonomyLookupRepository = static function () use (&$taxonomyLookup, $rvn, $service): TaxonomyLookupRepository {
+        if ($taxonomyLookup instanceof TaxonomyLookupRepository) {
+            return $taxonomyLookup;
+        }
+
+        /** @var ChannelRepository $channelRepository */
+        $channelRepository = $service('channel');
+        $taxonomyLookup = new TaxonomyLookupRepository(
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix'],
+            $channelRepository
+        );
+
+        return $taxonomyLookup;
     };
 
     /**
@@ -85,7 +109,7 @@ return static function (array $rvn): array {
     /**
      * Builds the public controller on first use so route registration stays light.
      */
-    $rvn['public_controller'] = static function () use (&$publicController, $rvn, $service, $extensionServicesProvider, $inviteTokenRepository): PublicController {
+    $rvn['public_controller'] = static function () use (&$publicController, $rvn, $service, $extensionServicesProvider, $inviteTokenRepository, $taxonomyLookupRepository): PublicController {
         if ($publicController instanceof PublicController) {
             return $publicController;
         }
@@ -94,11 +118,12 @@ return static function (array $rvn): array {
             $rvn['view'],
             $rvn['config'],
             $rvn['auth'],
+            $service('channel'),
             $service('group'),
             $service('page_images'),
             $service('page'),
             $service('redirect'),
-            $service('taxonomy_lookup'),
+            $taxonomyLookupRepository,
             $service('user'),
             $inviteTokenRepository,
             $rvn['input'],

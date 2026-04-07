@@ -15,7 +15,11 @@ use Raven\Core\Media\PageImageManager;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Log\EventLogger;
 use Raven\Lib\Site\SiteContextBuilder;
+use Raven\Repository\CategoryRepository;
+use Raven\Repository\ChannelRepository;
 use Raven\Repository\InviteTokenRepository;
+use Raven\Repository\TagRepository;
+use Raven\Repository\TaxonomyLookupRepository;
 use Raven\Repository\TaxonomySetRepository;
 
 /**
@@ -42,6 +46,9 @@ return static function (array $rvn): array {
     $inviteTokenRepository = null;
     $pageImageManager = null;
     $logger = null;
+    $categoryRepository = null;
+    $tagRepository = null;
+    $taxonomyLookupRepository = null;
 
     /**
      * Builds the file-backed category set repository only for panel taxonomy editors.
@@ -118,6 +125,61 @@ return static function (array $rvn): array {
     };
 
     /**
+     * Builds category storage only for panel taxonomy flows that actually use categories.
+     */
+    $categoryFactory = static function () use (&$categoryRepository, $rvn): CategoryRepository {
+        if ($categoryRepository instanceof CategoryRepository) {
+            return $categoryRepository;
+        }
+
+        $categoryRepository = new CategoryRepository(
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix']
+        );
+
+        return $categoryRepository;
+    };
+
+    /**
+     * Builds tag storage only for panel taxonomy flows that actually use tags.
+     */
+    $tagFactory = static function () use (&$tagRepository, $rvn): TagRepository {
+        if ($tagRepository instanceof TagRepository) {
+            return $tagRepository;
+        }
+
+        $tagRepository = new TagRepository(
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix']
+        );
+
+        return $tagRepository;
+    };
+
+    /**
+     * Builds taxonomy lookup storage only for routing and page-editor flows
+     * that need category/tag option lookups beyond channel routing.
+     */
+    $taxonomyLookupFactory = static function () use (&$taxonomyLookupRepository, $rvn, $service): TaxonomyLookupRepository {
+        if ($taxonomyLookupRepository instanceof TaxonomyLookupRepository) {
+            return $taxonomyLookupRepository;
+        }
+
+        /** @var ChannelRepository $channelRepository */
+        $channelRepository = $service('channel');
+        $taxonomyLookupRepository = new TaxonomyLookupRepository(
+            $rvn['db'],
+            (string) $rvn['driver'],
+            (string) $rvn['prefix'],
+            $channelRepository
+        );
+
+        return $taxonomyLookupRepository;
+    };
+
+    /**
      * Builds the auth controller on first use so login routes avoid panel-only dependencies.
      */
     $rvn['auth_controller'] = static function () use (&$authController, $rvn): AuthController {
@@ -146,8 +208,11 @@ return static function (array $rvn): array {
         &$panelController,
         &$rvn,
         $service,
+        $categoryFactory,
         $categorySetFactory,
+        $tagFactory,
         $tagSetFactory,
+        $taxonomyLookupFactory,
         $inviteTokenFactory,
         $pageImageManagerFactory,
         $loggerFactory
@@ -156,14 +221,11 @@ return static function (array $rvn): array {
             return $rvn + $panelRuntime;
         }
 
-        $rvn['category'] = $service('category');
         $rvn['channel'] = $service('channel');
         $rvn['group'] = $service('group');
         $rvn['page_images'] = $service('page_images');
         $rvn['page'] = $service('page');
         $rvn['redirect'] = $service('redirect');
-        $rvn['tag'] = $service('tag');
-        $rvn['taxonomy_lookup'] = $service('taxonomy_lookup');
         $rvn['user'] = $service('user');
 
         $categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', true), true);
@@ -183,15 +245,15 @@ return static function (array $rvn): array {
             $rvn['csrf'],
             $rvn['page_images'],
             $pageImageManagerFactory,
-            $rvn['category'],
+            $categoryFactory,
             $categorySetFactory,
             $rvn['channel'],
             $rvn['group'],
             $rvn['page'],
             $rvn['redirect'],
-            $rvn['tag'],
+            $tagFactory,
             $tagSetFactory,
-            $rvn['taxonomy_lookup'],
+            $taxonomyLookupFactory,
             $rvn['user'],
             $inviteTokenFactory,
             $loggerFactory
