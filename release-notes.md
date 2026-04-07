@@ -4,6 +4,7 @@
 
 ### April 6, 2026 — event logger
 
+- **Panel system-controller seam completed**: added `private/sys/Controller/Panel/SystemController.php` and moved `/configuration*`, `/update*`, `/routing*`, `/logs*`, `/themes*`, and `/extensions*` dispatch in `panel/index.php` onto a dedicated `panel_system_controller` factory from `panel/bootstrap.php`. The system seam now resolves its own config-editor, routing-preview, updater, theme, extension, and event-log services through the shared `RequestContext` and the existing `panel_domain_system` bundle instead of routing those screens through the monolithic `PanelController`.
 - **Bootstrap split start**: `private/raven.php` is now the shared core bootstrap instead of the all-in-one web runtime assembler. Public-only and panel-only controller wiring moved into new `public/bootstrap.php` and `panel/bootstrap.php` layers.
 - **Lazy bootstrap services**: `private/raven.php` now exposes a memoized service resolver for core repositories/services and defers extension provider execution behind a `boot_extensions` hook instead of instantiating all scope-specific services up front.
 - **Public controller assembly**: `public/index.php` now pulls a lazy `public_controller` factory from `public/bootstrap.php`. Public extension route registration uses the shared enabled-manifest map and a `notFound` closure instead of forcing a controller instance at route-registration time.

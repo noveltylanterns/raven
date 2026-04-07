@@ -16,6 +16,7 @@ use Raven\Controller\Panel\GroupController;
 use Raven\Controller\Panel\PreferencesController;
 use Raven\Controller\Panel\RedirectController;
 use Raven\Controller\Panel\RequestContext;
+use Raven\Controller\Panel\SystemController;
 use Raven\Controller\Panel\TaxonomyController;
 use Raven\Controller\Panel\UserController;
 use Raven\Controller\PanelController;
@@ -70,6 +71,7 @@ return static function (array $rvn): array {
     $panelRequestContext = null;
     $panelRuntime = null;
     $redirectController = null;
+    $systemController = null;
     $taxonomyController = null;
     $userController = null;
     $categorySetRepository = null;
@@ -371,23 +373,23 @@ return static function (array $rvn): array {
      */
     $panelSystemDomain = $memoize(static function () use (
         $channelFactory,
+        $categorySetFactory,
         $pageFactory,
         $redirectFactory,
-        $userFactory,
-        $loggerFactory,
+        $tagSetFactory,
         $taxonomyLookupFactory,
-        $categoryEnabled,
-        $tagEnabled
+        $userFactory,
+        $loggerFactory
     ): array {
         return [
             'channel' => $channelFactory(),
+            'category_set' => $categorySetFactory,
             'page' => $pageFactory(),
             'redirect' => $redirectFactory(),
+            'tag_set' => $tagSetFactory,
+            'taxonomy_lookup' => $taxonomyLookupFactory,
             'user' => $userFactory(),
             'logger' => $loggerFactory,
-            'taxonomy_lookup' => $taxonomyLookupFactory,
-            'category_enabled' => $categoryEnabled,
-            'tag_enabled' => $tagEnabled,
         ];
     });
 
@@ -409,6 +411,11 @@ return static function (array $rvn): array {
     $rvn['panel_permission_map_provider'] = static function () use (&$panelController, &$rvn): array {
         if (($rvn['auth']->userId() ?? null) === null) {
             return [];
+        }
+
+        $systemControllerFactory = $rvn['panel_system_controller'] ?? null;
+        if (is_callable($systemControllerFactory)) {
+            return $systemControllerFactory()->extensionPanelPermissionMapForDirectories();
         }
 
         if ($panelController instanceof PanelController) {
@@ -676,6 +683,39 @@ return static function (array $rvn): array {
         );
 
         return $preferencesController;
+    };
+
+    /**
+     * Builds the split system controller on first use.
+     * Owns configuration, update, routing, logs, themes, and extensions.
+     */
+    $rvn['panel_system_controller'] = static function () use (&$systemController, &$rvn, $panelSystemDomain): SystemController {
+        if ($systemController instanceof SystemController) {
+            return $systemController;
+        }
+
+        /** @var callable(): RequestContext $requestContextFactory */
+        $requestContextFactory = $rvn['panel_request_context'];
+        $systemDomain = $panelSystemDomain();
+        $systemController = new SystemController(
+            $requestContextFactory(),
+            $rvn['config'],
+            $rvn['input'],
+            (string) $rvn['root'],
+            $systemDomain['channel'],
+            $systemDomain['page'],
+            $systemDomain['redirect'],
+            $systemDomain['user'],
+            $systemDomain['category_set'],
+            $systemDomain['tag_set'],
+            $systemDomain['taxonomy_lookup'],
+            $systemDomain['logger'],
+            is_callable($rvn['extension_services_for'] ?? null)
+                ? $rvn['extension_services_for']
+                : static fn (?string $extensionDirectory = null): array => []
+        );
+
+        return $systemController;
     };
 
     /**

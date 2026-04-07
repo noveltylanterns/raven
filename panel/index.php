@@ -92,6 +92,13 @@ $panelPreferencesController = is_callable($rvn['panel_preferences_controller'] ?
         throw new RuntimeException('Panel preferences controller factory is unavailable.');
     };
 
+/** @var callable(): object $panelSystemController */
+$panelSystemController = is_callable($rvn['panel_system_controller'] ?? null)
+    ? $rvn['panel_system_controller']
+    : static function (): object {
+        throw new RuntimeException('Panel system controller factory is unavailable.');
+    };
+
 /** @var callable(): array<string, mixed> $initializePanelRuntime */
 $initializePanelRuntime = is_callable($rvn['initialize_panel_runtime'] ?? null)
     ? $rvn['initialize_panel_runtime']
@@ -923,96 +930,96 @@ $router->add('POST', '/preferences/2fa/webauthn/register', static function () us
 
 // Configuration routes.
 // Configuration editing is restricted to Super Admin capability.
-$router->add('GET', '/configuration', static function () use ($panelController): void {
-    $panelController()->configuration();
+$router->add('GET', '/configuration', static function () use ($panelSystemController): void {
+    $panelSystemController()->configuration();
 });
 
-$router->add('GET', '/update', static function () use ($panelController): void {
-    $panelController()->update();
+$router->add('GET', '/update', static function () use ($panelSystemController): void {
+    $panelSystemController()->update();
 });
 
-$router->add('POST', '/update/action', static function () use ($panelController): void {
-    $panelController()->updateAction($_POST);
+$router->add('POST', '/update/action', static function () use ($panelSystemController): void {
+    $panelSystemController()->updateAction($_POST);
 });
 
-$router->add('POST', '/configuration/save', static function () use ($panelController): void {
-    $panelController()->configurationSave($_POST);
+$router->add('POST', '/configuration/save', static function () use ($panelSystemController): void {
+    $panelSystemController()->configurationSave($_POST);
 });
 
 // Routing inventory route.
-$router->add('GET', '/routing', static function () use ($panelController): void {
-    $panelController()->routing();
+$router->add('GET', '/routing', static function () use ($panelSystemController): void {
+    $panelSystemController()->routing();
 });
 
-$router->add('GET', '/routing/export', static function () use ($panelController): void {
-    $panelController()->routingExport();
+$router->add('GET', '/routing/export', static function () use ($panelSystemController): void {
+    $panelSystemController()->routingExport();
 });
 
 // Event log routes.
-$router->add('GET', '/logs', static function () use ($panelController): void {
-    $panelController()->logs();
+$router->add('GET', '/logs', static function () use ($panelSystemController): void {
+    $panelSystemController()->logs();
 });
 
-$router->add('GET', '/logs/export', static function () use ($panelController): void {
-    $panelController()->logsExport();
+$router->add('GET', '/logs/export', static function () use ($panelSystemController): void {
+    $panelSystemController()->logsExport();
 });
 
-$router->add('POST', '/logs/clear', static function () use ($panelController): void {
-    $panelController()->logsClear();
+$router->add('POST', '/logs/clear', static function () use ($panelSystemController): void {
+    $panelSystemController()->logsClear();
 });
 
 // Public Theme manager routes.
-$router->add('GET', '/themes', static function () use ($panelController): void {
-    $panelController()->themes();
+$router->add('GET', '/themes', static function () use ($panelSystemController): void {
+    $panelSystemController()->themes();
 });
 
-$router->add('POST', '/themes/enable', static function () use ($panelController): void {
-    $panelController()->themesEnable($_POST);
+$router->add('POST', '/themes/enable', static function () use ($panelSystemController): void {
+    $panelSystemController()->themesEnable($_POST);
 });
 
-$router->add('POST', '/themes/create', static function () use ($panelController): void {
-    $panelController()->themesCreate($_POST);
+$router->add('POST', '/themes/create', static function () use ($panelSystemController): void {
+    $panelSystemController()->themesCreate($_POST);
 });
 
-$router->add('POST', '/themes/upload', static function () use ($panelController): void {
-    $panelController()->themesUpload($_POST, $_FILES);
+$router->add('POST', '/themes/upload', static function () use ($panelSystemController): void {
+    $panelSystemController()->themesUpload($_POST, $_FILES);
 });
 
-$router->add('GET', '/themes/export', static function () use ($panelController): void {
-    $panelController()->themesExport($_GET);
+$router->add('GET', '/themes/export', static function () use ($panelSystemController): void {
+    $panelSystemController()->themesExport($_GET);
 });
 
-$router->add('POST', '/themes/uninstall', static function () use ($panelController): void {
-    $panelController()->themesUninstall($_POST);
+$router->add('POST', '/themes/uninstall', static function () use ($panelSystemController): void {
+    $panelSystemController()->themesUninstall($_POST);
 });
 
 // Extensions management routes (placeholder system foundation for future plugin runtime wiring).
-$router->add('GET', '/extensions', static function () use ($panelController): void {
-    $panelController()->extensions();
+$router->add('GET', '/extensions', static function () use ($panelSystemController): void {
+    $panelSystemController()->extensions();
 });
 
-$router->add('POST', '/extensions/toggle', static function () use ($panelController): void {
-    $panelController()->extensionsToggle($_POST);
+$router->add('POST', '/extensions/toggle', static function () use ($panelSystemController): void {
+    $panelSystemController()->extensionsToggle($_POST);
 });
 
-$router->add('POST', '/extensions/upload', static function () use ($panelController): void {
-    $panelController()->extensionsUpload($_POST, $_FILES);
+$router->add('POST', '/extensions/upload', static function () use ($panelSystemController): void {
+    $panelSystemController()->extensionsUpload($_POST, $_FILES);
 });
 
-$router->add('GET', '/extensions/export', static function () use ($panelController): void {
-    $panelController()->extensionsExport($_GET);
+$router->add('GET', '/extensions/export', static function () use ($panelSystemController): void {
+    $panelSystemController()->extensionsExport($_GET);
 });
 
-$router->add('POST', '/extensions/create', static function () use ($panelController): void {
-    $panelController()->extensionsCreate($_POST);
+$router->add('POST', '/extensions/create', static function () use ($panelSystemController): void {
+    $panelSystemController()->extensionsCreate($_POST);
 });
 
-$router->add('POST', '/extensions/uninstall', static function () use ($panelController): void {
-    $panelController()->extensionsUninstall($_POST);
+$router->add('POST', '/extensions/uninstall', static function () use ($panelSystemController): void {
+    $panelSystemController()->extensionsUninstall($_POST);
 });
 
-$router->add('POST', '/extensions/permission', static function () use ($panelController): void {
-    $panelController()->extensionsPermission($_POST);
+$router->add('POST', '/extensions/permission', static function () use ($panelSystemController): void {
+    $panelSystemController()->extensionsPermission($_POST);
 });
 
 // Extension route registration.
