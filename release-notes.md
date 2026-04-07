@@ -2,6 +2,14 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 7, 2026 — ExtensionRegistry consolidated into lib
+
+- **`ExtensionRegistry` moved from `private/sys/` to `private/lib/Extension/`**: the canonical static extension metadata class (`enabledMap`, `permissionMap`, `enabledDirectories`, `readManifest`, `shortcodes`, `fields`) now lives in `Raven\Lib\Extension\ExtensionRegistry` — the correct lib domain — instead of `Raven\Core\Extension\ExtensionRegistry`. `private/raven.php` now loads from the lib path directly.
+- **Lib-depends-on-sys dependency inversion fixed**: five lib files (`ExtensionRuntimeRegistry`, `SchemaEnsureStateStore`, `ExtensionSchemaRunner`, `EmbeddedFormRuntimeService`, `ExtensionCatalogService`, `ExtensionEditorCatalogService`) all previously imported `Raven\Core\Extension\ExtensionRegistry` (a sys class), inverting the lib→sys dependency direction. All updated to `Raven\Lib\Extension\ExtensionRegistry`.
+- **Static manifest cache added**: `ExtensionRegistry::readManifest()` now caches results (including null misses) in a static array keyed by `"{root}::{directory}"`. The triple-read pattern — `enabledDirectories()` at bootstrap, `ExtensionRuntimeRegistry::discoverEnabledExtensions()`, and `SchemaEnsureStateStore::signature()` — now collapses to one filesystem hit per extension per process.
+- **Redundant CLI `require_once` calls removed**: five manual `require_once .../sys/Core/Extension/ExtensionRegistry.php` calls inside `raven_cli.php` command handlers removed; the autoloader handles class loading after bootstrap.
+- **Backward-compat shim retained**: `private/sys/Core/Extension/ExtensionRegistry.php` now just `require_once`s the lib file and registers a `class_alias` so any code still using the old namespace continues to work without an immediate update.
+
 ### April 7, 2026 — request-level performance fixes
 
 - **Double channel lookup eliminated**: `PageRepository::findChannelHomepage()` now returns a named-key tuple `['channel' => ..., 'page' => ...]` instead of just the page array, so the caller already has the resolved channel row. `ContentController::channel()` unpacks the tuple and no longer calls `channelRepo->findBySlug()` a second time — removes one DB round-trip from every channel landing request.

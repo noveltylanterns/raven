@@ -106,7 +106,11 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - DB connection, table resolution, schema ensure, introspection, and profiling helpers.
   - Includes schema-ensure state gating so hot-path bootstraps can skip repeated no-op schema walks until core or enabled-extension schema inputs change.
 - `private/lib/Extension/`
-  - Extension cataloging, manifests, state, storage provisioning, scaffolding, and lazy runtime bootstrap/service resolution. (`ExtensionRuntimeRegistry`, `ExtensionStorageProvisioner`, `ExtensionStorageCleaner`.)
+  - Extension cataloging, manifests, state, storage provisioning, scaffolding, and lazy runtime bootstrap/service resolution.
+  - `ExtensionRegistry` — canonical static registry for manifest parsing, enabled-directory discovery, shortcode/field validation, and permission maps. Manifests are cached in a static array so the triple-read pattern (autoloader setup → runtime registry → schema state store) collapses to one filesystem hit per extension per process.
+  - `ExtensionRuntimeRegistry` — per-request instance tracking which extensions have been booted and their lazy service maps.
+  - `ExtensionStorageProvisioner`, `ExtensionStorageCleaner` — storage lifecycle helpers.
+  - `private/sys/Core/Extension/ExtensionRegistry.php` is a legacy redirect shim only; prefer `Raven\Lib\Extension\ExtensionRegistry` in all new code.
 - `private/lib/Http/`
   - HTTP-layer helpers: response dispatch, session flash, request context resolution, upload normalization, and redirect-target validation. (`RedirectTargetValidator` enforces the http/https/root-path allowlist.)
 - `private/lib/Log/`

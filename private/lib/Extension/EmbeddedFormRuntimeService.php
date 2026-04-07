@@ -6,7 +6,7 @@ namespace Raven\Lib\Extension;
 
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Core\Extension\EmbeddedShortcodeRuntimeInterface;
-use Raven\Core\Extension\ExtensionRegistry;
+use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Security\InputSanitizer;
 
 /**

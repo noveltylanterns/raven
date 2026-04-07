@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Database\Schema;
 
 use PDO;
-use Raven\Core\Extension\ExtensionRegistry;
+use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
 
 /**

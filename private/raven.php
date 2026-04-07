@@ -13,7 +13,7 @@ use Raven\Core\Auth\AuthService;
 use Raven\Core\Config;
 use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\SchemaManager;
-use Raven\Core\Extension\ExtensionRegistry;
+use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
 use Raven\Lib\Extension\ExtensionRuntimeRegistry;
@@ -32,7 +32,7 @@ use Raven\Repository\PageRepository;
  */
 return (static function (): array {
     $root = dirname(__DIR__);
-    require_once $root . '/private/sys/Core/Extension/ExtensionRegistry.php';
+    require_once $root . '/private/lib/Extension/ExtensionRegistry.php';
     $enabledExtensionDirectories = ExtensionRegistry::enabledDirectories($root, true);
 
     // Load per-package handlers instead of the full Composer autoloader.

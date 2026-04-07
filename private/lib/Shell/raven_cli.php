@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 use Raven\Core\Config;
 use Raven\Core\Auth\PanelAccess;
-use Raven\Core\Extension\ExtensionRegistry;
+use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Repository\CategoryRepository;
 use Raven\Repository\ChannelRepository;
@@ -2163,7 +2163,6 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         }
 
         if ($action === 'list') {
-            require_once $root . '/private/sys/Core/Extension/ExtensionRegistry.php';
             $state = raven_cli_extension_state_load($root);
             $entries = scandir($extBase);
             if ($entries === false) {
@@ -2218,7 +2217,6 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         }
 
         if ($action === 'enable' || $action === 'disable') {
-            require_once $root . '/private/sys/Core/Extension/ExtensionRegistry.php';
             require_once $root . '/private/lib/Extension/ExtensionBootstrapContractResolver.php';
             require_once $root . '/private/lib/Extension/ExtensionStorageProvisioner.php';
             $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
@@ -2264,7 +2262,6 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         }
 
         if ($action === 'uninstall') {
-            require_once $root . '/private/sys/Core/Extension/ExtensionRegistry.php';
             require_once $root . '/private/lib/Extension/ExtensionBootstrapContractResolver.php';
             require_once $root . '/private/lib/Extension/ExtensionStorageCleaner.php';
             $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
@@ -2322,7 +2319,6 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         }
 
         if ($action === 'import') {
-            require_once $root . '/private/sys/Core/Extension/ExtensionRegistry.php';
             if (!class_exists(ZipArchive::class)) {
                 throw new RuntimeException('PHP zip extension is required for import.');
             }
@@ -2474,7 +2470,6 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 $createdFiles[] = 'composer.json';
             }
 
-            require_once $root . '/private/sys/Core/Extension/ExtensionRegistry.php';
             if (ExtensionRegistry::readManifest($root, $slug) === null) {
                 raven_cli_remove_directory_recursive($path);
                 throw new RuntimeException('Generated scaffold failed extension manifest/type validation.');

@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
 
-use Raven\Core\Extension\ExtensionRegistry;
+use Raven\Lib\Extension\ExtensionRegistry;
 
 /**
  * Tracks enabled extension bootstrap providers and exposes lazy runtime hooks.

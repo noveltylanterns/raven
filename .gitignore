@@ -25,7 +25,7 @@
 /.tmp/
 
 # Local dev tools
-/build/
+/build/legacy/
 /private/ext/debug-*/
 
 # Editor swap/backup artifacts
