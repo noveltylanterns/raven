@@ -71,6 +71,13 @@ $panelGroupController = is_callable($rvn['panel_group_controller'] ?? null)
         throw new RuntimeException('Panel group controller factory is unavailable.');
     };
 
+/** @var callable(): object $panelPreferencesController */
+$panelPreferencesController = is_callable($rvn['panel_preferences_controller'] ?? null)
+    ? $rvn['panel_preferences_controller']
+    : static function (): object {
+        throw new RuntimeException('Panel preferences controller factory is unavailable.');
+    };
+
 /** @var callable(): array<string, mixed> $initializePanelRuntime */
 $initializePanelRuntime = is_callable($rvn['initialize_panel_runtime'] ?? null)
     ? $rvn['initialize_panel_runtime']
@@ -877,28 +884,28 @@ $router->add('POST', '/group/delete', static function () use ($panelGroupControl
     $panelGroupController()->groupDelete($_POST);
 });
 
-$router->add('GET', '/preferences', static function () use ($panelController): void {
-    $panelController()->preferences();
+$router->add('GET', '/preferences', static function () use ($panelPreferencesController): void {
+    $panelPreferencesController()->preferences();
 });
 
-$router->add('POST', '/preferences/save', static function () use ($panelController): void {
-    $panelController()->preferencesSave($_POST, $_FILES);
+$router->add('POST', '/preferences/save', static function () use ($panelPreferencesController): void {
+    $panelPreferencesController()->preferencesSave($_POST, $_FILES);
 });
 
-$router->add('POST', '/preferences/2fa/totp/setup', static function () use ($panelController): void {
-    $panelController()->preferencesTotpSetup($_POST);
+$router->add('POST', '/preferences/2fa/totp/setup', static function () use ($panelPreferencesController): void {
+    $panelPreferencesController()->preferencesTotpSetup($_POST);
 });
 
-$router->add('POST', '/preferences/2fa/recovery/generate', static function () use ($panelController): void {
-    $panelController()->preferencesRecoveryCodeGenerate($_POST);
+$router->add('POST', '/preferences/2fa/recovery/generate', static function () use ($panelPreferencesController): void {
+    $panelPreferencesController()->preferencesRecoveryCodeGenerate($_POST);
 });
 
-$router->add('POST', '/preferences/2fa/webauthn/options', static function () use ($panelController): void {
-    $panelController()->preferencesWebauthnCreateOptions($_POST);
+$router->add('POST', '/preferences/2fa/webauthn/options', static function () use ($panelPreferencesController): void {
+    $panelPreferencesController()->preferencesWebauthnCreateOptions($_POST);
 });
 
-$router->add('POST', '/preferences/2fa/webauthn/register', static function () use ($panelController): void {
-    $panelController()->preferencesWebauthnRegister($_POST);
+$router->add('POST', '/preferences/2fa/webauthn/register', static function () use ($panelPreferencesController): void {
+    $panelPreferencesController()->preferencesWebauthnRegister($_POST);
 });
 
 // Configuration routes.

@@ -12,6 +12,7 @@ declare(strict_types=1);
 use Raven\Controller\AuthController;
 use Raven\Controller\Panel\DashboardController;
 use Raven\Controller\Panel\GroupController;
+use Raven\Controller\Panel\PreferencesController;
 use Raven\Controller\Panel\RequestContext;
 use Raven\Controller\Panel\TaxonomyController;
 use Raven\Controller\Panel\UserController;
@@ -22,6 +23,7 @@ use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelInvitePolicyService;
 use Raven\Lib\Auth\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
+use Raven\Lib\Auth\PasswordChangePolicy;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Config\PanelMediaConfigService;
 use Raven\Lib\Http\SessionFlash;
@@ -61,6 +63,7 @@ return static function (array $rvn): array {
     $dashboardController = null;
     $groupController = null;
     $panelController = null;
+    $preferencesController = null;
     $panelRequestContext = null;
     $panelRuntime = null;
     $taxonomyController = null;
@@ -569,6 +572,34 @@ return static function (array $rvn): array {
         );
 
         return $groupController;
+    };
+
+    /**
+     * Builds the split preferences controller on first use.
+     */
+    $rvn['panel_preferences_controller'] = static function () use (&$preferencesController, &$rvn): PreferencesController {
+        if ($preferencesController instanceof PreferencesController) {
+            return $preferencesController;
+        }
+
+        /** @var callable(): RequestContext $requestContextFactory */
+        $requestContextFactory = $rvn['panel_request_context'];
+        $preferencesController = new PreferencesController(
+            $requestContextFactory(),
+            $rvn['config'],
+            $rvn['input'],
+            (string) $rvn['root'],
+            new LoginIdentifierResolver(),
+            new PanelEditorTabService($rvn['input']),
+            new PanelMediaConfigService($rvn['config']),
+            new ProfileContactService($rvn['input']),
+            new PanelTwoFactorPreferencesService($rvn['input']),
+            new AvatarUploadService(),
+            new UserMediaPathService(),
+            new PasswordChangePolicy()
+        );
+
+        return $preferencesController;
     };
 
     /**
