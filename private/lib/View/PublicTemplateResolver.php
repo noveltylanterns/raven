@@ -14,6 +14,19 @@ final class PublicTemplateResolver
 {
     private InputSanitizer $input;
 
+    /**
+     * Per-request cache of resolved template paths.
+     *
+     * Keyed by a hash of [template, ...roots] so repeated calls with the same
+     * arguments — common on pages with multiple partials or child-theme chains —
+     * skip the full `is_file()` fallback loop. Null values are cached to avoid
+     * re-walking the chain for known-missing templates. Scope is one request
+     * (one resolver instance); no cross-request state is stored here.
+     *
+     * @var array<string, string|null>
+     */
+    private array $resolvedCache = [];
+
     public function __construct(InputSanitizer $input)
     {
         $this->input = $input;
@@ -35,9 +48,30 @@ final class PublicTemplateResolver
         return $roots;
     }
 
+    /**
+     * Resolves a template name to an absolute file path by walking the provided roots.
+     *
+     * Results are memoized for the lifetime of this instance (one request) to avoid
+     * repeated `is_file()` syscalls for the same template across multiple call sites
+     * (e.g. partials resolved more than once, or child-theme chains re-walked).
+     * Both hits and misses (null) are cached so re-walking never occurs.
+     *
+     * @param string $template Relative template name without leading slash or `.php` extension.
+     * @param string ...$roots Absolute directory paths to search in priority order.
+     * @return string|null Absolute path to the first matching file, or null if not found in any root.
+     */
     public function resolveTemplateFile(string $template, string ...$roots): ?string
     {
+        // Cache key encodes both the template name and the full root list so different
+        // theme chains for the same template name do not collide in the cache.
+        $cacheKey = md5($template . "\0" . implode("\0", $roots));
+
+        if (array_key_exists($cacheKey, $this->resolvedCache)) {
+            return $this->resolvedCache[$cacheKey];
+        }
+
         $relative = trim($template, '/') . '.php';
+        $resolved = null;
 
         foreach ($roots as $root) {
             if ($root === '') {
@@ -46,11 +80,15 @@ final class PublicTemplateResolver
 
             $candidate = rtrim($root, '/\\') . '/' . $relative;
             if (is_file($candidate)) {
-                return $candidate;
+                $resolved = $candidate;
+                break;
             }
         }
 
-        return null;
+        // Store null for misses so repeated calls for the same missing template are also cached.
+        $this->resolvedCache[$cacheKey] = $resolved;
+
+        return $resolved;
     }
 
     public function resolveChannelTemplateName(string $channelSlug, string ...$lookupRoots): string

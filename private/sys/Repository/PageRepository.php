@@ -106,9 +106,17 @@ final class PageRepository
     /**
      * Finds channel homepage by slug priority: `home` first, then `index`.
      *
+     * Returns the resolved channel and its homepage as a named-key tuple so the
+     * caller can reuse the already-fetched channel row without a second DB round-trip.
+     * Returns null when the channel slug does not resolve to a known channel.
+     * When the channel exists but has no published homepage, `page` is null.
+     *
      * Channel page must be published and belong to the requested channel slug.
      *
-     * @return array<string, mixed>|null
+     * @param string $channelSlug Normalized channel slug to look up.
+     * @return array{channel: array<string,mixed>, page: ?array<string,mixed>}|null
+     *         Null when the channel itself is not found; otherwise an array with
+     *         'channel' (the resolved channel row) and 'page' (the homepage row or null).
      */
     public function findChannelHomepage(string $channelSlug): ?array
     {
@@ -143,11 +151,12 @@ final class PageRepository
 
         $row = $stmt->fetch();
 
-        if ($row === false) {
-            return null;
-        }
-
-        return $this->withChannelContext($this->hydratePageRow($row), $channel);
+        // Return the channel alongside the page so callers avoid a second lookup.
+        // 'page' is null when no published homepage exists for this channel.
+        return [
+            'channel' => $channel,
+            'page'    => $row !== false ? $this->withChannelContext($this->hydratePageRow($row), $channel) : null,
+        ];
     }
 
     /**

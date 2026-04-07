@@ -2,6 +2,11 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 7, 2026 — request-level performance fixes
+
+- **Double channel lookup eliminated**: `PageRepository::findChannelHomepage()` now returns a named-key tuple `['channel' => ..., 'page' => ...]` instead of just the page array, so the caller already has the resolved channel row. `ContentController::channel()` unpacks the tuple and no longer calls `channelRepo->findBySlug()` a second time — removes one DB round-trip from every channel landing request.
+- **Template resolver memoized**: `PublicTemplateResolver::resolveTemplateFile()` now caches results in a `$resolvedCache` instance array keyed by a hash of `[template, ...roots]`. Both hits and misses (null) are cached, so repeated `is_file()` chains for the same template — common on pages with partials or child-theme fallback chains — are served from memory within the same request.
+
 ### April 7, 2026 — raven.php service map removal
 
 - **`$rvn['service']` compatibility lane pruned**: removed `$serviceCache`, `$serviceFactories`, `$service` closure, and the `'service'` container key from `private/raven.php`. The generic service map was the last compatibility shim from before the web bootstrap split.

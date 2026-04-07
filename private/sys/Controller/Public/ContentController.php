@@ -119,18 +119,24 @@ final class ContentController
     /**
      * Resolves one channel landing route by channel slug.
      *
+     * Unpacks the tuple returned by `findChannelHomepage()` to reuse the already-fetched
+     * channel row, avoiding a second DB round-trip for the same row on every channel landing.
+     *
      * @param string $channelSlug Normalized channel slug.
      * @return void
      */
     public function channel(string $channelSlug): void
     {
-        $page = $this->pageRepo->findChannelHomepage($channelSlug);
-        if ($page === null) {
+        // findChannelHomepage() returns null when the channel does not exist, or a
+        // ['channel' => ..., 'page' => ...] tuple — page is null when no homepage exists.
+        $result = $this->pageRepo->findChannelHomepage($channelSlug);
+        if ($result === null || $result['page'] === null) {
             $this->page($channelSlug, null);
             return;
         }
 
-        $channel = $this->channelRepo->findBySlug($channelSlug);
+        $channel = $result['channel'];
+        $page    = $result['page'];
         $page = $this->renderPageContentBlocks($page);
         $page = $this->publicTemplateDecorator()->decoratePageForTemplate($page);
 
@@ -142,15 +148,13 @@ final class ContentController
         );
 
         $site = $this->siteDataWithPageMeta($page);
-        if (is_array($channel)) {
-            // Channel-level cover/preview uploads override page/default meta images on channel landings.
-            $site = $this->context->siteDataWithTaxonomyMetaImage($channel, $site);
-        }
+        // Channel-level cover/preview uploads override page/default meta images on channel landings.
+        $site = $this->context->siteDataWithTaxonomyMetaImage($channel, $site);
 
         $this->context->renderPublic($channelTemplate, [
-            'site' => $site,
-            'channel' => is_array($channel) ? $channel : null,
-            'page' => $page,
+            'site'    => $site,
+            'channel' => $channel,
+            'page'    => $page,
         ], 'wrapper');
     }
 
