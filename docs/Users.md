@@ -113,7 +113,9 @@ Group assignment notes:
   - `private/sys/Controller/Panel/UserController.php`
 - Public auth controller:
   - `private/sys/Controller/Public/AuthController.php`
-- Remaining public route controller:
+- Public profile controller:
+  - `private/sys/Controller/Public/ProfileController.php`
+- Remaining public homepage/content controller:
   - `private/sys/Controller/PublicController.php`
 - Shared login workflow:
   - `private/lib/Auth/LoginAttemptWorkflowService.php`
@@ -201,7 +203,7 @@ Public routes (declared in `public/index.php`):
   - Requires invite token when mode is `invite`.
   - Keeps duplicate-account and persistence failures user-generic instead of reflecting raw repository exception text.
   - Creates user via `UserRepository::save(...)` and consumes invite token atomically where possible.
-- `PublicController::profile(string $username)` / `PublicController::group(string $groupSlug)`
+- `Public\ProfileController::profile(string $username)` / `group(string $groupSlug)`
   - public profile routes use the selector configured by `user.selector`
   - selector mode `id` uses numeric user ids
   - selector mode `username` uses usernames and is only valid when username login mode is enabled

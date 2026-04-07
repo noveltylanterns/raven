@@ -10,6 +10,9 @@
 declare(strict_types=1);
 
 use Raven\Controller\Public\AuthController as PublicAuthController;
+use Raven\Controller\Public\FeedController as PublicFeedController;
+use Raven\Controller\Public\FormController as PublicFormController;
+use Raven\Controller\Public\ProfileController as PublicProfileController;
 use Raven\Controller\Public\RequestContext;
 use Raven\Controller\PublicController;
 use Raven\Core\View;
@@ -36,6 +39,9 @@ return static function (array $rvn): array {
 
     $publicController = null;
     $publicAuthController = null;
+    $publicFeedController = null;
+    $publicFormController = null;
+    $publicProfileController = null;
     $publicRequestContext = null;
     $extensionServices = null;
     $inviteTokens = null;
@@ -314,6 +320,66 @@ return static function (array $rvn): array {
         );
 
         return $publicAuthController;
+    };
+
+    /**
+     * Builds the split public profile controller on first use.
+     */
+    $rvn['public_profile_controller'] = static function () use (&$publicProfileController, &$rvn, $publicAuthDomain): PublicProfileController {
+        if ($publicProfileController instanceof PublicProfileController) {
+            return $publicProfileController;
+        }
+
+        /** @var callable(): RequestContext $requestContextFactory */
+        $requestContextFactory = $rvn['public_request_context'];
+        $authDomain = $publicAuthDomain();
+        $publicProfileController = new PublicProfileController(
+            $requestContextFactory(),
+            $authDomain['group'],
+            $authDomain['user']
+        );
+
+        return $publicProfileController;
+    };
+
+    /**
+     * Builds the split public form controller on first use.
+     */
+    $rvn['public_form_controller'] = static function () use (&$publicFormController, &$rvn, $publicFormDomain): PublicFormController {
+        if ($publicFormController instanceof PublicFormController) {
+            return $publicFormController;
+        }
+
+        /** @var callable(): RequestContext $requestContextFactory */
+        $requestContextFactory = $rvn['public_request_context'];
+        $formDomain = $publicFormDomain();
+        $publicFormController = new PublicFormController(
+            $requestContextFactory(),
+            $formDomain['extension_services']
+        );
+
+        return $publicFormController;
+    };
+
+    /**
+     * Builds the split public feed/taxonomy controller on first use.
+     */
+    $rvn['public_feed_controller'] = static function () use (&$publicFeedController, &$rvn, $publicContentDomain): PublicFeedController {
+        if ($publicFeedController instanceof PublicFeedController) {
+            return $publicFeedController;
+        }
+
+        /** @var callable(): RequestContext $requestContextFactory */
+        $requestContextFactory = $rvn['public_request_context'];
+        $contentDomain = $publicContentDomain();
+        $publicFeedController = new PublicFeedController(
+            $requestContextFactory(),
+            $contentDomain['channel'],
+            $contentDomain['page'],
+            $contentDomain['taxonomy_lookup']()
+        );
+
+        return $publicFeedController;
     };
 
     /**

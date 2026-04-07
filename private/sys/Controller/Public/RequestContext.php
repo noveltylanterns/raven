@@ -199,6 +199,21 @@ final class RequestContext
     }
 
     /**
+     * Returns site data with taxonomy-level OG/Twitter image overrides when available.
+     *
+     * @param array<string, mixed> $taxonomy Taxonomy payload with optional image metadata.
+     * @param array<string, mixed>|null $baseSiteData Optional prebuilt site data payload.
+     * @return array<string, mixed> Site metadata payload with taxonomy image overrides.
+     */
+    public function siteDataWithTaxonomyMetaImage(array $taxonomy, ?array $baseSiteData = null): array
+    {
+        return $this->publicMetaService()->siteDataWithTaxonomyMetaImage(
+            $taxonomy,
+            $baseSiteData ?? $this->siteData()
+        );
+    }
+
+    /**
      * Renders the public not-found page.
      *
      * @return void

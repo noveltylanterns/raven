@@ -170,6 +170,27 @@ $publicAuthController = is_callable($rvn['public_auth_controller'] ?? null)
         throw new RuntimeException('Public auth controller factory is unavailable.');
     };
 
+/** @var callable(): object $publicProfileController */
+$publicProfileController = is_callable($rvn['public_profile_controller'] ?? null)
+    ? $rvn['public_profile_controller']
+    : static function (): object {
+        throw new RuntimeException('Public profile controller factory is unavailable.');
+    };
+
+/** @var callable(): object $publicFormController */
+$publicFormController = is_callable($rvn['public_form_controller'] ?? null)
+    ? $rvn['public_form_controller']
+    : static function (): object {
+        throw new RuntimeException('Public form controller factory is unavailable.');
+    };
+
+/** @var callable(): object $publicFeedController */
+$publicFeedController = is_callable($rvn['public_feed_controller'] ?? null)
+    ? $rvn['public_feed_controller']
+    : static function (): object {
+        throw new RuntimeException('Public feed controller factory is unavailable.');
+    };
+
 $input = $rvn['input'];
 $routeConfig = new RouteConfigService($rvn['config'], $input);
 
@@ -282,7 +303,7 @@ $router->add('POST', '/register', static function () use ($publicAuthController)
 });
 
 // Extension-agnostic embedded form submit endpoint.
-$router->add('POST', '/forms/submit', static function () use ($publicController, $input): void {
+$router->add('POST', '/forms/submit', static function () use ($publicFormController, $publicController, $input): void {
     $type = $input->slug((string) ($_POST['_rvn_form_type'] ?? ''));
     $slug = $input->slug((string) ($_POST['_rvn_form_slug'] ?? ''));
     if ($type === null || $slug === null) {
@@ -290,7 +311,7 @@ $router->add('POST', '/forms/submit', static function () use ($publicController,
         return;
     }
 
-    $publicController()->submitEmbeddedForm($type, $slug);
+    $publicFormController()->submitEmbeddedForm($type, $slug);
 });
 
 // Extension public route registration.
@@ -361,11 +382,11 @@ foreach ($enabledPublicExtensionManifests as $extensionName => $manifest) {
 }
 
 if ($feedsEnabled && $rssFeedRoute !== '') {
-    $router->add('GET', '/' . $rssFeedRoute, static function () use ($publicController): void {
-        $publicController()->rssFeed();
+    $router->add('GET', '/' . $rssFeedRoute, static function () use ($publicFeedController): void {
+        $publicFeedController()->rssFeed();
     });
 
-    $router->add('GET', '/' . $rssFeedRoute . '/{channel}', static function (array $params) use ($publicController, $input, $reservedPrefixes): void {
+    $router->add('GET', '/' . $rssFeedRoute . '/{channel}', static function (array $params) use ($publicFeedController, $publicController, $input, $reservedPrefixes): void {
         $channel = $input->slug($params['channel'] ?? null);
 
         if ($channel === null || in_array($channel, $reservedPrefixes, true)) {
@@ -373,11 +394,11 @@ if ($feedsEnabled && $rssFeedRoute !== '') {
             return;
         }
 
-        $publicController()->rssFeed($channel);
+        $publicFeedController()->rssFeed($channel);
     });
 
     if ($categoryPrefix !== '') {
-        $router->add('GET', '/' . $rssFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($publicController, $input): void {
+        $router->add('GET', '/' . $rssFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicController, $input): void {
             $slug = $input->slug($params['slug'] ?? null);
 
             if ($slug === null) {
@@ -385,12 +406,12 @@ if ($feedsEnabled && $rssFeedRoute !== '') {
                 return;
             }
 
-            $publicController()->rssCategoryFeed($slug);
+            $publicFeedController()->rssCategoryFeed($slug);
         });
     }
 
     if ($tagPrefix !== '') {
-        $router->add('GET', '/' . $rssFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($publicController, $input): void {
+        $router->add('GET', '/' . $rssFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicController, $input): void {
             $slug = $input->slug($params['slug'] ?? null);
 
             if ($slug === null) {
@@ -398,17 +419,17 @@ if ($feedsEnabled && $rssFeedRoute !== '') {
                 return;
             }
 
-            $publicController()->rssTagFeed($slug);
+            $publicFeedController()->rssTagFeed($slug);
         });
     }
 }
 
 if ($feedsEnabled && $atomFeedRoute !== '') {
-    $router->add('GET', '/' . $atomFeedRoute, static function () use ($publicController): void {
-        $publicController()->atomFeed();
+    $router->add('GET', '/' . $atomFeedRoute, static function () use ($publicFeedController): void {
+        $publicFeedController()->atomFeed();
     });
 
-    $router->add('GET', '/' . $atomFeedRoute . '/{channel}', static function (array $params) use ($publicController, $input, $reservedPrefixes): void {
+    $router->add('GET', '/' . $atomFeedRoute . '/{channel}', static function (array $params) use ($publicFeedController, $publicController, $input, $reservedPrefixes): void {
         $channel = $input->slug($params['channel'] ?? null);
 
         if ($channel === null || in_array($channel, $reservedPrefixes, true)) {
@@ -416,11 +437,11 @@ if ($feedsEnabled && $atomFeedRoute !== '') {
             return;
         }
 
-        $publicController()->atomFeed($channel);
+        $publicFeedController()->atomFeed($channel);
     });
 
     if ($categoryPrefix !== '') {
-        $router->add('GET', '/' . $atomFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($publicController, $input): void {
+        $router->add('GET', '/' . $atomFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicController, $input): void {
             $slug = $input->slug($params['slug'] ?? null);
 
             if ($slug === null) {
@@ -428,12 +449,12 @@ if ($feedsEnabled && $atomFeedRoute !== '') {
                 return;
             }
 
-            $publicController()->atomCategoryFeed($slug);
+            $publicFeedController()->atomCategoryFeed($slug);
         });
     }
 
     if ($tagPrefix !== '') {
-        $router->add('GET', '/' . $atomFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($publicController, $input): void {
+        $router->add('GET', '/' . $atomFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicController, $input): void {
             $slug = $input->slug($params['slug'] ?? null);
 
             if ($slug === null) {
@@ -441,7 +462,7 @@ if ($feedsEnabled && $atomFeedRoute !== '') {
                 return;
             }
 
-            $publicController()->atomTagFeed($slug);
+            $publicFeedController()->atomTagFeed($slug);
         });
     }
 }
@@ -449,7 +470,7 @@ if ($feedsEnabled && $atomFeedRoute !== '') {
 // Category routes with optional page number path segment.
 if ($categoryPrefix !== '') {
     $categoryRouteBase = '/' . $categoryPrefix;
-    $router->add('GET', $categoryRouteBase . '/{slug}', static function (array $params) use ($publicController, $input): void {
+    $router->add('GET', $categoryRouteBase . '/{slug}', static function (array $params) use ($publicFeedController, $publicController, $input): void {
         $slug = $input->slug($params['slug'] ?? null);
 
         if ($slug === null) {
@@ -457,10 +478,10 @@ if ($categoryPrefix !== '') {
             return;
         }
 
-        $publicController()->category($slug, 1);
+        $publicFeedController()->category($slug, 1);
     });
 
-    $router->add('GET', $categoryRouteBase . '/{slug}/{page}', static function (array $params) use ($publicController, $input): void {
+    $router->add('GET', $categoryRouteBase . '/{slug}/{page}', static function (array $params) use ($publicFeedController, $publicController, $input): void {
         $slug = $input->slug($params['slug'] ?? null);
         $page = $input->int($params['page'] ?? null, 1);
 
@@ -469,14 +490,14 @@ if ($categoryPrefix !== '') {
             return;
         }
 
-        $publicController()->category($slug, $page);
+        $publicFeedController()->category($slug, $page);
     });
 }
 
 // Tag routes with optional page number path segment.
 if ($tagPrefix !== '') {
     $tagRouteBase = '/' . $tagPrefix;
-    $router->add('GET', $tagRouteBase . '/{slug}', static function (array $params) use ($publicController, $input): void {
+    $router->add('GET', $tagRouteBase . '/{slug}', static function (array $params) use ($publicFeedController, $publicController, $input): void {
         $slug = $input->slug($params['slug'] ?? null);
 
         if ($slug === null) {
@@ -484,10 +505,10 @@ if ($tagPrefix !== '') {
             return;
         }
 
-        $publicController()->tag($slug, 1);
+        $publicFeedController()->tag($slug, 1);
     });
 
-    $router->add('GET', $tagRouteBase . '/{slug}/{page}', static function (array $params) use ($publicController, $input): void {
+    $router->add('GET', $tagRouteBase . '/{slug}/{page}', static function (array $params) use ($publicFeedController, $publicController, $input): void {
         $slug = $input->slug($params['slug'] ?? null);
         $page = $input->int($params['page'] ?? null, 1);
 
@@ -496,14 +517,14 @@ if ($tagPrefix !== '') {
             return;
         }
 
-        $publicController()->tag($slug, $page);
+        $publicFeedController()->tag($slug, $page);
     });
 }
 
 // Public profile route when a profile URL prefix is configured.
 if ($profilePrefix !== '') {
     $profileRouteBase = '/' . $profilePrefix;
-    $router->add('GET', $profileRouteBase . '/{username}', static function (array $params) use ($publicController, $input): void {
+    $router->add('GET', $profileRouteBase . '/{username}', static function (array $params) use ($publicProfileController, $publicController, $input): void {
         $username = $input->text(rawurldecode((string) ($params['username'] ?? '')), 254);
 
         if ($username === '') {
@@ -511,14 +532,14 @@ if ($profilePrefix !== '') {
             return;
         }
 
-        $publicController()->profile($username);
+        $publicProfileController()->profile($username);
     });
 }
 
 // Public group route when a group URL prefix is configured.
 if ($groupPrefix !== '') {
     $groupRouteBase = '/' . $groupPrefix;
-    $router->add('GET', $groupRouteBase . '/{slug}', static function (array $params) use ($publicController, $input): void {
+    $router->add('GET', $groupRouteBase . '/{slug}', static function (array $params) use ($publicProfileController, $publicController, $input): void {
         $slug = $input->slug($params['slug'] ?? null);
 
         if ($slug === null) {
@@ -526,7 +547,7 @@ if ($groupPrefix !== '') {
             return;
         }
 
-        $publicController()->group($slug);
+        $publicProfileController()->group($slug);
     });
 }
 
