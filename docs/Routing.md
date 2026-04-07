@@ -4,7 +4,7 @@
 
 This document explains Raven's Routing Table screen for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever Routing Table routes, row-building/conflict logic, export behavior, or Routing Table panel views change (`private/tpl/panel/routing.php`, `PanelController::routing*`, or routing inventory composition helpers).
+Maintenance note: keep this file updated whenever Routing Table routes, row-building/conflict logic, export behavior, or Routing Table panel views change (`private/tpl/panel/routing.php`, `SystemController::routing*`, or routing inventory composition helpers).
 
 Public-routing note: public route bootstrap lives in `public/index.php`, and public route handlers live in `private/sys/Controller/PublicController.php`. Keep those files and `public/theme/AGENTS.md` in sync when public route families such as feeds are added or changed.
 
@@ -78,7 +78,7 @@ Export fields include:
 - Panel view:
   - `private/tpl/panel/routing.php`
 - Panel controller:
-  - `private/sys/Controller/PanelController.php`
+  - `private/sys/Controller/Panel/SystemController.php`
 - Public route bootstrap:
   - `public/index.php`
 - Public route controller:
@@ -93,7 +93,7 @@ Declared in `panel/index.php`:
 
 ### Controller Flow
 
-`PanelController::routing()`:
+`SystemController::routing()`:
 
 1. Requires panel login.
 2. Requires `Manage Taxonomy`.
@@ -101,7 +101,7 @@ Declared in `panel/index.php`:
 4. Normalizes optional `search` query prefill for the filter UI.
 5. Computes summary counters and renders routing view.
 
-`PanelController::routingExport()`:
+`SystemController::routingExport()`:
 
 1. Requires panel login + `Manage Taxonomy`.
 2. Rebuilds rows via `routingRowsForPanel()`.

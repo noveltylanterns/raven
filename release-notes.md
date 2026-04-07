@@ -2,9 +2,14 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 7, 2026 — panel controller removal
+
+- **Panel split completed on the panel side**: removed `private/sys/Controller/PanelController.php`, deleted the last dead legacy capture from `panel/bootstrap.php`, and confirmed `panel/index.php` dispatch stays on the split `DashboardController`, `ContentController`, `TaxonomyController`, `RedirectController`, `UserController`, `GroupController`, `PreferencesController`, and `SystemController` factories.
+- **Panel behavior docs repointed**: channel/category/tag routes now document `TaxonomyController`, redirects document `RedirectController`, groups document `GroupController`, and user/group notes now reflect the current Admin-group permission wording instead of the older Super Admin naming.
+
 ### April 6, 2026 — event logger
 
-- **Panel system-controller seam completed**: added `private/sys/Controller/Panel/SystemController.php` and moved `/configuration*`, `/update*`, `/routing*`, `/logs*`, `/themes*`, and `/extensions*` dispatch in `panel/index.php` onto a dedicated `panel_system_controller` factory from `panel/bootstrap.php`. The system seam now resolves its own config-editor, routing-preview, updater, theme, extension, and event-log services through the shared `RequestContext` and the existing `panel_domain_system` bundle instead of routing those screens through the monolithic `PanelController`.
+- **Panel system-controller seam completed**: added `private/sys/Controller/Panel/SystemController.php` and moved `/configuration*`, `/update*`, `/routing*`, `/logs*`, `/themes*`, and `/extensions*` dispatch in `panel/index.php` onto a dedicated `panel_system_controller` factory from `panel/bootstrap.php`. The system seam now resolves its own config-editor, routing-preview, updater, theme, extension, and event-log services through the shared `RequestContext` and the existing `panel_domain_system` bundle instead of routing those screens through the monolithic `PanelController`. `initialize_panel_runtime()` no longer constructs `PanelController` as a side effect, and stock panel public-404 / extension-permission checks now resolve through `SystemController` too.
 - **Bootstrap split start**: `private/raven.php` is now the shared core bootstrap instead of the all-in-one web runtime assembler. Public-only and panel-only controller wiring moved into new `public/bootstrap.php` and `panel/bootstrap.php` layers.
 - **Lazy bootstrap services**: `private/raven.php` now exposes a memoized service resolver for core repositories/services and defers extension provider execution behind a `boot_extensions` hook instead of instantiating all scope-specific services up front.
 - **Public controller assembly**: `public/index.php` now pulls a lazy `public_controller` factory from `public/bootstrap.php`. Public extension route registration uses the shared enabled-manifest map and a `notFound` closure instead of forcing a controller instance at route-registration time.

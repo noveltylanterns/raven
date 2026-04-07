@@ -4,7 +4,7 @@
 
 This document explains Raven's user Preferences screen for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever Preferences routes, validation/avatar behavior, or Preferences panel views change (`private/tpl/panel/preferences.php`, `PanelController::preferences*`, or `AuthService` preference persistence contracts).
+Maintenance note: keep this file updated whenever Preferences routes, validation/avatar behavior, or Preferences panel views change (`private/tpl/panel/preferences.php`, `PreferencesController::preferences*`, or `AuthService` preference persistence contracts).
 
 ## 1) Panel Guide (Preferences)
 
@@ -70,7 +70,7 @@ Behavior notes:
 - Panel view:
   - `private/tpl/panel/preferences.php`
 - Panel controller:
-  - `private/sys/Controller/PanelController.php`
+  - `private/sys/Controller/Panel/PreferencesController.php`
 - Auth service persistence:
   - `private/sys/Core/Auth/AuthService.php`
 
@@ -84,13 +84,13 @@ Declared in `panel/index.php`:
 
 ### Controller Flow
 
-`PanelController::preferences()`:
+`PreferencesController::preferences()`:
 
 - Requires panel login.
 - Loads current user preference payload from `AuthService::userPreferences(...)`.
 - Renders preferences form with theme options.
 
-`PanelController::preferencesSave()`:
+`PreferencesController::preferencesSave()`:
 
 1. Requires panel login.
 2. Validates CSRF.

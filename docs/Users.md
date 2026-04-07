@@ -92,8 +92,8 @@ Fields/options:
 Group assignment notes:
 
 - If no group is selected, user is auto-assigned to `User`.
-- Only Super Admin users can assign `Super Admin` group.
-- Only Super Admin users can newly assign groups with `Manage System Configuration`.
+- Only Admin users can assign the `Admin` group.
+- Only Admin users can newly assign groups with `Manage System Configuration`.
 
 ## 2) Developer And Agent Internals
 
@@ -110,7 +110,7 @@ Group assignment notes:
   - `private/tpl/auth/login_2fa.php`
   - `private/tpl/auth/register.php`
 - Panel controller:
-  - `private/sys/Controller/PanelController.php`
+  - `private/sys/Controller/Panel/UserController.php`
 - Public controller:
   - `private/sys/Controller/PublicController.php`
 - Shared login workflow:
@@ -152,7 +152,7 @@ Public routes (declared in `public/index.php`):
 
 ### Controller Flow
 
-`PanelController` user handlers:
+`UserController` user handlers:
 
 - `userList()`
   - Requires login + `Manage Users` permission.
@@ -160,14 +160,14 @@ Public routes (declared in `public/index.php`):
 - `userEdit(?int $id)`
   - Loads existing row when id is provided.
   - Provides group options and theme options.
-  - Includes capability flags (`canAssignSuperAdmin`, `canAssignConfigurationGroups`).
+  - Includes capability flags for admin-group and configuration-capable-group assignment.
 - `userSave(array $post, array $files)`
   - Validates CSRF.
   - Sanitizes/normalizes user fields via `InputSanitizer`.
   - Validates username/email/theme.
   - Enforces password length rules (create required, update optional).
   - Normalizes selected group ids to existing groups only.
-  - Enforces super-admin-only assignment rules for `super` and configuration-capable groups.
+  - Enforces admin-only assignment rules for the `Admin` group and configuration-capable groups.
   - Applies fallback `user` group if none selected.
   - Validates avatar upload with `AvatarValidator` and stores sanitized image output.
   - Stores avatar originals using deterministic names: `public/uploads/user/avatar/{user_string}.{extension}`.

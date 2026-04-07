@@ -41,11 +41,13 @@ use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Routing\RoutingInventoryBuilder;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Update\GitCommandRunner;
 use Raven\Lib\Update\UpdateSourceResolver;
 use Raven\Lib\Update\UpdateWorkflowService;
 use Raven\Lib\View\ThemeCatalogService;
 use Raven\Lib\View\ThemeCloneService;
+use Raven\Lib\View\ThemeFallbackRenderer;
 use Raven\Lib\View\ThemeScaffoldService;
 use Raven\Repository\ChannelRepository;
 use Raven\Repository\PageRepository;
@@ -102,6 +104,8 @@ final class SystemController
     private ?ExtensionBootstrapContractResolver $extensionBootstrapContractResolver = null;
     private ?ConfigSnapshotSanitizer $configSnapshotSanitizer = null;
     private ?ThemeCloneService $themeCloneService = null;
+    private ?ThemeFallbackRenderer $publicFallbackRenderer = null;
+    private ?SiteContextBuilder $siteContextBuilder = null;
     private ?ConfigEditorSchemaService $configEditorSchemaService = null;
     private ?ProfileContactService $profileContactService = null;
     private ?RouteConfigService $routeConfigService = null;
@@ -1593,6 +1597,44 @@ final class SystemController
     }
 
     /**
+     * Renders the active public theme's 404 page with wrapper layout.
+     *
+     * Unauthenticated panel access and extension permission failures use the
+     * public 404 view so the panel URL structure is not exposed to guests.
+     *
+     * @return void
+     */
+    public function renderPublicNotFound(): void
+    {
+        http_response_code(404);
+
+        $renderer = $this->publicFallbackRenderer();
+        $activeTheme = $this->activePublicThemeSlug();
+        $templateFile = $renderer->resolveTemplateFile('status/404', $activeTheme);
+        if ($templateFile === null) {
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Not Found';
+            return;
+        }
+
+        $site = $this->publicSiteDataForNotFound();
+        $content = $renderer->renderFile($templateFile, [
+            'site' => $site,
+        ]);
+
+        $layoutFile = $renderer->resolveTemplateFile('wrapper', $activeTheme);
+        if ($layoutFile === null) {
+            echo $content;
+            return;
+        }
+
+        echo $renderer->renderFile($layoutFile, [
+            'site' => $site,
+            'content' => $content,
+        ]);
+    }
+
+    /**
      * Returns the category-set repository on first use.
      *
      * @return TaxonomySetRepository Category-set repository.
@@ -3021,6 +3063,49 @@ final class SystemController
         }
 
         return $this->themeCloneService;
+    }
+
+    /**
+     * Returns the public fallback renderer on first use.
+     */
+    private function publicFallbackRenderer(): ThemeFallbackRenderer
+    {
+        if (!$this->publicFallbackRenderer instanceof ThemeFallbackRenderer) {
+            $this->publicFallbackRenderer = new ThemeFallbackRenderer(
+                $this->publicThemesRoot(),
+                $this->root . '/private/tpl',
+                $this->root . '/.tmp/template_tag_cache'
+            );
+        }
+
+        return $this->publicFallbackRenderer;
+    }
+
+    /**
+     * Returns the site-context builder on first use.
+     */
+    private function siteContextBuilder(): SiteContextBuilder
+    {
+        if (!$this->siteContextBuilder instanceof SiteContextBuilder) {
+            $this->siteContextBuilder = new SiteContextBuilder();
+        }
+
+        return $this->siteContextBuilder;
+    }
+
+    /**
+     * Returns site context passed to public fallback templates.
+     *
+     * @return array<string, string> Public fallback site payload.
+     */
+    private function publicSiteDataForNotFound(): array
+    {
+        $publicTheme = $this->activePublicThemeSlug();
+        return $this->siteContextBuilder()->publicFallback(
+            $this->config,
+            $publicTheme,
+            $this->themeCatalogService()->cssSlug($publicTheme)
+        );
     }
 
     /**

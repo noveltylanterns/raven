@@ -89,7 +89,7 @@ Delete behavior note:
   - `private/tpl/panel/channel/list.php`
   - `private/tpl/panel/channel/edit.php`
 - Panel controller:
-  - `private/sys/Controller/PanelController.php`
+  - `private/sys/Controller/Panel/TaxonomyController.php`
 - Persistence:
   - `private/sys/Repository/ChannelRepository.php`
 
@@ -107,7 +107,7 @@ All state-changing routes use CSRF validation.
 
 ### Controller Flow
 
-`PanelController` channel handlers:
+`TaxonomyController` channel handlers:
 
 - `channelList()`
   - Requires login + `Manage Taxonomy` permission.

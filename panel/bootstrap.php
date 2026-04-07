@@ -19,7 +19,6 @@ use Raven\Controller\Panel\RequestContext;
 use Raven\Controller\Panel\SystemController;
 use Raven\Controller\Panel\TaxonomyController;
 use Raven\Controller\Panel\UserController;
-use Raven\Controller\PanelController;
 use Raven\Core\Media\PageImageManager;
 use Raven\Core\View;
 use Raven\Lib\Auth\LoginIdentifierResolver;
@@ -66,7 +65,6 @@ return static function (array $rvn): array {
     $contentController = null;
     $dashboardController = null;
     $groupController = null;
-    $panelController = null;
     $preferencesController = null;
     $panelRequestContext = null;
     $panelRuntime = null;
@@ -408,7 +406,7 @@ return static function (array $rvn): array {
      *
      * @return array<string, array<string, mixed>>
      */
-    $rvn['panel_permission_map_provider'] = static function () use (&$panelController, &$rvn): array {
+    $rvn['panel_permission_map_provider'] = static function () use (&$rvn): array {
         if (($rvn['auth']->userId() ?? null) === null) {
             return [];
         }
@@ -416,15 +414,6 @@ return static function (array $rvn): array {
         $systemControllerFactory = $rvn['panel_system_controller'] ?? null;
         if (is_callable($systemControllerFactory)) {
             return $systemControllerFactory()->extensionPanelPermissionMapForDirectories();
-        }
-
-        if ($panelController instanceof PanelController) {
-            return $panelController->extensionPanelPermissionMapForDirectories();
-        }
-
-        $panelControllerFactory = $rvn['panel_controller'] ?? null;
-        if (is_callable($panelControllerFactory)) {
-            return $panelControllerFactory()->extensionPanelPermissionMapForDirectories();
         }
 
         return [];
@@ -452,7 +441,7 @@ return static function (array $rvn): array {
     /**
      * Builds the shared request context for split panel sub-controllers.
      */
-    $rvn['panel_request_context'] = static function () use (&$panelRequestContext, &$panelController, &$rvn, $categoryEnabled, $tagEnabled): RequestContext {
+    $rvn['panel_request_context'] = static function () use (&$panelRequestContext, &$systemController, &$rvn, $categoryEnabled, $tagEnabled): RequestContext {
         if ($panelRequestContext instanceof RequestContext) {
             return $panelRequestContext;
         }
@@ -465,15 +454,15 @@ return static function (array $rvn): array {
             new SessionFlash('_raven_flash'),
             $categoryEnabled,
             $tagEnabled,
-            static function () use (&$panelController, &$rvn): void {
-                if ($panelController instanceof PanelController) {
-                    $panelController->renderPublicNotFound();
+            static function () use (&$systemController, &$rvn): void {
+                if ($systemController instanceof SystemController) {
+                    $systemController->renderPublicNotFound();
                     return;
                 }
 
-                $panelControllerFactory = $rvn['panel_controller'] ?? null;
-                if (is_callable($panelControllerFactory)) {
-                    $panelControllerFactory()->renderPublicNotFound();
+                $systemControllerFactory = $rvn['panel_system_controller'] ?? null;
+                if (is_callable($systemControllerFactory)) {
+                    $systemControllerFactory()->renderPublicNotFound();
                     return;
                 }
 
@@ -719,13 +708,12 @@ return static function (array $rvn): array {
     };
 
     /**
-     * Builds panel-only repositories, extension services, and the full controller on demand.
+     * Builds panel-only repositories, extension services, and route-registration data on demand.
      *
      * @return array<string, mixed>
      */
     $rvn['initialize_panel_runtime'] = static function () use (
         &$panelRuntime,
-        &$panelController,
         &$rvn,
         $panelContentDomain,
         $panelTaxonomyDomain,
@@ -756,24 +744,6 @@ return static function (array $rvn): array {
             return $siteContextBuilder->panel($rvn['config'], $categoryEnabled, $tagEnabled, $includeDomain);
         };
 
-        $panelController = new PanelController(
-            $rvn['view'],
-            $rvn['config'],
-            $rvn['auth'],
-            $rvn['input'],
-            $rvn['csrf'],
-            $taxonomyDomain['category_set'],
-            $contentDomain['channel'],
-            $userDomain['group'],
-            $contentDomain['page'],
-            $taxonomyDomain['redirect'],
-            $taxonomyDomain['tag_set'],
-            $taxonomyDomain['taxonomy_lookup'],
-            $userDomain['user'],
-            $userDomain['invite_tokens'],
-            $systemDomain['logger']
-        );
-
         $enabledExtensionManifests = is_array($rvn['enabled_extension_manifests'] ?? null)
             ? (array) $rvn['enabled_extension_manifests']
             : [];
@@ -792,21 +762,6 @@ return static function (array $rvn): array {
         ];
 
         return $rvn + $panelRuntime;
-    };
-
-    /**
-     * Builds the heavy panel controller only after a route actually needs it.
-     */
-    $rvn['panel_controller'] = static function () use (&$panelController, $rvn): PanelController {
-        if ($panelController instanceof PanelController) {
-            return $panelController;
-        }
-
-        /** @var callable(): array<string, mixed> $initializePanelRuntime */
-        $initializePanelRuntime = $rvn['initialize_panel_runtime'];
-        $initializePanelRuntime();
-
-        return $panelController;
     };
 
     return $rvn;

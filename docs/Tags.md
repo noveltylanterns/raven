@@ -84,7 +84,7 @@ Delete behavior note:
   - `private/tpl/panel/tag/list.php`
   - `private/tpl/panel/tag/edit.php`
 - Panel controller:
-  - `private/sys/Controller/PanelController.php`
+  - `private/sys/Controller/Panel/TaxonomyController.php`
 - Persistence:
   - `private/sys/Repository/TagRepository.php`
 
@@ -107,7 +107,7 @@ All state-changing routes use CSRF validation.
 
 ### Controller Flow
 
-`PanelController` tag handlers:
+`TaxonomyController` tag handlers:
 
 - `tagList()`
   - Requires login + `Manage Taxonomy` permission.

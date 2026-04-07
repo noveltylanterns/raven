@@ -142,7 +142,7 @@ Behavior notes:
   - `private/tpl/panel/page/list.php`
   - `private/tpl/panel/page/edit.php`
 - Panel controller:
-  - `private/sys/Controller/PanelController.php`
+  - `private/sys/Controller/Panel/ContentController.php`
 - Public controller:
   - `private/sys/Controller/PublicController.php`
 - Page persistence:
@@ -173,7 +173,7 @@ Root-scope note:
 - Pages no longer persist with `channel_id = NULL`.
 - Raven now maps root-level pages to the stock `<root>` channel id `0`, while the editor still exposes that as `<none>` so URLs remain rooted at `/slug`.
 
-`PanelController::pageSave()` pipeline:
+`ContentController::pageSave()` pipeline:
 
 1. Requires login + `Manage Content` permission.
 2. Validates CSRF.

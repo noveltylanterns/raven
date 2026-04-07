@@ -80,7 +80,7 @@ Fields/options:
 Extra editor behavior:
 
 - Public and panel base URLs are shown as copyable `<code>` snippets.
-- Non-super-admin editors cannot change `Manage System Configuration` bit.
+- Non-admin editors cannot change `Manage System Configuration` bit.
 - Stock role rules lock certain permission checkboxes.
 
 Stock-group constraints visible in UI:
@@ -90,7 +90,7 @@ Stock-group constraints visible in UI:
 - `User`: only public/private view bits can be toggled.
 - `Editor`: only public/private + panel login + manage content bits can be toggled.
 - `Admin`: only allowed admin subset can be toggled.
-- `Super Admin`: all bits effectively forced on.
+- `Admin`: all bits effectively forced on.
 
 ## 2) Developer And Agent Internals
 
@@ -100,7 +100,7 @@ Stock-group constraints visible in UI:
   - `private/tpl/panel/group/list.php`
   - `private/tpl/panel/group/edit.php`
 - Panel controller:
-  - `private/sys/Controller/PanelController.php`
+  - `private/sys/Controller/Panel/GroupController.php`
 - Persistence:
   - `private/sys/Repository/GroupRepository.php`
 
@@ -118,7 +118,7 @@ All state-changing routes use CSRF validation.
 
 ### Controller Flow
 
-`PanelController` group handlers:
+`GroupController` group handlers:
 
 - `groupList()`
   - Requires login + `Manage Groups` permission.
@@ -131,7 +131,7 @@ All state-changing routes use CSRF validation.
   - Validates CSRF.
   - Sanitizes/normalizes id/name/slug and permission bit payload.
   - Enforces stock-role routing/permission constraints.
-  - Enforces super-admin-only change policy for `MANAGE_CONFIGURATION` bit.
+  - Enforces admin-only change policy for `MANAGE_CONFIGURATION` bit.
   - Saves via `GroupRepository::save(...)`.
 - `groupDelete(array $post)`
   - Validates CSRF.

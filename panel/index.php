@@ -36,13 +36,6 @@ $authController = is_callable($rvn['auth_controller'] ?? null)
         throw new RuntimeException('Panel auth controller factory is unavailable.');
     };
 
-/** @var callable(): object $panelController */
-$panelController = is_callable($rvn['panel_controller'] ?? null)
-    ? $rvn['panel_controller']
-    : static function (): object {
-        throw new RuntimeException('Panel controller factory is unavailable.');
-    };
-
 /** @var callable(): object $panelDashboardController */
 $panelDashboardController = is_callable($rvn['panel_dashboard_controller'] ?? null)
     ? $rvn['panel_dashboard_controller']
@@ -347,15 +340,15 @@ $requirePanelLoginForExtension = static function () use (
     $panelUrl,
     $syncPanelIdentity,
     $isGuestPanelLoginEntryInternalPath,
-    $panelController
+    $panelSystemController
 ): void {
     (new PanelSessionGuard())->requirePanelLogin(
         $rvn['auth'],
         $isGuestPanelLoginEntryInternalPath(),
         $panelUrl('/login'),
         $panelUrl('/login/2fa'),
-        static function () use ($panelController): void {
-            $panelController()->renderPublicNotFound();
+        static function () use ($panelSystemController): void {
+            $panelSystemController()->renderPublicNotFound();
         }
     );
     $syncPanelIdentity();
@@ -460,7 +453,7 @@ $_SESSION['_raven_nav_stock'] = [
 $extensionPermissionCatalog = [];
 if ($shouldInitializeFullPanelRuntime) {
     // Resolve extension permission levels/bit assignments from controller-managed state.
-    $extensionPermissionCatalog = $panelController()->extensionPanelPermissionMapForDirectories(array_keys($enabledExtensionManifests));
+    $extensionPermissionCatalog = $panelSystemController()->extensionPanelPermissionMapForDirectories(array_keys($enabledExtensionManifests));
 
     $_SESSION['_raven_extension_permission_masks'] = $extensionPermissionCatalog;
     $_SESSION['_raven_enabled_extensions'] = array_keys($enabledExtensions);
@@ -1115,10 +1108,10 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
 
     $extensionRequirePanelAccess = $requirePanelLoginForExtension;
     if ($isSystemType) {
-        $extensionRequirePanelAccess = static function () use ($requirePanelLoginForExtension, $rvn, $panelController): void {
+        $extensionRequirePanelAccess = static function () use ($requirePanelLoginForExtension, $rvn, $panelSystemController): void {
             $requirePanelLoginForExtension();
             if (!$rvn['auth']->hasPanelPermissionBit(PanelAccess::CONFIGURATION_VIEW)) {
-                $panelController()->renderPublicNotFound();
+                $panelSystemController()->renderPublicNotFound();
                 exit;
             }
         };
@@ -1127,11 +1120,11 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
             $requirePanelLoginForExtension,
             $hasPanelPermissionBit,
             $requiredPermissionBit,
-            $panelController
+            $panelSystemController
         ): void {
             $requirePanelLoginForExtension();
             if ($requiredPermissionBit <= 0 || !$hasPanelPermissionBit($requiredPermissionBit)) {
-                $panelController()->renderPublicNotFound();
+                $panelSystemController()->renderPublicNotFound();
                 exit;
             }
         };
@@ -1142,7 +1135,7 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
         $hasPanelPermissionBit,
         $extensionPermissionBits,
         $requiredPermissionBit,
-        $panelController
+        $panelSystemController
     ): void {
         $requirePanelLoginForExtension();
 
@@ -1155,7 +1148,7 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
         }
 
         if ($targetBit <= 0 || !$hasPanelPermissionBit($targetBit)) {
-            $panelController()->renderPublicNotFound();
+            $panelSystemController()->renderPublicNotFound();
             exit;
         }
     };
@@ -1166,8 +1159,8 @@ foreach (array_keys($enabledExtensions) as $extensionName) {
         'requirePanelLogin' => $extensionRequirePanelAccess,
         'requireExtensionPermission' => $requireExtensionPermission,
         'currentUserTheme' => $currentUserTheme,
-        'renderPublicNotFound' => static function () use ($panelController): void {
-            $panelController()->renderPublicNotFound();
+        'renderPublicNotFound' => static function () use ($panelSystemController): void {
+            $panelSystemController()->renderPublicNotFound();
         },
         'extensionServices' => is_callable($rvn['extension_services_for'] ?? null)
             ? $rvn['extension_services_for']
@@ -1252,7 +1245,7 @@ if ($debugToolbarEnabled) {
 $dispatchResult = $router->dispatch(new RouteRequest($method, $internalPath));
 if (!$dispatchResult->isHandled()) {
     if ($shouldInitializeFullPanelRuntime) {
-        $panelController()->renderPublicNotFound();
+        $panelSystemController()->renderPublicNotFound();
     } else {
         http_response_code(404);
         echo 'Not Found';

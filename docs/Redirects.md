@@ -66,7 +66,7 @@ Fields/options:
   - `private/tpl/panel/redirect/list.php`
   - `private/tpl/panel/redirect/edit.php`
 - Panel controller:
-  - `private/sys/Controller/PanelController.php`
+  - `private/sys/Controller/Panel/RedirectController.php`
 - Persistence:
   - `private/sys/Repository/RedirectRepository.php`
 
@@ -84,7 +84,7 @@ All state-changing routes use CSRF validation.
 
 ### Controller Flow
 
-`PanelController` redirect handlers:
+`RedirectController` redirect handlers:
 
 - `redirectList()`
   - Requires login + `Manage Taxonomy` permission.
