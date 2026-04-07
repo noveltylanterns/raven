@@ -78,6 +78,13 @@ $panelGroupController = is_callable($rvn['panel_group_controller'] ?? null)
         throw new RuntimeException('Panel group controller factory is unavailable.');
     };
 
+/** @var callable(): object $panelContentController */
+$panelContentController = is_callable($rvn['panel_content_controller'] ?? null)
+    ? $rvn['panel_content_controller']
+    : static function (): object {
+        throw new RuntimeException('Panel content controller factory is unavailable.');
+    };
+
 /** @var callable(): object $panelPreferencesController */
 $panelPreferencesController = is_callable($rvn['panel_preferences_controller'] ?? null)
     ? $rvn['panel_preferences_controller']
@@ -603,15 +610,15 @@ $router->add('GET', '/', static function () use ($panelDashboardController): voi
 
 // Page routes.
 // Includes list/create/edit/save plus gallery media and delete actions.
-$router->add('GET', '/page', static function () use ($panelController): void {
-    $panelController()->pageList();
+$router->add('GET', '/page', static function () use ($panelContentController): void {
+    $panelContentController()->pageList();
 });
 
-$router->add('GET', '/page/edit', static function () use ($panelController): void {
-    $panelController()->pageEdit(null);
+$router->add('GET', '/page/edit', static function () use ($panelContentController): void {
+    $panelContentController()->pageEdit(null);
 });
 
-$router->add('GET', '/page/edit/{id}', static function (array $params) use ($panelController, $rvn): void {
+$router->add('GET', '/page/edit/{id}', static function (array $params) use ($panelContentController, $rvn): void {
     $id = $rvn['input']->int($params['id'] ?? null, 1);
 
     if ($id === null) {
@@ -620,26 +627,26 @@ $router->add('GET', '/page/edit/{id}', static function (array $params) use ($pan
         return;
     }
 
-    $panelController()->pageEdit($id);
+    $panelContentController()->pageEdit($id);
 });
 
-$router->add('POST', '/page/save', static function () use ($panelController): void {
-    $panelController()->pageSave($_POST);
+$router->add('POST', '/page/save', static function () use ($panelContentController): void {
+    $panelContentController()->pageSave($_POST);
 });
 
 // Uploads one image into a page gallery (Media tab action).
-$router->add('POST', '/page/gallery/upload', static function () use ($panelController): void {
-    $panelController()->pageGalleryUpload($_POST, $_FILES);
+$router->add('POST', '/page/gallery/upload', static function () use ($panelContentController): void {
+    $panelContentController()->pageGalleryUpload($_POST, $_FILES);
 });
 
 // Deletes one gallery image from a page (Media tab action).
-$router->add('POST', '/page/gallery/delete', static function () use ($panelController): void {
-    $panelController()->pageGalleryDelete($_POST);
+$router->add('POST', '/page/gallery/delete', static function () use ($panelContentController): void {
+    $panelContentController()->pageGalleryDelete($_POST);
 });
 
 // Deletes one page from the Pages index action column.
-$router->add('POST', '/page/delete', static function () use ($panelController): void {
-    $panelController()->pageDelete($_POST);
+$router->add('POST', '/page/delete', static function () use ($panelContentController): void {
+    $panelContentController()->pageDelete($_POST);
 });
 
 // Channel routes (list + edit + save + delete).

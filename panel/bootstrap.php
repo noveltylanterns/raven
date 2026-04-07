@@ -10,6 +10,7 @@
 declare(strict_types=1);
 
 use Raven\Controller\AuthController;
+use Raven\Controller\Panel\ContentController;
 use Raven\Controller\Panel\DashboardController;
 use Raven\Controller\Panel\GroupController;
 use Raven\Controller\Panel\PreferencesController;
@@ -61,6 +62,7 @@ return static function (array $rvn): array {
     }
 
     $authController = null;
+    $contentController = null;
     $dashboardController = null;
     $groupController = null;
     $panelController = null;
@@ -289,8 +291,9 @@ return static function (array $rvn): array {
     });
 
     /**
-     * Content routes share page/channel/media dependencies, which will map
-     * directly to the future panel content sub-controller.
+     * Content routes share page/channel/media/user dependencies mapped to the
+     * panel content sub-controller. User storage is included because page-editor
+     * author validation and author select options need the user repository.
      *
      * @return array<string, mixed>
      */
@@ -298,13 +301,15 @@ return static function (array $rvn): array {
         $channelFactory,
         $pageFactory,
         $pageImagesFactory,
-        $pageImageManagerFactory
+        $pageImageManagerFactory,
+        $userFactory
     ): array {
         return [
             'channel' => $channelFactory(),
             'page' => $pageFactory(),
             'page_images' => $pageImagesFactory(),
             'page_image_manager' => $pageImageManagerFactory,
+            'user' => $userFactory(),
         ];
     });
 
@@ -485,6 +490,43 @@ return static function (array $rvn): array {
         $requestContextFactory = $rvn['panel_request_context'];
         $dashboardController = new DashboardController($requestContextFactory());
         return $dashboardController;
+    };
+
+    /**
+     * Builds the split content controller on first use.
+     * Owns page list, create/edit, save, gallery upload/delete, and page delete.
+     */
+    $rvn['panel_content_controller'] = static function () use (&$contentController, &$rvn, $panelContentDomain, $panelTaxonomyDomain): ContentController {
+        if ($contentController instanceof ContentController) {
+            return $contentController;
+        }
+
+        /** @var callable(): RequestContext $requestContextFactory */
+        $requestContextFactory = $rvn['panel_request_context'];
+        $contentDomain = $panelContentDomain();
+        $taxonomyDomain = $panelTaxonomyDomain();
+        $contentController = new ContentController(
+            $requestContextFactory(),
+            $rvn['config'],
+            $rvn['input'],
+            $contentDomain['page'],
+            $contentDomain['channel'],
+            $contentDomain['page_images'],
+            $contentDomain['page_image_manager'],
+            $taxonomyDomain['category'],
+            $taxonomyDomain['category_set'],
+            $taxonomyDomain['tag'],
+            $taxonomyDomain['tag_set'],
+            $taxonomyDomain['taxonomy_lookup'],
+            $contentDomain['user'],
+            new RouteConfigService($rvn['config'], $rvn['input']),
+            new PanelEditorTabService($rvn['input']),
+            is_callable($rvn['extension_services_for'] ?? null)
+                ? $rvn['extension_services_for']
+                : static fn (?string $extensionDirectory = null): array => []
+        );
+
+        return $contentController;
     };
 
     /**
@@ -680,15 +722,11 @@ return static function (array $rvn): array {
             $rvn['auth'],
             $rvn['input'],
             $rvn['csrf'],
-            $contentDomain['page_images'],
-            $contentDomain['page_image_manager'],
-            $taxonomyDomain['category'],
             $taxonomyDomain['category_set'],
             $contentDomain['channel'],
             $userDomain['group'],
             $contentDomain['page'],
             $taxonomyDomain['redirect'],
-            $taxonomyDomain['tag'],
             $taxonomyDomain['tag_set'],
             $taxonomyDomain['taxonomy_lookup'],
             $userDomain['user'],

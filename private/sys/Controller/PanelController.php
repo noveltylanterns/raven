@@ -19,7 +19,6 @@ use Raven\Core\Auth\AuthService;
 use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Config;
 use Raven\Core\Database\ConnectionFactory;
-use Raven\Core\Media\PageImageManager;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Lib\Archive\ArchivePackageService;
 use Raven\Lib\Archive\PackageInstallWorkflowService;
@@ -35,11 +34,8 @@ use Raven\Lib\Config\ConfigEditorSchemaService;
 use Raven\Lib\Config\ConfigSnapshotSanitizer;
 use Raven\Lib\Config\ConfigEditorNormalizer;
 use Raven\Lib\Config\PanelMediaConfigService;
-use Raven\Lib\Content\BodyBlockPolicy;
-use Raven\Lib\Content\PageBodyBlockCodec;
 use Raven\Lib\Extension\ExtensionCatalogService;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
-use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStorageCleaner;
 use Raven\Lib\Extension\ExtensionStorageProvisioner;
@@ -55,10 +51,8 @@ use Raven\Lib\Media\AvatarUploadService;
 use Raven\Lib\Media\TaxonomyImageService;
 use Raven\Lib\Media\UserMediaPathService;
 use Raven\Lib\Pagination\Pagination;
-use Raven\Lib\Panel\PanelPageAuthorOptionBuilder;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\ChannelRoutePolicy;
-use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Panel\PanelRoutingPreviewService;
 use Raven\Lib\Panel\PanelUrl;
 use Raven\Lib\Routing\RouteConfigService;
@@ -66,7 +60,6 @@ use Raven\Lib\Routing\RoutingInventoryBuilder;
 use Raven\Lib\View\ThemeCatalogService;
 use Raven\Lib\View\ThemeCloneService;
 use Raven\Lib\View\ThemeScaffoldService;
-use Raven\Repository\CategoryRepository;
 use Raven\Core\Security\AvatarValidator;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
@@ -82,10 +75,8 @@ use Raven\Core\View;
 use Raven\Repository\ChannelRepository;
 use Raven\Repository\GroupRepository;
 use Raven\Repository\InviteTokenRepository;
-use Raven\Repository\PageImageRepository;
 use Raven\Repository\PageRepository;
 use Raven\Repository\RedirectRepository;
-use Raven\Repository\TagRepository;
 use Raven\Repository\TaxonomyLookupRepository;
 use Raven\Repository\TaxonomySetRepository;
 use Raven\Repository\UserRepository;
@@ -107,19 +98,12 @@ final class PanelController
     private SessionFlash $flash;
     private SessionFlash $flashList;
     private LoginIdentifierResolver $identifierResolver;
-    private PageImageRepository $pageImages;
-    private ?PageImageManager $pageImageManager = null;
-    private Closure $pageImageManagerResolver;
-    private ?CategoryRepository $categoryRepo = null;
-    private Closure $categoryRepoResolver;
     private ?TaxonomySetRepository $categorySetRepo = null;
     private Closure $categorySetRepoResolver;
     private ChannelRepository $channelRepo;
     private GroupRepository $groupRepo;
     private PageRepository $pageRepo;
     private RedirectRepository $redirectRepo;
-    private ?TagRepository $tagRepo = null;
-    private Closure $tagRepoResolver;
     private ?TaxonomySetRepository $tagSetRepo = null;
     private Closure $tagSetRepoResolver;
     private ?TaxonomyLookupRepository $taxonomyLookupRepo = null;
@@ -129,8 +113,6 @@ final class PanelController
     private Closure $inviteTokensResolver;
     private ?EventLogger $logger = null;
     private Closure $loggerResolver;
-    /** @var array<string, array{label: string, editor: string}>|null */
-    private ?array $pageBodyBlockTypeDefinitionsCache = null;
     private ?ArchivePackageService $archivePackages = null;
     private ?ThemeFallbackRenderer $publicFallbackRenderer = null;
     private ?ExtensionStateStore $extensionStateStore = null;
@@ -151,17 +133,13 @@ final class PanelController
     private ?TaxonomyImageService $taxonomyImageService = null;
     private ?ProfileContactService $profileContactService = null;
     private ?RouteConfigService $routeConfigService = null;
-    private ?BodyBlockPolicy $bodyBlockPolicy = null;
     private ?ExtensionCatalogService $extensionCatalogService = null;
     private ?PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog = null;
-    private ?PageBodyBlockCodec $pageBodyBlockCodec = null;
     private ?PanelSessionGuard $panelSessionGuard = null;
     private ?PanelEditorTabService $panelEditorTabService = null;
     private ?PanelRoutingPreviewService $panelRoutingPreviewService = null;
     private ?UploadFileSetNormalizer $uploadFileSetNormalizer = null;
     private ?ThemeCatalogService $themeCatalogService = null;
-    private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
-    private ?PanelPageAuthorOptionBuilder $pageAuthorOptionBuilder = null;
     private ?PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService = null;
     private ?PasswordChangePolicy $passwordChangePolicy = null;
     private ?PanelConfigFieldPolicyService $panelConfigFieldPolicyService = null;
@@ -183,17 +161,13 @@ final class PanelController
      * @param AuthService $auth Auth/session service for panel access gates.
      * @param InputSanitizer $input Shared input sanitizer for panel requests.
      * @param Csrf $csrf CSRF helper for panel forms and actions.
-     * @param PageImageRepository $pageImages Page-image repository for gallery persistence.
-     * @param callable $pageImageManagerResolver Lazy page-image manager resolver for media flows only.
-     * @param callable $categoryRepoResolver Lazy category repository resolver for category-aware routes only.
      * @param callable $categorySetRepoResolver Lazy category-set repository resolver for set editors only.
      * @param ChannelRepository $channelRepo Channel repository for routing/content panel flows.
      * @param GroupRepository $groupRepo Group repository for account/group management routes.
-     * @param PageRepository $pageRepo Page repository for content management routes.
+     * @param PageRepository $pageRepo Page repository for routing inventory and content management.
      * @param RedirectRepository $redirectRepo Redirect repository for routing management routes.
-     * @param callable $tagRepoResolver Lazy tag repository resolver for tag-aware routes only.
      * @param callable $tagSetRepoResolver Lazy tag-set repository resolver for set editors only.
-     * @param callable $taxonomyLookupRepoResolver Lazy taxonomy lookup resolver for routing/page-editor option sets.
+     * @param callable $taxonomyLookupRepoResolver Lazy taxonomy lookup resolver for routing inventory option sets.
      * @param UserRepository $userRepo User repository for account routes.
      * @param callable $inviteTokensResolver Lazy invite-token repository resolver for invite management only.
      * @param callable $loggerResolver Lazy event logger resolver for log screens only.
@@ -205,15 +179,11 @@ final class PanelController
         AuthService $auth,
         InputSanitizer $input,
         Csrf $csrf,
-        PageImageRepository $pageImages,
-        callable $pageImageManagerResolver,
-        callable $categoryRepoResolver,
         callable $categorySetRepoResolver,
         ChannelRepository $channelRepo,
         GroupRepository $groupRepo,
         PageRepository $pageRepo,
         RedirectRepository $redirectRepo,
-        callable $tagRepoResolver,
         callable $tagSetRepoResolver,
         callable $taxonomyLookupRepoResolver,
         UserRepository $userRepo,
@@ -228,41 +198,16 @@ final class PanelController
         $this->flash = new SessionFlash('_raven_flash');
         $this->flashList = new SessionFlash('_raven_flash_list');
         $this->identifierResolver = new LoginIdentifierResolver();
-        $this->pageImages = $pageImages;
-        $this->pageImageManagerResolver = Closure::fromCallable($pageImageManagerResolver);
-        $this->categoryRepoResolver = Closure::fromCallable($categoryRepoResolver);
         $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
         $this->channelRepo = $channelRepo;
         $this->groupRepo = $groupRepo;
         $this->pageRepo = $pageRepo;
         $this->redirectRepo = $redirectRepo;
-        $this->tagRepoResolver = Closure::fromCallable($tagRepoResolver);
         $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
         $this->taxonomyLookupRepoResolver = Closure::fromCallable($taxonomyLookupRepoResolver);
         $this->userRepo = $userRepo;
         $this->inviteTokensResolver = Closure::fromCallable($inviteTokensResolver);
         $this->loggerResolver = Closure::fromCallable($loggerResolver);
-    }
-
-    /**
-     * Returns the page-image manager on first use so non-media panel routes do
-     * not instantiate upload/storage helpers.
-     *
-     * @return PageImageManager Shared page-image manager.
-     */
-    private function pageImageManager(): PageImageManager
-    {
-        if ($this->pageImageManager instanceof PageImageManager) {
-            return $this->pageImageManager;
-        }
-
-        $pageImageManager = ($this->pageImageManagerResolver)();
-        if (!$pageImageManager instanceof PageImageManager) {
-            throw new \RuntimeException('Panel page-image manager resolver returned an invalid value.');
-        }
-
-        $this->pageImageManager = $pageImageManager;
-        return $this->pageImageManager;
     }
 
     /**
@@ -287,27 +232,6 @@ final class PanelController
     }
 
     /**
-     * Returns the category repository on first use so non-category panel flows
-     * avoid constructing taxonomy storage helpers entirely.
-     *
-     * @return CategoryRepository Category repository.
-     */
-    private function categoryRepo(): CategoryRepository
-    {
-        if ($this->categoryRepo instanceof CategoryRepository) {
-            return $this->categoryRepo;
-        }
-
-        $categoryRepo = ($this->categoryRepoResolver)();
-        if (!$categoryRepo instanceof CategoryRepository) {
-            throw new \RuntimeException('Panel category repository resolver returned an invalid value.');
-        }
-
-        $this->categoryRepo = $categoryRepo;
-        return $this->categoryRepo;
-    }
-
-    /**
      * Returns the tag-set repository on first use so non-taxonomy routes do not
      * instantiate file-backed taxonomy set storage.
      *
@@ -326,27 +250,6 @@ final class PanelController
 
         $this->tagSetRepo = $tagSetRepo;
         return $this->tagSetRepo;
-    }
-
-    /**
-     * Returns the tag repository on first use so non-tag panel flows avoid
-     * constructing taxonomy storage helpers entirely.
-     *
-     * @return TagRepository Tag repository.
-     */
-    private function tagRepo(): TagRepository
-    {
-        if ($this->tagRepo instanceof TagRepository) {
-            return $this->tagRepo;
-        }
-
-        $tagRepo = ($this->tagRepoResolver)();
-        if (!$tagRepo instanceof TagRepository) {
-            throw new \RuntimeException('Panel tag repository resolver returned an invalid value.');
-        }
-
-        $this->tagRepo = $tagRepo;
-        return $this->tagRepo;
     }
 
     /**
@@ -385,20 +288,6 @@ final class PanelController
      *   tag_options_selected: array<int, array<string, mixed>>
      * }
      */
-    private function pageEditorTaxonomyOptionSets(int $pageId, bool $categoryEnabled, bool $tagEnabled): array
-    {
-        if (!$categoryEnabled && !$tagEnabled) {
-            return [
-                'channel_options' => $this->channelRepo->listOptions(),
-                'category_options_all' => [],
-                'tag_options_all' => [],
-                'category_options_selected' => [],
-                'tag_options_selected' => [],
-            ];
-        }
-
-        return $this->taxonomyLookupRepo()->listPageEditorOptionSets($pageId, $categoryEnabled, $tagEnabled);
-    }
 
     /**
      * Returns routing inventory taxonomy data, but avoids taxonomy lookup
@@ -476,423 +365,44 @@ final class PanelController
     /**
      * Dashboard landing page.
      */
-    public function dashboard(): void
-    {
-        $this->requirePanelLogin();
-        $panelIdentity = $this->panelIdentityFromSession();
-
-        $this->view->render('panel/dashboard', [
-            'site' => $this->siteData(),
-            'user' => [
-                'email' => (string) ($panelIdentity['email'] ?? ''),
-            ],
-            'canManageUsers' => $this->auth->canManageUsers(),
-            'canManageGroups' => $this->auth->canManageGroups(),
-            'canManageConfiguration' => $this->auth->canManageConfiguration(),
-            'csrfField' => $this->csrf->field(),
-            'flashSuccess' => $this->pullFlash('success'),
-            'flashError' => $this->pullFlash('error'),
-            'section' => 'dashboard',
-            'showSidebar' => true,
-            'userTheme' => $this->currentUserTheme(),
-        ], 'panel/wrapper');
-    }
 
     /**
      * Page list route.
      */
-    public function pageList(): void
-    {
-        $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('page', 'view')) {
-            return;
-        }
-
-        $prefilterChannel = $this->input->slug($_GET['channel'] ?? null) ?? '';
-        $prefilterCategoryId = $this->input->int($_GET['category'] ?? null, 1) ?? 0;
-        $prefilterTagId = $this->input->int($_GET['tag'] ?? null, 1) ?? 0;
-        if (!$this->categoryEnabled()) {
-            $prefilterCategoryId = 0;
-        }
-        if (!$this->tagEnabled()) {
-            $prefilterTagId = 0;
-        }
-        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $perPage = 50;
-        $pageResult = $this->pageRepo->listPageForPanel(
-            $perPage,
-            ($requestedPage - 1) * $perPage,
-            $prefilterChannel !== '' ? $prefilterChannel : null,
-            $prefilterCategoryId > 0 ? $prefilterCategoryId : null,
-            $prefilterTagId > 0 ? $prefilterTagId : null
-        );
-        $totalItems = (int) ($pageResult['total'] ?? 0);
-        $pageRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pagination = $this->panelPaginationState($totalItems, $requestedPage, $perPage);
-        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->pageRepo->listPageForPanel(
-                $perPage,
-                $pagination['offset'],
-                $prefilterChannel !== '' ? $prefilterChannel : null,
-                $prefilterCategoryId > 0 ? $prefilterCategoryId : null,
-                $prefilterTagId > 0 ? $prefilterTagId : null
-            );
-            $pageRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        }
-        $prefilterCategoryIds = $prefilterCategoryId > 0 ? [$prefilterCategoryId] : [];
-        $prefilterTagIds = $prefilterTagId > 0 ? [$prefilterTagId] : [];
-        foreach ($pageRows as &$pageRow) {
-            // Server-side page prefilters already constrain result rows, so list rows only
-            // need the active prefilter ids for client-side in-page filter persistence.
-            $pageRow['category_ids'] = $prefilterCategoryIds;
-            $pageRow['tag_ids'] = $prefilterTagIds;
-        }
-        unset($pageRow);
-
-        $this->view->render('panel/page/list', [
-            'site' => $this->siteData(),
-            'pages' => $pageRows,
-            'prefilterChannel' => strtolower($prefilterChannel),
-            'prefilterCategoryId' => $prefilterCategoryId,
-            'prefilterTagId' => $prefilterTagId,
-            'pagination' => $this->panelPaginationViewData(
-                '/page',
-                $pagination,
-                [
-                    'channel' => $prefilterChannel,
-                    'category' => $prefilterCategoryId > 0 ? (string) $prefilterCategoryId : '',
-                    'tag' => $prefilterTagId > 0 ? (string) $prefilterTagId : '',
-                ]
-            ),
-            'csrfField' => $this->csrf->field(),
-            'flashSuccess' => $this->pullFlash('success'),
-            'flashError' => $this->pullFlash('error'),
-            'section' => 'page',
-            'pageNav' => 'list',
-            'showSidebar' => true,
-            'userTheme' => $this->currentUserTheme(),
-        ], 'panel/wrapper');
-    }
 
     /**
      * Page edit/create route.
      */
-    public function pageEdit(?int $id = null): void
-    {
-        $this->requirePanelLogin();
-        $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('page', $requiredAction)) {
-            return;
-        }
-
-        $pageNavChannel = '';
-        if ($id === null) {
-            $requestedChannel = $this->input->slug($_GET['channel'] ?? null);
-            if (is_string($requestedChannel) && $requestedChannel !== '') {
-                $pageNavChannel = $requestedChannel;
-            }
-        }
-
-        // Null id means create mode; numeric id means edit mode.
-        $page = null;
-        $galleryImages = [];
-        if ($id !== null) {
-            $editData = $this->pageRepo->editFormDataById($id);
-            if (is_array($editData)) {
-                $page = is_array($editData['page'] ?? null) ? $editData['page'] : null;
-                $galleryImages = is_array($editData['gallery_images'] ?? null) ? $editData['gallery_images'] : [];
-            }
-        }
-        // Load channel/category/tag options and page assignments in one query.
-        $categoryEnabled = $this->categoryEnabled();
-        $tagEnabled = $this->tagEnabled();
-        $taxonomyOptionSets = $this->pageEditorTaxonomyOptionSets($id ?? 0, $categoryEnabled, $tagEnabled);
-        $channelOptions = is_array($taxonomyOptionSets['channel_options'] ?? null) ? $taxonomyOptionSets['channel_options'] : [];
-        foreach ($channelOptions as &$channelOption) {
-            if (!is_array($channelOption)) {
-                continue;
-            }
-
-            $channelOption['category_sets'] = $this->allowedTaxonomySetIdsForChannel($channelOption, 'category');
-            $channelOption['tag_sets'] = $this->allowedTaxonomySetIdsForChannel($channelOption, 'tag');
-
-            $channelOption['editor_override'] = $this->normalizeChannelEditorOverride(
-                (string) ($channelOption['editor_override'] ?? 'inherit')
-            );
-            $channelOption['route_mode'] = $this->normalizeChannelRouteMode(
-                (string) ($channelOption['route_mode'] ?? 'inherit')
-            );
-            $channelOption['route_separator'] = $this->normalizeChannelRouteSeparator(
-                (string) ($channelOption['route_separator'] ?? 'inherit')
-            );
-        }
-        unset($channelOption);
-        if ($id === null && $pageNavChannel !== '') {
-            $channelExists = false;
-            foreach ($channelOptions as $channelOption) {
-                if (!is_array($channelOption)) {
-                    continue;
-                }
-
-                if (strtolower(trim((string) ($channelOption['slug'] ?? ''))) === strtolower($pageNavChannel)) {
-                    $channelExists = true;
-                    break;
-                }
-            }
-
-            if ($channelExists) {
-                if (!is_array($page)) {
-                    $page = [];
-                }
-                $page['channel_slug'] = $pageNavChannel;
-            } else {
-                $pageNavChannel = '';
-            }
-        }
-        $categoryOptionsAll = is_array($taxonomyOptionSets['category_options_all'] ?? null) ? $taxonomyOptionSets['category_options_all'] : [];
-        $tagOptionsAll = is_array($taxonomyOptionSets['tag_options_all'] ?? null) ? $taxonomyOptionSets['tag_options_all'] : [];
-        $categoryOptionsSelected = is_array($taxonomyOptionSets['category_options_selected'] ?? null) ? $taxonomyOptionSets['category_options_selected'] : [];
-        $tagOptionsSelected = is_array($taxonomyOptionSets['tag_options_selected'] ?? null) ? $taxonomyOptionSets['tag_options_selected'] : [];
-        $currentUserId = $this->auth->userId();
-
-        $this->view->render('panel/page/edit', [
-            'site' => $this->siteData(),
-            'page' => $page,
-            'currentUserId' => $currentUserId !== null ? $currentUserId : 0,
-            'authorOptions' => $this->pageAuthorOptions(),
-            'channelOptions' => $channelOptions,
-            'defaultCategorySetSelection' => $this->allowedTaxonomySetIdsForChannel(null, 'category'),
-            'defaultTagSetSelection' => $this->allowedTaxonomySetIdsForChannel(null, 'tag'),
-            'categoryOptionsAll' => $categoryOptionsAll,
-            'tagOptionsAll' => $tagOptionsAll,
-            'categoryOptionsSelected' => $categoryOptionsSelected,
-            'tagOptionsSelected' => $tagOptionsSelected,
-            'categoryEnabled' => $categoryEnabled,
-            'tagEnabled' => $tagEnabled,
-            'galleryImages' => $galleryImages,
-            'imageUploadTarget' => (string) $this->config->get('media.upload_target', 'local'),
-            'imageMaxFilesPerUpload' => max(0, (int) $this->config->get('media.max_files_per_upload', 10)),
-            'editorDefault' => $this->normalizeBodyTextEditorOption(
-                (string) $this->config->get('content.editor', 'tinymce')
-            ),
-            'routeModeDefault' => $this->globalPageRouteMode(),
-            'routeSeparatorDefault' => $this->normalizeGlobalRouteSeparator(
-                (string) $this->config->get('content.separator', '-')
-            ),
-            'bodyBlockTypeDefinitions' => $this->pageEditorBodyBlockTypeDefinitions(),
-            'shortcodeInsertItems' => $this->pageEditorInsertableShortcodes(),
-            'csrfField' => $this->csrf->field(),
-            'flashSuccess' => $this->pullFlash('success'),
-            'error' => $this->pullFlash('error'),
-            'section' => 'page',
-            // Highlight "Create Page" only when opening the new-page form.
-            'pageNav' => $id === null ? 'create' : null,
-            'pageNavChannel' => $id === null ? $pageNavChannel : null,
-            'showSidebar' => true,
-            'userTheme' => $this->currentUserTheme(),
-        ], 'panel/wrapper');
-    }
 
     /**
      * Saves page form using CSRF + centralized input sanitizer.
      */
-    public function pageSave(array $post): void
-    {
-        $this->requirePanelLogin();
-        $id = $this->input->int($post['id'] ?? null, 1);
-        $requiredAction = $id === null ? 'create' : 'edit';
-        if (!$this->requireRoutePermissionOrForbidden('page', $requiredAction)) {
-            return;
-        }
-
-        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
-            $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/page'));
-        }
-
-        $activeTab = $this->panelEditorTabService()->normalizeEditorTab($post['tab'] ?? null, ['content', 'meta', 'media'], 'content');
-        $title = $this->input->text($post['title'] ?? null, 255);
-        $slug = $this->input->slug($post['slug'] ?? null);
-        $contentBlocks = $this->normalizeContentBlocksInput($post['content_blocks'] ?? []);
-        $description = $this->input->text($post['description'] ?? null, 1000);
-        $channelSlug = $this->input->slug($post['channel_slug'] ?? null);
-        $status = strtolower((string) $this->input->text($post['status'] ?? null, 20));
-        $publishAt = $this->input->text($post['published'] ?? null, 32);
-        $expireAt = $this->input->text($post['expires'] ?? null, 32);
-        $displayTitle = isset($post['display_title']) && (string) $post['display_title'] === '1';
-        $galleryEnabled = $this->pageBodyBlocksIncludeGallery($contentBlocks)
-            || (isset($post['gallery_enabled']) && (string) $post['gallery_enabled'] === '1');
-        $authorUserId = $this->input->int($post['author_user_id'] ?? null, 1);
-        if ($authorUserId !== null && $this->userRepo->findById($authorUserId) === null) {
-            $this->flash('error', 'Selected author account was not found.');
-            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/page/edit', $id, $activeTab, 'meta'));
-        }
-        if ($authorUserId === null) {
-            $authorUserId = $this->auth->userId();
-        }
-        $categoryIds = [];
-        $tagIds = [];
-
-        /** @var mixed $categoryIdsRaw */
-        $categoryIdsRaw = $post['category_ids'] ?? [];
-        /** @var mixed $tagIdsRaw */
-        $tagIdsRaw = $post['tag_ids'] ?? [];
-        /** @var mixed $galleryImagesRaw */
-        $galleryImagesRaw = $post['gallery_images'] ?? [];
-
-        $galleryImageUpdates = $this->normalizeGalleryImageUpdates($galleryImagesRaw);
-
-        $categoryEnabled = $this->categoryEnabled();
-        $tagEnabled = $this->tagEnabled();
-
-        if ($categoryEnabled && is_array($categoryIdsRaw)) {
-            foreach ($categoryIdsRaw as $rawCategoryId) {
-                $parsed = $this->input->int($rawCategoryId, 1);
-                if ($parsed !== null) {
-                    $categoryIds[] = $parsed;
-                }
-            }
-        }
-
-        if ($tagEnabled && is_array($tagIdsRaw)) {
-            foreach ($tagIdsRaw as $rawTagId) {
-                $parsed = $this->input->int($rawTagId, 1);
-                if ($parsed !== null) {
-                    $tagIds[] = $parsed;
-                }
-            }
-        }
-
-        // Only keep ids that currently exist, preventing stale/manual post values.
-        $categoryIds = $categoryEnabled ? $this->categoryRepo()->existingIds($categoryIds) : [];
-        $tagIds = $tagEnabled ? $this->tagRepo()->existingIds($tagIds) : [];
-        $channelRecord = $channelSlug !== null && $channelSlug !== ''
-            ? $this->channelRepo->findBySlug($channelSlug)
-            : null;
-        $allowedCategorySets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'category');
-        $allowedTagSets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'tag');
-
-        if ($categoryEnabled && !$this->selectionAllowsAllSets($allowedCategorySets)) {
-            $categorySetIdsById = $this->categoryRepo()->setIdsByIds($categoryIds);
-            foreach ($categorySetIdsById as $setId) {
-                if (!in_array($setId, $allowedCategorySets, true)) {
-                    $this->flash('error', 'One or more selected categories are outside the allowed sets for this channel.');
-                    redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/page/edit', $id, $activeTab, 'meta'));
-                }
-            }
-        }
-
-        if ($tagEnabled && !$this->selectionAllowsAllSets($allowedTagSets)) {
-            $tagSetIdsById = $this->tagRepo()->setIdsByIds($tagIds);
-            foreach ($tagSetIdsById as $setId) {
-                if (!in_array($setId, $allowedTagSets, true)) {
-                    $this->flash('error', 'One or more selected tags are outside the allowed sets for this channel.');
-                    redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/page/edit', $id, $activeTab, 'meta'));
-                }
-            }
-        }
-
-        if ($title === '' || $slug === null) {
-            $this->flash('error', 'Title and valid slug are required.');
-            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/page/edit', $id, $activeTab, 'content'));
-        }
-
-        if (!in_array($status, ['published', 'draft'], true)) {
-            $this->flash('error', 'Status must be Published or Draft.');
-            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/page/edit', $id, $activeTab, 'content'));
-        }
-
-        // Normalize panel form input into repository payload shape.
-        try {
-            $savedId = $this->pageRepo->save([
-                'id' => $id,
-                'title' => $title,
-                'slug' => $slug,
-                'content_blocks' => $contentBlocks,
-                'description' => $description,
-                'display_title' => $displayTitle ? 1 : 0,
-                'gallery_enabled' => $galleryEnabled ? 1 : 0,
-                'author' => $authorUserId,
-                'channel_slug' => $channelSlug,
-                'category_ids' => $categoryIds,
-                'tag_ids' => $tagIds,
-                'status' => $status,
-                'published' => $publishAt !== '' ? $publishAt : null,
-                'expires' => $expireAt !== '' ? $expireAt : null,
-            ]);
-
-            // Keep Media tab metadata and page-level gallery toggle in sync with save.
-            $this->pageImages->updateGalleryForPage(
-                $savedId,
-                $galleryEnabled,
-                $galleryImageUpdates
-            );
-        } catch (\Throwable $exception) {
-            $this->flash('error', $exception->getMessage() ?: 'Failed to save page.');
-            redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/page/edit', $id, $activeTab, 'content'));
-        }
-
-        $this->flash('success', 'Changes saved.');
-        redirect($this->panelEditorTabService()->panelEditorUrlWithTab(fn (string $suffix): string => $this->panelUrl($suffix),'/page/edit', $savedId, $activeTab, 'content'));
-    }
 
     /**
      * Returns page-author select options for page editor Meta tab.
      *
      * @return array<int, array{id: int, username: string, name: string}>
      */
-    private function pageAuthorOptions(): array
-    {
-        return $this->pageAuthorOptionBuilder()->build(
-            $this->userRepo->listAll(),
-            $this->input,
-            fn (string $value): ?string => $this->normalizeUserIdentifierValue($value)
-        );
-    }
 
     /**
      * Normalizes optional repeatable page-editor body blocks.
      *
      * @return array<int, array{type: string, content: string, css_id: string, css_class: string}>
      */
-    private function normalizeContentBlocksInput(mixed $raw): array
-    {
-        return $this->pageBodyBlockCodec()->normalizeEditorSubmittedBlocks(
-            $raw,
-            fn (string $value): string => $this->normalizeBodyBlockType($value),
-            fn (string $type): string => $this->bodyBlockEditorMode($type),
-            50
-        );
-    }
 
     /**
      * Normalizes one optional body-block CSS id token.
      */
-    private function normalizeBodyBlockCssId(mixed $value): string
-    {
-        return $this->bodyBlockPolicy()->normalizeCssId($value);
-    }
 
     /**
      * Normalizes optional body-block CSS class list into one space-delimited value.
      */
-    private function normalizeBodyBlockCssClassList(mixed $value): string
-    {
-        return $this->bodyBlockPolicy()->normalizeCssClassList($value);
-    }
 
     /**
      * Returns true when at least one body block requests gallery output.
      *
      * @param array<int, array{type: string, content: string, css_id: string, css_class: string}> $blocks
      */
-    private function pageBodyBlocksIncludeGallery(array $blocks): bool
-    {
-        return $this->pageBodyBlockCodec()->hasGalleryBlock(
-            $blocks,
-            fn (string $type): string => $this->bodyBlockEditorMode($type)
-        );
-    }
 
     /**
      * Normalizes one text-editor option value from config/editor payloads.
@@ -908,29 +418,14 @@ final class PanelController
     /**
      * Normalizes one channel editor-override value.
      */
-    private function normalizeChannelEditorOverride(string $value): string
-    {
-        $editor = strtolower(trim($value));
-        return in_array($editor, ['inherit', 'tinymce', 'plaintext', 'autobr', 'markdown'], true)
-            ? $editor
-            : 'inherit';
-    }
 
     /**
      * Normalizes one channel route-mode value.
      */
-    private function normalizeChannelRouteMode(string $value): string
-    {
-        return $this->routeConfigService()->normalizeChannelRouteMode($value);
-    }
 
     /**
      * Normalizes one channel route-separator option.
      */
-    private function normalizeChannelRouteSeparator(string $value): string
-    {
-        return ChannelRoutePolicy::normalizeChannelSeparator($value);
-    }
 
     /**
      * Normalizes one global route-separator option.
@@ -944,53 +439,16 @@ final class PanelController
      * @param mixed $raw
      * @return array<int, int|string>
      */
-    private function normalizeTaxonomySetSelection(mixed $raw, bool $defaultAll = true): array
-    {
-        return TaxonomySetRecordPolicy::normalizeSelection($raw, $defaultAll);
-    }
 
-    private function configuredDefaultTaxonomySetId(string $kind): int
-    {
-        $isTag = strtolower(trim($kind)) === 'tag';
-        $path = $isTag ? 'tag.set' : 'category.set';
-        $repo = $isTag ? $this->tagSetRepo() : $this->categorySetRepo();
-        $configuredId = $this->input->int($this->config->get($path, TaxonomySetRecordPolicy::DEFAULT_SET_ID), TaxonomySetRecordPolicy::DEFAULT_SET_ID);
-        if ($configuredId === null || !$repo->existsId($configuredId)) {
-            return TaxonomySetRecordPolicy::DEFAULT_SET_ID;
-        }
-
-        return $configuredId;
-    }
 
     /**
      * @param array<string, mixed>|null $channelRecord
      * @return array<int, int|string>
      */
-    private function allowedTaxonomySetIdsForChannel(?array $channelRecord, string $kind): array
-    {
-        if ($channelRecord === null) {
-            return [$this->configuredDefaultTaxonomySetId($kind)];
-        }
-
-        $field = strtolower(trim($kind)) === 'tag' ? 'tag_sets' : 'category_sets';
-        $selection = $this->normalizeTaxonomySetSelection($channelRecord[$field] ?? [], false);
-        if ($this->selectionAllowsAllSets($selection)) {
-            return [TaxonomySetRecordPolicy::ALL_SET_ID];
-        }
-        if ($selection === []) {
-            return [$this->configuredDefaultTaxonomySetId($kind)];
-        }
-
-        return $selection;
-    }
 
     /**
      * @param array<int, int|string> $selection
      */
-    private function selectionAllowsAllSets(array $selection): bool
-    {
-        return TaxonomySetRecordPolicy::selectionIncludesAll($selection);
-    }
 
     private function globalPageRouteMode(): string
     {
@@ -1013,43 +471,16 @@ final class PanelController
     /**
      * Normalizes one body-block type value.
      */
-    private function normalizeBodyBlockType(string $value): string
-    {
-        return $this->bodyBlockPolicy()->normalizeType($value, $this->pageEditorBodyBlockTypeDefinitions());
-    }
 
     /**
      * Resolves editor mode for one body-block type key.
      */
-    private function bodyBlockEditorMode(string $type): string
-    {
-        return $this->bodyBlockPolicy()->editorMode($type, $this->pageEditorBodyBlockTypeDefinitions());
-    }
 
     /**
      * Returns page-editor body-block type definitions.
      *
      * @return array<string, array{label: string, editor: string}>
      */
-    private function pageEditorBodyBlockTypeDefinitions(): array
-    {
-        if (is_array($this->pageBodyBlockTypeDefinitionsCache)) {
-            return $this->pageBodyBlockTypeDefinitionsCache;
-        }
-
-        $definitions = $this->bodyBlockPolicy()->defaultDefinitions();
-
-        foreach ($this->extensionProvidedBodyBlocksForEditor($this->loadExtensionStateMap()) as $type => $entry) {
-            if (isset($definitions[$type])) {
-                continue;
-            }
-
-            $definitions[$type] = $entry;
-        }
-
-        $this->pageBodyBlockTypeDefinitionsCache = $definitions;
-        return $definitions;
-    }
 
     /**
      * Loads extension-provided body-block definitions for page editor menus.
@@ -1062,14 +493,6 @@ final class PanelController
      * @param array<string, bool> $enabledMap
      * @return array<string, array{label: string, editor: string}>
      */
-    private function extensionProvidedBodyBlocksForEditor(array $enabledMap): array
-    {
-        return $this->extensionEditorCatalogService()->panelBodyBlockDefinitions(
-            $enabledMap,
-            $this->extensionsBasePath(),
-            fn (string $extensionPath): array => $this->readExtensionManifest($extensionPath)
-        );
-    }
 
     /**
      * Uploads one gallery image for an existing page.
@@ -1077,201 +500,18 @@ final class PanelController
      * @param array<string, mixed> $post
      * @param array<string, mixed> $files
      */
-    public function pageGalleryUpload(array $post, array $files): void
-    {
-        $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('page', 'edit')) {
-            return;
-        }
-
-        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
-            $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/page'));
-        }
-
-        $pageId = $this->input->int($post['id'] ?? null, 1);
-        if ($pageId === null || !$this->pageImages->pageExists($pageId)) {
-            $this->flash('error', 'Save the page before uploading gallery images.');
-            redirect($this->panelUrl('/page'));
-        }
-
-        /** @var mixed $rawUploads */
-        $rawUploads = $files['gallery_upload_image'] ?? null;
-        $uploads = $this->normalizeUploadedFileSet($rawUploads);
-
-        if ($uploads === []) {
-            $this->flash('error', 'Please select one or more images to upload.');
-            redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
-        }
-
-        $maxFilesPerUpload = max(0, (int) $this->config->get('media.max_files_per_upload', 10));
-        if ($maxFilesPerUpload > 0 && count($uploads) > $maxFilesPerUpload) {
-            $this->flash(
-                'error',
-                'You selected ' . count($uploads) . ' image(s), but the max per upload is ' . $maxFilesPerUpload . '.'
-            );
-            redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
-        }
-
-        $successCount = 0;
-        $errors = [];
-
-        foreach ($uploads as $upload) {
-            $result = $this->pageImageManager()->uploadForPage($pageId, $upload);
-            if ((bool) ($result['ok'] ?? false)) {
-                $successCount++;
-                continue;
-            }
-
-            $errors[] = (string) ($result['error'] ?? 'Failed to upload one image.');
-        }
-
-        if ($successCount > 0) {
-            $this->flash(
-                'success',
-                'Uploaded ' . $successCount . ' image' . ($successCount === 1 ? '' : 's') . '.'
-            );
-        }
-
-        if ($errors !== []) {
-            $this->flash('error', implode(' ', array_values(array_unique($errors))));
-        }
-
-        redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
-    }
 
     /**
      * Deletes one gallery image from an existing page.
      *
      * @param array<string, mixed> $post
      */
-    public function pageGalleryDelete(array $post): void
-    {
-        $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('page', 'edit')) {
-            return;
-        }
-
-        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
-            $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/page'));
-        }
-
-        $pageId = $this->input->int($post['id'] ?? null, 1);
-        $imageId = $this->input->int($post['gallery_delete_image_id'] ?? null, 1);
-        $selectedImageIds = $this->selectedIdsFromPost($post, 'gallery_delete_image_ids');
-
-        if ($pageId === null) {
-            $this->flash('error', 'Invalid image delete request.');
-            redirect($this->panelUrl('/page'));
-        }
-
-        // Single-row delete action has priority when explicit image id is posted.
-        if ($imageId !== null) {
-            if (!$this->pageImageManager()->deleteImageForPage($pageId, $imageId)) {
-                $this->flash('error', 'Image not found or already deleted.');
-                redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
-            }
-
-            $this->flash('success', 'Image deleted.');
-            redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
-        }
-
-        // Bulk-delete path is used by Media-tab "Delete Selected" controls.
-        if ($selectedImageIds === []) {
-            $this->flash('error', 'No gallery images selected.');
-            redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
-        }
-
-        $deletedCount = 0;
-        $failedCount = 0;
-
-        foreach ($selectedImageIds as $selectedImageId) {
-            if ($this->pageImageManager()->deleteImageForPage($pageId, $selectedImageId)) {
-                $deletedCount++;
-            } else {
-                $failedCount++;
-            }
-        }
-
-        if ($deletedCount > 0) {
-            $message = 'Deleted ' . $deletedCount . ' image' . ($deletedCount === 1 ? '' : 's') . '.';
-            if ($failedCount > 0) {
-                $message .= ' Failed to delete ' . $failedCount . ' selected image' . ($failedCount === 1 ? '' : 's') . '.';
-            }
-            $this->flash('success', $message);
-        } else {
-            $this->flash('error', 'Failed to delete selected images.');
-        }
-
-        redirect($this->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
-    }
 
     /**
      * Deletes one page and its relation rows.
      *
      * @param array<string, mixed> $post
      */
-    public function pageDelete(array $post): void
-    {
-        $this->requirePanelLogin();
-        if (!$this->requireRoutePermissionOrForbidden('page', 'delete')) {
-            return;
-        }
-
-        if (!$this->csrf->validate($post['_csrf'] ?? null)) {
-            $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/page'));
-        }
-
-        $id = $this->input->int($post['id'] ?? null, 1);
-        if ($id !== null) {
-            // Single-row delete path (row action button).
-            try {
-                $this->pageImageManager()->deleteAllForPage($id);
-                $this->pageRepo->deleteById($id);
-            } catch (\Throwable) {
-                $this->flash('error', 'Failed to delete page.');
-                redirect($this->panelUrl('/page'));
-            }
-
-            $this->flash('success', 'Page deleted.');
-            redirect($this->panelUrl('/page'));
-        }
-
-        // Bulk-delete mode is used by the list-level "Delete" buttons.
-        $selectedIds = $this->selectedIdsFromPost($post);
-        if ($selectedIds === []) {
-            $this->flash('error', 'No pages selected.');
-            redirect($this->panelUrl('/page'));
-        }
-
-        $deletedCount = 0;
-        $failedCount = 0;
-
-        foreach ($selectedIds as $selectedId) {
-            try {
-                // Keep processing all selected ids even when one delete fails.
-                $this->pageImageManager()->deleteAllForPage($selectedId);
-                $this->pageRepo->deleteById($selectedId);
-                $deletedCount++;
-            } catch (\Throwable) {
-                $failedCount++;
-            }
-        }
-
-        if ($deletedCount > 0) {
-            $message = 'Deleted ' . $deletedCount . ' page' . ($deletedCount === 1 ? '' : 's') . '.';
-            if ($failedCount > 0) {
-                $message .= ' Failed to delete ' . $failedCount . ' selected page' . ($failedCount === 1 ? '' : 's') . '.';
-            }
-            $this->flash('success', $message);
-        } else {
-            $this->flash('error', 'Failed to delete selected pages.');
-        }
-
-        redirect($this->panelUrl('/page'));
-    }
 
 
     /**
@@ -4937,10 +4177,6 @@ final class PanelController
      *   shortcode: string
      * }>
      */
-    private function pageEditorInsertableShortcodes(): array
-    {
-        return $this->extensionProvidedShortcodesForEditor($this->loadExtensionStateMap());
-    }
 
     /**
      * Loads extension-provided shortcode definitions for the page editor menu.
@@ -4955,16 +4191,6 @@ final class PanelController
      * @param array<string, bool> $enabledMap
      * @return array<int, array{extension: string, label: string, shortcode: string}>
      */
-    private function extensionProvidedShortcodesForEditor(array $enabledMap): array
-    {
-        return $this->extensionEditorCatalogService()->panelInsertableShortcodes(
-            $enabledMap,
-            $this->extensionsBasePath(),
-            fn (string $extensionPath): array => $this->readExtensionManifest($extensionPath),
-            fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey),
-            $this->config
-        );
-    }
 
     /**
      * @return array<int, array{name: string, slug: string}>
@@ -6422,24 +5648,6 @@ final class PanelController
         return $this->routeConfigService;
     }
 
-    private function bodyBlockPolicy(): BodyBlockPolicy
-    {
-        if (!$this->bodyBlockPolicy instanceof BodyBlockPolicy) {
-            $this->bodyBlockPolicy = new BodyBlockPolicy($this->input);
-        }
-
-        return $this->bodyBlockPolicy;
-    }
-
-    private function pageBodyBlockCodec(): PageBodyBlockCodec
-    {
-        if (!$this->pageBodyBlockCodec instanceof PageBodyBlockCodec) {
-            $this->pageBodyBlockCodec = new PageBodyBlockCodec($this->input, $this->bodyBlockPolicy());
-        }
-
-        return $this->pageBodyBlockCodec;
-    }
-
     private function panelPermissionDefinitionCatalog(): PanelPermissionDefinitionCatalog
     {
         if (!$this->panelPermissionDefinitionCatalog instanceof PanelPermissionDefinitionCatalog) {
@@ -6544,28 +5752,6 @@ final class PanelController
         }
 
         return $this->extensionCatalogService;
-    }
-
-    private function extensionEditorCatalogService(): ExtensionEditorCatalogService
-    {
-        if (!$this->extensionEditorCatalogService instanceof ExtensionEditorCatalogService) {
-            $this->extensionEditorCatalogService = new ExtensionEditorCatalogService(
-                dirname(__DIR__, 3),
-                $this->input,
-                $this->bodyBlockPolicy()
-            );
-        }
-
-        return $this->extensionEditorCatalogService;
-    }
-
-    private function pageAuthorOptionBuilder(): PanelPageAuthorOptionBuilder
-    {
-        if (!$this->pageAuthorOptionBuilder instanceof PanelPageAuthorOptionBuilder) {
-            $this->pageAuthorOptionBuilder = new PanelPageAuthorOptionBuilder();
-        }
-
-        return $this->pageAuthorOptionBuilder;
     }
 
     private function themeCatalogService(): ThemeCatalogService
