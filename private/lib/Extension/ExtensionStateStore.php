@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
 
-use Raven\Lib\Database\Schema\SchemaEnsureStateStore;
+use Raven\Core\Database\Schema\SchemaEnsureStateStore;
 
 /**
  * Shared persistence service for extension enablement/permission state maps.

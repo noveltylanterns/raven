@@ -13,7 +13,7 @@ use Raven\Ext\ContactFormRepository;
 use Raven\Ext\ContactSubmissionRepository;
 use Raven\Lib\Routing\Router;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Lib\Support\redirect;
 
 /**
  * Registers Contact Forms extension routes into the panel router.

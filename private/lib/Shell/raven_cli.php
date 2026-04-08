@@ -9,15 +9,15 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Repository\CategoryRepository;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TagRepository;
-use Raven\Core\Theme\PublicThemeRegistry;
+use Raven\Lib\Auth\PanelAccess;
 use Raven\Lib\Config\Config;
 use Raven\Lib\Extension\ExtensionRegistry;
+use Raven\Lib\View\PublicThemeRegistry;
 
 final class RavenCliContext
 {

@@ -26,7 +26,7 @@ declare(strict_types=1);
  *   inheritance_chain: string
  * }> $themes */
 
-use function Raven\Core\Support\e;
+use function Raven\Lib\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 ?>

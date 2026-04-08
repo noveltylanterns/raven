@@ -12,8 +12,8 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
-use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Repository\GroupRepository;
+use Raven\Lib\Auth\PanelAccess;
 use Raven\Lib\Auth\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Http\UploadFileSetNormalizer;
 use Raven\Lib\Media\TaxonomyImageService;
@@ -21,7 +21,7 @@ use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\InputSanitizer;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Lib\Support\redirect;
 
 /**
  * Handles split group-management routes.

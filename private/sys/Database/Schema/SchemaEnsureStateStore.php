@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database\Schema;
+namespace Raven\Core\Database\Schema;
 
 /**
  * Persists and compares a schema-ensure signature so hot paths can skip no-op ensure runs.

@@ -11,9 +11,9 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Panel;
 
-use Raven\Core\Auth\AuthService;
-use Raven\Core\Auth\PanelAccess;
 use Raven\Core\View;
+use Raven\Lib\Auth\AuthService;
+use Raven\Lib\Auth\PanelAccess;
 use Raven\Lib\Auth\PanelSessionGuard;
 use Raven\Lib\Config\Config;
 use Raven\Lib\Http\SessionFlash;

@@ -13,7 +13,7 @@ use Raven\Ext\SignupFormRepository;
 use Raven\Ext\SignupSubmissionRepository;
 use Raven\Lib\Routing\Router;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Lib\Support\redirect;
 
 /**
  * Registers Signup Sheets extension routes into the panel router.

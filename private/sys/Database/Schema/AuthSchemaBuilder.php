@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/Schema/AuthSchemaBuilder.php
+ * ~/private/sys/Database/Schema/AuthSchemaBuilder.php
  * Ensures auth-side schema objects and Raven-specific user profile columns.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database\Schema;
+namespace Raven\Core\Database\Schema;
 
 use PDO;
 use RuntimeException;

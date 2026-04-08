@@ -12,7 +12,7 @@ declare(strict_types=1);
 use Raven\Ext\Repo\RepoService;
 use Raven\Lib\Routing\Router;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Lib\Support\redirect;
 
 /**
  * Registers Repo extension panel routes.

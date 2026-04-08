@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Extension/EmbeddedShortcodeRuntimeInterface.php
+ * ~/private/lib/Extension/EmbeddedShortcodeRuntimeInterface.php
  * Contract for extension-owned general-purpose shortcode content runtimes.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Extension;
+namespace Raven\Lib\Extension;
 
 /**
  * Defines one shortcode-renderable content runtime for embedding arbitrary content in page bodies.

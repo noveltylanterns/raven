@@ -11,14 +11,14 @@ declare(strict_types=1);
 
 namespace Raven\Ext;
 
-use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Ext\ContactFormRepository;
 use Raven\Ext\ContactSubmissionRepository;
 use Raven\Lib\Config\Config;
+use Raven\Lib\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Lib\Support\redirect;
 
 /**
  * Owns Contact embedded shortcode rendering and submit pipeline.

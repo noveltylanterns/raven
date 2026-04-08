@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database\Schema;
+namespace Raven\Core\Database\Schema;
 
 use PDO;
-use Raven\Core\Auth\PanelAccess;
+use Raven\Lib\Auth\PanelAccess;
 
 /**
  * Installs/normalizes seed rows for stock groups and starter pages.

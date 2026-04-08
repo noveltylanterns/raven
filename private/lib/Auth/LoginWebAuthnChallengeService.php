@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
 
-use Raven\Core\Auth\AuthService;
+use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Security\LoginTwoFactorFlowService;
 use Raven\Lib\Security\WebAuthnService;
 

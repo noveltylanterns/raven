@@ -26,7 +26,7 @@ declare(strict_types=1);
 
 use Raven\Ext\Smallweb\SmallwebService;
 
-use function Raven\Core\Support\e;
+use function Raven\Lib\Support\e;
 
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Smallweb'));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));

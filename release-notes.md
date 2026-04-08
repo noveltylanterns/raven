@@ -2,6 +2,23 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 8, 2026 — formal PSR-4 namespace map; Core/Lib boundary sweep
+
+- **Three-prefix autoloader established**: `private/raven.php` autoloader now maps `Raven\Core\` → `private/sys/`, `Raven\Lib\` → `private/lib/`, and `Raven\Ext\` → `private/ext/{slug}/src/`. The old single `Raven\` prefix that covered both sys/ and extension src/ directories is gone. The `flatten_repository` extension-repo hack is removed.
+- **`private/sys/` remapped to `Raven\Core\`**: all namespace declarations in sys/ updated from `Raven\X` to `Raven\Core\X`. All callers project-wide (lib/, tpl/, ext/, raven.php, install.php, debug/) updated accordingly, including `use function` imports throughout templates and controllers.
+- **Extension classes remapped to `Raven\Ext\`**: all extension `src/` namespace declarations updated from `Raven\X` to `Raven\Ext\X`. Slug-based subdirectory extensions (repo, cron, smallweb) use `Raven\Ext\{Slug}\*`; flat src/ extensions (contact, signups) use `Raven\Ext\*` with class names already carrying extension context.
+- **Entry point paths fixed**: `public/index.php` and `panel/index.php` updated to use correct `sys/Routing/` paths and `Raven\Core\Routing\*` FQCNs after the sys/Core/ collapse left stale hardcoded paths.
+- **`sys/Auth/` dissolved into `lib/Auth/`**: `AuthService` and `PanelAccess` moved to `Raven\Lib\Auth`. All 24 call sites updated. `sys/Auth/` deleted.
+- **Database bootstrap-only machinery pulled into `sys/Database/`**: `lib/Database/Connection/` and `lib/Database/Schema/` moved to `sys/Database/Connection/` and `sys/Database/Schema/` under `Raven\Core\Database\*` — these are pure core bootstrap concerns with no extension value. The `sys/Database/SchemaManager` shim is deleted; `raven.php` now instantiates `Raven\Core\Database\Schema\SchemaManager` directly. Reusable database primitives (`Profiling/`, `Runtime/`, `SqlUpsertPolicy`) remain in `lib/Database/`.
+- **`sys/Extension/` dissolved into `lib/Extension/`**: `EmbeddedFormRuntimeInterface` and `EmbeddedShortcodeRuntimeInterface` moved to `Raven\Lib\Extension` — the correct home for extension API contracts. All callers updated. `sys/Extension/` deleted.
+- **`sys/Media/` dissolved into `lib/Media/`**: `PageImageManager` moved to `Raven\Lib\Media`. All callers updated. `sys/Media/` deleted.
+- **`sys/Security/` dissolved into `lib/Media/`**: `AvatarValidator` moved to `Raven\Lib\Media` alongside the other upload policy classes. `sys/Security/` deleted.
+- **`sys/Support/` dissolved into `lib/Support/`**: `Helpers.php` (global functions `e()`, `redirect()`, `request_path()`) and `CountryOptions.php` moved to `Raven\Lib\Support`. All `use function Raven\Core\Support\*` imports updated project-wide. `raven.php` require_once updated to lib path. `sys/Support/` deleted.
+- **`sys/Theme/` dissolved into `lib/View/`**: `PublicThemeRegistry` moved to `Raven\Lib\View` alongside the rest of the view/theme stack. `sys/Theme/` deleted.
+- **`sys/View/` dissolved into `lib/View/`**: `TemplateTagEngine` moved to `Raven\Lib\View`. `sys/View/` deleted.
+- **Use blocks re-sorted throughout**: all affected PHP files re-sorted alphabetically after each namespace sweep pass.
+- **`docs/Filetree.md` rewritten**: now includes the PSR-4 namespace map table, explicit `sys/` vs `lib/` ownership rules, and updated High-Signal Subtrees entries reflecting all module moves.
+
 ### April 7, 2026 — sys/Core/ collapsed into sys/; raven bootstrap overhead reductions
 
 - **Webroots are back to two entry files**: `public/index.php` now delegates into `private/sys/Core/Routing/Public/PublicEntrypoint.php`, and `panel/index.php` now delegates into `private/sys/Core/Routing/Panel/PanelEntrypoint.php`. The old webroot `bootstrap.php` shims are deleted; runtime assembly now lives in `PublicRuntimeBuilder` and `PanelRuntimeBuilder` under `private/sys/Core/Routing/`.

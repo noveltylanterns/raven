@@ -13,7 +13,6 @@ namespace Raven\Core\Controller\Panel;
 
 use lbuchs\WebAuthn\WebAuthn;
 use lbuchs\WebAuthn\WebAuthnException;
-use Raven\Core\Security\AvatarValidator;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
@@ -22,6 +21,7 @@ use Raven\Lib\Config\PanelMediaConfigService;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Media\AvatarUploadService;
 use Raven\Lib\Media\AvatarValidationPolicy;
+use Raven\Lib\Media\AvatarValidator;
 use Raven\Lib\Media\UserMediaPathService;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Profile\ProfileContactService;
@@ -29,7 +29,7 @@ use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\QrCodeService;
 use Raven\Lib\Security\WebAuthnService;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Lib\Support\redirect;
 
 /**
  * Handles the current user's panel preferences routes.

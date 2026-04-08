@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Panel;
 
-use Raven\Core\Auth\PanelAccess;
+use Raven\Lib\Auth\PanelAccess;
 use Raven\Lib\Config\Config;
 use Raven\Lib\Diagnostics\RequestProfiler;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
@@ -21,8 +21,8 @@ use Raven\Lib\Routing\Router;
 use Raven\Lib\Routing\RouteRequest;
 use RuntimeException;
 
-use function Raven\Core\Support\redirect;
-use function Raven\Core\Support\request_path;
+use function Raven\Lib\Support\redirect;
+use function Raven\Lib\Support\request_path;
 
 /**
  * Owns panel-entry orchestration.

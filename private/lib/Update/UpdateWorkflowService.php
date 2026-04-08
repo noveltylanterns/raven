@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Update;
 
 use FilesystemIterator;
-use Raven\Lib\Database\Schema\SchemaEnsureStateStore;
+use Raven\Core\Database\Schema\SchemaEnsureStateStore;
 use RecursiveCallbackFilterIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;

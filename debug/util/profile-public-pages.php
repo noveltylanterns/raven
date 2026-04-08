@@ -13,13 +13,13 @@ use Raven\Core\Controller\Public\ContentController;
 use Raven\Core\Controller\Public\FeedController;
 use Raven\Core\Controller\Public\ProfileController;
 use Raven\Core\Controller\Public\RequestContext;
-use Raven\Core\Routing\Public\PublicRuntimeBuilder;
-use Raven\Lib\Diagnostics\RequestProfiler;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\UserRepository;
+use Raven\Core\Routing\Public\PublicRuntimeBuilder;
+use Raven\Lib\Diagnostics\RequestProfiler;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');

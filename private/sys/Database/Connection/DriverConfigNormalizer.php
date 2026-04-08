@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database\Connection;
+namespace Raven\Core\Database\Connection;
 
 use RuntimeException;
 

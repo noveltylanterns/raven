@@ -24,15 +24,15 @@ require_once __DIR__ . '/../../private/lib/Extension/ManifestContractValidator.p
 require_once __DIR__ . '/../../private/lib/Extension/ExtensionBootstrapContractResolver.php';
 require_once __DIR__ . '/../../private/lib/Security/InputSanitizer.php';
 
-use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Config;
+use Raven\Core\Repository\GroupRepository;
+use Raven\Core\Repository\UserRepository;
+use Raven\Lib\Auth\PanelAccess;
 use Raven\Lib\Extension\ExtensionCatalogService;
 use Raven\Lib\Extension\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionScaffoldService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\UserRepository;
 
 final class PanelPermissionsSmokeRunner
 {

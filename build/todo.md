@@ -22,68 +22,58 @@ belongs in lib/. Execute each group in order; update all callers and use stateme
 Run a full namespace sweep and smoke test after completing all groups.
 
 #### Auth — dissolve sys/Auth/ into lib/Auth/
-- [ ] Move `sys/Auth/AuthService.php` → `lib/Auth/AuthService.php`, namespace `Raven\Lib\Auth`
-- [ ] Move `sys/Auth/PanelAccess.php` → `lib/Auth/PanelAccess.php`, namespace `Raven\Lib\Auth`
-- [ ] Update all `Raven\Core\Auth\` references project-wide → `Raven\Lib\Auth\`
-- [ ] Delete `sys/Auth/` directory
+[x] Move `sys/Auth/AuthService.php` → `lib/Auth/AuthService.php`, namespace `Raven\Lib\Auth`
+[x] Move `sys/Auth/PanelAccess.php` → `lib/Auth/PanelAccess.php`, namespace `Raven\Lib\Auth`
+[x] Update all `Raven\Core\Auth\` references project-wide → `Raven\Lib\Auth\`
+[x] Delete `sys/Auth/` directory
 
 #### Database — pull core-only machinery into sys/, leave reusable primitives in lib/
-- [ ] Move `lib/Database/Connection/` → `sys/Database/Connection/`, namespace `Raven\Core\Database\Connection`
-      (DsnBuilder, DriverConfigNormalizer, SqliteConnectionBootstrap, SqlitePathResolver — pure bootstrap helpers)
-- [ ] Move `lib/Database/Schema/` → `sys/Database/Schema/`, namespace `Raven\Core\Database\Schema`
-      (all schema builders, runners, state store, seed installer — core orchestration only)
-- [ ] Eliminate the `sys/Database/SchemaManager.php` shim: update `raven.php` to instantiate
-      `Raven\Core\Database\Schema\SchemaManager` directly; delete the shim class
-- [ ] Update `sys/Database/ConnectionFactory.php` to use moved `Raven\Core\Database\Connection\*` classes
-- [ ] Confirm `lib/Database/Profiling/`, `lib/Database/Runtime/`, and `lib/Database/SqlUpsertPolicy.php`
-      stay in lib/ (reusable; extensions may use table name resolution and upsert helpers)
-- [ ] Update all callers of moved classes project-wide
+[x] Move `lib/Database/Connection/` → `sys/Database/Connection/`, namespace `Raven\Core\Database\Connection`
+[x] Move `lib/Database/Schema/` → `sys/Database/Schema/`, namespace `Raven\Core\Database\Schema`
+[x] Eliminate the `sys/Database/SchemaManager.php` shim; `raven.php` now uses `Raven\Core\Database\Schema\SchemaManager` directly
+[x] Confirmed `lib/Database/Profiling/`, `lib/Database/Runtime/`, and `lib/Database/SqlUpsertPolicy.php` stay in lib/
+[x] Update all callers of moved classes project-wide
 
 #### Extension — dissolve sys/Extension/ into lib/Extension/
-- [ ] Move `sys/Extension/EmbeddedFormRuntimeInterface.php` → `lib/Extension/`, namespace `Raven\Lib\Extension`
-- [ ] Move `sys/Extension/EmbeddedShortcodeRuntimeInterface.php` → `lib/Extension/`, namespace `Raven\Lib\Extension`
-- [ ] Update all `Raven\Core\Extension\` references project-wide → `Raven\Lib\Extension\`
-- [ ] Delete `sys/Extension/` directory
+[x] Move `sys/Extension/EmbeddedFormRuntimeInterface.php` → `lib/Extension/`, namespace `Raven\Lib\Extension`
+[x] Move `sys/Extension/EmbeddedShortcodeRuntimeInterface.php` → `lib/Extension/`, namespace `Raven\Lib\Extension`
+[x] Update all `Raven\Core\Extension\` references project-wide → `Raven\Lib\Extension\`
+[x] Delete `sys/Extension/` directory
 
 #### Media — dissolve sys/Media/ into lib/Media/
-- [ ] Move `sys/Media/PageImageManager.php` → `lib/Media/PageImageManager.php`, namespace `Raven\Lib\Media`
-- [ ] Update all `Raven\Core\Media\` references project-wide → `Raven\Lib\Media\`
-- [ ] Delete `sys/Media/` directory
+[x] Move `sys/Media/PageImageManager.php` → `lib/Media/PageImageManager.php`, namespace `Raven\Lib\Media`
+[x] Update all `Raven\Core\Media\` references project-wide → `Raven\Lib\Media\`
+[x] Delete `sys/Media/` directory
 
-#### Security — dissolve sys/Security/ into lib/Security/ or lib/Media/
-- [ ] Assess `sys/Security/AvatarValidator.php`: it validates image upload dimensions/type for avatars
-      — belongs in `lib/Media/` alongside other upload policy classes (AvatarUploadService, AvatarValidationPolicy)
-- [ ] Move `sys/Security/AvatarValidator.php` → `lib/Media/AvatarValidator.php`, namespace `Raven\Lib\Media`
-- [ ] Update all `Raven\Core\Security\` references project-wide → `Raven\Lib\Media\`
-- [ ] Delete `sys/Security/` directory
+#### Security — dissolve sys/Security/ into lib/Media/
+[x] Move `sys/Security/AvatarValidator.php` → `lib/Media/AvatarValidator.php`, namespace `Raven\Lib\Media`
+[x] Update all `Raven\Core\Security\` references project-wide → `Raven\Lib\Media\`
+[x] Delete `sys/Security/` directory
 
 #### Support — dissolve sys/Support/ into lib/Support/
-- [ ] Move `sys/Support/Helpers.php` → `lib/Support/Helpers.php`, namespace `Raven\Lib\Support`
-      (global functions e(), redirect(), request_path() — useful to extensions and templates)
-- [ ] Move `sys/Support/CountryOptions.php` → `lib/Support/CountryOptions.php`, namespace `Raven\Lib\Support`
-- [ ] Update all `Raven\Core\Support\` and `use function Raven\Core\Support\` references project-wide → `Raven\Lib\Support\`
-- [ ] Delete `sys/Support/` directory
+[x] Move `sys/Support/Helpers.php` → `lib/Support/Helpers.php`, namespace `Raven\Lib\Support`
+[x] Move `sys/Support/CountryOptions.php` → `lib/Support/CountryOptions.php`, namespace `Raven\Lib\Support`
+[x] Update all `Raven\Core\Support\` and `use function Raven\Core\Support\` references project-wide → `Raven\Lib\Support\`
+[x] Delete `sys/Support/` directory
 
-#### Theme — dissolve sys/Theme/ into lib/View/ or lib/Theme/
-- [ ] `sys/Theme/PublicThemeRegistry.php` is already consumed only by lib/View/ and lib/Shell/ —
-      move to `lib/View/PublicThemeRegistry.php`, namespace `Raven\Lib\View`
-      (alternatively: create `lib/Theme/` if more theme-registry classes are expected later — decide at time of move)
-- [ ] Update all `Raven\Core\Theme\` references project-wide → `Raven\Lib\View\` (or `Raven\Lib\Theme\`)
-- [ ] Delete `sys/Theme/` directory
+#### Theme — dissolve sys/Theme/ into lib/View/
+[x] Move `sys/Theme/PublicThemeRegistry.php` → `lib/View/PublicThemeRegistry.php`, namespace `Raven\Lib\View`
+[x] Update all `Raven\Core\Theme\` references project-wide → `Raven\Lib\View\`
+[x] Delete `sys/Theme/` directory
 
 #### View — dissolve sys/View/ into lib/View/
-- [ ] Move `sys/View/TemplateTagEngine.php` → `lib/View/TemplateTagEngine.php`, namespace `Raven\Lib\View`
-- [ ] Update all `Raven\Core\View\` references project-wide → `Raven\Lib\View\`
-- [ ] Delete `sys/View/` directory
+[x] Move `sys/View/TemplateTagEngine.php` → `lib/View/TemplateTagEngine.php`, namespace `Raven\Lib\View`
+[x] Update all `Raven\Core\View\` references project-wide → `Raven\Lib\View\`
+[x] Delete `sys/View/` directory
 
 #### Routing — post-sweep check
-- [ ] After all above groups are complete, re-examine `sys/Routing/` and `lib/Routing/` to confirm
-      the boundary still holds cleanly and no stray files need to move.
+[x] Routing boundary confirmed clean: sys/Routing/ holds all entrypoints/builders/registrars;
+    lib/Routing/ holds reusable primitives (Router, RouteRequest, policies, services). No moves needed.
 
 #### Final
-- [ ] Run full namespace audit (`grep -rn "Raven\\\\" ...`) to confirm zero outliers remain
-- [ ] Smoke-test public and panel entry points
-- [ ] Update `docs/Filetree.md` to reflect the new sys/ and lib/ boundaries
+[x] Full namespace audit — zero outliers remain
+[x] Smoke-test passed — public and panel entry points boot cleanly
+[x] Update `docs/Filetree.md` to reflect the new sys/ and lib/ boundaries
 
 
 ### General Organization & Consolidation

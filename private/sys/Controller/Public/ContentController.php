@@ -12,8 +12,6 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Closure;
-use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
-use Raven\Core\Extension\EmbeddedShortcodeRuntimeInterface;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageImageRepository;
 use Raven\Core\Repository\PageRepository;
@@ -22,7 +20,9 @@ use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Content\BodyBlockPolicy;
 use Raven\Lib\Content\MarkdownRenderer;
 use Raven\Lib\Content\PublicPageBodyRenderer;
+use Raven\Lib\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Extension\EmbeddedFormRuntimeService;
+use Raven\Lib\Extension\EmbeddedShortcodeRuntimeInterface;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Http\RedirectTargetValidator;
 use Raven\Lib\Profile\ProfileContactService;
@@ -34,7 +34,7 @@ use Raven\Lib\View\PublicTemplatePipeline;
 use Raven\Lib\View\PublicTemplateResolver;
 use Raven\Lib\View\ThemeCatalogService;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Lib\Support\redirect;
 
 /**
  * Handles split public homepage and page-routing routes.

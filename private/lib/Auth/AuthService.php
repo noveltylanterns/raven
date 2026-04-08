@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Auth/AuthService.php
+ * ~/private/lib/Auth/AuthService.php
  * Authentication and authorization core component.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Auth;
+namespace Raven\Lib\Auth;
 
 use PDO;
 use Raven\Lib\Auth\AuthAccessGateService;

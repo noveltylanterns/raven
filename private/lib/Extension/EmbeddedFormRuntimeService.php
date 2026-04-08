@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
 
-use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
-use Raven\Core\Extension\EmbeddedShortcodeRuntimeInterface;
+use Raven\Lib\Extension\EmbeddedFormRuntimeInterface;
+use Raven\Lib\Extension\EmbeddedShortcodeRuntimeInterface;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Security\InputSanitizer;
 

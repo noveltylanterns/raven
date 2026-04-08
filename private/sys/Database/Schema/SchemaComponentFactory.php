@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database\Schema;
+namespace Raven\Core\Database\Schema;
 
 /**
  * Lazily wires schema bootstrap components with shared dependencies.

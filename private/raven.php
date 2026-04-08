@@ -9,11 +9,11 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Auth\AuthService;
 use Raven\Core\Database\ConnectionFactory;
-use Raven\Core\Database\SchemaManager;
+use Raven\Core\Database\Schema\SchemaManager;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
+use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Config\Config;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Log\EventLogger;
@@ -88,7 +88,7 @@ return (static function (): array {
     });
 
     // Load global helper functions.
-    require_once $root . '/private/sys/Support/Helpers.php';
+    require_once $root . '/private/lib/Support/Helpers.php';
 
     $config = new Config($root . '/private/dat/config.php');
 

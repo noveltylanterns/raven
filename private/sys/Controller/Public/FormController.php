@@ -12,9 +12,9 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Closure;
-use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
-use Raven\Core\Extension\EmbeddedShortcodeRuntimeInterface;
+use Raven\Lib\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Extension\EmbeddedFormRuntimeService;
+use Raven\Lib\Extension\EmbeddedShortcodeRuntimeInterface;
 
 /**
  * Handles split public embedded-form submission routes.

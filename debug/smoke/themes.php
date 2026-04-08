@@ -21,7 +21,7 @@ require_once dirname(__DIR__, 2) . '/private/lib/View/PublicTemplatePipeline.php
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\PublicTemplatePipeline;
 use Raven\Lib\View\PublicTemplateResolver;
-use Raven\Core\View\TemplateTagEngine;
+use Raven\Lib\View\TemplateTagEngine;
 
 final class ThemeTemplateSmokeRunner
 {

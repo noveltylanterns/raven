@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
 
-use Raven\Core\Auth\PanelAccess;
+use Raven\Lib\Auth\PanelAccess;
 
 /**
  * Builds panel permission-definition rows from stock and extension sources.

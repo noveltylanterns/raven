@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
-use Raven\Core\Auth\PanelAccess;
 use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
@@ -20,10 +19,10 @@ use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\TaxonomySetRepository;
 use Raven\Core\Repository\UserRepository;
-use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Lib\Archive\ArchivePackageService;
 use Raven\Lib\Archive\PackageInstallWorkflowService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Auth\PanelAccess;
 use Raven\Lib\Config\Config;
 use Raven\Lib\Config\ConfigEditorNormalizer;
 use Raven\Lib\Config\ConfigEditorSchemaService;
@@ -50,13 +49,14 @@ use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Update\GitCommandRunner;
 use Raven\Lib\Update\UpdateSourceResolver;
 use Raven\Lib\Update\UpdateWorkflowService;
+use Raven\Lib\View\PublicThemeRegistry;
 use Raven\Lib\View\ThemeCatalogService;
 use Raven\Lib\View\ThemeCloneService;
 use Raven\Lib\View\ThemeFallbackRenderer;
 use Raven\Lib\View\ThemeScaffoldService;
 use ZipArchive;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Lib\Support\redirect;
 
 /**
  * Handles split panel system-management routes.

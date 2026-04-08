@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Support/Helpers.php
+ * ~/private/lib/Support/Helpers.php
  * Shared helper functions for Raven CMS.
  * Docs: https://raven.lanterns.io
  */
@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Core\Support;
+namespace Raven\Lib\Support;
 
 use Raven\Lib\Http\HttpResponse;
 

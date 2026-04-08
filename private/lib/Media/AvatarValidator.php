@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Security/AvatarValidator.php
+ * ~/private/lib/Media/AvatarValidator.php
  * Security utility for validation and protections.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Security;
+namespace Raven\Lib\Media;
 
 use Raven\Lib\Media\AvatarValidationPolicy;
 

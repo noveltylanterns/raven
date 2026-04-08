@@ -23,7 +23,7 @@
 /** @var string $coverImageUrl */
 /** @var int $bioMaxLength */
 
-use function Raven\Core\Support\e;
+use function Raven\Lib\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $loginIdentifierMode = strtolower(trim((string) ($loginIdentifierMode ?? 'email')));

@@ -15,7 +15,6 @@ use Closure;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\InviteTokenRepository;
 use Raven\Core\Repository\UserRepository;
-use Raven\Core\Security\AvatarValidator;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelInvitePolicyService;
 use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
@@ -24,13 +23,14 @@ use Raven\Lib\Config\PanelMediaConfigService;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Media\AvatarUploadService;
 use Raven\Lib\Media\AvatarValidationPolicy;
+use Raven\Lib\Media\AvatarValidator;
 use Raven\Lib\Media\UserMediaPathService;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\InputSanitizer;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Lib\Support\redirect;
 
 /**
  * Handles split user-management routes.

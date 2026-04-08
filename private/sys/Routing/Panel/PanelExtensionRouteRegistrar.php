@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Panel;
 
-use Raven\Core\Auth\PanelAccess;
+use Raven\Lib\Auth\PanelAccess;
 use Raven\Lib\Auth\PanelSessionGuard;
 use Raven\Lib\Panel\PanelUrl;
 use Raven\Lib\Routing\Router;

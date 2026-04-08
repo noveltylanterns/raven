@@ -31,8 +31,8 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
-use function Raven\Core\Support\e;
-use Raven\Core\Auth\PanelAccess;
+use function Raven\Lib\Support\e;
+use Raven\Lib\Auth\PanelAccess;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $loginIdentifierMode = strtolower(trim((string) ($loginIdentifierMode ?? 'email')));

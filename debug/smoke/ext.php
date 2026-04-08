@@ -14,7 +14,7 @@ ini_set('display_errors', '0');
 
 require_once __DIR__ . '/../../private/sys/Core/Extension/ExtensionRegistry.php';
 
-use Raven\Core\Extension\ExtensionRegistry;
+use Raven\Lib\Extension\ExtensionRegistry;
 
 /**
  * Validates extension type contracts and optionally manages local debug fixtures.

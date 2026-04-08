@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
-use Raven\Core\Media\PageImageManager;
 use Raven\Core\Repository\CategoryRepository;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageImageRepository;
@@ -31,6 +30,7 @@ use Raven\Lib\Extension\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Http\PanelPostNormalizer;
 use Raven\Lib\Http\UploadFileSetNormalizer;
+use Raven\Lib\Media\PageImageManager;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Panel\PanelPageAuthorOptionBuilder;
 use Raven\Lib\Routing\ChannelRoutePolicy;
@@ -38,7 +38,7 @@ use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Taxonomy\TaxonomySetRecordPolicy;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Lib\Support\redirect;
 
 /**
  * Handles panel page content management routes.

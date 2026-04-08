@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Extension/EmbeddedFormRuntimeInterface.php
+ * ~/private/lib/Extension/EmbeddedFormRuntimeInterface.php
  * Contract for extension-owned embedded form runtime handlers.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Extension;
+namespace Raven\Lib\Extension;
 
 /**
  * Defines one shortcode-renderable embedded form runtime.

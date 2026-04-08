@@ -11,8 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Public;
 
-use Raven\Core\Auth\AuthService;
-use Raven\Core\View\TemplateTagEngine;
+use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Config\Config;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\RequestContextResolver;
@@ -29,6 +28,7 @@ use Raven\Lib\View\PublicRouteRenderService;
 use Raven\Lib\View\PublicTemplateDecorator;
 use Raven\Lib\View\PublicTemplatePipeline;
 use Raven\Lib\View\PublicTemplateResolver;
+use Raven\Lib\View\TemplateTagEngine;
 use Raven\Lib\View\ThemeCatalogService;
 
 /**

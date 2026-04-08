@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/View/TemplateTagEngine.php
+ * ~/private/lib/View/TemplateTagEngine.php
  * Public-template brace-tag compiler and renderer.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\View;
+namespace Raven\Lib\View;
 
 require_once dirname(__DIR__, 2) . '/lib/View/TemplateTagPathResolver.php';
 require_once dirname(__DIR__, 2) . '/lib/View/TemplateTagCompiler.php';
@@ -18,7 +18,7 @@ use Raven\Lib\View\TemplateTagCompiler;
 use Raven\Lib\View\TemplateTagPathResolver;
 use RuntimeException;
 
-use function Raven\Core\Support\e;
+use function Raven\Lib\Support\e;
 
 /**
  * Compiles EE-style brace tags into PHP once, then renders from cache.

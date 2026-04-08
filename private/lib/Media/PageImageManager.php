@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Media/PageImageManager.php
+ * ~/private/lib/Media/PageImageManager.php
  * ImageMagick-backed service for per-entry gallery upload processing.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Media;
+namespace Raven\Lib\Media;
 
 use Imagick;
 use Raven\Core\Repository\PageImageRepository;

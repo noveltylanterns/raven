@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\View;
 
-use Raven\Core\Theme\PublicThemeRegistry;
-use Raven\Core\View\TemplateTagEngine;
+use Raven\Lib\View\PublicThemeRegistry;
+use Raven\Lib\View\TemplateTagEngine;
 
 /**
  * Shared resolver/renderer for public-theme fallback template files.

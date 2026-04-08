@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller;
 
-use Raven\Core\Auth\AuthService;
 use Raven\Core\View;
+use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\LoginAttemptWorkflowService;
 use Raven\Lib\Auth\LoginChallengeWorkflowService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
@@ -25,7 +25,7 @@ use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Site\SiteContextBuilder;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Lib\Support\redirect;
 
 /**
  * Handles dashboard authentication and logout actions.

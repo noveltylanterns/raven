@@ -24,7 +24,7 @@
 /** @var string|null $pageNavChannel */
 /** @var string|null $pageTitle */
 
-use function Raven\Core\Support\e;
+use function Raven\Lib\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $section ??= null;

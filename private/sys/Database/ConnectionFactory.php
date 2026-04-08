@@ -12,10 +12,10 @@ declare(strict_types=1);
 namespace Raven\Core\Database;
 
 use PDO;
-use Raven\Lib\Database\Connection\DriverConfigNormalizer;
-use Raven\Lib\Database\Connection\DsnBuilder;
-use Raven\Lib\Database\Connection\SqliteConnectionBootstrap;
-use Raven\Lib\Database\Connection\SqlitePathResolver;
+use Raven\Core\Database\Connection\DriverConfigNormalizer;
+use Raven\Core\Database\Connection\DsnBuilder;
+use Raven\Core\Database\Connection\SqliteConnectionBootstrap;
+use Raven\Core\Database\Connection\SqlitePathResolver;
 use Raven\Lib\Database\Profiling\ProfiledPDO;
 use Raven\Lib\Database\Profiling\QueryProfilerInterface;
 use Raven\Lib\Diagnostics\RequestQueryProfilerAdapter;

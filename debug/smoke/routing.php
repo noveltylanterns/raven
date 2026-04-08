@@ -37,11 +37,11 @@ require_once dirname(__DIR__, 2) . '/private/sys/Repository/ChannelRepository.ph
 require_once dirname(__DIR__, 2) . '/private/sys/Repository/PageRepository.php';
 
 use Raven\Core\Config;
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\PageRepository;
 use Raven\Lib\Routing\PublicChannelPageRouteService;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\PageRepository;
 
 final class RoutingSmokeRunner
 {

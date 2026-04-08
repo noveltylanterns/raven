@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\View;
 
-use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\View\PublicThemeRegistry;
 
 /**
  * Resolves public template lookup roots and slug-specific template overrides.

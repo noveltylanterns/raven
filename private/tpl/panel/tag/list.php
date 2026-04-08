@@ -18,7 +18,7 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
-use function Raven\Core\Support\e;
+use function Raven\Lib\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $bulkDeleteFormId = 'bulk-tag-delete-form';

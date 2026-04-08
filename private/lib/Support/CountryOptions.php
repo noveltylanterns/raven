@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Support/CountryOptions.php
+ * ~/private/lib/Support/CountryOptions.php
  * Shared country option catalog for signup forms and panel reporting.
  * Docs: https://raven.lanterns.io
  */
@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Core\Support;
+namespace Raven\Lib\Support;
 
 use RuntimeException;
 

@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Auth/PanelAccess.php
+ * ~/private/lib/Auth/PanelAccess.php
  * Authentication and authorization core component.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Auth;
+namespace Raven\Lib\Auth;
 
 require_once dirname(__DIR__, 2) . '/lib/Auth/PanelAccessCatalog.php';
 
