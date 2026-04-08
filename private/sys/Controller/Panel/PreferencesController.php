@@ -13,10 +13,10 @@ namespace Raven\Core\Controller\Panel;
 
 use lbuchs\WebAuthn\WebAuthn;
 use lbuchs\WebAuthn\WebAuthnException;
+use Raven\Core\Config;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
-use Raven\Core\Config;
 use Raven\Lib\Config\PanelMediaConfigService;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Media\AvatarUploadService;

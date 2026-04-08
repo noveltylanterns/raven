@@ -11,13 +11,13 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller;
 
+use Raven\Core\Config;
 use Raven\Core\View;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\LoginAttemptWorkflowService;
 use Raven\Lib\Auth\LoginChallengeWorkflowService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\LoginUiStateService;
-use Raven\Core\Config;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Panel\PanelUrl;

@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Routing\Panel;
 
 use Closure;
+use PDO;
 use Raven\Core\Controller\AuthController;
 use Raven\Core\Controller\Panel\ContentController;
 use Raven\Core\Controller\Panel\DashboardController;
@@ -34,7 +35,6 @@ use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\TaxonomySetRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Core\View;
-use PDO;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelInvitePolicyService;

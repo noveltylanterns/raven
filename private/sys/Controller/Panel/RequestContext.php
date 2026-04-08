@@ -11,11 +11,11 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Panel;
 
+use Raven\Core\Config;
 use Raven\Core\View;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\PanelAccess;
 use Raven\Lib\Auth\PanelSessionGuard;
-use Raven\Core\Config;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Pagination\Pagination;
 use Raven\Lib\Panel\PanelUrl;

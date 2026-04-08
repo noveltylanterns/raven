@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
+use Raven\Core\Config;
 use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
@@ -23,7 +24,6 @@ use Raven\Lib\Archive\ArchivePackageService;
 use Raven\Lib\Archive\PackageInstallWorkflowService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelAccess;
-use Raven\Core\Config;
 use Raven\Lib\Config\ConfigEditorNormalizer;
 use Raven\Lib\Config\ConfigEditorSchemaService;
 use Raven\Lib\Config\ConfigSnapshotSanitizer;

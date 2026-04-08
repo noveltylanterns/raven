@@ -12,13 +12,13 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
+use Raven\Core\Config;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\InviteTokenRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelInvitePolicyService;
 use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
-use Raven\Core\Config;
 use Raven\Lib\Config\PanelMediaConfigService;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Media\AvatarUploadService;

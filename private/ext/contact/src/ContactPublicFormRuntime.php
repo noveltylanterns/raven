@@ -11,9 +11,9 @@ declare(strict_types=1);
 
 namespace Raven\Ext;
 
+use Raven\Core\Config;
 use Raven\Ext\ContactFormRepository;
 use Raven\Ext\ContactSubmissionRepository;
-use Raven\Core\Config;
 use Raven\Lib\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;

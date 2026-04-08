@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Routing\Public;
 
 use Closure;
+use PDO;
 use Raven\Core\Controller\Public\AuthController as PublicAuthController;
 use Raven\Core\Controller\Public\ContentController as PublicContentController;
 use Raven\Core\Controller\Public\FeedController as PublicFeedController;
@@ -27,9 +28,8 @@ use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Core\View;
-use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Auth\AuthService;
-use PDO;
+use Raven\Lib\Config\ConfigValueParser;
 use RuntimeException;
 
 /**

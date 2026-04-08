@@ -9,13 +9,13 @@
 
 declare(strict_types=1);
 
+use Raven\Core\Config;
 use Raven\Core\Repository\CategoryRepository;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TagRepository;
 use Raven\Lib\Auth\PanelAccess;
-use Raven\Core\Config;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\View\PublicThemeRegistry;
 

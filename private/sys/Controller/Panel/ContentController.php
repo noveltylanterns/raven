@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
+use Raven\Core\Config;
 use Raven\Core\Repository\CategoryRepository;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageImageRepository;
@@ -21,7 +22,6 @@ use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\TaxonomySetRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Core\Config;
 use Raven\Lib\Content\BodyBlockPolicy;
 use Raven\Lib\Content\PageBodyBlockCodec;
 use Raven\Lib\Extension\ExtensionCatalogService;

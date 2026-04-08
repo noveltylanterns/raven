@@ -9,12 +9,12 @@
 
 declare(strict_types=1);
 
+use Raven\Core\Config;
 use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\Schema\SchemaManager;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Lib\Auth\AuthService;
-use Raven\Core\Config;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Log\EventLogger;
