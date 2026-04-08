@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Config;
 
+use Raven\Core\Config;
 
 /**
  * Shared panel media configuration and helper-text formatting policy.
