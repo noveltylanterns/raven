@@ -127,10 +127,10 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Shared core-agnostic entry helpers live directly under this folder; public-only and panel-only runtime builders, entrypoints, and route registrars belong under `Public/` and `Panel/`.
 - `private/sys/Core/Routing/Public/`
   - Public entry/runtime assembly currently starts here.
-  - `PublicEntrypoint` now owns public entry orchestration and `PublicRuntimeBuilder` owns public-scope runtime wiring on top of `private/raven.php`.
+  - `PublicEntrypoint` now owns public entry orchestration, `PublicRuntimeBuilder` owns public-scope runtime wiring on top of `private/raven.php`, and controller-aligned registrars own stock public route-family registration plus public extension-route loading.
 - `private/sys/Core/Routing/Panel/`
   - Panel entry/runtime assembly currently starts here.
-  - `PanelEntrypoint` now owns panel entry orchestration and `PanelRuntimeBuilder` owns panel-scope runtime wiring on top of `private/raven.php`.
+  - `PanelEntrypoint` now owns panel entry orchestration, `PanelRuntimeBuilder` owns panel-scope runtime wiring on top of `private/raven.php`, and controller-aligned registrars own stock panel route-family registration, panel extension-route loading, and the panel theme-asset fast path.
 - `private/sys/Repository/`
   - Core content/taxonomy/auth-facing persistence repositories.
 

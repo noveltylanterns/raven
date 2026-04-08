@@ -29,9 +29,9 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 [x] Delete the last webroot `bootstrap.php` shims so `public/` and `panel/` are back to one entry file each.
 [x] Create `private/sys/Core/Routing/Panel/PanelRuntimeBuilder.php` and move panel runtime assembly there.
 [x] Create `private/sys/Core/Routing/Panel/PanelEntrypoint.php` and reduce `panel/index.php` to a thin delegate.
-[ ] Extract public route registration out of `PublicEntrypoint` into controller-aligned registrars under `private/sys/Core/Routing/Public/`.
-[ ] Extract panel route registration out of `PanelEntrypoint`/`panel/index.php` into controller-aligned registrars under `private/sys/Core/Routing/Panel/`.
-[ ] Move extension-route registration into dedicated public/panel extension registrars under `private/sys/Core/Routing/Public/` and `private/sys/Core/Routing/Panel/`.
+[x] Extract public route registration out of `PublicEntrypoint` into controller-aligned registrars under `private/sys/Core/Routing/Public/`.
+[x] Extract panel route registration out of `PanelEntrypoint`/`panel/index.php` into controller-aligned registrars under `private/sys/Core/Routing/Panel/`.
+[x] Move extension-route registration into dedicated public/panel extension registrars under `private/sys/Core/Routing/Public/` and `private/sys/Core/Routing/Panel/`.
 [ ] Move shared entry hooks into `private/sys/Core/Routing/` only when they truly apply to both public and panel (`scheduler`, debug-toolbar wrapper coordination, shared web auth materialization helpers).
 [ ] Re-check `private/lib/Routing/` and `private/lib/Http/` during the sweep; keep only reusable primitives there and keep Raven stock web-entry orchestration in `private/sys/Core/Routing/`.
 [ ] Update `docs/Filetree.md` and the routing docs as each phase lands so the new ownership model stays explicit.

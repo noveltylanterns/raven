@@ -6,7 +6,7 @@ This document explains Raven's Routing Table screen for both panel users and dev
 
 Maintenance note: keep this file updated whenever Routing Table routes, row-building/conflict logic, export behavior, or Routing Table panel views change (`private/tpl/panel/routing.php`, `SystemController::routing*`, or routing inventory composition helpers).
 
-Public-routing note: public route bootstrap lives in `public/index.php`; public route handlers now live under `private/sys/Controller/Public/` with a shared `RequestContext`. Keep those files and `public/theme/AGENTS.md` in sync when public route families are added or changed.
+Public-routing note: public entry orchestration now lives in `private/sys/Core/Routing/Public/`, where controller-aligned registrars map stock public route families onto the split handlers under `private/sys/Controller/Public/`. Keep those files and `public/theme/AGENTS.md` in sync when public route families are added or changed.
 
 ## 1) Panel Guide (Routing Table)
 
@@ -80,7 +80,11 @@ Export fields include:
 - Panel controller:
   - `private/sys/Controller/Panel/SystemController.php`
 - Public route bootstrap:
-  - `public/index.php`
+  - `private/sys/Core/Routing/Public/PublicEntrypoint.php`
+  - `private/sys/Core/Routing/Public/Public*RouteRegistrar.php`
+- Panel route bootstrap:
+  - `private/sys/Core/Routing/Panel/PanelEntrypoint.php`
+  - `private/sys/Core/Routing/Panel/Panel*RouteRegistrar.php`
 - Public auth controller:
   - `private/sys/Controller/Public/AuthController.php`
 - Public profile controller:
@@ -96,7 +100,7 @@ Export fields include:
 
 ### Panel Routes
 
-Declared in `panel/index.php`:
+Declared through `private/sys/Core/Routing/Panel/PanelSystemRouteRegistrar.php` and wired by `private/sys/Core/Routing/Panel/PanelEntrypoint.php`:
 
 - `GET /routing` -> routing inventory screen
 - `GET /routing/export` -> CSV export
