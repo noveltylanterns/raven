@@ -19,8 +19,8 @@ namespace Raven\Lib\Config;
  * from the runtime `Config` class so extension code and lib services can import
  * just the parsing primitive without pulling in I/O concerns.
  *
- * `Raven\Lib\Config\Config` re-exposes these as static methods for callers that
- * want a single import; call this class directly when only parsing is needed.
+ * Call this class directly when only value parsing is needed without the full
+ * config I/O surface (`Raven\Core\Config`).
  */
 final class ConfigValueParser
 {

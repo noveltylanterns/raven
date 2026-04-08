@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Diagnostics;
 
-use Raven\Lib\Database\Profiling\QueryProfilerInterface;
+use Raven\Lib\Database\QueryProfilerInterface;
 
 final class RequestQueryProfilerAdapter implements QueryProfilerInterface
 {

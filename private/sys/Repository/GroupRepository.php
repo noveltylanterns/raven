@@ -15,7 +15,7 @@ use PDO;
 use Raven\Lib\Auth\GroupMembershipWriteService;
 use Raven\Lib\Auth\GroupPublicRouteService;
 use Raven\Lib\Auth\GroupRolePolicy;
-use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Media\TaxonomyImagePathResolver;
 use RuntimeException;
 

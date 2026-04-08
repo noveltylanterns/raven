@@ -23,7 +23,7 @@ use Raven\Lib\Auth\TwoFactorChallengeVerificationService;
 use Raven\Lib\Auth\TwoFactorEmailChallengeService;
 use Raven\Lib\Auth\TwoFactorSessionStateService;
 use Raven\Lib\Auth\UserSecurityProfileService;
-use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Security\TwoFactorMethodNormalizer;
 use RuntimeException;
 

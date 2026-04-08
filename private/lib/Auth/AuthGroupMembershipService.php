@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use PDO;
-use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Database\TableNameResolver;
 
 /**
  * Shared user-group membership queries/mutations for auth permission flows.

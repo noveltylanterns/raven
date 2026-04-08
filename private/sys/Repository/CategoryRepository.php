@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Media\TaxonomyImagePathResolver;
 
 /**

@@ -22,7 +22,7 @@ use Raven\Lib\Auth\UserPanelHydrator;
 use Raven\Lib\Auth\UserPanelQueryService;
 use Raven\Lib\Auth\UserPersistenceService;
 use Raven\Lib\Auth\UserRoutingDataService;
-use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Database\TableNameResolver;
 
 /**
  * Data access for User CRUD and user-group membership assignments.

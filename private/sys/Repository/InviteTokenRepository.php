@@ -13,7 +13,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use PDOException;
-use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Security\InviteTokenPolicy;
 
 /**

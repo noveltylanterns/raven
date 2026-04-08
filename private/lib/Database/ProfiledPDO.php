@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database\Profiling;
+namespace Raven\Lib\Database;
 
 use PDO;
 use PDOStatement;

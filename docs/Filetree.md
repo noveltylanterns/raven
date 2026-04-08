@@ -104,6 +104,8 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 
 ### private/sys/
 
+- `private/sys/Config.php`
+  - `Raven\Core\Config` — canonical runtime config instance. Loads `private/dat/config.php` on construct, exposes dot-path `get`/`set`/`replace`/`save`, and writes config changes atomically with `LOCK_EX`. This is the single authoritative config class; `private/lib/Config/` holds reusable parsing/validation helpers only.
 - `private/sys/Controller/`
   - Public/panel/auth controllers and request flow coordination.
   - Split panel sub-controllers live under `private/sys/Controller/Panel/` with a shared `RequestContext`; `DashboardController`, `ContentController`, `TaxonomyController`, `RedirectController`, `UserController`, `GroupController`, `PreferencesController`, and `SystemController` own the panel route seams.
@@ -130,12 +132,12 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/lib/Channel/`
   - Channel record normalization policy, root channel constants, slug validation, and channel-context hydration helpers. (`ChannelRecordPolicy`, `ChannelContextService`, `ChannelFileStoreService`.)
 - `private/lib/Config/`
-  - Config parsing, validation, editor schema/defaults, and config file persistence.
-  - `Config` — canonical runtime config class. Loads `private/dat/config.php` on construct, exposes dot-path `get`/`set`/`replace`/`save`, and writes config changes atomically with `LOCK_EX`.
+  - Config validation, editor schema/defaults, and value-parsing primitives. Pure reusable policy; does not own the runtime config instance.
+  - `ConfigValueParser` — static scalar coercion helpers (`bool`, `int`, `float`) for extension and lib code that needs safe type conversion from raw config values.
 - `private/lib/Database/`
   - Reusable database primitives for core and extensions.
-  - `Profiling/` — `ProfiledPDO` and `ProfiledPDOStatement` wrap PDO for query-level profiling; `QueryProfilerInterface` is the shared contract.
-  - `Runtime/` — `TableNameResolver` resolves logical table names to physical prefixed names; available to extensions.
+  - `ProfiledPDO` and `ProfiledPDOStatement` wrap PDO for query-level profiling; `QueryProfilerInterface` is the shared contract.
+  - `TableNameResolver` — resolves logical table names to physical prefixed names for both app-db and auth-db contexts; available to extensions.
   - `SqlUpsertPolicy.php` — driver-aware upsert helper available to extensions.
   - Connection setup and schema orchestration have moved to `sys/Database/` as they are core-only bootstrap concerns.
 - `private/lib/Extension/`

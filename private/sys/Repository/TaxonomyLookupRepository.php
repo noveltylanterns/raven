@@ -15,7 +15,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Channel\ChannelContextService;
-use Raven\Lib\Database\Runtime\TableNameResolver;
+use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Media\TaxonomyImagePathResolver;
 
 /**
