@@ -77,6 +77,16 @@ final class PanelRuntimeBuilder
             return $rvn;
         }
 
+        // Panel entry closures ($hasPanelPermissionBit, $canRenderPanelDebugToolbar) capture
+        // $rvn by value and call $rvn['auth']->method() directly, so auth must be a concrete
+        // AuthService before build() returns — resolve both lazy DB and service handles now.
+        if (is_callable($rvn['auth_db'])) {
+            $rvn['auth_db'] = ($rvn['auth_db'])();
+        }
+        if (is_callable($rvn['auth'])) {
+            $rvn['auth'] = ($rvn['auth'])();
+        }
+
         $authController = null;
         $contentController = null;
         $dashboardController = null;
