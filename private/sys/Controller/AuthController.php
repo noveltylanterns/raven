@@ -17,7 +17,7 @@ use Raven\Lib\Auth\LoginAttemptWorkflowService;
 use Raven\Lib\Auth\LoginChallengeWorkflowService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\LoginUiStateService;
-use Raven\Lib\Config\Config;
+use Raven\Core\Config;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Panel\PanelUrl;

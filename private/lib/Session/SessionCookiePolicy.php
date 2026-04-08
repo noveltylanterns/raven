@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Session;
 
-use Raven\Lib\Config\Config;
+use Raven\Core\Config;
 
 /**
  * Session cookie name/domain policy + bootstrap utility.

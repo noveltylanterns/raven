@@ -23,7 +23,7 @@ use Raven\Lib\Archive\ArchivePackageService;
 use Raven\Lib\Archive\PackageInstallWorkflowService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelAccess;
-use Raven\Lib\Config\Config;
+use Raven\Core\Config;
 use Raven\Lib\Config\ConfigEditorNormalizer;
 use Raven\Lib\Config\ConfigEditorSchemaService;
 use Raven\Lib\Config\ConfigSnapshotSanitizer;

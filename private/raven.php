@@ -14,7 +14,8 @@ use Raven\Core\Database\Schema\SchemaManager;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Config\Config;
+use Raven\Core\Config;
+use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Log\EventLogger;
 use Raven\Lib\Scheduler\SchedulerRegistry;
@@ -131,8 +132,8 @@ return (static function (): array {
     };
 
     $input = new InputSanitizer();
-    $categoryEnabled = Config::bool($config->get('category.enabled', false), false);
-    $tagEnabled = Config::bool($config->get('tag.enabled', false), false);
+    $categoryEnabled = ConfigValueParser::bool($config->get('category.enabled', false), false);
+    $tagEnabled = ConfigValueParser::bool($config->get('tag.enabled', false), false);
     $loggingConfig = (array) $config->get('logging', []);
     $logger = null;
     $loggerResolver = static function () use (&$logger, $rvnDb, $driver, $prefix, $loggingConfig): EventLogger {

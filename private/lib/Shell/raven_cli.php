@@ -15,7 +15,7 @@ use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TagRepository;
 use Raven\Lib\Auth\PanelAccess;
-use Raven\Lib\Config\Config;
+use Raven\Core\Config;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\View\PublicThemeRegistry;
 

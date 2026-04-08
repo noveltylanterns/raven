@@ -13,7 +13,7 @@ namespace Raven\Lib\Media;
 
 use Imagick;
 use Raven\Core\Repository\PageImageRepository;
-use Raven\Lib\Config\Config;
+use Raven\Core\Config;
 use Raven\Lib\Media\ImageVariantProcessor;
 use Raven\Lib\Media\PageImagePathLayout;
 use Raven\Lib\Media\PageImageUploadPolicy;

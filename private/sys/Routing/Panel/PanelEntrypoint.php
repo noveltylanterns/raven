@@ -14,7 +14,7 @@ namespace Raven\Core\Routing\Panel;
 use Raven\Core\Routing\DebugToolbarResponseHook;
 use Raven\Core\Routing\SchedulerFallbackRunner;
 use Raven\Lib\Auth\PanelAccess;
-use Raven\Lib\Config\Config;
+use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
 use Raven\Lib\Panel\PanelUrl;
 use Raven\Lib\Routing\Router;
@@ -143,8 +143,8 @@ final class PanelEntrypoint
             ], true);
         };
 
-        $categoryEnabled = Config::bool($rvn['config']->get('category.enabled', true), true);
-        $tagEnabled = Config::bool($rvn['config']->get('tag.enabled', true), true);
+        $categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', true), true);
+        $tagEnabled = ConfigValueParser::bool($rvn['config']->get('tag.enabled', true), true);
         $_SESSION['_raven_category_enabled'] = $categoryEnabled;
         $_SESSION['_raven_tag_enabled'] = $tagEnabled;
 

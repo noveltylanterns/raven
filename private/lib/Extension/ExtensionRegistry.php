@@ -282,7 +282,7 @@ final class ExtensionRegistry
      * @param array{
      *   extension?: string,
      *   forms?: callable(string): array<int, array{name: string, slug: string}>,
-     *   config?: \Raven\Lib\Config\Config
+     *   config?: \Raven\Core\Config
      * } $context Optional context passed to the shortcode provider.
      * @return array<int, array{label: string, shortcode: string}>|null
      *         Normalized shortcode items, or null when the provider is invalid.
@@ -307,7 +307,7 @@ final class ExtensionRegistry
      * @param array{
      *   extension?: string,
      *   forms?: callable(string): array<int, array{name: string, slug: string}>,
-     *   config?: \Raven\Lib\Config\Config
+     *   config?: \Raven\Core\Config
      * } $context Optional context passed to the shortcode provider.
      * @return string|null Validation error message, or null when the provider is valid.
      */
@@ -617,7 +617,7 @@ final class ExtensionRegistry
      * @param array{
      *   extension?: string,
      *   forms?: callable(string): array<int, array{name: string, slug: string}>,
-     *   config?: \Raven\Lib\Config\Config
+     *   config?: \Raven\Core\Config
      * } $context
      * @return array{valid: bool, error: string, items: array<int, array{label: string, shortcode: string}>}
      */

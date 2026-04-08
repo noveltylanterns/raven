@@ -15,7 +15,7 @@ use Raven\Core\View;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\PanelAccess;
 use Raven\Lib\Auth\PanelSessionGuard;
-use Raven\Lib\Config\Config;
+use Raven\Core\Config;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Pagination\Pagination;
 use Raven\Lib\Panel\PanelUrl;

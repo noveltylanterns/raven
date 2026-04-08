@@ -16,7 +16,7 @@ use lbuchs\WebAuthn\WebAuthnException;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
-use Raven\Lib\Config\Config;
+use Raven\Core\Config;
 use Raven\Lib\Config\PanelMediaConfigService;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Media\AvatarUploadService;

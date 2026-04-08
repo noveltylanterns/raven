@@ -27,7 +27,7 @@ use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Core\View;
-use Raven\Lib\Config\Config;
+use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Auth\AuthService;
 use PDO;
 use RuntimeException;
@@ -70,8 +70,8 @@ final class PublicRuntimeBuilder
         $userRepository = null;
 
         $rvn['view'] = new View((string) $rvn['root'] . '/private/tpl');
-        $categoryEnabled = Config::bool($rvn['config']->get('category.enabled', false), false);
-        $tagEnabled = Config::bool($rvn['config']->get('tag.enabled', false), false);
+        $categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', false), false);
+        $tagEnabled = ConfigValueParser::bool($rvn['config']->get('tag.enabled', false), false);
 
         // Public entry closures ($canRenderPublicDebugToolbar) capture $rvn by value and call
         // $rvn['auth']->method() directly, so auth must be a concrete AuthService before

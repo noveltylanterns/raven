@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
 
-use Raven\Lib\Config\Config;
+use Raven\Core\Config;
 use Raven\Lib\Security\InputSanitizer;
 
 /**

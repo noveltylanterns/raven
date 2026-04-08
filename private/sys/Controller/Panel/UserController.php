@@ -18,7 +18,7 @@ use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelInvitePolicyService;
 use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
-use Raven\Lib\Config\Config;
+use Raven\Core\Config;
 use Raven\Lib\Config\PanelMediaConfigService;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Media\AvatarUploadService;

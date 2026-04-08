@@ -21,7 +21,7 @@ use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\TaxonomySetRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Config\Config;
+use Raven\Core\Config;
 use Raven\Lib\Content\BodyBlockPolicy;
 use Raven\Lib\Content\PageBodyBlockCodec;
 use Raven\Lib\Extension\ExtensionCatalogService;

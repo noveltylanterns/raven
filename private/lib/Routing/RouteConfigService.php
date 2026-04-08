@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Routing;
 
-use Raven\Lib\Config\Config;
+use Raven\Core\Config;
+use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Panel\PanelUrl;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -113,7 +114,7 @@ final class RouteConfigService
 
     public function configBool(mixed $value, bool $default = false): bool
     {
-        return Config::bool($value, $default);
+        return ConfigValueParser::bool($value, $default);
     }
 
     public function profileRoutePrefix(): string

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Site;
 
-use Raven\Lib\Config\Config;
+use Raven\Core\Config;
 use Raven\Lib\Http\RequestContextResolver;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\RouteConfigService;

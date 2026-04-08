@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Media;
 
 use Imagick;
-use Raven\Lib\Config\Config;
+use Raven\Core\Config;
 
 /**
  * Shared page-image variant sizing and EXIF-orientation helpers.
