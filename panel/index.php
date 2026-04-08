@@ -11,9 +11,9 @@ declare(strict_types=1);
 
 use Raven\Core\Auth\PanelAccess;
 use Raven\Lib\Auth\PanelSessionGuard;
-use Raven\Core\Diagnostics\DebugToolbarRenderer;
 use Raven\Lib\Config\Config;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
+use Raven\Lib\Diagnostics\Toolbar\DebugToolbarRenderer;
 use Raven\Lib\Diagnostics\RequestProfiler;
 use Raven\Lib\Panel\PanelUrl;
 use Raven\Lib\Routing\RouteRequest;
@@ -25,6 +25,8 @@ use function Raven\Core\Support\redirect;
 /**
  * Panel front controller for https://{domain}/{panel_path}/
  */
+// Keep the panel webroot limited to work that truly applies to every panel
+// request until the remaining routing and runtime assembly moves into `private/sys/`.
 $rvn = require dirname(__DIR__) . '/private/raven.php';
 $panelBootstrap = require __DIR__ . '/bootstrap.php';
 $rvn = $panelBootstrap($rvn);

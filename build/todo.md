@@ -19,6 +19,22 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 	- Do after above autoload delete mod.
 	- Store localized logic in lib/Composer/delight-im/auth.php
 
+### Webroot Routing Refactor
+- Rule for this whole sweep: `public/index.php`, `panel/index.php`, and every `RuntimeBuilder` / `Entrypoint` file must carry only work needed on every route in that scope. Route-family logic belongs in `private/sys/Controller/` and the routing registrars that will live beside it under `private/sys/Core/Routing/`.
+[x] Flatten debug-toolbar renderer ownership into `private/lib/Diagnostics/Toolbar/` so web entry/routing work does not keep leaning on a one-off `private/sys/Core/Diagnostics/` class.
+[x] Create `private/sys/Core/Routing/Public/PublicRuntimeBuilder.php` and move public runtime assembly there.
+[x] Create `private/sys/Core/Routing/Public/PublicEntrypoint.php` and reduce `public/index.php` to a thin delegate.
+[x] Reduce `public/bootstrap.php` to a temporary compatibility shim that forwards to `PublicRuntimeBuilder`.
+[ ] Repoint non-web public callers off `public/bootstrap.php`, then delete the shim entirely.
+[ ] Create `private/sys/Core/Routing/Panel/PanelRuntimeBuilder.php` and reduce `panel/bootstrap.php` to a thin shim.
+[ ] Create `private/sys/Core/Routing/Panel/PanelEntrypoint.php` and reduce `panel/index.php` to a thin delegate.
+[ ] Extract public route registration out of `PublicEntrypoint` into controller-aligned registrars under `private/sys/Core/Routing/Public/`.
+[ ] Extract panel route registration out of `PanelEntrypoint`/`panel/index.php` into controller-aligned registrars under `private/sys/Core/Routing/Panel/`.
+[ ] Move extension-route registration into dedicated public/panel extension registrars under `private/sys/Core/Routing/Public/` and `private/sys/Core/Routing/Panel/`.
+[ ] Move shared entry hooks into `private/sys/Core/Routing/` only when they truly apply to both public and panel (`scheduler`, debug-toolbar wrapper coordination, shared web auth materialization helpers).
+[ ] Re-check `private/lib/Routing/` and `private/lib/Http/` during the sweep; keep only reusable primitives there and keep Raven stock web-entry orchestration in `private/sys/Core/Routing/`.
+[ ] Update `docs/Filetree.md` and the routing docs as each phase lands so the new ownership model stays explicit.
+
 
 
 ## Long Term

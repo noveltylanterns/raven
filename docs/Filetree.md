@@ -24,10 +24,11 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 ## Runtime Entrypoints
 
 - `public/index.php`
-  - Public frontend controller.
+  - Public frontend entry shim.
+  - Should stay limited to universal public-entry delegation only.
 - `public/bootstrap.php`
-  - Public-runtime bootstrap assembly.
-  - Owns public-only controller wiring on top of the shared core bootstrap.
+  - Temporary public-runtime compatibility shim.
+  - Forwards to `private/sys/Core/Routing/Public/PublicRuntimeBuilder.php` while non-web callers are repointed.
 - `public/install.php`
   - First-run installer.
 - `panel/index.php`
@@ -126,6 +127,12 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Public/panel/auth controllers and request flow coordination.
   - Split panel sub-controllers now live under `private/sys/Controller/Panel/` with a shared `RequestContext`; `DashboardController`, `ContentController`, `TaxonomyController`, `RedirectController`, `UserController`, `GroupController`, `PreferencesController`, and `SystemController` own the `/`, `/page*`, `/channel*`, `/category*`, `/tag*`, `/redirect*`, `/user*`, `/group*`, `/preferences*`, `/configuration*`, `/update*`, `/routing*`, `/logs*`, `/themes*`, and `/extensions*` seams.
   - Public split controllers now live under `private/sys/Controller/Public/` with their own shared `RequestContext`; `AuthController`, `ProfileController`, `FormController`, `FeedController`, and `ContentController` own the `/login*`, `/register*`, profile/group, `/forms/submit`, feed/category/tag, homepage, channel, and page-routing seams, while `RequestContext` owns shared availability, not-found, and public extension-template rendering helpers.
+- `private/sys/Core/Routing/`
+  - Raven-owned web entry and dispatch orchestration.
+  - Shared core-agnostic entry helpers live directly under this folder; public-only and panel-only runtime builders, entrypoints, and route registrars belong under `Public/` and `Panel/`.
+- `private/sys/Core/Routing/Public/`
+  - Public entry/runtime assembly currently starts here.
+  - `PublicEntrypoint` now owns public entry orchestration and `PublicRuntimeBuilder` owns public-scope runtime wiring on top of `private/raven.php`.
 - `private/sys/Repository/`
   - Core content/taxonomy/auth-facing persistence repositories.
 

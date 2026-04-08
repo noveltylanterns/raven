@@ -4,6 +4,8 @@
 
 ### April 7, 2026 — raven bootstrap overhead reductions
 
+- **Public webroot extraction started**: `public/index.php` is now a thin delegate into `private/sys/Core/Routing/Public/PublicEntrypoint.php`, and the public-scope runtime assembly moved into `private/sys/Core/Routing/Public/PublicRuntimeBuilder.php`. `public/bootstrap.php` remains only as a temporary compatibility shim while non-web callers are repointed.
+- **Debug toolbar renderer flattened into lib**: `DebugToolbarRenderer` moved from `private/sys/Core/Diagnostics/` into `private/lib/Diagnostics/Toolbar/`, aligning the renderer with the rest of the debug-toolbar stack before the routing/entry sweep continues.
 - **Auth bootstrap split out of the steady path**: `private/raven.php` now ensures only app-side schema during baseline bootstrap, while auth DB setup and `AuthService` construction resolve lazily through the `auth_db` / `auth` container entries the first time something actually asks for them.
 - **Schema ensure split by responsibility**: `SchemaEnsurePipeline` and `SchemaManager` now expose dedicated app/auth ensure paths with separate state files, so auth schema work no longer forces an auth connection during non-auth bootstrap.
 - **Web bootstraps preserve the existing runtime contract**: `public/bootstrap.php` and `panel/bootstrap.php` now materialize the lazy auth entries when web runtime assembly begins, so the existing controller/request-context code still receives concrete auth objects while non-web consumers can stay off the auth connection path.
