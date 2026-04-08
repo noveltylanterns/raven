@@ -33,7 +33,8 @@ final class SchemaManager
         $this->authStateStore = $authStateStore ?? new SchemaEnsureStateStore(
             $root,
             $root . '/private/dat/.schema_ensure_auth_state.php',
-            $root . '/private/dat/.schema_ensure_auth.lock'
+            $root . '/private/dat/.schema_ensure_auth.lock',
+            $root . '/private/dat/.schema_ensure_auth.marker'
         );
     }
 

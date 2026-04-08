@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Database\Schema;
 
-use Raven\Lib\Extension\ExtensionRegistry;
-
 /**
  * Persists and compares a schema-ensure signature so hot paths can skip no-op ensure runs.
  *
@@ -18,24 +16,29 @@ final class SchemaEnsureStateStore
     private string $root;
     private string $stateFile;
     private string $lockFile;
+    private string $markerFile;
 
     /**
      * @param string $root Project root used to resolve schema and state paths.
      * @param string|null $stateFile Optional absolute path to the persisted state file.
      * @param string|null $lockFile Optional absolute path to the lock file guarding concurrent ensures.
+     * @param string|null $markerFile Optional absolute path to the invalidation marker file.
      */
-    public function __construct(string $root, ?string $stateFile = null, ?string $lockFile = null)
+    public function __construct(string $root, ?string $stateFile = null, ?string $lockFile = null, ?string $markerFile = null)
     {
         $this->root = rtrim($root, '/\\');
         $this->stateFile = $stateFile ?? ($this->root . '/private/dat/.schema_ensure_state.php');
         $this->lockFile = $lockFile ?? ($this->root . '/private/dat/.schema_ensure.lock');
+        $this->markerFile = $markerFile ?? ($this->root . '/private/dat/.schema_ensure.marker');
     }
 
     /**
-     * Runs the schema ensure callback only when the current signature changed.
+     * Runs the schema ensure callback only when the local invalidation marker is newer
+     * than the last successful ensure state.
      *
-     * The exclusive lock prevents a burst of concurrent requests from all paying the
-     * same expensive schema walk after one deployment or extension change.
+     * The fast path avoids lock contention and filesystem walks on steady-state
+     * requests. The exclusive lock still prevents a burst of concurrent requests from
+     * all paying the same ensure work after one update or extension-enable change.
      *
      * @param string $driver Active database driver name.
      * @param string $prefix Active Raven table prefix.
@@ -44,26 +47,31 @@ final class SchemaEnsureStateStore
      */
     public function ensureIfChanged(string $driver, string $prefix, callable $ensure): void
     {
+        if (!$this->isDirty()) {
+            return;
+        }
+
         $lockHandle = @fopen($this->lockFile, 'c+');
         if (!is_resource($lockHandle)) {
             // Fallback to the safe behavior when the local lock file cannot be opened.
             $ensure();
+            $this->writeState($driver, $prefix);
             return;
         }
 
         try {
             if (!@flock($lockHandle, LOCK_EX)) {
                 $ensure();
+                $this->writeState($driver, $prefix);
                 return;
             }
 
-            $signature = $this->signature($driver, $prefix);
-            if ($this->storedSignature() === $signature) {
+            if (!$this->isDirty()) {
                 return;
             }
 
             $ensure();
-            $this->writeState($signature);
+            $this->writeState($driver, $prefix);
         } finally {
             @flock($lockHandle, LOCK_UN);
             @fclose($lockHandle);
@@ -71,66 +79,73 @@ final class SchemaEnsureStateStore
     }
 
     /**
-     * Builds a deterministic signature for the currently relevant schema inputs.
+     * Marks the schema state dirty so the next bootstrap re-runs ensure.
+     *
+     * Call this from update/install/extension-enable flows that can change schema inputs.
+     *
+     * @return void
+     */
+    public function invalidate(): void
+    {
+        $markerDirectory = dirname($this->markerFile);
+        if (!is_dir($markerDirectory) && !mkdir($markerDirectory, 0775, true) && !is_dir($markerDirectory)) {
+            return;
+        }
+
+        if (@touch($this->markerFile) === false && @file_put_contents($this->markerFile, '', LOCK_EX) === false) {
+            return;
+        }
+
+        clearstatcache(true, $this->markerFile);
+        @chmod($this->markerFile, 0600);
+    }
+
+    /**
+     * Returns true when the invalidation marker requires another ensure pass.
+     *
+     * @return bool True when schema ensure should run again.
+     */
+    private function isDirty(): bool
+    {
+        if (!is_file($this->stateFile)) {
+            return true;
+        }
+
+        if (!is_file($this->markerFile)) {
+            return true;
+        }
+
+        $stateMtime = (int) (@filemtime($this->stateFile) ?: 0);
+        $markerMtime = (int) (@filemtime($this->markerFile) ?: 0);
+        if ($stateMtime <= 0 || $markerMtime <= 0) {
+            return true;
+        }
+
+        return $markerMtime > $stateMtime;
+    }
+
+    /**
+     * Persists one successful ensure stamp to local runtime state.
+     *
+     * The marker file is touched first, then the state file is written so the
+     * state mtime naturally ends up newer than the marker mtime.
      *
      * @param string $driver Active database driver name.
      * @param string $prefix Active Raven table prefix.
-     * @return string Stable hash covering core schema files and enabled extension schema inputs.
-     */
-    public function signature(string $driver, string $prefix): string
-    {
-        $parts = [
-            'driver=' . strtolower(trim($driver)),
-            'prefix=' . $prefix,
-        ];
-
-        foreach ($this->coreSchemaFiles() as $file) {
-            $parts[] = $this->fileSignaturePart($file);
-        }
-
-        $extensionStateFile = $this->root . '/private/dat/ext/.state.php';
-        $parts[] = $this->fileSignaturePart($extensionStateFile);
-
-        foreach (ExtensionRegistry::enabledDirectories($this->root, true) as $directory) {
-            $parts[] = 'extension=' . $directory;
-            $extensionRoot = $this->root . '/private/ext/' . $directory;
-            $parts[] = $this->fileSignaturePart($extensionRoot . '/ext.json');
-            $parts[] = $this->fileSignaturePart($extensionRoot . '/ext.php');
-            $parts[] = $this->fileSignaturePart($extensionRoot . '/lib/schema.php');
-        }
-
-        return sha1(implode("\n", $parts));
-    }
-
-    /**
-     * Returns the currently stored signature, or an empty string when no state exists yet.
-     */
-    private function storedSignature(): string
-    {
-        if (!is_file($this->stateFile)) {
-            return '';
-        }
-
-        /** @var mixed $state */
-        $state = require $this->stateFile;
-        if (!is_array($state)) {
-            return '';
-        }
-
-        $signature = trim((string) ($state['signature'] ?? ''));
-        return $signature !== '' ? $signature : '';
-    }
-
-    /**
-     * Persists one successful schema signature to local runtime state.
-     *
-     * @param string $signature Signature that completed a full ensure pass successfully.
      * @return void
      */
-    private function writeState(string $signature): void
+    private function writeState(string $driver, string $prefix): void
     {
+        $stateDirectory = dirname($this->stateFile);
+        if (!is_dir($stateDirectory) && !mkdir($stateDirectory, 0775, true) && !is_dir($stateDirectory)) {
+            return;
+        }
+
+        $this->invalidate();
+
         $payload = "<?php\n\nreturn " . var_export([
-            'signature' => $signature,
+            'driver' => strtolower(trim($driver)),
+            'prefix' => $prefix,
             'ensured_at' => gmdate('c'),
         ], true) . ";\n";
 
@@ -139,34 +154,6 @@ final class SchemaEnsureStateStore
         }
 
         @chmod($this->stateFile, 0600);
-    }
-
-    /**
-     * Returns all core schema files whose changes should invalidate the ensure signature.
-     *
-     * @return array<int, string>
-     */
-    private function coreSchemaFiles(): array
-    {
-        $files = glob($this->root . '/private/lib/Database/Schema/*.php') ?: [];
-        sort($files);
-        return array_values(array_filter($files, 'is_string'));
-    }
-
-    /**
-     * Returns one stable file-signature part covering path, existence, size, and mtime.
-     *
-     * @param string $file Absolute file path.
-     * @return string One signature fragment for this file.
-     */
-    private function fileSignaturePart(string $file): string
-    {
-        if (!is_file($file)) {
-            return $file . '|missing';
-        }
-
-        $mtime = (int) (@filemtime($file) ?: 0);
-        $size = (int) (@filesize($file) ?: 0);
-        return $file . '|mtime=' . $mtime . '|size=' . $size;
+        clearstatcache(true, $this->stateFile);
     }
 }

@@ -8,6 +8,7 @@ use FilesystemIterator;
 use RecursiveCallbackFilterIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use Raven\Lib\Database\Schema\SchemaEnsureStateStore;
 use RuntimeException;
 
 /**
@@ -148,6 +149,9 @@ final class UpdateWorkflowService
 
                 $appliedCount = $this->applyPlan($plan['actions'], (string) $workspace['source_tree']);
                 $this->syncLocalRepositoryToSource((string) $source['source_url'], (string) $workspace['remote']['branch']);
+                if ($appliedCount > 0) {
+                    $this->schemaEnsureStateStore()->invalidate();
+                }
                 $localState = $this->localRepositoryState();
                 $summary = $plan['summary'];
                 $summary['applied_count'] = $appliedCount;
@@ -973,6 +977,19 @@ final class UpdateWorkflowService
     {
         $this->git->mustRun(['fetch', '--quiet', '--depth', '1', $sourceUrl, $branch], $this->root);
         $this->git->mustRun(['reset', '--mixed', '--quiet', 'FETCH_HEAD'], $this->root);
+    }
+
+    /**
+     * Returns the schema ensure marker helper for the local install root.
+     *
+     * Updates can add, remove, or replace schema-related files, so the next
+     * bootstrap needs a fresh ensure pass after any applied update action.
+     *
+     * @return SchemaEnsureStateStore Shared schema ensure marker helper.
+     */
+    private function schemaEnsureStateStore(): SchemaEnsureStateStore
+    {
+        return new SchemaEnsureStateStore($this->root);
     }
 
     /**

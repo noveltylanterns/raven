@@ -15,12 +15,16 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 
 ### Performance: Bootstrap Overhead
 
-Two bootstrap-overhead targets were called out here. The auth-bootstrap deferral is done; the schema-guard hot path still remains.
+The two bootstrap-overhead targets from this section are now done.
 
 **1. `SchemaManager::ensure()` guard runs on every request**
 `SchemaEnsureStateStore::ensureIfChanged()` guards against running the full schema pipeline, but the guard's own work still runs every request: `fopen` + `flock(LOCK_EX)` (serializes concurrent requests), `glob()` over all schema PHP files, `filemtime`/`filesize` on every schema file and each extension's `ext.json`/`ext.php`/`schema.php`, and a `require` of the state file. On a stable install this is always a no-op outcome but still pays for all of it on every hit.
 
 Fix: Replace the per-request file-stat signature with a lighter "has the state file been invalidated?" check — compare the state file's own mtime against a marker set at deploy/update time, rather than recomputing a full content signature on every request.
+
+[x] Schema marker invalidation landed on April 7.
+- `SchemaEnsureStateStore` now uses local marker files plus state-file mtimes for the hot path instead of recomputing schema signatures on every request.
+- Update application and extension enable/disable changes now invalidate schema state for the next bootstrap.
 
 **2. `$authDb` opened eagerly on all entry points including CLI**
 `ConnectionFactory::createAuthConnection()` opens a real PDO connection (second SQLite file handle or second TCP connection for MySQL/pgsql) on every request. CLI commands via `rvn-*` never call into `AuthService` but still pay for the connection.

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
 
+use Raven\Lib\Database\Schema\SchemaEnsureStateStore;
+
 /**
  * Shared persistence service for extension enablement/permission state maps.
  */
@@ -149,8 +151,9 @@ final class ExtensionStateStore
      */
     public function saveState(array $enabledMap, array $permissionMap, array $permissionBitsMap = []): void
     {
+        $currentState = $this->loadStateData();
         if ($permissionBitsMap === []) {
-            $permissionBitsMap = $this->loadStateData()['permission_bits'];
+            $permissionBitsMap = $currentState['permission_bits'];
         }
         $filteredEnabled = $this->normalizeEnabledMap($enabledMap);
         $filteredPermissions = $this->normalizePermissionMap($permissionMap);
@@ -182,6 +185,23 @@ final class ExtensionStateStore
         if (function_exists('opcache_invalidate')) {
             @opcache_invalidate($statePath, true);
         }
+
+        if ($currentState['enabled'] !== $filteredEnabled) {
+            $this->schemaEnsureStateStore()->invalidate();
+        }
+    }
+
+    /**
+     * Returns the schema ensure marker helper for the current project root.
+     *
+     * Enabling/disabling extensions can change the set of active extension
+     * schema providers, so those transitions must invalidate the schema marker.
+     *
+     * @return SchemaEnsureStateStore Shared schema ensure marker helper.
+     */
+    private function schemaEnsureStateStore(): SchemaEnsureStateStore
+    {
+        return new SchemaEnsureStateStore(dirname($this->extensionsBasePath, 2));
     }
 
     private function isSafeExtensionDirectoryName(string $name): bool
