@@ -9,7 +9,11 @@
 
 declare(strict_types=1);
 
-use Raven\Controller\PublicController;
+use Raven\Controller\Public\ContentController;
+use Raven\Controller\Public\FeedController;
+use Raven\Controller\Public\ProfileController;
+use Raven\Controller\Public\RequestContext;
+use Raven\Core\Routing\Public\PublicRuntimeBuilder;
 use Raven\Lib\Diagnostics\RequestProfiler;
 use Raven\Repository\ChannelRepository;
 use Raven\Repository\GroupRepository;
@@ -19,6 +23,69 @@ use Raven\Repository\UserRepository;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
+
+/**
+ * Minimal adapter that preserves the profiler's old public-controller surface
+ * while the live public runtime is now split across sub-controllers.
+ *
+ * This utility is not a web entrypoint. It should resolve the split public
+ * controllers directly rather than keeping `public/bootstrap.php` alive.
+ */
+final class PublicProfileControllerAdapter
+{
+    public function __construct(
+        private readonly ContentController $content,
+        private readonly FeedController $feed,
+        private readonly ProfileController $profile,
+        private readonly RequestContext $requestContext
+    ) {
+    }
+
+    public function home(): void
+    {
+        $this->content->home();
+    }
+
+    public function channel(string $slug): void
+    {
+        $this->content->channel($slug);
+    }
+
+    public function page(string $slug, ?string $channel = null): void
+    {
+        $this->content->page($slug, $channel);
+    }
+
+    public function category(string $slug, int $page = 1): void
+    {
+        $this->feed->category($slug, $page);
+    }
+
+    public function tag(string $slug, int $page = 1): void
+    {
+        $this->feed->tag($slug, $page);
+    }
+
+    public function profile(string $username): void
+    {
+        $this->profile->profile($username);
+    }
+
+    public function group(string $slug): void
+    {
+        $this->profile->group($slug);
+    }
+
+    public function notFound(): void
+    {
+        $this->requestContext->notFound();
+    }
+
+    public function enforceSiteAvailability(): bool
+    {
+        return $this->requestContext->enforceSiteAvailability();
+    }
+}
 
 /**
  * Profiles public routes/views against current runtime config and data.
@@ -87,7 +154,7 @@ final class PublicRouteProfilerRunner
      * @return array<int, array{
      *   key: string,
      *   uri: string,
-     *   handler: callable(PublicController): void
+     *   handler: callable(PublicProfileControllerAdapter): void
      * }>
      */
     private function buildScenarios(): array
@@ -194,7 +261,7 @@ final class PublicRouteProfilerRunner
         $scenarios[] = [
             'key' => 'home',
             'uri' => '/',
-            'handler' => static function (PublicController $controller): void {
+            'handler' => static function (PublicProfileControllerAdapter $controller): void {
                 $controller->home();
             },
         ];
@@ -203,7 +270,7 @@ final class PublicRouteProfilerRunner
             $scenarios[] = [
                 'key' => 'channel_landing',
                 'uri' => '/' . rawurlencode($channelLandingSlug),
-                'handler' => static function (PublicController $controller) use ($channelLandingSlug): void {
+                'handler' => static function (PublicProfileControllerAdapter $controller) use ($channelLandingSlug): void {
                     $controller->channel($channelLandingSlug);
                 },
             ];
@@ -213,7 +280,7 @@ final class PublicRouteProfilerRunner
             $scenarios[] = [
                 'key' => 'page_root',
                 'uri' => '/' . rawurlencode($rootPageSlug),
-                'handler' => static function (PublicController $controller) use ($rootPageSlug): void {
+                'handler' => static function (PublicProfileControllerAdapter $controller) use ($rootPageSlug): void {
                     $controller->page($rootPageSlug, null);
                 },
             ];
@@ -226,7 +293,7 @@ final class PublicRouteProfilerRunner
                 $scenarios[] = [
                     'key' => 'page_channel',
                     'uri' => '/' . rawurlencode($channelSlug) . '/' . rawurlencode($pageSlug),
-                    'handler' => static function (PublicController $controller) use ($channelSlug, $pageSlug): void {
+                    'handler' => static function (PublicProfileControllerAdapter $controller) use ($channelSlug, $pageSlug): void {
                         $controller->page($pageSlug, $channelSlug);
                     },
                 ];
@@ -237,12 +304,12 @@ final class PublicRouteProfilerRunner
             $categorySlug = trim((string) ($categories[0]['slug'] ?? ''));
             if ($categorySlug !== '') {
                 $scenarios[] = [
-                    'key' => 'category_index',
-                    'uri' => '/' . rawurlencode($categoryPrefix) . '/' . rawurlencode($categorySlug),
-                    'handler' => static function (PublicController $controller) use ($categorySlug): void {
-                        $controller->category($categorySlug, 1);
-                    },
-                ];
+                'key' => 'category_index',
+                'uri' => '/' . rawurlencode($categoryPrefix) . '/' . rawurlencode($categorySlug),
+                'handler' => static function (PublicProfileControllerAdapter $controller) use ($categorySlug): void {
+                    $controller->category($categorySlug, 1);
+                },
+            ];
             }
         }
 
@@ -250,12 +317,12 @@ final class PublicRouteProfilerRunner
             $tagSlug = trim((string) ($tags[0]['slug'] ?? ''));
             if ($tagSlug !== '') {
                 $scenarios[] = [
-                    'key' => 'tag_index',
-                    'uri' => '/' . rawurlencode($tagPrefix) . '/' . rawurlencode($tagSlug),
-                    'handler' => static function (PublicController $controller) use ($tagSlug): void {
-                        $controller->tag($tagSlug, 1);
-                    },
-                ];
+                'key' => 'tag_index',
+                'uri' => '/' . rawurlencode($tagPrefix) . '/' . rawurlencode($tagSlug),
+                'handler' => static function (PublicProfileControllerAdapter $controller) use ($tagSlug): void {
+                    $controller->tag($tagSlug, 1);
+                },
+            ];
             }
         }
 
@@ -267,7 +334,7 @@ final class PublicRouteProfilerRunner
                     $scenarios[] = [
                         'key' => 'profile',
                         'uri' => '/' . rawurlencode($profilePrefix) . '/' . rawurlencode($username),
-                        'handler' => static function (PublicController $controller) use ($username): void {
+                        'handler' => static function (PublicProfileControllerAdapter $controller) use ($username): void {
                             $controller->profile($username);
                         },
                     ];
@@ -287,7 +354,7 @@ final class PublicRouteProfilerRunner
                 $scenarios[] = [
                     'key' => 'group',
                     'uri' => '/' . rawurlencode($groupPrefix) . '/' . rawurlencode($slug),
-                    'handler' => static function (PublicController $controller) use ($slug): void {
+                    'handler' => static function (PublicProfileControllerAdapter $controller) use ($slug): void {
                         $controller->group($slug);
                     },
                 ];
@@ -298,7 +365,7 @@ final class PublicRouteProfilerRunner
         $scenarios[] = [
             'key' => 'not_found',
             'uri' => '/__codex_profiler_not_found__',
-            'handler' => static function (PublicController $controller): void {
+            'handler' => static function (PublicProfileControllerAdapter $controller): void {
                 $controller->notFound();
             },
         ];
@@ -310,7 +377,7 @@ final class PublicRouteProfilerRunner
      * @param array{
      *   key: string,
      *   uri: string,
-     *   handler: callable(PublicController): void
+     *   handler: callable(PublicProfileControllerAdapter): void
      * } $scenario
      * @return array{
      *   status: int,
@@ -330,7 +397,7 @@ final class PublicRouteProfilerRunner
         http_response_code(200);
 
         $rvn = $this->bootstrapApp($uri);
-        $controller = $this->newPublicController($rvn);
+        $controller = $this->newPublicRouteAdapter($rvn);
 
         ob_start();
         RequestProfiler::start(microtime(true), 'public-profile');
@@ -338,7 +405,7 @@ final class PublicRouteProfilerRunner
 
         try {
             if ($controller->enforceSiteAvailability()) {
-                /** @var callable(PublicController): void $handler */
+                /** @var callable(PublicProfileControllerAdapter): void $handler */
                 $handler = $scenario['handler'];
                 $handler($controller);
             }
@@ -406,11 +473,23 @@ final class PublicRouteProfilerRunner
     /**
      * @param array<string, mixed> $rvn
      */
-    private function newPublicController(array $rvn): PublicController
+    private function newPublicRouteAdapter(array $rvn): PublicProfileControllerAdapter
     {
-        /** @var callable(): PublicController $publicControllerFactory */
-        $publicControllerFactory = $rvn['public_controller'];
-        return $publicControllerFactory();
+        /** @var callable(): ContentController $contentFactory */
+        $contentFactory = $rvn['public_content_controller'];
+        /** @var callable(): FeedController $feedFactory */
+        $feedFactory = $rvn['public_feed_controller'];
+        /** @var callable(): ProfileController $profileFactory */
+        $profileFactory = $rvn['public_profile_controller'];
+        /** @var callable(): RequestContext $requestContextFactory */
+        $requestContextFactory = $rvn['public_request_context'];
+
+        return new PublicProfileControllerAdapter(
+            $contentFactory(),
+            $feedFactory(),
+            $profileFactory(),
+            $requestContextFactory()
+        );
     }
 
     /**
@@ -427,13 +506,8 @@ final class PublicRouteProfilerRunner
 
         /** @var array<string, mixed> $rvn */
         $rvn = require $this->root . '/private/raven.php';
-        $publicBootstrap = require $this->root . '/public/bootstrap.php';
-        if (is_callable($publicBootstrap)) {
-            /** @var callable(array<string, mixed>): array<string, mixed> $publicBootstrap */
-            $rvn = $publicBootstrap($rvn);
-        }
 
-        return $rvn;
+        return PublicRuntimeBuilder::build($rvn);
     }
 
     private function seedRequestGlobals(string $uri): void

@@ -14,6 +14,7 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 ## Short Term
 
 ### General Organization & Consolidation
+[ ] We don't need a sys/Core/ folder because sys/ should BE Core/ in our PSR maps. Move all sys/Core/* contents into sys/ and then delete the dempty sys/Core/.
 [ ] Confirm legacy migration fallbacks are no longer needed to make this install work (locations at bottom of this file). expunge every one of them from our codebase as soon as each one is verified as redundant/unecessary.
 [ ] Migrate delight-auth tables from rvn_users_* to rvn_auth_*
 	- Do after above autoload delete mod.
@@ -24,10 +25,10 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 [x] Flatten debug-toolbar renderer ownership into `private/lib/Diagnostics/Toolbar/` so web entry/routing work does not keep leaning on a one-off `private/sys/Core/Diagnostics/` class.
 [x] Create `private/sys/Core/Routing/Public/PublicRuntimeBuilder.php` and move public runtime assembly there.
 [x] Create `private/sys/Core/Routing/Public/PublicEntrypoint.php` and reduce `public/index.php` to a thin delegate.
-[x] Reduce `public/bootstrap.php` to a temporary compatibility shim that forwards to `PublicRuntimeBuilder`.
-[ ] Repoint non-web public callers off `public/bootstrap.php`, then delete the shim entirely.
-[ ] Create `private/sys/Core/Routing/Panel/PanelRuntimeBuilder.php` and reduce `panel/bootstrap.php` to a thin shim.
-[ ] Create `private/sys/Core/Routing/Panel/PanelEntrypoint.php` and reduce `panel/index.php` to a thin delegate.
+[x] Repoint the non-web public profiler utility off `public/bootstrap.php` and the deleted `PublicController`, then delete the shim.
+[x] Delete the last webroot `bootstrap.php` shims so `public/` and `panel/` are back to one entry file each.
+[x] Create `private/sys/Core/Routing/Panel/PanelRuntimeBuilder.php` and move panel runtime assembly there.
+[x] Create `private/sys/Core/Routing/Panel/PanelEntrypoint.php` and reduce `panel/index.php` to a thin delegate.
 [ ] Extract public route registration out of `PublicEntrypoint` into controller-aligned registrars under `private/sys/Core/Routing/Public/`.
 [ ] Extract panel route registration out of `PanelEntrypoint`/`panel/index.php` into controller-aligned registrars under `private/sys/Core/Routing/Panel/`.
 [ ] Move extension-route registration into dedicated public/panel extension registrars under `private/sys/Core/Routing/Public/` and `private/sys/Core/Routing/Panel/`.

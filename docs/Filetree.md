@@ -26,16 +26,11 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `public/index.php`
   - Public frontend entry shim.
   - Should stay limited to universal public-entry delegation only.
-- `public/bootstrap.php`
-  - Temporary public-runtime compatibility shim.
-  - Forwards to `private/sys/Core/Routing/Public/PublicRuntimeBuilder.php` while non-web callers are repointed.
 - `public/install.php`
   - First-run installer.
 - `panel/index.php`
-  - Panel/dashboard controller.
-- `panel/bootstrap.php`
-  - Panel-runtime bootstrap assembly.
-  - Owns panel/auth controller wiring on top of the shared core bootstrap.
+  - Panel/dashboard entry shim.
+  - Should stay limited to universal panel-entry delegation only.
 - `private/raven.php`
   - Shared core bootstrap/container wiring used by both web roots.
   - Owns autoloading, config/session/database/auth startup, lazy service registration, extension metadata, and scheduler wiring.
@@ -133,6 +128,9 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/sys/Core/Routing/Public/`
   - Public entry/runtime assembly currently starts here.
   - `PublicEntrypoint` now owns public entry orchestration and `PublicRuntimeBuilder` owns public-scope runtime wiring on top of `private/raven.php`.
+- `private/sys/Core/Routing/Panel/`
+  - Panel entry/runtime assembly currently starts here.
+  - `PanelEntrypoint` now owns panel entry orchestration and `PanelRuntimeBuilder` owns panel-scope runtime wiring on top of `private/raven.php`.
 - `private/sys/Repository/`
   - Core content/taxonomy/auth-facing persistence repositories.
 

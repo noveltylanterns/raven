@@ -626,6 +626,6 @@ final class PublicEntrypoint
      */
     private static function rootPath(): string
     {
-        return dirname(__DIR__, 6);
+        return dirname(__DIR__, 5);
     }
 }
