@@ -11,13 +11,13 @@ declare(strict_types=1);
 
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Diagnostics\RequestProfiler;
-use Raven\Repository\CategoryRepository;
-use Raven\Repository\ChannelRepository;
-use Raven\Repository\GroupRepository;
-use Raven\Repository\PageRepository;
-use Raven\Repository\RedirectRepository;
-use Raven\Repository\TagRepository;
-use Raven\Repository\UserRepository;
+use Raven\Core\Repository\CategoryRepository;
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\GroupRepository;
+use Raven\Core\Repository\PageRepository;
+use Raven\Core\Repository\RedirectRepository;
+use Raven\Core\Repository\TagRepository;
+use Raven\Core\Repository\UserRepository;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
@@ -368,7 +368,7 @@ final class PanelListProfilerRunner
         $rawSignupServices = is_callable($servicesFor) ? $servicesFor('signups') : [];
 
         $contactFormsRepository = $rawContactServices['forms'] ?? null;
-        if ($contactFormsRepository instanceof \Raven\Repository\ContactFormRepository) {
+        if ($contactFormsRepository instanceof \Raven\Ext\ContactFormRepository) {
             $contactForms = $contactFormsRepository->listAll();
             if ($contactForms !== []) {
                 $contactSlug = trim((string) ($contactForms[0]['slug'] ?? ''));
@@ -379,7 +379,7 @@ final class PanelListProfilerRunner
         }
 
         $signupFormsRepository = $rawSignupServices['forms'] ?? null;
-        if ($signupFormsRepository instanceof \Raven\Repository\SignupFormRepository) {
+        if ($signupFormsRepository instanceof \Raven\Ext\SignupFormRepository) {
             $signupForms = $signupFormsRepository->listAll();
             if ($signupForms !== []) {
                 $signupsSlug = trim((string) ($signupForms[0]['slug'] ?? ''));

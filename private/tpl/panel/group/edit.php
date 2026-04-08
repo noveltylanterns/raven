@@ -22,7 +22,7 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
-use function Raven\Support\e;
+use function Raven\Core\Support\e;
 use Raven\Core\Auth\PanelAccess;
 
 $panelBase = '/' . trim($site['panel_path'], '/');

@@ -24,7 +24,7 @@ use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Taxonomy\TaxonomySetRecordPolicy;
 
-use function Raven\Support\redirect;
+use function Raven\Core\Support\redirect;
 
 /**
  * Handles channel, category, category-set, tag, and tag-set management routes.

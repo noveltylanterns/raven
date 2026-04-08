@@ -20,9 +20,9 @@ declare(strict_types=1);
 /** @var string $csrfField */
 /** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string} $extensionMeta */
 /** @var string $subdir */
-/** @var \Raven\Smallweb\SmallwebService $svc */
+/** @var \Raven\Ext\Smallweb\SmallwebService $svc */
 
-use function Raven\Support\e;
+use function Raven\Core\Support\e;
 
 $isEditMode = is_array($fileData);
 $fileSlug = (string) ($fileData['slug'] ?? '');

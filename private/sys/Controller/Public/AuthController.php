@@ -23,7 +23,7 @@ use Raven\Lib\Auth\LoginUiStateService;
 use Raven\Lib\Http\RedirectTargetValidator;
 use Raven\Lib\Security\LoginTwoFactorFlowService;
 
-use function Raven\Support\redirect;
+use function Raven\Core\Support\redirect;
 
 /**
  * Handles split public auth routes.

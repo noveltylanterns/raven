@@ -9,8 +9,8 @@
 
 declare(strict_types=1);
 
-use Raven\Repository\GroupRepository;
-use Raven\Repository\UserRepository;
+use Raven\Core\Repository\GroupRepository;
+use Raven\Core\Repository\UserRepository;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');

@@ -29,7 +29,7 @@ use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\QrCodeService;
 use Raven\Lib\Security\WebAuthnService;
 
-use function Raven\Support\redirect;
+use function Raven\Core\Support\redirect;
 
 /**
  * Handles the current user's panel preferences routes.

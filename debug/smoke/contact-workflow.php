@@ -9,8 +9,8 @@
 
 declare(strict_types=1);
 
-use Raven\Repository\GroupRepository;
-use Raven\Repository\UserRepository;
+use Raven\Core\Repository\GroupRepository;
+use Raven\Core\Repository\UserRepository;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
@@ -443,8 +443,8 @@ final class ContactWorkflowSmokeRunner
      *
      * @param array<string, mixed> $rvn
      * @return array{
-     *   forms: \Raven\Repository\ContactFormRepository,
-     *   submissions: \Raven\Repository\ContactSubmissionRepository
+     *   forms: \Raven\Ext\ContactFormRepository,
+     *   submissions: \Raven\Ext\ContactSubmissionRepository
      * }
      */
     private function contactRepositories(array $rvn): array
@@ -455,8 +455,8 @@ final class ContactWorkflowSmokeRunner
         $submissionsRepository = $rawContactServices['submissions'] ?? null;
 
         if (
-            !$formsRepository instanceof \Raven\Repository\ContactFormRepository
-            || !$submissionsRepository instanceof \Raven\Repository\ContactSubmissionRepository
+            !$formsRepository instanceof \Raven\Ext\ContactFormRepository
+            || !$submissionsRepository instanceof \Raven\Ext\ContactSubmissionRepository
         ) {
             throw new RuntimeException('Contact extension repositories are unavailable in extension_services.');
         }

@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-use function Raven\Support\e;
+use function Raven\Core\Support\e;
 
 $formatTimestamp = static function (?string $value): string {
     if (!is_string($value) || trim($value) === '') {

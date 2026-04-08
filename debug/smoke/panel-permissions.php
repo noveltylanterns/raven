@@ -31,8 +31,8 @@ use Raven\Lib\Extension\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionScaffoldService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Repository\GroupRepository;
-use Raven\Repository\UserRepository;
+use Raven\Core\Repository\GroupRepository;
+use Raven\Core\Repository\UserRepository;
 
 final class PanelPermissionsSmokeRunner
 {

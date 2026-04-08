@@ -29,7 +29,7 @@ declare(strict_types=1);
  *   is_conflict: bool
  * }> $routeRows */
 
-use function Raven\Support\e;
+use function Raven\Core\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $initialSearch = trim((string) ($initialSearch ?? ''));

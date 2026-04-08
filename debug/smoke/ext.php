@@ -364,7 +364,7 @@ final class ExtensionBoundarySmokeRunner
             $files['fields.php'] = "<?php\n\ndeclare(strict_types=1);\n\nreturn static function (array \$context = []): array {\n    return [[\n        'slug' => 'debug_text',\n        'label' => 'Debug Text',\n        'editor' => 'plaintext',\n    ]];\n};\n";
         }
         if ($type === 'module') {
-            $files['routes/public.php'] = "<?php\n\ndeclare(strict_types=1);\n\nuse Raven\\Core\\Routing\\Router;\n\nreturn static function (Router \$router, array \$context): void {\n    \$router->add('GET', '/" . $this->escapePhpString($directory) . "/ping', static function (): void {\n        header('Content-Type: text/plain; charset=UTF-8');\n        echo 'ok';\n    });\n};\n";
+            $files['routes/public.php'] = "<?php\n\ndeclare(strict_types=1);\n\nuse Raven\Core\\Core\\Routing\\Router;\n\nreturn static function (Router \$router, array \$context): void {\n    \$router->add('GET', '/" . $this->escapePhpString($directory) . "/ping', static function (): void {\n        header('Content-Type: text/plain; charset=UTF-8');\n        echo 'ok';\n    });\n};\n";
         }
 
         return $files;
@@ -372,7 +372,7 @@ final class ExtensionBoundarySmokeRunner
 
     private function panelRouteSkeleton(string $directory, string $displayName): string
     {
-        return "<?php\n\ndeclare(strict_types=1);\n\nuse Raven\\Core\\Routing\\Router;\n\nreturn static function (Router \$router, array \$context): void {\n    /** @var callable(): void \$requirePanelLogin */\n    \$requirePanelLogin = is_callable(\$context['requirePanelLogin'] ?? null)\n        ? \$context['requirePanelLogin']\n        : static function (): void {};\n\n    \$router->add('GET', '/" . $this->escapePhpString($directory) . "', static function () use (\$requirePanelLogin): void {\n        \$requirePanelLogin();\n        echo '<section class=\"card\"><div class=\"card-body\"><h1>" . $this->escapeHtml($displayName) . "</h1><p class=\"text-muted mb-0\">Debug dummy extension route is active.</p></div></section>';\n    });\n};\n";
+        return "<?php\n\ndeclare(strict_types=1);\n\nuse Raven\Core\\Core\\Routing\\Router;\n\nreturn static function (Router \$router, array \$context): void {\n    /** @var callable(): void \$requirePanelLogin */\n    \$requirePanelLogin = is_callable(\$context['requirePanelLogin'] ?? null)\n        ? \$context['requirePanelLogin']\n        : static function (): void {};\n\n    \$router->add('GET', '/" . $this->escapePhpString($directory) . "', static function () use (\$requirePanelLogin): void {\n        \$requirePanelLogin();\n        echo '<section class=\"card\"><div class=\"card-body\"><h1>" . $this->escapeHtml($displayName) . "</h1><p class=\"text-muted mb-0\">Debug dummy extension route is active.</p></div></section>';\n    });\n};\n";
     }
 
     private function deleteDirectory(string $directory): void

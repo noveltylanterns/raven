@@ -40,8 +40,8 @@ use Raven\Core\Config;
 use Raven\Lib\Routing\PublicChannelPageRouteService;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Repository\ChannelRepository;
-use Raven\Repository\PageRepository;
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\PageRepository;
 
 final class RoutingSmokeRunner
 {

@@ -11,6 +11,6 @@ declare(strict_types=1);
 
 // Keep the public webroot limited to universal entry delegation only.
 // Route-specific registration and runtime wiring belong under `private/sys/`.
-require_once dirname(__DIR__) . '/private/sys/Core/Routing/Public/PublicEntrypoint.php';
+require_once dirname(__DIR__) . '/private/sys/Routing/Public/PublicEntrypoint.php';
 
-\Raven\Routing\Public\PublicEntrypoint::handle();
+\Raven\Core\Routing\Public\PublicEntrypoint::handle();

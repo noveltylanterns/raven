@@ -15,7 +15,7 @@ use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Lib\Security\InputSanitizer;
 
-use function Raven\Support\redirect;
+use function Raven\Core\Support\redirect;
 
 /**
  * Handles redirect management routes for the panel.

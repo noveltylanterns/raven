@@ -25,7 +25,7 @@ use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Site\SiteContextBuilder;
 
-use function Raven\Support\redirect;
+use function Raven\Core\Support\redirect;
 
 /**
  * Handles dashboard authentication and logout actions.

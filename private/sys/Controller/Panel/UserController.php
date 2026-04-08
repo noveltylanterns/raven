@@ -30,7 +30,7 @@ use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\InputSanitizer;
 
-use function Raven\Support\redirect;
+use function Raven\Core\Support\redirect;
 
 /**
  * Handles split user-management routes.
@@ -351,7 +351,7 @@ final class UserController
 
         if (!$actorIsAdmin) {
             $configurationGroupIds = [];
-            $systemPanelBitsMask = \Raven\Auth\PanelAccess::maskFromBits(\Raven\Auth\PanelAccess::systemPanelBits());
+            $systemPanelBitsMask = \\Raven\\Core\\Auth\\PanelAccess::maskFromBits(\\Raven\\Core\\Auth\\PanelAccess::systemPanelBits());
             foreach ($groupPermissionMasks as $groupIdKey => $mask) {
                 if (($mask & $systemPanelBitsMask) !== 0) {
                     $configurationGroupIds[] = $groupIdKey;

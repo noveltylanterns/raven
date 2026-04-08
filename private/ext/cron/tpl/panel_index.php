@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-use function Raven\Support\e;
+use function Raven\Core\Support\e;
 
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Scheduled Tasks'));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));

@@ -21,8 +21,8 @@ use Raven\Lib\Routing\Router;
 use Raven\Lib\Routing\RouteRequest;
 use RuntimeException;
 
-use function Raven\Support\redirect;
-use function Raven\Support\request_path;
+use function Raven\Core\Support\redirect;
+use function Raven\Core\Support\request_path;
 
 /**
  * Owns panel-entry orchestration.

@@ -56,7 +56,7 @@ use Raven\Lib\View\ThemeFallbackRenderer;
 use Raven\Lib\View\ThemeScaffoldService;
 use ZipArchive;
 
-use function Raven\Support\redirect;
+use function Raven\Core\Support\redirect;
 
 /**
  * Handles split panel system-management routes.

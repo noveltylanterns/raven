@@ -18,7 +18,7 @@ use Raven\Ext\SignupSubmissionRepository;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 
-use function Raven\Support\redirect;
+use function Raven\Core\Support\redirect;
 
 /**
  * Owns Signup Sheets shortcode rendering and submit pipeline.

@@ -12,7 +12,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
     exit('Not Found');
 }
 
-use function Raven\Support\e;
+use function Raven\Core\Support\e;
 
 $registrationMode = strtolower(trim((string) ($registrationMode ?? 'closed')));
 $registrationClosed = (bool) ($registrationClosed ?? ($registrationMode === 'closed'));

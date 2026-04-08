@@ -34,7 +34,7 @@ use Raven\Lib\View\PublicTemplatePipeline;
 use Raven\Lib\View\PublicTemplateResolver;
 use Raven\Lib\View\ThemeCatalogService;
 
-use function Raven\Support\redirect;
+use function Raven\Core\Support\redirect;
 
 /**
  * Handles split public homepage and page-routing routes.

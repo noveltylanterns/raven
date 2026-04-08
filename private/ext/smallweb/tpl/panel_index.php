@@ -22,11 +22,11 @@ declare(strict_types=1);
 /** @var string|null $flashError */
 /** @var string $csrfField */
 /** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string} $extensionMeta */
-/** @var \Raven\Smallweb\SmallwebService $svc */
+/** @var \Raven\Ext\Smallweb\SmallwebService $svc */
 
 use Raven\Ext\Smallweb\SmallwebService;
 
-use function Raven\Support\e;
+use function Raven\Core\Support\e;
 
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Smallweb'));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
