@@ -12,7 +12,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
     exit('Not Found');
 }
 
-use function Raven\Core\Support\e;
+use function Raven\Support\e;
 
 $loginPath = trim((string) ($loginPath ?? '/login'));
 $registrationPath = trim((string) ($registrationPath ?? '/register'));

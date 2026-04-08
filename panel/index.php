@@ -13,4 +13,4 @@ declare(strict_types=1);
 // Route-specific registration and runtime wiring belong under `private/sys/`.
 require_once dirname(__DIR__) . '/private/sys/Core/Routing/Panel/PanelEntrypoint.php';
 
-\Raven\Core\Routing\Panel\PanelEntrypoint::handle();
+\Raven\Routing\Panel\PanelEntrypoint::handle();

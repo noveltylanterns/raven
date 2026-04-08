@@ -39,7 +39,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 
 - `private/sys/`
   - Core runtime orchestration.
-  - Controllers, repositories, service-container wiring, compatibility shims, and request-facing coordination live here.
+  - Controllers, repositories, service-container wiring, compatibility shims, and request-facing coordination live here. Subsystems (`Auth`, `Database`, `Extension`, `Media`, `Routing`, `Security`, `Support`, `Theme`, `View`) are direct children of this directory — there is no intermediate `Core/` layer.
 - `private/lib/`
   - Reusable core modules.
   - Domain helpers, policies, validators, codecs, render helpers, schema helpers, and other reusable units live here.
@@ -122,13 +122,13 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Public/panel/auth controllers and request flow coordination.
   - Split panel sub-controllers now live under `private/sys/Controller/Panel/` with a shared `RequestContext`; `DashboardController`, `ContentController`, `TaxonomyController`, `RedirectController`, `UserController`, `GroupController`, `PreferencesController`, and `SystemController` own the `/`, `/page*`, `/channel*`, `/category*`, `/tag*`, `/redirect*`, `/user*`, `/group*`, `/preferences*`, `/configuration*`, `/update*`, `/routing*`, `/logs*`, `/themes*`, and `/extensions*` seams.
   - Public split controllers now live under `private/sys/Controller/Public/` with their own shared `RequestContext`; `AuthController`, `ProfileController`, `FormController`, `FeedController`, and `ContentController` own the `/login*`, `/register*`, profile/group, `/forms/submit`, feed/category/tag, homepage, channel, and page-routing seams, while `RequestContext` owns shared availability, not-found, and public extension-template rendering helpers.
-- `private/sys/Core/Routing/`
+- `private/sys/Routing/`
   - Raven-owned web entry and dispatch orchestration.
   - Shared core-agnostic entry helpers live directly under this folder; public-only and panel-only runtime builders, entrypoints, and route registrars belong under `Public/` and `Panel/`.
-- `private/sys/Core/Routing/Public/`
+- `private/sys/Routing/Public/`
   - Public entry/runtime assembly currently starts here.
   - `PublicEntrypoint` now owns public entry orchestration, `PublicRuntimeBuilder` owns public-scope runtime wiring on top of `private/raven.php`, and controller-aligned registrars own stock public route-family registration plus public extension-route loading.
-- `private/sys/Core/Routing/Panel/`
+- `private/sys/Routing/Panel/`
   - Panel entry/runtime assembly currently starts here.
   - `PanelEntrypoint` now owns panel entry orchestration, `PanelRuntimeBuilder` owns panel-scope runtime wiring on top of `private/raven.php`, and controller-aligned registrars own stock panel route-family registration, panel extension-route loading, and the panel theme-asset fast path.
 - `private/sys/Repository/`

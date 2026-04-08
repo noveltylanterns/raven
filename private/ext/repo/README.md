@@ -37,7 +37,7 @@ This Raven `module` extension manages read-only Git repository mirrors with pane
 - See `build-notes.md` for remaining panel UI core follow-ups.
 
 ## Library Helpers Used
-- `Raven\Core\Extension\EmbeddedShortcodeRuntimeInterface`
+- `Raven\Extension\EmbeddedShortcodeRuntimeInterface`
 - `Raven\Lib\Filesystem\DirectoryTreeService`
 - `Raven\Lib\Routing\Router`
 - `Raven\Lib\Security\Csrf` via `$rvn['csrf']`

@@ -36,7 +36,7 @@ declare(strict_types=1);
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
-use function Raven\Core\Support\e;
+use function Raven\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $pageId = (int) ($page['id'] ?? 0);

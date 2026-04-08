@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Repository;
+namespace Raven\Ext;
 
 use DateTimeImmutable;
 use DateTimeZone;

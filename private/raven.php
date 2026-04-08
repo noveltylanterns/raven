@@ -19,8 +19,8 @@ use Raven\Lib\Scheduler\SchedulerRegistry;
 use Raven\Lib\Session\SessionCookiePolicy;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Repository\ChannelRepository;
-use Raven\Repository\PageRepository;
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\PageRepository;
 
 /**
  * Shared bootstrap for all web roots.
@@ -55,44 +55,40 @@ return (static function (): array {
             return;
         }
 
-        $prefix = 'Raven\\';
-        if (!str_starts_with($class, $prefix)) {
+        // Core sys/ classes: Raven\Core\* maps to private/sys/.
+        $corePrefix = 'Raven\\Core\\';
+        if (str_starts_with($class, $corePrefix)) {
+            $relativeSys = str_replace('\\', '/', substr($class, strlen($corePrefix)));
+            $sysFile = $root . '/private/sys/' . $relativeSys . '.php';
+            if (is_file($sysFile)) {
+                require_once $sysFile;
+            }
             return;
         }
 
-        $relative = str_replace('\\', '/', substr($class, strlen($prefix)));
-        $baseSpecs = [
-            ['path' => $root . '/private/sys/', 'flatten_repository' => false],
-        ];
+        // Extension classes: Raven\Ext\* maps to enabled extension src/ directories.
+        $extPrefix = 'Raven\\Ext\\';
+        if (!str_starts_with($class, $extPrefix)) {
+            return;
+        }
+
+        $relative = str_replace('\\', '/', substr($class, strlen($extPrefix)));
         foreach ($enabledExtensionDirectories as $directory) {
             $extensionSourcePath = $root . '/private/ext/' . $directory . '/src/';
             if (!is_dir($extensionSourcePath)) {
                 continue;
             }
 
-            $baseSpecs[] = ['path' => $extensionSourcePath, 'flatten_repository' => true];
-        }
-
-        foreach ($baseSpecs as $baseSpec) {
-            $base = (string) ($baseSpec['path'] ?? '');
-            $flattenRepository = !empty($baseSpec['flatten_repository']);
-            $candidates = [$base . $relative . '.php'];
-
-            if ($flattenRepository && str_starts_with($relative, 'Repository/')) {
-                $candidates[] = $base . substr($relative, strlen('Repository/')) . '.php';
-            }
-
-            foreach ($candidates as $file) {
-                if (is_file($file)) {
-                    require_once $file;
-                    return;
-                }
+            $file = $extensionSourcePath . $relative . '.php';
+            if (is_file($file)) {
+                require_once $file;
+                return;
             }
         }
     });
 
     // Load global helper functions.
-    require_once $root . '/private/sys/Core/Support/Helpers.php';
+    require_once $root . '/private/sys/Support/Helpers.php';
 
     $config = new Config($root . '/private/dat/config.php');
 

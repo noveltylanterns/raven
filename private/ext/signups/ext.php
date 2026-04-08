@@ -9,9 +9,9 @@
 
 declare(strict_types=1);
 
-use Raven\Repository\SignupFormRepository;
-use Raven\Repository\SignupSubmissionRepository;
-use Raven\SignupPublicFormRuntime;
+use Raven\Ext\SignupFormRepository;
+use Raven\Ext\SignupSubmissionRepository;
+use Raven\Ext\SignupPublicFormRuntime;
 
 /**
  * Registers Signup Sheets extension services into the shared app container.

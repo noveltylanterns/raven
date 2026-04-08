@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Controller\Panel;
+namespace Raven\Core\Controller\Panel;
 
 use Raven\Lib\Config\Config;
 use Raven\Core\Security\AvatarValidator;
@@ -29,7 +29,7 @@ use Raven\Lib\Security\WebAuthnService;
 use lbuchs\WebAuthn\WebAuthn;
 use lbuchs\WebAuthn\WebAuthnException;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Support\redirect;
 
 /**
  * Handles the current user's panel preferences routes.

@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-use Raven\Repo\RepoService;
+use Raven\Ext\Repo\RepoService;
 
 return [
     [

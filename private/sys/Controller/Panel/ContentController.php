@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Controller\Panel;
+namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Lib\Config\Config;
@@ -29,16 +29,16 @@ use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Taxonomy\TaxonomySetRecordPolicy;
-use Raven\Repository\CategoryRepository;
-use Raven\Repository\ChannelRepository;
-use Raven\Repository\PageImageRepository;
-use Raven\Repository\PageRepository;
-use Raven\Repository\TagRepository;
-use Raven\Repository\TaxonomyLookupRepository;
-use Raven\Repository\TaxonomySetRepository;
-use Raven\Repository\UserRepository;
+use Raven\Core\Repository\CategoryRepository;
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\PageImageRepository;
+use Raven\Core\Repository\PageRepository;
+use Raven\Core\Repository\TagRepository;
+use Raven\Core\Repository\TaxonomyLookupRepository;
+use Raven\Core\Repository\TaxonomySetRepository;
+use Raven\Core\Repository\UserRepository;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Support\redirect;
 
 /**
  * Handles panel page content management routes.

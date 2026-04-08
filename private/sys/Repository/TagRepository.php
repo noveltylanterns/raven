@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Repository;
+namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Database\Runtime\TableNameResolver;

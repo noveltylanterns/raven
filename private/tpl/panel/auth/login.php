@@ -15,7 +15,7 @@
 /** @var string|null $loginIdentifierMode */
 /** @var string|null $loginIdentifierLabel */
 
-use function Raven\Core\Support\e;
+use function Raven\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $loginIdentifierMode = in_array(strtolower((string) ($loginIdentifierMode ?? 'email')), ['email', 'username'], true)

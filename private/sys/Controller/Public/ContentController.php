@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Controller\Public;
+namespace Raven\Core\Controller\Public;
 
 use Closure;
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
@@ -28,13 +28,13 @@ use Raven\Lib\View\PublicTemplateDecorator;
 use Raven\Lib\View\PublicTemplatePipeline;
 use Raven\Lib\View\PublicTemplateResolver;
 use Raven\Lib\View\ThemeCatalogService;
-use Raven\Repository\ChannelRepository;
-use Raven\Repository\PageImageRepository;
-use Raven\Repository\PageRepository;
-use Raven\Repository\RedirectRepository;
-use Raven\Repository\UserRepository;
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\PageImageRepository;
+use Raven\Core\Repository\PageRepository;
+use Raven\Core\Repository\RedirectRepository;
+use Raven\Core\Repository\UserRepository;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Support\redirect;
 
 /**
  * Handles split public homepage and page-routing routes.

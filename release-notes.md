@@ -2,7 +2,7 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
-### April 7, 2026 — raven bootstrap overhead reductions
+### April 7, 2026 — sys/Core/ collapsed into sys/; raven bootstrap overhead reductions
 
 - **Webroots are back to two entry files**: `public/index.php` now delegates into `private/sys/Core/Routing/Public/PublicEntrypoint.php`, and `panel/index.php` now delegates into `private/sys/Core/Routing/Panel/PanelEntrypoint.php`. The old webroot `bootstrap.php` shims are deleted; runtime assembly now lives in `PublicRuntimeBuilder` and `PanelRuntimeBuilder` under `private/sys/Core/Routing/`.
 - **Stock route registration moved beside core routing ownership**: public and panel route families now register through controller-aligned registrars under `private/sys/Core/Routing/Public/` and `private/sys/Core/Routing/Panel/`, including dedicated public/panel extension-route registrars. `PanelEntrypoint` now delegates the panel theme asset fast path to `PanelThemeAssetResponder` instead of carrying that response logic inline.
@@ -13,6 +13,7 @@
 - **Web bootstraps preserve the existing runtime contract**: `public/bootstrap.php` and `panel/bootstrap.php` now materialize the lazy auth entries when web runtime assembly begins, so the existing controller/request-context code still receives concrete auth objects while non-web consumers can stay off the auth connection path.
 - **Schema guard hot path collapsed to marker checks**: `SchemaEnsureStateStore` no longer recomputes schema file signatures on every request. Steady-state requests now compare state-file mtimes against local invalidation markers, while update application and extension enable/disable changes mark schema state dirty for the next bootstrap.
 - **Category/tag `set` reads flattened**: `CategoryRepository` and `TagRepository` no longer alias the reserved-word `set` column to `set_value` in SELECT queries only to rename it back during hydration. They now select the quoted `set` column directly and read `$row['set']` throughout.
+- **`private/sys/Core/` eliminated**: all subsystems (`Auth`, `Database`, `Extension`, `Media`, `Routing`, `Security`, `Support`, `Theme`, `View`) moved directly under `private/sys/` to match the PSR-4 map where `Raven\\` already roots at `private/sys/`. All `Raven\\Core\\*` namespaces are now `Raven\\*`. `private/raven.php` hard-coded path and all `dirname()` depth constants in affected files updated. `docs/Filetree.md` and active AGENTS docs updated.
 
 ### April 7, 2026 — Config consolidated into lib
 

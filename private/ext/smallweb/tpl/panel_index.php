@@ -24,9 +24,9 @@ declare(strict_types=1);
 /** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string} $extensionMeta */
 /** @var \Raven\Smallweb\SmallwebService $svc */
 
-use Raven\Smallweb\SmallwebService;
+use Raven\Ext\Smallweb\SmallwebService;
 
-use function Raven\Core\Support\e;
+use function Raven\Support\e;
 
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Smallweb'));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));

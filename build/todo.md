@@ -14,7 +14,7 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 ## Short Term
 
 ### General Organization & Consolidation
-[ ] We don't need a sys/Core/ folder because sys/ should BE Core/ in our PSR maps. Move all sys/Core/* contents into sys/ and then delete the dempty sys/Core/.
+[x] We don\'t need a sys/Core/ folder because sys/ should BE Core/ in our PSR maps. Move all sys/Core/* contents into sys/ and then delete the dempty sys/Core/.
 [ ] Confirm legacy migration fallbacks are no longer needed to make this install work (locations at bottom of this file). expunge every one of them from our codebase as soon as each one is verified as redundant/unecessary.
 [ ] Migrate delight-auth tables from rvn_users_* to rvn_auth_*
 	- Do after above autoload delete mod.

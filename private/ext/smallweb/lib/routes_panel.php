@@ -10,9 +10,9 @@
 declare(strict_types=1);
 
 use Raven\Lib\Routing\Router;
-use Raven\Smallweb\SmallwebService;
+use Raven\Ext\Smallweb\SmallwebService;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Support\redirect;
 
 /**
  * Registers Smallweb extension routes into the panel router.

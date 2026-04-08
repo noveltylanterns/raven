@@ -17,7 +17,7 @@
 /** @var string|null $flashError */
 /** @var string $section */
 
-use function Raven\Core\Support\e;
+use function Raven\Support\e;
 
 ?>
 

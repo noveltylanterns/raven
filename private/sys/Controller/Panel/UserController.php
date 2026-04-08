@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Controller\Panel;
+namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Lib\Config\Config;
@@ -26,11 +26,11 @@ use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Repository\GroupRepository;
-use Raven\Repository\InviteTokenRepository;
-use Raven\Repository\UserRepository;
+use Raven\Core\Repository\GroupRepository;
+use Raven\Core\Repository\InviteTokenRepository;
+use Raven\Core\Repository\UserRepository;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Support\redirect;
 
 /**
  * Handles split user-management routes.
@@ -351,7 +351,7 @@ final class UserController
 
         if (!$actorIsAdmin) {
             $configurationGroupIds = [];
-            $systemPanelBitsMask = \Raven\Core\Auth\PanelAccess::maskFromBits(\Raven\Core\Auth\PanelAccess::systemPanelBits());
+            $systemPanelBitsMask = \Raven\Auth\PanelAccess::maskFromBits(\Raven\Auth\PanelAccess::systemPanelBits());
             foreach ($groupPermissionMasks as $groupIdKey => $mask) {
                 if (($mask & $systemPanelBitsMask) !== 0) {
                     $configurationGroupIds[] = $groupIdKey;

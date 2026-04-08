@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Cron;
+namespace Raven\Ext\Cron;
 
 use RuntimeException;
 

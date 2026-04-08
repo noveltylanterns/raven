@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Controller\Public;
+namespace Raven\Core\Controller\Public;
 
 use Closure;
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;

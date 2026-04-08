@@ -9,16 +9,16 @@
 
 declare(strict_types=1);
 
-namespace Raven;
+namespace Raven\Ext;
 
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Core\Support\CountryOptions;
-use Raven\Repository\SignupFormRepository;
-use Raven\Repository\SignupSubmissionRepository;
+use Raven\Ext\SignupFormRepository;
+use Raven\Ext\SignupSubmissionRepository;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Support\redirect;
 
 /**
  * Owns Signup Sheets shortcode rendering and submit pipeline.

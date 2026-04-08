@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-use Raven\Smallweb\SmallwebService;
+use Raven\Ext\Smallweb\SmallwebService;
 
 /**
  * Registers Smallweb extension services into the shared app container.

@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-use function Raven\Core\Support\e;
+use function Raven\Support\e;
 
 $repoView = is_array($payload['repo'] ?? null) ? $payload['repo'] : $repo;
 $mode = (string) ($payload['mode'] ?? 'metadata');

@@ -9,9 +9,9 @@
 
 declare(strict_types=1);
 
-use Raven\Repository\ContactFormRepository;
-use Raven\Repository\ContactSubmissionRepository;
-use Raven\ContactPublicFormRuntime;
+use Raven\Ext\ContactFormRepository;
+use Raven\Ext\ContactSubmissionRepository;
+use Raven\Ext\ContactPublicFormRuntime;
 
 /**
  * Registers Contact extension services into the shared app container.

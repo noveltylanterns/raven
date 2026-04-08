@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Smallweb;
+namespace Raven\Ext\Smallweb;
 
 use Raven\Lib\Extension\ExtensionStorageProvisioner;
 

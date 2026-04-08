@@ -10,10 +10,10 @@
 declare(strict_types=1);
 
 use Raven\Lib\Routing\Router;
-use Raven\Repository\ContactFormRepository;
-use Raven\Repository\ContactSubmissionRepository;
+use Raven\Ext\ContactFormRepository;
+use Raven\Ext\ContactSubmissionRepository;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Support\redirect;
 
 /**
  * Registers Contact Forms extension routes into the panel router.

@@ -10,10 +10,10 @@
 declare(strict_types=1);
 
 use Raven\Lib\Routing\Router;
-use Raven\Repository\SignupFormRepository;
-use Raven\Repository\SignupSubmissionRepository;
+use Raven\Ext\SignupFormRepository;
+use Raven\Ext\SignupSubmissionRepository;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Support\redirect;
 
 /**
  * Registers Signup Sheets extension routes into the panel router.

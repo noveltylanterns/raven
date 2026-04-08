@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Repository;
+namespace Raven\Core\Repository;
 
 use Raven\Lib\Taxonomy\TaxonomySetFileStoreService;
 use Raven\Lib\Taxonomy\TaxonomySetRecordPolicy;

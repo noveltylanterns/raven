@@ -9,13 +9,13 @@
 
 declare(strict_types=1);
 
-namespace Raven\Controller\Panel;
+namespace Raven\Core\Controller\Panel;
 
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Repository\ChannelRepository;
-use Raven\Repository\RedirectRepository;
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\RedirectRepository;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Support\redirect;
 
 /**
  * Handles redirect management routes for the panel.

@@ -21,7 +21,7 @@
 /** @var string|null $flashError */
 
 use Raven\Core\Auth\PanelAccess;
-use function Raven\Core\Support\e;
+use function Raven\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $bulkDeleteFormId = 'bulk-users-delete-form';

@@ -13,8 +13,8 @@ declare(strict_types=1);
 
 use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\SchemaManager;
-use Raven\Repository\GroupRepository;
-use Raven\Repository\UserRepository;
+use Raven\Core\Repository\GroupRepository;
+use Raven\Core\Repository\UserRepository;
 
 /**
  * Escapes text for HTML output.

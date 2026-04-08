@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Repo;
+namespace Raven\Ext\Repo;
 
 /**
  * Persists and normalizes global Repo extension settings.

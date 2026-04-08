@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Controller\Panel;
+namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Auth\AuthService;
 use Raven\Lib\Config\Config;

@@ -66,8 +66,8 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><?= \Raven\Core\Support\e((string) ($site['name'] ?? 'Raven CMS')); ?></title>
-  <link rel="stylesheet" href="<?= \Raven\Core\Support\e((string) ($theme['url'] ?? '/theme/raven')); ?>/css/style.css">
+  <title><?= \Raven\Support\e((string) ($site['name'] ?? 'Raven CMS')); ?></title>
+  <link rel="stylesheet" href="<?= \Raven\Support\e((string) ($theme['url'] ?? '/theme/raven')); ?>/css/style.css">
 </head>
 <body>
 <?= $content ?? ''; ?>
@@ -83,7 +83,7 @@ body { background: #fff; color: #212529; }
 ## Hard-Fail Validation Checklist (Before Hand-Off)
 - `theme.json` is valid JSON with non-empty `name`.
 - Every theme PHP template has `RAVEN_VIEW_RENDER_CONTEXT` guard.
-- No theme output assumes unescaped user input; escape with `Raven\Core\Support\e()` unless trusted HTML is intentional.
+- No theme output assumes unescaped user input; escape with `Raven\Support\e()` unless trusted HTML is intentional.
 - Theme works without any external network assets except configured captcha provider scripts on pages that render captcha.
 - Wrapper prints `$content` exactly once.
 - Theme renders 404/denied/disabled states cleanly (either overridden or inherited fallback).
@@ -327,7 +327,7 @@ body { background: #fff; color: #212529; }
 - Non-scalar values do not render for value tags unless traversed to a scalar child.
 
 ### Security Rules
-- Escaped tags use HTML escaping equivalent to `Raven\Core\Support\e()`.
+- Escaped tags use HTML escaping equivalent to `Raven\Support\e()`.
 - Use `raw:` only for trusted HTML (for example page editor content already sanitized/controlled by your policy).
 - Brace tags do not execute arbitrary PHP and do not evaluate expressions; they only read route/template data.
 
@@ -435,7 +435,7 @@ body { background: #fff; color: #212529; }
 - Keep the guard in every template:
 - check `defined('RAVEN_VIEW_RENDER_CONTEXT')`
 - return 404 and exit when accessed directly
-- Escape user-controlled values with `Raven\Core\Support\e()` unless output is intentionally trusted HTML.
+- Escape user-controlled values with `Raven\Support\e()` unless output is intentionally trusted HTML.
 
 ## Update-Safe Theme Workflow
 - Create a new folder under `public/theme/{your_slug}/`.

@@ -27,7 +27,7 @@
 /** @var array<int, array{id: int, name: string, slug: string, is_root: bool}>|null $tagSetOptions */
 /** @var string|null $activeConfigTab */
 
-use function Raven\Core\Support\e;
+use function Raven\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $configSnapshot = $configSnapshot ?? null;

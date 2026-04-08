@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Repo;
+namespace Raven\Ext\Repo;
 
 use Raven\Lib\Filesystem\DirectoryTreeService;
 use Raven\Lib\Update\GitCommandRunner;

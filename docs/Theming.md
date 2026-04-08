@@ -55,7 +55,7 @@ Templates still support regular PHP. Brace tags are additive.
 
 ## 3) Tag Semantics
 
-- Escaped value tags use HTML escaping (`Raven\Core\Support\e()`).
+- Escaped value tags use HTML escaping (`Raven\Support\e()`).
 - `raw:` tags bypass escaping and should only be used with trusted HTML.
 - Truthy checks:
   - `bool`: native boolean value

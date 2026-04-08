@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Controller\Panel;
+namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use ZipArchive;
@@ -49,14 +49,14 @@ use Raven\Lib\View\ThemeCatalogService;
 use Raven\Lib\View\ThemeCloneService;
 use Raven\Lib\View\ThemeFallbackRenderer;
 use Raven\Lib\View\ThemeScaffoldService;
-use Raven\Repository\ChannelRepository;
-use Raven\Repository\PageRepository;
-use Raven\Repository\RedirectRepository;
-use Raven\Repository\TaxonomyLookupRepository;
-use Raven\Repository\TaxonomySetRepository;
-use Raven\Repository\UserRepository;
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\PageRepository;
+use Raven\Core\Repository\RedirectRepository;
+use Raven\Core\Repository\TaxonomyLookupRepository;
+use Raven\Core\Repository\TaxonomySetRepository;
+use Raven\Core\Repository\UserRepository;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Support\redirect;
 
 /**
  * Handles split panel system-management routes.

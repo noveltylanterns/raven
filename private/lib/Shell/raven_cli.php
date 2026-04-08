@@ -13,11 +13,11 @@ use Raven\Lib\Config\Config;
 use Raven\Core\Auth\PanelAccess;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Core\Theme\PublicThemeRegistry;
-use Raven\Repository\CategoryRepository;
-use Raven\Repository\ChannelRepository;
-use Raven\Repository\GroupRepository;
-use Raven\Repository\RedirectRepository;
-use Raven\Repository\TagRepository;
+use Raven\Core\Repository\CategoryRepository;
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\GroupRepository;
+use Raven\Core\Repository\RedirectRepository;
+use Raven\Core\Repository\TagRepository;
 
 final class RavenCliContext
 {

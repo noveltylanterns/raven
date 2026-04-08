@@ -261,10 +261,12 @@ declare(strict_types=1);
 
 ## Extension Autoloading
 - Enabled extensions may autoload PHP classes from `private/ext/{slug}/src/`.
+- All extension classes live under the `Raven\Ext\` namespace prefix. The autoloader strips `Raven\Ext\` and resolves the remainder as a path relative to each enabled extension's `src/` directory.
 - Namespace-to-path mapping is PSR-4-like from that `src/` root.
 - Example:
-- class `Raven\Smallweb\SmallwebService` must live at `private/ext/smallweb/src/Smallweb/SmallwebService.php`
-- class `Raven\Acme\Admin\Controller` must live at `private/ext/acme/src/Acme/Admin/Controller.php`
+- class `Raven\Ext\Smallweb\SmallwebService` must live at `private/ext/smallweb/src/Smallweb/SmallwebService.php`
+- class `Raven\Ext\Acme\Admin\Controller` must live at `private/ext/acme/src/Acme/Admin/Controller.php`
+- Flat (no sub-directory) classes resolve directly: class `Raven\Ext\MyHelper` lives at `private/ext/myext/src/MyHelper.php`
 - Do not flatten namespaced classes directly into `src/` unless the namespace path is also flat.
 - If an extension service class is not loading, check the namespace/path match first.
 

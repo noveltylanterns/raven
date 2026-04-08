@@ -9,9 +9,9 @@
 
 declare(strict_types=1);
 
-use Raven\Cron\CronShellRunner;
-use Raven\Cron\CronTaskService;
-use Raven\Cron\CronTaskStore;
+use Raven\Ext\Cron\CronShellRunner;
+use Raven\Ext\Cron\CronTaskService;
+use Raven\Ext\Cron\CronTaskStore;
 
 /**
  * Registers Scheduled Tasks services into the shared app container.

@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Controller\Panel;
+namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Lib\Http\UploadFileSetNormalizer;
@@ -19,12 +19,12 @@ use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Taxonomy\TaxonomySetRecordPolicy;
-use Raven\Repository\CategoryRepository;
-use Raven\Repository\ChannelRepository;
-use Raven\Repository\TagRepository;
-use Raven\Repository\TaxonomySetRepository;
+use Raven\Core\Repository\CategoryRepository;
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\TagRepository;
+use Raven\Core\Repository\TaxonomySetRepository;
 
-use function Raven\Core\Support\redirect;
+use function Raven\Support\redirect;
 
 /**
  * Handles channel, category, category-set, tag, and tag-set management routes.
