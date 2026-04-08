@@ -28,6 +28,9 @@ use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Core\View;
 use Raven\Lib\Config\Config;
+use Raven\Lib\Auth\AuthService;
+use PDO;
+use RuntimeException;
 
 /**
  * Builds public-scope runtime factories on top of the shared Raven container.
@@ -50,13 +53,6 @@ final class PublicRuntimeBuilder
             return $rvn;
         }
 
-        if (is_callable($rvn['auth_db'])) {
-            $rvn['auth_db'] = $rvn['auth_db']();
-        }
-        if (is_callable($rvn['auth'])) {
-            $rvn['auth'] = $rvn['auth']();
-        }
-
         $publicAuthController = null;
         $publicContentController = null;
         $publicFeedController = null;
@@ -76,6 +72,40 @@ final class PublicRuntimeBuilder
         $rvn['view'] = new View((string) $rvn['root'] . '/private/tpl');
         $categoryEnabled = Config::bool($rvn['config']->get('category.enabled', false), false);
         $tagEnabled = Config::bool($rvn['config']->get('tag.enabled', false), false);
+
+        /**
+         * Resolves the lazy auth DB handle only for public factories that truly need it.
+         */
+        $resolveAuthDb = static function () use (&$rvn): PDO {
+            $authDb = $rvn['auth_db'] ?? null;
+            if (is_callable($authDb)) {
+                $authDb = $authDb();
+                $rvn['auth_db'] = $authDb;
+            }
+
+            if (!$authDb instanceof PDO) {
+                throw new RuntimeException('Public runtime auth database resolver is unavailable.');
+            }
+
+            return $authDb;
+        };
+
+        /**
+         * Resolves the lazy auth service only for public factories that truly need it.
+         */
+        $resolveAuth = static function () use (&$rvn): AuthService {
+            $auth = $rvn['auth'] ?? null;
+            if (is_callable($auth)) {
+                $auth = $auth();
+                $rvn['auth'] = $auth;
+            }
+
+            if (!$auth instanceof AuthService) {
+                throw new RuntimeException('Public runtime auth service resolver is unavailable.');
+            }
+
+            return $auth;
+        };
 
         /**
          * Request-scoped memoization keeps bootstrap factories lightweight while
@@ -172,9 +202,9 @@ final class PublicRuntimeBuilder
         /**
          * Builds user storage for public login/register/profile flows.
          */
-        $userRepositoryFactory = $memoize(static function () use (&$userRepository, $rvn): UserRepository {
+        $userRepositoryFactory = $memoize(static function () use (&$userRepository, $rvn, $resolveAuthDb): UserRepository {
             $userRepository = new UserRepository(
-                $rvn['auth_db'],
+                $resolveAuthDb(),
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
@@ -186,9 +216,9 @@ final class PublicRuntimeBuilder
         /**
          * Builds invite-token storage only for the registration flows that need it.
          */
-        $inviteTokenRepository = $memoize(static function () use (&$inviteTokens, $rvn): InviteTokenRepository {
+        $inviteTokenRepository = $memoize(static function () use (&$inviteTokens, $rvn, $resolveAuthDb): InviteTokenRepository {
             $inviteTokens = new InviteTokenRepository(
-                $rvn['auth_db'],
+                $resolveAuthDb(),
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
             );
@@ -306,14 +336,14 @@ final class PublicRuntimeBuilder
         /**
          * Builds the shared request context for split public sub-controllers.
          */
-        $rvn['public_request_context'] = static function () use (&$publicRequestContext, $rvn): RequestContext {
+        $rvn['public_request_context'] = static function () use (&$publicRequestContext, $rvn, $resolveAuth): RequestContext {
             if ($publicRequestContext instanceof RequestContext) {
                 return $publicRequestContext;
             }
 
             $publicRequestContext = new RequestContext(
                 $rvn['config'],
-                $rvn['auth'],
+                $resolveAuth(),
                 $rvn['input'],
                 $rvn['csrf']
             );

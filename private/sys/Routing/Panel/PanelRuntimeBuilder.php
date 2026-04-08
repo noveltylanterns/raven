@@ -34,6 +34,8 @@ use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\TaxonomySetRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Core\View;
+use PDO;
+use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelInvitePolicyService;
 use Raven\Lib\Auth\PanelPermissionDefinitionCatalog;
@@ -52,6 +54,7 @@ use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Site\SiteContextBuilder;
+use RuntimeException;
 
 /**
  * Builds panel-scope runtime factories on top of the shared Raven container.
@@ -72,13 +75,6 @@ final class PanelRuntimeBuilder
     {
         if (!isset($rvn['root'], $rvn['db'], $rvn['auth_db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], $rvn['auth'], $rvn['input'], $rvn['csrf'])) {
             return $rvn;
-        }
-
-        if (is_callable($rvn['auth_db'])) {
-            $rvn['auth_db'] = $rvn['auth_db']();
-        }
-        if (is_callable($rvn['auth'])) {
-            $rvn['auth'] = $rvn['auth']();
         }
 
         $authController = null;
@@ -110,6 +106,40 @@ final class PanelRuntimeBuilder
         $rvn['view'] = new View((string) $rvn['root'] . '/private/tpl');
         $categoryEnabled = Config::bool($rvn['config']->get('category.enabled', true), true);
         $tagEnabled = Config::bool($rvn['config']->get('tag.enabled', true), true);
+
+        /**
+         * Resolves the lazy auth DB handle only for panel factories that truly need it.
+         */
+        $resolveAuthDb = static function () use (&$rvn): PDO {
+            $authDb = $rvn['auth_db'] ?? null;
+            if (is_callable($authDb)) {
+                $authDb = $authDb();
+                $rvn['auth_db'] = $authDb;
+            }
+
+            if (!$authDb instanceof PDO) {
+                throw new RuntimeException('Panel runtime auth database resolver is unavailable.');
+            }
+
+            return $authDb;
+        };
+
+        /**
+         * Resolves the lazy auth service only for panel factories that truly need it.
+         */
+        $resolveAuth = static function () use (&$rvn): AuthService {
+            $auth = $rvn['auth'] ?? null;
+            if (is_callable($auth)) {
+                $auth = $auth();
+                $rvn['auth'] = $auth;
+            }
+
+            if (!$auth instanceof AuthService) {
+                throw new RuntimeException('Panel runtime auth service resolver is unavailable.');
+            }
+
+            return $auth;
+        };
 
         /**
          * Request-scoped memoization keeps bootstrap factories lightweight while
@@ -206,9 +236,9 @@ final class PanelRuntimeBuilder
         /**
          * Builds user storage for panel user/preferences flows.
          */
-        $userFactory = $memoize(static function () use (&$userRepository, $rvn): UserRepository {
+        $userFactory = $memoize(static function () use (&$userRepository, $rvn, $resolveAuthDb): UserRepository {
             $userRepository = new UserRepository(
-                $rvn['auth_db'],
+                $resolveAuthDb(),
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
@@ -236,9 +266,9 @@ final class PanelRuntimeBuilder
         /**
          * Builds invite-token storage only for panel invite management.
          */
-        $inviteTokenFactory = $memoize(static function () use (&$inviteTokenRepository, $rvn): InviteTokenRepository {
+        $inviteTokenFactory = $memoize(static function () use (&$inviteTokenRepository, $rvn, $resolveAuthDb): InviteTokenRepository {
             $inviteTokenRepository = new InviteTokenRepository(
-                $rvn['auth_db'],
+                $resolveAuthDb(),
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
             );
@@ -426,8 +456,8 @@ final class PanelRuntimeBuilder
          *
          * @return array<string, array<string, mixed>>
          */
-        $rvn['panel_permission_map_provider'] = static function () use (&$rvn): array {
-            if (($rvn['auth']->userId() ?? null) === null) {
+        $rvn['panel_permission_map_provider'] = static function () use (&$rvn, $resolveAuth): array {
+            if (($resolveAuth()->userId() ?? null) === null) {
                 return [];
             }
 
@@ -442,7 +472,7 @@ final class PanelRuntimeBuilder
         /**
          * Builds the auth controller on first use so login routes avoid panel-only dependencies.
          */
-        $rvn['auth_controller'] = static function () use (&$authController, $rvn): AuthController {
+        $rvn['auth_controller'] = static function () use (&$authController, $rvn, $resolveAuth): AuthController {
             if ($authController instanceof AuthController) {
                 return $authController;
             }
@@ -450,7 +480,7 @@ final class PanelRuntimeBuilder
             $authController = new AuthController(
                 $rvn['view'],
                 $rvn['config'],
-                $rvn['auth'],
+                $resolveAuth(),
                 $rvn['input'],
                 $rvn['csrf']
             );
@@ -461,7 +491,7 @@ final class PanelRuntimeBuilder
         /**
          * Builds the shared request context for split panel sub-controllers.
          */
-        $rvn['panel_request_context'] = static function () use (&$panelRequestContext, &$systemController, &$rvn, $categoryEnabled, $tagEnabled): RequestContext {
+        $rvn['panel_request_context'] = static function () use (&$panelRequestContext, &$systemController, &$rvn, $categoryEnabled, $tagEnabled, $resolveAuth): RequestContext {
             if ($panelRequestContext instanceof RequestContext) {
                 return $panelRequestContext;
             }
@@ -469,7 +499,7 @@ final class PanelRuntimeBuilder
             $panelRequestContext = new RequestContext(
                 $rvn['view'],
                 $rvn['config'],
-                $rvn['auth'],
+                $resolveAuth(),
                 $rvn['csrf'],
                 new SessionFlash('_raven_flash'),
                 $categoryEnabled,

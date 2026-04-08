@@ -11,11 +11,11 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Panel;
 
+use Raven\Core\Routing\DebugToolbarResponseHook;
+use Raven\Core\Routing\SchedulerFallbackRunner;
 use Raven\Lib\Auth\PanelAccess;
 use Raven\Lib\Config\Config;
-use Raven\Lib\Diagnostics\RequestProfiler;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
-use Raven\Lib\Diagnostics\Toolbar\DebugToolbarRenderer;
 use Raven\Lib\Panel\PanelUrl;
 use Raven\Lib\Routing\Router;
 use Raven\Lib\Routing\RouteRequest;
@@ -344,7 +344,6 @@ final class PanelEntrypoint
 
         $method = $requestMethod;
         $debugToolbarSettings = DebugToolbarConfigResolver::fromConfig($rvn['config']);
-        $debugToolbarEnabled = false;
         $canRenderPanelDebugToolbar = static function () use ($rvn, $isPanelAuthHelperInternalPath, $internalPath): bool {
             if (!isset($rvn['auth']) || $isPanelAuthHelperInternalPath($internalPath)) {
                 return false;
@@ -358,54 +357,20 @@ final class PanelEntrypoint
             return $rvn['auth']->isTwoFactorVerifiedForUser($userId);
         };
 
-        if (
-            $method === 'GET'
-            && $canRenderPanelDebugToolbar()
-        ) {
-            if ($debugToolbarSettings['show_on_panel']) {
-                RequestProfiler::start((float) ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true)), 'panel');
-                RequestProfiler::enable();
-                $debugToolbarEnabled = true;
-            }
-        }
-
-        if ($debugToolbarEnabled) {
-            ob_start(static function (string $body) use ($debugToolbarSettings, $internalPath, $method, $canRenderPanelDebugToolbar): string {
-                if (!RequestProfiler::isEnabled() || !DebugToolbarRenderer::isHtmlResponseCandidate($body)) {
-                    return $body;
-                }
-
-                // Defense-in-depth: always re-check current auth permission before rendering.
-                if (!$canRenderPanelDebugToolbar()) {
-                    return $body;
-                }
-
-                $toolbarHtml = DebugToolbarRenderer::render(
-                    [
-                        'show_benchmarks' => (bool) ($debugToolbarSettings['show_benchmarks'] ?? true),
-                        'show_queries' => (bool) ($debugToolbarSettings['show_queries'] ?? true),
-                        'show_stack_trace' => (bool) ($debugToolbarSettings['show_stack_trace'] ?? true),
-                        'show_request' => (bool) ($debugToolbarSettings['show_request'] ?? true),
-                        'show_environment' => (bool) ($debugToolbarSettings['show_environment'] ?? true),
-                    ],
-                    RequestProfiler::snapshot(),
-                    [
-                        'scope' => 'panel',
-                        'can_manage_configuration' => true,
-                        'status_code' => http_response_code(),
-                        'request_method' => $method,
-                        'request_path' => $internalPath,
-                        'hostname' => (string) ($_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? '')),
-                    ]
-                );
-
-                if ($toolbarHtml === '') {
-                    return $body;
-                }
-
-                return DebugToolbarRenderer::inject($body, $toolbarHtml);
-            });
-        }
+        DebugToolbarResponseHook::arm(
+            [
+                'show_benchmarks' => (bool) ($debugToolbarSettings['show_benchmarks'] ?? true),
+                'show_queries' => (bool) ($debugToolbarSettings['show_queries'] ?? true),
+                'show_stack_trace' => (bool) ($debugToolbarSettings['show_stack_trace'] ?? true),
+                'show_request' => (bool) ($debugToolbarSettings['show_request'] ?? true),
+                'show_environment' => (bool) ($debugToolbarSettings['show_environment'] ?? true),
+            ],
+            'panel',
+            $method,
+            $internalPath,
+            (bool) ($debugToolbarSettings['show_on_panel'] ?? false),
+            $canRenderPanelDebugToolbar
+        );
 
         $dispatchResult = $router->dispatch(new RouteRequest($method, $internalPath));
         if (!$dispatchResult->isHandled()) {
@@ -417,22 +382,20 @@ final class PanelEntrypoint
             }
         }
 
-        if (in_array($rvn['config']->get('site.scheduler', 'always'), ['always', 'panel'], true)) {
-            $schedulerStampFile = $root . '/private/dat/scheduler_last_run';
-            $lastRun = is_file($schedulerStampFile) ? (int) @file_get_contents($schedulerStampFile) : 0;
-            if (time() - $lastRun >= 60) {
-                if (is_callable($rvn['boot_extensions'] ?? null)) {
-                    /** @var callable(): array<string, mixed> $bootExtensions */
-                    $bootExtensions = $rvn['boot_extensions'];
-                    $rvn = $bootExtensions();
+        SchedulerFallbackRunner::runIfDue(
+            $rvn,
+            $root,
+            in_array($rvn['config']->get('site.scheduler', 'always'), ['always', 'panel'], true),
+            static function (array $runtime): array {
+                if (!is_callable($runtime['boot_extensions'] ?? null)) {
+                    return $runtime;
                 }
-                @file_put_contents($schedulerStampFile, (string) time());
-                if (function_exists('fastcgi_finish_request')) {
-                    fastcgi_finish_request();
-                }
-                $rvn['scheduler']->runDue(['root' => $root, 'rvn' => $rvn]);
+
+                /** @var callable(): array<string, mixed> $bootExtensions */
+                $bootExtensions = $runtime['boot_extensions'];
+                return $bootExtensions();
             }
-        }
+        );
     }
 
     /**

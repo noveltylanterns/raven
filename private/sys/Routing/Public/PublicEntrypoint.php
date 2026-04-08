@@ -11,9 +11,9 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Public;
 
-use Raven\Lib\Diagnostics\RequestProfiler;
+use Raven\Core\Routing\DebugToolbarResponseHook;
+use Raven\Core\Routing\SchedulerFallbackRunner;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
-use Raven\Lib\Diagnostics\Toolbar\DebugToolbarRenderer;
 use Raven\Lib\Routing\Router;
 use Raven\Lib\Routing\RouteRequest;
 use RuntimeException;
@@ -92,7 +92,6 @@ final class PublicEntrypoint
 
         $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
         $debugToolbarSettings = DebugToolbarConfigResolver::fromConfig($rvn['config']);
-        $debugToolbarEnabled = false;
         $isPublicAuthHelperPath = static function (string $path) use ($requestPath): bool {
             $normalized = trim($path !== '' ? $path : $requestPath);
             $normalized = (string) parse_url($normalized, PHP_URL_PATH);
@@ -123,54 +122,20 @@ final class PublicEntrypoint
             return $rvn['auth']->isTwoFactorVerifiedForUser($userId);
         };
 
-        if (
-            $requestMethod === 'GET'
-            && $canRenderPublicDebugToolbar()
-        ) {
-            if ($debugToolbarSettings['show_on_public']) {
-                RequestProfiler::start((float) ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true)), 'public');
-                RequestProfiler::enable();
-                $debugToolbarEnabled = true;
-            }
-        }
-
-        if ($debugToolbarEnabled) {
-            ob_start(static function (string $body) use ($debugToolbarSettings, $requestPath, $requestMethod, $canRenderPublicDebugToolbar): string {
-                if (!RequestProfiler::isEnabled() || !DebugToolbarRenderer::isHtmlResponseCandidate($body)) {
-                    return $body;
-                }
-
-                // Defense-in-depth: always re-check current auth permission before rendering.
-                if (!$canRenderPublicDebugToolbar()) {
-                    return $body;
-                }
-
-                $toolbarHtml = DebugToolbarRenderer::render(
-                    [
-                        'show_benchmarks' => (bool) ($debugToolbarSettings['show_benchmarks'] ?? true),
-                        'show_queries' => (bool) ($debugToolbarSettings['show_queries'] ?? true),
-                        'show_stack_trace' => (bool) ($debugToolbarSettings['show_stack_trace'] ?? true),
-                        'show_request' => (bool) ($debugToolbarSettings['show_request'] ?? true),
-                        'show_environment' => (bool) ($debugToolbarSettings['show_environment'] ?? true),
-                    ],
-                    RequestProfiler::snapshot(),
-                    [
-                        'scope' => 'public',
-                        'can_manage_configuration' => true,
-                        'status_code' => http_response_code(),
-                        'request_method' => $requestMethod,
-                        'request_path' => $requestPath,
-                        'hostname' => (string) ($_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? '')),
-                    ]
-                );
-
-                if ($toolbarHtml === '') {
-                    return $body;
-                }
-
-                return DebugToolbarRenderer::inject($body, $toolbarHtml);
-            });
-        }
+        DebugToolbarResponseHook::arm(
+            [
+                'show_benchmarks' => (bool) ($debugToolbarSettings['show_benchmarks'] ?? true),
+                'show_queries' => (bool) ($debugToolbarSettings['show_queries'] ?? true),
+                'show_stack_trace' => (bool) ($debugToolbarSettings['show_stack_trace'] ?? true),
+                'show_request' => (bool) ($debugToolbarSettings['show_request'] ?? true),
+                'show_environment' => (bool) ($debugToolbarSettings['show_environment'] ?? true),
+            ],
+            'public',
+            $requestMethod,
+            $requestPath,
+            (bool) ($debugToolbarSettings['show_on_public'] ?? false),
+            $canRenderPublicDebugToolbar
+        );
 
         /** @var callable(): object $publicContentController */
         $publicContentController = is_callable($rvn['public_content_controller'] ?? null)
@@ -249,17 +214,11 @@ final class PublicEntrypoint
             $publicRequestContext()->notFound();
         }
 
-        if ($rvn['config']->get('site.scheduler', 'always') === 'always') {
-            $schedulerStampFile = $root . '/private/dat/scheduler_last_run';
-            $lastRun = is_file($schedulerStampFile) ? (int) @file_get_contents($schedulerStampFile) : 0;
-            if (time() - $lastRun >= 60) {
-                @file_put_contents($schedulerStampFile, (string) time());
-                if (function_exists('fastcgi_finish_request')) {
-                    fastcgi_finish_request();
-                }
-                $rvn['scheduler']->runDue(['root' => $root, 'rvn' => $rvn]);
-            }
-        }
+        SchedulerFallbackRunner::runIfDue(
+            $rvn,
+            $root,
+            $rvn['config']->get('site.scheduler', 'always') === 'always'
+        );
     }
 
     /**

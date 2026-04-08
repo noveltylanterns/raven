@@ -117,6 +117,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Core content/taxonomy/auth-facing persistence repositories (`PageRepository`, `ChannelRepository`, `UserRepository`, `GroupRepository`, `CategoryRepository`, `TagRepository`, `TaxonomyLookupRepository`, `TaxonomySetRepository`, `RedirectRepository`, `PageImageRepository`, `InviteTokenRepository`).
 - `private/sys/Routing/`
   - Raven-owned web entry and dispatch orchestration.
+  - Root-level helpers such as `DebugToolbarResponseHook` and `SchedulerFallbackRunner` own only shared low-level web-entry mechanics; scope decisions still stay in the public/panel entrypoints.
   - `Routing/Public/` — `PublicEntrypoint`, `PublicRuntimeBuilder`, and controller-aligned public route registrars including extension-route loading.
   - `Routing/Panel/` — `PanelEntrypoint`, `PanelRuntimeBuilder`, controller-aligned panel route registrars, extension-route loading, and panel theme-asset fast path.
 
