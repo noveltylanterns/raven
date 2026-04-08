@@ -261,8 +261,7 @@ final class ExtensionCatalogService
         $defaultPermissionLevel = (string) ($permissionLevels[0]['key'] ?? 'access');
         $panelPath = $directorySlug;
         $author = $this->input->text((string) ($decoded['author'] ?? ''), 120);
-        // homepage = author/publisher URL (ext.json key: "homepage"; legacy fallback: "author_url")
-        $homepageRaw = trim((string) ($decoded['homepage'] ?? ($decoded['author_url'] ?? '')));
+        $homepageRaw = trim((string) ($decoded['homepage'] ?? ''));
         $homepage = '';
         if ($homepageRaw !== '' && filter_var($homepageRaw, FILTER_VALIDATE_URL) !== false) {
             $scheme = strtolower((string) parse_url($homepageRaw, PHP_URL_SCHEME));
@@ -270,8 +269,7 @@ final class ExtensionCatalogService
                 $homepage = $homepageRaw;
             }
         }
-        // docs = documentation URL (ext.json key: "docs"; legacy fallback: "docs_url")
-        $docsRaw = trim((string) ($decoded['docs'] ?? ($decoded['docs_url'] ?? '')));
+        $docsRaw = trim((string) ($decoded['docs'] ?? ''));
         $docs = '';
         if ($docsRaw !== '' && filter_var($docsRaw, FILTER_VALIDATE_URL) !== false) {
             $scheme = strtolower((string) parse_url($docsRaw, PHP_URL_SCHEME));

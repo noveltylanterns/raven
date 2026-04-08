@@ -878,7 +878,7 @@ $renderConfigField = static function (array $field) use (
             <!-- Default panel theme is constrained to supported panel variants. -->
             <?php
             $panelDefaultTheme = strtolower(trim((string) $field['value']));
-            if (in_array($panelDefaultTheme, ['light', 'raven', 'default'], true)) {
+            if (in_array($panelDefaultTheme, ['light', 'default'], true)) {
                 $panelDefaultTheme = 'corp';
             } elseif ($panelDefaultTheme === 'dark') {
                 $panelDefaultTheme = 'midnight';

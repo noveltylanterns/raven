@@ -155,8 +155,8 @@ return static function (Router $router, array $context): void {
                 $extensionMeta['version'] = trim((string) ($manifestDecoded['version'] ?? ''));
                 $extensionMeta['author'] = trim((string) ($manifestDecoded['author'] ?? ''));
                 $extensionMeta['description'] = trim((string) ($manifestDecoded['description'] ?? ''));
-                // "docs" is the canonical ext.json key; fall back to legacy "docs_url" for old manifests.
-                $docsUrl = trim((string) ($manifestDecoded['docs'] ?? ($manifestDecoded['docs_url'] ?? '')));
+                // "docs" is the canonical ext.json key for extension documentation links.
+                $docsUrl = trim((string) ($manifestDecoded['docs'] ?? ''));
                 if ($docsUrl !== '') {
                     $extensionMeta['docs'] = $docsUrl;
                 }

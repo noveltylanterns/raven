@@ -506,48 +506,6 @@ final class ExtensionRegistry
     }
 
     /**
-     * Returns the extension-owned overlay that route registrars should see in
-     * their local `$rvn` context.
-     *
-     * Resolves the extension's services first, then builds an overlay of any
-     * keys that the extension boot provider added to `$rvn` beyond the core set.
-     * This lets route registrars access their own boot-provided aliases without
-     * requiring eager boot of every other extension.
-     *
-     * @param array<string, mixed> $rvn              Shared bootstrap container.
-     * @param string               $directory        Extension directory name.
-     * @param array<string, bool>  $coreContainerKeys Keys owned by core bootstrap itself; excluded from overlay.
-     * @return array<string, mixed> Booted extension overlay plus current extension service map.
-     */
-    public function extensionContext(array &$rvn, string $directory, array $coreContainerKeys): array
-    {
-        $directory = trim($directory);
-        if ($directory === '') {
-            return [];
-        }
-
-        $this->resolveExtensionServices($rvn, $directory);
-
-        $overlay = [];
-        foreach ($rvn as $key => $value) {
-            if ($key === 'extension_services') {
-                if (is_array($value) && array_key_exists($directory, $value)) {
-                    $overlay[$key] = $value;
-                }
-                continue;
-            }
-
-            if (isset($coreContainerKeys[$key])) {
-                continue;
-            }
-
-            $overlay[$key] = $value;
-        }
-
-        return $overlay;
-    }
-
-    /**
      * Boots every enabled extension provider.
      *
      * Preserved for maintenance/debug paths that want the full extension graph

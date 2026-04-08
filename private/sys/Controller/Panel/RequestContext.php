@@ -347,7 +347,7 @@ final class RequestContext
     private function defaultPanelTheme(): string
     {
         $theme = strtolower(trim((string) $this->config->get('panel.theme', 'corp')));
-        if (in_array($theme, ['light', 'raven', 'default', 'corp'], true)) {
+        if (in_array($theme, ['light', 'default', 'corp'], true)) {
             return 'corp';
         }
         if (in_array($theme, ['dark', 'midnight'], true)) {
@@ -382,7 +382,7 @@ final class RequestContext
             return $normalized;
         }
 
-        if (in_array($normalized, ['light', 'raven', 'default'], true)) {
+        if (in_array($normalized, ['light', 'default'], true)) {
             return 'corp';
         }
 

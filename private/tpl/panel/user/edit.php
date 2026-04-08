@@ -185,7 +185,7 @@ if ($userRow !== null && $publicBase !== '' && $profileRoutesEnabled && $profile
 $requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
 $activeTab = in_array($requestedTab, ['account', 'permissions', 'profile', 'security'], true) ? $requestedTab : 'account';
 $selectedTheme = strtolower(trim((string) ($userRow['theme'] ?? 'default')));
-if (in_array($selectedTheme, ['light', 'raven'], true)) {
+if ($selectedTheme === 'light') {
     $selectedTheme = 'corp';
 } elseif ($selectedTheme === 'dark') {
     $selectedTheme = 'midnight';

@@ -112,7 +112,7 @@ usort($twoFactorMethods, static function (array $left, array $right): int {
     return strtolower((string) ($left['type'] ?? '')) <=> strtolower((string) ($right['type'] ?? ''));
 });
 $selectedTheme = strtolower(trim((string) ($preferences['theme'] ?? 'default')));
-if (in_array($selectedTheme, ['light', 'raven'], true)) {
+if ($selectedTheme === 'light') {
     $selectedTheme = 'corp';
 } elseif ($selectedTheme === 'dark') {
     $selectedTheme = 'midnight';

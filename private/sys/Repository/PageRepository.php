@@ -78,7 +78,7 @@ final class PageRepository
 
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
-                WHERE (p.channel = 0 OR p.channel IS NULL)
+                WHERE p.channel = 0
                   AND p.status = :status
                   AND p.slug IN (:slug_home, :slug_index)
                 ORDER BY CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
@@ -180,7 +180,7 @@ final class PageRepository
         // Unchanneled pages resolve at root; channeled pages require explicit channel slug match.
         $channel = null;
         if ($channelSlug === null) {
-            $sql .= ' AND (p.channel = 0 OR p.channel IS NULL)';
+            $sql .= ' AND p.channel = 0';
         } else {
             $channel = $this->channelRepo->findBySlug($channelSlug);
             if ($channel === null) {
@@ -233,7 +233,7 @@ final class PageRepository
 
         $channel = null;
         if ($channelSlug === null) {
-            $sql .= ' AND (p.channel = 0 OR p.channel IS NULL)';
+            $sql .= ' AND p.channel = 0';
         } else {
             $channel = $this->channelRepo->findBySlug($channelSlug);
             if ($channel === null) {
@@ -288,7 +288,7 @@ final class PageRepository
             $params[':channel'] = $channel;
         } else {
             // null or 0 = root scope
-            $sql .= ' AND (p.channel = 0 OR p.channel IS NULL)';
+            $sql .= ' AND p.channel = 0';
         }
 
         $sql .= ' LIMIT 1';
@@ -322,7 +322,7 @@ final class PageRepository
             $sql .= ' AND p.channel = :channel';
             $params[':channel'] = $channel;
         } else {
-            $sql .= ' AND (p.channel = 0 OR p.channel IS NULL)';
+            $sql .= ' AND p.channel = 0';
         }
 
         $sql .= ' LIMIT 1';
@@ -358,7 +358,7 @@ final class PageRepository
 
         $channel = null;
         if ($normalizedChannelSlug === ChannelRecordPolicy::ROOT_CHANNEL_SLUG) {
-            $sql .= ' AND (p.channel = 0 OR p.channel IS NULL)';
+            $sql .= ' AND p.channel = 0';
         } elseif ($normalizedChannelSlug !== '') {
             $channel = $this->channelRepo->findBySlug($normalizedChannelSlug);
             if ($channel === null) {
@@ -438,7 +438,7 @@ final class PageRepository
         unset($normalizedSlugs[ChannelRecordPolicy::ROOT_CHANNEL_SLUG]);
 
         if ($includeRoot) {
-            $clauses[] = '(p.channel = 0 OR p.channel IS NULL)';
+            $clauses[] = 'p.channel = 0';
         }
 
         $channelIds = [];

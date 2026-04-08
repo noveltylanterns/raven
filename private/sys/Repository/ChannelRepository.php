@@ -559,9 +559,9 @@ final class ChannelRepository
     {
         $pages = $this->table('pages');
         $stmt = $this->db->prepare(
-            'SELECT COALESCE(channel, 0) AS resolved_channel_id, COUNT(*) AS page_count
+            'SELECT channel AS resolved_channel_id, COUNT(*) AS page_count
              FROM ' . $pages . '
-             GROUP BY COALESCE(channel, 0)'
+             GROUP BY channel'
         );
         $stmt->execute();
 

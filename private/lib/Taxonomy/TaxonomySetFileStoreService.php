@@ -232,10 +232,6 @@ final class TaxonomySetFileStoreService
         $this->ensureDirectory();
         $normalizedId = max(0, $id);
         $paths = [];
-        $legacyPath = $this->setDirectory . '/' . $normalizedId . '.php';
-        if (is_file($legacyPath)) {
-            $paths[] = $legacyPath;
-        }
 
         foreach (glob($this->setDirectory . '/' . $normalizedId . '_*.php') ?: [] as $path) {
             $paths[] = $path;

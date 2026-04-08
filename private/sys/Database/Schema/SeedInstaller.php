@@ -99,18 +99,14 @@ final class SeedInstaller
         $pagesTable = $this->tables->resolve($driver, $prefix, 'pages');
         $usersTable = $prefix . 'users';
 
-        try {
-            $userCountStmt = $db->query('SELECT COUNT(*) FROM ' . $usersTable);
-            $userCount = (int) (($userCountStmt?->fetchColumn()) ?: 0);
-            if ($userCount > 0) {
-                return;
-            }
-        } catch (\Throwable) {
-            // If user table is unavailable, fall back to legacy seeding behavior.
+        $userCountStmt = $db->query('SELECT COUNT(*) FROM ' . $usersTable);
+        $userCount = (int) (($userCountStmt?->fetchColumn()) ?: 0);
+        if ($userCount > 0) {
+            return;
         }
 
         $check = $db->prepare(
-            'SELECT COUNT(*) FROM ' . $pagesTable . ' WHERE (channel = 0 OR channel IS NULL) AND slug IN (:home, :index)'
+            'SELECT COUNT(*) FROM ' . $pagesTable . ' WHERE channel = 0 AND slug IN (:home, :index)'
         );
         $check->execute([
             ':home' => 'home',

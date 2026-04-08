@@ -129,7 +129,7 @@ final class PanelExtensionRouteRegistrar
                 return $normalized;
             }
 
-            if (in_array($normalized, ['light', 'raven', 'default'], true)) {
+            if (in_array($normalized, ['light', 'default'], true)) {
                 return 'corp';
             }
 
@@ -147,7 +147,7 @@ final class PanelExtensionRouteRegistrar
          */
         $defaultPanelTheme = static function () use ($rvn): string {
             $theme = strtolower(trim((string) $rvn['config']->get('panel.theme', 'corp')));
-            if (in_array($theme, ['light', 'raven', 'default', 'corp'], true)) {
+            if (in_array($theme, ['light', 'default', 'corp'], true)) {
                 return 'corp';
             }
             if (in_array($theme, ['dark', 'midnight'], true)) {
@@ -199,16 +199,6 @@ final class PanelExtensionRouteRegistrar
             $registrar = require $routesFile;
             if (!is_callable($registrar)) {
                 continue;
-            }
-
-            $extensionRouteRvn = $rvn;
-            if (is_callable($rvn['extension_context_for'] ?? null)) {
-                /** @var callable(string): array<string, mixed> $extensionContextFor */
-                $extensionContextFor = $rvn['extension_context_for'];
-                $extensionContext = $extensionContextFor($extensionName);
-                if ($extensionContext !== []) {
-                    $extensionRouteRvn = array_replace($extensionRouteRvn, $extensionContext);
-                }
             }
 
             $manifest = $enabledExtensionManifests[$extensionName] ?? null;
@@ -308,7 +298,7 @@ final class PanelExtensionRouteRegistrar
             };
 
             $registrar($router, [
-                'rvn' => $extensionRouteRvn,
+                'rvn' => $rvn,
                 'panelUrl' => $panelUrl,
                 'requirePanelLogin' => $extensionRequirePanelAccess,
                 'requireExtensionPermission' => $requireExtensionPermission,

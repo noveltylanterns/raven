@@ -782,15 +782,6 @@ final class PanelRuntimeBuilder
             $userDomain = $panelUserDomain();
             $panelSystemDomain();
 
-            // Keep legacy top-level aliases populated during panel runtime so
-            // stock and third-party panel routes keep their existing container contract.
-            $rvn['channel'] = $contentDomain['channel'];
-            $rvn['group'] = $userDomain['group'];
-            $rvn['page_images'] = $contentDomain['page_images'];
-            $rvn['page'] = $contentDomain['page'];
-            $rvn['redirect'] = $taxonomyDomain['redirect'];
-            $rvn['user'] = $userDomain['user'];
-
             // Panel route files depend on this closure, so populate it only when panel runtime is active.
             $rvn['panel_site_data'] = static function (bool $includeDomain = true) use ($siteContextBuilder, $rvn, $categoryEnabled, $tagEnabled): array {
                 return $siteContextBuilder->panel($rvn['config'], $categoryEnabled, $tagEnabled, $includeDomain);

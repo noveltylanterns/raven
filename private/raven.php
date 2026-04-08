@@ -213,21 +213,6 @@ return (static function (): array {
         return $extensionRegistry->resolveAllExtensionServices($rvn);
     };
 
-    /**
-     * Returns the booted extension overlay that route registrars should see in
-     * their local `$rvn` context.
-     *
-     * This preserves compatibility for extensions that still read their own
-     * boot-provided top-level aliases or `$rvn['extension_services'][$slug]`
-     * directly during route registration, while keeping unrelated extensions lazy.
-     *
-     * @return array<string, mixed>
-     */
-    $coreContainerKeys = [];
-    $rvn['extension_context_for'] = static function (string $directory) use (&$rvn, &$coreContainerKeys, $extensionRegistry): array {
-        return $extensionRegistry->extensionContext($rvn, $directory, $coreContainerKeys);
-    };
-
     $extensionsBooted = false;
     $rvn['boot_extensions'] = static function () use (&$extensionsBooted, &$rvn, $extensionRegistry): array {
         if ($extensionsBooted) {
@@ -270,7 +255,6 @@ return (static function (): array {
     }
 
     $rvn['scheduler'] = $scheduler;
-    $coreContainerKeys = array_fill_keys(array_keys($rvn), true);
 
     return $rvn;
 })();

@@ -57,21 +57,11 @@ final class PublicExtensionRouteRegistrar
                 continue;
             }
 
-            $extensionRouteRvn = $rvn;
-            if (is_callable($rvn['extension_context_for'] ?? null)) {
-                /** @var callable(string): array<string, mixed> $extensionContextFor */
-                $extensionContextFor = $rvn['extension_context_for'];
-                $extensionContext = $extensionContextFor($extensionName);
-                if ($extensionContext !== []) {
-                    $extensionRouteRvn = array_replace($extensionRouteRvn, $extensionContext);
-                }
-            }
-
             // Pre-resolve the tpl root so the render helper does not rebuild it every time.
             $extTplRoot = rtrim((string) ($rvn['root'] ?? ''), '/') . '/private/ext/' . $extensionName . '/tpl';
 
             $registrar($router, [
-                'rvn' => $extensionRouteRvn,
+                'rvn' => $rvn,
                 'input' => $input,
                 'extensionDirectory' => $extensionName,
                 'extensionServices' => is_callable($rvn['public_extension_services'] ?? null)

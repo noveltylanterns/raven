@@ -540,7 +540,7 @@ final class SystemController
             redirect($this->context->panelUrl('/themes'));
         }
 
-        $themeSlug = strtolower(trim((string) $this->input->text($post['theme'] ?? ($post['slug'] ?? null), 80)));
+        $themeSlug = strtolower(trim((string) $this->input->text($post['slug'] ?? null, 80)));
         if (!$this->isSafePublicThemeSlug($themeSlug)) {
             $this->context->flash('error', 'Theme slug must use lowercase letters, numbers, underscores, or dashes.');
             redirect($this->context->panelUrl('/themes'));
@@ -732,7 +732,7 @@ final class SystemController
         $derivedThemeSlug = $this->packageInstallWorkflowService()->themeSlugFromArchiveManifest($tmpPath);
 
         $slugResult = $this->packageInstallWorkflowService()->resolveInstallName(
-            (string) ($post['upload_slug'] ?? ($post['theme'] ?? '')),
+            (string) ($post['upload_slug'] ?? ''),
             $archiveName,
             fn (string $name): ?string => $derivedThemeSlug ?? $this->themeSlugFromArchiveFilename($name),
             fn (string $slug): bool => $this->isSafePublicThemeSlug($slug),
@@ -745,7 +745,7 @@ final class SystemController
         if (!(bool) ($slugResult['ok'] ?? false)) {
             $slugError = (string) ($slugResult['error'] ?? 'Failed to resolve theme slug.');
             if (
-                trim((string) ($post['upload_slug'] ?? ($post['theme'] ?? ''))) === ''
+                trim((string) ($post['upload_slug'] ?? '')) === ''
                 && $derivedThemeSlug === null
                 && $this->themeSlugFromArchiveFilename($archiveName) === null
             ) {
@@ -1316,7 +1316,7 @@ final class SystemController
         $description = $this->input->text($post['description'] ?? null, 1000);
         $author = $this->input->text($post['author'] ?? null, 120);
 
-        $homepageRaw = trim((string) $this->input->text($post['homepage'] ?? ($post['author_url'] ?? null), 400));
+        $homepageRaw = trim((string) $this->input->text($post['homepage'] ?? null, 400));
         $homepage = '';
         if ($homepageRaw !== '') {
             if (filter_var($homepageRaw, FILTER_VALIDATE_URL) === false) {
@@ -1333,7 +1333,7 @@ final class SystemController
             $homepage = $homepageRaw;
         }
 
-        $docsRaw = trim((string) $this->input->text($post['docs'] ?? ($post['docs_url'] ?? null), 400));
+        $docsRaw = trim((string) $this->input->text($post['docs'] ?? null, 400));
         $docs = '';
         if ($docsRaw !== '') {
             if (filter_var($docsRaw, FILTER_VALIDATE_URL) === false) {

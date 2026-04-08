@@ -444,7 +444,7 @@ function raven_cli_find_row_by_slug(array $rows, string $slug): ?array
  */
 function raven_cli_extension_state_load(string $root): array
 {
-    $statePath = raven_cli_extension_state_path($root);
+    $statePath = raven_cli_extension_state_primary_path($root);
     if (!is_file($statePath)) {
         return ['enabled' => [], 'permissions' => []];
     }
@@ -565,16 +565,6 @@ function raven_cli_extension_state_save(string $root, array $enabled, array $per
 function raven_cli_extension_state_primary_path(string $root): string
 {
     return rtrim($root, '/') . '/private/dat/ext/.state.php';
-}
-
-function raven_cli_extension_state_path(string $root): string
-{
-    $primaryPath = raven_cli_extension_state_primary_path($root);
-    if (is_file($primaryPath)) {
-        return $primaryPath;
-    }
-
-    return rtrim($root, '/') . '/private/ext/.state.php';
 }
 
 function raven_cli_remove_directory_recursive(string $directory): void
@@ -2423,8 +2413,6 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
             $description = trim((string) raven_cli_option($options, 'description', ''));
             $author = trim((string) raven_cli_option($options, 'author', ''));
             $homepage = trim((string) raven_cli_option($options, 'homepage', ''));
-            $authorUrl = trim((string) raven_cli_option($options, 'author-url', ''));
-
             $withAgents = raven_cli_bool_option($options, 'with-agents', false);
             $withComposer = raven_cli_bool_option($options, 'with-composer', true);
 
@@ -2443,7 +2431,6 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                     'type' => $type,
                     'author' => $author,
                     'homepage' => $homepage,
-                    'author_url' => $authorUrl,
                 ], $withAgents, $withComposer);
             } catch (Throwable $exception) {
                 raven_cli_remove_directory_recursive($path);

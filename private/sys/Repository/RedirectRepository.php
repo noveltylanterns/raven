@@ -226,7 +226,7 @@ final class RedirectRepository
             $params[':channel'] = $channel;
         } else {
             // null or 0 = root scope
-            $sql .= ' AND (r.channel = 0 OR r.channel IS NULL)';
+            $sql .= ' AND r.channel = 0';
         }
 
         $sql .= ' LIMIT 1';
@@ -260,7 +260,7 @@ final class RedirectRepository
             $sql .= ' AND r.channel = :channel';
             $params[':channel'] = $channel;
         } else {
-            $sql .= ' AND (r.channel = 0 OR r.channel IS NULL)';
+            $sql .= ' AND r.channel = 0';
         }
 
         $sql .= ' LIMIT 1';
@@ -326,7 +326,7 @@ final class RedirectRepository
 
         // Root redirects match only channelless rows; channel routes must match channel slug.
         if ($channelSlug === null) {
-            $sql .= ' AND (r.channel = 0 OR r.channel IS NULL)';
+            $sql .= ' AND r.channel = 0';
         } else {
             try {
                 $channelId = $this->channelIdBySlug($channelSlug);

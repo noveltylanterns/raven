@@ -17,6 +17,7 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 - [ ] Confirm legacy migration fallbacks are no longer needed to make this install work (locations at bottom of this file). expunge every one of them from our codebase as soon as each one is verified as redundant/unecessary.
 - [ ] Migrate delight-auth tables from rvn_users_* to rvn_auth_*
 	- Store localized logic in lib/Composer/delight-im/auth.php
+- [ ] Extension runtime refactor cleanup: settle the embedded-form/shortcode runtime contract, then remove legacy `embedded_form_runtimes` support from `private/lib/Extension/EmbeddedFormRuntimeService.php`.
 
 ## Long Term
 
@@ -101,45 +102,20 @@ We've been making this one up as we go along:
 
 Running ledger of backward-friendly and legacy shims added during the cleanup work, so they can be removed later once the new schema/contracts are fully settled.
 
-Items below are **unsorted** — needs owner review to classify each as PURGE vs KEEP-INTENTIONAL before targeting in a sweep.
+Items below are the remaining classified legacy/compatibility lanes after the current purge pass.
 
 ---
 
-- `private/lib/Extension/EmbeddedFormRuntimeService.php`
-	- Accepts legacy `embedded_form_runtimes` alongside canonical `shortcode_runtimes`.
-- `private/lib/Extension/ExtensionCatalogService.php`
-	- Accepts legacy ext.json keys `author_url` -> `homepage` and `docs_url` -> `docs`.
-- `private/lib/Extension/ExtensionScaffoldService.php`
-	- Existing-manifest metadata read path still accepts legacy `docs_url` when reflecting extension metadata.
-- `private/sys/Controller/Panel/SystemController.php`
-	- Accepts legacy posted extension metadata fields `author_url` and `docs_url` in the panel save flow.
-- `private/sys/Controller/Panel/SystemController.php`
-	- Theme-management actions still accept older POST field aliases for slug inputs (`theme` -> `slug` during scaffold create, `theme` -> `upload_slug` during theme upload).
-- `private/raven.php`
-	- `extension_context_for()` preserves extension boot-provided top-level aliases and `$rvn['extension_services'][$slug]` compatibility overlay during route registration.
-- `private/sys/Routing/Panel/PanelRuntimeBuilder.php`
-	- `initialize_panel_runtime()` still populates legacy top-level aliases (`channel`, `group`, `page_images`, `page`, `redirect`, `user`) for panel routes/extensions.
-- `private/lib/Taxonomy/TaxonomySetFileStoreService.php`
-	- `candidatePathsForId()` still reads legacy `{id}.php` taxonomy-set files alongside canonical `{id}_{slug}.php`.
-- `private/lib/Shell/raven_cli.php`
-	- `raven_cli_extension_state_path()` still falls back to legacy `private/ext/.state.php` if `private/dat/ext/.state.php` is missing.
-- `private/lib/Shell/raven_cli.php`
-	- Extension scaffold command still passes legacy `author_url` metadata into `ExtensionScaffoldService`; CLI should emit only canonical manifest fields if it is an official frontend.
-- `private/sys/Controller/AuthController.php`
-	- `defaultPanelTheme()` still normalizes legacy panel theme aliases (`light`, `dark`, `raven`) to canonical panel theme slugs during login/auth rendering.
-- `private/sys/Controller/Panel/RequestContext.php`
-	- `defaultPanelTheme()` / `normalizePanelThemeChoice()` still normalize legacy panel theme names (`light`, `dark`, `raven`) to canonical theme slugs.
-- `private/sys/Routing/Panel/PanelExtensionRouteRegistrar.php`
-	- Panel extension theme helpers still normalize legacy panel theme names (`light`, `dark`, `raven`) to canonical theme slugs.
-- `private/sys/Database/Schema/SeedInstaller.php`
-	- `ensureSeedPages()` still falls through to legacy-style seeding behavior when the user table is unavailable; needs owner review whether this is intentional resiliency or dead migration residue.
-- `private/sys/Repository/PageRepository.php`
-	- Root-scope page queries still tolerate `channel IS NULL` alongside canonical `channel = 0`.
-- `private/sys/Repository/RedirectRepository.php`
-	- Root-scope redirect queries still tolerate `channel IS NULL` alongside canonical `channel = 0`.
-- `private/sys/Repository/ChannelRepository.php`
-	- Channel page counts still collapse root scope with `COALESCE(channel, 0)`, implying continued tolerance for legacy `NULL` channel rows.
-- `private/sys/Database/Schema/RvnSchemaBuilder.php`
-	- Root-channel uniqueness/index logic still includes `channel IS NULL OR channel = 0` even though `ensureRootChannelScope()` normalizes `NULL` to `0`.
+- `DEFER FOR EXTENSION RUNTIME REFACTOR`
+	- `private/lib/Extension/EmbeddedFormRuntimeService.php`
+	- Accepts legacy `embedded_form_runtimes` alongside canonical `shortcode_runtimes`; defer removal until the extension form/runtime contract is intentionally rebuilt.
+- `KEEP-INTENTIONAL FOR STOCK PANEL THEME MIGRATION`
+	- `private/sys/Controller/AuthController.php`
+	- `private/sys/Controller/Panel/RequestContext.php`
+	- `private/sys/Routing/Panel/PanelExtensionRouteRegistrar.php`
+	- `private/tpl/panel/configuration.php`
+	- `private/tpl/panel/preferences.php`
+	- `private/tpl/panel/user/edit.php`
+	- Keep only the minimal `default` / `light` / `dark` -> `corp` / `midnight` normalization needed to carry stock bootstrap theme values forward; extra `raven` alias support was removed in this pass.
 
 ---

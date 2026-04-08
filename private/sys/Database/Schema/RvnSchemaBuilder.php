@@ -95,7 +95,7 @@ final class RvnSchemaBuilder
             $db->exec(
                 'CREATE UNIQUE INDEX uniq_' . $prefix . 'pages_root_slug
                  ON ' . $this->introspector->quotePgIdentifier($pagesTable) . ' (slug)
-                 WHERE channel IS NULL OR channel = 0'
+                 WHERE channel = 0'
             );
         }
 
@@ -366,7 +366,7 @@ final class RvnSchemaBuilder
     {
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_created ON ' . $pagesTable . ' (created DESC)');
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel ON ' . $pagesTable . ' (channel)');
-        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_root_slug_unique ON ' . $pagesTable . ' (slug) WHERE channel IS NULL OR channel = 0');
+        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_root_slug_unique ON ' . $pagesTable . ' (slug) WHERE channel = 0');
         $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_slug_unique ON ' . $pagesTable . ' (channel, slug) WHERE channel IS NOT NULL AND channel <> 0');
     }
 
