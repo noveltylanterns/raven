@@ -18,24 +18,6 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 [ ] Migrate delight-auth tables from rvn_users_* to rvn_auth_*
 	- Store localized logic in lib/Composer/delight-im/auth.php
 
-### Webroot Routing Refactor
-[x] Keep `private/raven.php` as the shared app bootstrap only.
-	- Own lazy shared resolvers/service wiring (`auth_db`, `auth`, extension registry, scheduler registry).
-	- Keep it safe for CLI/debug tooling and free of panel/public request-policy branching.
-[x] Keep request-scope decisions in `private/sys/Routing/Public/` and `private/sys/Routing/Panel/`.
-	- Public/panel entrypoints own scope-specific path normalization, route registration, dispatch, toolbar gating, scheduler fallback decisions, and any per-scope permission/auth helper rules.
-[x] Re-check duplicated auth materialization in the public/panel runtime builders.
-	- Keep resolver definition in `private/raven.php`.
-	- Keep any eager realization only where the web scope actually needs it.
-[x] Re-check duplicated scheduler fallback/debug-toolbar plumbing in the entrypoints.
-	- Keep scope-specific gating local to each entrypoint.
-	- Only extract tiny shared helpers if they reduce noise without hiding scope differences.
-[x] Re-check `private/lib/Routing/` and `private/lib/Http/` during the sweep.
-	- Keep only reusable primitives there.
-	- Keep Raven-owned web-entry orchestration in `private/sys/Routing/`.
-[x] Update `docs/Filetree.md`, `docs/Routing.md`, and `release-notes.md` as each phase lands so the ownership model stays explicit.
-
-
 ## Long Term
 
 ### Core Consolidation
