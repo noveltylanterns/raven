@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Controller\Panel;
 
 use Closure;
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 use Raven\Core\Media\PageImageManager;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Content\BodyBlockPolicy;

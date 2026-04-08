@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven;
 
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;

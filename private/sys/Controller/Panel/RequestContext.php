@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Controller\Panel;
 
 use Raven\Core\Auth\AuthService;
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 use Raven\Core\View;
 use Raven\Lib\Auth\PanelSessionGuard;
 use Raven\Lib\Http\SessionFlash;

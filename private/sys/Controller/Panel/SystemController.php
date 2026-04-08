@@ -14,7 +14,7 @@ namespace Raven\Controller\Panel;
 use Closure;
 use ZipArchive;
 use Raven\Core\Auth\PanelAccess;
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Theme\PublicThemeRegistry;
 use Raven\Lib\Archive\ArchivePackageService;

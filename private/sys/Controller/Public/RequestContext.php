@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Controller\Public;
 
 use Raven\Core\Auth\AuthService;
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 use Raven\Core\View\TemplateTagEngine;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\RequestContextResolver;

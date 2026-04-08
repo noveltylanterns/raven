@@ -102,6 +102,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Channel record normalization policy, root channel constants, slug validation, and channel-context hydration helpers. (`ChannelRecordPolicy`, `ChannelContextService`, `ChannelFileStoreService`.)
 - `private/lib/Config/`
   - Config parsing, validation, editor schema/defaults, and config file persistence.
+  - `Config` — canonical runtime config class (formerly split across `Core\Config` + `ConfigFileStore`). Loads `private/dat/config.php` on construct, exposes dot-path `get`/`set`/`replace`/`save`, and writes config changes atomically with `LOCK_EX`. Use `Raven\Lib\Config\Config` directly; the old `Raven\Core\Config` path has been deleted.
 - `private/lib/Database/`
   - DB connection, table resolution, schema ensure, introspection, and profiling helpers.
   - Includes schema-ensure state gating so hot-path bootstraps can skip repeated no-op schema walks until core or enabled-extension schema inputs change.
@@ -109,7 +110,6 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Extension cataloging, manifests, state, storage provisioning, scaffolding, and lazy runtime bootstrap/service resolution.
   - `ExtensionRegistry` — unified registry with two surfaces: a static metadata API (manifest parsing, enabled-directory discovery, shortcode/field validation, permission maps; callable before the autoloader is registered) and a per-request instance API (boot providers, lazy service resolution, storage, scheduler discovery). Manifests are cached in a static array so repeated calls within the same process pay for one filesystem hit per extension.
   - `ExtensionStorageProvisioner`, `ExtensionStorageCleaner` — storage lifecycle helpers.
-  - `private/sys/Core/Extension/ExtensionRegistry.php` is a legacy redirect shim only; prefer `Raven\Lib\Extension\ExtensionRegistry` in all new code.
 - `private/lib/Http/`
   - HTTP-layer helpers: response dispatch, session flash, request context resolution, upload normalization, and redirect-target validation. (`RedirectTargetValidator` enforces the http/https/root-path allowlist.)
 - `private/lib/Log/`

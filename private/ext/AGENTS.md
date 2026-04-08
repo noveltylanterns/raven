@@ -312,7 +312,7 @@ declare(strict_types=1);
 ## Extension Enablement State
 - Runtime enablement state file: `private/dat/ext/.state.php`
 - Commit-safe template: `private/dat/ext/.state.php.dist`
-- Shared parser: `private/sys/Core/Extension/ExtensionRegistry.php` (used by bootstrap/panel/public runtime checks)
+- Shared parser: `private/lib/Extension/ExtensionRegistry.php` (`Raven\Lib\Extension\ExtensionRegistry`; used by bootstrap/panel/public runtime checks)
 - State structure:
 - `enabled`: `{extension_directory => true}`
 - `permissions`: `{extension_directory => panel_permission_bit}` for non-system extensions
@@ -495,7 +495,7 @@ declare(strict_types=1);
 - `private/ext/{directory_name}/lib/shortcodes.php`
 - Provider file may return either:
 - `array<int, array{label: string, shortcode: string}>`
-- `callable(array{extension?: string, forms?: callable(string): array<int, array{name: string, slug: string}>, config?: \Raven\Core\Config}): array<int, array{label: string, shortcode: string}>`
+- `callable(array{extension?: string, forms?: callable(string): array<int, array{name: string, slug: string}>, config?: \Raven\Lib\Config\Config}): array<int, array{label: string, shortcode: string}>`
 - `callable(): array<int, array{label: string, shortcode: string}>` (fallback supported)
 - Each shortcode entry must provide:
 - `label`: shown in the Page Editor `Extensions` dropdown

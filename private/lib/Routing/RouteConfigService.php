@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Routing;
 
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Panel\PanelUrl;
 use Raven\Lib\Security\InputSanitizer;

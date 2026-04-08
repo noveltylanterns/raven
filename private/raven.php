@@ -10,7 +10,7 @@
 declare(strict_types=1);
 
 use Raven\Core\Auth\AuthService;
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\SchemaManager;
 use Raven\Lib\Extension\ExtensionRegistry;
@@ -24,7 +24,7 @@ use Raven\Repository\ChannelRepository;
 use Raven\Repository\PageRepository;
 
 /**
- * Shared bootstrap for both web roots.
+ * Shared bootstrap for all web roots.
  *
  * Returns service container array used by front controllers.
  */
@@ -42,7 +42,9 @@ return (static function (): array {
         require_once $authHandler;
     }
 
-    // Always provide local PSR-4 fallback so app/lib/extension classes work before install.
+    // Always provide local PSR-4 fallback.
+    // Someone will probably want to build hooks with it.
+    // Also lets app/lib/extension classes work before install.
     spl_autoload_register(static function (string $class) use ($root, $enabledExtensionDirectories): void {
         $libPrefix = 'Raven\\Lib\\';
         if (str_starts_with($class, $libPrefix)) {

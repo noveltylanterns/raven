@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Site;
 
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 
 /**
  * Shared site-context payload builder for panel/public templates.

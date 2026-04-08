@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
 
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Content\BodyBlockPolicy;
 use Raven\Lib\Security\InputSanitizer;

@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Controller\Panel;
 
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 use Raven\Core\Security\AvatarValidator;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelTwoFactorPreferencesService;

@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Controller;
 
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 use Raven\Lib\Auth\LoginAttemptWorkflowService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\LoginChallengeWorkflowService;

@@ -20,7 +20,7 @@ final class ExtensionProviderValidator
      * @param array{
      *   extension?: string,
      *   forms?: callable(string): array<int, array{name: string, slug: string}>,
-     *   config?: \Raven\Core\Config
+     *   config?: \Raven\Lib\Config\Config
      * } $context
      * @return array{
      *   valid: bool,

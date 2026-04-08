@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Media;
 
 use Imagick;
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 use Raven\Lib\Media\ImageVariantProcessor;
 use Raven\Lib\Media\PageImagePathLayout;
 use Raven\Lib\Media\PageImageUploadPolicy;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Security;
 
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 
 /**
  * Shared public captcha provider config, verification, and markup helpers.

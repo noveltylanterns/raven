@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 use Raven\Core\Auth\PanelAccess;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Core\Theme\PublicThemeRegistry;

@@ -1,0 +1,183 @@
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/lib/Config/Config.php
+ * Runtime configuration loader, reader, and writer.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+namespace Raven\Lib\Config;
+
+use RuntimeException;
+
+/**
+ * Loads and manages Raven runtime configuration from a PHP array file.
+ *
+ * Provides dot-notation access (`get`/`set`) over the in-memory config tree,
+ * and persists changes back to disk in executable PHP format with OPcache
+ * invalidation. The file I/O that previously lived in ConfigFileStore is
+ * folded here — there was only ever one caller and no polymorphism needed.
+ *
+ * Used across the full bootstrap and request lifecycle: both `public/` and
+ * `panel/` receive a shared instance via `$rvn['config']`.
+ */
+final class Config
+{
+    /** @var array<string, mixed> Parsed config tree held in memory for this request. */
+    private array $data;
+
+    /** Absolute path to the config PHP file on disk. */
+    private string $path;
+
+    /**
+     * Loads the config file at `$path` into memory.
+     *
+     * The file must return a PHP array; anything else is a hard failure since
+     * the rest of the application cannot safely proceed without a valid config.
+     *
+     * @param string $path Absolute path to `private/dat/config.php`.
+     * @throws RuntimeException When the file does not return an array.
+     */
+    public function __construct(string $path)
+    {
+        $this->path = $path;
+        /** @var mixed $loaded */
+        $loaded = require $path;
+        if (!is_array($loaded)) {
+            throw new RuntimeException('Config file must return an array.');
+        }
+
+        $this->data = $loaded;
+    }
+
+    /**
+     * Returns the full config tree for read-only inspection.
+     *
+     * @return array<string, mixed>
+     */
+    public function all(): array
+    {
+        return $this->data;
+    }
+
+    /**
+     * Reads one config value using dot notation (e.g. `panel.path`).
+     *
+     * Traverses nested arrays segment by segment; returns `$default` when any
+     * segment is missing or the current cursor is not an array.
+     *
+     * @param string $key     Dot-delimited config key path.
+     * @param mixed  $default Value to return when the key does not exist.
+     * @return mixed The resolved config value, or `$default`.
+     */
+    public function get(string $key, mixed $default = null): mixed
+    {
+        $segments = explode('.', $key);
+        $cursor = $this->data;
+
+        foreach ($segments as $segment) {
+            if (!is_array($cursor) || !array_key_exists($segment, $cursor)) {
+                return $default;
+            }
+
+            $cursor = $cursor[$segment];
+        }
+
+        return $cursor;
+    }
+
+    /**
+     * Writes one config value into the in-memory tree using dot notation.
+     *
+     * Intermediate arrays are created as needed when a new key path is introduced.
+     * Changes are not persisted until `save()` is called.
+     *
+     * @param string $key   Dot-delimited config key path.
+     * @param mixed  $value Value to store at the resolved path.
+     * @return void
+     */
+    public function set(string $key, mixed $value): void
+    {
+        $segments = explode('.', $key);
+        $cursor = &$this->data;
+
+        foreach ($segments as $index => $segment) {
+            // Create intermediate arrays when a new path segment is introduced.
+            if (!is_array($cursor)) {
+                $cursor = [];
+            }
+
+            if ($index === count($segments) - 1) {
+                $cursor[$segment] = $value;
+                return;
+            }
+
+            if (!isset($cursor[$segment]) || !is_array($cursor[$segment])) {
+                $cursor[$segment] = [];
+            }
+
+            $cursor = &$cursor[$segment];
+        }
+    }
+
+    /**
+     * Replaces the entire in-memory config tree.
+     *
+     * Used by the panel config editor after normalizing and validating a full
+     * config snapshot. Changes are not persisted until `save()` is called.
+     *
+     * @param array<string, mixed> $data Complete replacement config tree.
+     * @return void
+     */
+    public function replace(array $data): void
+    {
+        $this->data = $data;
+    }
+
+    /**
+     * Persists the current in-memory config tree back to disk.
+     *
+     * Writes the PHP array file with LOCK_EX, then clears the stat cache and
+     * invalidates OPcache so subsequent requests pick up the new values.
+     *
+     * @throws RuntimeException When the file cannot be written.
+     * @return void
+     */
+    public function save(): void
+    {
+        $export = var_export($this->data, true);
+        $content = <<<PHP
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/dat/config.php
+ * Runtime configuration values for Raven CMS.
+ * Docs: https://raven.lanterns.io
+ */
+
+// Inline note: Keep site/database defaults explicit so panel config editing stays predictable.
+
+declare(strict_types=1);
+
+/**
+ * Raven runtime configuration (generated by panel editor).
+ */
+return {$export};
+
+PHP;
+
+        $written = file_put_contents($this->path, $content, LOCK_EX);
+        if ($written === false) {
+            throw new RuntimeException('Failed to save config file.');
+        }
+
+        clearstatcache(true, $this->path);
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($this->path, true);
+        }
+    }
+}

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Media;
 
-use Raven\Core\Config;
+use Raven\Lib\Config\Config;
 
 /**
  * Shared taxonomy image upload/storage pipeline with variant management.

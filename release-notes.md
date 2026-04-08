@@ -2,6 +2,13 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 7, 2026 — Config consolidated into lib
+
+- **`Config` moved from `private/sys/Core/Config.php` to `private/lib/Config/Config.php`**: canonical config class now lives in `Raven\Lib\Config\Config`, fixing the lib-depends-on-sys dependency inversion. All ~32 lib files that previously imported `Raven\Core\Config` now import `Raven\Lib\Config\Config`.
+- **`ConfigFileStore` folded in**: `private/lib/Config/ConfigFileStore.php` had exactly one caller (`Core\Config`) and provided no polymorphism. Its logic (file load, atomic PHP-array write, `clearstatcache`, `opcache_invalidate`) is now inlined directly into `Config::__construct()` and `Config::save()`. The file is deleted.
+- **`private/sys/Core/Config.php` deleted**: all callers already updated; no shim retained.
+- **All `\Raven\Core\Config` PHPDoc references updated**: affected lib, sys, and extension PHPDoc annotations and AGENTS.md contract docs updated to `\Raven\Lib\Config\Config`.
+
 ### April 7, 2026 — ExtensionRegistry consolidated into lib
 
 - **`ExtensionRegistry` moved from `private/sys/` to `private/lib/Extension/`**: the canonical static extension metadata class (`enabledMap`, `permissionMap`, `enabledDirectories`, `readManifest`, `shortcodes`, `fields`) now lives in `Raven\Lib\Extension\ExtensionRegistry` — the correct lib domain — instead of `Raven\Core\Extension\ExtensionRegistry`. `private/raven.php` now loads from the lib path directly.
@@ -9,7 +16,7 @@
 - **Static manifest cache added**: `ExtensionRegistry::readManifest()` now caches results (including null misses) in a static array keyed by `"{root}::{directory}"`. The triple-read pattern — `enabledDirectories()` at bootstrap, `ExtensionRuntimeRegistry::discoverEnabledExtensions()`, and `SchemaEnsureStateStore::signature()` — now collapses to one filesystem hit per extension per process.
 - **Redundant CLI `require_once` calls removed**: five manual `require_once .../sys/Core/Extension/ExtensionRegistry.php` calls inside `raven_cli.php` command handlers removed; the autoloader handles class loading after bootstrap.
 - **`ExtensionRuntimeRegistry` merged into `ExtensionRegistry`**: the separate instance runtime class (`ExtensionRuntimeRegistry`) is deleted; its constructor, `manifests()`, `storageMap()`, `schedulerDirectories()`, `bootExtension()`, `resolveExtensionServices()`, `resolveAllExtensionServices()`, `extensionContext()`, `bootAllExtensions()`, and `discoverEnabledExtensions()` are now instance methods on `ExtensionRegistry` itself. `raven.php` drops the separate `ExtensionRuntimeRegistry` use/instantiation and the standalone `ExtensionBootstrapContractResolver` instantiation; `$extensionRegistry = new ExtensionRegistry($root, $enabledExtensionDirectories)` replaces both. `discoverEnabledExtensions()` now calls `self::readManifest()` directly, hitting the static cache.
-- **Backward-compat shim retained**: `private/sys/Core/Extension/ExtensionRegistry.php` now just `require_once`s the lib file and registers a `class_alias` so any code still using the old namespace continues to work without an immediate update.
+- **`private/sys/Core/Extension/ExtensionRegistry.php` deleted**: all callers already updated; no shim retained.
 
 ### April 7, 2026 — request-level performance fixes
 
