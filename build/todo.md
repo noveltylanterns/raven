@@ -87,7 +87,7 @@ We've been making this one up as we go along:
 [ ] Our upgrade shims are a mess, but they have potential. After 1.0, lets organize our shims neatly into a subfolder of lib/Update/ so theyre near the rest of our updater logic.
 [ ] Each point release gets its own unique shim or set of shims.
 [ ] This foundation should enable us to build a stable update platform that can update systems many versions at once, by running through the version-bound-shims in order or release.
-- Note for ongoing bootstrap work: local schema hot-path caching should use input signatures or other local state, not a second public schema-version number. Release/update versioning still belongs here in the updater plan.
+- Note for updater design: release/update versioning still belongs here in the updater plan; keep it separate from local bootstrap schema-state tracking.
 
 
 ### Tooling Watchlist
@@ -108,11 +108,6 @@ Items below are **unsorted** — needs owner review to classify each as PURGE vs
 
 ---
 
-### [UNSORTED] `set_value` SQL alias indirection in `CategoryRepository` and `TagRepository`
-
-Both repos alias the reserved-word column `set` as `set_value` in every SELECT, then `hydrateRow()` immediately un-aliases it: `$row['set'] = (int) ($row['set_value'] ?? $row['set'] ?? 0); unset($row['set_value'])`. The intermediate alias is unnecessary — `PDO::FETCH_ASSOC` returns reserved-word columns under their unquoted name without aliasing. The `?? $row['set']` fallback branch is unreachable since every SELECT aliases it. Could SELECT `"set"` directly and read `$row['set']`.
-
-- `private/sys/Repository/CategoryRepository.php` — `setColumn() AS set_value` in all SELECT queries + `hydrateRow()` un-alias
-- `private/sys/Repository/TagRepository.php` — same pattern
+No unsorted legacy fallback items currently tracked.
 
 ---

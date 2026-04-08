@@ -45,7 +45,7 @@ final class CategoryRepository
         $setColumn = $this->setColumn('c');
 
         $stmt = $this->db->prepare(
-            'SELECT c.id, c.name, c.slug, ' . $setColumn . ' AS set_value, c.description, c.created, c.updated,
+            'SELECT c.id, c.name, c.slug, ' . $setColumn . ', c.description, c.created, c.updated,
                     c.cover_image, c.preview_image, c.icon_image,
                     COALESCE(pc.page_count, 0) AS page_count
              FROM ' . $categories . ' c
@@ -95,7 +95,7 @@ final class CategoryRepository
         }
 
         $stmt = $this->db->prepare(
-            'SELECT c.id, c.name, c.slug, ' . $this->setColumn('c') . ' AS set_value, c.description, c.created, c.updated,
+            'SELECT c.id, c.name, c.slug, ' . $this->setColumn('c') . ', c.description, c.created, c.updated,
                     c.cover_image, c.preview_image, c.icon_image,
                     COALESCE(pc.page_count, 0) AS page_count
              FROM ' . $categories . ' c
@@ -138,7 +138,7 @@ final class CategoryRepository
             'SELECT page_rows.id,
                     page_rows.name,
                     page_rows.slug,
-                    page_rows.set_value,
+                    ' . $this->setColumn('page_rows') . ',
                     page_rows.description,
                     page_rows.created,
                     page_rows.updated,
@@ -148,7 +148,7 @@ final class CategoryRepository
                     page_rows.page_count,
                     totals.total_rows
              FROM (
-                 SELECT c.id, c.name, c.slug, ' . $this->setColumn('c') . ' AS set_value, c.description, c.created, c.updated,
+                 SELECT c.id, c.name, c.slug, ' . $this->setColumn('c') . ', c.description, c.created, c.updated,
                         c.cover_image, c.preview_image, c.icon_image,
                         COALESCE(pc.page_count, 0) AS page_count
                  FROM ' . $categories . ' c
@@ -207,7 +207,7 @@ final class CategoryRepository
         $categories = $this->table('categories');
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug, ' . $this->setColumn() . ' AS set_value
+            'SELECT id, name, slug, ' . $this->setColumn() . '
              FROM ' . $categories . '
              ORDER BY name ASC, id ASC'
         );
@@ -220,7 +220,7 @@ final class CategoryRepository
                 'id' => (int) ($row['id'] ?? 0),
                 'name' => (string) ($row['name'] ?? ''),
                 'slug' => (string) ($row['slug'] ?? ''),
-                'set' => (int) ($row['set_value'] ?? 0),
+                'set' => (int) ($row['set'] ?? 0),
             ];
         }
 
@@ -278,7 +278,7 @@ final class CategoryRepository
         $categories = $this->table('categories');
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug, ' . $this->setColumn() . ' AS set_value, description, created, updated,
+            'SELECT id, name, slug, ' . $this->setColumn() . ', description, created, updated,
                     cover_image, preview_image, icon_image
              FROM ' . $categories . '
              WHERE id = :id
@@ -301,7 +301,7 @@ final class CategoryRepository
         $categories = $this->table('categories');
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug, ' . $this->setColumn() . ' AS set_value, description, created, updated,
+            'SELECT id, name, slug, ' . $this->setColumn() . ', description, created, updated,
                     cover_image, preview_image, icon_image
              FROM ' . $categories . '
              WHERE slug = :slug
@@ -480,7 +480,7 @@ final class CategoryRepository
         $categories = $this->table('categories');
         $placeholders = implode(', ', array_fill(0, count($normalizedIds), '?'));
         $stmt = $this->db->prepare(
-            'SELECT id, ' . $this->setColumn() . ' AS set_value
+            'SELECT id, ' . $this->setColumn() . '
              FROM ' . $categories . '
              WHERE id IN (' . $placeholders . ')'
         );
@@ -488,7 +488,7 @@ final class CategoryRepository
 
         $result = [];
         foreach ($stmt->fetchAll() ?: [] as $row) {
-            $result[(int) ($row['id'] ?? 0)] = (int) ($row['set_value'] ?? 0);
+            $result[(int) ($row['id'] ?? 0)] = (int) ($row['set'] ?? 0);
         }
 
         return $result;
@@ -501,7 +501,7 @@ final class CategoryRepository
     {
         $categories = $this->table('categories');
         $stmt = $this->db->prepare(
-            'SELECT ' . $this->setColumn() . ' AS set_value, COUNT(*) AS row_count
+            'SELECT ' . $this->setColumn() . ', COUNT(*) AS row_count
              FROM ' . $categories . '
              GROUP BY ' . $this->setColumn()
         );
@@ -509,7 +509,7 @@ final class CategoryRepository
 
         $result = [];
         foreach ($stmt->fetchAll() ?: [] as $row) {
-            $result[(int) ($row['set_value'] ?? 0)] = (int) ($row['row_count'] ?? 0);
+            $result[(int) ($row['set'] ?? 0)] = (int) ($row['row_count'] ?? 0);
         }
 
         return $result;
@@ -545,8 +545,7 @@ final class CategoryRepository
     {
         $id = (int) ($row['id'] ?? 0);
         $storage = TaxonomyImagePathResolver::storagePayloadFromRecord('categories', $row);
-        $row['set'] = (int) ($row['set_value'] ?? $row['set'] ?? 0);
-        unset($row['set_value']);
+        $row['set'] = (int) ($row['set'] ?? 0);
         $row['cover_image'] = $storage['cover_image'] ?? null;
         $row['preview_image'] = $storage['preview_image'] ?? null;
         $row['icon_image'] = $storage['icon_image'] ?? null;

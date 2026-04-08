@@ -8,6 +8,7 @@
 - **Schema ensure split by responsibility**: `SchemaEnsurePipeline` and `SchemaManager` now expose dedicated app/auth ensure paths with separate state files, so auth schema work no longer forces an auth connection during non-auth bootstrap.
 - **Web bootstraps preserve the existing runtime contract**: `public/bootstrap.php` and `panel/bootstrap.php` now materialize the lazy auth entries when web runtime assembly begins, so the existing controller/request-context code still receives concrete auth objects while non-web consumers can stay off the auth connection path.
 - **Schema guard hot path collapsed to marker checks**: `SchemaEnsureStateStore` no longer recomputes schema file signatures on every request. Steady-state requests now compare state-file mtimes against local invalidation markers, while update application and extension enable/disable changes mark schema state dirty for the next bootstrap.
+- **Category/tag `set` reads flattened**: `CategoryRepository` and `TagRepository` no longer alias the reserved-word `set` column to `set_value` in SELECT queries only to rename it back during hydration. They now select the quoted `set` column directly and read `$row['set']` throughout.
 
 ### April 7, 2026 — Config consolidated into lib
 

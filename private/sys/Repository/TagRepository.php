@@ -45,7 +45,7 @@ final class TagRepository
         $setColumn = $this->setColumn('t');
 
         $stmt = $this->db->prepare(
-            'SELECT t.id, t.name, t.slug, ' . $setColumn . ' AS set_value, t.description, t.created, t.updated,
+            'SELECT t.id, t.name, t.slug, ' . $setColumn . ', t.description, t.created, t.updated,
                     t.cover_image, t.preview_image, t.icon_image,
                     COALESCE(pt.page_count, 0) AS page_count
              FROM ' . $tags . ' t
@@ -95,7 +95,7 @@ final class TagRepository
         }
 
         $stmt = $this->db->prepare(
-            'SELECT t.id, t.name, t.slug, ' . $this->setColumn('t') . ' AS set_value, t.description, t.created, t.updated,
+            'SELECT t.id, t.name, t.slug, ' . $this->setColumn('t') . ', t.description, t.created, t.updated,
                     t.cover_image, t.preview_image, t.icon_image,
                     COALESCE(pt.page_count, 0) AS page_count
              FROM ' . $tags . ' t
@@ -138,7 +138,7 @@ final class TagRepository
             'SELECT page_rows.id,
                     page_rows.name,
                     page_rows.slug,
-                    page_rows.set_value,
+                    ' . $this->setColumn('page_rows') . ',
                     page_rows.description,
                     page_rows.created,
                     page_rows.updated,
@@ -148,7 +148,7 @@ final class TagRepository
                     page_rows.page_count,
                     totals.total_rows
              FROM (
-                 SELECT t.id, t.name, t.slug, ' . $this->setColumn('t') . ' AS set_value, t.description, t.created, t.updated,
+                 SELECT t.id, t.name, t.slug, ' . $this->setColumn('t') . ', t.description, t.created, t.updated,
                         t.cover_image, t.preview_image, t.icon_image,
                         COALESCE(pt.page_count, 0) AS page_count
                  FROM ' . $tags . ' t
@@ -207,7 +207,7 @@ final class TagRepository
         $tags = $this->table('tags');
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug, ' . $this->setColumn() . ' AS set_value
+            'SELECT id, name, slug, ' . $this->setColumn() . '
              FROM ' . $tags . '
              ORDER BY name ASC, id ASC'
         );
@@ -220,7 +220,7 @@ final class TagRepository
                 'id' => (int) ($row['id'] ?? 0),
                 'name' => (string) ($row['name'] ?? ''),
                 'slug' => (string) ($row['slug'] ?? ''),
-                'set' => (int) ($row['set_value'] ?? 0),
+                'set' => (int) ($row['set'] ?? 0),
             ];
         }
 
@@ -278,7 +278,7 @@ final class TagRepository
         $tags = $this->table('tags');
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug, ' . $this->setColumn() . ' AS set_value, description, created, updated,
+            'SELECT id, name, slug, ' . $this->setColumn() . ', description, created, updated,
                     cover_image, preview_image, icon_image
              FROM ' . $tags . '
              WHERE id = :id
@@ -301,7 +301,7 @@ final class TagRepository
         $tags = $this->table('tags');
 
         $stmt = $this->db->prepare(
-            'SELECT id, name, slug, ' . $this->setColumn() . ' AS set_value, description, created, updated,
+            'SELECT id, name, slug, ' . $this->setColumn() . ', description, created, updated,
                     cover_image, preview_image, icon_image
              FROM ' . $tags . '
              WHERE slug = :slug
@@ -480,7 +480,7 @@ final class TagRepository
         $tags = $this->table('tags');
         $placeholders = implode(', ', array_fill(0, count($normalizedIds), '?'));
         $stmt = $this->db->prepare(
-            'SELECT id, ' . $this->setColumn() . ' AS set_value
+            'SELECT id, ' . $this->setColumn() . '
              FROM ' . $tags . '
              WHERE id IN (' . $placeholders . ')'
         );
@@ -488,7 +488,7 @@ final class TagRepository
 
         $result = [];
         foreach ($stmt->fetchAll() ?: [] as $row) {
-            $result[(int) ($row['id'] ?? 0)] = (int) ($row['set_value'] ?? 0);
+            $result[(int) ($row['id'] ?? 0)] = (int) ($row['set'] ?? 0);
         }
 
         return $result;
@@ -501,7 +501,7 @@ final class TagRepository
     {
         $tags = $this->table('tags');
         $stmt = $this->db->prepare(
-            'SELECT ' . $this->setColumn() . ' AS set_value, COUNT(*) AS row_count
+            'SELECT ' . $this->setColumn() . ', COUNT(*) AS row_count
              FROM ' . $tags . '
              GROUP BY ' . $this->setColumn()
         );
@@ -509,7 +509,7 @@ final class TagRepository
 
         $result = [];
         foreach ($stmt->fetchAll() ?: [] as $row) {
-            $result[(int) ($row['set_value'] ?? 0)] = (int) ($row['row_count'] ?? 0);
+            $result[(int) ($row['set'] ?? 0)] = (int) ($row['row_count'] ?? 0);
         }
 
         return $result;
@@ -545,8 +545,7 @@ final class TagRepository
     {
         $id = (int) ($row['id'] ?? 0);
         $storage = TaxonomyImagePathResolver::storagePayloadFromRecord('tags', $row);
-        $row['set'] = (int) ($row['set_value'] ?? $row['set'] ?? 0);
-        unset($row['set_value']);
+        $row['set'] = (int) ($row['set'] ?? 0);
         $row['cover_image'] = $storage['cover_image'] ?? null;
         $row['preview_image'] = $storage['preview_image'] ?? null;
         $row['icon_image'] = $storage['icon_image'] ?? null;
