@@ -13,34 +13,6 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 
 ## Short Term
 
-### Performance: Bootstrap Overhead
-
-The two bootstrap-overhead targets from this section are now done.
-
-**1. `SchemaManager::ensure()` guard runs on every request**
-`SchemaEnsureStateStore::ensureIfChanged()` guards against running the full schema pipeline, but the guard's own work still runs every request: `fopen` + `flock(LOCK_EX)` (serializes concurrent requests), `glob()` over all schema PHP files, `filemtime`/`filesize` on every schema file and each extension's `ext.json`/`ext.php`/`schema.php`, and a `require` of the state file. On a stable install this is always a no-op outcome but still pays for all of it on every hit.
-
-Fix: Replace the per-request file-stat signature with a lighter "has the state file been invalidated?" check — compare the state file's own mtime against a marker set at deploy/update time, rather than recomputing a full content signature on every request.
-
-[x] Schema marker invalidation landed on April 7.
-- `SchemaEnsureStateStore` now uses local marker files plus state-file mtimes for the hot path instead of recomputing schema signatures on every request.
-- Update application and extension enable/disable changes now invalidate schema state for the next bootstrap.
-
-**2. `$authDb` opened eagerly on all entry points including CLI**
-`ConnectionFactory::createAuthConnection()` opens a real PDO connection (second SQLite file handle or second TCP connection for MySQL/pgsql) on every request. CLI commands via `rvn-*` never call into `AuthService` but still pay for the connection.
-
-Fix: Defer `$authDb` and `AuthService` construction behind a closure in the `$rvn` container, similar to the logger. Callers that need auth resolve it on first access; CLI and non-auth paths never pay for it.
-
-[x] Auth bootstrap deferral landed on April 7.
-- `private/raven.php` now keeps auth DB/AuthService behind lazy container resolvers.
-- App schema ensure runs during baseline bootstrap; auth schema ensure moved behind first auth resolution with its own state file.
-- `public/bootstrap.php` and `panel/bootstrap.php` resolve the lazy auth entries for web requests so existing controller code still receives concrete auth objects.
-
-
-### private/raven.php Bootstrap Cleanup
-[ ] Core\Config and Lib\Config\ConfigValueParser were supposed to merge, instead we have Lib\Config\ConfigValueParser and Lib\Config\Config???
-
-
 ### General Organization & Consolidation
 [ ] Confirm legacy migration fallbacks are no longer needed to make this install work (locations at bottom of this file). expunge every one of them from our codebase as soon as each one is verified as redundant/unecessary.
 [ ] Migrate delight-auth tables from rvn_users_* to rvn_auth_*
@@ -107,7 +79,7 @@ Targets (generator owns these files — do not hand-edit them):
 [ ] Long-term: build a `git-mirror` extension to automate repo pulls into `private/dat/` on a schedule
 
 
-### Finish Base Updater Logic
+### Finish Updater
 We've been making this one up as we go along:
 [ ] It needs a cohesive plan to make it work long term.
 [ ] Incorporate normal versioning system at "1.0" once we are out of prototype stage.

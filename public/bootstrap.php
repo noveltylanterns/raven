@@ -16,7 +16,7 @@ use Raven\Controller\Public\FormController as PublicFormController;
 use Raven\Controller\Public\ProfileController as PublicProfileController;
 use Raven\Controller\Public\RequestContext;
 use Raven\Core\View;
-use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Config\Config;
 use Raven\Repository\ChannelRepository;
 use Raven\Repository\GroupRepository;
 use Raven\Repository\InviteTokenRepository;
@@ -61,8 +61,8 @@ return static function (array $rvn): array {
     $userRepository = null;
 
     $rvn['view'] = new View((string) $rvn['root'] . '/private/tpl');
-    $categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', false), false);
-    $tagEnabled = ConfigValueParser::bool($rvn['config']->get('tag.enabled', false), false);
+    $categoryEnabled = Config::bool($rvn['config']->get('category.enabled', false), false);
+    $tagEnabled = Config::bool($rvn['config']->get('tag.enabled', false), false);
 
     /**
      * Request-scoped memoization keeps bootstrap factories lightweight while

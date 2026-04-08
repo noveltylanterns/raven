@@ -13,6 +13,7 @@
 
 - **`Config` moved from `private/sys/Core/Config.php` to `private/lib/Config/Config.php`**: canonical config class now lives in `Raven\Lib\Config\Config`, fixing the lib-depends-on-sys dependency inversion. All ~32 lib files that previously imported `Raven\Core\Config` now import `Raven\Lib\Config\Config`.
 - **`ConfigFileStore` folded in**: `private/lib/Config/ConfigFileStore.php` had exactly one caller (`Core\Config`) and provided no polymorphism. Its logic (file load, atomic PHP-array write, `clearstatcache`, `opcache_invalidate`) is now inlined directly into `Config::__construct()` and `Config::save()`. The file is deleted.
+- **`ConfigValueParser` folded in**: the leftover scalar parsing helper class is gone. `Config::bool()`, `Config::int()`, and `Config::float()` now own those normalization helpers directly, and all callers were updated to use the canonical config class instead of a parallel parser file.
 - **`private/sys/Core/Config.php` deleted**: all callers already updated; no shim retained.
 - **All `\Raven\Core\Config` PHPDoc references updated**: affected lib, sys, and extension PHPDoc annotations and AGENTS.md contract docs updated to `\Raven\Lib\Config\Config`.
 

@@ -26,7 +26,7 @@ use Raven\Lib\Auth\PanelInvitePolicyService;
 use Raven\Lib\Auth\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
-use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Config\Config;
 use Raven\Lib\Config\PanelMediaConfigService;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Http\UploadFileSetNormalizer;
@@ -95,8 +95,8 @@ return static function (array $rvn): array {
     $userRepository = null;
 
     $rvn['view'] = new View((string) $rvn['root'] . '/private/tpl');
-    $categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', true), true);
-    $tagEnabled = ConfigValueParser::bool($rvn['config']->get('tag.enabled', true), true);
+    $categoryEnabled = Config::bool($rvn['config']->get('category.enabled', true), true);
+    $tagEnabled = Config::bool($rvn['config']->get('tag.enabled', true), true);
 
     /**
      * Request-scoped memoization keeps bootstrap factories lightweight while

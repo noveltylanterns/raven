@@ -201,11 +201,11 @@ final class PanelConfigFieldPolicyService
 
             $isCategoryPath = $path === 'category.prefix';
             $thisEnabled = $isCategoryPath
-                ? ConfigValueParser::bool(
+                ? Config::bool(
                     $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', false),
                     false
                 )
-                : ConfigValueParser::bool(
+                : Config::bool(
                     $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', false),
                     false
                 );
@@ -226,11 +226,11 @@ final class PanelConfigFieldPolicyService
             $otherPath = $path === 'category.prefix' ? 'tag.prefix' : 'category.prefix';
             $otherDefault = $path === 'category.prefix' ? 'tag' : 'cat';
             $otherEnabled = $isCategoryPath
-                ? ConfigValueParser::bool(
+                ? Config::bool(
                     $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', false),
                     false
                 )
-                : ConfigValueParser::bool(
+                : Config::bool(
                     $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', false),
                     false
                 );
@@ -256,7 +256,7 @@ final class PanelConfigFieldPolicyService
                 throw new \RuntimeException($path . ' must be a valid slug.');
             }
 
-            $feedEnabled = ConfigValueParser::bool(
+            $feedEnabled = Config::bool(
                 $workingConfig['feed']['enabled'] ?? $this->config->get('feed.enabled', false),
                 false
             );
@@ -277,7 +277,7 @@ final class PanelConfigFieldPolicyService
             $categoryPrefix = $this->input->slug(
                 (string) ($workingConfig['category']['prefix'] ?? $this->config->get('category.prefix', 'cat'))
             );
-            $categoryEnabled = ConfigValueParser::bool(
+            $categoryEnabled = Config::bool(
                 $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', false),
                 false
             );
@@ -288,7 +288,7 @@ final class PanelConfigFieldPolicyService
             $tagPrefix = $this->input->slug(
                 (string) ($workingConfig['tag']['prefix'] ?? $this->config->get('tag.prefix', 'tag'))
             );
-            $tagEnabled = ConfigValueParser::bool(
+            $tagEnabled = Config::bool(
                 $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', false),
                 false
             );
@@ -384,7 +384,7 @@ final class PanelConfigFieldPolicyService
             $categoryPrefix = $this->input->slug(
                 (string) ($workingConfig['category']['prefix'] ?? $this->config->get('category.prefix', 'cat'))
             );
-            $categoryEnabled = ConfigValueParser::bool(
+            $categoryEnabled = Config::bool(
                 $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', false),
                 false
             );
@@ -395,7 +395,7 @@ final class PanelConfigFieldPolicyService
             $tagPrefix = $this->input->slug(
                 (string) ($workingConfig['tag']['prefix'] ?? $this->config->get('tag.prefix', 'tag'))
             );
-            $tagEnabled = ConfigValueParser::bool(
+            $tagEnabled = Config::bool(
                 $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', false),
                 false
             );
@@ -451,7 +451,7 @@ final class PanelConfigFieldPolicyService
             $categoryPrefix = $this->input->slug(
                 (string) ($workingConfig['category']['prefix'] ?? $this->config->get('category.prefix', 'cat'))
             );
-            $categoryEnabled = ConfigValueParser::bool(
+            $categoryEnabled = Config::bool(
                 $workingConfig['category']['enabled'] ?? $this->config->get('category.enabled', false),
                 false
             );
@@ -462,7 +462,7 @@ final class PanelConfigFieldPolicyService
             $tagPrefix = $this->input->slug(
                 (string) ($workingConfig['tag']['prefix'] ?? $this->config->get('tag.prefix', 'tag'))
             );
-            $tagEnabled = ConfigValueParser::bool(
+            $tagEnabled = Config::bool(
                 $workingConfig['tag']['enabled'] ?? $this->config->get('tag.enabled', false),
                 false
             );

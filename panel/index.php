@@ -12,7 +12,7 @@ declare(strict_types=1);
 use Raven\Core\Auth\PanelAccess;
 use Raven\Lib\Auth\PanelSessionGuard;
 use Raven\Core\Diagnostics\DebugToolbarRenderer;
-use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Config\Config;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
 use Raven\Lib\Diagnostics\RequestProfiler;
 use Raven\Lib\Panel\PanelUrl;
@@ -129,8 +129,8 @@ $isPanelAuthHelperInternalPath = static function (string $path) use ($internalPa
     ], true);
 };
 
-$categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', true), true);
-$tagEnabled = ConfigValueParser::bool($rvn['config']->get('tag.enabled', true), true);
+$categoryEnabled = Config::bool($rvn['config']->get('category.enabled', true), true);
+$tagEnabled = Config::bool($rvn['config']->get('tag.enabled', true), true);
 $_SESSION['_raven_category_enabled'] = $categoryEnabled;
 $_SESSION['_raven_tag_enabled'] = $tagEnabled;
 
