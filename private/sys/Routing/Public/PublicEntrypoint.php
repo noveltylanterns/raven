@@ -14,8 +14,8 @@ namespace Raven\Core\Routing\Public;
 use Raven\Lib\Diagnostics\RequestProfiler;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarRenderer;
-use Raven\Lib\Routing\RouteRequest;
 use Raven\Lib\Routing\Router;
+use Raven\Lib\Routing\RouteRequest;
 use RuntimeException;
 
 use function Raven\Support\request_path;

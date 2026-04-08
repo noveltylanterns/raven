@@ -23,6 +23,17 @@ use Raven\Core\Controller\Panel\SystemController;
 use Raven\Core\Controller\Panel\TaxonomyController;
 use Raven\Core\Controller\Panel\UserController;
 use Raven\Core\Media\PageImageManager;
+use Raven\Core\Repository\CategoryRepository;
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\GroupRepository;
+use Raven\Core\Repository\InviteTokenRepository;
+use Raven\Core\Repository\PageImageRepository;
+use Raven\Core\Repository\PageRepository;
+use Raven\Core\Repository\RedirectRepository;
+use Raven\Core\Repository\TagRepository;
+use Raven\Core\Repository\TaxonomyLookupRepository;
+use Raven\Core\Repository\TaxonomySetRepository;
+use Raven\Core\Repository\UserRepository;
 use Raven\Core\View;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelInvitePolicyService;
@@ -41,17 +52,6 @@ use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Site\SiteContextBuilder;
-use Raven\Core\Repository\CategoryRepository;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\InviteTokenRepository;
-use Raven\Core\Repository\PageImageRepository;
-use Raven\Core\Repository\PageRepository;
-use Raven\Core\Repository\RedirectRepository;
-use Raven\Core\Repository\TagRepository;
-use Raven\Core\Repository\TaxonomyLookupRepository;
-use Raven\Core\Repository\TaxonomySetRepository;
-use Raven\Core\Repository\UserRepository;
 
 /**
  * Builds panel-scope runtime factories on top of the shared Raven container.

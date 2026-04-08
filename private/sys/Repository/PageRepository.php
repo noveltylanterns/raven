@@ -12,15 +12,15 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
+use Raven\Lib\Channel\ChannelContextService;
+use Raven\Lib\Channel\ChannelRecordPolicy;
 use Raven\Lib\Content\PageBodyBlockCodec;
-use Raven\Lib\Content\PagePersistenceService;
 use Raven\Lib\Content\PagePanelFilterClauseBuilder;
+use Raven\Lib\Content\PagePersistenceService;
 use Raven\Lib\Content\PageTaxonomyAssignmentService;
 use Raven\Lib\Content\PageTaxonomyQueryService;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 use Raven\Lib\Media\PageEditorGalleryHydrator;
-use Raven\Lib\Channel\ChannelContextService;
-use Raven\Lib\Channel\ChannelRecordPolicy;
 use Raven\Lib\Routing\PathScopeLookupService;
 use RuntimeException;
 

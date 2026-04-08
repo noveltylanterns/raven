@@ -11,11 +11,13 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Panel;
 
-use Raven\Lib\Config\Config;
+use lbuchs\WebAuthn\WebAuthn;
+use lbuchs\WebAuthn\WebAuthnException;
 use Raven\Core\Security\AvatarValidator;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
+use Raven\Lib\Config\Config;
 use Raven\Lib\Config\PanelMediaConfigService;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Media\AvatarUploadService;
@@ -26,8 +28,6 @@ use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\QrCodeService;
 use Raven\Lib\Security\WebAuthnService;
-use lbuchs\WebAuthn\WebAuthn;
-use lbuchs\WebAuthn\WebAuthnException;
 
 use function Raven\Support\redirect;
 

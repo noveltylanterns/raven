@@ -24,8 +24,8 @@ declare(strict_types=1);
 /** @var string|null $flashError */
 /** @var string $csrfField */
 
-use Raven\Core\Support\CountryOptions;
 use function Raven\Support\e;
+use Raven\Core\Support\CountryOptions;
 
 $formName = (string) ($formData['name'] ?? '');
 $formSlug = (string) ($formData['slug'] ?? '');

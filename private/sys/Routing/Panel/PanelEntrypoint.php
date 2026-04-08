@@ -17,12 +17,12 @@ use Raven\Lib\Diagnostics\RequestProfiler;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarRenderer;
 use Raven\Lib\Panel\PanelUrl;
-use Raven\Lib\Routing\RouteRequest;
 use Raven\Lib\Routing\Router;
+use Raven\Lib\Routing\RouteRequest;
 use RuntimeException;
 
-use function Raven\Support\request_path;
 use function Raven\Support\redirect;
+use function Raven\Support\request_path;
 
 /**
  * Owns panel-entry orchestration.

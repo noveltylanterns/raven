@@ -12,15 +12,15 @@ declare(strict_types=1);
 use Raven\Core\Auth\AuthService;
 use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\SchemaManager;
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\PageRepository;
 use Raven\Lib\Config\Config;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Log\EventLogger;
 use Raven\Lib\Scheduler\SchedulerRegistry;
-use Raven\Lib\Session\SessionCookiePolicy;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\PageRepository;
+use Raven\Lib\Session\SessionCookiePolicy;
 
 /**
  * Shared bootstrap for all web roots.

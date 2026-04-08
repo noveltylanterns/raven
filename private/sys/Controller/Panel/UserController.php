@@ -12,11 +12,14 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
-use Raven\Lib\Config\Config;
+use Raven\Core\Repository\GroupRepository;
+use Raven\Core\Repository\InviteTokenRepository;
+use Raven\Core\Repository\UserRepository;
 use Raven\Core\Security\AvatarValidator;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\PanelInvitePolicyService;
 use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
+use Raven\Lib\Config\Config;
 use Raven\Lib\Config\PanelMediaConfigService;
 use Raven\Lib\Http\SessionFlash;
 use Raven\Lib\Media\AvatarUploadService;
@@ -26,9 +29,6 @@ use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\InviteTokenRepository;
-use Raven\Core\Repository\UserRepository;
 
 use function Raven\Support\redirect;
 

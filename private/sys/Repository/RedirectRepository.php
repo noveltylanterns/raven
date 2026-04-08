@@ -14,9 +14,9 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Database\Runtime\TableNameResolver;
 use Raven\Lib\Channel\ChannelContextService;
 use Raven\Lib\Channel\ChannelRecordPolicy;
+use Raven\Lib\Database\Runtime\TableNameResolver;
 use Raven\Lib\Routing\PathScopeLookupService;
 use RuntimeException;
 

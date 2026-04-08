@@ -14,9 +14,9 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
+use Raven\Lib\Channel\ChannelContextService;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 use Raven\Lib\Media\TaxonomyImagePathResolver;
-use Raven\Lib\Channel\ChannelContextService;
 
 /**
  * Lookup repository for channel/category/tag rows and taxonomy option sets.

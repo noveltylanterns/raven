@@ -12,6 +12,10 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
+use Raven\Core\Repository\CategoryRepository;
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\TagRepository;
+use Raven\Core\Repository\TaxonomySetRepository;
 use Raven\Lib\Http\UploadFileSetNormalizer;
 use Raven\Lib\Media\TaxonomyImageService;
 use Raven\Lib\Panel\PanelEditorTabService;
@@ -19,10 +23,6 @@ use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Taxonomy\TaxonomySetRecordPolicy;
-use Raven\Core\Repository\CategoryRepository;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\TagRepository;
-use Raven\Core\Repository\TaxonomySetRepository;
 
 use function Raven\Support\redirect;
 

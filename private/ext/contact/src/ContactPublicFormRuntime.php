@@ -11,12 +11,12 @@ declare(strict_types=1);
 
 namespace Raven\Ext;
 
-use Raven\Lib\Config\Config;
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
-use Raven\Lib\Security\Csrf;
-use Raven\Lib\Security\InputSanitizer;
 use Raven\Ext\ContactFormRepository;
 use Raven\Ext\ContactSubmissionRepository;
+use Raven\Lib\Config\Config;
+use Raven\Lib\Security\Csrf;
+use Raven\Lib\Security\InputSanitizer;
 
 use function Raven\Support\redirect;
 

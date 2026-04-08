@@ -17,11 +17,11 @@ use PDO;
 use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\ContactProfileNormalizer;
 use Raven\Lib\Auth\GroupMembershipWriteService;
-use Raven\Lib\Auth\UserPersistenceService;
 use Raven\Lib\Auth\UserGroupCatalogService;
-use Raven\Lib\Auth\UserRoutingDataService;
-use Raven\Lib\Auth\UserPanelQueryService;
 use Raven\Lib\Auth\UserPanelHydrator;
+use Raven\Lib\Auth\UserPanelQueryService;
+use Raven\Lib\Auth\UserPersistenceService;
+use Raven\Lib\Auth\UserRoutingDataService;
 use Raven\Lib\Database\Runtime\TableNameResolver;
 
 /**

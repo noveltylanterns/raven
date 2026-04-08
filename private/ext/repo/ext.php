@@ -9,13 +9,13 @@
 
 declare(strict_types=1);
 
-use Raven\Lib\Filesystem\DirectoryTreeService;
-use Raven\Lib\Update\GitCommandRunner;
 use Raven\Ext\Repo\RepoLogStore;
 use Raven\Ext\Repo\RepoRegistryStore;
 use Raven\Ext\Repo\RepoService;
 use Raven\Ext\Repo\RepoSettingsStore;
 use Raven\Ext\Repo\RepoShortcodeRuntime;
+use Raven\Lib\Filesystem\DirectoryTreeService;
+use Raven\Lib\Update\GitCommandRunner;
 
 /**
  * Registers Repositories extension services into the shared app container.

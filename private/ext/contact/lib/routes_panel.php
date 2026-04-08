@@ -9,9 +9,9 @@
 
 declare(strict_types=1);
 
-use Raven\Lib\Routing\Router;
 use Raven\Ext\ContactFormRepository;
 use Raven\Ext\ContactSubmissionRepository;
+use Raven\Lib\Routing\Router;
 
 use function Raven\Support\redirect;
 

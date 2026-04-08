@@ -11,14 +11,14 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Public;
 
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\PageRepository;
+use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Lib\Routing\PublicChannelPageRouteService;
 use Raven\Lib\View\PublicTemplateDecorator;
 use Raven\Lib\View\PublicTemplatePipeline;
 use Raven\Lib\View\PublicTemplateResolver;
 use Raven\Lib\View\ThemeCatalogService;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\PageRepository;
-use Raven\Core\Repository\TaxonomyLookupRepository;
 
 /**
  * Handles split public feed and taxonomy-list routes.

@@ -11,9 +11,9 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Panel;
 
-use Raven\Lib\Security\InputSanitizer;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\RedirectRepository;
+use Raven\Lib\Security\InputSanitizer;
 
 use function Raven\Support\redirect;
 

@@ -13,14 +13,14 @@ namespace Raven\Core\Auth;
 
 use PDO;
 use Raven\Lib\Auth\AuthAccessGateService;
-use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\AuthGroupMembershipService;
 use Raven\Lib\Auth\AuthIdentityLookupService;
+use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\ContactProfileNormalizer;
 use Raven\Lib\Auth\LoginThrottleService;
 use Raven\Lib\Auth\PermissionMaskService;
-use Raven\Lib\Auth\TwoFactorEmailChallengeService;
 use Raven\Lib\Auth\TwoFactorChallengeVerificationService;
+use Raven\Lib\Auth\TwoFactorEmailChallengeService;
 use Raven\Lib\Auth\TwoFactorSessionStateService;
 use Raven\Lib\Auth\UserSecurityProfileService;
 use Raven\Lib\Database\Runtime\TableNameResolver;

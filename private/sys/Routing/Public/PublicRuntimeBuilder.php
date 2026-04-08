@@ -18,8 +18,6 @@ use Raven\Core\Controller\Public\FeedController as PublicFeedController;
 use Raven\Core\Controller\Public\FormController as PublicFormController;
 use Raven\Core\Controller\Public\ProfileController as PublicProfileController;
 use Raven\Core\Controller\Public\RequestContext;
-use Raven\Core\View;
-use Raven\Lib\Config\Config;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\InviteTokenRepository;
@@ -28,6 +26,8 @@ use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\UserRepository;
+use Raven\Core\View;
+use Raven\Lib\Config\Config;
 
 /**
  * Builds public-scope runtime factories on top of the shared Raven container.

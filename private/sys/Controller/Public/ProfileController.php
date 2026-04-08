@@ -11,12 +11,12 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Public;
 
+use Raven\Core\Repository\GroupRepository;
+use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\View\PublicRouteRenderService;
 use Raven\Lib\View\PublicTemplateDecorator;
-use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\UserRepository;
 
 /**
  * Handles split public profile and group routes.

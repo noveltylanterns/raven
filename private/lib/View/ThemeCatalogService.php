@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\View;
 
-use Raven\Lib\Config\Config;
 use Raven\Core\Theme\PublicThemeRegistry;
+use Raven\Lib\Config\Config;
 use Raven\Lib\Security\InputSanitizer;
 
 /**

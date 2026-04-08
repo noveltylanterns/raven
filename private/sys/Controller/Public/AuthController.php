@@ -12,6 +12,9 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Closure;
+use Raven\Core\Repository\GroupRepository;
+use Raven\Core\Repository\InviteTokenRepository;
+use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginAttemptPolicy;
 use Raven\Lib\Auth\LoginAttemptWorkflowService;
 use Raven\Lib\Auth\LoginChallengeWorkflowService;
@@ -19,9 +22,6 @@ use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\LoginUiStateService;
 use Raven\Lib\Http\RedirectTargetValidator;
 use Raven\Lib\Security\LoginTwoFactorFlowService;
-use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\InviteTokenRepository;
-use Raven\Core\Repository\UserRepository;
 
 use function Raven\Support\redirect;
 

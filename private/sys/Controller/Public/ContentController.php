@@ -14,6 +14,11 @@ namespace Raven\Core\Controller\Public;
 use Closure;
 use Raven\Core\Extension\EmbeddedFormRuntimeInterface;
 use Raven\Core\Extension\EmbeddedShortcodeRuntimeInterface;
+use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\PageImageRepository;
+use Raven\Core\Repository\PageRepository;
+use Raven\Core\Repository\RedirectRepository;
+use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Content\BodyBlockPolicy;
 use Raven\Lib\Content\MarkdownRenderer;
 use Raven\Lib\Content\PublicPageBodyRenderer;
@@ -28,11 +33,6 @@ use Raven\Lib\View\PublicTemplateDecorator;
 use Raven\Lib\View\PublicTemplatePipeline;
 use Raven\Lib\View\PublicTemplateResolver;
 use Raven\Lib\View\ThemeCatalogService;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\PageImageRepository;
-use Raven\Core\Repository\PageRepository;
-use Raven\Core\Repository\RedirectRepository;
-use Raven\Core\Repository\UserRepository;
 
 use function Raven\Support\redirect;
 

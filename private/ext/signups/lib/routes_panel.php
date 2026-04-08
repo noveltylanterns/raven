@@ -9,9 +9,9 @@
 
 declare(strict_types=1);
 
-use Raven\Lib\Routing\Router;
 use Raven\Ext\SignupFormRepository;
 use Raven\Ext\SignupSubmissionRepository;
+use Raven\Lib\Routing\Router;
 
 use function Raven\Support\redirect;
 

@@ -9,8 +9,8 @@
 
 declare(strict_types=1);
 
-use Raven\Lib\Routing\Router;
 use Raven\Ext\Smallweb\SmallwebService;
+use Raven\Lib\Routing\Router;
 
 use function Raven\Support\redirect;
 

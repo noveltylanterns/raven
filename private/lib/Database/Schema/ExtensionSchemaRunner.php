@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Raven\Lib\Database\Schema;
 
 use PDO;
-use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
+use Raven\Lib\Extension\ExtensionRegistry;
 
 /**
  * Executes extension-owned schema providers during bootstrap.

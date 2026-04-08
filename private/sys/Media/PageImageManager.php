@@ -12,12 +12,12 @@ declare(strict_types=1);
 namespace Raven\Core\Media;
 
 use Imagick;
+use Raven\Core\Repository\PageImageRepository;
 use Raven\Lib\Config\Config;
 use Raven\Lib\Media\ImageVariantProcessor;
 use Raven\Lib\Media\PageImagePathLayout;
 use Raven\Lib\Media\PageImageUploadPolicy;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Core\Repository\PageImageRepository;
 
 /**
  * Handles upload validation, variant generation, and filesystem cleanup for page galleries.

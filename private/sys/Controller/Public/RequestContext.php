@@ -12,8 +12,8 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Auth\AuthService;
-use Raven\Lib\Config\Config;
 use Raven\Core\View\TemplateTagEngine;
+use Raven\Lib\Config\Config;
 use Raven\Lib\Http\HttpResponse;
 use Raven\Lib\Http\RequestContextResolver;
 use Raven\Lib\Http\SessionFlash;
