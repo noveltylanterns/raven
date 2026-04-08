@@ -365,7 +365,7 @@ PHP;
 
 declare(strict_types=1);
 
-use Raven\Lib\Routing\Router;
+use Raven\Core\Routing\Router;
 
 /**
  * Registers __NAME_DOC__ routes into the panel router.
@@ -534,7 +534,7 @@ PHP;
 
 declare(strict_types=1);
 
-use Raven\Lib\Routing\Router;
+use Raven\Core\Routing\Router;
 
 /**
  * Registers extension routes into the public router.

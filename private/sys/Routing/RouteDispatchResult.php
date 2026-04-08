@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Routing;
+namespace Raven\Core\Routing;
 
 /**
  * Immutable dispatch response contract.

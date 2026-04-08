@@ -170,7 +170,7 @@ return static function (array $context): void {
  */
 declare(strict_types=1);
 
-use Raven\Lib\Routing\Router;
+use Raven\Core\Routing\Router;
 
 return static function (Router $router, array $context): void {
     // Register panel routes here.
@@ -187,7 +187,7 @@ return static function (Router $router, array $context): void {
  */
 declare(strict_types=1);
 
-use Raven\Lib\Routing\Router;
+use Raven\Core\Routing\Router;
 
 return static function (Router $router, array $context): void {
     // Register public routes here.

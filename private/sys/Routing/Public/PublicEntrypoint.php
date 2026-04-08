@@ -14,8 +14,8 @@ namespace Raven\Core\Routing\Public;
 use Raven\Core\Routing\DebugToolbarResponseHook;
 use Raven\Core\Routing\SchedulerFallbackRunner;
 use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
-use Raven\Lib\Routing\Router;
-use Raven\Lib\Routing\RouteRequest;
+use Raven\Core\Routing\Router;
+use Raven\Core\Routing\RouteRequest;
 use RuntimeException;
 
 use function Raven\Lib\Support\request_path;

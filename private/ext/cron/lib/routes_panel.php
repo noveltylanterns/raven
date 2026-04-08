@@ -10,7 +10,7 @@
 declare(strict_types=1);
 
 use Raven\Ext\Cron\CronTaskService;
-use Raven\Lib\Routing\Router;
+use Raven\Core\Routing\Router;
 use Raven\Lib\Scheduler\SchedulerRegistry;
 
 use function Raven\Lib\Support\redirect;

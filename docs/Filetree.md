@@ -118,7 +118,10 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/sys/Repository/`
   - Core content/taxonomy/auth-facing persistence repositories (`PageRepository`, `ChannelRepository`, `UserRepository`, `GroupRepository`, `CategoryRepository`, `TagRepository`, `TaxonomyLookupRepository`, `TaxonomySetRepository`, `RedirectRepository`, `PageImageRepository`, `InviteTokenRepository`).
 - `private/sys/Routing/`
-  - Raven-owned web entry and dispatch orchestration.
+  - Raven-owned web entry, dispatch engine, and orchestration. Not for extension use.
+  - `Router` — the core dispatcher: registers routes via `add()`, compiles `{param}` patterns to named-capture regex, and resolves requests via `dispatch()`.
+  - `RouteRequest` — immutable HTTP method + path value object passed to `Router::dispatch()`.
+  - `RouteDispatchResult` — immutable dispatch result returned by `Router::dispatch()`; carries matched params and handler response.
   - Root-level helpers such as `DebugToolbarResponseHook` and `SchedulerFallbackRunner` own only shared low-level web-entry mechanics; scope decisions still stay in the public/panel entrypoints.
   - `Routing/Public/` — `PublicEntrypoint`, `PublicRuntimeBuilder`, and controller-aligned public route registrars including extension-route loading.
   - `Routing/Panel/` — `PanelEntrypoint`, `PanelRuntimeBuilder`, controller-aligned panel route registrars, extension-route loading, and panel theme-asset fast path.
@@ -154,7 +157,12 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/lib/Panel/`
   - Panel UI helpers: tab normalization, tab-preserving URL builders, panel path resolution, and routing-preview derivations.
 - `private/lib/Routing/`
-  - Reusable routing primitives: `Router`, `RouteRequest`, `RouteDispatchResult`, channel/page route policies, routing inventory, and route-config helpers. Does not own entrypoints or route registrars — those live in `sys/Routing/`.
+  - Reusable routing library functions available to extensions and core alike.
+  - `ChannelRoutePolicy` — channel route mode (`slug`, `date_slug`, `id`, etc.) and word-separator normalization/resolution policy.
+  - `PathScopeLookupService` — generic slug-uniqueness DB lookup for any (slug, channel) scoped table; used by core repositories and available to extensions.
+  - `PublicChannelPageRouteService` — wraps `ChannelRoutePolicy` for public content controllers: lookup-target resolution and canonical segment building.
+  - `RouteConfigService` — config-aware route-prefix, feed, profile, and group route helpers; consumes `Raven\Core\Config` and exposes normalized policy accessors.
+  - `RoutingInventoryBuilder` — builds the normalized routing inventory row set for the panel routing diagnostics view.
 - `private/lib/Security/`
   - Security primitives available to core and extensions: CSRF (`Csrf`, `CsrfTokenStoreInterface`), input sanitization (`InputSanitizer`), 2FA (TOTP, WebAuthn, recovery phrase, QR code), captcha, and invite token policy.
 - `private/lib/Support/`

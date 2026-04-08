@@ -10,7 +10,7 @@
 declare(strict_types=1);
 
 use Raven\Ext\Smallweb\SmallwebService;
-use Raven\Lib\Routing\Router;
+use Raven\Core\Routing\Router;
 
 use function Raven\Lib\Support\redirect;
 

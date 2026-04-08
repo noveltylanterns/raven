@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Panel;
 
-use Raven\Lib\Routing\Router;
+use Raven\Core\Routing\Router;
 use Raven\Lib\Security\InputSanitizer;
 
 /**

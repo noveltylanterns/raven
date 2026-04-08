@@ -14,7 +14,7 @@ namespace Raven\Core\Routing\Panel;
 use Raven\Lib\Auth\PanelAccess;
 use Raven\Lib\Auth\PanelSessionGuard;
 use Raven\Lib\Panel\PanelUrl;
-use Raven\Lib\Routing\Router;
+use Raven\Core\Routing\Router;
 
 /**
  * Registers extension-provided panel routes for enabled extensions.
