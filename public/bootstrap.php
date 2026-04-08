@@ -37,6 +37,13 @@ return static function (array $rvn): array {
         return $rvn;
     }
 
+    if (is_callable($rvn['auth_db'])) {
+        $rvn['auth_db'] = $rvn['auth_db']();
+    }
+    if (is_callable($rvn['auth'])) {
+        $rvn['auth'] = $rvn['auth']();
+    }
+
     $publicAuthController = null;
     $publicContentController = null;
     $publicFeedController = null;

@@ -108,13 +108,32 @@ return (static function (): array {
     $prefix = $connectionFactory->getPrefix();
 
     $rvnDb = $connectionFactory->createAppConnection();
-    $authDb = $connectionFactory->createAuthConnection();
 
-    // Ensure schema exists on each startup to keep first run friction low.
+    // Keep app-side schema current during every bootstrap, but defer auth-side
+    // schema and auth connection setup until something actually needs auth.
     $schema = new SchemaManager();
-    $schema->ensure($rvnDb, $authDb, $driver, $prefix);
+    $schema->ensureApp($rvnDb, $driver, $prefix);
 
-    $auth = new AuthService($authDb, $rvnDb, $driver, $prefix);
+    $authDb = null;
+    $authDbResolver = static function () use (&$authDb, $connectionFactory, $schema, $driver, $prefix): PDO {
+        if ($authDb instanceof PDO) {
+            return $authDb;
+        }
+
+        $authDb = $connectionFactory->createAuthConnection();
+        $schema->ensureAuth($authDb, $driver, $prefix);
+        return $authDb;
+    };
+
+    $auth = null;
+    $authResolver = static function () use (&$auth, $authDbResolver, $rvnDb, $driver, $prefix): AuthService {
+        if ($auth instanceof AuthService) {
+            return $auth;
+        }
+
+        $auth = new AuthService($authDbResolver(), $rvnDb, $driver, $prefix);
+        return $auth;
+    };
 
     $input = new InputSanitizer();
     $categoryEnabled = ConfigValueParser::bool($config->get('category.enabled', false), false);
@@ -167,8 +186,8 @@ return (static function (): array {
         'driver' => $driver,
         'prefix' => $prefix,
         'db' => $rvnDb,
-        'auth_db' => $authDb,
-        'auth' => $auth,
+        'auth_db' => $authDbResolver,
+        'auth' => $authResolver,
         'input' => $input,
         'csrf' => new Csrf(),
         'enabled_extension_directories' => array_keys($extensionManifests),

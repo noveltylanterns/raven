@@ -2,6 +2,12 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 7, 2026 — raven bootstrap auth deferral
+
+- **Auth bootstrap split out of the steady path**: `private/raven.php` now ensures only app-side schema during baseline bootstrap, while auth DB setup and `AuthService` construction resolve lazily through the `auth_db` / `auth` container entries the first time something actually asks for them.
+- **Schema ensure split by responsibility**: `SchemaEnsurePipeline` and `SchemaManager` now expose dedicated app/auth ensure paths with separate state files, so auth schema work no longer forces an auth connection during non-auth bootstrap.
+- **Web bootstraps preserve the existing runtime contract**: `public/bootstrap.php` and `panel/bootstrap.php` now materialize the lazy auth entries when web runtime assembly begins, so the existing controller/request-context code still receives concrete auth objects while non-web consumers can stay off the auth connection path.
+
 ### April 7, 2026 — Config consolidated into lib
 
 - **`Config` moved from `private/sys/Core/Config.php` to `private/lib/Config/Config.php`**: canonical config class now lives in `Raven\Lib\Config\Config`, fixing the lib-depends-on-sys dependency inversion. All ~32 lib files that previously imported `Raven\Core\Config` now import `Raven\Lib\Config\Config`.

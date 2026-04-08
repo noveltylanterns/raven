@@ -40,9 +40,41 @@ final class SchemaManager
 
     /**
      * Ensures both app and auth schemas exist for the selected backend.
+     *
+     * @param PDO $rvnDb App database connection.
+     * @param PDO $authDb Auth database connection.
+     * @param string $driver Active PDO driver name.
+     * @param string $prefix Active Raven table prefix.
+     * @return void
      */
     public function ensure(PDO $rvnDb, PDO $authDb, string $driver, string $prefix): void
     {
         $this->schemaManager->ensure($rvnDb, $authDb, $driver, $prefix);
+    }
+
+    /**
+     * Ensures app-side schema state only.
+     *
+     * @param PDO $rvnDb App database connection.
+     * @param string $driver Active PDO driver name.
+     * @param string $prefix Active Raven table prefix.
+     * @return void
+     */
+    public function ensureApp(PDO $rvnDb, string $driver, string $prefix): void
+    {
+        $this->schemaManager->ensureApp($rvnDb, $driver, $prefix);
+    }
+
+    /**
+     * Ensures auth-side schema state only.
+     *
+     * @param PDO $authDb Auth database connection.
+     * @param string $driver Active PDO driver name.
+     * @param string $prefix Active Raven table prefix.
+     * @return void
+     */
+    public function ensureAuth(PDO $authDb, string $driver, string $prefix): void
+    {
+        $this->schemaManager->ensureAuth($authDb, $driver, $prefix);
     }
 }
