@@ -14,24 +14,24 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 ## Short Term
 
 ### General Organization & Consolidation
-[ ] Confirm legacy migration fallbacks are no longer needed to make this install work (locations at bottom of this file). expunge every one of them from our codebase as soon as each one is verified as redundant/unecessary.
-[ ] Migrate delight-auth tables from rvn_users_* to rvn_auth_*
+- [ ] Confirm legacy migration fallbacks are no longer needed to make this install work (locations at bottom of this file). expunge every one of them from our codebase as soon as each one is verified as redundant/unecessary.
+- [ ] Migrate delight-auth tables from rvn_users_* to rvn_auth_*
 	- Store localized logic in lib/Composer/delight-im/auth.php
 
 ## Long Term
 
 ### Core Consolidation
-[ ] Thoroughly analyze private/sys/ for functions that can be simplified/collapsed.
-[ ] Do not work in batches. Leave a running log of targets at the bottom of this file.
-[ ] Be thorough with this sweep. DO NOT just "stop" when you have a few targets, like you did before.
-[ ] Consolidate targets when analysis is complete.
+- [ ] Thoroughly analyze private/sys/ for functions that can be simplified/collapsed.
+- [ ] Do not work in batches. Leave a running log of targets at the bottom of this file.
+- [ ] Be thorough with this sweep. DO NOT just "stop" when you have a few targets, like you did before.
+- [ ] Consolidate targets when analysis is complete.
 
 
 ### Library Consolidation
-[ ] Thoroughly analyze private/lib/ for functions that can be simplified/collapsed.
-[ ] Do not work in batches. Leave a running log of targets at the bottom of this file.
-[ ] Be thorough with this sweep. DO NOT just "stop" when you have a few targets, like you did before.
-[ ] Consolidate targets when analysis is complete.
+- [ ] Thoroughly analyze private/lib/ for functions that can be simplified/collapsed.
+- [ ] Do not work in batches. Leave a running log of targets at the bottom of this file.
+- [ ] Be thorough with this sweep. DO NOT just "stop" when you have a few targets, like you did before.
+- [ ] Consolidate targets when analysis is complete.
 
 
 ### Environment Hardening
@@ -52,39 +52,39 @@ Full aggressive security sweep and pentesting run, including (but not limited to
 Build a single fast CLI command that auto-generates all reference appendix files from the codebase.
 Pure PHP — Reflection API + lightweight PHPDoc regex, no extra composer deps. Run at release time.
 Targets (generator owns these files — do not hand-edit them):
-[ ] `docs/appendix/libraries.md` — reflect on all public repository methods; pull `@param`/`@return`/first docline per method; group by service key in `context['rvn']`
-[ ] `docs/appendix/config.md` — parse `private/dat/config.php.dist` key tree + reflect on `ConfigEditorSchemaService` for descriptions and defaults
-[ ] `docs/appendix/database.md` — reflect on `RvnSchemaBuilder`/`AuthSchemaBuilder` method names + annotations to enumerate tables and columns; include column purposes and the full chain of variables/routes/forms that map to each column
-[ ] `docs/cli.md` — shell each `private/bin/rvn-*` with `--help` and format output as markdown; replaces current hand-written content
-[ ] Wire into release checklist once generator is built
+- [ ] `docs/appendix/libraries.md` — reflect on all public repository methods; pull `@param`/`@return`/first docline per method; group by service key in `context['rvn']`
+- [ ] `docs/appendix/config.md` — parse `private/dat/config.php.dist` key tree + reflect on `ConfigEditorSchemaService` for descriptions and defaults
+- [ ] `docs/appendix/database.md` — reflect on `RvnSchemaBuilder`/`AuthSchemaBuilder` method names + annotations to enumerate tables and columns; include column purposes and the full chain of variables/routes/forms that map to each column
+- [ ] `docs/cli.md` — shell each `private/bin/rvn-*` with `--help` and format output as markdown; replaces current hand-written content
+- [ ] Wire into release checklist once generator is built
 
 #### Hand-Authored Docs
-[ ] `docs/appendix/architecture.md` - Finer details of why Raven is structured the way that it is, and what this structure enables.
-[ ] `docs/introduction.md` — project overview, philosophy, and quick-start
-[ ] `docs/api.md` — top-level index linking all developer-facing surfaces (Extensions, Libraries, CLI, Theming); summary paragraph per surface; grows to link more appendix pages over time
-[ ] Narrative docs (`pages.md`, `routing.md`, `configuration.md`, etc.) — AI-authored drafts exist but are unverified Codex output; needs full accuracy sweep and rewrite pass against actual codebase
-[ ] `docs/extensions/` folder — per-extension docs for bundled stock extensions (contact, signups, database, etc.)
-[ ] `docs/screenshots/` folder — UI screenshots for operator-facing docs
-[ ] Do a proper human proofreading sweep once narrative docs are rewritten; replace this section with final authoring task list
+- [ ] `docs/appendix/architecture.md` - Finer details of why Raven is structured the way that it is, and what this structure enables.
+- [ ] `docs/introduction.md` — project overview, philosophy, and quick-start
+- [ ] `docs/api.md` — top-level index linking all developer-facing surfaces (Extensions, Libraries, CLI, Theming); summary paragraph per surface; grows to link more appendix pages over time
+- [ ] Narrative docs (`pages.md`, `routing.md`, `configuration.md`, etc.) — AI-authored drafts exist but are unverified Codex output; needs full accuracy sweep and rewrite pass against actual codebase
+- [ ] `docs/extensions/` folder — per-extension docs for bundled stock extensions (contact, signups, database, etc.)
+- [ ] `docs/screenshots/` folder — UI screenshots for operator-facing docs
+- [ ] Do a proper human proofreading sweep once narrative docs are rewritten; replace this section with final authoring task list
 
 #### Delivery Architecture
-- Use lowercase file names for docs/* files from now on.
-- `docs/` is the single source of truth for both the GitHub repo and the live Raven docs site
-- Docs site: Raven instance on lanterns.io, dedicated channel for Raven docs; other channels for other projects
-- Git repos mirrored into `private/dat/` so Raven can embed always-current markdown via the markdown content block
-- Raven's per-page title-display flag lets embedded markdown files use their own `#` headings natively
-[ ] Long-term: build a `git-mirror` extension to automate repo pulls into `private/dat/` on a schedule
+- [ ]Use lowercase file names for docs/* files from now on.
+- [ ] `docs/` is the single source of truth for both the GitHub repo and the live Raven docs site
+- [ ] Docs site: Raven instance on lanterns.io, dedicated channel for Raven docs; other channels for other projects
+- [ ] Git repos mirrored into `private/dat/` so Raven can embed always-current markdown via the markdown content block
+- [ ] Raven's per-page title-display flag lets embedded markdown files use their own `#` headings natively
+- [ ] Long-term: build a `git-mirror` extension to automate repo pulls into `private/dat/` on a schedule
 
 
 ### Finish Updater
 We've been making this one up as we go along:
-[ ] It needs a cohesive plan to make it work long term.
-[ ] Incorporate normal versioning system at "1.0" once we are out of prototype stage.
-[ ] Keep tracking long-form commit id's from the git repo. We will refer to them in the full version string as the build, ie: 1.0.0 Build 8b9c5d172d84d024d7c14a074baf8d81c6aa3b1b
-[ ] Our upgrade shims are a mess, but they have potential. After 1.0, lets organize our shims neatly into a subfolder of lib/Update/ so theyre near the rest of our updater logic.
-[ ] Each point release gets its own unique shim or set of shims.
-[ ] This foundation should enable us to build a stable update platform that can update systems many versions at once, by running through the version-bound-shims in order or release.
-- Note for updater design: release/update versioning still belongs here in the updater plan; keep it separate from local bootstrap schema-state tracking.
+- [ ] It needs a cohesive plan to make it work long term.
+- [ ] Incorporate normal versioning system at "1.0" once we are out of prototype stage.
+- [ ] Keep tracking long-form commit id's from the git repo. We will refer to them in the full version string as the build, ie: 1.0.0 Build 8b9c5d172d84d024d7c14a074baf8d81c6aa3b1b
+- [ ] Our upgrade shims are a mess, but they have potential. After 1.0, lets organize our shims neatly into a subfolder of lib/Update/ so theyre near the rest of our updater logic.
+- [ ] Each point release gets its own unique shim or set of shims.
+- [ ] This foundation should enable us to build a stable update platform that can update systems many versions at once, by running through the version-bound-shims in order or release.
+- [ ] release/update versioning still belongs here in the updater plan; keep it separate from local bootstrap schema-state tracking.
 
 
 ### Tooling Watchlist
