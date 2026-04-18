@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth\Panel;
 
-require_once dirname(__DIR__, 2) . '/lib/Auth/PanelAccessCatalog.php';
+require_once __DIR__ . '/PanelAccessCatalog.php';
 
 use Raven\Lib\Auth\Panel\PanelAccessCatalog;
 

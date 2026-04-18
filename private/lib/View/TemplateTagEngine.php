@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\View;
 
-require_once dirname(__DIR__, 2) . '/lib/View/TemplateTagPathResolver.php';
-require_once dirname(__DIR__, 2) . '/lib/View/TemplateTagCompiler.php';
+require_once __DIR__ . '/TemplateTagPathResolver.php';
+require_once __DIR__ . '/TemplateTagCompiler.php';
 
 use Raven\Lib\View\TemplateTagCompiler;
 use Raven\Lib\View\TemplateTagPathResolver;

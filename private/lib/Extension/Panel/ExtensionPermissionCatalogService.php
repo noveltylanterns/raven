@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Extension\Panel;
 
 use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Security\InputSanitizer;
 
 /**

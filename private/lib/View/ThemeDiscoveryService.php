@@ -1,8 +1,17 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/View/ThemeDiscoveryService.php
+ * Discovers and validates public theme manifests from a themes root.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\View;
+
+use Raven\Lib\View\Panel\ThemeManifestValidator;
 
 /**
  * Discovers and validates public theme manifests from one themes root.

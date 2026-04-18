@@ -1,8 +1,18 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/sys/Router.php
+ * Minimal route registration and dispatch helper.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Core;
+
+use Raven\Core\Routing\RouteDispatchResult;
+use Raven\Core\Routing\RouteRequest;
 
 /**
  * Minimal path router supporting `{param}` placeholders.
@@ -62,4 +72,3 @@ final class Router
         return '#^' . $regex . '$#';
     }
 }
-

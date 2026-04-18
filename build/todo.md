@@ -34,6 +34,10 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	- [ ] Update PackageInstallWorkflowService to use Upload (Transport) + new Archive/Types/*.php handlers.
 
 
+### Library Refactor Phase 2
+Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
+- [ ] Move sys/Router.php to sys/Routing/Router.php
+
 ## Long Term
 
 ### Environment Hardening

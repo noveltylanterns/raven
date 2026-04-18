@@ -11,9 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\View\Public;
 
-require_once dirname(__DIR__, 2) . '/lib/View/ThemeManifestValidator.php';
-require_once dirname(__DIR__, 2) . '/lib/View/ThemeDiscoveryService.php';
-require_once dirname(__DIR__, 2) . '/lib/View/ThemeInheritanceResolver.php';
+require_once dirname(__DIR__) . '/ThemeDiscoveryService.php';
+require_once dirname(__DIR__) . '/ThemeInheritanceResolver.php';
 
 use Raven\Lib\View\ThemeDiscoveryService;
 use Raven\Lib\View\ThemeInheritanceResolver;

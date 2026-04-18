@@ -18,6 +18,8 @@ Nine canonical type-handler classes added to `private/lib/Archive/Types/` under 
 
 Remaining Archive block items (forwarder handlers, Transport/Upload expansion, consumer updates) are tracked in `build/todo.md`.
 
+- Fixed post-library-rebuild route bootstrap regressions that caused 500 errors on both public and panel requests. `private/sys/Router.php` now imports the relocated `Raven\Core\Routing\RouteRequest` / `RouteDispatchResult` classes, manual `require_once` paths were corrected in `private/lib/Auth/Panel/PanelAccess.php`, `private/lib/View/Public/PublicThemeRegistry.php`, and `private/lib/View/TemplateTagEngine.php`, and moved-class imports were restored in `private/lib/View/ThemeDiscoveryService.php`, `private/lib/Extension/Panel/ExtensionPermissionCatalogService.php`, and `private/lib/Extension/Panel/ExtensionCatalogService.php`.
+
 ### April 18, 2026 — library refactor: sys/ promotions, lib/ reorganization, Panel/Public segregation
 
 - **`sys/Routing/Router.php` promoted to `sys/Router.php`**: `Router`, `RouteRequest`, and `RouteDispatchResult` now live at the `sys/` root under `Raven\Core`. `Routing/` now holds only entrypoints, runtime builders, and route registrars. All 27+ callers across sys/, lib/, ext/, and bin/ updated.

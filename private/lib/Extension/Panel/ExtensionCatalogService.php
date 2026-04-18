@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Raven\Lib\Extension\Panel;
 
 use Raven\Core\Config;
+use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
 use Raven\Lib\Extension\ExtensionRegistry;
+use Raven\Lib\Extension\ExtensionStateStore;
+use Raven\Lib\Extension\ManifestContractValidator;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
