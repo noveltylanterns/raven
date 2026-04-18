@@ -34,22 +34,22 @@ use Raven\Core\Repository\TagRepository;
 use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\TaxonomySetRepository;
 use Raven\Core\Repository\UserRepository;
-use Raven\Core\View;
+use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Auth\PanelInvitePolicyService;
-use Raven\Lib\Auth\PanelPermissionDefinitionCatalog;
-use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
+use Raven\Lib\Auth\Panel\PanelInvitePolicyService;
+use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
+use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
 use Raven\Lib\Config\ConfigValueParser;
-use Raven\Lib\Config\PanelMediaConfigService;
-use Raven\Lib\Http\SessionFlash;
-use Raven\Lib\Http\UploadFileSetNormalizer;
-use Raven\Lib\Log\EventLogger;
-use Raven\Lib\Media\AvatarUploadService;
-use Raven\Lib\Media\PageImageManager;
-use Raven\Lib\Media\TaxonomyImageService;
-use Raven\Lib\Media\UserMediaPathService;
+use Raven\Lib\Config\Panel\PanelMediaConfigService;
+use Raven\Lib\Auth\SessionFlash;
+use Raven\Lib\Transport\Upload;
+use Raven\Core\Logger;
+use Raven\Lib\Media\Panel\AvatarUploadService;
+use Raven\Lib\Media\Panel\PageImageManager;
+use Raven\Lib\Media\Panel\TaxonomyImageService;
+use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\RouteConfigService;
@@ -113,7 +113,7 @@ final class PanelRuntimeBuilder
         $redirectRepository = null;
         $userRepository = null;
 
-        $rvn['view'] = new View((string) $rvn['root'] . '/private/tpl');
+        $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
         $categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', true), true);
         $tagEnabled = ConfigValueParser::bool($rvn['config']->get('tag.enabled', true), true);
 
@@ -298,8 +298,8 @@ final class PanelRuntimeBuilder
         /**
          * Builds panel log storage only for routes that touch the event log UI.
          */
-        $loggerFactory = $memoize(static function () use (&$logger, $rvn): EventLogger {
-            $logger = new EventLogger(
+        $loggerFactory = $memoize(static function () use (&$logger, $rvn): Logger {
+            $logger = new Logger(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],
@@ -632,7 +632,7 @@ final class PanelRuntimeBuilder
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
                 new RouteConfigService($rvn['config'], $rvn['input']),
                 new PanelEditorTabService($rvn['input']),
-                new UploadFileSetNormalizer()
+                new Upload()
             );
 
             return $taxonomyController;
@@ -691,7 +691,7 @@ final class PanelRuntimeBuilder
                 new PanelEditorTabService($rvn['input']),
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
                 new PanelPermissionDefinitionCatalog(),
-                new UploadFileSetNormalizer(),
+                new Upload(),
                 static function () use (&$rvn): array {
                     $provider = $rvn['panel_permission_map_provider'] ?? null;
                     if (!is_callable($provider)) {

@@ -20,7 +20,7 @@ use Raven\Lib\Content\PagePersistenceService;
 use Raven\Lib\Content\PageTaxonomyAssignmentService;
 use Raven\Lib\Content\PageTaxonomyQueryService;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Media\PageEditorGalleryHydrator;
+use Raven\Lib\Media\Panel\PageEditorGalleryHydrator;
 use Raven\Lib\Routing\PathScopeLookupService;
 use RuntimeException;
 

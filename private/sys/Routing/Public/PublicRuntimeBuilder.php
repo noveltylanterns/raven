@@ -27,7 +27,7 @@ use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\UserRepository;
-use Raven\Core\View;
+use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Config\ConfigValueParser;
 use RuntimeException;
@@ -69,7 +69,7 @@ final class PublicRuntimeBuilder
         $redirectRepository = null;
         $userRepository = null;
 
-        $rvn['view'] = new View((string) $rvn['root'] . '/private/tpl');
+        $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
         $categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', false), false);
         $tagEnabled = ConfigValueParser::bool($rvn['config']->get('tag.enabled', false), false);
 

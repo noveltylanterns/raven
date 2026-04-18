@@ -373,7 +373,7 @@ final class RepoService
      */
     public function schedulerAvailable(): bool
     {
-        return class_exists(\Raven\Lib\Scheduler\SchedulerRegistry::class);
+        return class_exists(\Raven\Core\Scheduler::class);
     }
 
     /**

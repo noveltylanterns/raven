@@ -12,14 +12,14 @@ declare(strict_types=1);
 namespace Raven\Core\Controller;
 
 use Raven\Core\Config;
-use Raven\Core\View;
+use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\LoginAttemptWorkflowService;
 use Raven\Lib\Auth\LoginChallengeWorkflowService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\LoginUiStateService;
-use Raven\Lib\Http\HttpResponse;
-use Raven\Lib\Http\SessionFlash;
+use Raven\Lib\Transport\Response;
+use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Panel\PanelUrl;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
@@ -32,7 +32,7 @@ use function Raven\Lib\Support\redirect;
  */
 final class AuthController
 {
-    private View $view;
+    private Renderer $view;
     private Config $config;
     private AuthService $auth;
     private InputSanitizer $input;
@@ -45,7 +45,7 @@ final class AuthController
     private ?SiteContextBuilder $siteContextBuilder = null;
 
     public function __construct(
-        View $view,
+        Renderer $view,
         Config $config,
         AuthService $auth,
         InputSanitizer $input,
@@ -423,7 +423,7 @@ final class AuthController
                 $this->config,
                 $this->input,
                 $this->identifierResolver,
-                new \Raven\Lib\Auth\LoginAttemptPolicy($this->config, new \Raven\Lib\Http\RequestContextResolver()),
+                new \Raven\Lib\Auth\LoginAttemptPolicy($this->config, new \Raven\Lib\Transport\Request()),
                 new \Raven\Lib\Security\LoginTwoFactorFlowService()
             );
         }
@@ -451,6 +451,6 @@ final class AuthController
      */
     private function jsonResponse(array $payload, int $status = 200): void
     {
-        HttpResponse::json($payload, $status, true);
+        Response::json($payload, $status, true);
     }
 }

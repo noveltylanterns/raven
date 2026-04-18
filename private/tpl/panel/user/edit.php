@@ -32,7 +32,7 @@
 /** @var string|null $error */
 
 use function Raven\Lib\Support\e;
-use Raven\Lib\Auth\PanelAccess;
+use Raven\Lib\Auth\Panel\PanelAccess;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $loginIdentifierMode = strtolower(trim((string) ($loginIdentifierMode ?? 'email')));

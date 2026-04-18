@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use Raven\Core\Config;
-use Raven\Lib\Http\RequestContextResolver;
+use Raven\Lib\Transport\Request;
 
 /**
  * Shared login-throttle policy and request-context normalization helper.
@@ -17,9 +17,9 @@ final class LoginAttemptPolicy
     public const DEFAULT_LOCK_SECONDS = 900;
 
     private Config $config;
-    private RequestContextResolver $requestContextResolver;
+    private Request $requestContextResolver;
 
-    public function __construct(Config $config, RequestContextResolver $requestContextResolver)
+    public function __construct(Config $config, Request $requestContextResolver)
     {
         $this->config = $config;
         $this->requestContextResolver = $requestContextResolver;

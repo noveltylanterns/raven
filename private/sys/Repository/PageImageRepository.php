@@ -13,8 +13,8 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Media\PageImageDeletionService;
-use Raven\Lib\Media\PageImagePrimarySelectionService;
+use Raven\Lib\Media\Panel\PageImageDeletionService;
+use Raven\Lib\Media\Panel\PageImagePrimarySelectionService;
 
 /**
  * Data access for page gallery images and their size variants.

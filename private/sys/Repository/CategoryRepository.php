@@ -15,7 +15,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Media\TaxonomyImagePathResolver;
+use Raven\Lib\Media\Panel\TaxonomyImagePathResolver;
 
 /**
  * Data access for Category CRUD operations in panel.

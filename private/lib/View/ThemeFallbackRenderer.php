@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\View;
 
-use Raven\Lib\View\PublicThemeRegistry;
+use Raven\Lib\View\Public\PublicThemeRegistry;
 use Raven\Lib\View\TemplateTagEngine;
 
 /**

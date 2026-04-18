@@ -15,14 +15,14 @@ use lbuchs\WebAuthn\WebAuthn;
 use lbuchs\WebAuthn\WebAuthnException;
 use Raven\Core\Config;
 use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Auth\PanelTwoFactorPreferencesService;
+use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
-use Raven\Lib\Config\PanelMediaConfigService;
-use Raven\Lib\Http\HttpResponse;
-use Raven\Lib\Media\AvatarUploadService;
-use Raven\Lib\Media\AvatarValidationPolicy;
-use Raven\Lib\Media\AvatarValidator;
-use Raven\Lib\Media\UserMediaPathService;
+use Raven\Lib\Config\Panel\PanelMediaConfigService;
+use Raven\Lib\Transport\Response;
+use Raven\Lib\Media\Panel\AvatarUploadService;
+use Raven\Lib\Media\Panel\AvatarValidationPolicy;
+use Raven\Lib\Media\Panel\AvatarValidator;
+use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Security\InputSanitizer;
@@ -833,6 +833,6 @@ final class PreferencesController
      */
     private function jsonResponse(array $payload, int $status = 200): void
     {
-        HttpResponse::json($payload, $status, true);
+        Response::json($payload, $status, true);
     }
 }

@@ -97,7 +97,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 
 - `private/bin/`
   - Distributed Raven CLI entrypoints such as `rvn`, `rvn-ext`, `rvn-theme`, and related tools.
-- `private/lib/Shell/raven_cli.php`
+- `private/lib/Shell/CLI.php`
   - Shared CLI framework and command implementations. Loaded via direct `require_once` by bin scripts; intentionally global-namespace rather than autoloaded, as the procedural CLI surface has no extension-reuse value.
 
 ## High-Signal Subtrees
@@ -106,6 +106,16 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 
 - `private/sys/Config.php`
   - `Raven\Core\Config` — canonical runtime config instance. Loads `private/dat/config.php` on construct, exposes dot-path `get`/`set`/`replace`/`save`, and writes config changes atomically with `LOCK_EX`. This is the single authoritative config class; `private/lib/Config/` holds reusable parsing/validation helpers only.
+- `private/sys/Router.php`
+  - `Raven\Core\Router` — the core dispatcher: registers routes via `add()`, compiles `{param}` patterns to named-capture regex, and resolves requests via `dispatch()`. Also owns `RouteRequest` and `RouteDispatchResult` value objects in the same directory.
+- `private/sys/Renderer.php`
+  - `Raven\Core\Renderer` — core PHP template renderer. Captures output from isolated template includes, injects named variables, and supports layout/wrapper composition. Used by controllers across both panel and public routes.
+- `private/sys/Logger.php`
+  - `Raven\Core\Logger` — event logging subsystem. Writes severity-gated entries to the `{prefix}event_log` table, supports syslog mirroring, and exposes query/count/prune/export/clear APIs.
+- `private/sys/Scheduler.php`
+  - `Raven\Core\Scheduler` — task scheduler registry. Registers named tasks with intervals, tracks last-run state in the `{prefix}scheduler` table, and dispatches overdue tasks on request.
+- `private/sys/Debug/`
+  - Debug toolbar infrastructure (`Raven\Core\Debug`). Owns `DebugToolbarConfigResolver`, `DebugToolbarDataSanitizer`, `DebugToolbarMarkupBuilder`, and `DebugToolbarRenderer`. Injected into responses by `DebugToolbarResponseHook` when debug mode is active.
 - `private/sys/Controller/`
   - Public/panel/auth controllers and request flow coordination.
   - Split panel sub-controllers live under `private/sys/Controller/Panel/` with a shared `RequestContext`; `DashboardController`, `ContentController`, `TaxonomyController`, `RedirectController`, `UserController`, `GroupController`, `PreferencesController`, and `SystemController` own the panel route seams.
@@ -118,25 +128,28 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/sys/Repository/`
   - Core content/taxonomy/auth-facing persistence repositories (`PageRepository`, `ChannelRepository`, `UserRepository`, `GroupRepository`, `CategoryRepository`, `TagRepository`, `TaxonomyLookupRepository`, `TaxonomySetRepository`, `RedirectRepository`, `PageImageRepository`, `InviteTokenRepository`).
 - `private/sys/Routing/`
-  - Raven-owned web entry, dispatch engine, and orchestration. Not for extension use.
-  - `Router` — the core dispatcher: registers routes via `add()`, compiles `{param}` patterns to named-capture regex, and resolves requests via `dispatch()`.
-  - `RouteRequest` — immutable HTTP method + path value object passed to `Router::dispatch()`.
-  - `RouteDispatchResult` — immutable dispatch result returned by `Router::dispatch()`; carries matched params and handler response.
-  - Root-level helpers such as `DebugToolbarResponseHook` and `SchedulerFallbackRunner` own only shared low-level web-entry mechanics; scope decisions still stay in the public/panel entrypoints.
+  - Raven-owned web entrypoints, runtime builders, and route registrars. Not for extension use.
+  - Root-level helpers `DebugToolbarResponseHook` and `SchedulerFallbackRunner` own shared low-level web-entry mechanics; scope decisions stay in the public/panel entrypoints.
   - `Routing/Public/` — `PublicEntrypoint`, `PublicRuntimeBuilder`, and controller-aligned public route registrars including extension-route loading.
   - `Routing/Panel/` — `PanelEntrypoint`, `PanelRuntimeBuilder`, controller-aligned panel route registrars, extension-route loading, and panel theme-asset fast path.
+  - Note: `Router.php`, `RouteRequest.php`, and `RouteDispatchResult.php` live at the `sys/` root (see above); `Routing/` holds only entrypoints, runtime builders, and route registrars.
 
 ### private/lib/
 
 - `private/lib/Auth/`
   - All auth and permission machinery for both core and extensions.
-  - Includes `AuthService` (delight-im wrapper) and `PanelAccess` (permission bit constants) alongside auth workflows, login/2FA flow services, panel ACL catalogs, group role policy, and user/session helpers.
+  - Includes `AuthService` (delight-im wrapper), login/2FA flow services, group role policy, and user/session helpers.
+  - `Auth/Panel/` — panel-only ACL classes: `PanelAccess` (permission bit constants), `PanelAccessCatalog`, `PanelPermissionDefinitionCatalog`, `PanelSessionGuard`, `PanelInvitePolicyService`, `PanelTwoFactorPreferencesService`, `UserPanelHydrator`, `UserPanelQueryService`.
+  - `Auth/Public/` — public-route-only auth helpers: `GroupPublicRouteService`, `UserRoutingDataService`.
+  - `SessionFlash.php` — session-backed flash message store; used by both panel and public routes.
+  - `SessionCookiePolicy.php` — session cookie configuration policy; applied at bootstrap.
   - Note: `sys/Auth/` may be re-introduced later as a lean internal-only auth package; for now everything lives here.
 - `private/lib/Channel/`
   - Channel record normalization policy, root channel constants, slug validation, and channel-context hydration helpers. (`ChannelRecordPolicy`, `ChannelContextService`, `ChannelFileStoreService`.)
 - `private/lib/Config/`
   - Config validation, editor schema/defaults, and value-parsing primitives. Pure reusable policy; does not own the runtime config instance.
   - `ConfigValueParser` — static scalar coercion helpers (`bool`, `int`, `float`) for extension and lib code that needs safe type conversion from raw config values.
+  - `Config/Panel/` — panel-only config helpers: `ConfigEditorNormalizer`, `ConfigEditorSchemaService`, `ConfigSnapshotSanitizer`, `PanelConfigDefaultsService`, `PanelConfigFieldPolicyService`, `PanelMediaConfigService`.
 - `private/lib/Database/`
   - Reusable database primitives for core and extensions.
   - `ProfiledPDO` and `ProfiledPDOStatement` wrap PDO for query-level profiling; `QueryProfilerInterface` is the shared contract.
@@ -144,25 +157,26 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `SqlUpsertPolicy.php` — driver-aware upsert helper available to extensions.
   - Connection setup and schema orchestration have moved to `sys/Database/` as they are core-only bootstrap concerns.
 - `private/lib/Extension/`
-  - Extension cataloging, manifests, state, storage provisioning, scaffolding, and lazy runtime bootstrap/service resolution.
-  - Includes `EmbeddedFormRuntimeInterface` and `EmbeddedShortcodeRuntimeInterface` — the contracts extension authors implement for shortcode/form runtime registration.
+  - Extension cataloging, manifests, state, storage provisioning, and lazy runtime bootstrap/service resolution.
   - `ExtensionRegistry` — unified registry with a static metadata API and a per-request instance API.
-- `private/lib/Http/`
-  - HTTP-layer helpers: response dispatch, session flash, request context resolution, upload normalization, and redirect-target validation.
-- `private/lib/Log/`
-  - Event logging subsystem. `EventLogger` writes severity-gated entries to the `{prefix}event_log` table, supports syslog mirroring, and exposes query/count/prune/export/clear APIs.
+  - `Extension/Panel/` — panel-only extension management: `ExtensionCatalogService`, `ExtensionPermissionCatalogService`, `ExtensionScaffoldService`.
+  - `Extension/Public/` — public-route extension runtime contracts: `EmbeddedFormRuntimeInterface`, `EmbeddedFormRuntimeService`, `EmbeddedShortcodeRuntimeInterface` — the contracts extension authors implement for shortcode/form runtime registration.
+- `private/lib/Transport/`
+  - HTTP-layer helpers for both panel and public routes: `Response` (response dispatch), `Request` (request context resolution), `Redirect` (redirect-target validation), `Upload` (upload file-set normalization).
+  - `Transport/Panel/` — panel-only transport helpers: `Post` (panel POST body normalization).
+  - Note: session flash has moved to `lib/Auth/SessionFlash.php`; event logging has moved to `sys/Logger.php`.
 - `private/lib/Media/`
-  - Image upload, validation, variant processing, and path management.
-  - Includes `AvatarValidator` (avatar upload constraints), `PageImageManager` (page image lifecycle orchestration), `PageImageUploadPolicy`, `ImageVariantProcessor`, `PageImageDeletionService`, and related path/gallery helpers.
+  - Image upload, validation, variant processing, and path management. All media handling is panel-route-only.
+  - `Media/Panel/` — all media classes live here: `AvatarValidator` (avatar upload constraints), `PageImageManager` (page image lifecycle orchestration), `PageImageUploadPolicy`, `ImageVariantProcessor`, `PageImageDeletionService`, and related path/gallery helpers.
 - `private/lib/Panel/`
   - Panel UI helpers: tab normalization, tab-preserving URL builders, panel path resolution, and routing-preview derivations.
 - `private/lib/Routing/`
   - Reusable routing library functions available to extensions and core alike.
   - `ChannelRoutePolicy` — channel route mode (`slug`, `date_slug`, `id`, etc.) and word-separator normalization/resolution policy.
   - `PathScopeLookupService` — generic slug-uniqueness DB lookup for any (slug, channel) scoped table; used by core repositories and available to extensions.
-  - `PublicChannelPageRouteService` — wraps `ChannelRoutePolicy` for public content controllers: lookup-target resolution and canonical segment building.
   - `RouteConfigService` — config-aware route-prefix, feed, profile, and group route helpers; consumes `Raven\Core\Config` and exposes normalized policy accessors.
-  - `RoutingInventoryBuilder` — builds the normalized routing inventory row set for the panel routing diagnostics view.
+  - `Routing/Panel/` — panel-only routing helpers: `RoutingInventoryBuilder` (builds the normalized routing inventory row set for the panel routing diagnostics view).
+  - `Routing/Public/` — public-route-only routing helpers: `PublicChannelPageRouteService` (wraps `ChannelRoutePolicy` for public content controllers: lookup-target resolution and canonical segment building).
 - `private/lib/Security/`
   - Security primitives available to core and extensions: CSRF (`Csrf`, `CsrfTokenStoreInterface`), input sanitization (`InputSanitizer`), 2FA (TOTP, WebAuthn, recovery phrase, QR code), captcha, and invite token policy.
 - `private/lib/Support/`
@@ -172,10 +186,12 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/lib/Taxonomy/`
   - File-backed taxonomy-set policies and persistence helpers shared by channels/categories/tags.
 - `private/lib/View/`
-  - Theme discovery, inheritance, public template rendering, and template tag engine.
+  - Theme discovery, inheritance, and template rendering utilities.
   - `TemplateTagEngine` — core template tag processor used by the public theme renderer.
-  - `PublicThemeRegistry` — discovers and validates installed public themes; consumed by view helpers and CLI theme commands.
-  - Also contains `ThemeCatalogService`, `ThemeDiscoveryService`, `ThemeInheritanceResolver`, `ThemeFallbackRenderer`, `PublicTemplatePipeline`, and related helpers.
+  - `ThemeDiscoveryService`, `ThemeInheritanceResolver`, `ThemeFallbackRenderer` — shared theme infrastructure used by both panel and public contexts.
+  - `Pagination.php` — reusable pagination value object and helper; available to both panel and public controllers.
+  - `View/Panel/` — panel-only view/theme management: `ThemeCatalogService`, `ThemeCloneService`, `ThemeScaffoldService`, `ThemeManifestValidator`.
+  - `View/Public/` — public-route-only view/theme rendering: `PublicThemeRegistry` (discovers and validates installed public themes), `PublicRouteRenderService`, `PublicTemplateDecorator`, `PublicTemplatePipeline`, `PublicTemplateResolver`.
 
 ## Reading Order
 

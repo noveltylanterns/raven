@@ -17,11 +17,11 @@ use Raven\Core\Repository\PageRepository;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Extension\ExtensionRegistry;
-use Raven\Lib\Log\EventLogger;
-use Raven\Lib\Scheduler\SchedulerRegistry;
+use Raven\Core\Logger;
+use Raven\Core\Scheduler;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Session\SessionCookiePolicy;
+use Raven\Lib\Auth\SessionCookiePolicy;
 
 /**
  * Shared bootstrap for all web roots.
@@ -136,11 +136,11 @@ return (static function (): array {
     $tagEnabled = ConfigValueParser::bool($config->get('tag.enabled', false), false);
     $loggingConfig = (array) $config->get('logging', []);
     $logger = null;
-    $loggerResolver = static function () use (&$logger, $rvnDb, $driver, $prefix, $loggingConfig): EventLogger {
-        if (!$logger instanceof EventLogger) {
+    $loggerResolver = static function () use (&$logger, $rvnDb, $driver, $prefix, $loggingConfig): Logger {
+        if (!$logger instanceof Logger) {
             // Keep logger wiring local to core bootstrap internals so rare panel/log
             // consumers do not expand the shared repo service contract.
-            $logger = new EventLogger($rvnDb, $driver, $prefix, $loggingConfig);
+            $logger = new Logger($rvnDb, $driver, $prefix, $loggingConfig);
         }
 
         return $logger;
@@ -227,7 +227,7 @@ return (static function (): array {
     // Wire the system-wide scheduler.
     // Both core jobs and extension-declared jobs (from lib/cron.php) run through this registry.
     // The scheduler is passive at bootstrap time — jobs only execute when rvn-cron triggers runDue().
-    $scheduler = new SchedulerRegistry($root);
+    $scheduler = new Scheduler($root);
 
     // Built-in core job: flip page publish/draft status based on scheduled publish/expires columns.
     // Interval of 60 s means rvn-cron running every minute covers all scheduled posts promptly.

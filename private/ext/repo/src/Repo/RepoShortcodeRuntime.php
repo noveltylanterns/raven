@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Ext\Repo;
 
-use Raven\Lib\Extension\EmbeddedShortcodeRuntimeInterface;
+use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
 
 /**
  * Renders `[repo ...]` embeds through Raven's generic shortcode runtime contract.

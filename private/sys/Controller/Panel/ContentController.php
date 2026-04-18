@@ -24,13 +24,13 @@ use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Content\BodyBlockPolicy;
 use Raven\Lib\Content\PageBodyBlockCodec;
-use Raven\Lib\Extension\ExtensionCatalogService;
+use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
-use Raven\Lib\Extension\ExtensionPermissionCatalogService;
+use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
-use Raven\Lib\Http\PanelPostNormalizer;
-use Raven\Lib\Http\UploadFileSetNormalizer;
-use Raven\Lib\Media\PageImageManager;
+use Raven\Lib\Transport\Panel\Post;
+use Raven\Lib\Transport\Upload;
+use Raven\Lib\Media\Panel\PageImageManager;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Panel\PanelPageAuthorOptionBuilder;
 use Raven\Lib\Routing\ChannelRoutePolicy;
@@ -81,8 +81,8 @@ final class ContentController
     private Closure $extensionServicesFor;
     private ?BodyBlockPolicy $bodyBlockPolicy = null;
     private ?PageBodyBlockCodec $pageBodyBlockCodec = null;
-    private ?UploadFileSetNormalizer $uploadFileSetNormalizer = null;
-    private ?PanelPostNormalizer $panelPostNormalizer = null;
+    private ?Upload $uploadFileSetNormalizer = null;
+    private ?Post $panelPostNormalizer = null;
     private ?PanelPageAuthorOptionBuilder $pageAuthorOptionBuilder = null;
     private ?LoginIdentifierResolver $identifierResolver = null;
     private ?ExtensionStateStore $extensionStateStore = null;
@@ -867,12 +867,12 @@ final class ContentController
     /**
      * Returns the upload file set normalizer on first use.
      *
-     * @return UploadFileSetNormalizer Normalizer for $_FILES upload group arrays.
+     * @return Upload Normalizer for $_FILES upload group arrays.
      */
-    private function uploadFileSetNormalizer(): UploadFileSetNormalizer
+    private function uploadFileSetNormalizer(): Upload
     {
-        if (!$this->uploadFileSetNormalizer instanceof UploadFileSetNormalizer) {
-            $this->uploadFileSetNormalizer = new UploadFileSetNormalizer();
+        if (!$this->uploadFileSetNormalizer instanceof Upload) {
+            $this->uploadFileSetNormalizer = new Upload();
         }
 
         return $this->uploadFileSetNormalizer;
@@ -881,12 +881,12 @@ final class ContentController
     /**
      * Returns the panel POST normalizer on first use.
      *
-     * @return PanelPostNormalizer Normalizer for complex panel form POST payloads.
+     * @return Post Normalizer for complex panel form POST payloads.
      */
-    private function panelPostNormalizer(): PanelPostNormalizer
+    private function panelPostNormalizer(): Post
     {
-        if (!$this->panelPostNormalizer instanceof PanelPostNormalizer) {
-            $this->panelPostNormalizer = new PanelPostNormalizer($this->input);
+        if (!$this->panelPostNormalizer instanceof Post) {
+            $this->panelPostNormalizer = new Post($this->input);
         }
 
         return $this->panelPostNormalizer;

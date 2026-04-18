@@ -13,11 +13,11 @@ namespace Raven\Core\Routing\Panel;
 
 use Raven\Core\Routing\DebugToolbarResponseHook;
 use Raven\Core\Routing\SchedulerFallbackRunner;
-use Raven\Lib\Auth\PanelAccess;
+use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Config\ConfigValueParser;
-use Raven\Lib\Diagnostics\Toolbar\DebugToolbarConfigResolver;
+use Raven\Core\Debug\DebugToolbarConfigResolver;
 use Raven\Lib\Panel\PanelUrl;
-use Raven\Core\Routing\Router;
+use Raven\Core\Router;
 use Raven\Core\Routing\RouteRequest;
 use RuntimeException;
 

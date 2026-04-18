@@ -13,10 +13,10 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Auth\GroupMembershipWriteService;
-use Raven\Lib\Auth\GroupPublicRouteService;
+use Raven\Lib\Auth\Public\GroupPublicRouteService;
 use Raven\Lib\Auth\GroupRolePolicy;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Media\TaxonomyImagePathResolver;
+use Raven\Lib\Media\Panel\TaxonomyImagePathResolver;
 use RuntimeException;
 
 /**

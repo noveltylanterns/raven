@@ -291,7 +291,7 @@ final class RedirectController
      */
     private function isAllowedRedirectTargetUrl(string $targetUrl): bool
     {
-        return \Raven\Lib\Http\RedirectTargetValidator::isAllowedHttpOrRootPath($targetUrl);
+        return \Raven\Lib\Transport\Redirect::isAllowedHttpOrRootPath($targetUrl);
     }
 
     /**

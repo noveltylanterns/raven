@@ -2,6 +2,49 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 18, 2026 — lib/Archive/Types/: canonical archive and data handlers (phase 1)
+
+Nine canonical type-handler classes added to `private/lib/Archive/Types/` under `Raven\Lib\Archive\Types\`. Each is standalone, requires no configuration, and is available to both core and extensions:
+
+- **`Zip`** — Full ZIP handler: safe entry-path validation (zip-slip prevention), whole-archive extraction, single-entry extraction, directory compression, file addition, entry listing, and manifest-slug reading. Consolidates ZIP logic previously split across `ArchivePackageService`.
+- **`Tar`** — TAR handler via PHP's PharData: `.tar` and `.tar.gz` extraction (whole and single-entry), directory-to-tar compression, directory-to-tar.gz compression. For `.tar.bz2` / `.tar.xz` / `.tar.zst`, decompress the outer layer first with the appropriate handler, then pass the `.tar` to this class.
+- **`Gz`** — Gzip single-file handler via PHP's zlib (gzopen/gzread/gzwrite): chunked compress and decompress without loading the full file into memory.
+- **`Bz2`** — Bzip2 single-file handler via PHP's bz2 extension: chunked compress and decompress; `isAvailable()` guard for optional usage.
+- **`Xz`** — XZ single-file handler via the system `xz` binary (no native PHP extension): compress and decompress streamed to file; proc_open without shell interpolation; configurable binary path; `isAvailable()` guard.
+- **`Zst`** — Zstandard single-file handler via the system `zstd` binary: same pattern as Xz; proc_open without shell interpolation; configurable binary path; `isAvailable()` guard.
+- **`Rar`** — RAR extraction handler: uses the PHP `rar` extension when loaded, falls back to the system `unrar` binary; whole-archive extraction, single-entry extraction, entry listing; full zip-slip path validation; `isAvailable()` guard.
+- **`Git`** — High-level Git handler wrapping `GitCommandRunner`: `cloneRepository()`, `fetch()`, `addRemote()`, `init()`, `extractWorktree()`, `isRepository()`, `currentRevision()`, `currentBranch()`, `isAvailable()`. Exposes the underlying runner via `runner()` for callers (such as the Updater) that need low-level `run()`/`mustRun()` access.
+- **`Csv`** — Generic CSV handler: streaming `read()` (Generator, header-aware, BOM-stripping), `readStream()`, `write()`, `writeStream()`, `streamToOutput()` (sends HTTP download headers and streams directly to output). Also provides `uploadErrorMessage()` for consistent CSV upload error text across extensions.
+
+Remaining Archive block items (forwarder handlers, Transport/Upload expansion, consumer updates) are tracked in `build/todo.md`.
+
+### April 18, 2026 — library refactor: sys/ promotions, lib/ reorganization, Panel/Public segregation
+
+- **`sys/Routing/Router.php` promoted to `sys/Router.php`**: `Router`, `RouteRequest`, and `RouteDispatchResult` now live at the `sys/` root under `Raven\Core`. `Routing/` now holds only entrypoints, runtime builders, and route registrars. All 27+ callers across sys/, lib/, ext/, and bin/ updated.
+- **`sys/View.php` renamed to `sys/Renderer.php`**: class renamed `View` → `Renderer`; namespace unchanged (`Raven\Core`). All 40+ callers updated project-wide.
+- **`lib/Log/EventLogger.php` promoted to `sys/Logger.php`**: class renamed `EventLogger` → `Logger`; namespace changed from `Raven\Lib\Log` to `Raven\Core`. All callers updated. `lib/Log/` deleted.
+- **`lib/Scheduler/SchedulerRegistry.php` promoted to `sys/Scheduler.php`**: class renamed `SchedulerRegistry` → `Scheduler`; namespace changed from `Raven\Lib\Scheduler` to `Raven\Core`. All callers updated. `lib/Scheduler/` deleted.
+- **`lib/Diagnostics/Toolbar/` moved to `sys/Debug/`**: four debug toolbar classes (`DebugToolbarConfigResolver`, `DebugToolbarDataSanitizer`, `DebugToolbarMarkupBuilder`, `DebugToolbarRenderer`) moved to `Raven\Core\Debug`. Profiler files (`ProfilerOutputInterface`, `RequestProfiler`, `RequestQueryProfilerAdapter`) remain in `lib/Diagnostics/`. All callers updated.
+- **`lib/Shell/raven_cli.php` renamed to `lib/Shell/CLI.php`**: all 11 bin scripts updated to require the new path.
+- **`lib/Http/` renamed to `lib/Transport/`** with class renames: `HttpResponse` → `Response`, `PanelPostNormalizer` → `Post`, `RedirectTargetValidator` → `Redirect`, `RequestContextResolver` → `Request`, `UploadFileSetNormalizer` → `Upload`. `Post` is panel-only and placed in `lib/Transport/Panel/`. All namespace references updated from `Raven\Lib\Http` to `Raven\Lib\Transport`. `lib/Http/` deleted.
+- **`lib/Http/SessionFlash.php` moved to `lib/Auth/SessionFlash.php`**: namespace changed from `Raven\Lib\Http` to `Raven\Lib\Auth`. All callers updated.
+- **`lib/Pagination/Pagination.php` moved to `lib/View/Pagination.php`**: namespace changed from `Raven\Lib\Pagination` to `Raven\Lib\View`. All callers updated. `lib/Pagination/` deleted.
+- **`lib/Session/SessionCookiePolicy.php` moved to `lib/Auth/SessionCookiePolicy.php`**: namespace changed from `Raven\Lib\Session` to `Raven\Lib\Auth`. Caller in `private/raven.php` updated. `lib/Session/` deleted.
+- **Panel/Public subdirectory segregation across lib/**: panel-only classes moved into `Panel/` subdirectories and public-route-only classes into `Public/` subdirectories within their respective lib domains, following the existing `sys/Controller/Panel/`, `sys/Controller/Public/`, `sys/Routing/Panel/`, `sys/Routing/Public/` convention:
+  - `lib/Auth/Panel/` — `PanelAccess`, `PanelAccessCatalog`, `PanelPermissionDefinitionCatalog`, `PanelSessionGuard`, `PanelInvitePolicyService`, `PanelTwoFactorPreferencesService`, `UserPanelHydrator`, `UserPanelQueryService`
+  - `lib/Auth/Public/` — `GroupPublicRouteService`, `UserRoutingDataService`
+  - `lib/Config/Panel/` — `ConfigEditorNormalizer`, `ConfigEditorSchemaService`, `ConfigSnapshotSanitizer`, `PanelConfigDefaultsService`, `PanelConfigFieldPolicyService`, `PanelMediaConfigService`
+  - `lib/Extension/Panel/` — `ExtensionCatalogService`, `ExtensionPermissionCatalogService`, `ExtensionScaffoldService`
+  - `lib/Extension/Public/` — `EmbeddedFormRuntimeInterface`, `EmbeddedFormRuntimeService`, `EmbeddedShortcodeRuntimeInterface`
+  - `lib/Media/Panel/` — all 13 media classes (confirmed no public-route callers)
+  - `lib/Routing/Panel/` — `RoutingInventoryBuilder`
+  - `lib/Routing/Public/` — `PublicChannelPageRouteService`
+  - `lib/Transport/Panel/` — `Post` (formerly `PanelPostNormalizer`)
+  - `lib/View/Panel/` — `ThemeCatalogService`, `ThemeCloneService`, `ThemeScaffoldService`, `ThemeManifestValidator`
+  - `lib/View/Public/` — `PublicRouteRenderService`, `PublicTemplateDecorator`, `PublicTemplatePipeline`, `PublicTemplateResolver`, `PublicThemeRegistry`
+- **Empty lib/ directories pruned**: `lib/Http/`, `lib/Log/`, `lib/Pagination/`, `lib/Scheduler/`, `lib/Session/` all removed after their contents were relocated.
+- **`docs/Filetree.md` updated**: all structural changes reflected; new `sys/` root-level class entries, Panel/Public subdirectory notes across all affected lib domains, Transport replacing Http, CLI.php replacing raven_cli.php.
+
 ### April 8, 2026 — formal PSR-4 namespace map; Core/Lib boundary sweep
 
 - **Three-prefix autoloader established**: `private/raven.php` autoloader now maps `Raven\Core\` → `private/sys/`, `Raven\Lib\` → `private/lib/`, and `Raven\Ext\` → `private/ext/{slug}/src/`. The old single `Raven\` prefix that covered both sys/ and extension src/ directories is gone. The `flatten_repository` extension-repo hack is removed.

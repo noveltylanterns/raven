@@ -7,7 +7,7 @@ namespace Raven\Lib\Panel;
 use Raven\Core\Config;
 use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\ThemeCatalogService;
+use Raven\Lib\View\Panel\ThemeCatalogService;
 
 /**
  * Shared helpers for panel routing-preview derivations.

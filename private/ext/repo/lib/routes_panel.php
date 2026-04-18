@@ -10,7 +10,7 @@
 declare(strict_types=1);
 
 use Raven\Ext\Repo\RepoService;
-use Raven\Core\Routing\Router;
+use Raven\Core\Router;
 
 use function Raven\Lib\Support\redirect;
 

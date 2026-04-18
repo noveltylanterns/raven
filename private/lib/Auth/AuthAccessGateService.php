@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
 
-use Raven\Lib\Auth\PanelAccess;
+use Raven\Lib\Auth\Panel\PanelAccess;
 
 /**
  * Shared auth capability gate helpers derived from one resolved permission mask.

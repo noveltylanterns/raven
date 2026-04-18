@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Routing;
 
 use Raven\Lib\Diagnostics\RequestProfiler;
-use Raven\Lib\Diagnostics\Toolbar\DebugToolbarRenderer;
+use Raven\Core\Debug\DebugToolbarRenderer;
 
 /**
  * Arms the shared debug-toolbar response hook for one web scope.

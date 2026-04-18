@@ -23,37 +23,37 @@ use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Archive\ArchivePackageService;
 use Raven\Lib\Archive\PackageInstallWorkflowService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Auth\PanelAccess;
-use Raven\Lib\Config\ConfigEditorNormalizer;
-use Raven\Lib\Config\ConfigEditorSchemaService;
-use Raven\Lib\Config\ConfigSnapshotSanitizer;
-use Raven\Lib\Config\PanelConfigDefaultsService;
-use Raven\Lib\Config\PanelConfigFieldPolicyService;
+use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\Config\Panel\ConfigEditorNormalizer;
+use Raven\Lib\Config\Panel\ConfigEditorSchemaService;
+use Raven\Lib\Config\Panel\ConfigSnapshotSanitizer;
+use Raven\Lib\Config\Panel\PanelConfigDefaultsService;
+use Raven\Lib\Config\Panel\PanelConfigFieldPolicyService;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
-use Raven\Lib\Extension\ExtensionCatalogService;
-use Raven\Lib\Extension\ExtensionPermissionCatalogService;
-use Raven\Lib\Extension\ExtensionScaffoldService;
+use Raven\Lib\Extension\Panel\ExtensionCatalogService;
+use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
+use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\ExtensionStorageCleaner;
 use Raven\Lib\Extension\ExtensionStorageProvisioner;
 use Raven\Lib\Filesystem\DirectoryTreeService;
-use Raven\Lib\Log\EventLogger;
+use Raven\Core\Logger;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Panel\PanelRoutingPreviewService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\RouteConfigService;
-use Raven\Lib\Routing\RoutingInventoryBuilder;
+use Raven\Lib\Routing\Panel\RoutingInventoryBuilder;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Update\GitCommandRunner;
 use Raven\Lib\Update\UpdateSourceResolver;
 use Raven\Lib\Update\UpdateWorkflowService;
-use Raven\Lib\View\PublicThemeRegistry;
-use Raven\Lib\View\ThemeCatalogService;
-use Raven\Lib\View\ThemeCloneService;
+use Raven\Lib\View\Public\PublicThemeRegistry;
+use Raven\Lib\View\Panel\ThemeCatalogService;
+use Raven\Lib\View\Panel\ThemeCloneService;
 use Raven\Lib\View\ThemeFallbackRenderer;
-use Raven\Lib\View\ThemeScaffoldService;
+use Raven\Lib\View\Panel\ThemeScaffoldService;
 use ZipArchive;
 
 use function Raven\Lib\Support\redirect;
@@ -86,9 +86,9 @@ final class SystemController
     /** @var Closure(): TaxonomyLookupRepository */
     private Closure $taxonomyLookupRepoResolver;
     private ?TaxonomyLookupRepository $taxonomyLookupRepo = null;
-    /** @var Closure(): EventLogger */
+    /** @var Closure(): Logger */
     private Closure $loggerResolver;
-    private ?EventLogger $logger = null;
+    private ?Logger $logger = null;
     /** @var Closure(string): array<string, mixed> */
     private Closure $extensionServicesFor;
     private LoginIdentifierResolver $identifierResolver;
@@ -132,7 +132,7 @@ final class SystemController
      * @param callable(): TaxonomySetRepository $categorySetRepoResolver Lazy category-set repository resolver.
      * @param callable(): TaxonomySetRepository $tagSetRepoResolver Lazy tag-set repository resolver.
      * @param callable(): TaxonomyLookupRepository $taxonomyLookupRepoResolver Lazy taxonomy lookup resolver.
-     * @param callable(): EventLogger $loggerResolver Lazy event logger resolver.
+     * @param callable(): Logger $loggerResolver Lazy event logger resolver.
      * @param callable(string): array<string, mixed> $extensionServicesFor Lazy per-extension services resolver.
      * @return void
      */
@@ -1726,16 +1726,16 @@ final class SystemController
     /**
      * Returns the event logger on first use.
      *
-     * @return EventLogger Event logger service.
+     * @return Logger Event logger service.
      */
-    private function logger(): EventLogger
+    private function logger(): Logger
     {
-        if ($this->logger instanceof EventLogger) {
+        if ($this->logger instanceof Logger) {
             return $this->logger;
         }
 
         $logger = ($this->loggerResolver)();
-        if (!$logger instanceof EventLogger) {
+        if (!$logger instanceof Logger) {
             throw new \RuntimeException('Panel event logger resolver returned an invalid value.');
         }
 

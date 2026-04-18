@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 use Raven\Ext\SignupFormRepository;
 use Raven\Ext\SignupSubmissionRepository;
-use Raven\Core\Routing\Router;
+use Raven\Core\Router;
 
 use function Raven\Lib\Support\redirect;
 

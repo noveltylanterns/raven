@@ -20,7 +20,7 @@ use Raven\Lib\Auth\LoginAttemptWorkflowService;
 use Raven\Lib\Auth\LoginChallengeWorkflowService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\LoginUiStateService;
-use Raven\Lib\Http\RedirectTargetValidator;
+use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Security\LoginTwoFactorFlowService;
 
 use function Raven\Lib\Support\redirect;
@@ -617,7 +617,7 @@ final class AuthController
         }
 
         $referer = trim((string) ($_SERVER['HTTP_REFERER'] ?? ''));
-        if ($referer !== '' && RedirectTargetValidator::isAllowedHttpOrRootPath($referer)) {
+        if ($referer !== '' && Redirect::isAllowedHttpOrRootPath($referer)) {
             $parts = parse_url($referer);
             if (is_array($parts)) {
                 $host = strtolower(trim((string) ($parts['host'] ?? '')));

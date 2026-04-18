@@ -12,12 +12,12 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Config;
-use Raven\Core\View;
+use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Auth\PanelAccess;
-use Raven\Lib\Auth\PanelSessionGuard;
-use Raven\Lib\Http\SessionFlash;
-use Raven\Lib\Pagination\Pagination;
+use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\Auth\Panel\PanelSessionGuard;
+use Raven\Lib\Auth\SessionFlash;
+use Raven\Lib\View\Pagination;
 use Raven\Lib\Panel\PanelUrl;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Site\SiteContextBuilder;
@@ -27,7 +27,7 @@ use Raven\Lib\Site\SiteContextBuilder;
  */
 final class RequestContext
 {
-    private View $view;
+    private Renderer $view;
     private Config $config;
     private AuthService $auth;
     private Csrf $csrf;
@@ -40,7 +40,7 @@ final class RequestContext
     private $publicNotFoundRenderer;
 
     /**
-     * @param View $view Shared panel view renderer.
+     * @param Renderer $view Shared panel view renderer.
      * @param Config $config Runtime configuration reader.
      * @param AuthService $auth Auth/session service for panel requests.
      * @param Csrf $csrf CSRF helper for panel forms and actions.
@@ -51,7 +51,7 @@ final class RequestContext
      * @return void
      */
     public function __construct(
-        View $view,
+        Renderer $view,
         Config $config,
         AuthService $auth,
         Csrf $csrf,

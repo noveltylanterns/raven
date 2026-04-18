@@ -5,24 +5,24 @@ declare(strict_types=1);
 namespace Raven\Lib\Site;
 
 use Raven\Core\Config;
-use Raven\Lib\Http\RequestContextResolver;
+use Raven\Lib\Transport\Request;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\RouteConfigService;
-use Raven\Lib\View\ThemeCatalogService;
+use Raven\Lib\View\Panel\ThemeCatalogService;
 
 /**
  * Shared site/public meta payload builder and social-image URL resolver.
  */
 final class PublicMetaService
 {
-    private RequestContextResolver $requestContextResolver;
+    private Request $requestContextResolver;
     private SiteContextBuilder $siteContextBuilder;
     private ThemeCatalogService $themeCatalogService;
     private ProfileContactService $profileContactService;
     private RouteConfigService $routeConfigService;
 
     public function __construct(
-        RequestContextResolver $requestContextResolver,
+        Request $requestContextResolver,
         SiteContextBuilder $siteContextBuilder,
         ThemeCatalogService $themeCatalogService,
         ProfileContactService $profileContactService,

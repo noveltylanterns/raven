@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Panel;
 
-use Raven\Core\Routing\Router;
+use Raven\Core\Router;
 
 /**
  * Registers the panel dashboard route family.

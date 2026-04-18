@@ -14,26 +14,27 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 ## Short Term
 
 ### General Organization & Consolidation
-- [ ] Confirm legacy migration fallbacks are no longer needed to make this install work (locations at bottom of this file). expunge every one of them from our codebase as soon as each one is verified as redundant/unecessary.
-- [ ] Migrate delight-auth tables from rvn_users_* to rvn_auth_*
-	- Store localized logic in lib/Composer/delight-im/auth.php
 - [ ] Extension runtime refactor cleanup: settle the embedded-form/shortcode runtime contract, then remove legacy `embedded_form_runtimes` support from `private/lib/Extension/EmbeddedFormRuntimeService.php`.
 
+
+### Library Refactor
+Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
+- [x] lib/Archive/ needs a Types/ folder, for Tar.php, Zip.php, Gz.php, Bz2.php, Xz.php, Zst.php and Rar.php
+	- [x] Each handler can extract/compress whole archives and individual files within.
+	- [x] lib/Archive/Types/Git.php for basic Git handling (Clone, Fetch, Extract, etc)
+	- [x] lib/Archive/Types/Csv.php as a new generic CSV handler.
+	- [ ] Doublecheck that Tar.php's built-in compression handlers (gz, bz2, xz, zst) just calls our dedicated handlers for those archive types.
+	- [ ] lib/Archive/Extract.php & Compress.php forwarding handlers for our various filetypes.
+	- [ ] lib/Transport/Upload.php — expand with universal upload security policies so it can be used by ALL public/private/ext upload forms.
+	- [ ] Update ArchivePackageService, Extension & Theme managers & CLI apps to use new archive handlers.
+	- [ ] ArchivePackageService, Extension & Theme managers should be able to process all applicable archive types from lib/Archive/Types/, not just Zip.
+	- [ ] Update Updater (UpdateWorkflowService) to use lib/Archive/Types/Git.php instead of GitCommandRunner directly.
+	- [ ] In fact just merge GitCommandRunner into Git.php
+	- [ ] Update stock extensions with CSV functionality (contact, signups) to use Csv.php.
+	- [ ] Update PackageInstallWorkflowService to use Upload (Transport) + new Archive/Types/*.php handlers.
+
+
 ## Long Term
-
-### Core Consolidation
-- [ ] Thoroughly analyze private/sys/ for functions that can be simplified/collapsed.
-- [ ] Do not work in batches. Leave a running log of targets at the bottom of this file.
-- [ ] Be thorough with this sweep. DO NOT just "stop" when you have a few targets, like you did before.
-- [ ] Consolidate targets when analysis is complete.
-
-
-### Library Consolidation
-- [ ] Thoroughly analyze private/lib/ for functions that can be simplified/collapsed.
-- [ ] Do not work in batches. Leave a running log of targets at the bottom of this file.
-- [ ] Be thorough with this sweep. DO NOT just "stop" when you have a few targets, like you did before.
-- [ ] Consolidate targets when analysis is complete.
-
 
 ### Environment Hardening
 Analyze PHP config and note every module/extension not being used by this script
@@ -109,13 +110,4 @@ Items below are the remaining classified legacy/compatibility lanes after the cu
 - `DEFER FOR EXTENSION RUNTIME REFACTOR`
 	- `private/lib/Extension/EmbeddedFormRuntimeService.php`
 	- Accepts legacy `embedded_form_runtimes` alongside canonical `shortcode_runtimes`; defer removal until the extension form/runtime contract is intentionally rebuilt.
-- `KEEP-INTENTIONAL FOR STOCK PANEL THEME MIGRATION`
-	- `private/sys/Controller/AuthController.php`
-	- `private/sys/Controller/Panel/RequestContext.php`
-	- `private/sys/Routing/Panel/PanelExtensionRouteRegistrar.php`
-	- `private/tpl/panel/configuration.php`
-	- `private/tpl/panel/preferences.php`
-	- `private/tpl/panel/user/edit.php`
-	- Keep only the minimal `default` / `light` / `dark` -> `corp` / `midnight` normalization needed to carry stock bootstrap theme values forward; extra `raven` alias support was removed in this pass.
-
 ---

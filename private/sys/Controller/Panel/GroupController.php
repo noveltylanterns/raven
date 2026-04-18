@@ -13,10 +13,10 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Repository\GroupRepository;
-use Raven\Lib\Auth\PanelAccess;
-use Raven\Lib\Auth\PanelPermissionDefinitionCatalog;
-use Raven\Lib\Http\UploadFileSetNormalizer;
-use Raven\Lib\Media\TaxonomyImageService;
+use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
+use Raven\Lib\Transport\Upload;
+use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\InputSanitizer;
@@ -35,7 +35,7 @@ final class GroupController
     private PanelEditorTabService $panelEditorTabService;
     private TaxonomyImageService $taxonomyImageService;
     private PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog;
-    private UploadFileSetNormalizer $uploadFileSetNormalizer;
+    private Upload $uploadFileSetNormalizer;
     private Closure $panelPermissionMapProvider;
 
     /**
@@ -46,7 +46,7 @@ final class GroupController
      * @param PanelEditorTabService $panelEditorTabService Shared editor-tab helper.
      * @param TaxonomyImageService $taxonomyImageService Shared group image upload/storage pipeline.
      * @param PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog Shared panel permission-definition catalog.
-     * @param UploadFileSetNormalizer $uploadFileSetNormalizer Shared upload payload flattener.
+     * @param Upload $uploadFileSetNormalizer Shared upload payload flattener.
      * @param callable(): array<string, array<string, mixed>> $panelPermissionMapProvider Session-scoped extension permission map provider.
      * @return void
      */
@@ -58,7 +58,7 @@ final class GroupController
         PanelEditorTabService $panelEditorTabService,
         TaxonomyImageService $taxonomyImageService,
         PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog,
-        UploadFileSetNormalizer $uploadFileSetNormalizer,
+        Upload $uploadFileSetNormalizer,
         callable $panelPermissionMapProvider
     ) {
         $this->context = $context;

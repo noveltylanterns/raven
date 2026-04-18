@@ -13,9 +13,9 @@ namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Config;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Http\HttpResponse;
-use Raven\Lib\Http\RequestContextResolver;
-use Raven\Lib\Http\SessionFlash;
+use Raven\Lib\Transport\Response;
+use Raven\Lib\Transport\Request;
+use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Panel\PanelUrl;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\RouteConfigService;
@@ -24,12 +24,12 @@ use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Site\PublicMetaService;
 use Raven\Lib\Site\SiteContextBuilder;
-use Raven\Lib\View\PublicRouteRenderService;
-use Raven\Lib\View\PublicTemplateDecorator;
-use Raven\Lib\View\PublicTemplatePipeline;
-use Raven\Lib\View\PublicTemplateResolver;
+use Raven\Lib\View\Public\PublicRouteRenderService;
+use Raven\Lib\View\Public\PublicTemplateDecorator;
+use Raven\Lib\View\Public\PublicTemplatePipeline;
+use Raven\Lib\View\Public\PublicTemplateResolver;
 use Raven\Lib\View\TemplateTagEngine;
-use Raven\Lib\View\ThemeCatalogService;
+use Raven\Lib\View\Panel\ThemeCatalogService;
 
 /**
  * Holds public-request shared deps and helpers for split public sub-controllers.
@@ -43,7 +43,7 @@ final class RequestContext
     private SessionFlash $flash;
     private TemplateTagEngine $templateTags;
     private bool $captchaScriptIncluded = false;
-    private ?RequestContextResolver $requestContextResolver = null;
+    private ?Request $requestContextResolver = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
     private ?ProfileContactService $profileContactService = null;
     private ?RouteConfigService $routeConfigService = null;
@@ -166,12 +166,12 @@ final class RequestContext
     /**
      * Returns normalized request-context helper cached for the current request.
      *
-     * @return RequestContextResolver Shared request-context helper.
+     * @return Request Shared request-context helper.
      */
-    public function requestContextResolver(): RequestContextResolver
+    public function requestContextResolver(): Request
     {
-        if (!$this->requestContextResolver instanceof RequestContextResolver) {
-            $this->requestContextResolver = new RequestContextResolver();
+        if (!$this->requestContextResolver instanceof Request) {
+            $this->requestContextResolver = new Request();
         }
 
         return $this->requestContextResolver;
@@ -359,7 +359,7 @@ final class RequestContext
      */
     public function jsonResponse(array $payload, int $status = 200): void
     {
-        HttpResponse::json($payload, $status, true);
+        Response::json($payload, $status, true);
     }
 
     /**

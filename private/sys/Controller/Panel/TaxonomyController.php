@@ -16,8 +16,8 @@ use Raven\Core\Repository\CategoryRepository;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\TagRepository;
 use Raven\Core\Repository\TaxonomySetRepository;
-use Raven\Lib\Http\UploadFileSetNormalizer;
-use Raven\Lib\Media\TaxonomyImageService;
+use Raven\Lib\Transport\Upload;
+use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\RouteConfigService;
@@ -56,7 +56,7 @@ final class TaxonomyController
     private TaxonomyImageService $taxonomyImageService;
     private RouteConfigService $routeConfigService;
     private PanelEditorTabService $panelEditorTabService;
-    private UploadFileSetNormalizer $uploadFileSetNormalizer;
+    private Upload $uploadFileSetNormalizer;
 
     /**
      * @param RequestContext $context Shared panel request context.
@@ -71,7 +71,7 @@ final class TaxonomyController
      * @param TaxonomyImageService $taxonomyImageService Service for taxonomy image uploads and path management.
      * @param RouteConfigService $routeConfigService Route configuration reader for channel/category/tag route mode and prefix helpers.
      * @param PanelEditorTabService $panelEditorTabService Panel editor tab normalization and tab-preserving URL builder.
-     * @param UploadFileSetNormalizer $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
+     * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
      * @return void
      */
     public function __construct(
@@ -87,7 +87,7 @@ final class TaxonomyController
         TaxonomyImageService $taxonomyImageService,
         RouteConfigService $routeConfigService,
         PanelEditorTabService $panelEditorTabService,
-        UploadFileSetNormalizer $uploadFileSetNormalizer
+        Upload $uploadFileSetNormalizer
     ) {
         $this->context = $context;
         $this->input = $input;

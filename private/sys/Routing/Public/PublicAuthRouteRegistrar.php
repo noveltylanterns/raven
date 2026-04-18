@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Public;
 
-use Raven\Core\Routing\Router;
+use Raven\Core\Router;
 
 /**
  * Registers login and registration routes for the public runtime.

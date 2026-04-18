@@ -170,7 +170,7 @@ return static function (array $context): void {
  */
 declare(strict_types=1);
 
-use Raven\Core\Routing\Router;
+use Raven\Core\Router;
 
 return static function (Router $router, array $context): void {
     // Register panel routes here.
@@ -187,7 +187,7 @@ return static function (Router $router, array $context): void {
  */
 declare(strict_types=1);
 
-use Raven\Core\Routing\Router;
+use Raven\Core\Router;
 
 return static function (Router $router, array $context): void {
     // Register public routes here.
@@ -438,7 +438,7 @@ declare(strict_types=1);
 - `tags`
 - `taxonomy`
 - `users`
-- `scheduler` => `Raven\Lib\Scheduler\SchedulerRegistry` — system-wide scheduler registry (core + extension jobs)
+- `scheduler` => `Raven\Core\Scheduler` — system-wide scheduler registry (core + extension jobs)
 - `extension_services` (recommended extension-owned service map keyed by extension directory and service name)
 - `extension_services_for` => callable `fn(string $extensionDirectory): array<string, mixed>` that boots and returns one extension's service map without touching unrelated extensions
 - `extension_services.{extension}.shortcode_runtimes` (optional list of shortcode runtimes; accepts `EmbeddedShortcodeRuntimeInterface` for content-only and `EmbeddedFormRuntimeInterface` for form-capable runtimes)

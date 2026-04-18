@@ -15,8 +15,8 @@ use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Profile\ProfileContactService;
-use Raven\Lib\View\PublicRouteRenderService;
-use Raven\Lib\View\PublicTemplateDecorator;
+use Raven\Lib\View\Public\PublicRouteRenderService;
+use Raven\Lib\View\Public\PublicTemplateDecorator;
 
 /**
  * Handles split public profile and group routes.

@@ -404,7 +404,7 @@ final class RvnSchemaBuilder
     /**
      * Creates the event_log table and its indexes when they do not yet exist.
      *
-     * The table stores panel event log entries written by EventLogger. Each row captures
+     * The table stores panel event log entries written by Logger. Each row captures
      * a timestamp, severity (error/warn/info), a freeform channel label, the message, and
      * an optional JSON context blob. Indexes on logged_at and severity support the two most
      * common panel-query access patterns: time-range pruning and severity filtering.
