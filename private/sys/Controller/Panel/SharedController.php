@@ -20,7 +20,6 @@ use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\View\Pagination;
 use Raven\Lib\Directory\Panel;
 use Raven\Lib\Security\Csrf;
-use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\SiteContextBuilder;
 
 /**
@@ -37,7 +36,6 @@ final class SharedController
     private SiteContextBuilder $siteContextBuilder;
     private bool $categoryEnabled;
     private bool $tagEnabled;
-    private Editor $editor;
     /** @var callable(): void */
     private $publicNotFoundRenderer;
 
@@ -49,7 +47,6 @@ final class SharedController
      * @param SessionFlash $flash Shared panel flash-message store.
      * @param bool $categoryEnabled Whether category routes are enabled in runtime config.
      * @param bool $tagEnabled Whether tag routes are enabled in runtime config.
-     * @param Editor $editor Shared panel editor normalizers for theme resolution.
      * @param callable(): void $publicNotFoundRenderer Callback that renders the public 404 fallback for guest panel access.
      * @return void
      */
@@ -61,7 +58,6 @@ final class SharedController
         SessionFlash $flash,
         bool $categoryEnabled,
         bool $tagEnabled,
-        Editor $editor,
         callable $publicNotFoundRenderer
     ) {
         $this->view = $view;
@@ -73,7 +69,6 @@ final class SharedController
         $this->siteContextBuilder = new SiteContextBuilder();
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
-        $this->editor = $editor;
         $this->publicNotFoundRenderer = $publicNotFoundRenderer;
     }
 
@@ -317,7 +312,7 @@ final class SharedController
 
         $preferences = $this->auth->userPreferences($userId);
         $theme = is_array($preferences)
-            ? $this->editor->normalizePanelThemeChoice((string) ($preferences['theme'] ?? 'default'), true)
+            ? $this->normalizePanelThemeChoice((string) ($preferences['theme'] ?? 'default'), true)
             : 'default';
 
         if (!is_string($theme)) {
@@ -347,14 +342,53 @@ final class SharedController
     /**
      * Resolves the default panel theme from config.
      *
-     * Passes `$allowDefault = false` so the config value must be a real theme slug;
-     * falls back to `corp` for empty, unrecognized, or Bootstrap alias values.
+     * Config must name a real theme slug; `default` is not accepted here. Falls back
+     * to `corp` for empty, unrecognized, or legacy Bootstrap alias values.
      *
      * @return string Normalized default theme slug.
      */
     private function defaultPanelTheme(): string
     {
         $theme = (string) $this->config->get('panel.theme', 'corp');
-        return $this->editor->normalizePanelThemeChoice($theme, false) ?? 'corp';
+        return $this->normalizePanelThemeChoice($theme, false) ?? 'corp';
+    }
+
+    /**
+     * Normalizes one panel-theme identifier to a valid Raven theme slug.
+     *
+     * Accepts Raven slugs (`corp`, `ice`, `midnight`) and Bootstrap data-bs-theme
+     * aliases (`default`→`corp`, `light`→`ice`, `dark`→`midnight`) so stored legacy
+     * preferences remain valid. Returns null for unrecognized non-empty values.
+     *
+     * @param string $theme Raw theme value from stored preference or config.
+     * @param bool $allowDefault Whether the `default` sentinel is permitted (user-level preference).
+     * @return string|null Canonical Raven theme slug, or null when the value is unrecognized.
+     */
+    private function normalizePanelThemeChoice(string $theme, bool $allowDefault): ?string
+    {
+        $normalized = strtolower(trim($theme));
+
+        if ($normalized === '') {
+            return $allowDefault ? 'default' : 'corp';
+        }
+
+        if ($allowDefault && $normalized === 'default') {
+            return 'default';
+        }
+
+        // Bootstrap data-bs-theme aliases: light→ice, dark→midnight, default→corp.
+        if ($normalized === 'light') {
+            return 'ice';
+        }
+
+        if ($normalized === 'dark') {
+            return 'midnight';
+        }
+
+        if (in_array($normalized, ['corp', 'ice', 'midnight'], true)) {
+            return $normalized;
+        }
+
+        return null;
     }
 }

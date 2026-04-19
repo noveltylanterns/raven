@@ -522,7 +522,6 @@ final class PanelRuntimeBuilder
                 new SessionFlash('_raven_flash'),
                 $categoryEnabled,
                 $tagEnabled,
-                $rvn['panel_editor'],
                 static function () use (&$systemController, &$rvn): void {
                     if ($systemController instanceof SystemController) {
                         $systemController->renderPublicNotFound();
