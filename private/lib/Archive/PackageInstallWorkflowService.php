@@ -1,58 +1,76 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Archive/PackageInstallWorkflowService.php
+ * Shared package-upload workflow helpers for theme and extension installs.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Archive;
 
 use Raven\Lib\Security\InputSanitizer;
-use ZipArchive;
+use Raven\Lib\Transport\Upload;
 
 /**
  * Shared package-upload orchestration helpers for panel theme/extension installs.
+ *
+ * Keeps slug resolution, upload validation, archive extraction, and wrapper
+ * directory flattening consistent between the theme and extension managers.
  */
 final class PackageInstallWorkflowService
 {
     private InputSanitizer $input;
+    private Upload $uploads;
     private ArchivePackageService $archives;
 
-    public function __construct(InputSanitizer $input, ArchivePackageService $archives)
+    /**
+     * @param InputSanitizer $input Shared text/path normalization helper.
+     * @param Upload $uploads Shared upload validation policy.
+     * @param ArchivePackageService $archives Shared archive package helper surface.
+     */
+    public function __construct(InputSanitizer $input, Upload $uploads, ArchivePackageService $archives)
     {
         $this->input = $input;
+        $this->uploads = $uploads;
         $this->archives = $archives;
     }
 
     /**
-     * @param mixed $rawUpload
+     * Validates one uploaded archive payload for a theme/extension install flow.
+     *
+     * @param mixed $rawUpload Raw `$_FILES[...]` node.
+     * @param string $packageLabel Human-facing package label.
+     * @param string $collectionLabel Human-facing collection label used in errors.
+     * @param int $maxArchiveBytes Maximum allowed archive size in bytes.
      * @return array{ok: bool, error?: string, tmp_path?: string, archive_name?: string}
      */
-    public function validateZipUploadPayload(
+    public function validateArchiveUploadPayload(
         mixed $rawUpload,
         string $packageLabel,
         string $collectionLabel,
         int $maxArchiveBytes = 52428800
     ): array {
-        if (!is_array($rawUpload)) {
-            return ['ok' => false, 'error' => 'No ' . strtolower($packageLabel) . ' payload was received.'];
+        $validatedUpload = $this->uploads->validateSingleUpload($rawUpload, strtolower($packageLabel), [
+            'max_bytes' => $maxArchiveBytes,
+            'empty_error' => 'Uploaded archive appears empty.',
+            'too_large_error' => $packageLabel . ' exceeds the 50MB upload limit.',
+        ]);
+        if (($validatedUpload['ok'] ?? false) !== true) {
+            return ['ok' => false, 'error' => (string) ($validatedUpload['error'] ?? 'Archive upload failed.')];
         }
 
-        $uploadError = (int) ($rawUpload['error'] ?? UPLOAD_ERR_NO_FILE);
-        if ($uploadError !== UPLOAD_ERR_OK) {
-            return ['ok' => false, 'error' => $this->archives->uploadErrorMessage($uploadError, $packageLabel)];
-        }
-
-        $tmpPath = (string) ($rawUpload['tmp_name'] ?? '');
-        if ($tmpPath === '' || !is_uploaded_file($tmpPath) || !is_file($tmpPath)) {
-            return ['ok' => false, 'error' => 'Uploaded archive could not be validated as an HTTP upload.'];
-        }
-
-        $archiveName = $this->input->text((string) ($rawUpload['name'] ?? 'package.zip'), 255);
-        if (strtolower((string) pathinfo($archiveName, PATHINFO_EXTENSION)) !== 'zip') {
-            return ['ok' => false, 'error' => $collectionLabel . ' must be uploaded as .zip archives.'];
-        }
-
-        $archiveSize = (int) ($rawUpload['size'] ?? 0);
-        if ($archiveSize < 1 || $archiveSize > $maxArchiveBytes) {
-            return ['ok' => false, 'error' => $packageLabel . ' exceeds the 50MB upload limit.'];
+        /** @var array<string, mixed> $upload */
+        $upload = $validatedUpload['upload'] ?? [];
+        $tmpPath = (string) ($upload['tmp_name'] ?? '');
+        $archiveName = $this->input->text((string) ($upload['name'] ?? 'package.zip'), 255);
+        if (!$this->archives->isSupportedPackageArchiveName($archiveName)) {
+            return [
+                'ok' => false,
+                'error' => $collectionLabel . ' must be uploaded as .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, or .rar archives.',
+            ];
         }
 
         return [
@@ -63,11 +81,17 @@ final class PackageInstallWorkflowService
     }
 
     /**
-     * @param callable(string): ?string $deriveFromArchive
-     * @param callable(string): bool $isSafeName
-     * @param callable(string): bool $isReservedName
-     * @param callable(string): ?string $nextAvailableName
-     * @param callable(string): bool $pathExists
+     * Resolves one final install name from manual input, archive metadata, and collision rules.
+     *
+     * @param string $requestedName Manual slug/directory override from the operator.
+     * @param string $archiveName Original uploaded archive filename.
+     * @param callable(string): ?string $deriveFromArchive Archive-derived fallback name resolver.
+     * @param callable(string): bool $isSafeName Name validator for the target collection.
+     * @param callable(string): bool $isReservedName Reserved-name guard for stock items.
+     * @param callable(string): ?string $nextAvailableName Auto-rename resolver for slug collisions.
+     * @param callable(string): bool $pathExists Filesystem existence probe for the target name.
+     * @param string $entityName Human-facing entity label.
+     * @param string $safeNameRequirement Human-facing validation error for unsafe names.
      * @return array{
      *   ok: bool,
      *   error?: string,
@@ -142,12 +166,18 @@ final class PackageInstallWorkflowService
     }
 
     /**
-     * @param callable(string): void $cleanup
+     * Extracts an uploaded archive into a target directory and validates non-empty output.
+     *
+     * @param string $tmpPath Absolute path to the uploaded temporary archive.
+     * @param string $targetDirectory Absolute target directory.
+     * @param callable(string): void $cleanup Cleanup callback for failed extraction.
+     * @param string $entityLabel Human-facing entity label for fallback errors.
+     * @return string|null Null on success, or one human-facing error message.
      */
     public function extractIntoTarget(string $tmpPath, string $targetDirectory, callable $cleanup, string $entityLabel): ?string
     {
         try {
-            $this->archives->extractUploadedZip($tmpPath, $targetDirectory);
+            $this->archives->extractUploadedArchive($tmpPath, $targetDirectory);
         } catch (\Throwable $exception) {
             $cleanup($targetDirectory);
             return $exception->getMessage() !== '' ? $exception->getMessage() : ucfirst($entityLabel) . ' upload failed.';
@@ -162,7 +192,10 @@ final class PackageInstallWorkflowService
     }
 
     /**
-     * Normalizes extracted package layout when archive uses one top-level wrapper directory.
+     * Normalizes extracted package layout when the archive uses one top-level wrapper directory.
+     *
+     * @param string $targetDirectory Absolute extraction target directory.
+     * @return string|null Null on success, or one human-facing error message.
      */
     public function flattenSingleRootDirectory(string $targetDirectory): ?string
     {
@@ -205,137 +238,46 @@ final class PackageInstallWorkflowService
     }
 
     /**
-     * Reads extension directory slug from archive ext.json manifest.
+     * Reads an extension directory slug from an uploaded archive manifest.
      *
-     * Supports archives where ext.json is at root or one wrapper-directory deep.
+     * Supports manifests at archive root or one wrapper-directory deep.
+     *
+     * @param string $tmpPath Absolute path to the uploaded temporary archive.
+     * @return string|null Valid extension slug, or null when none can be resolved.
      */
     public function extensionSlugFromArchiveManifest(string $tmpPath): ?string
     {
-        return $this->manifestSlugFromArchive($tmpPath, 'ext.json', 119);
+        return $this->archives->slugFromArchiveManifest($tmpPath, 'ext.json', 119);
     }
 
     /**
-     * Reads public-theme slug from archive theme.json manifest.
+     * Reads a public-theme slug from an uploaded archive manifest.
      *
-     * Supports archives where theme.json is at root or one wrapper-directory deep.
+     * Supports manifests at archive root or one wrapper-directory deep.
+     *
+     * @param string $tmpPath Absolute path to the uploaded temporary archive.
+     * @return string|null Valid theme slug, or null when none can be resolved.
      */
     public function themeSlugFromArchiveManifest(string $tmpPath): ?string
     {
-        return $this->manifestSlugFromArchive($tmpPath, 'theme.json', 63);
-    }
-
-    private function manifestSlugFromArchive(string $tmpPath, string $manifestFilename, int $maxSlugLength): ?string
-    {
-        $manifestFilename = strtolower(trim($manifestFilename));
-        if ($manifestFilename === '') {
-            return null;
-        }
-
-        $zip = new ZipArchive();
-        $opened = $zip->open($tmpPath);
-        if ($opened !== true) {
-            return null;
-        }
-
-        try {
-            $slugPattern = '/^[a-z0-9][a-z0-9_-]{0,' . max(0, $maxSlugLength) . '}$/';
-            $candidateIndexes = $this->manifestEntryIndexes($zip, $manifestFilename);
-            foreach ($candidateIndexes as $candidate) {
-                $index = (int) $candidate;
-                if ($index < 0) {
-                    continue;
-                }
-
-                $raw = $zip->getFromIndex($index);
-                if (!is_string($raw) || trim($raw) === '') {
-                    continue;
-                }
-
-                /** @var mixed $decoded */
-                $decoded = json_decode($raw, true);
-                if (!is_array($decoded)) {
-                    continue;
-                }
-
-                $slugRaw = trim((string) ($decoded['slug'] ?? ''));
-                if ($slugRaw === '') {
-                    continue;
-                }
-
-                $slug = strtolower($slugRaw);
-                if (preg_match($slugPattern, $slug) === 1) {
-                    return $slug;
-                }
-            }
-        } finally {
-            $zip->close();
-        }
-
-        return null;
+        return $this->archives->slugFromArchiveManifest($tmpPath, 'theme.json', 63);
     }
 
     /**
-     * Collects candidate manifest entry indexes in preferred lookup order:
-     * - root-level manifest first
-     * - one-wrapper-directory manifest second
+     * Returns one directory listing with dot entries removed.
      *
-     * @return array<int, int>
-     */
-    private function manifestEntryIndexes(ZipArchive $zip, string $manifestFilename): array
-    {
-        $rootIndexes = [];
-        $wrappedIndexes = [];
-
-        for ($index = 0; $index < $zip->numFiles; $index++) {
-            $entryName = $zip->getNameIndex($index);
-            if (!is_string($entryName) || !$this->archives->isSafeZipEntryPath($entryName)) {
-                continue;
-            }
-
-            $normalizedEntry = trim(str_replace('\\', '/', $entryName), '/');
-            if ($normalizedEntry === '' || strtolower((string) pathinfo($normalizedEntry, PATHINFO_BASENAME)) !== $manifestFilename) {
-                continue;
-            }
-
-            $directory = trim((string) pathinfo($normalizedEntry, PATHINFO_DIRNAME), '.');
-            $depth = $directory === '' ? 0 : substr_count($directory, '/') + 1;
-            if ($depth > 1) {
-                continue;
-            }
-
-            if ($depth === 0) {
-                $rootIndexes[] = $index;
-                continue;
-            }
-
-            $wrappedIndexes[] = $index;
-        }
-
-        return [...$rootIndexes, ...$wrappedIndexes];
-    }
-
-    /**
-     * @return array<int, string>|null
+     * @param string $path Absolute path to the directory to inspect.
+     * @return array<int, string>|null Child entry names, or null on read failure.
      */
     private function scandirEntries(string $path): ?array
     {
-        if (!is_dir($path)) {
-            return null;
-        }
-
         $entries = scandir($path);
         if (!is_array($entries)) {
             return null;
         }
 
-        $filtered = [];
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..') {
-                continue;
-            }
-            $filtered[] = $entry;
-        }
-
-        return $filtered;
+        return array_values(array_filter($entries, static function (string $entry): bool {
+            return $entry !== '.' && $entry !== '..';
+        }));
     }
 }

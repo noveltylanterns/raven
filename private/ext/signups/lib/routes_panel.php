@@ -9,9 +9,11 @@
 
 declare(strict_types=1);
 
+use Raven\Core\Router;
 use Raven\Ext\SignupFormRepository;
 use Raven\Ext\SignupSubmissionRepository;
-use Raven\Core\Router;
+use Raven\Lib\Archive\Types\Csv;
+use Raven\Lib\Transport\Upload;
 
 use function Raven\Lib\Support\redirect;
 
@@ -95,6 +97,9 @@ return static function (Router $router, array $context): void {
             'submissions' => $submissionsService,
         ];
     };
+
+    $csv = new Csv();
+    $uploads = new Upload();
 
     $signupsRepository = new class($requireSignupRepositories) {
         /** @var \Closure(): array{forms: SignupFormRepository, submissions: SignupSubmissionRepository} */
@@ -483,6 +488,7 @@ return static function (Router $router, array $context): void {
         $requirePanelLogin,
         $findFormBySlug,
         $signupsRepository,
+        $csv,
         $flash,
         $indexPath,
         $submissionsListPath,
@@ -519,44 +525,34 @@ return static function (Router $router, array $context): void {
             $safeFileSlug = 'signups';
         }
 
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-
-        header('Content-Type: text/csv; charset=UTF-8');
-        header('Content-Disposition: attachment; filename="signups-' . $safeFileSlug . '-submissions.csv"');
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-        header('Pragma: no-cache');
-
-        $stream = fopen('php://output', 'wb');
-        if (!is_resource($stream)) {
-            http_response_code(500);
-            echo 'Failed to open export stream.';
-            return;
-        }
-
-        fputcsv($stream, ['ID', 'Email', 'Display Name', 'Country', 'Additional Fields JSON', 'Source URL', 'IP Address', 'Hostname', 'User Agent', 'Created At']);
-        foreach ($rows as $row) {
-            fputcsv($stream, [
-                (string) ($row['id'] ?? ''),
-                (string) ($row['email'] ?? ''),
-                (string) ($row['display_name'] ?? ''),
-                (string) ($row['country'] ?? ''),
-                (string) ($row['additional_fields_json'] ?? ''),
-                (string) ($row['source_url'] ?? ''),
-                (string) ($row['ip_address'] ?? ''),
-                (string) ($row['hostname'] ?? ''),
-                (string) ($row['user_agent'] ?? ''),
-                (string) ($row['created'] ?? ''),
-            ]);
-        }
-        fclose($stream);
+        $csv->streamToOutput(
+            'signups-' . $safeFileSlug . '-submissions.csv',
+            (static function (array $rows): \Generator {
+                foreach ($rows as $row) {
+                    yield [
+                        (string) ($row['id'] ?? ''),
+                        (string) ($row['email'] ?? ''),
+                        (string) ($row['display_name'] ?? ''),
+                        (string) ($row['country'] ?? ''),
+                        (string) ($row['additional_fields_json'] ?? ''),
+                        (string) ($row['source_url'] ?? ''),
+                        (string) ($row['ip_address'] ?? ''),
+                        (string) ($row['hostname'] ?? ''),
+                        (string) ($row['user_agent'] ?? ''),
+                        (string) ($row['created'] ?? ''),
+                    ];
+                }
+            })($rows),
+            ['ID', 'Email', 'Display Name', 'Country', 'Additional Fields JSON', 'Source URL', 'IP Address', 'Hostname', 'User Agent', 'Created At']
+        );
     });
 
     $router->add('POST', '/signups/submissions/import', static function () use (
         $requirePanelLogin,
         $findFormBySlug,
         $signupsRepository,
+        $csv,
+        $uploads,
         $flash,
         $indexPath,
         $submissionsListPath,
@@ -589,48 +585,22 @@ return static function (Router $router, array $context): void {
 
         /** @var mixed $rawUpload */
         $rawUpload = $_FILES['import_csv'] ?? null;
-        if (!is_array($rawUpload)) {
-            $flash('error', 'Please choose a CSV file to import.');
-            redirect($submissionsListPath($slug, $searchQuery, 1));
-        }
-
-        $uploadError = (int) ($rawUpload['error'] ?? UPLOAD_ERR_NO_FILE);
-        if ($uploadError !== UPLOAD_ERR_OK) {
-            $uploadMessage = match ($uploadError) {
-                UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'CSV upload exceeds server upload size limits.',
-                UPLOAD_ERR_PARTIAL => 'CSV upload was only partially received.',
-                UPLOAD_ERR_NO_FILE => 'Please choose a CSV file to import.',
-                UPLOAD_ERR_NO_TMP_DIR => 'Server temporary upload directory is missing.',
-                UPLOAD_ERR_CANT_WRITE => 'Server failed to write uploaded CSV file.',
-                UPLOAD_ERR_EXTENSION => 'A server extension blocked CSV upload.',
-                default => 'CSV upload failed with an unknown error.',
-            };
-            $flash('error', $uploadMessage);
-            redirect($submissionsListPath($slug, $searchQuery, 1));
-        }
-
-        $tmpPath = trim((string) ($rawUpload['tmp_name'] ?? ''));
-        if ($tmpPath === '' || !is_uploaded_file($tmpPath) || !is_file($tmpPath)) {
-            $flash('error', 'Uploaded CSV could not be validated as an upload.');
-            redirect($submissionsListPath($slug, $searchQuery, 1));
-        }
-
-        $originalName = strtolower(trim((string) ($rawUpload['name'] ?? '')));
-        if ($originalName !== '' && !str_ends_with($originalName, '.csv')) {
-            $flash('error', 'Signup submissions import currently supports .csv files only.');
-            redirect($submissionsListPath($slug, $searchQuery, 1));
-        }
-
         $maxImportBytes = 10 * 1024 * 1024;
-        $uploadSize = max(0, (int) ($rawUpload['size'] ?? 0));
-        if ($uploadSize > $maxImportBytes) {
-            $flash('error', 'CSV import file exceeds the 10MB limit.');
+        $validatedUpload = $uploads->validateSingleUpload($rawUpload, 'CSV', [
+            'max_bytes' => $maxImportBytes,
+            'too_large_error' => 'CSV import file exceeds the 10MB limit.',
+        ]);
+        if (($validatedUpload['ok'] ?? false) !== true) {
+            $flash('error', (string) ($validatedUpload['error'] ?? 'CSV upload failed.'));
             redirect($submissionsListPath($slug, $searchQuery, 1));
         }
 
-        $stream = fopen($tmpPath, 'rb');
-        if (!is_resource($stream)) {
-            $flash('error', 'Failed to open uploaded CSV file.');
+        /** @var array<string, mixed> $upload */
+        $upload = $validatedUpload['upload'] ?? [];
+        $tmpPath = trim((string) ($upload['tmp_name'] ?? ''));
+        $originalName = strtolower(trim((string) ($upload['name'] ?? '')));
+        if ($originalName !== '' && !$uploads->filenameUsesAllowedExtension($originalName, ['csv'])) {
+            $flash('error', 'Signup submissions import currently supports .csv files only.');
             redirect($submissionsListPath($slug, $searchQuery, 1));
         }
 
@@ -652,185 +622,189 @@ return static function (Router $router, array $context): void {
         $rowErrors = [];
         $reachedRowLimit = false;
 
-        while (($rawRow = fgetcsv($stream)) !== false) {
-            $fileRowNumber++;
+        try {
+            foreach ($csv->read($tmpPath, false) as $rawRow) {
+                $fileRowNumber++;
 
-            if (!is_array($rawRow)) {
-                continue;
-            }
-
-            $row = [];
-            foreach ($rawRow as $index => $cell) {
-                $cellText = is_string($cell) ? trim($cell) : '';
-                if ($index === 0) {
-                    $cellText = preg_replace('/^\xEF\xBB\xBF/', '', $cellText) ?? $cellText;
-                }
-                $row[] = $cellText;
-            }
-
-            $hasAnyCell = false;
-            foreach ($row as $cellText) {
-                if ($cellText !== '') {
-                    $hasAnyCell = true;
-                    break;
-                }
-            }
-            if (!$hasAnyCell) {
-                continue;
-            }
-
-            if ($headerMap === null) {
-                $normalizedHeaders = array_map($normalizeHeader, $row);
-                $hasEmailHeader = in_array('email', $normalizedHeaders, true);
-                $hasDisplayHeader = in_array('display_name', $normalizedHeaders, true)
-                    || in_array('display', $normalizedHeaders, true)
-                    || in_array('displayname', $normalizedHeaders, true)
-                    || in_array('name', $normalizedHeaders, true);
-
-                if ($hasEmailHeader && $hasDisplayHeader) {
-                    $findHeaderIndex = static function (array $headers, array $aliases): ?int {
-                        foreach ($aliases as $alias) {
-                            $index = array_search($alias, $headers, true);
-                            if ($index !== false) {
-                                return (int) $index;
-                            }
-                        }
-
-                        return null;
-                    };
-
-                    $headerMap = [
-                        'email' => $findHeaderIndex($normalizedHeaders, ['email']),
-                        'display_name' => $findHeaderIndex($normalizedHeaders, ['display_name', 'display', 'displayname', 'name']),
-                        'country' => $findHeaderIndex($normalizedHeaders, ['country']),
-                        'additional_fields_json' => $findHeaderIndex($normalizedHeaders, ['additional_fields_json', 'additional_fields', 'additional_json', 'additional']),
-                        'source_url' => $findHeaderIndex($normalizedHeaders, ['source_url', 'source', 'url']),
-                        'ip_address' => $findHeaderIndex($normalizedHeaders, ['ip_address', 'ip']),
-                        'hostname' => $findHeaderIndex($normalizedHeaders, ['hostname', 'host']),
-                        'user_agent' => $findHeaderIndex($normalizedHeaders, ['user_agent', 'useragent', 'ua']),
-                        'created' => $findHeaderIndex($normalizedHeaders, [
-                            'created',
-                            'created_at',
-                            'submitted_at',
-                            'submission_date',
-                            'submitted_on',
-                            'timestamp',
-                        ]),
-                    ];
+                if (!is_array($rawRow)) {
                     continue;
                 }
 
-                // Fallback format: exported Raven CSV row order (with optional leading ID column).
-                $headerMap = [];
-            }
-
-            $processedRows++;
-            if ($processedRows > $maxRows) {
-                $reachedRowLimit = true;
-                break;
-            }
-
-            $fieldValue = static function (array $rowData, ?int $index): string {
-                if ($index === null || !array_key_exists($index, $rowData)) {
-                    return '';
+                $row = [];
+                foreach ($rawRow as $index => $cell) {
+                    $cellText = is_string($cell) ? trim($cell) : '';
+                    if ($index === 0) {
+                        $cellText = preg_replace('/^\xEF\xBB\xBF/', '', $cellText) ?? $cellText;
+                    }
+                    $row[] = $cellText;
                 }
 
-                return trim((string) $rowData[$index]);
-            };
-
-            if ($headerMap !== []) {
-                $rawEmail = $fieldValue($row, $headerMap['email'] ?? null);
-                $rawDisplayName = $fieldValue($row, $headerMap['display_name'] ?? null);
-                $rawCountry = $fieldValue($row, $headerMap['country'] ?? null);
-                $rawAdditionalFieldsJson = $fieldValue($row, $headerMap['additional_fields_json'] ?? null);
-                $rawSourceUrl = $fieldValue($row, $headerMap['source_url'] ?? null);
-                $rawIpAddress = $fieldValue($row, $headerMap['ip_address'] ?? null);
-                $rawHostname = $fieldValue($row, $headerMap['hostname'] ?? null);
-                $rawUserAgent = $fieldValue($row, $headerMap['user_agent'] ?? null);
-                $rawCreatedAt = $fieldValue($row, $headerMap['created'] ?? null);
-            } else {
-                $emailIndex = 0;
-                if (isset($row[1]) && $rvn['input']->email((string) $row[1]) !== null) {
-                    $emailIndex = 1;
+                $hasAnyCell = false;
+                foreach ($row as $cellText) {
+                    if ($cellText !== '') {
+                        $hasAnyCell = true;
+                        break;
+                    }
+                }
+                if (!$hasAnyCell) {
+                    continue;
                 }
 
-                $rawEmail = $fieldValue($row, $emailIndex);
-                $rawDisplayName = $fieldValue($row, $emailIndex + 1);
-                $rawCountry = $fieldValue($row, $emailIndex + 2);
-                $rawAdditionalFieldsJson = $fieldValue($row, $emailIndex + 3);
-                $rawSourceUrl = $fieldValue($row, $emailIndex + 4);
-                $rawIpAddress = $fieldValue($row, $emailIndex + 5);
-                $rawHostname = $fieldValue($row, $emailIndex + 6);
-                $rawUserAgent = $fieldValue($row, $emailIndex + 7);
-                $rawCreatedAt = $fieldValue($row, $emailIndex + 8);
-            }
+                if ($headerMap === null) {
+                    $normalizedHeaders = array_map($normalizeHeader, $row);
+                    $hasEmailHeader = in_array('email', $normalizedHeaders, true);
+                    $hasDisplayHeader = in_array('display_name', $normalizedHeaders, true)
+                        || in_array('display', $normalizedHeaders, true)
+                        || in_array('displayname', $normalizedHeaders, true)
+                        || in_array('name', $normalizedHeaders, true);
 
-            $email = $rvn['input']->email($rawEmail);
-            $displayName = $rvn['input']->text($rawDisplayName, 160);
-            $country = strtolower($rvn['input']->text($rawCountry, 16));
-            if ($email === null || $displayName === '' || $country === '') {
-                $invalidCount++;
-                if (count($rowErrors) < 5) {
-                    $rowErrors[] = 'Row ' . $fileRowNumber . ': required values are missing (email, display name, country).';
+                    if ($hasEmailHeader && $hasDisplayHeader) {
+                        $findHeaderIndex = static function (array $headers, array $aliases): ?int {
+                            foreach ($aliases as $alias) {
+                                $index = array_search($alias, $headers, true);
+                                if ($index !== false) {
+                                    return (int) $index;
+                                }
+                            }
+
+                            return null;
+                        };
+
+                        $headerMap = [
+                            'email' => $findHeaderIndex($normalizedHeaders, ['email']),
+                            'display_name' => $findHeaderIndex($normalizedHeaders, ['display_name', 'display', 'displayname', 'name']),
+                            'country' => $findHeaderIndex($normalizedHeaders, ['country']),
+                            'additional_fields_json' => $findHeaderIndex($normalizedHeaders, ['additional_fields_json', 'additional_fields', 'additional_json', 'additional']),
+                            'source_url' => $findHeaderIndex($normalizedHeaders, ['source_url', 'source', 'url']),
+                            'ip_address' => $findHeaderIndex($normalizedHeaders, ['ip_address', 'ip']),
+                            'hostname' => $findHeaderIndex($normalizedHeaders, ['hostname', 'host']),
+                            'user_agent' => $findHeaderIndex($normalizedHeaders, ['user_agent', 'useragent', 'ua']),
+                            'created' => $findHeaderIndex($normalizedHeaders, [
+                                'created',
+                                'created_at',
+                                'submitted_at',
+                                'submission_date',
+                                'submitted_on',
+                                'timestamp',
+                            ]),
+                        ];
+                        continue;
+                    }
+
+                    // Fallback format: exported Raven CSV row order (with optional leading ID column).
+                    $headerMap = [];
                 }
-                continue;
-            }
 
-            $sourceUrl = $rvn['input']->text($rawSourceUrl, 2048);
-            $ipAddress = $rvn['input']->text($rawIpAddress, 45);
-            if ($ipAddress !== '' && filter_var($ipAddress, FILTER_VALIDATE_IP) === false) {
-                $ipAddress = '';
-            }
+                $processedRows++;
+                if ($processedRows > $maxRows) {
+                    $reachedRowLimit = true;
+                    break;
+                }
 
-            $hostname = strtolower($rvn['input']->text($rawHostname, 255));
-            $userAgent = $rvn['input']->text($rawUserAgent, 500);
-            $createdAt = $rvn['input']->text($rawCreatedAt, 120);
+                $fieldValue = static function (array $rowData, ?int $index): string {
+                    if ($index === null || !array_key_exists($index, $rowData)) {
+                        return '';
+                    }
 
-            $additionalFieldsJson = '[]';
-            $rawAdditionalFieldsJson = $rvn['input']->text($rawAdditionalFieldsJson, 20000);
-            if ($rawAdditionalFieldsJson !== '') {
-                /** @var mixed $decodedAdditionalFields */
-                $decodedAdditionalFields = json_decode($rawAdditionalFieldsJson, true);
-                if (is_array($decodedAdditionalFields)) {
-                    $encodedAdditionalFields = json_encode(
-                        $decodedAdditionalFields,
-                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-                    );
-                    if (is_string($encodedAdditionalFields) && $encodedAdditionalFields !== '') {
-                        $additionalFieldsJson = $rvn['input']->text($encodedAdditionalFields, 20000);
+                    return trim((string) $rowData[$index]);
+                };
+
+                if ($headerMap !== []) {
+                    $rawEmail = $fieldValue($row, $headerMap['email'] ?? null);
+                    $rawDisplayName = $fieldValue($row, $headerMap['display_name'] ?? null);
+                    $rawCountry = $fieldValue($row, $headerMap['country'] ?? null);
+                    $rawAdditionalFieldsJson = $fieldValue($row, $headerMap['additional_fields_json'] ?? null);
+                    $rawSourceUrl = $fieldValue($row, $headerMap['source_url'] ?? null);
+                    $rawIpAddress = $fieldValue($row, $headerMap['ip_address'] ?? null);
+                    $rawHostname = $fieldValue($row, $headerMap['hostname'] ?? null);
+                    $rawUserAgent = $fieldValue($row, $headerMap['user_agent'] ?? null);
+                    $rawCreatedAt = $fieldValue($row, $headerMap['created'] ?? null);
+                } else {
+                    $emailIndex = 0;
+                    if (isset($row[1]) && $rvn['input']->email((string) $row[1]) !== null) {
+                        $emailIndex = 1;
+                    }
+
+                    $rawEmail = $fieldValue($row, $emailIndex);
+                    $rawDisplayName = $fieldValue($row, $emailIndex + 1);
+                    $rawCountry = $fieldValue($row, $emailIndex + 2);
+                    $rawAdditionalFieldsJson = $fieldValue($row, $emailIndex + 3);
+                    $rawSourceUrl = $fieldValue($row, $emailIndex + 4);
+                    $rawIpAddress = $fieldValue($row, $emailIndex + 5);
+                    $rawHostname = $fieldValue($row, $emailIndex + 6);
+                    $rawUserAgent = $fieldValue($row, $emailIndex + 7);
+                    $rawCreatedAt = $fieldValue($row, $emailIndex + 8);
+                }
+
+                $email = $rvn['input']->email($rawEmail);
+                $displayName = $rvn['input']->text($rawDisplayName, 160);
+                $country = strtolower($rvn['input']->text($rawCountry, 16));
+                if ($email === null || $displayName === '' || $country === '') {
+                    $invalidCount++;
+                    if (count($rowErrors) < 5) {
+                        $rowErrors[] = 'Row ' . $fileRowNumber . ': required values are missing (email, display name, country).';
+                    }
+                    continue;
+                }
+
+                $sourceUrl = $rvn['input']->text($rawSourceUrl, 2048);
+                $ipAddress = $rvn['input']->text($rawIpAddress, 45);
+                if ($ipAddress !== '' && filter_var($ipAddress, FILTER_VALIDATE_IP) === false) {
+                    $ipAddress = '';
+                }
+
+                $hostname = strtolower($rvn['input']->text($rawHostname, 255));
+                $userAgent = $rvn['input']->text($rawUserAgent, 500);
+                $createdAt = $rvn['input']->text($rawCreatedAt, 120);
+
+                $additionalFieldsJson = '[]';
+                $rawAdditionalFieldsJson = $rvn['input']->text($rawAdditionalFieldsJson, 20000);
+                if ($rawAdditionalFieldsJson !== '') {
+                    /** @var mixed $decodedAdditionalFields */
+                    $decodedAdditionalFields = json_decode($rawAdditionalFieldsJson, true);
+                    if (is_array($decodedAdditionalFields)) {
+                        $encodedAdditionalFields = json_encode(
+                            $decodedAdditionalFields,
+                            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                        );
+                        if (is_string($encodedAdditionalFields) && $encodedAdditionalFields !== '') {
+                            $additionalFieldsJson = $rvn['input']->text($encodedAdditionalFields, 20000);
+                        }
+                    }
+                }
+
+                try {
+                    $signupsRepository->create([
+                        'form_slug' => $slug,
+                        'email' => (string) $email,
+                        'display_name' => $displayName,
+                        'country' => $country,
+                        'additional_fields_json' => $additionalFieldsJson,
+                        'source_url' => $sourceUrl,
+                        'ip_address' => $ipAddress !== '' ? $ipAddress : null,
+                        'hostname' => $hostname !== '' ? $hostname : null,
+                        'user_agent' => $userAgent !== '' ? $userAgent : null,
+                        'created' => $createdAt,
+                    ]);
+                    $importedCount++;
+                } catch (RuntimeException $exception) {
+                    $message = trim($exception->getMessage());
+                    if (str_contains(strtolower($message), 'already signed up')) {
+                        $duplicateCount++;
+                        continue;
+                    }
+
+                    $errorCount++;
+                    if (count($rowErrors) < 5) {
+                        $rowErrors[] = 'Row ' . $fileRowNumber . ': ' . ($message !== '' ? $message : 'Failed to import submission.');
                     }
                 }
             }
-
-            try {
-                $signupsRepository->create([
-                    'form_slug' => $slug,
-                    'email' => (string) $email,
-                    'display_name' => $displayName,
-                    'country' => $country,
-                    'additional_fields_json' => $additionalFieldsJson,
-                    'source_url' => $sourceUrl,
-                    'ip_address' => $ipAddress !== '' ? $ipAddress : null,
-                    'hostname' => $hostname !== '' ? $hostname : null,
-                    'user_agent' => $userAgent !== '' ? $userAgent : null,
-                    'created' => $createdAt,
-                ]);
-                $importedCount++;
-            } catch (RuntimeException $exception) {
-                $message = trim($exception->getMessage());
-                if (str_contains(strtolower($message), 'already signed up')) {
-                    $duplicateCount++;
-                    continue;
-                }
-
-                $errorCount++;
-                if (count($rowErrors) < 5) {
-                    $rowErrors[] = 'Row ' . $fileRowNumber . ': ' . ($message !== '' ? $message : 'Failed to import submission.');
-                }
-            }
+        } catch (RuntimeException $exception) {
+            $message = trim($exception->getMessage());
+            $flash('error', $message !== '' ? $message : 'Failed to open uploaded CSV file.');
+            redirect($submissionsListPath($slug, $searchQuery, 1));
         }
-
-        fclose($stream);
 
         $skippedCount = $duplicateCount + $invalidCount + $errorCount;
 

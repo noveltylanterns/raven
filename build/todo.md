@@ -23,20 +23,40 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	- [x] Each handler can extract/compress whole archives and individual files within.
 	- [x] lib/Archive/Types/Git.php for basic Git handling (Clone, Fetch, Extract, etc)
 	- [x] lib/Archive/Types/Csv.php as a new generic CSV handler.
-	- [ ] Doublecheck that Tar.php's built-in compression handlers (gz, bz2, xz, zst) just calls our dedicated handlers for those archive types.
-	- [ ] lib/Archive/Extract.php & Compress.php forwarding handlers for our various filetypes.
-	- [ ] lib/Transport/Upload.php — expand with universal upload security policies so it can be used by ALL public/private/ext upload forms.
-	- [ ] Update ArchivePackageService, Extension & Theme managers & CLI apps to use new archive handlers.
-	- [ ] ArchivePackageService, Extension & Theme managers should be able to process all applicable archive types from lib/Archive/Types/, not just Zip.
-	- [ ] Update Updater (UpdateWorkflowService) to use lib/Archive/Types/Git.php instead of GitCommandRunner directly.
-	- [ ] In fact just merge GitCommandRunner into Git.php
-	- [ ] Update stock extensions with CSV functionality (contact, signups) to use Csv.php.
-	- [ ] Update PackageInstallWorkflowService to use Upload (Transport) + new Archive/Types/*.php handlers.
+	- [x] Doublecheck that Tar.php's built-in compression handlers (gz, bz2, xz, zst) just calls our dedicated handlers for those archive types.
+	- [x] lib/Archive/Extract.php & Compress.php forwarding handlers for our various filetypes.
+	- [x] lib/Transport/Upload.php — expanded with shared HTTP-upload validation, size policy, error text, and extension checks so panel/public/ext upload forms can reuse one baseline contract.
+	- [x] Update ArchivePackageService, Extension & Theme managers & CLI apps to use new archive handlers.
+		- [x] Panel theme/extension upload workflows now route through `ArchivePackageService` + `Extract` and accept `.zip`, `.tar`, `.tar.gz/.tgz`, `.tar.bz2/.tbz2`, `.tar.xz/.txz`, `.tar.zst/.tzst`, and `.rar`.
+		- [x] CLI extension import now routes through `ArchivePackageService` + `Extract`; the unsafe zip-slip smoke fixture remains raw by design so it can manufacture invalid archives.
+	- [x] ArchivePackageService, Extension & Theme managers should be able to process all applicable archive types from lib/Archive/Types/, not just Zip.
+	- [x] Update Updater (UpdateWorkflowService) to use lib/Archive/Types/Git.php instead of GitCommandRunner directly.
+	- [x] In fact just merge GitCommandRunner into Git.php
+	- [x] Update stock extensions with CSV functionality (contact, signups) to use Csv.php.
+		- [x] Contact + Signups panel exports now stream through `private/lib/Archive/Types/Csv.php`.
+		- [x] Signups CSV import now reads through `Csv.php` and validates uploads through `Transport/Upload.php`.
+		- [x] Core panel routing/log exports now use `Csv.php` too, so Raven no longer keeps separate inline CSV emitters for these stock surfaces.
+	- [x] Update PackageInstallWorkflowService to use Upload (Transport) + new Archive/Types/*.php handlers.
 
 
 ### Library Refactor Phase 2
 Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
 - [ ] Move sys/Router.php to sys/Routing/Router.php
+- [ ] Move sys/Routing/DebugToolbarResponseHook.php to sys/Debug/
+- [ ] Move sys/Scheduler.php to lib/Scheduler/Registry.php
+- [ ] Move sys/Routing/SchedulerFallbackRunner.php to sys/Scheduler.php
+- [ ] Move lib/Transport/Panel/Post.php to lib/Panel/PanelPost.php, delete lib/Transport/Panel/ after.
+- [ ] Simplify sys/Debug/DebugToolbar*.php classes to Toolbar*.php
+- [ ] Consolidate all updater functions to lib/Archive/Update.php, delete lib/Update/ after.
+- [ ] Rename sys/Database/Schema/RvnSchemaBuilder.php to SchemaBuilder.php
+- [ ] Rename sys/Database/Schema/RvnSchemaBootstrap.php to SchemaBootstrap.php
+- [ ] Merge sys/Database/Schema/TableNameResolver.php into lib/Database/TableNameResolver.php
+- [ ] Make sure all our .php files have the standard 6-line PHPDoc comment just after <?php, and the use maps at the beginning are in alphabetical order.
+- [ ] Doublecheck that sys/Logger.php can be used for both public+panel routes.
+- [ ] sys/Config.php should be reduced to bare minimum for reading config to make system work, since it's read on every page read. Offload write functions to lib/Config/ConfigValueWriter.php. Offload anything else unnecessary to public/panel/extension init to lib/Config/*.php.
+- [ ] Any purely visual functions in lib/Config/Panel/ should be moved to lib/View/Panel/. Check that anything remaining doesnt belong in lib/Config/ConfigValueWriter.php instead. Any other remaining lib/Config/Panel/ items should go in lib/Panel/.
+
+
 
 ## Long Term
 

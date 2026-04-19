@@ -151,30 +151,101 @@ final class Tar
             throw new RuntimeException('TAR source directory could not be resolved: ' . $sourceDir);
         }
 
-        // PharData::compress() writes to a path derived from the current archive
-        // name, so we build to a .tar first and let PharData produce the .tar.gz.
-        $tarPath = rtrim($outputPath, '.gz');
-        if (!str_ends_with($tarPath, '.tar')) {
-            $tarPath .= '.tar';
+        $this->compressDirectoryWithOuterLayer(
+            $sourceRoot,
+            $outputPath,
+            static function (string $tarPath, string $archivePath): void {
+                (new Gz())->compress($tarPath, $archivePath);
+            },
+            'TAR.GZ'
+        );
+    }
+
+    /**
+     * Creates a .tar.bz2 archive from all files in a source directory.
+     *
+     * Builds a temporary `.tar` first, then compresses it through the dedicated
+     * `Bz2` handler so TAR-family compression consistently flows through the
+     * canonical single-file archive-type implementation.
+     *
+     * @param string $sourceDir Absolute path to the source directory.
+     * @param string $outputPath Absolute path where the .tar.bz2 file should be written.
+     * @return void
+     * @throws RuntimeException When the source directory is invalid or archiving fails.
+     */
+    public function compressDirectoryBz2(string $sourceDir, string $outputPath): void
+    {
+        $sourceRoot = realpath($sourceDir);
+        if ($sourceRoot === false || !is_dir($sourceRoot)) {
+            throw new RuntimeException('TAR source directory could not be resolved: ' . $sourceDir);
         }
 
-        try {
-            $phar = new PharData($tarPath);
-            $phar->buildFromDirectory($sourceRoot);
-            // compress() creates the .tar.gz alongside the .tar.
-            $phar->compress(\Phar::GZ);
-        } catch (\Throwable $e) {
-            @unlink($tarPath);
-            @unlink($outputPath);
-            throw new RuntimeException(
-                'Failed to create TAR.GZ archive: ' . $e->getMessage(),
-                0,
-                $e
-            );
-        } finally {
-            // Remove the intermediate .tar whether we succeeded or failed.
-            @unlink($tarPath);
+        $this->compressDirectoryWithOuterLayer(
+            $sourceRoot,
+            $outputPath,
+            static function (string $tarPath, string $archivePath): void {
+                (new Bz2())->compress($tarPath, $archivePath);
+            },
+            'TAR.BZ2'
+        );
+    }
+
+    /**
+     * Creates a .tar.xz archive from all files in a source directory.
+     *
+     * Builds a temporary `.tar` first, then compresses it through the dedicated
+     * `Xz` handler so TAR-family compression stays aligned with the shared
+     * archive-type entrypoint.
+     *
+     * @param string $sourceDir Absolute path to the source directory.
+     * @param string $outputPath Absolute path where the .tar.xz file should be written.
+     * @return void
+     * @throws RuntimeException When the source directory is invalid or archiving fails.
+     */
+    public function compressDirectoryXz(string $sourceDir, string $outputPath): void
+    {
+        $sourceRoot = realpath($sourceDir);
+        if ($sourceRoot === false || !is_dir($sourceRoot)) {
+            throw new RuntimeException('TAR source directory could not be resolved: ' . $sourceDir);
         }
+
+        $this->compressDirectoryWithOuterLayer(
+            $sourceRoot,
+            $outputPath,
+            static function (string $tarPath, string $archivePath): void {
+                (new Xz())->compress($tarPath, $archivePath);
+            },
+            'TAR.XZ'
+        );
+    }
+
+    /**
+     * Creates a .tar.zst archive from all files in a source directory.
+     *
+     * Builds a temporary `.tar` first, then compresses it through the dedicated
+     * `Zst` handler so TAR-family compression stays aligned with the shared
+     * archive-type entrypoint.
+     *
+     * @param string $sourceDir Absolute path to the source directory.
+     * @param string $outputPath Absolute path where the .tar.zst file should be written.
+     * @return void
+     * @throws RuntimeException When the source directory is invalid or archiving fails.
+     */
+    public function compressDirectoryZst(string $sourceDir, string $outputPath): void
+    {
+        $sourceRoot = realpath($sourceDir);
+        if ($sourceRoot === false || !is_dir($sourceRoot)) {
+            throw new RuntimeException('TAR source directory could not be resolved: ' . $sourceDir);
+        }
+
+        $this->compressDirectoryWithOuterLayer(
+            $sourceRoot,
+            $outputPath,
+            static function (string $tarPath, string $archivePath): void {
+                (new Zst())->compress($tarPath, $archivePath);
+            },
+            'TAR.ZST'
+        );
     }
 
     /**
@@ -191,7 +262,10 @@ final class Tar
             $entries = [];
             foreach (new \RecursiveIteratorIterator($phar) as $file) {
                 if ($file instanceof \PharFileInfo) {
-                    $entries[] = $file->getFilename();
+                    $entryPath = $this->normalizePharEntryPath($file, $archivePath);
+                    if ($entryPath !== '') {
+                        $entries[] = $entryPath;
+                    }
                 }
             }
 
@@ -232,5 +306,93 @@ final class Tar
         }
 
         return true;
+    }
+
+    /**
+     * Builds a `.tar` first, then compresses it through one dedicated outer-layer handler.
+     *
+     * @param string $sourceRoot Canonical realpath() result for the source directory.
+     * @param string $outputPath Absolute path of the final compressed TAR artifact.
+     * @param callable(string, string): void $compressor Receives `$tarPath`, `$outputPath`.
+     * @param string $label Human-readable archive label for exception messages.
+     * @return void
+     * @throws RuntimeException When intermediate TAR creation or outer compression fails.
+     */
+    private function compressDirectoryWithOuterLayer(
+        string $sourceRoot,
+        string $outputPath,
+        callable $compressor,
+        string $label
+    ): void {
+        $temporaryTarPath = $this->allocateTemporaryTarPath();
+
+        try {
+            $this->compressDirectory($sourceRoot, $temporaryTarPath);
+            $compressor($temporaryTarPath, $outputPath);
+        } catch (\Throwable $e) {
+            @unlink($outputPath);
+            throw new RuntimeException(
+                'Failed to create ' . $label . ' archive: ' . $e->getMessage(),
+                0,
+                $e
+            );
+        } finally {
+            @unlink($temporaryTarPath);
+        }
+    }
+
+    /**
+     * Allocates one temporary `.tar` file path for staged TAR-family compression.
+     *
+     * @return string Absolute temporary `.tar` path.
+     * @throws RuntimeException When the temporary file cannot be prepared.
+     */
+    private function allocateTemporaryTarPath(): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'rvn-tar-');
+        if (!is_string($path) || $path === '') {
+            throw new RuntimeException('Failed to allocate temporary TAR path.');
+        }
+
+        // PharData expects to create a fresh archive file itself; leaving the
+        // tempnam placeholder in place causes it to interpret an empty file as
+        // a truncated TAR. Remove the placeholder and return a fresh suffix path.
+        if (!@unlink($path)) {
+            throw new RuntimeException('Failed to prepare temporary TAR path.');
+        }
+
+        return $path . '.tar';
+    }
+
+    /**
+     * Normalizes one PharData entry to a relative archive-internal path.
+     *
+     * Phar exposes TAR entries as `phar:///absolute/archive/path.tar/entry/path`,
+     * so callers need the prefix stripped before manifest resolution or targeted
+     * extraction logic can reason about wrapper-directory depth.
+     *
+     * @param \PharFileInfo $file One entry returned from the Phar iterator.
+     * @param string $archivePath Absolute path to the source archive.
+     * @return string Relative archive entry path.
+     */
+    private function normalizePharEntryPath(\PharFileInfo $file, string $archivePath): string
+    {
+        $entryPath = str_replace('\\', '/', $file->getPathName());
+        $candidatePrefixes = [
+            'phar://' . str_replace('\\', '/', $archivePath) . '/',
+        ];
+
+        $resolvedArchivePath = realpath($archivePath);
+        if (is_string($resolvedArchivePath) && $resolvedArchivePath !== '') {
+            $candidatePrefixes[] = 'phar://' . str_replace('\\', '/', $resolvedArchivePath) . '/';
+        }
+
+        foreach ($candidatePrefixes as $prefix) {
+            if (str_starts_with($entryPath, $prefix)) {
+                return ltrim(substr($entryPath, strlen($prefix)), '/');
+            }
+        }
+
+        return ltrim($file->getFilename(), '/');
     }
 }

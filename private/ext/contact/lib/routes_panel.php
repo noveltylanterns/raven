@@ -9,9 +9,10 @@
 
 declare(strict_types=1);
 
+use Raven\Core\Router;
 use Raven\Ext\ContactFormRepository;
 use Raven\Ext\ContactSubmissionRepository;
-use Raven\Core\Router;
+use Raven\Lib\Archive\Types\Csv;
 
 use function Raven\Lib\Support\redirect;
 
@@ -95,6 +96,8 @@ return static function (Router $router, array $context): void {
             'submissions' => $submissionsService,
         ];
     };
+
+    $csv = new Csv();
 
     $contactSubmissionsRepository = new class($requireContactRepositories) {
         /** @var \Closure(): array{forms: ContactFormRepository, submissions: ContactSubmissionRepository} */
@@ -546,6 +549,7 @@ return static function (Router $router, array $context): void {
         $requirePanelLogin,
         $findFormBySlug,
         $contactSubmissionsRepository,
+        $csv,
         $flash,
         $indexPath,
         $submissionsListPath,
@@ -582,38 +586,26 @@ return static function (Router $router, array $context): void {
             $safeFileSlug = 'contact';
         }
 
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-
-        header('Content-Type: text/csv; charset=UTF-8');
-        header('Content-Disposition: attachment; filename="contact-' . $safeFileSlug . '-submissions.csv"');
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-        header('Pragma: no-cache');
-
-        $stream = fopen('php://output', 'wb');
-        if (!is_resource($stream)) {
-            http_response_code(500);
-            echo 'Failed to open export stream.';
-            return;
-        }
-
-        fputcsv($stream, ['ID', 'Sender Name', 'Sender Email', 'Message', 'Additional Fields JSON', 'Source URL', 'IP Address', 'Hostname', 'User Agent', 'Created At']);
-        foreach ($rows as $row) {
-            fputcsv($stream, [
-                (string) ($row['id'] ?? ''),
-                (string) ($row['sender_name'] ?? ''),
-                (string) ($row['sender_email'] ?? ''),
-                (string) ($row['message_text'] ?? ''),
-                (string) ($row['additional_fields_json'] ?? ''),
-                (string) ($row['source_url'] ?? ''),
-                (string) ($row['ip_address'] ?? ''),
-                (string) ($row['hostname'] ?? ''),
-                (string) ($row['user_agent'] ?? ''),
-                (string) ($row['created'] ?? ''),
-            ]);
-        }
-        fclose($stream);
+        $csv->streamToOutput(
+            'contact-' . $safeFileSlug . '-submissions.csv',
+            (static function (array $rows): \Generator {
+                foreach ($rows as $row) {
+                    yield [
+                        (string) ($row['id'] ?? ''),
+                        (string) ($row['sender_name'] ?? ''),
+                        (string) ($row['sender_email'] ?? ''),
+                        (string) ($row['message_text'] ?? ''),
+                        (string) ($row['additional_fields_json'] ?? ''),
+                        (string) ($row['source_url'] ?? ''),
+                        (string) ($row['ip_address'] ?? ''),
+                        (string) ($row['hostname'] ?? ''),
+                        (string) ($row['user_agent'] ?? ''),
+                        (string) ($row['created'] ?? ''),
+                    ];
+                }
+            })($rows),
+            ['ID', 'Sender Name', 'Sender Email', 'Message', 'Additional Fields JSON', 'Source URL', 'IP Address', 'Hostname', 'User Agent', 'Created At']
+        );
     });
 
     $router->add('POST', '/contact/submissions/delete', static function () use (

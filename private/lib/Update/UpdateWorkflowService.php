@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Update;
 
 use FilesystemIterator;
+use Raven\Lib\Archive\Types\Git;
 use Raven\Core\Database\Schema\SchemaEnsureStateStore;
 use RecursiveCallbackFilterIterator;
 use RecursiveDirectoryIterator;
@@ -17,7 +18,7 @@ use RuntimeException;
 final class UpdateWorkflowService
 {
     private string $root;
-    private GitCommandRunner $git;
+    private Git $git;
     /** @var array<int, string> */
     private array $stockThemeSlugs;
     /** @var array<int, string> */
@@ -29,7 +30,7 @@ final class UpdateWorkflowService
      */
     public function __construct(
         string $root,
-        GitCommandRunner $git,
+        Git $git,
         array $stockThemeSlugs,
         array $stockExtensionDirectories
     ) {

@@ -15,9 +15,49 @@ use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TagRepository;
+use Raven\Lib\Archive\ArchivePackageService;
+use Raven\Lib\Archive\PackageInstallWorkflowService;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Extension\ExtensionRegistry;
+use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Public\PublicThemeRegistry;
+
+require_once dirname(__DIR__) . '/Archive/ArchivePackageService.php';
+require_once dirname(__DIR__) . '/Archive/PackageInstallWorkflowService.php';
+require_once dirname(__DIR__) . '/Archive/Extract.php';
+require_once dirname(__DIR__) . '/Archive/Compress.php';
+require_once dirname(__DIR__) . '/Archive/Types/Zip.php';
+require_once dirname(__DIR__) . '/Archive/Types/Tar.php';
+require_once dirname(__DIR__) . '/Archive/Types/Gz.php';
+require_once dirname(__DIR__) . '/Archive/Types/Bz2.php';
+require_once dirname(__DIR__) . '/Archive/Types/Xz.php';
+require_once dirname(__DIR__) . '/Archive/Types/Zst.php';
+require_once dirname(__DIR__) . '/Archive/Types/Rar.php';
+require_once dirname(__DIR__) . '/Security/InputSanitizer.php';
+
+spl_autoload_register(static function (string $class): void {
+    $root = dirname(__DIR__, 3);
+
+    $libPrefix = 'Raven\\Lib\\';
+    if (str_starts_with($class, $libPrefix)) {
+        $relative = str_replace('\\', '/', substr($class, strlen($libPrefix)));
+        $path = $root . '/private/lib/' . $relative . '.php';
+        if (is_file($path)) {
+            require_once $path;
+        }
+        return;
+    }
+
+    $corePrefix = 'Raven\\Core\\';
+    if (str_starts_with($class, $corePrefix)) {
+        $relative = str_replace('\\', '/', substr($class, strlen($corePrefix)));
+        $path = $root . '/private/sys/' . $relative . '.php';
+        if (is_file($path)) {
+            require_once $path;
+        }
+    }
+});
 
 final class RavenCliContext
 {
@@ -641,100 +681,14 @@ function raven_cli_copy_directory_recursive(string $source, string $target): voi
     }
 }
 
-function raven_cli_is_safe_zip_path(string $entryName): bool
+function raven_cli_archive_packages(string $root): ArchivePackageService
 {
-    $path = str_replace('\\\\', '/', trim($entryName));
-    if ($path === '' || str_starts_with($path, '/')) {
-        return false;
-    }
-
-    if (preg_match('/^[A-Za-z]:\//', $path) === 1) {
-        return false;
-    }
-
-    if (str_contains($path, "\0")) {
-        return false;
-    }
-
-    foreach (explode('/', $path) as $segment) {
-        if ($segment === '' || $segment === '.') {
-            continue;
-        }
-        if ($segment === '..') {
-            return false;
-        }
-    }
-
-    return true;
+    return new ArchivePackageService($root);
 }
 
-function raven_cli_extension_slug_from_archive_manifest(string $archivePath): ?string
+function raven_cli_package_install_workflow(string $root): PackageInstallWorkflowService
 {
-    if (!class_exists(ZipArchive::class)) {
-        return null;
-    }
-
-    $zip = new ZipArchive();
-    if ($zip->open($archivePath) !== true) {
-        return null;
-    }
-
-    try {
-        $candidates = [];
-        for ($index = 0; $index < $zip->numFiles; $index++) {
-            $entryName = $zip->getNameIndex($index);
-            if (!is_string($entryName) || !raven_cli_is_safe_zip_path($entryName)) {
-                continue;
-            }
-
-            $normalizedEntry = trim(str_replace('\\', '/', $entryName), '/');
-            if ($normalizedEntry === '' || strtolower((string) pathinfo($normalizedEntry, PATHINFO_BASENAME)) !== 'ext.json') {
-                continue;
-            }
-
-            $directory = trim((string) pathinfo($normalizedEntry, PATHINFO_DIRNAME), '.');
-            $depth = $directory === '' ? 0 : substr_count($directory, '/') + 1;
-            if ($depth > 1) {
-                continue;
-            }
-
-            $candidates[] = [
-                'index' => $index,
-                'depth' => $depth,
-            ];
-        }
-
-        usort($candidates, static function (array $left, array $right): int {
-            return ((int) ($left['depth'] ?? 99)) <=> ((int) ($right['depth'] ?? 99));
-        });
-
-        foreach ($candidates as $candidate) {
-            $index = (int) ($candidate['index'] ?? -1);
-            if ($index < 0) {
-                continue;
-            }
-
-            $raw = $zip->getFromIndex($index);
-            if (!is_string($raw) || trim($raw) === '') {
-                continue;
-            }
-
-            /** @var mixed $decoded */
-            $decoded = json_decode($raw, true);
-            if (!is_array($decoded)) {
-                continue;
-            }
-
-            $slug = strtolower(trim((string) ($decoded['slug'] ?? '')));
-            if ($slug !== '' && preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) === 1) {
-                return $slug;
-            }
-        }
-    } finally {
-        $zip->close();
-    }
-
-    return null;
+    return new PackageInstallWorkflowService(new InputSanitizer(), new Upload(), raven_cli_archive_packages($root));
 }
 
 /**
@@ -2135,6 +2089,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         $context->info('Actions: list, enable, disable, create, import, uninstall');
         $context->info('Options: --slug, --archive, --type <helper|content|framework|module|system>, --name, --version (optional), --description, --author, --homepage');
         $context->info('Import uses ext.json "slug" when --slug is omitted.');
+        $context->info('Import accepts .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, and .rar archives.');
         return 0;
     }
 
@@ -2309,18 +2264,20 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         }
 
         if ($action === 'import') {
-            if (!class_exists(ZipArchive::class)) {
-                throw new RuntimeException('PHP zip extension is required for import.');
-            }
-
             $archivePath = raven_cli_required_scalar_option($options, 'archive', 'Missing --archive option.', 'a');
             if (!is_file($archivePath)) {
                 throw new RuntimeException('Archive not found: ' . $archivePath);
             }
 
+            $archivePackages = raven_cli_archive_packages($root);
+            $packageWorkflow = raven_cli_package_install_workflow($root);
+            if (!$archivePackages->isSupportedPackageArchiveName($archivePath)) {
+                throw new RuntimeException('Unsupported archive type. Use .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, or .rar.');
+            }
+
             $slug = strtolower(trim((string) raven_cli_option($options, 'slug', '')));
             if ($slug === '') {
-                $slug = (string) (raven_cli_extension_slug_from_archive_manifest($archivePath) ?? '');
+                $slug = (string) ($archivePackages->slugFromArchiveManifest($archivePath, 'ext.json', 119) ?? '');
             }
             if ($slug === '') {
                 throw new RuntimeException('Missing extension slug. Provide --slug or include a valid ext.json slug in the archive.');
@@ -2337,34 +2294,25 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 throw new RuntimeException('Failed to create extension target directory.');
             }
 
-            $zip = new ZipArchive();
-            if ($zip->open($archivePath) !== true) {
+            $extractError = $packageWorkflow->extractIntoTarget(
+                $archivePath,
+                $target,
+                static function (string $directory): void {
+                    raven_cli_remove_directory_recursive($directory);
+                },
+                'extension'
+            );
+            if (is_string($extractError)) {
                 raven_cli_remove_directory_recursive($target);
-                throw new RuntimeException('Failed to open ZIP archive.');
+                throw new RuntimeException($extractError);
             }
 
-            try {
-                if ($zip->numFiles < 1) {
-                    throw new RuntimeException('Archive is empty.');
-                }
-
-                for ($i = 0; $i < $zip->numFiles; $i++) {
-                    $entry = $zip->getNameIndex($i);
-                    if (!is_string($entry) || !raven_cli_is_safe_zip_path($entry)) {
-                        throw new RuntimeException('Archive has unsafe entry path(s).');
-                    }
-                }
-
-                if (!$zip->extractTo($target)) {
-                    throw new RuntimeException('Archive extraction failed.');
-                }
-            } catch (Throwable $exception) {
-                $zip->close();
+            $flattenError = $packageWorkflow->flattenSingleRootDirectory($target);
+            if (is_string($flattenError)) {
                 raven_cli_remove_directory_recursive($target);
-                throw $exception;
+                throw new RuntimeException($flattenError);
             }
 
-            $zip->close();
             if (ExtensionRegistry::readManifest($root, $slug) === null) {
                 raven_cli_remove_directory_recursive($target);
                 throw new RuntimeException('Imported extension has invalid ext.json/type contract.');
@@ -2383,7 +2331,6 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         }
 
         if ($action === 'create') {
-            require_once $root . '/private/lib/Extension/ExtensionScaffoldService.php';
             $slug = strtolower(trim((string) raven_cli_option($options, 'slug', '')));
             if ($slug === '' && $context->interactive) {
                 $slug = strtolower(trim($context->prompt('Extension slug')));
@@ -2413,6 +2360,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
             $description = trim((string) raven_cli_option($options, 'description', ''));
             $author = trim((string) raven_cli_option($options, 'author', ''));
             $homepage = trim((string) raven_cli_option($options, 'homepage', ''));
+            $docs = trim((string) raven_cli_option($options, 'docs', ''));
             $withAgents = raven_cli_bool_option($options, 'with-agents', false);
             $withComposer = raven_cli_bool_option($options, 'with-composer', true);
 
@@ -2431,6 +2379,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                     'type' => $type,
                     'author' => $author,
                     'homepage' => $homepage,
+                    'docs' => $docs,
                 ], $withAgents, $withComposer);
             } catch (Throwable $exception) {
                 raven_cli_remove_directory_recursive($path);
@@ -2630,7 +2579,6 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
 
     try {
         $root = $context->root;
-        require_once $root . '/private/sys/Core/Theme/PublicThemeRegistry.php';
 
         $themesRoot = $root . '/public/theme';
         if ($action === 'create' && !is_dir($themesRoot) && !mkdir($themesRoot, 0770, true) && !is_dir($themesRoot)) {

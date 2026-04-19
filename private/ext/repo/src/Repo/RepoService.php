@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Ext\Repo;
 
+use Raven\Lib\Archive\Types\Git;
 use Raven\Lib\Filesystem\DirectoryTreeService;
-use Raven\Lib\Update\GitCommandRunner;
 use RuntimeException;
 
 /**
@@ -28,7 +28,7 @@ final class RepoService
     private RepoSettingsStore $settingsStore;
     private RepoRegistryStore $registryStore;
     private RepoLogStore $logStore;
-    private GitCommandRunner $git;
+    private Git $git;
     private DirectoryTreeService $directoryTree;
     private string $localRoot;
     private string $publicRoot;
@@ -42,7 +42,7 @@ final class RepoService
         RepoSettingsStore $settingsStore,
         RepoRegistryStore $registryStore,
         RepoLogStore $logStore,
-        GitCommandRunner $git,
+        Git $git,
         DirectoryTreeService $directoryTree,
         string $localRoot,
         string $publicRoot

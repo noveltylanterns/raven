@@ -150,12 +150,13 @@ Theme selection policy:
 Panel counterpart:
 
 - `GET /{panel.path}/themes` provides Theme Manager UI for list/enable/scaffold.
-- `POST /{panel.path}/themes/upload` uploads one `.zip` archive into `public/theme/{slug}/`.
+- `POST /{panel.path}/themes/upload` uploads one supported archive package into `public/theme/{slug}/`.
 - `POST /{panel.path}/themes/uninstall` uninstalls one non-active, non-stock theme.
 
 Theme upload notes:
 
 - Upload archive must include `theme.json` at archive root.
+- Theme Manager accepts `.zip`, `.tar`, `.tar.gz/.tgz`, `.tar.bz2/.tbz2`, `.tar.xz/.txz`, `.tar.zst/.tzst`, and `.rar` packages.
 - If slug override is blank, Theme Manager derives slug from `theme.json` `slug` (fallback: archive filename).
 - If that derived slug already exists, Theme Manager auto-renames with `-copy`.
 - Uploaded themes are not auto-enabled; activate them from Theme Manager or `rvn-theme enable`.

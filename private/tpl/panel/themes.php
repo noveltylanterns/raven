@@ -181,16 +181,16 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                 <?= $csrfField ?>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="theme_archive" class="form-label"><span class="h6">Theme Archive</span> <small>(zip)</small></label>
+                        <label for="theme_archive" class="form-label"><span class="h6">Theme Archive</span> <small>(zip, tar, tar.*, rar)</small></label>
                         <input
                             id="theme_archive"
                             type="file"
                             name="theme_archive"
                             class="form-control"
-                            accept=".zip,application/zip"
+                            accept=".zip,.tar,.tgz,.gz,.tbz2,.bz2,.txz,.xz,.tzst,.zst,.rar,application/zip,application/x-tar,application/gzip,application/x-gzip,application/x-bzip2,application/x-rar-compressed"
                             required
                         >
-                        <div class="form-text">Archive must contain a valid <code>theme.json</code> manifest (top-level folder wrappers are supported).</div>
+                        <div class="form-text">Archive must contain a valid <code>theme.json</code> manifest. Raven accepts <code>.zip</code>, <code>.tar</code>, <code>.tar.gz/.tgz</code>, <code>.tar.bz2/.tbz2</code>, <code>.tar.xz/.txz</code>, <code>.tar.zst/.tzst</code>, and <code>.rar</code> packages; top-level folder wrappers are supported.</div>
                     </div>
                     <div>
                         <label for="theme_upload_slug" class="form-label">Slug Override (optional)</label>

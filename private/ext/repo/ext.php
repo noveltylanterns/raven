@@ -14,8 +14,8 @@ use Raven\Ext\Repo\RepoRegistryStore;
 use Raven\Ext\Repo\RepoService;
 use Raven\Ext\Repo\RepoSettingsStore;
 use Raven\Ext\Repo\RepoShortcodeRuntime;
+use Raven\Lib\Archive\Types\Git;
 use Raven\Lib\Filesystem\DirectoryTreeService;
-use Raven\Lib\Update\GitCommandRunner;
 
 /**
  * Registers Repositories extension services into the shared app container.
@@ -78,7 +78,7 @@ return [
                 $settingsStore,
                 $registryStore,
                 $logStore,
-                new GitCommandRunner(),
+                new Git(),
                 new DirectoryTreeService(),
                 $localRoot,
                 $publicRoot

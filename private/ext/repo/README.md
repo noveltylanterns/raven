@@ -42,4 +42,4 @@ This Raven `module` extension manages read-only Git repository mirrors with pane
 - `Raven\Core\Router`
 - `Raven\Lib\Security\Csrf` via `$rvn['csrf']`
 - `Raven\Lib\Security\InputSanitizer` via `$rvn['input']`
-- `Raven\Lib\Update\GitCommandRunner`
+- `Raven\Lib\Archive\Types\Git`

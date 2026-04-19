@@ -150,6 +150,12 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Config validation, editor schema/defaults, and value-parsing primitives. Pure reusable policy; does not own the runtime config instance.
   - `ConfigValueParser` — static scalar coercion helpers (`bool`, `int`, `float`) for extension and lib code that needs safe type conversion from raw config values.
   - `Config/Panel/` — panel-only config helpers: `ConfigEditorNormalizer`, `ConfigEditorSchemaService`, `ConfigSnapshotSanitizer`, `PanelConfigDefaultsService`, `PanelConfigFieldPolicyService`, `PanelMediaConfigService`.
+- `private/lib/Archive/`
+  - Reusable archive/package helpers for core and extensions.
+  - `ArchivePackageService` — panel/CLI-facing package helper for supported archive checks, manifest slug reads, temp archive allocation, and download streaming.
+  - `Extract` — shared archive extraction forwarder for ZIP, TAR-family, and RAR packages, including manifest reads across wrapped package layouts.
+  - `Compress` — shared archive compression forwarder for ZIP and TAR-family outputs.
+  - `Archive/Types/` — canonical format handlers such as `Zip`, `Tar`, `Gz`, `Bz2`, `Xz`, `Zst`, `Rar`, `Git`, and `Csv`; stock extension exports/imports and panel CSV downloads now route through `Csv`.
 - `private/lib/Database/`
   - Reusable database primitives for core and extensions.
   - `ProfiledPDO` and `ProfiledPDOStatement` wrap PDO for query-level profiling; `QueryProfilerInterface` is the shared contract.
@@ -162,7 +168,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `Extension/Panel/` — panel-only extension management: `ExtensionCatalogService`, `ExtensionPermissionCatalogService`, `ExtensionScaffoldService`.
   - `Extension/Public/` — public-route extension runtime contracts: `EmbeddedFormRuntimeInterface`, `EmbeddedFormRuntimeService`, `EmbeddedShortcodeRuntimeInterface` — the contracts extension authors implement for shortcode/form runtime registration.
 - `private/lib/Transport/`
-  - HTTP-layer helpers for both panel and public routes: `Response` (response dispatch), `Request` (request context resolution), `Redirect` (redirect-target validation), `Upload` (upload file-set normalization).
+  - HTTP-layer helpers for both panel and public routes: `Response` (response dispatch), `Request` (request context resolution), `Redirect` (redirect-target validation), `Upload` (upload file-set normalization plus shared HTTP-upload validation, size/error policy, and extension checks).
   - `Transport/Panel/` — panel-only transport helpers: `Post` (panel POST body normalization).
   - Note: session flash has moved to `lib/Auth/SessionFlash.php`; event logging has moved to `sys/Logger.php`.
 - `private/lib/Media/`

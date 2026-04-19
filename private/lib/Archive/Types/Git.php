@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Archive/Types/Git.php
- * High-level Git operations — clone, fetch, and repository inspection.
+ * Canonical Git command and repository handler for Raven core and extensions.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,43 +11,130 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Archive\Types;
 
-use Raven\Lib\Update\GitCommandRunner;
 use RuntimeException;
 
 /**
- * High-level Git handler for Raven core and extensions.
+ * Canonical Git handler for Raven core and extensions.
  *
- * Wraps `GitCommandRunner` to expose canonical clone, fetch, and repository
- * inspection operations without requiring callers to compose raw argument arrays.
- * The underlying `GitCommandRunner` is exposed via `runner()` for callers that
- * need low-level access (such as the Updater's diff/compare pipeline).
+ * This class is the single Git-facing library surface for Raven. It provides
+ * both low-level `run()` / `mustRun()` command execution and higher-level clone,
+ * fetch, repository-inspection, and worktree-export helpers so callers no
+ * longer need a second command-runner wrapper alongside the archive type.
  *
- * All commands run via proc_open without shell interpolation (see GitCommandRunner).
+ * All commands run via `proc_open` without shell interpolation.
  */
 final class Git
 {
-    private GitCommandRunner $runner;
+    private string $binary;
 
     /**
-     * @param GitCommandRunner|null $runner Shared runner; a new default instance is created when null.
-     * @param string                $binary Git binary path used when constructing the default runner.
+     * @param string $binary Git binary path; defaults to `git`.
      */
-    public function __construct(?GitCommandRunner $runner = null, string $binary = 'git')
+    public function __construct(string $binary = 'git')
     {
-        $this->runner = $runner ?? new GitCommandRunner($binary);
+        $this->binary = $binary !== '' ? $binary : 'git';
     }
 
     /**
-     * Returns the underlying GitCommandRunner for low-level git operations.
+     * Runs one git command without shell interpolation.
      *
-     * Use this when you need to run git commands not covered by the high-level
-     * API — for example, `rev-list`, `check-ignore`, or `ls-remote`.
-     *
-     * @return GitCommandRunner The shared command runner instance.
+     * @param array<int, string> $arguments Git CLI arguments excluding the binary.
+     * @param string|null $cwd Optional working directory.
+     * @param string|null $stdin Optional stdin payload.
+     * @return array{
+     *   ok: bool,
+     *   exit_code: int,
+     *   stdout: string,
+     *   stderr: string,
+     *   command: string
+     * }
+     * @throws RuntimeException When the git process cannot be started.
      */
-    public function runner(): GitCommandRunner
+    public function run(array $arguments, ?string $cwd = null, ?string $stdin = null): array
     {
-        return $this->runner;
+        $command = array_merge([$this->binary], array_values(array_map(
+            static fn (string $argument): string => $argument,
+            $arguments
+        )));
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $process = @proc_open(
+            $command,
+            $descriptorSpec,
+            $pipes,
+            $cwd,
+            [
+                'GIT_TERMINAL_PROMPT' => '0',
+                'GCM_INTERACTIVE' => 'Never',
+            ]
+        );
+
+        if (!is_resource($process)) {
+            throw new RuntimeException('Failed to start git command.');
+        }
+
+        $stdout = '';
+        $stderr = '';
+
+        try {
+            if (isset($pipes[0]) && is_resource($pipes[0])) {
+                if ($stdin !== null && $stdin !== '') {
+                    fwrite($pipes[0], $stdin);
+                }
+                fclose($pipes[0]);
+            }
+
+            if (isset($pipes[1]) && is_resource($pipes[1])) {
+                $stdout = stream_get_contents($pipes[1]) ?: '';
+                fclose($pipes[1]);
+            }
+
+            if (isset($pipes[2]) && is_resource($pipes[2])) {
+                $stderr = stream_get_contents($pipes[2]) ?: '';
+                fclose($pipes[2]);
+            }
+        } finally {
+            $exitCode = proc_close($process);
+        }
+
+        return [
+            'ok' => $exitCode === 0,
+            'exit_code' => $exitCode,
+            'stdout' => trim($stdout),
+            'stderr' => trim($stderr),
+            'command' => implode(' ', $command),
+        ];
+    }
+
+    /**
+     * Runs one git command and throws when the exit code is non-zero.
+     *
+     * @param array<int, string> $arguments Git CLI arguments excluding the binary.
+     * @param string|null $cwd Optional working directory.
+     * @param string|null $stdin Optional stdin payload.
+     * @return array{
+     *   ok: bool,
+     *   exit_code: int,
+     *   stdout: string,
+     *   stderr: string,
+     *   command: string
+     * }
+     * @throws RuntimeException When the command fails or the process cannot be started.
+     */
+    public function mustRun(array $arguments, ?string $cwd = null, ?string $stdin = null): array
+    {
+        $result = $this->run($arguments, $cwd, $stdin);
+        if (!$result['ok']) {
+            $message = $result['stderr'] !== '' ? $result['stderr'] : 'Git command failed.';
+            throw new RuntimeException($message);
+        }
+
+        return $result;
     }
 
     /**
@@ -57,7 +144,7 @@ final class Git
      */
     public function isAvailable(): bool
     {
-        $result = $this->runner->run(['--version']);
+        $result = $this->run(['--version']);
         return $result['ok'];
     }
 
@@ -67,88 +154,85 @@ final class Git
      * By default performs a shallow clone (`--depth 1`) of the default or
      * specified branch. Pass `$depth = 0` for a full clone.
      *
-     * @param string      $url       Remote repository URL (HTTPS or SSH).
-     * @param string      $targetDir Absolute path where the clone should be created.
-     * @param string|null $branch    Branch to clone; null clones the default branch.
-     * @param int         $depth     Shallow clone depth; 0 means full clone.
+     * @param string $url Remote repository URL.
+     * @param string $targetDir Absolute clone target directory.
+     * @param string|null $branch Optional branch to clone.
+     * @param int $depth Shallow clone depth; `0` means full clone.
      * @return void
      * @throws RuntimeException When the clone fails.
      */
     public function cloneRepository(string $url, string $targetDir, ?string $branch = null, int $depth = 1): void
     {
-        $args = ['clone', '--quiet'];
+        $arguments = ['clone', '--quiet'];
 
         if ($depth > 0) {
-            $args[] = '--depth';
-            $args[] = (string) $depth;
+            $arguments[] = '--depth';
+            $arguments[] = (string) $depth;
         }
 
         if ($branch !== null && $branch !== '') {
-            $args[] = '--branch';
-            $args[] = $branch;
-            $args[] = '--single-branch';
+            $arguments[] = '--branch';
+            $arguments[] = $branch;
+            $arguments[] = '--single-branch';
         }
 
-        $args[] = $url;
-        $args[] = $targetDir;
+        $arguments[] = $url;
+        $arguments[] = $targetDir;
 
-        $this->runner->mustRun($args);
+        $this->mustRun($arguments);
     }
 
     /**
      * Fetches refs from a remote into an existing local repository.
      *
-     * Optionally fetches a specific ref (branch name or refspec). Pass `$depth > 0`
-     * for a shallow fetch to limit history depth.
-     *
-     * @param string      $repoDir Working directory of the existing local repository.
-     * @param string      $remote  Remote name or URL to fetch from; defaults to `origin`.
-     * @param string|null $ref     Branch name or refspec to fetch; null fetches the default.
-     * @param int         $depth   Shallow fetch depth; 0 means full history.
+     * @param string $repoDir Working directory of the local repository.
+     * @param string $remote Remote name or URL.
+     * @param string|null $ref Optional branch or refspec.
+     * @param int $depth Optional shallow fetch depth; `0` means full history.
      * @return void
      * @throws RuntimeException When the fetch fails.
      */
     public function fetch(string $repoDir, string $remote = 'origin', ?string $ref = null, int $depth = 0): void
     {
-        $args = ['fetch', '--quiet'];
+        $arguments = ['fetch', '--quiet'];
 
         if ($depth > 0) {
-            $args[] = '--depth';
-            $args[] = (string) $depth;
+            $arguments[] = '--depth';
+            $arguments[] = (string) $depth;
         }
 
-        $args[] = $remote;
+        $arguments[] = $remote;
 
         if ($ref !== null && $ref !== '') {
-            $args[] = $ref;
+            $arguments[] = $ref;
         }
 
-        $this->runner->mustRun($args, $repoDir);
+        $this->mustRun($arguments, $repoDir);
     }
 
     /**
      * Adds a named remote to an existing local repository.
      *
      * @param string $repoDir Working directory of the local repository.
-     * @param string $name    Remote name to add (e.g. `origin`, `upstream`).
-     * @param string $url     Remote URL.
+     * @param string $name Remote name to add.
+     * @param string $url Remote URL.
      * @return void
      * @throws RuntimeException When the remote cannot be added.
      */
     public function addRemote(string $repoDir, string $name, string $url): void
     {
-        $this->runner->mustRun(['remote', 'add', $name, $url], $repoDir);
+        $this->mustRun(['remote', 'add', $name, $url], $repoDir);
     }
 
     /**
      * Returns true when the given directory is inside a git working tree.
      *
-     * @param string $dir Absolute path to check.
-     * @return bool True when the directory is inside a git repository.
+     * @param string $dir Absolute path to inspect.
+     * @return bool True when the directory is inside a repository.
      */
     public function isRepository(string $dir): bool
     {
-        $result = $this->runner->run(['rev-parse', '--is-inside-work-tree'], $dir);
+        $result = $this->run(['rev-parse', '--is-inside-work-tree'], $dir);
         return $result['ok'] && strtolower(trim((string) $result['stdout'])) === 'true';
     }
 
@@ -161,36 +245,29 @@ final class Git
      */
     public function currentRevision(string $repoDir): string
     {
-        $result = $this->runner->mustRun(['rev-parse', 'HEAD'], $repoDir);
+        $result = $this->mustRun(['rev-parse', 'HEAD'], $repoDir);
         return trim((string) $result['stdout']);
     }
 
     /**
      * Returns the current branch name in a local repository.
      *
-     * Returns `'detached'` when HEAD is in a detached state (e.g. after a
-     * shallow clone without a tracking branch).
-     *
      * @param string $repoDir Working directory of the local repository.
-     * @return string Current branch name, or `'detached'` when HEAD is detached.
+     * @return string Current branch name, or `detached`.
      * @throws RuntimeException When the repository state cannot be resolved.
      */
     public function currentBranch(string $repoDir): string
     {
-        $result = $this->runner->run(['branch', '--show-current'], $repoDir);
+        $result = $this->run(['branch', '--show-current'], $repoDir);
         $branch = trim((string) ($result['stdout'] ?? ''));
         return $branch !== '' ? $branch : 'detached';
     }
 
     /**
-     * Extracts the checked-out working tree of a repository into a target directory.
+     * Extracts the checked-out work tree of a repository into a target directory.
      *
-     * Copies all tracked, non-ignored files from the repository work tree into
-     * `$targetDir` using `git checkout-index`. This is useful when you need a
-     * clean copy of the repository contents without the `.git` directory.
-     *
-     * @param string $repoDir   Working directory of the source repository.
-     * @param string $targetDir Absolute path of the destination directory (must exist).
+     * @param string $repoDir Working directory of the source repository.
+     * @param string $targetDir Absolute destination directory.
      * @return void
      * @throws RuntimeException When extraction fails.
      */
@@ -200,16 +277,12 @@ final class Git
             throw new RuntimeException('Failed to create worktree extraction target directory: ' . $targetDir);
         }
 
-        // `checkout-index --all --prefix=` copies the index into the target directory.
-        // The prefix must end with a directory separator.
         $prefix = rtrim(str_replace('\\', '/', $targetDir), '/') . '/';
-        $this->runner->mustRun(['checkout-index', '--all', '--prefix=' . $prefix], $repoDir);
+        $this->mustRun(['checkout-index', '--all', '--prefix=' . $prefix], $repoDir);
     }
 
     /**
      * Initializes a new empty repository in the given directory.
-     *
-     * Creates the directory if it does not yet exist.
      *
      * @param string $dir Absolute path for the new repository directory.
      * @return void
@@ -221,6 +294,6 @@ final class Git
             throw new RuntimeException('Failed to create directory for git init: ' . $dir);
         }
 
-        $this->runner->mustRun(['init', '--quiet'], $dir);
+        $this->mustRun(['init', '--quiet'], $dir);
     }
 }

@@ -22,6 +22,8 @@ use Raven\Core\Repository\TaxonomySetRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Archive\ArchivePackageService;
 use Raven\Lib\Archive\PackageInstallWorkflowService;
+use Raven\Lib\Archive\Types\Csv;
+use Raven\Lib\Archive\Types\Git;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Config\Panel\ConfigEditorNormalizer;
@@ -46,7 +48,7 @@ use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Routing\Panel\RoutingInventoryBuilder;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Site\SiteContextBuilder;
-use Raven\Lib\Update\GitCommandRunner;
+use Raven\Lib\Transport\Upload;
 use Raven\Lib\Update\UpdateSourceResolver;
 use Raven\Lib\Update\UpdateWorkflowService;
 use Raven\Lib\View\Public\PublicThemeRegistry;
@@ -54,7 +56,6 @@ use Raven\Lib\View\Panel\ThemeCatalogService;
 use Raven\Lib\View\Panel\ThemeCloneService;
 use Raven\Lib\View\ThemeFallbackRenderer;
 use Raven\Lib\View\Panel\ThemeScaffoldService;
-use ZipArchive;
 
 use function Raven\Lib\Support\redirect;
 
@@ -116,7 +117,8 @@ final class SystemController
     private ?PanelConfigFieldPolicyService $panelConfigFieldPolicyService = null;
     private ?PackageInstallWorkflowService $packageInstallWorkflowService = null;
     private ?DirectoryTreeService $directoryTreeService = null;
-    private ?GitCommandRunner $gitCommandRunner = null;
+    private ?Csv $csvHandler = null;
+    private ?Git $gitArchiveHandler = null;
     private ?UpdateSourceResolver $updateSourceResolver = null;
     private ?UpdateWorkflowService $updateWorkflowService = null;
 
@@ -418,37 +420,23 @@ final class SystemController
 
         $rows = $this->routingRowsForPanel();
         $filename = 'routing-inventory-' . gmdate('Ymd-His') . '.csv';
-
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-
-        header('Content-Type: text/csv; charset=UTF-8');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-        header('Pragma: no-cache');
-
-        $stream = fopen('php://output', 'wb');
-        if (!is_resource($stream)) {
-            http_response_code(500);
-            echo 'Failed to open export stream.';
-            return;
-        }
-
-        fputcsv($stream, ['Type', 'Title', 'Public URL', 'Target URL', 'Status', 'Notes', 'Conflict']);
-        foreach ($rows as $row) {
-            fputcsv($stream, [
-                (string) ($row['type_label'] ?? ''),
-                (string) ($row['source_label'] ?? ''),
-                (string) ($row['public_url'] ?? ''),
-                (string) ($row['target_url'] ?? ''),
-                (string) ($row['status_label'] ?? ''),
-                (string) ($row['notes'] ?? ''),
-                !empty($row['is_conflict']) ? 'Yes' : 'No',
-            ]);
-        }
-
-        fclose($stream);
+        $this->csvHandler()->streamToOutput(
+            $filename,
+            (static function (array $rows): \Generator {
+                foreach ($rows as $row) {
+                    yield [
+                        (string) ($row['type_label'] ?? ''),
+                        (string) ($row['source_label'] ?? ''),
+                        (string) ($row['public_url'] ?? ''),
+                        (string) ($row['target_url'] ?? ''),
+                        (string) ($row['status_label'] ?? ''),
+                        (string) ($row['notes'] ?? ''),
+                        !empty($row['is_conflict']) ? 'Yes' : 'No',
+                    ];
+                }
+            })($rows),
+            ['Type', 'Title', 'Public URL', 'Target URL', 'Status', 'Notes', 'Conflict']
+        );
     }
 
     /**
@@ -694,7 +682,7 @@ final class SystemController
     }
 
     /**
-     * Uploads a zipped public-theme package.
+     * Uploads one public-theme archive package.
      *
      * @param array<string, mixed> $post Submitted form payload.
      * @param array<string, mixed> $files Uploaded file payload.
@@ -712,12 +700,7 @@ final class SystemController
             redirect($this->context->panelUrl('/themes'));
         }
 
-        if (!class_exists(ZipArchive::class)) {
-            $this->context->flash('error', 'Theme upload requires the PHP zip extension.');
-            redirect($this->context->panelUrl('/themes'));
-        }
-
-        $upload = $this->packageInstallWorkflowService()->validateZipUploadPayload(
+        $upload = $this->packageInstallWorkflowService()->validateArchiveUploadPayload(
             $files['theme_archive'] ?? null,
             'Theme archive',
             'Themes'
@@ -728,7 +711,7 @@ final class SystemController
         }
 
         $tmpPath = (string) ($upload['tmp_path'] ?? '');
-        $archiveName = (string) ($upload['archive_name'] ?? 'theme.zip');
+        $archiveName = (string) ($upload['archive_name'] ?? 'theme-package.zip');
         $derivedThemeSlug = $this->packageInstallWorkflowService()->themeSlugFromArchiveManifest($tmpPath);
 
         $slugResult = $this->packageInstallWorkflowService()->resolveInstallName(
@@ -823,11 +806,6 @@ final class SystemController
         $this->context->requirePanelLogin();
         if (!$this->context->requireRoutePermissionOrForbidden('themes', 'view')) {
             return;
-        }
-
-        if (!class_exists(ZipArchive::class)) {
-            $this->context->flash('error', 'Theme export requires the PHP zip extension.');
-            redirect($this->context->panelUrl('/themes'));
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($query['theme'] ?? null, 80)));
@@ -1104,7 +1082,7 @@ final class SystemController
     }
 
     /**
-     * Uploads one zipped extension package.
+     * Uploads one extension archive package.
      *
      * @param array<string, mixed> $post Submitted form payload.
      * @param array<string, mixed> $files Uploaded file payload.
@@ -1122,12 +1100,7 @@ final class SystemController
             redirect($this->context->panelUrl('/extensions'));
         }
 
-        if (!class_exists(ZipArchive::class)) {
-            $this->context->flash('error', 'Extension upload requires the PHP zip extension.');
-            redirect($this->context->panelUrl('/extensions'));
-        }
-
-        $upload = $this->packageInstallWorkflowService()->validateZipUploadPayload(
+        $upload = $this->packageInstallWorkflowService()->validateArchiveUploadPayload(
             $files['extension_archive'] ?? null,
             'Extension archive',
             'Extensions'
@@ -1138,7 +1111,7 @@ final class SystemController
         }
 
         $tmpPath = (string) ($upload['tmp_path'] ?? '');
-        $archiveName = (string) ($upload['archive_name'] ?? 'extension.zip');
+        $archiveName = (string) ($upload['archive_name'] ?? 'extension-package.zip');
         $derivedExtensionSlug = $this->packageInstallWorkflowService()->extensionSlugFromArchiveManifest($tmpPath);
 
         $nameResult = $this->packageInstallWorkflowService()->resolveInstallName(
@@ -1242,11 +1215,6 @@ final class SystemController
         $this->context->requirePanelLogin();
         if (!$this->context->requireRoutePermissionOrForbidden('extensions', 'view')) {
             return;
-        }
-
-        if (!class_exists(ZipArchive::class)) {
-            $this->context->flash('error', 'Extension export requires the PHP zip extension.');
-            redirect($this->context->panelUrl('/extensions'));
         }
 
         $extensionName = strtolower(trim((string) $this->input->text($query['extension'] ?? null, 120)));
@@ -1522,36 +1490,22 @@ final class SystemController
 
         $rows = $this->logger()->allForExport($filters);
         $filename = 'event-log-' . gmdate('Ymd-His') . '.csv';
-
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-
-        header('Content-Type: text/csv; charset=UTF-8');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-        header('Pragma: no-cache');
-
-        $stream = fopen('php://output', 'wb');
-        if (!is_resource($stream)) {
-            http_response_code(500);
-            echo 'Failed to open export stream.';
-            return;
-        }
-
-        fputcsv($stream, ['ID', 'Logged At', 'Severity', 'Channel', 'Message', 'Context']);
-        foreach ($rows as $row) {
-            fputcsv($stream, [
-                (string) ($row['id'] ?? ''),
-                (string) ($row['logged_at'] ?? ''),
-                (string) ($row['severity'] ?? ''),
-                (string) ($row['channel'] ?? ''),
-                (string) ($row['message'] ?? ''),
-                (string) ($row['context'] ?? ''),
-            ]);
-        }
-
-        fclose($stream);
+        $this->csvHandler()->streamToOutput(
+            $filename,
+            (static function (array $rows): \Generator {
+                foreach ($rows as $row) {
+                    yield [
+                        (string) ($row['id'] ?? ''),
+                        (string) ($row['logged_at'] ?? ''),
+                        (string) ($row['severity'] ?? ''),
+                        (string) ($row['channel'] ?? ''),
+                        (string) ($row['message'] ?? ''),
+                        (string) ($row['context'] ?? ''),
+                    ];
+                }
+            })($rows),
+            ['ID', 'Logged At', 'Severity', 'Channel', 'Message', 'Context']
+        );
     }
 
     /**
@@ -2853,6 +2807,7 @@ final class SystemController
         if (!$this->packageInstallWorkflowService instanceof PackageInstallWorkflowService) {
             $this->packageInstallWorkflowService = new PackageInstallWorkflowService(
                 $this->input,
+                new Upload(),
                 $this->archivePackages()
             );
         }
@@ -2870,6 +2825,20 @@ final class SystemController
         }
 
         return $this->directoryTreeService;
+    }
+
+    /**
+     * Returns the CSV archive handler on first use.
+     *
+     * @return Csv Canonical CSV import/export helper.
+     */
+    private function csvHandler(): Csv
+    {
+        if (!$this->csvHandler instanceof Csv) {
+            $this->csvHandler = new Csv();
+        }
+
+        return $this->csvHandler;
     }
 
     /**
@@ -3001,15 +2970,15 @@ final class SystemController
     }
 
     /**
-     * Returns the git-command runner on first use.
+     * Returns the canonical Git handler on first use.
      */
-    private function gitCommandRunner(): GitCommandRunner
+    private function gitArchiveHandler(): Git
     {
-        if (!$this->gitCommandRunner instanceof GitCommandRunner) {
-            $this->gitCommandRunner = new GitCommandRunner();
+        if (!$this->gitArchiveHandler instanceof Git) {
+            $this->gitArchiveHandler = new Git();
         }
 
-        return $this->gitCommandRunner;
+        return $this->gitArchiveHandler;
     }
 
     /**
@@ -3032,7 +3001,7 @@ final class SystemController
         if (!$this->updateWorkflowService instanceof UpdateWorkflowService) {
             $this->updateWorkflowService = new UpdateWorkflowService(
                 $this->root,
-                $this->gitCommandRunner(),
+                $this->gitArchiveHandler(),
                 $this->stockPublicThemeSlugs(),
                 $this->stockExtensionDirectories()
             );

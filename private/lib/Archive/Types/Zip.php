@@ -24,6 +24,16 @@ use ZipArchive;
 final class Zip
 {
     /**
+     * Returns true when the PHP zip extension is loaded and usable.
+     *
+     * @return bool True when `ZipArchive` is available.
+     */
+    public function isAvailable(): bool
+    {
+        return class_exists(ZipArchive::class);
+    }
+
+    /**
      * Returns true when a ZIP entry path is safe to extract.
      *
      * Rejects absolute paths, Windows drive-letter paths, null bytes, and any
@@ -158,6 +168,8 @@ final class Zip
      */
     public function compressDirectory(string $sourceDir, string $archiveRoot, string $outputPath): void
     {
+        $this->assertAvailable();
+
         $sourceRoot = realpath($sourceDir);
         if ($sourceRoot === false || !is_dir($sourceRoot)) {
             throw new RuntimeException('ZIP source directory could not be resolved: ' . $sourceDir);
@@ -231,6 +243,8 @@ final class Zip
      */
     public function addFile(string $archivePath, string $sourcePath, string $entryName): void
     {
+        $this->assertAvailable();
+
         if (!$this->isSafeEntryPath($entryName)) {
             throw new RuntimeException('Unsafe ZIP entry name: ' . $entryName);
         }
@@ -337,6 +351,8 @@ final class Zip
      */
     private function open(string $archivePath): ZipArchive
     {
+        $this->assertAvailable();
+
         $zip = new ZipArchive();
         if ($zip->open($archivePath) !== true) {
             throw new RuntimeException('Failed to open ZIP archive: ' . $archivePath);
@@ -385,5 +401,18 @@ final class Zip
         }
 
         return [...$root, ...$wrapped];
+    }
+
+    /**
+     * Throws when the PHP zip extension is unavailable.
+     *
+     * @return void
+     * @throws RuntimeException When `ZipArchive` cannot be instantiated on this system.
+     */
+    private function assertAvailable(): void
+    {
+        if (!$this->isAvailable()) {
+            throw new RuntimeException('PHP zip extension is not available.');
+        }
     }
 }
