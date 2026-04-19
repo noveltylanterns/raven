@@ -133,7 +133,7 @@ final class ExtensionStorageCleaner
             return;
         }
 
-        $this->directoryTreeService->removeDirectoryRecursively($path);
+        $this->directoryTreeService->removeTree($path);
         if (is_dir($path)) {
             throw new RuntimeException('Failed to delete ' . $label . ' directory.');
         }

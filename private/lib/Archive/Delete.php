@@ -28,7 +28,7 @@ final class Delete
      * @param string $directory Absolute path to the directory to remove.
      * @return void
      */
-    public function removeDirectoryRecursively(string $directory): void
+    public function removeTree(string $directory): void
     {
         if (!is_dir($directory)) {
             return;

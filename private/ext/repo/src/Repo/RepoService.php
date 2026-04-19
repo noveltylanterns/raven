@@ -245,7 +245,7 @@ final class RepoService
         }
 
         foreach ([$this->localRepositoryPath($slug), $this->publicRepositoryPath($slug)] as $path) {
-            $this->directoryTree->removeDirectoryRecursively($path);
+            $this->directoryTree->removeTree($path);
         }
 
         $removed = $this->registryStore->remove($slug);
@@ -979,7 +979,7 @@ final class RepoService
     {
         if (!$this->isValidBareRepoPath($repoPath)) {
             if (is_dir($repoPath)) {
-                $this->directoryTree->removeDirectoryRecursively($repoPath);
+                $this->directoryTree->removeTree($repoPath);
             }
 
             RepoStorageSupport::ensureParentDirectory($repoPath . '/HEAD');

@@ -175,7 +175,7 @@ final class Tar
 
         @unlink($outputPath);
 
-        $staging = $this->stagePathPreservingMetadata($sourcePath, $entryName);
+        $staging = $this->stagePath($sourcePath, $entryName);
 
         try {
             $result = $this->runBinary([
@@ -196,7 +196,7 @@ final class Tar
                 $e
             );
         } finally {
-            $this->deleteDirectoryRecursively($staging['directory']);
+            $this->deleteTree($staging['directory']);
         }
     }
 
@@ -243,7 +243,7 @@ final class Tar
      */
     public function compressPathGz(string $sourcePath, string $outputPath, ?string $entryName = null): void
     {
-        $this->compressPathWithOuterLayer(
+        $this->compressOuter(
             $sourcePath,
             $outputPath,
             function (string $tarPath, string $archivePath) use ($entryName, $sourcePath): void {
@@ -282,7 +282,7 @@ final class Tar
      */
     public function compressPathBz2(string $sourcePath, string $outputPath, ?string $entryName = null): void
     {
-        $this->compressPathWithOuterLayer(
+        $this->compressOuter(
             $sourcePath,
             $outputPath,
             function (string $tarPath, string $archivePath) use ($entryName, $sourcePath): void {
@@ -321,7 +321,7 @@ final class Tar
      */
     public function compressPathXz(string $sourcePath, string $outputPath, ?string $entryName = null): void
     {
-        $this->compressPathWithOuterLayer(
+        $this->compressOuter(
             $sourcePath,
             $outputPath,
             function (string $tarPath, string $archivePath) use ($entryName, $sourcePath): void {
@@ -360,7 +360,7 @@ final class Tar
      */
     public function compressPathZst(string $sourcePath, string $outputPath, ?string $entryName = null): void
     {
-        $this->compressPathWithOuterLayer(
+        $this->compressOuter(
             $sourcePath,
             $outputPath,
             function (string $tarPath, string $archivePath) use ($entryName, $sourcePath): void {
@@ -391,7 +391,7 @@ final class Tar
             throw new RuntimeException('Failed to create TAR archive directory.');
         }
 
-        $staging = $this->stagePathPreservingMetadata($sourcePath, $entryName);
+        $staging = $this->stagePath($sourcePath, $entryName);
 
         try {
             $command = [
@@ -412,7 +412,7 @@ final class Tar
                 $e
             );
         } finally {
-            $this->deleteDirectoryRecursively($staging['directory']);
+            $this->deleteTree($staging['directory']);
         }
     }
 
@@ -430,7 +430,7 @@ final class Tar
             $entries = [];
             foreach (new \RecursiveIteratorIterator($phar, \RecursiveIteratorIterator::SELF_FIRST) as $file) {
                 if ($file instanceof \PharFileInfo) {
-                    $entryPath = $this->normalizePharEntryPath($file, $archivePath);
+                    $entryPath = $this->pharEntryPath($file, $archivePath);
                     if ($entryPath !== '') {
                         if ($file->isDir()) {
                             $entryPath = rtrim($entryPath, '/') . '/';
@@ -489,13 +489,13 @@ final class Tar
      * @return void
      * @throws RuntimeException When intermediate TAR creation or outer compression fails.
      */
-    private function compressPathWithOuterLayer(
+    private function compressOuter(
         string $sourcePath,
         string $outputPath,
         callable $compressor,
         string $label
     ): void {
-        $temporaryTarPath = $this->allocateTemporaryTarPath();
+        $temporaryTarPath = $this->tempTar();
 
         try {
             if (!file_exists($sourcePath)) {
@@ -521,9 +521,9 @@ final class Tar
      * @return string Absolute temporary `.tar` path.
      * @throws RuntimeException When the temporary file cannot be prepared.
      */
-    private function allocateTemporaryTarPath(): string
+    private function tempTar(): string
     {
-        foreach ($this->temporaryDirectoryRoots() as $directory) {
+        foreach ($this->tempRoots() as $directory) {
             $path = @tempnam($directory, 'rvn-tar-');
             if (!is_string($path) || $path === '') {
                 continue;
@@ -547,7 +547,7 @@ final class Tar
      *
      * @return array<int, string> Writable temporary directory roots.
      */
-    private function temporaryDirectoryRoots(): array
+    private function tempRoots(): array
     {
         $projectRoot = dirname(__DIR__, 3);
         $candidates = [
@@ -587,7 +587,7 @@ final class Tar
      * @param string $archivePath Absolute path to the source archive.
      * @return string Relative archive entry path.
      */
-    private function normalizePharEntryPath(\PharFileInfo $file, string $archivePath): string
+    private function pharEntryPath(\PharFileInfo $file, string $archivePath): string
     {
         $entryPath = str_replace('\\', '/', $file->getPathName());
         $candidatePrefixes = [
@@ -649,32 +649,32 @@ final class Tar
      * @return array{directory: string, target: string} Staging directory and tar command target.
      * @throws RuntimeException When the source cannot be staged.
      */
-    private function stagePathPreservingMetadata(string $sourcePath, ?string $entryName): array
+    private function stagePath(string $sourcePath, ?string $entryName): array
     {
-        $stagingDirectory = $this->allocateTemporaryDirectory();
-        $stagedEntryPath = $this->stagedEntryPath($sourcePath, $entryName);
+        $stagingDirectory = $this->tempDir();
+        $stagedEntryPath = $this->stagedPath($sourcePath, $entryName);
         $destinationPath = $stagingDirectory . '/' . $stagedEntryPath;
         $destinationDirectory = dirname($destinationPath);
 
         if (!is_dir($destinationDirectory) && !mkdir($destinationDirectory, 0775, true) && !is_dir($destinationDirectory)) {
-            $this->deleteDirectoryRecursively($stagingDirectory);
+            $this->deleteTree($stagingDirectory);
             throw new RuntimeException('Failed to prepare TAR staging directory.');
         }
 
         try {
             if (is_dir($sourcePath)) {
-                $this->copyDirectoryRecursivelyPreservingMetadata($sourcePath, $destinationPath);
+                $this->copyTree($sourcePath, $destinationPath);
             } else {
-                $this->copyFilePreservingMetadata($sourcePath, $destinationPath);
+                $this->copyFile($sourcePath, $destinationPath);
             }
         } catch (\Throwable $exception) {
-            $this->deleteDirectoryRecursively($stagingDirectory);
+            $this->deleteTree($stagingDirectory);
             throw $exception;
         }
 
         return [
             'directory' => $stagingDirectory,
-            'target' => $this->stagedCommandTarget($sourcePath, $entryName),
+            'target' => $this->stagedTarget($sourcePath, $entryName),
         ];
     }
 
@@ -685,7 +685,7 @@ final class Tar
      * @param string|null $entryName Optional archive-internal root path.
      * @return string Relative path inside the temporary staging directory.
      */
-    private function stagedEntryPath(string $sourcePath, ?string $entryName): string
+    private function stagedPath(string $sourcePath, ?string $entryName): string
     {
         if (is_string($entryName) && trim($entryName) !== '') {
             return $this->normalizeEntryName($entryName);
@@ -704,9 +704,9 @@ final class Tar
      * @param string|null $entryName Optional archive-internal root path.
      * @return string Relative staging target for the tar command.
      */
-    private function stagedCommandTarget(string $sourcePath, ?string $entryName): string
+    private function stagedTarget(string $sourcePath, ?string $entryName): string
     {
-        $stagedEntryPath = $this->stagedEntryPath($sourcePath, $entryName);
+        $stagedEntryPath = $this->stagedPath($sourcePath, $entryName);
         $segments = explode('/', $stagedEntryPath);
 
         return $segments[0] !== '' ? $segments[0] : trim(basename($sourcePath), '/');
@@ -718,9 +718,9 @@ final class Tar
      * @return string Absolute temporary directory path.
      * @throws RuntimeException When the directory cannot be created.
      */
-    private function allocateTemporaryDirectory(): string
+    private function tempDir(): string
     {
-        foreach ($this->temporaryDirectoryRoots() as $directory) {
+        foreach ($this->tempRoots() as $directory) {
             for ($attempt = 0; $attempt < 5; $attempt++) {
                 $path = $directory . '/rvn-tar-stage-' . bin2hex(random_bytes(6));
                 if (mkdir($path, 0775, true)) {
@@ -747,7 +747,7 @@ final class Tar
      * @return void
      * @throws RuntimeException When one file or directory cannot be copied.
      */
-    private function copyDirectoryRecursivelyPreservingMetadata(string $sourceDir, string $targetDir): void
+    private function copyTree(string $sourceDir, string $targetDir): void
     {
         if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
             throw new RuntimeException('Failed to create TAR staging directory.');
@@ -785,7 +785,7 @@ final class Tar
                 continue;
             }
 
-            $this->copyFilePreservingMetadata($absolutePath, $destinationPath);
+            $this->copyFile($absolutePath, $destinationPath);
         }
 
         // Directories get their mtime bumped while files are copied into them,
@@ -811,7 +811,7 @@ final class Tar
      * @return void
      * @throws RuntimeException When the file cannot be copied.
      */
-    private function copyFilePreservingMetadata(string $sourcePath, string $destinationPath): void
+    private function copyFile(string $sourcePath, string $destinationPath): void
     {
         $destinationDirectory = dirname($destinationPath);
         if (!is_dir($destinationDirectory) && !mkdir($destinationDirectory, 0775, true) && !is_dir($destinationDirectory)) {
@@ -832,7 +832,7 @@ final class Tar
      * @param string $directory Absolute directory path to delete.
      * @return void
      */
-    private function deleteDirectoryRecursively(string $directory): void
+    private function deleteTree(string $directory): void
     {
         if ($directory === '' || !is_dir($directory)) {
             return;

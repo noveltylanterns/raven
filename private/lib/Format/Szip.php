@@ -92,10 +92,10 @@ final class Szip
     public function extractFile(string $archivePath, string $entryName, string $targetPath): void
     {
         $entry = $this->normalizeEntryName($entryName);
-        $temporaryDirectory = $this->allocateTemporaryDirectory();
+        $temporaryDirectory = $this->tempDir();
 
         try {
-            $this->extractSelectedEntries($archivePath, [$entry], $temporaryDirectory);
+            $this->extractEntries($archivePath, [$entry], $temporaryDirectory);
 
             $extractedPath = $temporaryDirectory . '/' . $entry;
             if (!is_file($extractedPath)) {
@@ -114,7 +114,7 @@ final class Szip
                 }
             }
         } finally {
-            $this->deleteDirectoryRecursively($temporaryDirectory);
+            $this->deleteTree($temporaryDirectory);
         }
     }
 
@@ -130,7 +130,7 @@ final class Szip
     public function extractDirectory(string $archivePath, string $entryName, string $targetDir): void
     {
         $directory = $this->normalizeDirectoryEntryName($entryName);
-        $matches = $this->matchingDirectoryEntries($archivePath, $directory);
+        $matches = $this->directoryEntries($archivePath, $directory);
         if ($matches === []) {
             throw new RuntimeException('Directory "' . trim($directory, '/') . '" not found in 7Z archive.');
         }
@@ -228,7 +228,7 @@ final class Szip
         $stagingDirectory = $this->stagePath($sourcePath, $entryName);
 
         try {
-            $relativeEntry = $this->stagedCommandTarget($sourcePath, $entryName);
+            $relativeEntry = $this->stagedTarget($sourcePath, $entryName);
             $result = $this->runBinary([
                 'a',
                 '-t7z',
@@ -247,7 +247,7 @@ final class Szip
                 );
             }
         } finally {
-            $this->deleteDirectoryRecursively($stagingDirectory);
+            $this->deleteTree($stagingDirectory);
         }
     }
 
@@ -269,7 +269,7 @@ final class Szip
         $stagingDirectory = $this->stagePath($sourcePath, $entryName);
 
         try {
-            $relativeEntry = $this->stagedCommandTarget($sourcePath, $entryName);
+            $relativeEntry = $this->stagedTarget($sourcePath, $entryName);
             $result = $this->runBinary([
                 'a',
                 '-y',
@@ -286,7 +286,7 @@ final class Szip
                 );
             }
         } finally {
-            $this->deleteDirectoryRecursively($stagingDirectory);
+            $this->deleteTree($stagingDirectory);
         }
     }
 
@@ -325,7 +325,7 @@ final class Szip
      * @return void
      * @throws RuntimeException When extraction fails.
      */
-    private function extractSelectedEntries(string $archivePath, array $entries, string $targetDir): void
+    private function extractEntries(string $archivePath, array $entries, string $targetDir): void
     {
         $command = [
             'x',
@@ -356,7 +356,7 @@ final class Szip
      * @param string $directory Archive-internal directory prefix ending in `/`.
      * @return array<int, string> Matching entry paths.
      */
-    private function matchingDirectoryEntries(string $archivePath, string $directory): array
+    private function directoryEntries(string $archivePath, string $directory): array
     {
         $matches = [];
 
@@ -389,26 +389,26 @@ final class Szip
      */
     private function stagePath(string $sourcePath, ?string $entryName): string
     {
-        $stagingDirectory = $this->allocateTemporaryDirectory();
-        $stagedEntryPath = $this->stagedEntryPath($sourcePath, $entryName);
+        $stagingDirectory = $this->tempDir();
+        $stagedEntryPath = $this->stagedPath($sourcePath, $entryName);
         $destinationPath = $stagingDirectory . '/' . $stagedEntryPath;
 
         $destinationDirectory = dirname($destinationPath);
         if (!is_dir($destinationDirectory) && !mkdir($destinationDirectory, 0775, true) && !is_dir($destinationDirectory)) {
-            $this->deleteDirectoryRecursively($stagingDirectory);
+            $this->deleteTree($stagingDirectory);
             throw new RuntimeException('Failed to prepare 7Z staging directory.');
         }
 
         try {
             if (is_dir($sourcePath)) {
-                $this->copyDirectoryRecursively($sourcePath, $destinationPath);
+                $this->copyTree($sourcePath, $destinationPath);
             } else {
                 if (!@copy($sourcePath, $destinationPath)) {
                     throw new RuntimeException('Failed to copy file into 7Z staging directory.');
                 }
             }
         } catch (\Throwable $exception) {
-            $this->deleteDirectoryRecursively($stagingDirectory);
+            $this->deleteTree($stagingDirectory);
             throw $exception;
         }
 
@@ -422,7 +422,7 @@ final class Szip
      * @param string|null $entryName Optional archive-internal root path.
      * @return string Relative path inside the temporary staging directory.
      */
-    private function stagedEntryPath(string $sourcePath, ?string $entryName): string
+    private function stagedPath(string $sourcePath, ?string $entryName): string
     {
         if (is_string($entryName) && trim($entryName) !== '') {
             return $this->normalizeEntryName($entryName);
@@ -441,9 +441,9 @@ final class Szip
      * @param string|null $entryName Optional archive-internal root path.
      * @return string Relative staging target for the `7z a` command.
      */
-    private function stagedCommandTarget(string $sourcePath, ?string $entryName): string
+    private function stagedTarget(string $sourcePath, ?string $entryName): string
     {
-        $stagedEntryPath = $this->stagedEntryPath($sourcePath, $entryName);
+        $stagedEntryPath = $this->stagedPath($sourcePath, $entryName);
         $segments = explode('/', $stagedEntryPath);
 
         return $segments[0] !== '' ? $segments[0] : trim(basename($sourcePath), '/');
@@ -484,9 +484,9 @@ final class Szip
      * @return string Absolute temporary directory path.
      * @throws RuntimeException When the directory cannot be created.
      */
-    private function allocateTemporaryDirectory(): string
+    private function tempDir(): string
     {
-        foreach ($this->temporaryDirectoryRoots() as $directory) {
+        foreach ($this->tempRoots() as $directory) {
             for ($attempt = 0; $attempt < 5; $attempt++) {
                 $path = $directory . '/rvn-7z-' . bin2hex(random_bytes(6));
                 if (mkdir($path, 0775, true)) {
@@ -511,7 +511,7 @@ final class Szip
      *
      * @return array<int, string> Writable temporary directory roots.
      */
-    private function temporaryDirectoryRoots(): array
+    private function tempRoots(): array
     {
         $projectRoot = dirname(__DIR__, 3);
         $candidates = [
@@ -548,7 +548,7 @@ final class Szip
      * @return void
      * @throws RuntimeException When one file or directory cannot be copied.
      */
-    private function copyDirectoryRecursively(string $sourceDir, string $targetDir): void
+    private function copyTree(string $sourceDir, string $targetDir): void
     {
         if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
             throw new RuntimeException('Failed to create 7Z staging subdirectory.');
@@ -596,7 +596,7 @@ final class Szip
      * @param string $directory Absolute directory path to delete.
      * @return void
      */
-    private function deleteDirectoryRecursively(string $directory): void
+    private function deleteTree(string $directory): void
     {
         if ($directory === '' || !is_dir($directory)) {
             return;

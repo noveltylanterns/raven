@@ -70,7 +70,7 @@ final class Compress
      *
      * @return array<int, string> Lowercase extension list without leading dots.
      */
-    public function supportedDirectoryArchiveExtensions(): array
+    public function directoryFormats(): array
     {
         return [
             'zip',
@@ -88,7 +88,7 @@ final class Compress
      *
      * @return array<int, string> Lowercase extension list without leading dots.
      */
-    public function supportedFileArchiveExtensions(): array
+    public function fileFormats(): array
     {
         return [
             'gz',
@@ -103,11 +103,11 @@ final class Compress
      *
      * @return array<int, string> Lowercase extension list without leading dots.
      */
-    public function supportedArchiveExtensions(): array
+    public function formats(): array
     {
         return array_values(array_unique([
-            ...$this->supportedDirectoryArchiveExtensions(),
-            ...$this->supportedFileArchiveExtensions(),
+            ...$this->directoryFormats(),
+            ...$this->fileFormats(),
         ]));
     }
 
@@ -126,20 +126,20 @@ final class Compress
      */
     public function compressPath(string $sourcePath, string $archiveRoot, string $outputPath): void
     {
-        $type = $this->requireArchiveType($outputPath);
+        $type = $this->type($outputPath);
 
         match ($type) {
-            'zip' => $this->zip->compressPath($sourcePath, $this->entryNameForContainer($sourcePath, $archiveRoot), $outputPath),
-            '7z' => $this->szip->compressPath($sourcePath, $outputPath, $this->entryNameForContainer($sourcePath, $archiveRoot)),
-            'tar' => $this->tar->compressPath($sourcePath, $outputPath, $this->entryNameForTarFamily($sourcePath, $archiveRoot)),
-            'tar.gz' => $this->tar->compressPathGz($sourcePath, $outputPath, $this->entryNameForTarFamily($sourcePath, $archiveRoot)),
-            'tar.bz2' => $this->tar->compressPathBz2($sourcePath, $outputPath, $this->entryNameForTarFamily($sourcePath, $archiveRoot)),
-            'tar.xz' => $this->tar->compressPathXz($sourcePath, $outputPath, $this->entryNameForTarFamily($sourcePath, $archiveRoot)),
-            'tar.zst' => $this->tar->compressPathZst($sourcePath, $outputPath, $this->entryNameForTarFamily($sourcePath, $archiveRoot)),
-            'gz' => $this->gz->compress($this->requireFileSource($sourcePath, $type), $outputPath),
-            'bz2' => $this->bz2->compress($this->requireFileSource($sourcePath, $type), $outputPath),
-            'xz' => $this->xz->compress($this->requireFileSource($sourcePath, $type), $outputPath),
-            'zst' => $this->zst->compress($this->requireFileSource($sourcePath, $type), $outputPath),
+            'zip' => $this->zip->compressPath($sourcePath, $this->containerEntry($sourcePath, $archiveRoot), $outputPath),
+            '7z' => $this->szip->compressPath($sourcePath, $outputPath, $this->containerEntry($sourcePath, $archiveRoot)),
+            'tar' => $this->tar->compressPath($sourcePath, $outputPath, $this->tarEntry($sourcePath, $archiveRoot)),
+            'tar.gz' => $this->tar->compressPathGz($sourcePath, $outputPath, $this->tarEntry($sourcePath, $archiveRoot)),
+            'tar.bz2' => $this->tar->compressPathBz2($sourcePath, $outputPath, $this->tarEntry($sourcePath, $archiveRoot)),
+            'tar.xz' => $this->tar->compressPathXz($sourcePath, $outputPath, $this->tarEntry($sourcePath, $archiveRoot)),
+            'tar.zst' => $this->tar->compressPathZst($sourcePath, $outputPath, $this->tarEntry($sourcePath, $archiveRoot)),
+            'gz' => $this->gz->compress($this->fileSource($sourcePath, $type), $outputPath),
+            'bz2' => $this->bz2->compress($this->fileSource($sourcePath, $type), $outputPath),
+            'xz' => $this->xz->compress($this->fileSource($sourcePath, $type), $outputPath),
+            'zst' => $this->zst->compress($this->fileSource($sourcePath, $type), $outputPath),
             default => throw new RuntimeException('Unsupported archive type: ' . $outputPath),
         };
     }
@@ -171,9 +171,9 @@ final class Compress
      * @param string $filename Output filename or archive path to inspect.
      * @return bool True when `compressDirectory()` can handle the requested format.
      */
-    public function isSupportedDirectoryArchiveName(string $filename): bool
+    public function supportsDirectory(string $filename): bool
     {
-        return $this->detectDirectoryArchiveType($filename) !== null;
+        return $this->detectDirectoryType($filename) !== null;
     }
 
     /**
@@ -182,9 +182,9 @@ final class Compress
      * @param string $filename Output filename or archive path to inspect.
      * @return bool True when `compressPath()` can handle the requested format.
      */
-    public function isSupportedArchiveName(string $filename): bool
+    public function supports(string $filename): bool
     {
-        return $this->detectArchiveType($filename) !== null;
+        return $this->detectType($filename) !== null;
     }
 
     /**
@@ -202,22 +202,22 @@ final class Compress
      */
     public function addPath(string $archivePath, string $sourcePath, string $entryName): void
     {
-        $type = $this->requireDirectoryArchiveType($archivePath);
+        $type = $this->directoryType($archivePath);
 
         match ($type) {
             'zip' => $this->zip->addPath($archivePath, $sourcePath, $entryName),
             '7z' => $this->szip->addPath($archivePath, $sourcePath, $entryName),
             'tar' => $this->tar->addPath($archivePath, $sourcePath, $entryName),
-            'tar.gz' => $this->withMutableCompressedTar($archivePath, 'gz', function (string $tarPath) use ($sourcePath, $entryName): void {
+            'tar.gz' => $this->withTempTar($archivePath, 'gz', function (string $tarPath) use ($sourcePath, $entryName): void {
                 $this->tar->addPath($tarPath, $sourcePath, $entryName);
             }),
-            'tar.bz2' => $this->withMutableCompressedTar($archivePath, 'bz2', function (string $tarPath) use ($sourcePath, $entryName): void {
+            'tar.bz2' => $this->withTempTar($archivePath, 'bz2', function (string $tarPath) use ($sourcePath, $entryName): void {
                 $this->tar->addPath($tarPath, $sourcePath, $entryName);
             }),
-            'tar.xz' => $this->withMutableCompressedTar($archivePath, 'xz', function (string $tarPath) use ($sourcePath, $entryName): void {
+            'tar.xz' => $this->withTempTar($archivePath, 'xz', function (string $tarPath) use ($sourcePath, $entryName): void {
                 $this->tar->addPath($tarPath, $sourcePath, $entryName);
             }),
-            'tar.zst' => $this->withMutableCompressedTar($archivePath, 'zst', function (string $tarPath) use ($sourcePath, $entryName): void {
+            'tar.zst' => $this->withTempTar($archivePath, 'zst', function (string $tarPath) use ($sourcePath, $entryName): void {
                 $this->tar->addPath($tarPath, $sourcePath, $entryName);
             }),
             default => throw new RuntimeException('Unsupported archive type for path updates: ' . $archivePath),
@@ -230,7 +230,7 @@ final class Compress
      * @param string $archivePath Archive filename or absolute path.
      * @return string|null Canonical archive type key, or null when unsupported.
      */
-    private function detectDirectoryArchiveType(string $archivePath): ?string
+    private function detectDirectoryType(string $archivePath): ?string
     {
         $filename = strtolower(trim((string) pathinfo($archivePath, PATHINFO_BASENAME)));
         if ($filename === '') {
@@ -264,9 +264,9 @@ final class Compress
      * @param string $archivePath Archive filename or absolute path.
      * @return string|null Canonical archive type key, or null when unsupported.
      */
-    private function detectArchiveType(string $archivePath): ?string
+    private function detectType(string $archivePath): ?string
     {
-        $directoryType = $this->detectDirectoryArchiveType($archivePath);
+        $directoryType = $this->detectDirectoryType($archivePath);
         if ($directoryType !== null) {
             return $directoryType;
         }
@@ -297,9 +297,9 @@ final class Compress
      * @return string Canonical archive type key.
      * @throws RuntimeException When the filename/path does not use a supported suffix.
      */
-    private function requireDirectoryArchiveType(string $archivePath): string
+    private function directoryType(string $archivePath): string
     {
-        $type = $this->detectDirectoryArchiveType($archivePath);
+        $type = $this->detectDirectoryType($archivePath);
         if ($type === null) {
             throw new RuntimeException('Unsupported archive type: ' . $archivePath);
         }
@@ -314,9 +314,9 @@ final class Compress
      * @return string Canonical archive type key.
      * @throws RuntimeException When the filename/path does not use a supported suffix.
      */
-    private function requireArchiveType(string $archivePath): string
+    private function type(string $archivePath): string
     {
-        $type = $this->detectArchiveType($archivePath);
+        $type = $this->detectType($archivePath);
         if ($type === null) {
             throw new RuntimeException('Unsupported archive type: ' . $archivePath);
         }
@@ -331,7 +331,7 @@ final class Compress
      * @param string $archiveRoot Preferred archive root name from the caller.
      * @return string Archive-internal root name.
      */
-    private function entryNameForContainer(string $sourcePath, string $archiveRoot): string
+    private function containerEntry(string $sourcePath, string $archiveRoot): string
     {
         $root = trim(str_replace('\\', '/', $archiveRoot), '/');
         if ($root !== '') {
@@ -351,7 +351,7 @@ final class Compress
      * @param string $archiveRoot Preferred archive root name from the caller.
      * @return string|null Archive-internal root name, or null for bare directory contents.
      */
-    private function entryNameForTarFamily(string $sourcePath, string $archiveRoot): ?string
+    private function tarEntry(string $sourcePath, string $archiveRoot): ?string
     {
         $root = trim(str_replace('\\', '/', $archiveRoot), '/');
         if ($root !== '') {
@@ -373,7 +373,7 @@ final class Compress
      * @return string Absolute validated file path.
      * @throws RuntimeException When the source is not a regular file.
      */
-    private function requireFileSource(string $sourcePath, string $type): string
+    private function fileSource(string $sourcePath, string $type): string
     {
         if (!is_file($sourcePath)) {
             throw new RuntimeException(strtoupper($type) . ' compression requires a file source: ' . $sourcePath);
@@ -395,9 +395,9 @@ final class Compress
      * @return T Callback result.
      * @throws RuntimeException When decompression or recompression fails.
      */
-    private function withMutableCompressedTar(string $archivePath, string $compressionType, callable $operation): mixed
+    private function withTempTar(string $archivePath, string $compressionType, callable $operation): mixed
     {
-        $temporaryTarPath = $this->temporaryFilePath('.tar');
+        $temporaryTarPath = $this->tempPath('.tar');
 
         try {
             if (is_file($archivePath)) {
@@ -433,9 +433,9 @@ final class Compress
      * @return string Absolute temporary file path reserved for this process.
      * @throws RuntimeException When no temporary file path can be created.
      */
-    private function temporaryFilePath(string $suffix = ''): string
+    private function tempPath(string $suffix = ''): string
     {
-        foreach ($this->temporaryDirectoryRoots() as $directory) {
+        foreach ($this->tempRoots() as $directory) {
             $path = @tempnam($directory, 'rvn-archive-');
             if (!is_string($path) || $path === '') {
                 continue;
@@ -461,7 +461,7 @@ final class Compress
      *
      * @return array<int, string> Writable temporary directory roots.
      */
-    private function temporaryDirectoryRoots(): array
+    private function tempRoots(): array
     {
         $projectRoot = dirname(__DIR__, 3);
         $candidates = [

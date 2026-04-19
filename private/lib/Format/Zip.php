@@ -350,7 +350,7 @@ final class Zip
      * @param int    $maxSlugLength    Maximum allowed slug length for the regex check.
      * @return string|null The slug string, or null if none found or valid.
      */
-    public function slugFromManifest(string $archivePath, string $manifestFilename, int $maxSlugLength): ?string
+    public function manifestSlug(string $archivePath, string $manifestFilename, int $maxSlugLength): ?string
     {
         $filename = strtolower(trim($manifestFilename));
         if ($filename === '') {
@@ -410,7 +410,7 @@ final class Zip
      * Collects candidate manifest entry indexes in preferred lookup order.
      *
      * Returns root-level manifest indexes before one-directory-deep indexes so
-     * that `slugFromManifest` can prefer the root manifest when both exist.
+     * that `manifestSlug()` can prefer the root manifest when both exist.
      *
      * @param ZipArchive $zip            Open ZIP archive handle.
      * @param string     $manifestFile   Lowercase manifest filename to search for.

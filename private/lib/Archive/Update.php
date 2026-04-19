@@ -129,7 +129,7 @@ final class Update
                     'summary' => $plan['summary'],
                 ];
             } finally {
-                $this->deleteDirectoryRecursively((string) ($workspace['temp_dir'] ?? ''));
+                $this->deleteTree((string) ($workspace['temp_dir'] ?? ''));
             }
         } catch (RuntimeException $exception) {
             return $this->errorResult('dry_run', $source, $exception->getMessage());
@@ -198,7 +198,7 @@ final class Update
                     'summary' => $summary,
                 ];
             } finally {
-                $this->deleteDirectoryRecursively((string) ($workspace['temp_dir'] ?? ''));
+                $this->deleteTree((string) ($workspace['temp_dir'] ?? ''));
             }
         } catch (RuntimeException $exception) {
             return $this->errorResult('update_now', $source, $exception->getMessage());
@@ -328,7 +328,7 @@ final class Update
                 'source_tree' => $sourceTree,
             ];
         } catch (RuntimeException $exception) {
-            $this->deleteDirectoryRecursively($tempDir);
+            $this->deleteTree($tempDir);
             throw $exception;
         }
     }
@@ -440,7 +440,7 @@ final class Update
         }
 
         if (!$preserveWorkspace) {
-            $this->deleteDirectoryRecursively((string) ($workspace['temp_dir'] ?? ''));
+            $this->deleteTree((string) ($workspace['temp_dir'] ?? ''));
         }
 
         return [
@@ -624,7 +624,7 @@ final class Update
 
             return trim((string) ($timestamp['stdout'] ?? ''));
         } finally {
-            $this->deleteDirectoryRecursively($tempDir);
+            $this->deleteTree($tempDir);
         }
     }
 
@@ -1059,7 +1059,7 @@ final class Update
      * @param string $directory Absolute path to the directory to remove.
      * @return void
      */
-    private function deleteDirectoryRecursively(string $directory): void
+    private function deleteTree(string $directory): void
     {
         if ($directory === '' || !is_dir($directory)) {
             return;

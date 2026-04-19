@@ -47,7 +47,7 @@ final class Install
      * @param int $maxArchiveBytes Maximum allowed archive size in bytes.
      * @return array{ok: bool, error?: string, tmp_path?: string, archive_name?: string}
      */
-    public function validateArchiveUploadPayload(
+    public function validateUpload(
         mixed $rawUpload,
         string $packageLabel,
         string $collectionLabel,
@@ -66,7 +66,7 @@ final class Install
         $upload = $validatedUpload['upload'] ?? [];
         $tmpPath = (string) ($upload['tmp_name'] ?? '');
         $archiveName = $this->input->text((string) ($upload['name'] ?? 'package.zip'), 255);
-        if (!$this->archives->isSupportedPackageArchiveName($archiveName)) {
+        if (!$this->archives->supportsPackage($archiveName)) {
             return [
                 'ok' => false,
                 'error' => $collectionLabel . ' must be uploaded as .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, or .7z archives.',
@@ -174,10 +174,10 @@ final class Install
      * @param string $entityLabel Human-facing entity label for fallback errors.
      * @return string|null Null on success, or one human-facing error message.
      */
-    public function extractIntoTarget(string $tmpPath, string $targetDirectory, callable $cleanup, string $entityLabel): ?string
+    public function extractTo(string $tmpPath, string $targetDirectory, callable $cleanup, string $entityLabel): ?string
     {
         try {
-            $this->archives->extractUploadedArchive($tmpPath, $targetDirectory);
+            $this->archives->extractUpload($tmpPath, $targetDirectory);
         } catch (\Throwable $exception) {
             $cleanup($targetDirectory);
             return $exception->getMessage() !== '' ? $exception->getMessage() : ucfirst($entityLabel) . ' upload failed.';
@@ -197,9 +197,9 @@ final class Install
      * @param string $targetDirectory Absolute extraction target directory.
      * @return string|null Null on success, or one human-facing error message.
      */
-    public function flattenSingleRootDirectory(string $targetDirectory): ?string
+    public function flattenRoot(string $targetDirectory): ?string
     {
-        $entries = $this->scandirEntries($targetDirectory);
+        $entries = $this->entries($targetDirectory);
         if ($entries === null) {
             return 'Failed to inspect extracted package.';
         }
@@ -213,7 +213,7 @@ final class Install
             return null;
         }
 
-        $innerEntries = $this->scandirEntries($innerRoot);
+        $innerEntries = $this->entries($innerRoot);
         if ($innerEntries === null) {
             return 'Failed to inspect extracted package root directory.';
         }
@@ -245,9 +245,9 @@ final class Install
      * @param string $tmpPath Absolute path to the uploaded temporary archive.
      * @return string|null Valid extension slug, or null when none can be resolved.
      */
-    public function extensionSlugFromArchiveManifest(string $tmpPath): ?string
+    public function extensionSlug(string $tmpPath): ?string
     {
-        return $this->archives->slugFromArchiveManifest($tmpPath, 'ext.json', 119);
+        return $this->archives->manifestSlug($tmpPath, 'ext.json', 119);
     }
 
     /**
@@ -258,9 +258,9 @@ final class Install
      * @param string $tmpPath Absolute path to the uploaded temporary archive.
      * @return string|null Valid theme slug, or null when none can be resolved.
      */
-    public function themeSlugFromArchiveManifest(string $tmpPath): ?string
+    public function themeSlug(string $tmpPath): ?string
     {
-        return $this->archives->slugFromArchiveManifest($tmpPath, 'theme.json', 63);
+        return $this->archives->manifestSlug($tmpPath, 'theme.json', 63);
     }
 
     /**
@@ -269,7 +269,7 @@ final class Install
      * @param string $path Absolute path to the directory to inspect.
      * @return array<int, string>|null Child entry names, or null on read failure.
      */
-    private function scandirEntries(string $path): ?array
+    private function entries(string $path): ?array
     {
         $entries = scandir($path);
         if (!is_array($entries)) {

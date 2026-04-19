@@ -2272,13 +2272,13 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
 
             $archivePackages = raven_cli_archive_packages($root);
             $packageWorkflow = raven_cli_package_install_workflow($root);
-            if (!$archivePackages->isSupportedPackageArchiveName($archivePath)) {
+            if (!$archivePackages->supportsPackage($archivePath)) {
                 throw new RuntimeException('Unsupported archive type. Use .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, or .7z.');
             }
 
             $slug = strtolower(trim((string) raven_cli_option($options, 'slug', '')));
             if ($slug === '') {
-                $slug = (string) ($archivePackages->slugFromArchiveManifest($archivePath, 'ext.json', 119) ?? '');
+                $slug = (string) ($archivePackages->manifestSlug($archivePath, 'ext.json', 119) ?? '');
             }
             if ($slug === '') {
                 throw new RuntimeException('Missing extension slug. Provide --slug or include a valid ext.json slug in the archive.');
@@ -2295,7 +2295,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 throw new RuntimeException('Failed to create extension target directory.');
             }
 
-            $extractError = $packageWorkflow->extractIntoTarget(
+            $extractError = $packageWorkflow->extractTo(
                 $archivePath,
                 $target,
                 static function (string $directory): void {
@@ -2308,7 +2308,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 throw new RuntimeException($extractError);
             }
 
-            $flattenError = $packageWorkflow->flattenSingleRootDirectory($target);
+            $flattenError = $packageWorkflow->flattenRoot($target);
             if (is_string($flattenError)) {
                 raven_cli_remove_directory_recursive($target);
                 throw new RuntimeException($flattenError);

@@ -461,9 +461,9 @@ final class SystemController
             'themes' => $this->listPublicThemesForPanel(),
             'activeTheme' => $this->activePublicThemeSlug(),
             'themeOptions' => PublicThemeRegistry::options($this->publicThemesRoot()),
-            'packageArchiveAcceptAttribute' => $archivePackages->packageArchiveAcceptAttribute(),
-            'packageArchiveFormats' => $archivePackages->supportedPackageArchiveDisplayFormats(),
-            'exportArchiveFormats' => $archivePackages->exportArchiveFormatOptions(),
+            'packageArchiveAcceptAttribute' => $archivePackages->packageAccept(),
+            'packageArchiveFormats' => $archivePackages->packageFormatLabels(),
+            'exportArchiveFormats' => $archivePackages->exportFormatOptions(),
         ]);
     }
 
@@ -647,7 +647,7 @@ final class SystemController
                 );
             }
         } catch (\RuntimeException $exception) {
-            $this->directoryTreeService()->removeDirectoryRecursively($themePath);
+            $this->directoryTreeService()->removeTree($themePath);
             $this->context->flash('error', 'Failed to create theme scaffold: ' . $exception->getMessage());
             redirect($this->context->panelUrl('/themes'));
         }
@@ -657,7 +657,7 @@ final class SystemController
                 $this->config->set('site.theme', $themeSlug);
                 $this->config->save();
             } catch (\RuntimeException $exception) {
-                $this->directoryTreeService()->removeDirectoryRecursively($themePath);
+                $this->directoryTreeService()->removeTree($themePath);
                 $this->context->flash('error', 'Theme scaffold created, but activation failed: ' . $exception->getMessage());
                 redirect($this->context->panelUrl('/themes'));
             }
@@ -705,7 +705,7 @@ final class SystemController
             redirect($this->context->panelUrl('/themes'));
         }
 
-        $upload = $this->packageInstallWorkflowService()->validateArchiveUploadPayload(
+        $upload = $this->packageInstallWorkflowService()->validateUpload(
             $files['theme_archive'] ?? null,
             'Theme archive',
             'Themes'
@@ -717,7 +717,7 @@ final class SystemController
 
         $tmpPath = (string) ($upload['tmp_path'] ?? '');
         $archiveName = (string) ($upload['archive_name'] ?? 'theme-package.zip');
-        $derivedThemeSlug = $this->packageInstallWorkflowService()->themeSlugFromArchiveManifest($tmpPath);
+        $derivedThemeSlug = $this->packageInstallWorkflowService()->themeSlug($tmpPath);
 
         $slugResult = $this->packageInstallWorkflowService()->resolveInstallName(
             (string) ($post['upload_slug'] ?? ''),
@@ -757,11 +757,11 @@ final class SystemController
             redirect($this->context->panelUrl('/themes'));
         }
 
-        $extractError = $this->packageInstallWorkflowService()->extractIntoTarget(
+        $extractError = $this->packageInstallWorkflowService()->extractTo(
             $tmpPath,
             $targetDirectory,
             function (string $directory): void {
-                $this->directoryTreeService()->removeDirectoryRecursively($directory);
+                $this->directoryTreeService()->removeTree($directory);
             },
             'theme'
         );
@@ -770,23 +770,23 @@ final class SystemController
             redirect($this->context->panelUrl('/themes'));
         }
 
-        $flattenError = $this->packageInstallWorkflowService()->flattenSingleRootDirectory($targetDirectory);
+        $flattenError = $this->packageInstallWorkflowService()->flattenRoot($targetDirectory);
         if (is_string($flattenError)) {
-            $this->directoryTreeService()->removeDirectoryRecursively($targetDirectory);
+            $this->directoryTreeService()->removeTree($targetDirectory);
             $this->context->flash('error', $flattenError);
             redirect($this->context->panelUrl('/themes'));
         }
 
         $manifestPath = $targetDirectory . '/theme.json';
         if (!is_file($manifestPath)) {
-            $this->directoryTreeService()->removeDirectoryRecursively($targetDirectory);
+            $this->directoryTreeService()->removeTree($targetDirectory);
             $this->context->flash('error', 'Theme upload failed: archive must include theme.json at archive root.');
             redirect($this->context->panelUrl('/themes'));
         }
 
         $manifests = PublicThemeRegistry::manifests($themesRoot);
         if (!isset($manifests[$themeSlug])) {
-            $this->directoryTreeService()->removeDirectoryRecursively($targetDirectory);
+            $this->directoryTreeService()->removeTree($targetDirectory);
             $this->context->flash('error', 'Theme upload failed: theme.json is missing required/valid metadata.');
             redirect($this->context->panelUrl('/themes'));
         }
@@ -828,14 +828,14 @@ final class SystemController
         $format = strtolower(trim((string) $this->input->text($query['format'] ?? 'zip', 20)));
 
         try {
-            $archive = $this->archivePackages()->buildArchiveFromDirectory($themePath, $themeSlug, $format);
+            $archive = $this->archivePackages()->exportDir($themePath, $themeSlug, $format);
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', 'Theme export failed: ' . $exception->getMessage());
             redirect($this->context->panelUrl('/themes'));
         }
 
-        $downloadFilename = $this->archivePackages()->exportDownloadFilename('theme-' . $themeSlug, (string) ($archive['format'] ?? 'zip'));
-        $this->archivePackages()->streamDownloadFile(
+        $downloadFilename = $this->archivePackages()->downloadName('theme-' . $themeSlug, (string) ($archive['format'] ?? 'zip'));
+        $this->archivePackages()->streamDownload(
             (string) ($archive['path'] ?? ''),
             $downloadFilename,
             (string) ($archive['mime_type'] ?? 'application/octet-stream')
@@ -882,7 +882,7 @@ final class SystemController
             redirect($this->context->panelUrl('/themes'));
         }
 
-        $this->directoryTreeService()->removeDirectoryRecursively($themePath);
+        $this->directoryTreeService()->removeTree($themePath);
         if (is_dir($themePath)) {
             $this->context->flash('error', 'Failed to uninstall theme directory from disk.');
             redirect($this->context->panelUrl('/themes'));
@@ -919,9 +919,9 @@ final class SystemController
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'extensions',
             'extensions' => $extensions,
-            'packageArchiveAcceptAttribute' => $archivePackages->packageArchiveAcceptAttribute(),
-            'packageArchiveFormats' => $archivePackages->supportedPackageArchiveDisplayFormats(),
-            'exportArchiveFormats' => $archivePackages->exportArchiveFormatOptions(),
+            'packageArchiveAcceptAttribute' => $archivePackages->packageAccept(),
+            'packageArchiveFormats' => $archivePackages->packageFormatLabels(),
+            'exportArchiveFormats' => $archivePackages->exportFormatOptions(),
         ]);
     }
 
@@ -1073,7 +1073,7 @@ final class SystemController
             redirect($this->context->panelUrl('/extensions'));
         }
 
-        $this->directoryTreeService()->removeDirectoryRecursively($extensionPath);
+        $this->directoryTreeService()->removeTree($extensionPath);
         if (is_dir($extensionPath)) {
             $this->context->flash('error', 'Failed to uninstall extension directory from disk.');
             redirect($this->context->panelUrl('/extensions'));
@@ -1116,7 +1116,7 @@ final class SystemController
             redirect($this->context->panelUrl('/extensions'));
         }
 
-        $upload = $this->packageInstallWorkflowService()->validateArchiveUploadPayload(
+        $upload = $this->packageInstallWorkflowService()->validateUpload(
             $files['extension_archive'] ?? null,
             'Extension archive',
             'Extensions'
@@ -1128,7 +1128,7 @@ final class SystemController
 
         $tmpPath = (string) ($upload['tmp_path'] ?? '');
         $archiveName = (string) ($upload['archive_name'] ?? 'extension-package.zip');
-        $derivedExtensionSlug = $this->packageInstallWorkflowService()->extensionSlugFromArchiveManifest($tmpPath);
+        $derivedExtensionSlug = $this->packageInstallWorkflowService()->extensionSlug($tmpPath);
 
         $nameResult = $this->packageInstallWorkflowService()->resolveInstallName(
             (string) ($post['upload_slug'] ?? ''),
@@ -1165,11 +1165,11 @@ final class SystemController
             redirect($this->context->panelUrl('/extensions'));
         }
 
-        $extractError = $this->packageInstallWorkflowService()->extractIntoTarget(
+        $extractError = $this->packageInstallWorkflowService()->extractTo(
             $tmpPath,
             $targetDirectory,
             function (string $directory): void {
-                $this->directoryTreeService()->removeDirectoryRecursively($directory);
+                $this->directoryTreeService()->removeTree($directory);
             },
             'extension'
         );
@@ -1178,16 +1178,16 @@ final class SystemController
             redirect($this->context->panelUrl('/extensions'));
         }
 
-        $flattenError = $this->packageInstallWorkflowService()->flattenSingleRootDirectory($targetDirectory);
+        $flattenError = $this->packageInstallWorkflowService()->flattenRoot($targetDirectory);
         if (is_string($flattenError)) {
-            $this->directoryTreeService()->removeDirectoryRecursively($targetDirectory);
+            $this->directoryTreeService()->removeTree($targetDirectory);
             $this->context->flash('error', $flattenError);
             redirect($this->context->panelUrl('/extensions'));
         }
 
         $manifest = $this->readExtensionManifest($targetDirectory);
         if (!($manifest['valid'] ?? false)) {
-            $this->directoryTreeService()->removeDirectoryRecursively($targetDirectory);
+            $this->directoryTreeService()->removeTree($targetDirectory);
             $reason = (string) ($manifest['invalid_reason'] ?? 'Missing required extension metadata.');
             $this->context->flash('error', 'Extension upload failed: ' . $reason);
             redirect($this->context->panelUrl('/extensions'));
@@ -1206,7 +1206,7 @@ final class SystemController
                 $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
             }
         } catch (\RuntimeException $exception) {
-            $this->directoryTreeService()->removeDirectoryRecursively($targetDirectory);
+            $this->directoryTreeService()->removeTree($targetDirectory);
             $this->context->flash('error', 'Extension upload failed: ' . $exception->getMessage());
             redirect($this->context->panelUrl('/extensions'));
         }
@@ -1248,14 +1248,14 @@ final class SystemController
         $format = strtolower(trim((string) $this->input->text($query['format'] ?? 'zip', 20)));
 
         try {
-            $archive = $this->archivePackages()->buildArchiveFromDirectory($extensionPath, $extensionName, $format);
+            $archive = $this->archivePackages()->exportDir($extensionPath, $extensionName, $format);
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', 'Extension export failed: ' . $exception->getMessage());
             redirect($this->context->panelUrl('/extensions'));
         }
 
-        $downloadFilename = $this->archivePackages()->exportDownloadFilename('extension-' . $extensionName, (string) ($archive['format'] ?? 'zip'));
-        $this->archivePackages()->streamDownloadFile(
+        $downloadFilename = $this->archivePackages()->downloadName('extension-' . $extensionName, (string) ($archive['format'] ?? 'zip'));
+        $this->archivePackages()->streamDownload(
             (string) ($archive['path'] ?? ''),
             $downloadFilename,
             (string) ($archive['mime_type'] ?? 'application/octet-stream')
@@ -1373,7 +1373,7 @@ final class SystemController
                 $generateComposerFile
             );
         } catch (\Throwable $exception) {
-            $this->directoryTreeService()->removeDirectoryRecursively($extensionPath);
+            $this->directoryTreeService()->removeTree($extensionPath);
             $this->context->flash('error', 'Failed to create extension scaffold: ' . $exception->getMessage());
             redirect($this->context->panelUrl('/extensions'));
         }
@@ -1391,7 +1391,7 @@ final class SystemController
                 $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
             }
         } catch (\RuntimeException $exception) {
-            $this->directoryTreeService()->removeDirectoryRecursively($extensionPath);
+            $this->directoryTreeService()->removeTree($extensionPath);
             $this->context->flash('error', 'Extension scaffold created, but state finalization failed: ' . $exception->getMessage());
             redirect($this->context->panelUrl('/extensions'));
         }

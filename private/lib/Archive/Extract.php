@@ -69,7 +69,7 @@ final class Extract
      *
      * @return array<int, string> Lowercase extension list without leading dots.
      */
-    public function supportedPackageExtensions(): array
+    public function packageExtensions(): array
     {
         return [
             'zip',
@@ -94,7 +94,7 @@ final class Extract
      *
      * @return string Comma-delimited `accept` attribute value.
      */
-    public function packageArchiveAcceptAttribute(): string
+    public function packageAccept(): string
     {
         return implode(',', [
             '.zip',
@@ -123,9 +123,9 @@ final class Extract
      * @param string $filename Uploaded/archive filename to inspect.
      * @return bool True when Raven can extract the package.
      */
-    public function isSupportedPackageArchiveName(string $filename): bool
+    public function supportsPackage(string $filename): bool
     {
-        return $this->detectPackageArchiveType($filename) !== null;
+        return $this->detectPackageType($filename) !== null;
     }
 
     /**
@@ -141,21 +141,21 @@ final class Extract
      */
     public function extractTo(string $archivePath, string $targetDir): void
     {
-        $type = $this->requirePackageArchiveType($archivePath);
+        $type = $this->packageType($archivePath);
 
         match ($type) {
             'zip' => $this->zip->extractTo($archivePath, $targetDir),
             'tar' => $this->tar->extractTo($archivePath, $targetDir),
-            'tar.gz' => $this->withTemporaryTarFromCompressed($archivePath, 'gz', static function (string $tarPath) use ($targetDir): void {
+            'tar.gz' => $this->withTempTar($archivePath, 'gz', static function (string $tarPath) use ($targetDir): void {
                 (new Tar())->extractTo($tarPath, $targetDir);
             }),
-            'tar.bz2' => $this->withTemporaryTarFromCompressed($archivePath, 'bz2', static function (string $tarPath) use ($targetDir): void {
+            'tar.bz2' => $this->withTempTar($archivePath, 'bz2', static function (string $tarPath) use ($targetDir): void {
                 (new Tar())->extractTo($tarPath, $targetDir);
             }),
-            'tar.xz' => $this->withTemporaryTarFromCompressed($archivePath, 'xz', static function (string $tarPath) use ($targetDir): void {
+            'tar.xz' => $this->withTempTar($archivePath, 'xz', static function (string $tarPath) use ($targetDir): void {
                 (new Tar())->extractTo($tarPath, $targetDir);
             }),
-            'tar.zst' => $this->withTemporaryTarFromCompressed($archivePath, 'zst', static function (string $tarPath) use ($targetDir): void {
+            'tar.zst' => $this->withTempTar($archivePath, 'zst', static function (string $tarPath) use ($targetDir): void {
                 (new Tar())->extractTo($tarPath, $targetDir);
             }),
             '7z' => $this->szip->extractTo($archivePath, $targetDir),
@@ -176,16 +176,16 @@ final class Extract
      * @return void
      * @throws RuntimeException When the archive type is unsupported or extraction fails.
      */
-    public function extractArchive(string $archivePath, string $targetPath): void
+    public function extract(string $archivePath, string $targetPath): void
     {
-        $type = $this->requireArchiveType($archivePath);
+        $type = $this->type($archivePath);
 
         match ($type) {
             'zip', 'tar', 'tar.gz', 'tar.bz2', 'tar.xz', 'tar.zst', '7z' => $this->extractTo($archivePath, $targetPath),
-            'gz' => $this->gz->decompress($archivePath, $this->resolveSingleFileTargetPath($archivePath, $targetPath, '.gz')),
-            'bz2' => $this->bz2->decompress($archivePath, $this->resolveSingleFileTargetPath($archivePath, $targetPath, '.bz2')),
-            'xz' => $this->xz->decompress($archivePath, $this->resolveSingleFileTargetPath($archivePath, $targetPath, '.xz')),
-            'zst' => $this->zst->decompress($archivePath, $this->resolveSingleFileTargetPath($archivePath, $targetPath, '.zst')),
+            'gz' => $this->gz->decompress($archivePath, $this->singleFileTarget($archivePath, $targetPath, '.gz')),
+            'bz2' => $this->bz2->decompress($archivePath, $this->singleFileTarget($archivePath, $targetPath, '.bz2')),
+            'xz' => $this->xz->decompress($archivePath, $this->singleFileTarget($archivePath, $targetPath, '.xz')),
+            'zst' => $this->zst->decompress($archivePath, $this->singleFileTarget($archivePath, $targetPath, '.zst')),
             default => throw new RuntimeException('Unsupported archive type: ' . $archivePath),
         };
     }
@@ -201,21 +201,21 @@ final class Extract
      */
     public function extractFile(string $archivePath, string $entryName, string $targetPath): void
     {
-        $type = $this->requirePackageArchiveType($archivePath);
+        $type = $this->packageType($archivePath);
 
         match ($type) {
             'zip' => $this->zip->extractFile($archivePath, $entryName, $targetPath),
             'tar' => $this->tar->extractFile($archivePath, $entryName, $targetPath),
-            'tar.gz' => $this->withTemporaryTarFromCompressed($archivePath, 'gz', function (string $tarPath) use ($entryName, $targetPath): void {
+            'tar.gz' => $this->withTempTar($archivePath, 'gz', function (string $tarPath) use ($entryName, $targetPath): void {
                 $this->tar->extractFile($tarPath, $entryName, $targetPath);
             }),
-            'tar.bz2' => $this->withTemporaryTarFromCompressed($archivePath, 'bz2', function (string $tarPath) use ($entryName, $targetPath): void {
+            'tar.bz2' => $this->withTempTar($archivePath, 'bz2', function (string $tarPath) use ($entryName, $targetPath): void {
                 $this->tar->extractFile($tarPath, $entryName, $targetPath);
             }),
-            'tar.xz' => $this->withTemporaryTarFromCompressed($archivePath, 'xz', function (string $tarPath) use ($entryName, $targetPath): void {
+            'tar.xz' => $this->withTempTar($archivePath, 'xz', function (string $tarPath) use ($entryName, $targetPath): void {
                 $this->tar->extractFile($tarPath, $entryName, $targetPath);
             }),
-            'tar.zst' => $this->withTemporaryTarFromCompressed($archivePath, 'zst', function (string $tarPath) use ($entryName, $targetPath): void {
+            'tar.zst' => $this->withTempTar($archivePath, 'zst', function (string $tarPath) use ($entryName, $targetPath): void {
                 $this->tar->extractFile($tarPath, $entryName, $targetPath);
             }),
             '7z' => $this->szip->extractFile($archivePath, $entryName, $targetPath),
@@ -239,21 +239,21 @@ final class Extract
      */
     public function extractDirectory(string $archivePath, string $entryName, string $targetDir): void
     {
-        $type = $this->requirePackageArchiveType($archivePath);
+        $type = $this->packageType($archivePath);
 
         match ($type) {
             'zip' => $this->zip->extractDirectory($archivePath, $entryName, $targetDir),
             'tar' => $this->tar->extractDirectory($archivePath, $entryName, $targetDir),
-            'tar.gz' => $this->withTemporaryTarFromCompressed($archivePath, 'gz', function (string $tarPath) use ($entryName, $targetDir): void {
+            'tar.gz' => $this->withTempTar($archivePath, 'gz', function (string $tarPath) use ($entryName, $targetDir): void {
                 $this->tar->extractDirectory($tarPath, $entryName, $targetDir);
             }),
-            'tar.bz2' => $this->withTemporaryTarFromCompressed($archivePath, 'bz2', function (string $tarPath) use ($entryName, $targetDir): void {
+            'tar.bz2' => $this->withTempTar($archivePath, 'bz2', function (string $tarPath) use ($entryName, $targetDir): void {
                 $this->tar->extractDirectory($tarPath, $entryName, $targetDir);
             }),
-            'tar.xz' => $this->withTemporaryTarFromCompressed($archivePath, 'xz', function (string $tarPath) use ($entryName, $targetDir): void {
+            'tar.xz' => $this->withTempTar($archivePath, 'xz', function (string $tarPath) use ($entryName, $targetDir): void {
                 $this->tar->extractDirectory($tarPath, $entryName, $targetDir);
             }),
-            'tar.zst' => $this->withTemporaryTarFromCompressed($archivePath, 'zst', function (string $tarPath) use ($entryName, $targetDir): void {
+            'tar.zst' => $this->withTempTar($archivePath, 'zst', function (string $tarPath) use ($entryName, $targetDir): void {
                 $this->tar->extractDirectory($tarPath, $entryName, $targetDir);
             }),
             '7z' => $this->szip->extractDirectory($archivePath, $entryName, $targetDir),
@@ -270,24 +270,24 @@ final class Extract
      */
     public function listEntries(string $archivePath): array
     {
-        $type = $this->requirePackageArchiveType($archivePath);
+        $type = $this->packageType($archivePath);
 
         return match ($type) {
             'zip' => $this->zip->listEntries($archivePath),
             'tar' => $this->tar->listEntries($archivePath),
-            'tar.gz' => $this->withTemporaryTarFromCompressed($archivePath, 'gz', function (string $tarPath): array {
+            'tar.gz' => $this->withTempTar($archivePath, 'gz', function (string $tarPath): array {
                 return $this->tar->listEntries($tarPath);
             }),
-            'tar.bz2' => $this->withTemporaryTarFromCompressed($archivePath, 'bz2', function (string $tarPath): array {
+            'tar.bz2' => $this->withTempTar($archivePath, 'bz2', function (string $tarPath): array {
                 return $this->tar->listEntries($tarPath);
             }),
-            'tar.xz' => $this->withTemporaryTarFromCompressed($archivePath, 'xz', function (string $tarPath): array {
+            'tar.xz' => $this->withTempTar($archivePath, 'xz', function (string $tarPath): array {
                 return $this->tar->listEntries($tarPath);
             }),
-            'tar.zst' => $this->withTemporaryTarFromCompressed($archivePath, 'zst', function (string $tarPath): array {
+            'tar.zst' => $this->withTempTar($archivePath, 'zst', function (string $tarPath): array {
                 return $this->tar->listEntries($tarPath);
             }),
-            '7z' => $this->sevenZip->listEntries($archivePath),
+            '7z' => $this->szip->listEntries($archivePath),
             default => throw new RuntimeException('Unsupported archive type: ' . $archivePath),
         };
     }
@@ -295,7 +295,7 @@ final class Extract
     /**
      * Reads a slug value from an archive manifest at root or one wrapper level deep.
      *
-     * ZIP archives delegate directly to `Zip::slugFromManifest()`. Other archive
+     * ZIP archives delegate directly to `Zip::manifestSlug()`. Other archive
      * types inspect entry names, extract candidate manifest files to temporary
      * JSON files, and then validate the `slug` field with the same regex policy.
      *
@@ -304,11 +304,11 @@ final class Extract
      * @param int $maxSlugLength Maximum slug length allowed by the caller.
      * @return string|null Valid slug string, or null when no candidate manifest matches.
      */
-    public function slugFromManifest(string $archivePath, string $manifestFilename, int $maxSlugLength): ?string
+    public function manifestSlug(string $archivePath, string $manifestFilename, int $maxSlugLength): ?string
     {
-        $type = $this->requirePackageArchiveType($archivePath);
+        $type = $this->packageType($archivePath);
         if ($type === 'zip') {
-            return $this->zip->slugFromManifest($archivePath, $manifestFilename, $maxSlugLength);
+            return $this->zip->manifestSlug($archivePath, $manifestFilename, $maxSlugLength);
         }
 
         $manifestFile = strtolower(trim($manifestFilename));
@@ -318,8 +318,8 @@ final class Extract
 
         $slugPattern = '/^[a-z0-9][a-z0-9_-]{0,' . max(0, $maxSlugLength) . '}$/';
 
-        foreach ($this->manifestCandidateEntries($archivePath, $manifestFile) as $entryName) {
-            $tmpManifestPath = $this->temporaryFilePath('.json');
+        foreach ($this->manifestPaths($archivePath, $manifestFile) as $entryName) {
+            $tmpManifestPath = $this->tempPath('.json');
 
             try {
                 $this->extractFile($archivePath, $entryName, $tmpManifestPath);
@@ -357,7 +357,7 @@ final class Extract
      * @param string $manifestFilename Lowercase manifest basename to search for.
      * @return array<int, string> Candidate manifest entry paths.
      */
-    private function manifestCandidateEntries(string $archivePath, string $manifestFilename): array
+    private function manifestPaths(string $archivePath, string $manifestFilename): array
     {
         $rootEntries = [];
         $wrappedEntries = [];
@@ -395,9 +395,9 @@ final class Extract
      * @param callable(string): T $operation Callback that receives the temporary `.tar` path.
      * @return T Callback result.
      */
-    private function withTemporaryTarFromCompressed(string $archivePath, string $compressionType, callable $operation): mixed
+    private function withTempTar(string $archivePath, string $compressionType, callable $operation): mixed
     {
-        $temporaryTarPath = $this->temporaryFilePath('.tar');
+        $temporaryTarPath = $this->tempPath('.tar');
 
         try {
             match ($compressionType) {
@@ -420,7 +420,7 @@ final class Extract
      * @param string $archivePath Archive filename or absolute path.
      * @return string|null Canonical archive type key, or null when unsupported.
      */
-    private function detectPackageArchiveType(string $archivePath): ?string
+    private function detectPackageType(string $archivePath): ?string
     {
         $filename = strtolower(trim((string) pathinfo($archivePath, PATHINFO_BASENAME)));
         if ($filename === '') {
@@ -455,9 +455,9 @@ final class Extract
      * @return string Canonical archive type key.
      * @throws RuntimeException When the filename/path does not use a supported suffix.
      */
-    private function requirePackageArchiveType(string $archivePath): string
+    private function packageType(string $archivePath): string
     {
-        $type = $this->detectPackageArchiveType($archivePath);
+        $type = $this->detectPackageType($archivePath);
         if ($type === null) {
             throw new RuntimeException('Unsupported archive type: ' . $archivePath);
         }
@@ -469,15 +469,15 @@ final class Extract
      * Detects and returns one supported archive type from a filename/path.
      *
      * Package/container formats and single-file compression formats both map to
-     * canonical type keys so `extractArchive()` can route everything through one
+     * canonical type keys so `extract()` can route everything through one
      * stable detection layer.
      *
      * @param string $archivePath Archive filename or absolute path.
      * @return string|null Canonical archive type key, or null when unsupported.
      */
-    private function detectArchiveType(string $archivePath): ?string
+    private function detectType(string $archivePath): ?string
     {
-        $packageType = $this->detectPackageArchiveType($archivePath);
+        $packageType = $this->detectPackageType($archivePath);
         if ($packageType !== null) {
             return $packageType;
         }
@@ -508,9 +508,9 @@ final class Extract
      * @return string Canonical archive type key.
      * @throws RuntimeException When the filename/path does not use a supported suffix.
      */
-    private function requireArchiveType(string $archivePath): string
+    private function type(string $archivePath): string
     {
-        $type = $this->detectArchiveType($archivePath);
+        $type = $this->detectType($archivePath);
         if ($type === null) {
             throw new RuntimeException('Unsupported archive type: ' . $archivePath);
         }
@@ -525,9 +525,9 @@ final class Extract
      * @return string Absolute temporary file path reserved for this process.
      * @throws RuntimeException When no temporary file path can be created.
      */
-    private function temporaryFilePath(string $suffix = ''): string
+    private function tempPath(string $suffix = ''): string
     {
-        foreach ($this->temporaryDirectoryRoots() as $directory) {
+        foreach ($this->tempRoots() as $directory) {
             $path = @tempnam($directory, 'rvn-archive-');
             if (!is_string($path) || $path === '') {
                 continue;
@@ -553,7 +553,7 @@ final class Extract
      *
      * @return array<int, string> Writable temporary directory roots.
      */
-    private function temporaryDirectoryRoots(): array
+    private function tempRoots(): array
     {
         $projectRoot = dirname(__DIR__, 3);
         $candidates = [
@@ -594,7 +594,7 @@ final class Extract
      * @return string Absolute output file path.
      * @throws RuntimeException When the output directory cannot be prepared.
      */
-    private function resolveSingleFileTargetPath(string $archivePath, string $targetPath, string $suffix): string
+    private function singleFileTarget(string $archivePath, string $targetPath, string $suffix): string
     {
         $treatAsDirectory = is_dir($targetPath) || preg_match('#[\\\\/]$#', $targetPath) === 1;
         if (!$treatAsDirectory) {
@@ -610,7 +610,7 @@ final class Extract
             throw new RuntimeException('Failed to create single-file extraction directory: ' . $directory);
         }
 
-        return $directory . '/' . $this->derivedSingleFileName($archivePath, $suffix);
+        return $directory . '/' . $this->singleFileName($archivePath, $suffix);
     }
 
     /**
@@ -620,7 +620,7 @@ final class Extract
      * @param string $suffix Canonical archive suffix including the leading dot.
      * @return string Derived output basename.
      */
-    private function derivedSingleFileName(string $archivePath, string $suffix): string
+    private function singleFileName(string $archivePath, string $suffix): string
     {
         $basename = (string) pathinfo($archivePath, PATHINFO_BASENAME);
         if (str_ends_with(strtolower($basename), strtolower($suffix))) {

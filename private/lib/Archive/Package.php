@@ -42,9 +42,9 @@ final class Package
      *
      * @return array<int, string> Lowercase extension list without leading dots.
      */
-    public function supportedPackageArchiveExtensions(): array
+    public function packageExtensions(): array
     {
-        return $this->extract->supportedPackageExtensions();
+        return $this->extract->packageExtensions();
     }
 
     /**
@@ -55,9 +55,9 @@ final class Package
      *
      * @return array<int, string> Lowercase extension list without leading dots.
      */
-    public function supportedExportArchiveExtensions(): array
+    public function exportFormats(): array
     {
-        return $this->compress->supportedDirectoryArchiveExtensions();
+        return $this->compress->directoryFormats();
     }
 
     /**
@@ -68,7 +68,7 @@ final class Package
      *
      * @return array<int, string> Display labels without leading dots.
      */
-    public function supportedPackageArchiveDisplayFormats(): array
+    public function packageFormatLabels(): array
     {
         return [
             'zip',
@@ -89,11 +89,11 @@ final class Package
      *
      * @return array<string, string> Canonical format key => human-facing label.
      */
-    public function exportArchiveFormatOptions(): array
+    public function exportFormatOptions(): array
     {
         return array_combine(
-            $this->supportedExportArchiveExtensions(),
-            $this->supportedExportArchiveExtensions()
+            $this->exportFormats(),
+            $this->exportFormats()
         ) ?: [];
     }
 
@@ -102,9 +102,9 @@ final class Package
      *
      * @return string Comma-delimited `accept` attribute value.
      */
-    public function packageArchiveAcceptAttribute(): string
+    public function packageAccept(): string
     {
-        return $this->extract->packageArchiveAcceptAttribute();
+        return $this->extract->packageAccept();
     }
 
     /**
@@ -113,9 +113,9 @@ final class Package
      * @param string $filename Uploaded/archive filename to inspect.
      * @return bool True when Raven can extract the package.
      */
-    public function isSupportedPackageArchiveName(string $filename): bool
+    public function supportsPackage(string $filename): bool
     {
-        return $this->extract->isSupportedPackageArchiveName($filename);
+        return $this->extract->supportsPackage($filename);
     }
 
     /**
@@ -125,7 +125,7 @@ final class Package
      * @param string $targetDirectory Absolute extraction target directory.
      * @return void
      */
-    public function extractUploadedArchive(string $tmpPath, string $targetDirectory): void
+    public function extractUpload(string $tmpPath, string $targetDirectory): void
     {
         $this->extract->extractTo($tmpPath, $targetDirectory);
     }
@@ -171,18 +171,18 @@ final class Package
      * @param string $format Requested archive format key.
      * @return array{path: string, format: string, suffix: string, mime_type: string} Export metadata.
      */
-    public function buildArchiveFromDirectory(string $sourceDirectory, string $archiveRoot, string $format = 'zip'): array
+    public function exportDir(string $sourceDirectory, string $archiveRoot, string $format = 'zip'): array
     {
-        $resolvedFormat = $this->normalizeExportFormat($format);
-        $suffix = $this->archiveSuffix($resolvedFormat);
-        $temporaryArchivePath = $this->allocateTemporaryArchivePath($suffix);
+        $resolvedFormat = $this->exportFormat($format);
+        $suffix = $this->suffix($resolvedFormat);
+        $temporaryArchivePath = $this->tempPath($suffix);
         $this->compress->compressDirectory($sourceDirectory, $archiveRoot, $temporaryArchivePath);
 
         return [
             'path' => $temporaryArchivePath,
             'format' => $resolvedFormat,
             'suffix' => $suffix,
-            'mime_type' => $this->archiveMimeType($resolvedFormat),
+            'mime_type' => $this->mimeType($resolvedFormat),
         ];
     }
 
@@ -194,19 +194,19 @@ final class Package
      * @param string|null $timestamp Optional preformatted timestamp; null uses current UTC time.
      * @return string Browser-facing archive filename.
      */
-    public function exportDownloadFilename(string $prefix, string $format, ?string $timestamp = null): string
+    public function downloadName(string $prefix, string $format, ?string $timestamp = null): string
     {
         $safePrefix = trim(preg_replace('/[^a-z0-9._-]+/i', '-', $prefix) ?? '', '-_.');
         if ($safePrefix === '') {
             $safePrefix = 'package';
         }
 
-        $resolvedFormat = $this->normalizeExportFormat($format);
+        $resolvedFormat = $this->exportFormat($format);
         $stamp = is_string($timestamp) && trim($timestamp) !== ''
             ? trim($timestamp)
             : gmdate('Ymd-His');
 
-        return $safePrefix . '-' . $stamp . $this->archiveSuffix($resolvedFormat);
+        return $safePrefix . '-' . $stamp . $this->suffix($resolvedFormat);
     }
 
     /**
@@ -215,9 +215,9 @@ final class Package
      * @param string $format Archive format key.
      * @return string Response content type.
      */
-    public function archiveMimeType(string $format): string
+    public function mimeType(string $format): string
     {
-        return match ($this->normalizeExportFormat($format)) {
+        return match ($this->exportFormat($format)) {
             'zip' => 'application/zip',
             '7z' => 'application/x-7z-compressed',
             'tar' => 'application/x-tar',
@@ -237,7 +237,7 @@ final class Package
      * @param string $contentType HTTP content type for the response.
      * @return void
      */
-    public function streamDownloadFile(string $path, string $downloadFilename, string $contentType): void
+    public function streamDownload(string $path, string $downloadFilename, string $contentType): void
     {
         while (ob_get_level() > 0) {
             ob_end_clean();
@@ -276,9 +276,9 @@ final class Package
      * @param int $maxSlugLength Maximum allowed slug length.
      * @return string|null Valid slug string, or null when none can be resolved.
      */
-    public function slugFromArchiveManifest(string $archivePath, string $manifestFilename, int $maxSlugLength): ?string
+    public function manifestSlug(string $archivePath, string $manifestFilename, int $maxSlugLength): ?string
     {
-        return $this->extract->slugFromManifest($archivePath, $manifestFilename, $maxSlugLength);
+        return $this->extract->manifestSlug($archivePath, $manifestFilename, $maxSlugLength);
     }
 
     /**
@@ -312,7 +312,7 @@ final class Package
      * @param string $suffix Optional suffix such as `.zip`.
      * @return string Absolute temporary file path reserved for the caller.
      */
-    private function allocateTemporaryArchivePath(string $suffix = ''): string
+    private function tempPath(string $suffix = ''): string
     {
         $candidateDirectories = [
             (string) sys_get_temp_dir(),
@@ -363,7 +363,7 @@ final class Package
      * @return string Canonical archive format key.
      * @throws \RuntimeException When the format is unsupported for directory export.
      */
-    private function normalizeExportFormat(string $format): string
+    private function exportFormat(string $format): string
     {
         $resolved = strtolower(trim($format));
         if ($resolved === 'tgz') {
@@ -376,7 +376,7 @@ final class Package
             $resolved = 'tar.zst';
         }
 
-        if (!in_array($resolved, $this->supportedExportArchiveExtensions(), true)) {
+        if (!in_array($resolved, $this->exportFormats(), true)) {
             throw new \RuntimeException('Unsupported export archive format: ' . $format);
         }
 
@@ -389,7 +389,7 @@ final class Package
      * @param string $format Canonical archive format key.
      * @return string Filename suffix including the leading dot.
      */
-    private function archiveSuffix(string $format): string
+    private function suffix(string $format): string
     {
         return match ($format) {
             'zip' => '.zip',
