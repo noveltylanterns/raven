@@ -25,7 +25,7 @@
 /** @var array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>|null $channelOptions */
 /** @var array<int, array{id: int, name: string, slug: string, is_root: bool}>|null $categorySetOptions */
 /** @var array<int, array{id: int, name: string, slug: string, is_root: bool}>|null $tagSetOptions */
-/** @var string|null $activeConfigTab */
+/** @var string $activeTab */
 
 use function Raven\Lib\Extra\e;
 
@@ -35,10 +35,7 @@ $configFields = $configFields ?? [];
 $channelOptions = is_array($channelOptions ?? null) ? $channelOptions : [];
 $categorySetOptions = is_array($categorySetOptions ?? null) ? $categorySetOptions : [];
 $tagSetOptions = is_array($tagSetOptions ?? null) ? $tagSetOptions : [];
-$activeConfigTab = strtolower(trim((string) ($activeConfigTab ?? 'basic')));
-if (!in_array($activeConfigTab, ['basic', 'content', 'database', 'debug', 'media', 'meta', 'security', 'users'], true)) {
-    $activeConfigTab = 'basic';
-}
+$activeTab = (string) ($activeTab ?? 'basic');
 $selectedFeedChannels = $configSnapshot['feed']['channels'] ?? null;
 if (!is_array($selectedFeedChannels)) {
     $selectedFeedChannels = ['all'];
@@ -542,8 +539,8 @@ if ($sessionCookieConfigFields !== []) {
     );
 }
 
-$isActiveConfigTab = static function (string $tabKey) use ($activeConfigTab): bool {
-    return $activeConfigTab === $tabKey;
+$isActiveTab = static function (string $tabKey) use ($activeTab): bool {
+    return $activeTab === $tabKey;
 };
 
 /**
@@ -1084,7 +1081,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
 <?php else: ?>
 <form method="post" action="<?= e($panelBase) ?>/configuration/save">
         <?= $csrfField ?>
-        <input type="hidden" name="_config_tab" id="config-active-tab" value="<?= e($activeConfigTab) ?>">
+        <input type="hidden" name="_config_tab" id="config-active-tab" value="<?= e($activeTab) ?>">
         <nav class="rvnp-editor-actions">
             <button class="btn btn-primary" type="submit"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Configuration</button>
         </nav>
@@ -1092,98 +1089,98 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
         <section class="rvnp-editor-layout" data-rvn-tab-layout="editor">
         <ul class="nav nav-tabs" id="rvnp-editor-tabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link<?= $isActiveConfigTab('basic') ? ' active' : '' ?>"
+                <button class="nav-link<?= $isActiveTab('basic') ? ' active' : '' ?>"
                     id="config-basic-tab"
                     data-bs-toggle="tab"
                     data-bs-target="#rvnp-editor-pane-basic"
                     type="button"
                     role="tab"
                     aria-controls="rvnp-editor-pane-basic"
-                    aria-selected="<?= $isActiveConfigTab('basic') ? 'true' : 'false' ?>"
+                    aria-selected="<?= $isActiveTab('basic') ? 'true' : 'false' ?>"
                 >Basic</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link<?= $isActiveConfigTab('content') ? ' active' : '' ?>"
+                <button class="nav-link<?= $isActiveTab('content') ? ' active' : '' ?>"
                     id="config-content-tab"
                     data-bs-toggle="tab"
                     data-bs-target="#rvnp-editor-pane-content"
                     type="button"
                     role="tab"
                     aria-controls="rvnp-editor-pane-content"
-                    aria-selected="<?= $isActiveConfigTab('content') ? 'true' : 'false' ?>"
+                    aria-selected="<?= $isActiveTab('content') ? 'true' : 'false' ?>"
                 >Content</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link<?= $isActiveConfigTab('database') ? ' active' : '' ?>"
+                <button class="nav-link<?= $isActiveTab('database') ? ' active' : '' ?>"
                     id="config-database-tab"
                     data-bs-toggle="tab"
                     data-bs-target="#rvnp-editor-pane-database"
                     type="button"
                     role="tab"
                     aria-controls="rvnp-editor-pane-database"
-                    aria-selected="<?= $isActiveConfigTab('database') ? 'true' : 'false' ?>"
+                    aria-selected="<?= $isActiveTab('database') ? 'true' : 'false' ?>"
                 >Database</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link<?= $isActiveConfigTab('debug') ? ' active' : '' ?>"
+                <button class="nav-link<?= $isActiveTab('debug') ? ' active' : '' ?>"
                     id="config-debug-tab"
                     data-bs-toggle="tab"
                     data-bs-target="#rvnp-editor-pane-debug"
                     type="button"
                     role="tab"
                     aria-controls="rvnp-editor-pane-debug"
-                    aria-selected="<?= $isActiveConfigTab('debug') ? 'true' : 'false' ?>"
+                    aria-selected="<?= $isActiveTab('debug') ? 'true' : 'false' ?>"
                 >Debug</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link<?= $isActiveConfigTab('media') ? ' active' : '' ?>"
+                <button class="nav-link<?= $isActiveTab('media') ? ' active' : '' ?>"
                     id="config-media-tab"
                     data-bs-toggle="tab"
                     data-bs-target="#rvnp-editor-pane-media"
                     type="button"
                     role="tab"
                     aria-controls="rvnp-editor-pane-media"
-                    aria-selected="<?= $isActiveConfigTab('media') ? 'true' : 'false' ?>"
+                    aria-selected="<?= $isActiveTab('media') ? 'true' : 'false' ?>"
                 >Media</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link<?= $isActiveConfigTab('meta') ? ' active' : '' ?>"
+                <button class="nav-link<?= $isActiveTab('meta') ? ' active' : '' ?>"
                     id="config-meta-tab"
                     data-bs-toggle="tab"
                     data-bs-target="#rvnp-editor-pane-meta"
                     type="button"
                     role="tab"
                     aria-controls="rvnp-editor-pane-meta"
-                    aria-selected="<?= $isActiveConfigTab('meta') ? 'true' : 'false' ?>"
+                    aria-selected="<?= $isActiveTab('meta') ? 'true' : 'false' ?>"
                 >Meta</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link<?= $isActiveConfigTab('security') ? ' active' : '' ?>"
+                <button class="nav-link<?= $isActiveTab('security') ? ' active' : '' ?>"
                     id="config-security-tab"
                     data-bs-toggle="tab"
                     data-bs-target="#rvnp-editor-pane-security"
                     type="button"
                     role="tab"
                     aria-controls="rvnp-editor-pane-security"
-                    aria-selected="<?= $isActiveConfigTab('security') ? 'true' : 'false' ?>"
+                    aria-selected="<?= $isActiveTab('security') ? 'true' : 'false' ?>"
                 >Security</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link<?= $isActiveConfigTab('users') ? ' active' : '' ?>"
+                <button class="nav-link<?= $isActiveTab('users') ? ' active' : '' ?>"
                     id="config-users-tab"
                     data-bs-toggle="tab"
                     data-bs-target="#rvnp-editor-pane-users"
                     type="button"
                     role="tab"
                     aria-controls="rvnp-editor-pane-users"
-                    aria-selected="<?= $isActiveConfigTab('users') ? 'true' : 'false' ?>"
+                    aria-selected="<?= $isActiveTab('users') ? 'true' : 'false' ?>"
                 >Users</button>
             </li>
         </ul>
 
         <div class="tab-content raven-tab-content-surface border border-top-0 p-3" id="rvnp-editor-content">
                         <div
-                            class="tab-pane fade<?= $isActiveConfigTab('basic') ? ' show active' : '' ?>"
+                            class="tab-pane fade<?= $isActiveTab('basic') ? ' show active' : '' ?>"
                             id="rvnp-editor-pane-basic"
                             role="tabpanel"
                             aria-labelledby="config-basic-tab"
@@ -1227,7 +1224,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             <?php endif; ?>
                         </div>
                         <div
-                            class="tab-pane fade<?= $isActiveConfigTab('content') ? ' show active' : '' ?>"
+                            class="tab-pane fade<?= $isActiveTab('content') ? ' show active' : '' ?>"
                             id="rvnp-editor-pane-content"
                             role="tabpanel"
                             aria-labelledby="config-content-tab"
@@ -1280,7 +1277,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             <?php endif; ?>
                         </div>
                         <div
-                            class="tab-pane fade<?= $isActiveConfigTab('database') ? ' show active' : '' ?>"
+                            class="tab-pane fade<?= $isActiveTab('database') ? ' show active' : '' ?>"
                             id="rvnp-editor-pane-database"
                             role="tabpanel"
                             aria-labelledby="config-database-tab"
@@ -1289,7 +1286,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             <?php $renderConfigFieldGroup($databaseConfigFields); ?>
                         </div>
                         <div
-                            class="tab-pane fade<?= $isActiveConfigTab('debug') ? ' show active' : '' ?>"
+                            class="tab-pane fade<?= $isActiveTab('debug') ? ' show active' : '' ?>"
                             id="rvnp-editor-pane-debug"
                             role="tabpanel"
                             aria-labelledby="config-debug-tab"
@@ -1317,7 +1314,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             <?php endif; ?>
                         </div>
                         <div
-                            class="tab-pane fade<?= $isActiveConfigTab('media') ? ' show active' : '' ?>"
+                            class="tab-pane fade<?= $isActiveTab('media') ? ' show active' : '' ?>"
                             id="rvnp-editor-pane-media"
                             role="tabpanel"
                             aria-labelledby="config-media-tab"
@@ -1346,7 +1343,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             <?php endif; ?>
                         </div>
                         <div
-                            class="tab-pane fade<?= $isActiveConfigTab('meta') ? ' show active' : '' ?>"
+                            class="tab-pane fade<?= $isActiveTab('meta') ? ' show active' : '' ?>"
                             id="rvnp-editor-pane-meta"
                             role="tabpanel"
                             aria-labelledby="config-meta-tab"
@@ -1391,7 +1388,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             <?php endif; ?>
                         </div>
                         <div
-                            class="tab-pane fade<?= $isActiveConfigTab('security') ? ' show active' : '' ?>"
+                            class="tab-pane fade<?= $isActiveTab('security') ? ' show active' : '' ?>"
                             id="rvnp-editor-pane-security"
                             role="tabpanel"
                             aria-labelledby="config-security-tab"
@@ -1419,7 +1416,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                             <?php endif; ?>
                         </div>
                         <div
-                            class="tab-pane fade<?= $isActiveConfigTab('users') ? ' show active' : '' ?>"
+                            class="tab-pane fade<?= $isActiveTab('users') ? ' show active' : '' ?>"
                             id="rvnp-editor-pane-users"
                             role="tabpanel"
                             aria-labelledby="config-users-tab"

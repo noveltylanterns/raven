@@ -35,6 +35,7 @@ use Raven\Lib\Directory\Mode;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Directory\SetContext;
+use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorAuthor;
 use Raven\Lib\View\Panel\EditorTabs;
 
@@ -58,7 +59,8 @@ final class ContentController
     private PageImageRepository $pageImages;
     private UserRepository $userRepo;
     private Route $routeConfigService;
-    private EditorTabs $panelEditorTabService;
+    private EditorTabs $editorTabs;
+    private Editor $editor;
     /** @var Closure(): PageImageManager */
     private Closure $pageImageManagerResolver;
     private ?PageImageManager $pageImageManager = null;
@@ -107,7 +109,8 @@ final class ContentController
      * @param callable $taxonomyLookupRepoResolver Lazy taxonomy lookup resolver; resolved only on page-editor option-set queries.
      * @param UserRepository $userRepo User repository for author validation and author select options.
      * @param Route $routeConfigService Route configuration service for route-mode and separator helpers.
-     * @param EditorTabs $panelEditorTabService Panel editor tab normalization and tab-preserving URL builder.
+     * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
+     * @param Editor $editor Shared panel editor utility methods (body-text editor normalization).
      * @param callable $extensionServicesFor Extension services resolver used to load per-extension shortcode and body-block contributions.
      * @return void
      */
@@ -126,7 +129,8 @@ final class ContentController
         callable $taxonomyLookupRepoResolver,
         UserRepository $userRepo,
         Route $routeConfigService,
-        EditorTabs $panelEditorTabService,
+        EditorTabs $editorTabs,
+        Editor $editor,
         callable $extensionServicesFor
     ) {
         $this->context = $context;
@@ -143,7 +147,8 @@ final class ContentController
         $this->taxonomyLookupRepoResolver = Closure::fromCallable($taxonomyLookupRepoResolver);
         $this->userRepo = $userRepo;
         $this->routeConfigService = $routeConfigService;
-        $this->panelEditorTabService = $panelEditorTabService;
+        $this->editorTabs = $editorTabs;
+        $this->editor = $editor;
         $this->extensionServicesFor = Closure::fromCallable($extensionServicesFor);
     }
 
@@ -258,6 +263,8 @@ final class ContentController
                 $galleryImages = is_array($editData['gallery_images'] ?? null) ? $editData['gallery_images'] : [];
             }
         }
+        $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['content', 'meta', 'media'], 'content');
+
         // Load channel/category/tag options and page assignments in one query.
         $categoryEnabled = $this->context->categoryEnabled();
         $tagEnabled = $this->context->tagEnabled();
@@ -326,7 +333,7 @@ final class ContentController
             'galleryImages' => $galleryImages,
             'imageUploadTarget' => (string) $this->config->get('media.upload_target', 'local'),
             'imageMaxFilesPerUpload' => max(0, (int) $this->config->get('media.max_files_per_upload', 10)),
-            'editorDefault' => $this->normalizeBodyTextEditorOption(
+            'editorDefault' => $this->editor->normalizeBodyTextEditorOption(
                 (string) $this->config->get('content.editor', 'tinymce')
             ),
             'routeModeDefault' => $this->globalPageRouteMode(),
@@ -335,6 +342,7 @@ final class ContentController
             ),
             'bodyBlockTypeDefinitions' => $this->pageEditorBodyBlockTypeDefinitions(),
             'shortcodeInsertItems' => $this->pageEditorInsertableShortcodes(),
+            'activeTab' => $activeTab,
             'csrfField' => $this->context->csrfField(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'error' => $this->context->pullFlash('error'),
@@ -365,7 +373,7 @@ final class ContentController
             redirect($this->context->panelUrl('/page'));
         }
 
-        $activeTab = $this->panelEditorTabService->normalizeEditorTab($post['tab'] ?? null, ['content', 'meta', 'media'], 'content');
+        $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['content', 'meta', 'media'], 'content');
         $title = $this->input->text($post['title'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
         $contentBlocks = $this->normalizeContentBlocksInput($post['content_blocks'] ?? []);
@@ -380,7 +388,7 @@ final class ContentController
         $authorUserId = $this->input->int($post['author_user_id'] ?? null, 1);
         if ($authorUserId !== null && $this->userRepo->findById($authorUserId) === null) {
             $this->context->flash('error', 'Selected author account was not found.');
-            redirect($this->panelEditorTabService->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
+            redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
         }
         if ($authorUserId === null) {
             $authorUserId = $this->context->auth()->userId();
@@ -432,7 +440,7 @@ final class ContentController
             foreach ($categorySetIdsById as $setId) {
                 if (!in_array($setId, $allowedCategorySets, true)) {
                     $this->context->flash('error', 'One or more selected categories are outside the allowed sets for this channel.');
-                    redirect($this->panelEditorTabService->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
+                    redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
                 }
             }
         }
@@ -442,19 +450,19 @@ final class ContentController
             foreach ($tagSetIdsById as $setId) {
                 if (!in_array($setId, $allowedTagSets, true)) {
                     $this->context->flash('error', 'One or more selected tags are outside the allowed sets for this channel.');
-                    redirect($this->panelEditorTabService->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
+                    redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
                 }
             }
         }
 
         if ($title === '' || $slug === null) {
             $this->context->flash('error', 'Title and valid slug are required.');
-            redirect($this->panelEditorTabService->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'content'));
+            redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'content'));
         }
 
         if (!in_array($status, ['published', 'draft'], true)) {
             $this->context->flash('error', 'Status must be Published or Draft.');
-            redirect($this->panelEditorTabService->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'content'));
+            redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'content'));
         }
 
         // Normalize panel form input into repository payload shape.
@@ -484,11 +492,11 @@ final class ContentController
             );
         } catch (\Throwable $exception) {
             $this->context->flash('error', $exception->getMessage() ?: 'Failed to save page.');
-            redirect($this->panelEditorTabService->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'content'));
+            redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'content'));
         }
 
         $this->context->flash('success', 'Changes saved.');
-        redirect($this->panelEditorTabService->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $savedId, $activeTab, 'content'));
+        redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $savedId, $activeTab, 'content'));
     }
 
     /**
@@ -522,7 +530,14 @@ final class ContentController
 
         if ($uploads === []) {
             $this->context->flash('error', 'Please select one or more images to upload.');
-            redirect($this->context->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
+            redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/page/edit',
+                $pageId,
+                'media',
+                'content',
+                'rvnp-editor-pane-media'
+            ));
         }
 
         $maxFilesPerUpload = max(0, (int) $this->config->get('media.max_files_per_upload', 10));
@@ -531,7 +546,14 @@ final class ContentController
                 'error',
                 'You selected ' . count($uploads) . ' image(s), but the max per upload is ' . $maxFilesPerUpload . '.'
             );
-            redirect($this->context->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
+            redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/page/edit',
+                $pageId,
+                'media',
+                'content',
+                'rvnp-editor-pane-media'
+            ));
         }
 
         $successCount = 0;
@@ -558,7 +580,14 @@ final class ContentController
             $this->context->flash('error', implode(' ', array_values(array_unique($errors))));
         }
 
-        redirect($this->context->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
+        redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/page/edit',
+                $pageId,
+                'media',
+                'content',
+                'rvnp-editor-pane-media'
+            ));
     }
 
     /**
@@ -595,17 +624,38 @@ final class ContentController
         if ($imageId !== null) {
             if (!$this->pageImageManager()->deleteImageForPage($pageId, $imageId)) {
                 $this->context->flash('error', 'Image not found or already deleted.');
-                redirect($this->context->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
+                redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/page/edit',
+                $pageId,
+                'media',
+                'content',
+                'rvnp-editor-pane-media'
+            ));
             }
 
             $this->context->flash('success', 'Image deleted.');
-            redirect($this->context->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
+            redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/page/edit',
+                $pageId,
+                'media',
+                'content',
+                'rvnp-editor-pane-media'
+            ));
         }
 
         // Bulk-delete path is used by Media-tab "Delete Selected" controls.
         if ($selectedImageIds === []) {
             $this->context->flash('error', 'No gallery images selected.');
-            redirect($this->context->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
+            redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/page/edit',
+                $pageId,
+                'media',
+                'content',
+                'rvnp-editor-pane-media'
+            ));
         }
 
         $deletedCount = 0;
@@ -629,7 +679,14 @@ final class ContentController
             $this->context->flash('error', 'Failed to delete selected images.');
         }
 
-        redirect($this->context->panelUrl('/page/edit/' . $pageId) . '?tab=media#rvnp-editor-pane-media');
+        redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/page/edit',
+                $pageId,
+                'media',
+                'content',
+                'rvnp-editor-pane-media'
+            ));
     }
 
     /**
@@ -1169,20 +1226,6 @@ final class ContentController
     // -------------------------------------------------------------------------
     // Body-block / editor helpers
     // -------------------------------------------------------------------------
-
-    /**
-     * Normalizes one text-editor option value.
-     *
-     * @param string $value Raw editor option from config or form input.
-     * @return string One of: tinymce, plaintext, autobr, markdown. Defaults to tinymce.
-     */
-    private function normalizeBodyTextEditorOption(string $value): string
-    {
-        $editor = strtolower(trim($value));
-        return in_array($editor, ['tinymce', 'plaintext', 'autobr', 'markdown'], true)
-            ? $editor
-            : 'tinymce';
-    }
 
     /**
      * Normalizes one body-block type value against the current type definitions.

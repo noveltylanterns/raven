@@ -64,8 +64,7 @@ foreach ($contactProfilesRaw as $entry) {
         'value' => $value,
     ];
 }
-$requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
-$activeTab = in_array($requestedTab, ['account', 'profile', 'security'], true) ? $requestedTab : 'account';
+$activeTab = (string) ($activeTab ?? 'account');
 $twoFactorMethodsRaw = is_array($preferences['two_factor'] ?? null) ? $preferences['two_factor'] : [];
 $twoFactorMethods = [];
 foreach ($twoFactorMethodsRaw as $methodRow) {

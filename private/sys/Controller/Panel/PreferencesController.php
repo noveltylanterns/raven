@@ -21,6 +21,7 @@ use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
+use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\Panel\PanelMediaConfigService;
 use Raven\Lib\Profile\ProfileContactService;
@@ -43,7 +44,8 @@ final class PreferencesController
     private InputSanitizer $input;
     private string $root;
     private LoginIdentifierResolver $loginIdentifierResolver;
-    private EditorTabs $panelEditorTabService;
+    private EditorTabs $editorTabs;
+    private Editor $editor;
     private PanelMediaConfigService $panelMediaConfigService;
     private ProfileContactService $profileContactService;
     private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
@@ -57,7 +59,8 @@ final class PreferencesController
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for user-media storage helpers.
      * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
-     * @param EditorTabs $panelEditorTabService Shared editor-tab normalization helper.
+     * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
+     * @param Editor $editor Shared panel editor utility methods (theme normalization).
      * @param PanelMediaConfigService $panelMediaConfigService Shared media-limit helper.
      * @param ProfileContactService $profileContactService Shared profile-contact normalizer.
      * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA helper set.
@@ -72,7 +75,8 @@ final class PreferencesController
         InputSanitizer $input,
         string $root,
         LoginIdentifierResolver $loginIdentifierResolver,
-        EditorTabs $panelEditorTabService,
+        EditorTabs $editorTabs,
+        Editor $editor,
         PanelMediaConfigService $panelMediaConfigService,
         ProfileContactService $profileContactService,
         PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,
@@ -85,7 +89,8 @@ final class PreferencesController
         $this->input = $input;
         $this->root = rtrim($root, '/\\');
         $this->loginIdentifierResolver = $loginIdentifierResolver;
-        $this->panelEditorTabService = $panelEditorTabService;
+        $this->editorTabs = $editorTabs;
+        $this->editor = $editor;
         $this->panelMediaConfigService = $panelMediaConfigService;
         $this->profileContactService = $profileContactService;
         $this->panelTwoFactorPreferencesService = $panelTwoFactorPreferencesService;
@@ -114,7 +119,8 @@ final class PreferencesController
             redirect($this->context->panelUrl('/'));
         }
 
-        $normalizedTheme = $this->normalizePanelThemeChoice((string) ($preferences['theme'] ?? 'default'), true);
+        $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['account', 'profile', 'security'], 'account');
+        $normalizedTheme = $this->editor->normalizePanelThemeChoice((string) ($preferences['theme'] ?? 'default'), true);
         $preferences['theme'] = $normalizedTheme ?? 'default';
         $preferences['two_factor'] = $this->prepareTwoFactorMethodsForView(
             is_array($preferences['two_factor'] ?? null) ? $preferences['two_factor'] : [],
@@ -132,6 +138,7 @@ final class PreferencesController
             'avatarTemplateData' => $this->avatarTemplateData((string) ($preferences['avatar'] ?? '')),
             'avatarUploadLimitsNote' => $this->avatarUploadLimitsNote(),
             'coverImageUrl' => $this->coverPublicUrl((string) ($preferences['cover_image'] ?? '')),
+            'activeTab' => $activeTab,
             'section' => 'preferences',
             'csrfField' => $this->context->csrfField(),
             'flashSuccess' => $this->context->pullFlash('success'),
@@ -149,8 +156,14 @@ final class PreferencesController
     public function preferencesSave(array $post, array $files): void
     {
         $this->context->requirePanelLogin();
-        $activeTab = $this->panelEditorTabService->normalizeEditorTab($post['tab'] ?? null, ['account', 'profile', 'security'], 'account');
-        $preferencesUrl = $this->preferencesUrlWithTab($activeTab, 'account');
+        $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['account', 'profile', 'security'], 'account');
+        $preferencesUrl = $this->editorTabs->panelEditorUrlWithTab(
+            fn (string $suffix): string => $this->context->panelUrl($suffix),
+            '/preferences',
+            null,
+            $activeTab,
+            'account'
+        );
 
         $userId = $this->context->auth()->userId();
         if ($userId === null) {
@@ -177,7 +190,7 @@ final class PreferencesController
         $bio = $this->input->text($post['bio'] ?? null, $bioMaxLength);
         $email = $this->input->email($post['email'] ?? null);
         $themeRaw = $this->input->text($post['theme'] ?? null, 50);
-        $theme = $this->normalizePanelThemeChoice((string) $themeRaw, true);
+        $theme = $this->editor->normalizePanelThemeChoice((string) $themeRaw, true);
         $timezoneRaw = trim((string) $this->input->text($post['timezone'] ?? null, 64));
         $newPassword = $this->input->text($post['new_password'] ?? null, 255);
         $confirmNewPassword = $this->input->text($post['confirm_new_password'] ?? null, 255);
@@ -611,24 +624,6 @@ final class PreferencesController
     }
 
     /**
-     * Builds the panel preferences URL while preserving the active editor tab.
-     *
-     * @param string $tab Active tab slug.
-     * @param string $defaultTab Default tab slug.
-     * @return string Panel preferences URL.
-     */
-    private function preferencesUrlWithTab(string $tab, string $defaultTab): string
-    {
-        return $this->panelEditorTabService->panelEditorUrlWithTab(
-            fn (string $suffix): string => $this->context->panelUrl($suffix),
-            '/preferences',
-            null,
-            $tab,
-            $defaultTab
-        );
-    }
-
-    /**
      * Resolves configured panel login identifier mode.
      *
      * @return string `email` or `username`.
@@ -771,31 +766,6 @@ final class PreferencesController
         $allowedExtensions = (string) $this->config->get('media.allowed_extensions', 'gif,jpg,jpeg,png');
         $policy = new AvatarValidationPolicy($maxBytes, 10000, 10000, $allowedExtensions);
         return $policy->validate($upload);
-    }
-
-    /**
-     * Normalizes panel-theme identifiers to a valid theme slug.
-     *
-     * @param string $theme Submitted theme identifier.
-     * @param bool $allowDefault Whether the sentinel `default` value is allowed.
-     * @return string|null Canonical theme slug, or null when invalid.
-     */
-    private function normalizePanelThemeChoice(string $theme, bool $allowDefault): ?string
-    {
-        $normalized = strtolower(trim($theme));
-        if ($normalized === '') {
-            return $allowDefault ? 'default' : 'corp';
-        }
-
-        if ($allowDefault && $normalized === 'default') {
-            return 'default';
-        }
-
-        if (in_array($normalized, ['corp', 'ice', 'midnight'], true)) {
-            return $normalized;
-        }
-
-        return null;
     }
 
     /**

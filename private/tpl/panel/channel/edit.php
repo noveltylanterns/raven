@@ -48,8 +48,7 @@ $routeSeparator = trim((string) ($channel['route_separator'] ?? 'inherit'));
 if (!in_array($routeSeparator, ['inherit', '-', '_'], true)) {
     $routeSeparator = 'inherit';
 }
-$requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
-$activeTab = in_array($requestedTab, ['basic', 'meta', 'media'], true) ? $requestedTab : 'basic';
+$activeTab = (string) ($activeTab ?? 'basic');
 $taxonomyAssignmentsEnabled = $categoryEnabled || $tagEnabled;
 $deleteFormId = 'delete-channel-form';
 $coverPath = trim((string) ($channel['cover_image_path'] ?? ''));

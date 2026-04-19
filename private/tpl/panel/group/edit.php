@@ -188,8 +188,7 @@ $panelPermissionState = static function (int $bit) use (
         'requires_panel_access' => $requiresPanelAccess,
     ];
 };
-$requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
-$activeTab = in_array($requestedTab, ['basic', 'media', 'permissions'], true) ? $requestedTab : 'basic';
+$activeTab = (string) ($activeTab ?? 'basic');
 // Resolve stored image filenames into public paths for display in the Media tab.
 $coverFilename = trim((string) ($group['cover_image'] ?? ''));
 $iconFilename = trim((string) ($group['icon_image'] ?? ''));

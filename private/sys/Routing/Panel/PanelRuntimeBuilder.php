@@ -53,6 +53,7 @@ use Raven\Lib\Panel\PanelMediaConfigService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\View\SiteContextBuilder;
+use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\Transport\Upload;
 use RuntimeException;
@@ -118,6 +119,11 @@ final class PanelRuntimeBuilder
         $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
         $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', true), true);
         $tagEnabled = ConfigParser::bool($rvn['config']->get('tag.enabled', true), true);
+
+        // Shared panel editor services — created once here and reused across every
+        // controller factory so that extensions can also access panel_editor_tabs.
+        $rvn['panel_editor_tabs'] = new EditorTabs($rvn['input']);
+        $rvn['panel_editor'] = new Editor();
 
         /**
          * Resolves the lazy auth DB handle only for panel factories that truly need it.
@@ -578,7 +584,8 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['taxonomy_lookup'],
                 $contentDomain['user'],
                 new Route($rvn['config'], $rvn['input']),
-                new EditorTabs($rvn['input']),
+                $rvn['panel_editor_tabs'],
+                $rvn['panel_editor'],
                 is_callable($rvn['extension_services_for'] ?? null)
                     ? $rvn['extension_services_for']
                     : static fn (?string $extensionDirectory = null): array => []
@@ -633,7 +640,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['tag_enabled'],
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
                 new Route($rvn['config'], $rvn['input']),
-                new EditorTabs($rvn['input']),
+                $rvn['panel_editor_tabs'],
                 new Upload()
             );
 
@@ -663,7 +670,8 @@ final class PanelRuntimeBuilder
                 new Route($rvn['config'], $rvn['input']),
                 new PanelInvitePolicyService($rvn['input']),
                 new LoginIdentifierResolver(),
-                new EditorTabs($rvn['input']),
+                $rvn['panel_editor_tabs'],
+                $rvn['panel_editor'],
                 new PanelMediaConfigService($rvn['config']),
                 new ProfileContactService($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
@@ -690,7 +698,7 @@ final class PanelRuntimeBuilder
                 $rvn['input'],
                 $groupDomain['group'],
                 new Route($rvn['config'], $rvn['input']),
-                new EditorTabs($rvn['input']),
+                $rvn['panel_editor_tabs'],
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
                 new PanelPermissionDefinitionCatalog(),
                 new Upload(),
@@ -724,7 +732,8 @@ final class PanelRuntimeBuilder
                 $rvn['input'],
                 (string) $rvn['root'],
                 new LoginIdentifierResolver(),
-                new EditorTabs($rvn['input']),
+                $rvn['panel_editor_tabs'],
+                $rvn['panel_editor'],
                 new PanelMediaConfigService($rvn['config']),
                 new ProfileContactService($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
@@ -755,7 +764,9 @@ final class PanelRuntimeBuilder
                 (string) $rvn['root'],
                 $systemDomain['channel'],
                 $systemDomain['category_set'],
-                $systemDomain['tag_set']
+                $systemDomain['tag_set'],
+                $rvn['panel_editor_tabs'],
+                $rvn['panel_editor']
             );
 
             return $configController;

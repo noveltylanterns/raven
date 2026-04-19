@@ -55,7 +55,7 @@ final class TaxonomyController
     private bool $tagEnabled;
     private TaxonomyImageService $taxonomyImageService;
     private Route $routeConfigService;
-    private EditorTabs $panelEditorTabService;
+    private EditorTabs $editorTabs;
     private Upload $uploadFileSetNormalizer;
 
     /**
@@ -70,7 +70,7 @@ final class TaxonomyController
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Service for taxonomy image uploads and path management.
      * @param Route $routeConfigService Route configuration reader for channel/category/tag route mode and prefix helpers.
-     * @param EditorTabs $panelEditorTabService Panel editor tab normalization and tab-preserving URL builder.
+     * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
      * @return void
      */
@@ -86,7 +86,7 @@ final class TaxonomyController
         bool $tagEnabled,
         TaxonomyImageService $taxonomyImageService,
         Route $routeConfigService,
-        EditorTabs $panelEditorTabService,
+        EditorTabs $editorTabs,
         Upload $uploadFileSetNormalizer
     ) {
         $this->context = $context;
@@ -100,7 +100,7 @@ final class TaxonomyController
         $this->tagEnabled = $tagEnabled;
         $this->taxonomyImageService = $taxonomyImageService;
         $this->routeConfigService = $routeConfigService;
-        $this->panelEditorTabService = $panelEditorTabService;
+        $this->editorTabs = $editorTabs;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
     }
 
@@ -180,6 +180,8 @@ final class TaxonomyController
             );
         }
 
+        $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['basic', 'meta', 'media'], 'basic');
+
         $this->context->renderPanel('panel/channel/edit', [
             'channel' => $channel,
             'feedsEnabled' => $this->routeConfigService->feedEnabled(),
@@ -192,6 +194,7 @@ final class TaxonomyController
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),
+            'activeTab' => $activeTab,
             'csrfField' => $this->context->csrfField(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'error' => $this->context->pullFlash('error'),
@@ -220,7 +223,7 @@ final class TaxonomyController
             redirect($this->context->panelUrl('/channel'));
         }
 
-        $activeTab = $this->panelEditorTabService->normalizeEditorTab($post['tab'] ?? null, ['basic', 'meta', 'media'], 'basic');
+        $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['basic', 'meta', 'media'], 'basic');
         // Preserve existing slug when edit form does not re-submit the slug field.
         $existingSet = $id !== null && $id > 0 ? $this->categorySetRepo()->findById($id) : null;
         $name = $this->input->text($post['name'] ?? null, 255);
@@ -251,7 +254,7 @@ final class TaxonomyController
 
         if ($name === '' || $slug === null) {
             $this->context->flash('error', 'Channel name and valid slug are required.');
-            redirect($this->panelEditorTabService->panelEditorUrlWithTab(
+            redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/channel/edit',
                 $id,
@@ -281,7 +284,7 @@ final class TaxonomyController
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->context->flash('error', $message !== '' ? $message : 'Failed to save channel. Slug may already exist.');
-            redirect($this->panelEditorTabService->panelEditorUrlWithTab(
+            redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/channel/edit',
                 $id,
@@ -290,7 +293,7 @@ final class TaxonomyController
             ));
         }
 
-        $savedEditUrl = $this->panelEditorTabService->panelEditorUrlWithTab(
+        $savedEditUrl = $this->editorTabs->panelEditorUrlWithTab(
             fn (string $suffix): string => $this->context->panelUrl($suffix),
             '/channel/edit',
             $savedId,
@@ -551,6 +554,8 @@ final class TaxonomyController
             }
         }
 
+        $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['basic', 'media'], 'basic');
+
         $this->context->renderPanel('panel/category/edit', [
             'category' => $category,
             'setOptions' => $this->categorySetRepo()->listOptions(),
@@ -558,6 +563,7 @@ final class TaxonomyController
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),
+            'activeTab' => $activeTab,
             'csrfField' => $this->context->csrfField(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'error' => $this->context->pullFlash('error'),
@@ -590,7 +596,7 @@ final class TaxonomyController
             redirect($this->context->panelUrl('/category'));
         }
 
-        $activeTab = $this->panelEditorTabService->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
+        $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
         $setId = $this->input->int($post['set'] ?? null, 1);
@@ -598,7 +604,7 @@ final class TaxonomyController
 
         if ($name === '' || $slug === null || $setId === null || !$this->categorySetRepo()->existsId($setId)) {
             $this->context->flash('error', 'Category name, valid slug, and valid set are required.');
-            redirect($this->panelEditorTabService->panelEditorUrlWithTab(
+            redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/category/edit',
                 $id,
@@ -618,7 +624,7 @@ final class TaxonomyController
             ]);
         } catch (\Throwable) {
             $this->context->flash('error', 'Failed to save category. Slug may already exist.');
-            redirect($this->panelEditorTabService->panelEditorUrlWithTab(
+            redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/category/edit',
                 $id,
@@ -627,7 +633,7 @@ final class TaxonomyController
             ));
         }
 
-        $savedEditUrl = $this->panelEditorTabService->panelEditorUrlWithTab(
+        $savedEditUrl = $this->editorTabs->panelEditorUrlWithTab(
             fn (string $suffix): string => $this->context->panelUrl($suffix),
             '/category/edit',
             $savedId,
@@ -928,13 +934,7 @@ final class TaxonomyController
 
         if ($name === '' || ($id !== 0 && $slug === null)) {
             $this->context->flash('error', 'Set name and valid slug are required.');
-            redirect($this->panelEditorTabService->panelEditorUrlWithTab(
-                fn (string $suffix): string => $this->context->panelUrl($suffix),
-                '/category/set/edit',
-                $id,
-                'basic',
-                'basic'
-            ));
+            redirect($this->context->panelUrl('/category/set/edit' . ($id !== null ? '/' . $id : '')));
         }
 
         try {
@@ -947,23 +947,11 @@ final class TaxonomyController
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->context->flash('error', $message !== '' ? $message : 'Failed to save category set.');
-            redirect($this->panelEditorTabService->panelEditorUrlWithTab(
-                fn (string $suffix): string => $this->context->panelUrl($suffix),
-                '/category/set/edit',
-                $id,
-                'basic',
-                'basic'
-            ));
+            redirect($this->context->panelUrl('/category/set/edit' . ($id !== null ? '/' . $id : '')));
         }
 
         $this->context->flash('success', 'Changes saved.');
-        redirect($this->panelEditorTabService->panelEditorUrlWithTab(
-            fn (string $suffix): string => $this->context->panelUrl($suffix),
-            '/category/set/edit',
-            $savedId,
-            'basic',
-            'basic'
-        ));
+        redirect($this->context->panelUrl('/category/set/edit/' . $savedId));
     }
 
     /**
@@ -1113,6 +1101,8 @@ final class TaxonomyController
             }
         }
 
+        $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['basic', 'media'], 'basic');
+
         $this->context->renderPanel('panel/tag/edit', [
             'tag' => $tag,
             'setOptions' => $this->tagSetRepo()->listOptions(),
@@ -1120,6 +1110,7 @@ final class TaxonomyController
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),
+            'activeTab' => $activeTab,
             'csrfField' => $this->context->csrfField(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'error' => $this->context->pullFlash('error'),
@@ -1152,7 +1143,7 @@ final class TaxonomyController
             redirect($this->context->panelUrl('/tag'));
         }
 
-        $activeTab = $this->panelEditorTabService->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
+        $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
         $setId = $this->input->int($post['set'] ?? null, 1);
@@ -1160,7 +1151,7 @@ final class TaxonomyController
 
         if ($name === '' || $slug === null || $setId === null || !$this->tagSetRepo()->existsId($setId)) {
             $this->context->flash('error', 'Tag name, valid slug, and valid set are required.');
-            redirect($this->panelEditorTabService->panelEditorUrlWithTab(
+            redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/tag/edit',
                 $id,
@@ -1180,7 +1171,7 @@ final class TaxonomyController
             ]);
         } catch (\Throwable) {
             $this->context->flash('error', 'Failed to save tag. Slug may already exist.');
-            redirect($this->panelEditorTabService->panelEditorUrlWithTab(
+            redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/tag/edit',
                 $id,
@@ -1189,7 +1180,7 @@ final class TaxonomyController
             ));
         }
 
-        $savedEditUrl = $this->panelEditorTabService->panelEditorUrlWithTab(
+        $savedEditUrl = $this->editorTabs->panelEditorUrlWithTab(
             fn (string $suffix): string => $this->context->panelUrl($suffix),
             '/tag/edit',
             $savedId,
@@ -1484,13 +1475,7 @@ final class TaxonomyController
 
         if ($name === '' || ($id !== 0 && $slug === null)) {
             $this->context->flash('error', 'Set name and valid slug are required.');
-            redirect($this->panelEditorTabService->panelEditorUrlWithTab(
-                fn (string $suffix): string => $this->context->panelUrl($suffix),
-                '/tag/set/edit',
-                $id,
-                'basic',
-                'basic'
-            ));
+            redirect($this->context->panelUrl('/tag/set/edit' . ($id !== null ? '/' . $id : '')));
         }
 
         try {
@@ -1503,23 +1488,11 @@ final class TaxonomyController
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->context->flash('error', $message !== '' ? $message : 'Failed to save tag set.');
-            redirect($this->panelEditorTabService->panelEditorUrlWithTab(
-                fn (string $suffix): string => $this->context->panelUrl($suffix),
-                '/tag/set/edit',
-                $id,
-                'basic',
-                'basic'
-            ));
+            redirect($this->context->panelUrl('/tag/set/edit' . ($id !== null ? '/' . $id : '')));
         }
 
         $this->context->flash('success', 'Changes saved.');
-        redirect($this->panelEditorTabService->panelEditorUrlWithTab(
-            fn (string $suffix): string => $this->context->panelUrl($suffix),
-            '/tag/set/edit',
-            $savedId,
-            'basic',
-            'basic'
-        ));
+        redirect($this->context->panelUrl('/tag/set/edit/' . $savedId));
     }
 
     /**

@@ -32,7 +32,7 @@ final class GroupController
     private InputSanitizer $input;
     private GroupRepository $groupRepo;
     private Route $routeConfigService;
-    private EditorTabs $panelEditorTabService;
+    private EditorTabs $editorTabs;
     private TaxonomyImageService $taxonomyImageService;
     private PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog;
     private Upload $uploadFileSetNormalizer;
@@ -43,7 +43,7 @@ final class GroupController
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param GroupRepository $groupRepo Group repository for panel CRUD.
      * @param Route $routeConfigService Shared route-configuration helper.
-     * @param EditorTabs $panelEditorTabService Shared editor-tab helper.
+     * @param EditorTabs $editorTabs Shared editor-tab helper.
      * @param TaxonomyImageService $taxonomyImageService Shared group image upload/storage pipeline.
      * @param PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog Shared panel permission-definition catalog.
      * @param Upload $uploadFileSetNormalizer Shared upload payload flattener.
@@ -55,7 +55,7 @@ final class GroupController
         InputSanitizer $input,
         GroupRepository $groupRepo,
         Route $routeConfigService,
-        EditorTabs $panelEditorTabService,
+        EditorTabs $editorTabs,
         TaxonomyImageService $taxonomyImageService,
         PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog,
         Upload $uploadFileSetNormalizer,
@@ -65,7 +65,7 @@ final class GroupController
         $this->input = $input;
         $this->groupRepo = $groupRepo;
         $this->routeConfigService = $routeConfigService;
-        $this->panelEditorTabService = $panelEditorTabService;
+        $this->editorTabs = $editorTabs;
         $this->taxonomyImageService = $taxonomyImageService;
         $this->panelPermissionDefinitionCatalog = $panelPermissionDefinitionCatalog;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
@@ -129,6 +129,8 @@ final class GroupController
             }
         }
 
+        $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['basic', 'media', 'permissions'], 'basic');
+
         $this->context->renderPanel('panel/group/edit', [
             'group' => $group,
             'groupRoutePrefix' => $this->groupRoutePrefix(),
@@ -138,6 +140,7 @@ final class GroupController
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),
+            'activeTab' => $activeTab,
             'csrfField' => $this->context->csrfField(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'error' => $this->context->pullFlash('error'),
@@ -166,9 +169,15 @@ final class GroupController
             redirect($this->context->panelUrl('/group'));
         }
 
-        $activeTab = $this->panelEditorTabService->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media', 'permissions'], 'basic');
+        $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media', 'permissions'], 'basic');
         $name = $this->input->text($post['name'] ?? null, 100);
-        $editUrl = $this->groupEditUrlWithTab($id, $activeTab, 'basic');
+        $editUrl = $this->editorTabs->panelEditorUrlWithTab(
+            fn (string $suffix): string => $this->context->panelUrl($suffix),
+            '/group/edit',
+            $id,
+            $activeTab,
+            'basic'
+        );
         $actorIsAdmin = $this->context->auth()->isAdmin();
         $existingGroup = $id !== null ? $this->groupRepo->findById($id) : null;
         $isExistingStockGroup = is_array($existingGroup) && (int) ($existingGroup['is_stock'] ?? 0) === 1;
@@ -261,7 +270,13 @@ final class GroupController
             redirect($editUrl);
         }
 
-        $savedEditUrl = $this->groupEditUrlWithTab($savedId, $activeTab, 'basic');
+        $savedEditUrl = $this->editorTabs->panelEditorUrlWithTab(
+            fn (string $suffix): string => $this->context->panelUrl($suffix),
+            '/group/edit',
+            $savedId,
+            $activeTab,
+            'basic'
+        );
         $currentRecord = $this->groupRepo->findById($savedId);
         $currentStorage = $this->taxonomyImageService->imageStoragePayloadFromRecord('groups', $currentRecord);
         $currentPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('groups', $savedId, $currentStorage);
@@ -442,25 +457,6 @@ final class GroupController
     private function groupRoutesEnabledForRoutingTable(): bool
     {
         return $this->routeConfigService->groupRoutesEnabledForRoutingTable();
-    }
-
-    /**
-     * Builds one group-edit URL while preserving the active editor tab.
-     *
-     * @param int|null $id Group id in edit mode, or null in create mode.
-     * @param string $tab Active editor tab.
-     * @param string $defaultTab Default tab slug.
-     * @return string Panel group-editor URL.
-     */
-    private function groupEditUrlWithTab(?int $id, string $tab, string $defaultTab): string
-    {
-        return $this->panelEditorTabService->panelEditorUrlWithTab(
-            fn (string $suffix): string => $this->context->panelUrl($suffix),
-            '/group/edit',
-            $id,
-            $tab,
-            $defaultTab
-        );
     }
 
     /**

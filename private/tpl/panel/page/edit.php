@@ -174,8 +174,7 @@ $selectedChannelUrlSeparator = (string) ($channelUrlSeparators[$selectedChannelS
 $effectiveChannelUrlSeparator = $selectedChannelUrlSeparator === 'inherit'
     ? $routeSeparatorDefault
     : $selectedChannelUrlSeparator;
-$requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
-$activeTab = in_array($requestedTab, ['content', 'meta', 'media'], true) ? $requestedTab : 'content';
+$activeTab = (string) ($activeTab ?? 'content');
 $maxFilesPerUploadNote = $imageMaxFilesPerUpload > 0
     ? 'max ' . $imageMaxFilesPerUpload . ' per upload'
     : 'no limit per upload';

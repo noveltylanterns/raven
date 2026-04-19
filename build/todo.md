@@ -28,6 +28,97 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 
 
 
+### EditorTabs Universalization Refactor
+
+All tabbed panel editor forms must use `lib/View/Panel/EditorTabs.php` consistently.
+Controllers pass the normalized `$activeTab` to templates. Templates stop reading `$_GET['tab']` directly.
+Shared non-tabbed editor logic moves to `lib/View/Panel/Editor.php` (and additional `Editor*.php` files as needed).
+Clean refactor — no fallback aliasing or backwards-compat shims.
+
+#### Inventory: Tabbed Editor Routes (Core)
+
+Path-routed with numeric ID:
+- [x] `/page/edit/{id}` — `ContentController` — tabs: `content, meta, media`, default `content`
+- [x] `/user/edit/{id}` — `UserController` — tabs: `account, permissions, profile, security`, default `account`
+- [x] `/group/edit/{id}` — `GroupController` — tabs: `basic, media, permissions`, default `basic`
+- [x] `/channel/edit/{id}` — `TaxonomyController` — tabs: `basic, meta, media`, default `basic`
+- [x] `/category/edit/{id}` — `TaxonomyController` — tabs: `basic, media`, default `basic`
+- [x] `/tag/edit/{id}` — `TaxonomyController` — tabs: `basic, media`, default `basic`
+
+Query-tabbed (no ID in path):
+- [x] `/configuration` — `ConfigController` — tabs: `basic, content, database, debug, media, meta, security, users`, default `basic`
+- [x] `/preferences` — `PreferencesController` — tabs: `account, profile, security`, default `account`
+
+Extension — path-segment tab model (tab IS the URL path, not `?tab=`):
+- [x] `/smallweb` (settings) + `/smallweb/{protocol}` (per-protocol file list) — `routes_panel.php` — tabs are `'settings'` or a protocol slug; route handler sets `$currentTab` directly; no `$_GET['tab']` reads; redirects built as `$panelUrl('/smallweb/' . $protocol)`
+
+No tabbed routes found in `contact`, `signups`, `database`, or `repo`.
+
+#### Inventory: Stray Tab Logic to Eliminate
+
+Templates reading `$_GET['tab']` directly and normalizing inline (controller never passes `$activeTab`):
+- [x] `private/tpl/panel/page/edit.php` — hardcoded allowed-list `['content', 'meta', 'media']`
+- [x] `private/tpl/panel/user/edit.php` — hardcoded allowed-list `['account', 'permissions', 'profile', 'security']`
+- [x] `private/tpl/panel/group/edit.php` — verify and remove stray normalization
+- [x] `private/tpl/panel/channel/edit.php` — verify and remove stray normalization
+- [x] `private/tpl/panel/category/edit.php` — verify and remove stray normalization
+- [x] `private/tpl/panel/tag/edit.php` — verify and remove stray normalization
+- [x] `private/tpl/panel/preferences.php` — hardcoded allowed-list `['account', 'profile', 'security']`
+- [x] `private/tpl/panel/configuration.php` — receives `$activeConfigTab` but re-normalizes it inline anyway; remove redundant guard and rename to `$activeTab`
+
+Controller-side stray tab logic:
+- [x] `ConfigController` — self-constructs `EditorTabs` inline (`new EditorTabs($input)`) instead of receiving it via injection; fix to use constructor injection like all other tabbed controllers
+- [x] `ConfigController` — uses `$activeConfigTab` variable name throughout; standardize to `$activeTab` everywhere
+- [x] `ConfigController` — private `configurationUrlForTab(string $tab): string` is a thin wrapper around `panelEditorUrlWithTab`; remove and call `EditorTabs` directly
+- [x] `UserController` — private `userEditUrlWithTab(?int $id, string $tab, string $defaultTab): string` is a thin wrapper; remove and call `EditorTabs` directly
+- [x] `GroupController` — private `groupEditUrlWithTab(?int $id, string $tab, string $defaultTab): string` is a thin wrapper; remove and call `EditorTabs` directly
+- [x] `PreferencesController` — private `preferencesUrlWithTab(string $tab, string $defaultTab): string` is a thin wrapper; remove and call `EditorTabs` directly
+
+Hardcoded redirect strings bypassing EditorTabs entirely:
+- [x] `ContentController::pageGalleryUpload()` — builds redirect as raw string `?tab=media#rvnp-editor-pane-media` (~3 occurrences); replace with `EditorTabs` call once fragment support is added
+- [x] `ContentController::pageGalleryDelete()` — same pattern (~3 occurrences); replace likewise
+
+Spurious EditorTabs usage on single-tab forms (no real tab navigation):
+- [x] `TaxonomyController::categorySetSave()` — calls `panelEditorUrlWithTab(..., 'basic', 'basic')`; evaluate whether these forms should gain tabs or just use a plain `panelUrl()` call
+- [x] `TaxonomyController::tagSetSave()` — same; evaluate and clean up
+
+Duplicated editor utility methods across multiple controllers:
+- [x] `normalizeBodyTextEditorOption()` — exists in both `ContentController` and `ConfigController`; extract to `lib/View/Panel/Editor.php`
+- [x] `normalizePanelThemeChoice()` — exists in `UserController`, `PreferencesController`, and `ConfigController`; extract to `lib/View/Panel/Editor.php`
+- [x] Audit all tabbed controllers for any other shared normalization methods duplicated across two or more controllers; extract to `Editor.php` or a dedicated `Editor*.php` file if domain warrants it
+
+#### Planned Changes: `lib/View/Panel/EditorTabs.php`
+
+- [x] Add optional `string $fragment = ''` parameter to `panelEditorUrlWithTab()` — append `#` + fragment to the URL when non-empty; this unblocks the gallery redirect pattern without special-casing it elsewhere
+- [x] Confirm `?int $id = null` already handles both path-routed and query-tabbed cases (it does; no structural change needed there)
+- [x] Add `panelPathTabUrl(callable $panelUrlBuilder, string $basePath, string $tab): string` method for path-segment tab routing (where tab value is a URL path segment, not a query param) — used by Smallweb and any future extension with the same model
+- [x] Update PHPDoc blocks for any modified signatures
+
+#### Planned New File: `lib/View/Panel/Editor.php`
+
+- [x] Create `private/lib/View/Panel/Editor.php` — home for shared non-tabbed editor utility methods
+- [x] Move `normalizeBodyTextEditorOption()` here from `ContentController` and `ConfigController`
+- [x] Move `normalizePanelThemeChoice()` here from `UserController`, `PreferencesController`, and `ConfigController`
+- [x] Add full PHPDoc (file header, class docblock, per-method docblocks) per the PHPDoc contract
+- [x] Wire `Editor` into the service container and inject it into affected controllers, replacing the duplicated private methods
+
+#### Planned Execution Order
+
+- [x] 1. Add fragment parameter to `EditorTabs::panelEditorUrlWithTab()` and update its docblock
+- [x] 2. Create `lib/View/Panel/Editor.php` with extracted shared methods; wire into DI container
+- [x] 3. Fix `ConfigController`: switch to constructor-injected `EditorTabs`; replace `$activeConfigTab` with `$activeTab`; remove `configurationUrlForTab()` wrapper; inject `Editor`; remove duplicated methods
+- [x] 4. Fix `UserController`: remove `userEditUrlWithTab()` wrapper; inject `Editor`; remove duplicated `normalizePanelThemeChoice()`; pass `$activeTab` to template
+- [x] 5. Fix `PreferencesController`: remove `preferencesUrlWithTab()` wrapper; inject `Editor`; remove duplicated `normalizePanelThemeChoice()`; pass `$activeTab` to template
+- [x] 6. Fix `GroupController`: remove `groupEditUrlWithTab()` wrapper; pass `$activeTab` to template
+- [x] 7. Fix `ContentController`: remove hardcoded gallery redirect strings; use `EditorTabs` with fragment; inject `Editor`; remove duplicated `normalizeBodyTextEditorOption()`; pass `$activeTab` to template
+- [x] 8. Fix `TaxonomyController`: pass `$activeTab` to channel/category/tag edit templates; resolve category-set/tag-set single-tab cleanup
+- [x] 9. Fix all tabbed templates: remove `$_GET['tab']` reads and inline normalization; use `$activeTab` from controller
+- [x] 10. Audit templates for group/channel/category/tag editors that may have stray normalization not confirmed in prior research; fix any found
+- [x] 11. Migrate Smallweb `routes_panel.php` redirect URL construction to use `EditorTabs::panelPathTabUrl()` once that method exists
+- [x] 12. Run `php -l` on all modified PHP files; verify panel editor flows in browser for each route
+- [x] 13. Update `docs/Filetree.md` to document `Editor.php` alongside `EditorTabs.php` and `EditorAuthor.php`
+
+
 ## Long Term
 
 ### Environment Hardening

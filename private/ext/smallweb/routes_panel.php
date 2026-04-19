@@ -33,6 +33,9 @@ return static function (Router $router, array $context): void {
     /** @var callable(string): string $panelUrl */
     $panelUrl = $context['panelUrl'] ?? static fn (string $suffix = ''): string => '/' . ltrim($suffix, '/');
 
+    // Shared EditorTabs instance from the panel container for protocol tab URL building.
+    $editorTabs = $rvn['panel_editor_tabs'] ?? null;
+
     /** @var callable(): void $requirePanelLogin */
     $requirePanelLogin = $context['requirePanelLogin'] ?? static function (): void {};
 
@@ -411,7 +414,8 @@ return static function (Router $router, array $context): void {
         $indexPath,
         $panelUrl,
         $fileEditViewFile,
-        $extensionMeta
+        $extensionMeta,
+        $editorTabs
     ): void {
         $requirePanelLogin();
         $protocol = strtolower(trim((string) ($params['protocol'] ?? '')));
@@ -421,7 +425,9 @@ return static function (Router $router, array $context): void {
 
         $filename = (string) ($params['filename'] ?? '');
         if (!$svc->isValidFilename($filename)) {
-            redirect($panelUrl('/smallweb/' . $protocol));
+            redirect($editorTabs !== null
+                ? $editorTabs->panelPathTabUrl($panelUrl, '/smallweb', $protocol)
+                : $panelUrl('/smallweb/' . $protocol));
             return;
         }
 
@@ -432,7 +438,9 @@ return static function (Router $router, array $context): void {
 
         $content = $svc->readProtocolFile($protocol, $filename, $subdir);
         if ($content === null) {
-            redirect($panelUrl('/smallweb/' . $protocol));
+            redirect($editorTabs !== null
+                ? $editorTabs->panelPathTabUrl($panelUrl, '/smallweb', $protocol)
+                : $panelUrl('/smallweb/' . $protocol));
             return;
         }
 
@@ -496,7 +504,7 @@ return static function (Router $router, array $context): void {
             return;
         }
 
-        $tabUrl = $panelUrl('/smallweb/' . $protocol);
+        $tabUrl = $rvn['panel_editor_tabs']->panelPathTabUrl($panelUrl, '/smallweb', $protocol);
 
         if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
@@ -585,7 +593,7 @@ return static function (Router $router, array $context): void {
             return;
         }
 
-        $tabUrl = $panelUrl('/smallweb/' . $protocol);
+        $tabUrl = $rvn['panel_editor_tabs']->panelPathTabUrl($panelUrl, '/smallweb', $protocol);
 
         if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
@@ -633,7 +641,7 @@ return static function (Router $router, array $context): void {
             return;
         }
 
-        $tabUrl = $panelUrl('/smallweb/' . $protocol);
+        $tabUrl = $rvn['panel_editor_tabs']->panelPathTabUrl($panelUrl, '/smallweb', $protocol);
 
         if (!$svc->protocolSupportsDirectories($protocol)) {
             $flash('error', 'This protocol does not support directories.');
@@ -690,7 +698,7 @@ return static function (Router $router, array $context): void {
             return;
         }
 
-        $tabUrl = $panelUrl('/smallweb/' . $protocol);
+        $tabUrl = $rvn['panel_editor_tabs']->panelPathTabUrl($panelUrl, '/smallweb', $protocol);
 
         if (!$svc->protocolSupportsDirectories($protocol)) {
             $flash('error', 'This protocol does not support directories.');
@@ -738,7 +746,7 @@ return static function (Router $router, array $context): void {
             return;
         }
 
-        $tabUrl = $panelUrl('/smallweb/' . $protocol);
+        $tabUrl = $rvn['panel_editor_tabs']->panelPathTabUrl($panelUrl, '/smallweb', $protocol);
 
         if (!$svc->protocolSupportsUpload($protocol)) {
             $flash('error', 'This protocol does not support file uploads.');

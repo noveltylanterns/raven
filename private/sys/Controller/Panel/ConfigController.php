@@ -20,6 +20,7 @@ use Raven\Lib\Config\ConfigWriter;
 use Raven\Lib\Directory\Mode;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\ThemeCatalogService;
 
@@ -139,6 +140,7 @@ final class ConfigController
     private ?TaxonomySetRepository $tagSetRepo = null;
     private ProfileContactService $profileContacts;
     private EditorTabs $editorTabs;
+    private Editor $editor;
     /** @var array<string, string>|null */
     private ?array $publicThemeOptionsCache = null;
     /** @var array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>|null */
@@ -157,6 +159,8 @@ final class ConfigController
      * @param ChannelRepository $channelRepo Channel repository for feed-channel options.
      * @param callable(): TaxonomySetRepository $categorySetRepoResolver Lazy category-set resolver.
      * @param callable(): TaxonomySetRepository $tagSetRepoResolver Lazy tag-set resolver.
+     * @param EditorTabs $editorTabs Shared panel editor-tab normalization and URL builder.
+     * @param Editor $editor Shared panel editor utility methods (body-text editor, theme normalization).
      * @return void
      */
     public function __construct(
@@ -166,7 +170,9 @@ final class ConfigController
         string $root,
         ChannelRepository $channelRepo,
         callable $categorySetRepoResolver,
-        callable $tagSetRepoResolver
+        callable $tagSetRepoResolver,
+        EditorTabs $editorTabs,
+        Editor $editor
     ) {
         $this->context = $context;
         $this->config = $config;
@@ -176,7 +182,8 @@ final class ConfigController
         $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
         $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
         $this->profileContacts = new ProfileContactService($input);
-        $this->editorTabs = new EditorTabs($input);
+        $this->editorTabs = $editorTabs;
+        $this->editor = $editor;
     }
 
     /**
@@ -197,9 +204,9 @@ final class ConfigController
         $configSnapshot = $this->applyDefaults(
             $configSnapshot,
             $publicThemeOptions,
-            fn (string $theme, bool $allowDefault): ?string => $this->normalizePanelThemeChoice($theme, $allowDefault)
+            fn (string $theme, bool $allowDefault): ?string => $this->editor->normalizePanelThemeChoice($theme, $allowDefault)
         );
-        $activeConfigTab = $this->normalizeConfigTab($_GET['tab'] ?? 'basic');
+        $activeTab = $this->normalizeConfigTab($_GET['tab'] ?? 'basic');
 
         $this->context->renderPanel('panel/configuration', [
             'canManageConfiguration' => $this->context->auth()->canManageConfiguration(),
@@ -212,7 +219,7 @@ final class ConfigController
             'channelOptions' => $this->channelRoutingOptions(),
             'categorySetOptions' => $this->categorySetOptions(),
             'tagSetOptions' => $this->tagSetOptions(),
-            'activeConfigTab' => $activeConfigTab,
+            'activeTab' => $activeTab,
         ]);
     }
 
@@ -225,7 +232,7 @@ final class ConfigController
     public function configurationSave(array $post): void
     {
         $this->context->requirePanelLogin();
-        $activeConfigTab = $this->normalizeConfigTab($post['_config_tab'] ?? 'basic');
+        $activeTab = $this->normalizeConfigTab($post['_config_tab'] ?? 'basic');
 
         if (!$this->context->requireRoutePermissionOrForbidden('configuration', 'edit')) {
             return;
@@ -233,14 +240,26 @@ final class ConfigController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->configurationUrlForTab($activeConfigTab));
+            redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/configuration',
+                null,
+                $activeTab,
+                'basic'
+            ));
         }
 
         /** @var mixed $rawConfigValues */
         $rawConfigValues = $post['config_values'] ?? [];
         if (!is_array($rawConfigValues)) {
             $this->context->flash('error', 'Invalid configuration payload.');
-            redirect($this->configurationUrlForTab($activeConfigTab));
+            redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/configuration',
+                null,
+                $activeTab,
+                'basic'
+            ));
         }
 
         $publicThemeOptions = $this->publicThemeOptions();
@@ -252,7 +271,7 @@ final class ConfigController
         $currentConfig = $this->applyDefaults(
             $currentConfig,
             $publicThemeOptions,
-            fn (string $theme, bool $allowDefault): ?string => $this->normalizePanelThemeChoice($theme, $allowDefault)
+            fn (string $theme, bool $allowDefault): ?string => $this->editor->normalizePanelThemeChoice($theme, $allowDefault)
         );
         $fields = $this->flattenFields($currentConfig);
         $nextConfig = $currentConfig;
@@ -285,9 +304,9 @@ final class ConfigController
                     $type,
                     $rawValue,
                     $nextConfig,
-                    fn (string $value): string => $this->normalizeBodyTextEditorOption($value),
+                    fn (string $value): string => $this->editor->normalizeBodyTextEditorOption($value),
                     fn (string $value): string => $this->normalizeGlobalRouteSeparator($value),
-                    fn (string $theme, bool $allowDefault): ?string => $this->normalizePanelThemeChoice($theme, $allowDefault),
+                    fn (string $theme, bool $allowDefault): ?string => $this->editor->normalizePanelThemeChoice($theme, $allowDefault),
                     $publicThemeOptions,
                     $channelRoutingOptions,
                     $categorySetOptions,
@@ -297,14 +316,26 @@ final class ConfigController
             }
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', $exception->getMessage());
-            redirect($this->configurationUrlForTab($activeConfigTab));
+            redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/configuration',
+                null,
+                $activeTab,
+                'basic'
+            ));
         }
 
         $domain = $this->input->text((string) ($nextConfig['site']['domain'] ?? ''), 200);
         $panelPath = $this->input->slug((string) ($nextConfig['panel']['path'] ?? ''));
         if ($domain === '' || $panelPath === null) {
             $this->context->flash('error', 'site.domain and panel.path are required.');
-            redirect($this->configurationUrlForTab($activeConfigTab));
+            redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/configuration',
+                null,
+                $activeTab,
+                'basic'
+            ));
         }
 
         $nextConfig['site']['domain'] = $domain;
@@ -317,13 +348,19 @@ final class ConfigController
         $nextConfig = $this->applyDefaults(
             $nextConfig,
             $publicThemeOptions,
-            fn (string $theme, bool $allowDefault): ?string => $this->normalizePanelThemeChoice($theme, $allowDefault)
+            fn (string $theme, bool $allowDefault): ?string => $this->editor->normalizePanelThemeChoice($theme, $allowDefault)
         );
         $nextConfig = $this->removeSqliteDatabaseFiles($nextConfig);
         $this->persistConfigSnapshot($nextConfig);
 
         $this->context->flash('success', 'Configuration saved.');
-        redirect($this->configurationUrlForTab($activeConfigTab));
+        redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/configuration',
+                null,
+                $activeTab,
+                'basic'
+            ));
     }
 
     /**
@@ -379,23 +416,6 @@ final class ConfigController
 
         $this->publicThemeOptionsCache = $this->themeCatalogService()->options();
         return $this->publicThemeOptionsCache;
-    }
-
-    /**
-     * Builds a tab-preserving configuration URL under the panel prefix.
-     *
-     * @param string $tab Requested config-editor tab.
-     * @return string Config editor URL for that tab.
-     */
-    private function configurationUrlForTab(string $tab): string
-    {
-        return $this->editorTabs->panelEditorUrlWithTab(
-            fn (string $suffix): string => $this->context->panelUrl($suffix),
-            '/configuration',
-            null,
-            $this->normalizeConfigTab($tab),
-            'basic'
-        );
     }
 
     /**
@@ -1319,7 +1339,7 @@ final class ConfigController
             $content = [];
         }
 
-        $content['editor'] = $this->normalizeBodyTextEditorOption((string) ($content['editor'] ?? 'tinymce'));
+        $content['editor'] = $this->editor->normalizeBodyTextEditorOption((string) ($content['editor'] ?? 'tinymce'));
         $content['mode'] = $this->normalizeGlobalPageRouteMode((string) ($content['mode'] ?? 'slug'));
         $content['separator'] = $this->normalizeGlobalRouteSeparator((string) ($content['separator'] ?? '-'));
 
@@ -2190,19 +2210,6 @@ final class ConfigController
     }
 
     /**
-     * Normalizes a submitted content editor choice.
-     *
-     * @param string $value Submitted editor choice.
-     * @return string Canonical editor key.
-     */
-    private function normalizeBodyTextEditorOption(string $value): string
-    {
-        $editor = strtolower(trim($value));
-
-        return in_array($editor, ['tinymce', 'plaintext', 'autobr', 'markdown'], true) ? $editor : 'tinymce';
-    }
-
-    /**
      * Normalizes the global route separator choice.
      *
      * @param string $value Submitted separator choice.
@@ -2238,31 +2245,6 @@ final class ConfigController
         }
 
         return self::$timezoneIdentifiers;
-    }
-
-    /**
-     * Normalizes panel-theme identifiers to valid theme slugs.
-     *
-     * @param string $theme Submitted panel-theme value.
-     * @param bool $allowDefault Whether the literal `default` sentinel is allowed.
-     * @return string|null Canonical panel-theme slug, or null when invalid.
-     */
-    private function normalizePanelThemeChoice(string $theme, bool $allowDefault): ?string
-    {
-        $normalized = strtolower(trim($theme));
-        if ($normalized === '') {
-            return $allowDefault ? 'default' : 'corp';
-        }
-
-        if ($allowDefault && $normalized === 'default') {
-            return 'default';
-        }
-
-        if (in_array($normalized, ['corp', 'ice', 'midnight'], true)) {
-            return $normalized;
-        }
-
-        return null;
     }
 
     /**

@@ -182,8 +182,7 @@ $userPublicUrl = null;
 if ($userRow !== null && $publicBase !== '' && $profileRoutesEnabled && $profileRoutePrefix !== '' && $profileRouteSegment !== '') {
     $userPublicUrl = $publicBase . '/' . rawurlencode($profileRoutePrefix) . '/' . rawurlencode($profileRouteSegment);
 }
-$requestedTab = strtolower((string) ($_GET['tab'] ?? ''));
-$activeTab = in_array($requestedTab, ['account', 'permissions', 'profile', 'security'], true) ? $requestedTab : 'account';
+$activeTab = (string) ($activeTab ?? 'account');
 $selectedTheme = strtolower(trim((string) ($userRow['theme'] ?? 'default')));
 if ($selectedTheme === 'light') {
     $selectedTheme = 'corp';

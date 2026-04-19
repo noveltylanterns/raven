@@ -206,7 +206,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `SiteContextBuilder`, `BodyBlockPolicy`, `MarkdownRenderer`, `PageBodyBlockCodec`, `PagePersistenceService`, `PageTaxonomyAssignmentService`, `PageTaxonomyQueryService`, and `PublicPageBodyRenderer` now live directly under `View/` as the shared content/view surface.
   - `ThemeDiscoveryService`, `ThemeInheritanceResolver`, `ThemeFallbackRenderer` — shared theme infrastructure used by both panel and public contexts.
   - `Pagination.php` — reusable pagination value object and helper; available to both panel and public controllers.
-  - `View/Panel/` — panel-only view/theme helpers: `EditorTabs`, `EditorAuthor`, `ThemeCatalogService`, `ThemeCloneService`, `ThemeScaffoldService`, `ThemeManifestValidator`.
+  - `View/Panel/` — panel-only view/theme helpers: `Editor` (shared body-text editor and theme-normalization utilities), `EditorTabs` (shared tab normalization and tab-preserving URL helpers), `EditorAuthor`, `ThemeCatalogService`, `ThemeCloneService`, `ThemeScaffoldService`, `ThemeManifestValidator`.
   - `View/Public/` — public-route-only view/theme rendering: `PublicThemeRegistry` (discovers and validates installed public themes), `PublicRouteRenderService`, `PublicTemplateDecorator`, `PublicTemplatePipeline`, `PublicTemplateResolver`, and `PublicMetaService`.
 
 ## Reading Order

@@ -25,6 +25,7 @@ use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
+use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\Panel\PanelMediaConfigService;
 use Raven\Lib\Profile\ProfileContactService;
@@ -53,7 +54,8 @@ final class UserController
     private Route $routeConfigService;
     private PanelInvitePolicyService $panelInvitePolicyService;
     private LoginIdentifierResolver $loginIdentifierResolver;
-    private EditorTabs $panelEditorTabService;
+    private EditorTabs $editorTabs;
+    private Editor $editor;
     private PanelMediaConfigService $panelMediaConfigService;
     private ProfileContactService $profileContactService;
     private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
@@ -72,7 +74,8 @@ final class UserController
      * @param Route $routeConfigService Shared route-configuration helper.
      * @param PanelInvitePolicyService $panelInvitePolicyService Shared invite-form parsing helper.
      * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
-     * @param EditorTabs $panelEditorTabService Shared editor-tab normalization helper.
+     * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
+     * @param Editor $editor Shared panel editor utility methods (theme normalization).
      * @param PanelMediaConfigService $panelMediaConfigService Shared media-limit helper.
      * @param ProfileContactService $profileContactService Shared profile-contact normalizer.
      * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA list normalizer.
@@ -92,7 +95,8 @@ final class UserController
         Route $routeConfigService,
         PanelInvitePolicyService $panelInvitePolicyService,
         LoginIdentifierResolver $loginIdentifierResolver,
-        EditorTabs $panelEditorTabService,
+        EditorTabs $editorTabs,
+        Editor $editor,
         PanelMediaConfigService $panelMediaConfigService,
         ProfileContactService $profileContactService,
         PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,
@@ -110,7 +114,8 @@ final class UserController
         $this->routeConfigService = $routeConfigService;
         $this->panelInvitePolicyService = $panelInvitePolicyService;
         $this->loginIdentifierResolver = $loginIdentifierResolver;
-        $this->panelEditorTabService = $panelEditorTabService;
+        $this->editorTabs = $editorTabs;
+        $this->editor = $editor;
         $this->panelMediaConfigService = $panelMediaConfigService;
         $this->profileContactService = $profileContactService;
         $this->panelTwoFactorPreferencesService = $panelTwoFactorPreferencesService;
@@ -182,10 +187,11 @@ final class UserController
             return;
         }
 
+        $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['account', 'permissions', 'profile', 'security'], 'account');
         $editData = $this->userRepo->editFormData($id);
         $user = is_array($editData['user'] ?? null) ? $editData['user'] : null;
         if (is_array($user)) {
-            $normalizedTheme = $this->normalizePanelThemeChoice((string) ($user['theme'] ?? 'default'), true);
+            $normalizedTheme = $this->editor->normalizePanelThemeChoice((string) ($user['theme'] ?? 'default'), true);
             $user['theme'] = $normalizedTheme ?? 'default';
 
             if ($id !== null) {
@@ -227,6 +233,7 @@ final class UserController
             'canAssignAdmin' => $actorIsAdmin,
             'canAssignConfigurationGroups' => $actorIsAdmin,
             'themeOptions' => ['default', 'corp', 'ice', 'midnight'],
+            'activeTab' => $activeTab,
             'csrfField' => $this->context->csrfField(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'error' => $this->context->pullFlash('error'),
@@ -255,9 +262,21 @@ final class UserController
             redirect($this->context->panelUrl('/user'));
         }
 
-        $activeTab = $this->panelEditorTabService->normalizeEditorTab($post['tab'] ?? null, ['account', 'permissions', 'profile', 'security'], 'account');
-        $editUrl = $this->userEditUrlWithTab($id, $activeTab, 'account');
-        $securityTabUrl = $this->userEditUrlWithTab($id, $activeTab, 'security');
+        $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['account', 'permissions', 'profile', 'security'], 'account');
+        $editUrl = $this->editorTabs->panelEditorUrlWithTab(
+            fn (string $suffix): string => $this->context->panelUrl($suffix),
+            '/user/edit',
+            $id,
+            $activeTab,
+            'account'
+        );
+        $securityTabUrl = $this->editorTabs->panelEditorUrlWithTab(
+            fn (string $suffix): string => $this->context->panelUrl($suffix),
+            '/user/edit',
+            $id,
+            $activeTab,
+            'security'
+        );
         $loginIdentifierMode = $this->panelLoginIdentifierMode();
         $usernameSubmitted = array_key_exists('username', $post);
         $rawUsername = $this->input->text($post['username'] ?? null, 254);
@@ -267,7 +286,7 @@ final class UserController
         $bio = $this->input->text($post['bio'] ?? null, $bioMaxLength);
         $email = $this->input->email($post['email'] ?? null);
         $themeRaw = $this->input->text($post['theme'] ?? null, 50);
-        $theme = $this->normalizePanelThemeChoice((string) $themeRaw, true);
+        $theme = $this->editor->normalizePanelThemeChoice((string) $themeRaw, true);
         $password = $this->input->text($post['password'] ?? null, 255);
         $passwordConfirm = $this->input->text($post['password_confirm'] ?? null, 255);
         $profileContactOptions = $this->profileContactOptions();
@@ -673,11 +692,23 @@ final class UserController
 
         if ($twoFactorUpdateError !== null) {
             $this->context->flash('error', $twoFactorUpdateError);
-            redirect($this->userEditUrlWithTab($savedId, $activeTab, 'security'));
+            redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/user/edit',
+                $savedId,
+                $activeTab,
+                'security'
+            ));
         }
 
         $this->context->flash('success', 'Changes saved.');
-        redirect($this->userEditUrlWithTab($savedId, $activeTab, 'account'));
+        redirect($this->editorTabs->panelEditorUrlWithTab(
+            fn (string $suffix): string => $this->context->panelUrl($suffix),
+            '/user/edit',
+            $savedId,
+            $activeTab,
+            'account'
+        ));
     }
 
     /**
@@ -1200,50 +1231,6 @@ final class UserController
         $allowedExtensions = (string) $this->config->get('media.allowed_extensions', 'gif,jpg,jpeg,png');
         $policy = new AvatarValidationPolicy($maxBytes, 10000, 10000, $allowedExtensions);
         return $policy->validate($upload);
-    }
-
-    /**
-     * Normalizes panel-theme identifiers to a valid theme slug.
-     *
-     * @param string $theme Submitted theme identifier.
-     * @param bool $allowDefault Whether the sentinel `default` value is allowed.
-     * @return string|null Canonical theme slug, or null when invalid.
-     */
-    private function normalizePanelThemeChoice(string $theme, bool $allowDefault): ?string
-    {
-        $normalized = strtolower(trim($theme));
-        if ($normalized === '') {
-            return $allowDefault ? 'default' : 'corp';
-        }
-
-        if ($allowDefault && $normalized === 'default') {
-            return 'default';
-        }
-
-        if (in_array($normalized, ['corp', 'ice', 'midnight'], true)) {
-            return $normalized;
-        }
-
-        return null;
-    }
-
-    /**
-     * Builds one user-edit URL while preserving the active editor tab.
-     *
-     * @param int|null $id User id in edit mode, or null in create mode.
-     * @param string $tab Active tab.
-     * @param string $defaultTab Default tab slug.
-     * @return string Panel user-editor URL.
-     */
-    private function userEditUrlWithTab(?int $id, string $tab, string $defaultTab): string
-    {
-        return $this->panelEditorTabService->panelEditorUrlWithTab(
-            fn (string $suffix): string => $this->context->panelUrl($suffix),
-            '/user/edit',
-            $id,
-            $tab,
-            $defaultTab
-        );
     }
 
     /**
