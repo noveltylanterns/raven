@@ -25,7 +25,7 @@ use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
-use Raven\Lib\Panel\PanelEditorTabService;
+use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\Panel\PanelMediaConfigService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Directory\Route;
@@ -53,7 +53,7 @@ final class UserController
     private Route $routeConfigService;
     private PanelInvitePolicyService $panelInvitePolicyService;
     private LoginIdentifierResolver $loginIdentifierResolver;
-    private PanelEditorTabService $panelEditorTabService;
+    private EditorTabs $panelEditorTabService;
     private PanelMediaConfigService $panelMediaConfigService;
     private ProfileContactService $profileContactService;
     private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
@@ -72,7 +72,7 @@ final class UserController
      * @param Route $routeConfigService Shared route-configuration helper.
      * @param PanelInvitePolicyService $panelInvitePolicyService Shared invite-form parsing helper.
      * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
-     * @param PanelEditorTabService $panelEditorTabService Shared editor-tab normalization helper.
+     * @param EditorTabs $panelEditorTabService Shared editor-tab normalization helper.
      * @param PanelMediaConfigService $panelMediaConfigService Shared media-limit helper.
      * @param ProfileContactService $profileContactService Shared profile-contact normalizer.
      * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA list normalizer.
@@ -92,7 +92,7 @@ final class UserController
         Route $routeConfigService,
         PanelInvitePolicyService $panelInvitePolicyService,
         LoginIdentifierResolver $loginIdentifierResolver,
-        PanelEditorTabService $panelEditorTabService,
+        EditorTabs $panelEditorTabService,
         PanelMediaConfigService $panelMediaConfigService,
         ProfileContactService $profileContactService,
         PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,

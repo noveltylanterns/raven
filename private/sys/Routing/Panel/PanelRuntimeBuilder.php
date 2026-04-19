@@ -14,6 +14,7 @@ namespace Raven\Core\Routing\Panel;
 use Closure;
 use PDO;
 use Raven\Core\Controller\Panel\AuthController;
+use Raven\Core\Controller\Panel\ConfigController;
 use Raven\Core\Controller\Panel\ContentController;
 use Raven\Core\Controller\Panel\DashboardController;
 use Raven\Core\Controller\Panel\GroupController;
@@ -48,11 +49,11 @@ use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\PageImageManager;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Media\Panel\UserMediaPathService;
-use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Panel\PanelMediaConfigService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\View\SiteContextBuilder;
+use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\Transport\Upload;
 use RuntimeException;
 
@@ -88,6 +89,7 @@ final class PanelRuntimeBuilder
         }
 
         $authController = null;
+        $configController = null;
         $contentController = null;
         $dashboardController = null;
         $groupController = null;
@@ -576,7 +578,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['taxonomy_lookup'],
                 $contentDomain['user'],
                 new Route($rvn['config'], $rvn['input']),
-                new PanelEditorTabService($rvn['input']),
+                new EditorTabs($rvn['input']),
                 is_callable($rvn['extension_services_for'] ?? null)
                     ? $rvn['extension_services_for']
                     : static fn (?string $extensionDirectory = null): array => []
@@ -631,7 +633,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['tag_enabled'],
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
                 new Route($rvn['config'], $rvn['input']),
-                new PanelEditorTabService($rvn['input']),
+                new EditorTabs($rvn['input']),
                 new Upload()
             );
 
@@ -661,7 +663,7 @@ final class PanelRuntimeBuilder
                 new Route($rvn['config'], $rvn['input']),
                 new PanelInvitePolicyService($rvn['input']),
                 new LoginIdentifierResolver(),
-                new PanelEditorTabService($rvn['input']),
+                new EditorTabs($rvn['input']),
                 new PanelMediaConfigService($rvn['config']),
                 new ProfileContactService($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
@@ -688,7 +690,7 @@ final class PanelRuntimeBuilder
                 $rvn['input'],
                 $groupDomain['group'],
                 new Route($rvn['config'], $rvn['input']),
-                new PanelEditorTabService($rvn['input']),
+                new EditorTabs($rvn['input']),
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
                 new PanelPermissionDefinitionCatalog(),
                 new Upload(),
@@ -722,7 +724,7 @@ final class PanelRuntimeBuilder
                 $rvn['input'],
                 (string) $rvn['root'],
                 new LoginIdentifierResolver(),
-                new PanelEditorTabService($rvn['input']),
+                new EditorTabs($rvn['input']),
                 new PanelMediaConfigService($rvn['config']),
                 new ProfileContactService($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
@@ -735,8 +737,33 @@ final class PanelRuntimeBuilder
         };
 
         /**
+         * Builds the split configuration controller on first use.
+         * Owns `/configuration` and `/configuration/save` only.
+         */
+        $rvn['panel_config_controller'] = static function () use (&$configController, &$rvn, $panelSystemDomain): ConfigController {
+            if ($configController instanceof ConfigController) {
+                return $configController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $systemDomain = $panelSystemDomain();
+            $configController = new ConfigController(
+                $requestContextFactory(),
+                $rvn['config'],
+                $rvn['input'],
+                (string) $rvn['root'],
+                $systemDomain['channel'],
+                $systemDomain['category_set'],
+                $systemDomain['tag_set']
+            );
+
+            return $configController;
+        };
+
+        /**
          * Builds the split system controller on first use.
-         * Owns configuration, update, routing, logs, themes, and extensions.
+         * Owns update, routing, logs, themes, and extensions.
          */
         $rvn['panel_system_controller'] = static function () use (&$systemController, &$rvn, $panelSystemDomain): SystemController {
             if ($systemController instanceof SystemController) {

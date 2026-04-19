@@ -1,15 +1,22 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/View/Panel/EditorAuthor.php
+ * Panel page-editor author option normalization helper.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Panel;
+namespace Raven\Lib\View\Panel;
 
 use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Builds normalized page-author option rows for panel page editor selects.
  */
-final class PanelPageAuthorOptionBuilder
+final class EditorAuthor
 {
     /**
      * @param array<int, mixed> $users

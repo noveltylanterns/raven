@@ -18,7 +18,7 @@ use Raven\Core\Repository\TagRepository;
 use Raven\Core\Repository\TaxonomySetRepository;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
-use Raven\Lib\Panel\PanelEditorTabService;
+use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\Directory\Mode;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
@@ -55,7 +55,7 @@ final class TaxonomyController
     private bool $tagEnabled;
     private TaxonomyImageService $taxonomyImageService;
     private Route $routeConfigService;
-    private PanelEditorTabService $panelEditorTabService;
+    private EditorTabs $panelEditorTabService;
     private Upload $uploadFileSetNormalizer;
 
     /**
@@ -70,7 +70,7 @@ final class TaxonomyController
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Service for taxonomy image uploads and path management.
      * @param Route $routeConfigService Route configuration reader for channel/category/tag route mode and prefix helpers.
-     * @param PanelEditorTabService $panelEditorTabService Panel editor tab normalization and tab-preserving URL builder.
+     * @param EditorTabs $panelEditorTabService Panel editor tab normalization and tab-preserving URL builder.
      * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
      * @return void
      */
@@ -86,7 +86,7 @@ final class TaxonomyController
         bool $tagEnabled,
         TaxonomyImageService $taxonomyImageService,
         Route $routeConfigService,
-        PanelEditorTabService $panelEditorTabService,
+        EditorTabs $panelEditorTabService,
         Upload $uploadFileSetNormalizer
     ) {
         $this->context = $context;

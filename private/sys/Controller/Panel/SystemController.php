@@ -31,6 +31,7 @@ use Raven\Lib\Archive\Update as ArchiveUpdate;
 use Raven\Lib\Archive\Upstream;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\Config\ConfigWriter;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\ExtensionStorageCleaner;
@@ -38,15 +39,7 @@ use Raven\Lib\Extension\ExtensionStorageProvisioner;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
-use Raven\Lib\Panel\ConfigEditorNormalizer;
-use Raven\Lib\Panel\ConfigEditorSchemaService;
-use Raven\Lib\Panel\ConfigSnapshotSanitizer;
-use Raven\Lib\Panel\PanelConfigDefaultsService;
-use Raven\Lib\Panel\PanelConfigFieldPolicyService;
-use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Panel\PanelRoutingPreviewService;
-use Raven\Lib\Profile\ProfileContactService;
-use Raven\Lib\Directory\Mode;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\SiteContextBuilder;
@@ -62,11 +55,11 @@ use function Raven\Lib\Extra\redirect;
 /**
  * Handles split panel system-management routes.
  *
- * Owns the remaining panel administration seam: configuration, updater,
- * routing inventory, event logs, public-theme management, and extension
- * management. The shared auth/flash/render state stays centralized in
- * SharedController, while this controller keeps the system-specific services and
- * filesystem workflows localized to one place.
+ * Owns the remaining panel administration seam: updater, routing inventory,
+ * event logs, public-theme management, extension management, and shared panel
+ * fallback rendering. The configuration editor now has its own dedicated
+ * `ConfigController`, while shared auth/flash/render state stays centralized in
+ * `SharedController`.
  */
 final class SystemController
 {
@@ -97,24 +90,17 @@ final class SystemController
     private ?ExtensionStateStore $extensionStateStore = null;
     private ?ExtensionScaffoldService $extensionScaffoldService = null;
     private ?ThemeScaffoldService $themeScaffoldService = null;
-    private ?ConfigEditorNormalizer $configEditorNormalizer = null;
-    private ?PanelConfigDefaultsService $panelConfigDefaultsService = null;
     private ?RoutingInventoryBuilder $routingInventoryBuilder = null;
     private ?ExtensionPermissionCatalogService $extensionPermissionCatalogService = null;
     private ?ExtensionStorageProvisioner $extensionStorageProvisioner = null;
     private ?ExtensionBootstrapContractResolver $extensionBootstrapContractResolver = null;
-    private ?ConfigSnapshotSanitizer $configSnapshotSanitizer = null;
     private ?ThemeCloneService $themeCloneService = null;
     private ?ThemeFallbackRenderer $publicFallbackRenderer = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
-    private ?ConfigEditorSchemaService $configEditorSchemaService = null;
-    private ?ProfileContactService $profileContactService = null;
     private ?Route $routeConfigService = null;
     private ?ExtensionCatalogService $extensionCatalogService = null;
-    private ?PanelEditorTabService $panelEditorTabService = null;
     private ?PanelRoutingPreviewService $panelRoutingPreviewService = null;
     private ?ThemeCatalogService $themeCatalogService = null;
-    private ?PanelConfigFieldPolicyService $panelConfigFieldPolicyService = null;
     private ?ArchiveInstall $packageInstallWorkflowService = null;
     private ?ArchiveDelete $directoryTreeService = null;
     private ?Csv $csvHandler = null;
@@ -167,127 +153,6 @@ final class SystemController
         $this->loggerResolver = Closure::fromCallable($loggerResolver);
         $this->extensionServicesFor = Closure::fromCallable($extensionServicesFor);
         $this->identifierResolver = new LoginIdentifierResolver();
-    }
-
-    /**
-     * Renders the configuration editor.
-     *
-     * @return void
-     */
-    public function configuration(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('configuration', 'view')) {
-            return;
-        }
-
-        $configSnapshot = $this->config->all();
-        $configSnapshot = $this->removeSqliteDatabaseFilesConfig($configSnapshot);
-        $configSnapshot = $this->applyConfigEditorDefaults($configSnapshot);
-        $activeConfigTab = $this->normalizeConfigEditorTab($_GET['tab'] ?? 'basic');
-
-        $this->context->renderPanel('panel/configuration', [
-            'canManageConfiguration' => $this->context->auth()->canManageConfiguration(),
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
-            'section' => 'configuration',
-            'configSnapshot' => $configSnapshot,
-            'configFields' => $this->flattenConfigFields($configSnapshot),
-            'channelOptions' => $this->channelRepo->listRoutingOptions(),
-            'categorySetOptions' => $this->categorySetRepo()->listOptions(),
-            'tagSetOptions' => $this->tagSetRepo()->listOptions(),
-            'activeConfigTab' => $activeConfigTab,
-        ]);
-    }
-
-    /**
-     * Saves configuration values from the configuration editor.
-     *
-     * @param array<string, mixed> $post Submitted form payload.
-     * @return void
-     */
-    public function configurationSave(array $post): void
-    {
-        $this->context->requirePanelLogin();
-        $activeConfigTab = $this->normalizeConfigEditorTab($post['_config_tab'] ?? 'basic');
-
-        if (!$this->context->requireRoutePermissionOrForbidden('configuration', 'edit')) {
-            return;
-        }
-
-        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
-            $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->configurationUrlForTab($activeConfigTab));
-        }
-
-        /** @var mixed $rawConfigValues */
-        $rawConfigValues = $post['config_values'] ?? [];
-        if (!is_array($rawConfigValues)) {
-            $this->context->flash('error', 'Invalid configuration payload.');
-            redirect($this->configurationUrlForTab($activeConfigTab));
-        }
-
-        $currentConfig = $this->config->all();
-        $currentConfig = $this->removeSqliteDatabaseFilesConfig($currentConfig);
-        $currentConfig = $this->applyConfigEditorDefaults($currentConfig);
-        $fields = $this->flattenConfigFields($currentConfig);
-        $nextConfig = $currentConfig;
-
-        try {
-            foreach ($fields as $field) {
-                /** @var array<int, string> $segments */
-                $segments = $field['segments'];
-                $path = (string) $field['path'];
-                if (str_starts_with($path, 'user.contact.')) {
-                    continue;
-                }
-
-                $type = (string) $field['type'];
-                if ($path === 'feed.channels') {
-                    $rawValue = is_array($rawConfigValues['feed']['channels'] ?? null)
-                        ? $rawConfigValues['feed']['channels']
-                        : [];
-                    $normalized = $this->panelConfigFieldPolicyService()->normalizeFeedChannelsValue(
-                        $rawValue,
-                        $this->channelRepo->listRoutingOptions()
-                    );
-                    $this->setNestedConfigValue($nextConfig, $segments, $normalized);
-                    continue;
-                }
-
-                $rawValue = $this->readNestedConfigValue($rawConfigValues, $segments);
-                $normalized = $this->normalizeConfigFieldValue($path, $type, $rawValue, $nextConfig);
-                $this->setNestedConfigValue($nextConfig, $segments, $normalized);
-            }
-        } catch (\RuntimeException $exception) {
-            $this->context->flash('error', $exception->getMessage());
-            redirect($this->configurationUrlForTab($activeConfigTab));
-        }
-
-        // Keep critical bootstrap keys valid before replacing the config file.
-        $domain = $this->input->text((string) ($nextConfig['site']['domain'] ?? ''), 200);
-        $panelPath = $this->input->slug((string) ($nextConfig['panel']['path'] ?? ''));
-        if ($domain === '' || $panelPath === null) {
-            $this->context->flash('error', 'site.domain and panel.path are required.');
-            redirect($this->configurationUrlForTab($activeConfigTab));
-        }
-
-        $nextConfig['site']['domain'] = $domain;
-        $nextConfig['panel']['path'] = $panelPath;
-        $nextConfig['user'] = is_array($nextConfig['user'] ?? null) ? $nextConfig['user'] : [];
-        $nextConfig['user']['contact'] = $this->normalizeSubmittedProfileContactOptionsConfig(
-            $post['profile_contact_options'] ?? null
-        );
-
-        $nextConfig = $this->applyConfigEditorDefaults($nextConfig);
-        $nextConfig = $this->removeSqliteDatabaseFilesConfig($nextConfig);
-
-        $this->config->replace($nextConfig);
-        $this->config->save();
-
-        $this->context->flash('success', 'Configuration saved.');
-        redirect($this->configurationUrlForTab($activeConfigTab));
     }
 
     /**
@@ -344,7 +209,17 @@ final class SystemController
         }
 
         try {
-            $this->persistUpstreamConfig($source);
+            ConfigWriter::persistValue(
+                $this->config->path(),
+                $this->config->all(),
+                'update.source',
+                [
+                    'mode' => (string) ($source['mode'] ?? 'github_mirror'),
+                    'github_repo' => (string) ($source['github_repo'] ?? 'noveltylanterns/raven'),
+                    'repo_url' => (string) ($source['repo_url'] ?? ''),
+                ]
+            );
+            $this->config = new Config($this->config->path());
         } catch (\RuntimeException $exception) {
             $error = 'Failed to save updater source settings: ' . $exception->getMessage();
             $result = $this->updateWorkflowService()->compare($source);
@@ -498,8 +373,8 @@ final class SystemController
         }
 
         try {
-            $this->config->set('site.theme', $themeSlug);
-            $this->config->save();
+            ConfigWriter::persistValue($this->config->path(), $this->config->all(), 'site.theme', $themeSlug);
+            $this->config = new Config($this->config->path());
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', 'Failed to update active theme: ' . $exception->getMessage());
             redirect($this->context->panelUrl('/themes'));
@@ -654,8 +529,8 @@ final class SystemController
 
         if ($setActive) {
             try {
-                $this->config->set('site.theme', $themeSlug);
-                $this->config->save();
+                ConfigWriter::persistValue($this->config->path(), $this->config->all(), 'site.theme', $themeSlug);
+                $this->config = new Config($this->config->path());
             } catch (\RuntimeException $exception) {
                 $this->directoryTreeService()->removeTree($themePath);
                 $this->context->flash('error', 'Theme scaffold created, but activation failed: ' . $exception->getMessage());
@@ -1727,25 +1602,6 @@ final class SystemController
     }
 
     /**
-     * Normalizes one text-editor option from config/editor payloads.
-     */
-    private function normalizeBodyTextEditorOption(string $value): string
-    {
-        $editor = strtolower(trim($value));
-        return in_array($editor, ['tinymce', 'plaintext', 'autobr', 'markdown'], true)
-            ? $editor
-            : 'tinymce';
-    }
-
-    /**
-     * Normalizes one global route-separator option.
-     */
-    private function normalizeGlobalRouteSeparator(string $value): string
-    {
-        return Mode::normalizeGlobalSeparator($value);
-    }
-
-    /**
      * Returns the configured global page route mode.
      */
     private function globalPageRouteMode(): string
@@ -1759,101 +1615,6 @@ final class SystemController
     private function effectiveChannelRouteMode(string $channelValue): string
     {
         return $this->routeConfigService()->effectiveChannelRouteMode($channelValue);
-    }
-
-    /**
-     * Flattens the config tree into scalar field descriptors.
-     *
-     * @param array<string, mixed> $config Config snapshot to flatten.
-     * @param array<int, string> $segments Current path segments during recursion.
-     * @return array<int, array{
-     *   path: string,
-     *   segments: array<int, string>,
-     *   label: string,
-     *   type: string,
-     *   value: string
-     * }>
-     */
-    private function flattenConfigFields(array $config, array $segments = []): array
-    {
-        return $this->configEditorSchemaService()->flattenFields($config, $segments);
-    }
-
-    /**
-     * Reads one submitted config value from a nested posted array.
-     *
-     * @param array<string, mixed> $submitted Posted config payload.
-     * @param array<int, string> $segments Nested config path segments.
-     * @return string Submitted scalar value.
-     */
-    private function readNestedConfigValue(array $submitted, array $segments): string
-    {
-        return $this->configEditorSchemaService()->readNestedValue($submitted, $segments);
-    }
-
-    /**
-     * Writes one scalar value into a nested config array by path segments.
-     *
-     * @param array<string, mixed> $config Config array being mutated.
-     * @param array<int, string> $segments Nested config path segments.
-     * @param mixed $value Normalized value to write.
-     * @return void
-     */
-    private function setNestedConfigValue(array &$config, array $segments, mixed $value): void
-    {
-        $this->configEditorSchemaService()->setNestedValue($config, $segments, $value);
-    }
-
-    /**
-     * Casts and validates one submitted config field value by expected type.
-     *
-     * @param string $path Dotted config key path.
-     * @param string $type Expected scalar type.
-     * @param string $rawValue Submitted scalar value.
-     * @param array<string, mixed> $workingConfig Current config snapshot being normalized.
-     * @return mixed Normalized config value.
-     */
-    private function normalizeConfigFieldValue(string $path, string $type, string $rawValue, array $workingConfig = []): mixed
-    {
-        return $this->panelConfigFieldPolicyService()->normalizeFieldValue(
-            $path,
-            $type,
-            $rawValue,
-            $workingConfig,
-            fn (string $value): string => $this->normalizeBodyTextEditorOption($value),
-            fn (string $value): string => $this->normalizeGlobalRouteSeparator($value),
-            fn (string $theme, bool $allowDefault): ?string => $this->normalizePanelThemeChoice($theme, $allowDefault),
-            $this->publicThemeOptions(),
-            $this->channelRepo->listRoutingOptions(),
-            $this->categorySetRepo()->listOptions(),
-            $this->tagSetRepo()->listOptions()
-        );
-    }
-
-    /**
-     * Removes SQLite file-map config from the editable config snapshot.
-     *
-     * @param array<string, mixed> $config Editable config snapshot.
-     * @return array<string, mixed> Sanitized config snapshot.
-     */
-    private function removeSqliteDatabaseFilesConfig(array $config): array
-    {
-        return $this->configSnapshotSanitizer()->removeSqliteDatabaseFiles($config);
-    }
-
-    /**
-     * Applies shared config-editor default keys across core sections.
-     *
-     * @param array<string, mixed> $config Editable config snapshot.
-     * @return array<string, mixed> Config snapshot with enforced defaults.
-     */
-    private function applyConfigEditorDefaults(array $config): array
-    {
-        return $this->panelConfigDefaultsService()->apply(
-            $config,
-            $this->publicThemeOptions(),
-            fn (string $theme, bool $allowDefault): ?string => $this->normalizePanelThemeChoice($theme, $allowDefault)
-        );
     }
 
     /**
@@ -2048,46 +1809,6 @@ final class SystemController
                 $this->profileRoutePrefix(),
                 $this->groupRoutePrefix(),
             ]
-        );
-    }
-
-    /**
-     * Returns the default profile-contact option map.
-     *
-     * @return array<string, array{label: string, prefix: string}> Default option map.
-     */
-    private function defaultProfileContactOptions(): array
-    {
-        return $this->profileContactService()->defaultOptions();
-    }
-
-    /**
-     * Normalizes submitted profile-contact option rows from the configuration editor.
-     *
-     * @param mixed $rawOptions Submitted option payload.
-     * @return array<string, array{label: string, prefix: string}> Normalized option map.
-     */
-    private function normalizeSubmittedProfileContactOptionsConfig(mixed $rawOptions): array
-    {
-        return $this->profileContactService()->normalizeSubmittedOptions($rawOptions);
-    }
-
-    /**
-     * Returns one normalized config-editor tab key.
-     */
-    private function normalizeConfigEditorTab(mixed $value): string
-    {
-        return $this->panelEditorTabService()->normalizeConfigEditorTab($value);
-    }
-
-    /**
-     * Builds the configuration URL while preserving the selected tab.
-     */
-    private function configurationUrlForTab(string $tab): string
-    {
-        return $this->panelEditorTabService()->configurationUrlForTab(
-            fn (string $suffix): string => $this->context->panelUrl($suffix),
-            $tab
         );
     }
 
@@ -2802,50 +2523,6 @@ final class SystemController
     }
 
     /**
-     * Returns the config-editor normalizer on first use.
-     */
-    private function configEditorNormalizer(): ConfigEditorNormalizer
-    {
-        if (!$this->configEditorNormalizer instanceof ConfigEditorNormalizer) {
-            $this->configEditorNormalizer = new ConfigEditorNormalizer();
-        }
-
-        return $this->configEditorNormalizer;
-    }
-
-    /**
-     * Returns the config-editor defaults service on first use.
-     */
-    private function panelConfigDefaultsService(): PanelConfigDefaultsService
-    {
-        if (!$this->panelConfigDefaultsService instanceof PanelConfigDefaultsService) {
-            $this->panelConfigDefaultsService = new PanelConfigDefaultsService(
-                $this->configEditorSchemaService(),
-                $this->configEditorNormalizer()
-            );
-        }
-
-        return $this->panelConfigDefaultsService;
-    }
-
-    /**
-     * Returns the config-field policy service on first use.
-     */
-    private function panelConfigFieldPolicyService(): PanelConfigFieldPolicyService
-    {
-        if (!$this->panelConfigFieldPolicyService instanceof PanelConfigFieldPolicyService) {
-            $this->panelConfigFieldPolicyService = new PanelConfigFieldPolicyService(
-                $this->config,
-                $this->input,
-                $this->panelConfigDefaultsService(),
-                $this->configEditorNormalizer()
-            );
-        }
-
-        return $this->panelConfigFieldPolicyService;
-    }
-
-    /**
      * Returns the package-install workflow service on first use.
      */
     private function packageInstallWorkflowService(): ArchiveInstall
@@ -2888,18 +2565,6 @@ final class SystemController
     }
 
     /**
-     * Returns the profile-contact service on first use.
-     */
-    private function profileContactService(): ProfileContactService
-    {
-        if (!$this->profileContactService instanceof ProfileContactService) {
-            $this->profileContactService = new ProfileContactService($this->input);
-        }
-
-        return $this->profileContactService;
-    }
-
-    /**
      * Returns the route-config service on first use.
      */
     private function routeConfigService(): Route
@@ -2909,49 +2574,6 @@ final class SystemController
         }
 
         return $this->routeConfigService;
-    }
-
-    /**
-     * Returns the panel editor-tab service on first use.
-     */
-    private function panelEditorTabService(): PanelEditorTabService
-    {
-        if (!$this->panelEditorTabService instanceof PanelEditorTabService) {
-            $this->panelEditorTabService = new PanelEditorTabService($this->input);
-        }
-
-        return $this->panelEditorTabService;
-    }
-
-    /**
-     * Returns the panel routing-preview service on first use.
-     */
-    private function panelRoutingPreviewService(): PanelRoutingPreviewService
-    {
-        if (!$this->panelRoutingPreviewService instanceof PanelRoutingPreviewService) {
-            $this->panelRoutingPreviewService = new PanelRoutingPreviewService(
-                $this->root,
-                $this->input,
-                $this->themeCatalogService()
-            );
-        }
-
-        return $this->panelRoutingPreviewService;
-    }
-
-    /**
-     * Returns the config-editor schema service on first use.
-     */
-    private function configEditorSchemaService(): ConfigEditorSchemaService
-    {
-        if (!$this->configEditorSchemaService instanceof ConfigEditorSchemaService) {
-            $this->configEditorSchemaService = new ConfigEditorSchemaService(
-                $this->input,
-                $this->profileContactService()
-            );
-        }
-
-        return $this->configEditorSchemaService;
     }
 
     /**
@@ -3061,15 +2683,19 @@ final class SystemController
     }
 
     /**
-     * Returns the config-snapshot sanitizer on first use.
+     * Returns the panel routing-preview service on first use.
      */
-    private function configSnapshotSanitizer(): ConfigSnapshotSanitizer
+    private function panelRoutingPreviewService(): PanelRoutingPreviewService
     {
-        if (!$this->configSnapshotSanitizer instanceof ConfigSnapshotSanitizer) {
-            $this->configSnapshotSanitizer = new ConfigSnapshotSanitizer();
+        if (!$this->panelRoutingPreviewService instanceof PanelRoutingPreviewService) {
+            $this->panelRoutingPreviewService = new PanelRoutingPreviewService(
+                $this->root,
+                $this->input,
+                $this->themeCatalogService()
+            );
         }
 
-        return $this->configSnapshotSanitizer;
+        return $this->panelRoutingPreviewService;
     }
 
     /**
@@ -3162,23 +2788,4 @@ final class SystemController
         ]);
     }
 
-    /**
-     * Persists the selected updater source config.
-     *
-     * @param array<string, mixed> $source Resolved update source settings.
-     * @return void
-     */
-    private function persistUpstreamConfig(array $source): void
-    {
-        $nextConfig = $this->config->all();
-        $nextConfig['update'] = is_array($nextConfig['update'] ?? null) ? $nextConfig['update'] : [];
-        $nextConfig['update']['source'] = [
-            'mode' => (string) ($source['mode'] ?? 'github_mirror'),
-            'github_repo' => (string) ($source['github_repo'] ?? 'noveltylanterns/raven'),
-            'repo_url' => (string) ($source['repo_url'] ?? ''),
-        ];
-
-        $this->config->replace($nextConfig);
-        $this->config->save();
-    }
 }

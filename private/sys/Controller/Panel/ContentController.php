@@ -30,13 +30,13 @@ use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\PageImageManager;
-use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Panel\PanelPost;
-use Raven\Lib\Panel\PanelPageAuthorOptionBuilder;
 use Raven\Lib\Directory\Mode;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Directory\SetContext;
+use Raven\Lib\View\Panel\EditorAuthor;
+use Raven\Lib\View\Panel\EditorTabs;
 
 use function Raven\Lib\Extra\redirect;
 
@@ -58,7 +58,7 @@ final class ContentController
     private PageImageRepository $pageImages;
     private UserRepository $userRepo;
     private Route $routeConfigService;
-    private PanelEditorTabService $panelEditorTabService;
+    private EditorTabs $panelEditorTabService;
     /** @var Closure(): PageImageManager */
     private Closure $pageImageManagerResolver;
     private ?PageImageManager $pageImageManager = null;
@@ -83,7 +83,7 @@ final class ContentController
     private ?PageBodyBlockCodec $pageBodyBlockCodec = null;
     private ?Upload $uploadFileSetNormalizer = null;
     private ?PanelPost $panelPostNormalizer = null;
-    private ?PanelPageAuthorOptionBuilder $pageAuthorOptionBuilder = null;
+    private ?EditorAuthor $pageAuthorOptionBuilder = null;
     private ?LoginIdentifierResolver $identifierResolver = null;
     private ?ExtensionStateStore $extensionStateStore = null;
     private ?ExtensionPermissionCatalogService $extensionPermissionCatalogService = null;
@@ -107,7 +107,7 @@ final class ContentController
      * @param callable $taxonomyLookupRepoResolver Lazy taxonomy lookup resolver; resolved only on page-editor option-set queries.
      * @param UserRepository $userRepo User repository for author validation and author select options.
      * @param Route $routeConfigService Route configuration service for route-mode and separator helpers.
-     * @param PanelEditorTabService $panelEditorTabService Panel editor tab normalization and tab-preserving URL builder.
+     * @param EditorTabs $panelEditorTabService Panel editor tab normalization and tab-preserving URL builder.
      * @param callable $extensionServicesFor Extension services resolver used to load per-extension shortcode and body-block contributions.
      * @return void
      */
@@ -126,7 +126,7 @@ final class ContentController
         callable $taxonomyLookupRepoResolver,
         UserRepository $userRepo,
         Route $routeConfigService,
-        PanelEditorTabService $panelEditorTabService,
+        EditorTabs $panelEditorTabService,
         callable $extensionServicesFor
     ) {
         $this->context = $context;
@@ -895,12 +895,12 @@ final class ContentController
     /**
      * Returns the page author option builder on first use.
      *
-     * @return PanelPageAuthorOptionBuilder Builder for page-editor author select options.
+     * @return EditorAuthor Builder for page-editor author select options.
      */
-    private function pageAuthorOptionBuilder(): PanelPageAuthorOptionBuilder
+    private function pageAuthorOptionBuilder(): EditorAuthor
     {
-        if (!$this->pageAuthorOptionBuilder instanceof PanelPageAuthorOptionBuilder) {
-            $this->pageAuthorOptionBuilder = new PanelPageAuthorOptionBuilder();
+        if (!$this->pageAuthorOptionBuilder instanceof EditorAuthor) {
+            $this->pageAuthorOptionBuilder = new EditorAuthor();
         }
 
         return $this->pageAuthorOptionBuilder;

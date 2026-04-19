@@ -19,7 +19,7 @@ use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Core\Routing\Public\PublicRuntimeBuilder;
-use Raven\Lib\Diagnostics\RequestProfiler;
+use Raven\Lib\Diagnostic\RequestProfiler;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');

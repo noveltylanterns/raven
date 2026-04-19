@@ -22,13 +22,18 @@ final class PanelSystemRouteRegistrar
      * Registers the panel system route family.
      *
      * @param Router $router Mutable router receiving system routes.
+     * @param callable(): object $panelConfigController Lazy configuration controller factory.
      * @param callable(): object $panelSystemController Lazy system controller factory.
      * @return void
      */
-    public static function register(Router $router, callable $panelSystemController): void
+    public static function register(
+        Router $router,
+        callable $panelConfigController,
+        callable $panelSystemController
+    ): void
     {
-        $router->add('GET', '/configuration', static function () use ($panelSystemController): void {
-            $panelSystemController()->configuration();
+        $router->add('GET', '/configuration', static function () use ($panelConfigController): void {
+            $panelConfigController()->configuration();
         });
 
         $router->add('GET', '/update', static function () use ($panelSystemController): void {
@@ -39,8 +44,8 @@ final class PanelSystemRouteRegistrar
             $panelSystemController()->updateAction($_POST);
         });
 
-        $router->add('POST', '/configuration/save', static function () use ($panelSystemController): void {
-            $panelSystemController()->configurationSave($_POST);
+        $router->add('POST', '/configuration/save', static function () use ($panelConfigController): void {
+            $panelConfigController()->configurationSave($_POST);
         });
 
         $router->add('GET', '/routing', static function () use ($panelSystemController): void {

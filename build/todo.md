@@ -15,10 +15,16 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 
 ### Library Refactor
 Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
-
-
-### Misc
-
+- [x] Rename lib/Auth/SessionCookiePolicy.php to SessionCookie.php
+- [x] lib/Config/ConfigWriter.php needs to be able to write individual config values, as well as whole file.
+- [x] Write functions are still in sys/Config.php which should have been migrated to ConfigWriter, because Config.php is just bare-minimum read-only functions for bootstrapping Raven.
+- [x] sys/Config.php should be using canonical lib/Config/ConfigParser.php whenever possible instead of its own logic.
+- [x] Update panel's Config editor to build off ConfigParser/ConfigWriter primitives.
+- [x] lib/Panel/(ConfigEditorNormalizer|ConfigEditorSchemaService|ConfigSnapshotSanitizer|PanelConfigDefaultsService|PanelConfigFieldPolicyService).php should all be consolidated into the dedicated config-editor seam, now `sys/Controller/Panel/ConfigController.php`, using ConfigParser/ConfigWriter primitives.
+- [x] Move lib/Panel/PanelEditorTabService.php to lib/View/Panel/EditorTabs.php
+- [x] Move lib/Panel/PanelPageAuthorOptionBuilder.php to lib/View/Panel/EditorAuthor.php
+- [x] Move lib/Panel/PanelUrl.php to lib/Directory/Panel.php
+- [x] Rename lib/Diagnostics/ to lib/Diagnostic/
 
 
 
@@ -54,7 +60,7 @@ Pure PHP — Reflection API + lightweight PHPDoc regex, no extra composer deps. 
 Targets (generator owns these files — do not hand-edit them):
 - [ ] `docs/appendix/libraries.md` — reflect on all lib/* classes & functions; pull `@param`/`@return`/first docline per function; group by service key in `context['rvn']`
 - [ ] `docs/appendix/core.md` — reflect on all sys/* classes & functions; pull `@param`/`@return`/first docline per function; group by service key in `context['rvn']` if applicable.
-- [ ] `docs/appendix/config.md` — parse `private/dat/config.php.dist` key tree + reflect on `ConfigEditorSchemaService` for descriptions and defaults
+- [ ] `docs/appendix/config.md` — parse `private/dat/config.php.dist` key tree + reflect on `Controller/Panel/ConfigController` for descriptions and defaults
 - [ ] `docs/appendix/database.md` — reflect on `SchemaBuilder`/`AuthSchemaBuilder` method names + annotations to enumerate tables and columns; include column purposes and the full chain of variables/routes/forms that map to each column
 - [ ] `docs/cli.md` — shell each `private/bin/rvn-*` with `--help` and format output as markdown; replaces current hand-written content
 - [ ] `docs/extensions/` folder — per-extension docs for bundled stock extensions (contact, signups, database, etc.)

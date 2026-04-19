@@ -16,7 +16,7 @@ use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Transport\Response;
 use Raven\Lib\Transport\Request;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Lib\Panel\PanelUrl;
+use Raven\Lib\Directory\Panel;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\CaptchaService;
@@ -185,7 +185,7 @@ final class SharedController
      */
     public function panelUrl(string $suffix = ''): string
     {
-        return PanelUrl::fromConfig($this->config, $suffix);
+        return Panel::fromConfig($this->config, $suffix);
     }
 
     /**

@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Config/ConfigParser.php
- * Lightweight scalar type-coercion helpers for config values.
+ * Lightweight config-reading and scalar type-coercion helpers.
  * Docs: https://raven.lanterns.io
  */
 
@@ -24,6 +24,73 @@ namespace Raven\Lib\Config;
  */
 final class ConfigParser
 {
+    /** @var array<string, array<int, string>> */
+    private static array $pathSegmentsCache = [];
+
+    /**
+     * Returns cached dot-path segments for one config key.
+     *
+     * Config-heavy request paths such as routing and the panel configuration
+     * editor repeatedly resolve the same keys, so cache the split segments once
+     * per request instead of re-running `explode()` on every access.
+     *
+     * @param string $key Dot-delimited config key path.
+     * @return array<int, string> Cached path segments.
+     */
+    public static function segments(string $key): array
+    {
+        $normalized = trim($key);
+        if ($normalized === '') {
+            return [];
+        }
+
+        if (isset(self::$pathSegmentsCache[$normalized])) {
+            return self::$pathSegmentsCache[$normalized];
+        }
+
+        self::$pathSegmentsCache[$normalized] = str_contains($normalized, '.')
+            ? explode('.', $normalized)
+            : [$normalized];
+
+        return self::$pathSegmentsCache[$normalized];
+    }
+
+    /**
+     * Reads one config value from a nested array using dot notation.
+     *
+     * @param array<string, mixed> $config Config tree to read from.
+     * @param string $key Dot-delimited config key path.
+     * @param mixed $default Value returned when the path does not resolve.
+     * @return mixed Resolved config value or the provided default.
+     */
+    public static function get(array $config, string $key, mixed $default = null): mixed
+    {
+        return self::getBySegments($config, self::segments($key), $default);
+    }
+
+    /**
+     * Reads one config value from a nested array using pre-split path segments.
+     *
+     * @param array<string, mixed> $config Config tree to read from.
+     * @param array<int, string> $segments Pre-split config path segments.
+     * @param mixed $default Value returned when the path does not resolve.
+     * @return mixed Resolved config value or the provided default.
+     */
+    public static function getBySegments(array $config, array $segments, mixed $default = null): mixed
+    {
+        $cursor = $config;
+
+        foreach ($segments as $segment) {
+            if (!is_array($cursor) || !array_key_exists($segment, $cursor)) {
+                return $default;
+            }
+
+            $cursor = $cursor[$segment];
+        }
+
+        return $cursor;
+    }
+
     /**
      * Normalizes one mixed config value into a boolean.
      *
@@ -112,5 +179,71 @@ final class ConfigParser
         }
 
         return $parsed;
+    }
+
+    /**
+     * Reads one submitted nested scalar value and normalizes it to a string.
+     *
+     * @param array<string, mixed> $submitted Nested submitted data.
+     * @param array<int, string> $segments Nested config path segments.
+     * @return string Submitted scalar value, or an empty string when absent.
+     */
+    public static function readNestedString(array $submitted, array $segments): string
+    {
+        $cursor = $submitted;
+
+        foreach ($segments as $segment) {
+            if (!is_array($cursor) || !array_key_exists($segment, $cursor)) {
+                return '';
+            }
+
+            $cursor = $cursor[$segment];
+        }
+
+        if (is_string($cursor)) {
+            return $cursor;
+        }
+
+        if (is_int($cursor) || is_float($cursor) || is_bool($cursor)) {
+            return (string) $cursor;
+        }
+
+        return '';
+    }
+
+    /**
+     * Detects the scalar type label used by the panel config editor.
+     *
+     * @param mixed $value Raw config value.
+     * @return string Scalar type label for form normalization.
+     */
+    public static function detectScalarType(mixed $value): string
+    {
+        return match (true) {
+            is_int($value) => 'int',
+            is_float($value) => 'float',
+            is_bool($value) => 'bool',
+            $value === null => 'null',
+            default => 'string',
+        };
+    }
+
+    /**
+     * Stringifies one scalar config value for panel form fields.
+     *
+     * @param mixed $value Raw config value.
+     * @return string Normalized string form used by the panel editor.
+     */
+    public static function stringifyScalar(mixed $value): string
+    {
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+
+        if ($value === null) {
+            return '';
+        }
+
+        return (string) $value;
     }
 }

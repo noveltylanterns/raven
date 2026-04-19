@@ -13,7 +13,7 @@ namespace Raven\Lib\Directory;
 
 use Raven\Core\Config;
 use Raven\Lib\Config\ConfigParser;
-use Raven\Lib\Panel\PanelUrl;
+use Raven\Lib\Directory\Panel;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -131,6 +131,6 @@ final class Feed
      */
     private function normalizeRoutePrefix(string $configured, string $fallback, bool $allowBlank = false): string
     {
-        return PanelUrl::normalizeRoutePrefix($this->input, $configured, $fallback, $allowBlank);
+        return Panel::normalizeRoutePrefix($this->input, $configured, $fallback, $allowBlank);
     }
 }

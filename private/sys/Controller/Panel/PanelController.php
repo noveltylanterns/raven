@@ -31,7 +31,7 @@ use Raven\Core\Routing\Panel\PanelUserRouteRegistrar;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Config\ConfigParser;
 use Raven\Lib\Extension\Layout;
-use Raven\Lib\Panel\PanelUrl;
+use Raven\Lib\Directory\Panel;
 use RuntimeException;
 
 use function Raven\Lib\Extra\redirect;
@@ -113,6 +113,13 @@ final class PanelController
                 throw new RuntimeException('Panel preferences controller factory is unavailable.');
             };
 
+        /** @var callable(): object $panelConfigController */
+        $panelConfigController = is_callable($rvn['panel_config_controller'] ?? null)
+            ? $rvn['panel_config_controller']
+            : static function (): object {
+                throw new RuntimeException('Panel config controller factory is unavailable.');
+            };
+
         /** @var callable(): object $panelSystemController */
         $panelSystemController = is_callable($rvn['panel_system_controller'] ?? null)
             ? $rvn['panel_system_controller']
@@ -131,7 +138,7 @@ final class PanelController
          * Normalizes request path into panel-internal path.
          */
         $requestedPath = request_path();
-        $configuredPanelPrefix = PanelUrl::fromConfig($rvn['config']);
+        $configuredPanelPrefix = Panel::fromConfig($rvn['config']);
 
         $internalPath = $requestedPath;
 
@@ -172,7 +179,7 @@ final class PanelController
          * Builds panel URL with configured prefix.
          */
         $panelUrl = static function (string $suffix = '') use ($rvn): string {
-            return PanelUrl::fromConfig($rvn['config'], $suffix);
+            return Panel::fromConfig($rvn['config'], $suffix);
         };
         $shouldInitializeFullPanelRuntime = !$isPanelAuthHelperInternalPath($internalPath);
         $enabledExtensions = [];
@@ -345,7 +352,7 @@ final class PanelController
         PanelUserRouteRegistrar::register($router, $panelUserController, $rvn['input']);
         PanelGroupRouteRegistrar::register($router, $panelGroupController, $rvn['input']);
         PanelPreferencesRouteRegistrar::register($router, $panelPreferencesController);
-        PanelSystemRouteRegistrar::register($router, $panelSystemController);
+        PanelSystemRouteRegistrar::register($router, $panelConfigController, $panelSystemController);
 
         PanelExtensionRouteRegistrar::register(
             $router,

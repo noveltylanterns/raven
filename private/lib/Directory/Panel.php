@@ -1,8 +1,15 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Directory/Panel.php
+ * Shared panel path and route-prefix normalization helpers.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Panel;
+namespace Raven\Lib\Directory;
 
 use Raven\Core\Config;
 use Raven\Lib\Security\InputSanitizer;
@@ -10,7 +17,7 @@ use Raven\Lib\Security\InputSanitizer;
 /**
  * Shared panel-path and route-prefix normalization helper.
  */
-final class PanelUrl
+final class Panel
 {
     public static function fromConfig(Config $config, string $suffix = ''): string
     {

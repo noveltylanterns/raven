@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Debug;
 
-use Raven\Lib\Diagnostics\RequestProfiler;
+use Raven\Lib\Diagnostic\RequestProfiler;
 
 /**
  * Arms the shared debug-toolbar response hook for one web scope.

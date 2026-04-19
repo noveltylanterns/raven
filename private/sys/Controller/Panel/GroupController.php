@@ -17,7 +17,7 @@ use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
-use Raven\Lib\Panel\PanelEditorTabService;
+use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -32,7 +32,7 @@ final class GroupController
     private InputSanitizer $input;
     private GroupRepository $groupRepo;
     private Route $routeConfigService;
-    private PanelEditorTabService $panelEditorTabService;
+    private EditorTabs $panelEditorTabService;
     private TaxonomyImageService $taxonomyImageService;
     private PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog;
     private Upload $uploadFileSetNormalizer;
@@ -43,7 +43,7 @@ final class GroupController
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param GroupRepository $groupRepo Group repository for panel CRUD.
      * @param Route $routeConfigService Shared route-configuration helper.
-     * @param PanelEditorTabService $panelEditorTabService Shared editor-tab helper.
+     * @param EditorTabs $panelEditorTabService Shared editor-tab helper.
      * @param TaxonomyImageService $taxonomyImageService Shared group image upload/storage pipeline.
      * @param PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog Shared panel permission-definition catalog.
      * @param Upload $uploadFileSetNormalizer Shared upload payload flattener.
@@ -55,7 +55,7 @@ final class GroupController
         InputSanitizer $input,
         GroupRepository $groupRepo,
         Route $routeConfigService,
-        PanelEditorTabService $panelEditorTabService,
+        EditorTabs $panelEditorTabService,
         TaxonomyImageService $taxonomyImageService,
         PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog,
         Upload $uploadFileSetNormalizer,

@@ -19,7 +19,7 @@ use Raven\Core\Logger;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Auth\SessionCookiePolicy;
+use Raven\Lib\Auth\SessionCookie;
 use Raven\Lib\Config\ConfigParser;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Scheduler\Registry;
@@ -108,8 +108,8 @@ final class Raven
     $config = new Config($root . '/private/dat/config.php');
 
     // Initialize session early for auth, CSRF, and flash messaging.
-    $sessionCookiePolicy = new SessionCookiePolicy();
-    $sessionCookiePolicy->startIfNeeded($config, $root, $_SERVER);
+    $sessionCookie = new SessionCookie();
+    $sessionCookie->startIfNeeded($config, $root, $_SERVER);
 
     $databaseConfig = (array) $config->get('database', []);
     $connectionFactory = new ConnectionFactory($databaseConfig);

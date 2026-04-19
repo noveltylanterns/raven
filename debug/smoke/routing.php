@@ -41,6 +41,7 @@ use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Core\Routing\Public\PublicChannelPageRouteService;
+use Raven\Lib\Config\ConfigWriter;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -94,19 +95,25 @@ final class RoutingSmokeRunner
         $this->assert((string) ($rootSlug['canonical_path'] ?? '') === '/hello-world', 'Global slug mode canonical root path mismatch.');
         $this->events[] = 'root_slug=ok';
 
-        $config->set('content.separator', '_');
+        ConfigWriter::persistValue($configPath, $config->all(), 'content.separator', '_');
+        $config = new Config($configPath);
+        $routeConfig = new Route($config, $input);
         $rootUnderscore = $this->resolvePublicPath($config, $routeConfig, $routeService, $channels, $pages, 'hello_world', null);
         $this->assert((int) ($rootUnderscore['page']['id'] ?? 0) === 7, 'Underscore separator should resolve root slug page.');
         $this->assert((string) ($rootUnderscore['canonical_path'] ?? '') === '/hello_world', 'Underscore separator canonical root path mismatch.');
         $this->events[] = 'root_slug_separator=ok';
 
-        $config->set('content.separator', '-');
+        ConfigWriter::persistValue($configPath, $config->all(), 'content.separator', '-');
+        $config = new Config($configPath);
+        $routeConfig = new Route($config, $input);
         $inheritSlug = $this->resolvePublicPath($config, $routeConfig, $routeService, $channels, $pages, 'smoke-post', 'news');
         $this->assert((int) ($inheritSlug['page']['id'] ?? 0) === 42, 'Inherited channel slug mode should resolve channel page by slug.');
         $this->assert((string) ($inheritSlug['canonical_path'] ?? '') === '/news/smoke-post', 'Inherited channel slug canonical path mismatch.');
         $this->events[] = 'channel_inherit_slug=ok';
 
-        $config->set('content.mode', 'id');
+        ConfigWriter::persistValue($configPath, $config->all(), 'content.mode', 'id');
+        $config = new Config($configPath);
+        $routeConfig = new Route($config, $input);
         $rootId = $this->resolvePublicPath($config, $routeConfig, $routeService, $channels, $pages, '7', null);
         $this->assert((int) ($rootId['page']['id'] ?? 0) === 7, 'Global id mode should resolve root page by id.');
         $this->assert((string) ($rootId['canonical_path'] ?? '') === '/7', 'Global id mode canonical root path mismatch.');

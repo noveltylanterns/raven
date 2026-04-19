@@ -18,6 +18,7 @@ use Raven\Core\Repository\TagRepository;
 use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
 use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\Config\ConfigWriter;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
 use Raven\Lib\Security\InputSanitizer;
@@ -2020,10 +2021,7 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
             $exists = raven_cli_has_config_key($config, $key);
             $existingValue = $exists ? raven_cli_get_config_value($config, $key) : null;
             $parsedValue = raven_cli_parse_typed_value((string) $valueRaw, $type, $existingValue, $exists);
-            raven_cli_set_config_value($config, $key, $parsedValue);
-
-            $configObject->replace($config);
-            $configObject->save();
+            $config = ConfigWriter::persistValue($configObject->path(), $config, $key, $parsedValue);
 
             if ($context->json) {
                 $context->printJson(['ok' => true, 'key' => $key, 'value' => $parsedValue]);
@@ -2048,8 +2046,7 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
             $added = [];
             $merged = raven_cli_merge_missing_config_defaults($config, $dist, $added);
             if ($added !== []) {
-                $configObject->replace($merged);
-                $configObject->save();
+                ConfigWriter::persist($configObject->path(), $merged);
             }
 
             if ($context->json) {
@@ -2647,8 +2644,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 throw new RuntimeException('Config service unavailable.');
             }
 
-            $rvn['config']->set('site.theme', $slug);
-            $rvn['config']->save();
+            ConfigWriter::persistValue($rvn['config']->path(), $rvn['config']->all(), 'site.theme', $slug);
 
             if ($context->json) {
                 $context->printJson(['ok' => true, 'slug' => $slug, 'enabled' => true]);
@@ -2758,8 +2754,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 if (!isset($rvn['config']) || !$rvn['config'] instanceof Config) {
                     throw new RuntimeException('Config service unavailable.');
                 }
-                $rvn['config']->set('site.theme', $slug);
-                $rvn['config']->save();
+                ConfigWriter::persistValue($rvn['config']->path(), $rvn['config']->all(), 'site.theme', $slug);
             }
 
             if ($context->json) {

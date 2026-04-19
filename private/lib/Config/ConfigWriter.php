@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Config/ConfigWriter.php
- * Handles the on-disk persistence format for Raven runtime config files.
+ * Handles nested config writes and on-disk persistence for Raven config files.
  * Docs: https://raven.lanterns.io
  */
 
@@ -23,6 +23,68 @@ use RuntimeException;
  */
 final class ConfigWriter
 {
+    /**
+     * Writes one dot-delimited config value into an array tree.
+     *
+     * @param array<string, mixed> $config Config tree being mutated.
+     * @param string $key Dot-delimited config key path.
+     * @param mixed $value Value to store at the resolved path.
+     * @return void
+     */
+    public static function set(array &$config, string $key, mixed $value): void
+    {
+        self::setNested($config, ConfigParser::segments($key), $value);
+    }
+
+    /**
+     * Writes one nested config value into an array tree by path segments.
+     *
+     * @param array<string, mixed> $config Config tree being mutated.
+     * @param array<int, string> $segments Nested config path segments.
+     * @param mixed $value Value to store at the resolved path.
+     * @return void
+     */
+    public static function setNested(array &$config, array $segments, mixed $value): void
+    {
+        if ($segments === []) {
+            return;
+        }
+
+        $cursor = &$config;
+        $lastIndex = count($segments) - 1;
+
+        foreach ($segments as $index => $segment) {
+            if ($index === $lastIndex) {
+                $cursor[$segment] = $value;
+                return;
+            }
+
+            if (!isset($cursor[$segment]) || !is_array($cursor[$segment])) {
+                $cursor[$segment] = [];
+            }
+
+            $cursor = &$cursor[$segment];
+        }
+    }
+
+    /**
+     * Persists one config value while leaving the rest of the file untouched.
+     *
+     * @param string $path Absolute path to the config file on disk.
+     * @param array<string, mixed> $data Current config tree.
+     * @param string $key Dot-delimited config key path.
+     * @param mixed $value Value to persist at the resolved path.
+     * @throws RuntimeException When the file cannot be written.
+     * @return array<string, mixed> Updated config tree after the write.
+     */
+    public static function persistValue(string $path, array $data, string $key, mixed $value): array
+    {
+        self::set($data, $key, $value);
+        self::persist($path, $data);
+
+        return $data;
+    }
+
     /**
      * Persists a config array to a PHP file at the given path.
      *

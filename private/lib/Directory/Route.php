@@ -12,8 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Directory;
 
 use Raven\Core\Config;
-use Raven\Lib\Config\ConfigParser;
-use Raven\Lib\Panel\PanelUrl;
+use Raven\Lib\Directory\Panel;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -101,18 +100,6 @@ final class Route
     }
 
     /**
-     * Normalizes a raw boolean-like config value to a bool.
-     *
-     * @param mixed $value   Raw config value.
-     * @param bool  $default Default when the value cannot be interpreted.
-     * @return bool          Parsed boolean.
-     */
-    public function configBool(mixed $value, bool $default = false): bool
-    {
-        return ConfigParser::bool($value, $default);
-    }
-
-    /**
      * Normalizes a raw route-prefix string through the panel URL helper.
      *
      * @param string $configured Configured prefix value.
@@ -122,7 +109,7 @@ final class Route
      */
     public function normalizeRoutePrefix(string $configured, string $fallback, bool $allowBlank = false): string
     {
-        return PanelUrl::normalizeRoutePrefix($this->input, $configured, $fallback, $allowBlank);
+        return Panel::normalizeRoutePrefix($this->input, $configured, $fallback, $allowBlank);
     }
 
     // -------------------------------------------------------------------------

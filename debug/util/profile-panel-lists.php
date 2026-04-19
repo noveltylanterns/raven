@@ -17,7 +17,7 @@ use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TagRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Config\ConfigParser;
-use Raven\Lib\Diagnostics\RequestProfiler;
+use Raven\Lib\Diagnostic\RequestProfiler;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');

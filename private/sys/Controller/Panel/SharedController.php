@@ -18,7 +18,7 @@ use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Auth\Panel\PanelSessionGuard;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\View\Pagination;
-use Raven\Lib\Panel\PanelUrl;
+use Raven\Lib\Directory\Panel;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\View\SiteContextBuilder;
 
@@ -222,7 +222,7 @@ final class SharedController
      */
     public function panelUrl(string $suffix): string
     {
-        return PanelUrl::fromConfig($this->config, $suffix);
+        return Panel::fromConfig($this->config, $suffix);
     }
 
     /**

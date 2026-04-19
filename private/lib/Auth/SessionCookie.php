@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Auth/SessionCookie.php
+ * Session cookie policy and bootstrap helper for Raven auth flows.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
@@ -9,7 +16,7 @@ use Raven\Core\Config;
 /**
  * Session cookie name/domain policy + bootstrap utility.
  */
-final class SessionCookiePolicy
+final class SessionCookie
 {
     public function startIfNeeded(Config $config, string $root, array $server): void
     {
