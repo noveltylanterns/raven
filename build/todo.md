@@ -19,44 +19,24 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 
 ### Library Refactor
 Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
-- [x] lib/Archive/ needs a Types/ folder, for Tar.php, Zip.php, Gz.php, Bz2.php, Xz.php, Zst.php and Rar.php
-	- [x] Each handler can extract/compress whole archives and individual files within.
-	- [x] lib/Archive/Types/Git.php for basic Git handling (Clone, Fetch, Extract, etc)
-	- [x] lib/Archive/Types/Csv.php as a new generic CSV handler.
-	- [x] Doublecheck that Tar.php's built-in compression handlers (gz, bz2, xz, zst) just calls our dedicated handlers for those archive types.
-	- [x] lib/Archive/Extract.php & Compress.php forwarding handlers for our various filetypes.
-	- [x] lib/Transport/Upload.php — expanded with shared HTTP-upload validation, size policy, error text, and extension checks so panel/public/ext upload forms can reuse one baseline contract.
-	- [x] Update ArchivePackageService, Extension & Theme managers & CLI apps to use new archive handlers.
-		- [x] Panel theme/extension upload workflows now route through `ArchivePackageService` + `Extract` and accept `.zip`, `.tar`, `.tar.gz/.tgz`, `.tar.bz2/.tbz2`, `.tar.xz/.txz`, `.tar.zst/.tzst`, and `.rar`.
-		- [x] CLI extension import now routes through `ArchivePackageService` + `Extract`; the unsafe zip-slip smoke fixture remains raw by design so it can manufacture invalid archives.
-	- [x] ArchivePackageService, Extension & Theme managers should be able to process all applicable archive types from lib/Archive/Types/, not just Zip.
-	- [x] Update Updater (UpdateWorkflowService) to use lib/Archive/Types/Git.php instead of GitCommandRunner directly.
-	- [x] In fact just merge GitCommandRunner into Git.php
-	- [x] Update stock extensions with CSV functionality (contact, signups) to use Csv.php.
-		- [x] Contact + Signups panel exports now stream through `private/lib/Archive/Types/Csv.php`.
-		- [x] Signups CSV import now reads through `Csv.php` and validates uploads through `Transport/Upload.php`.
-		- [x] Core panel routing/log exports now use `Csv.php` too, so Raven no longer keeps separate inline CSV emitters for these stock surfaces.
-	- [x] Update PackageInstallWorkflowService to use Upload (Transport) + new Archive/Types/*.php handlers.
+- [x] Rename lib/Archive/PackageInstallWorkflowService.php to Install.php
+- [x] Rename lib/Archive/ArchivePackageService.php to Package.php
+- [x] Move lib/Filesystem/DirectoryTreeService to lib/Archive/Delete.php, delete lib/Filesystem/ after.
+- [x] Merge lib/Routing/Panel/ into sys/Routing/Panel/
+- [x] Merge lib/Routing/Public/ into sys/Routing/Public/
+- [x] Install.php & Package.php should be using our new canonical Archive/Types/*.php handlers instead of hardcoded zip functions, if they are not already.
+- [x] Consolidate all updater functions to lib/Archive/Update.php, delete lib/Update/ after.
+- [x] Any purely visual functions in lib/Config/Panel/ should be moved to lib/View/Panel/. Check that anything remaining doesnt belong in lib/Config/ConfigValueWriter.php instead. Any other remaining lib/Config/Panel/ items should go in lib/Panel/.
+- [x] sys/Config.php should be reduced to bare minimum for reading config to make system work, since it's read on every page read. Offload write functions to lib/Config/ConfigValueWriter.php. Offload anything else unnecessary to public/panel/extension init to lib/Config/*.php.
+- [x] Make sure all our .php files have the standard 6-line PHPDoc comment just after <?php, and the use maps at the beginning are in alphabetical order.
 
 
-### Library Refactor Phase 2
-Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
-- [x] Move sys/Routing/DebugToolbarResponseHook.php to sys/Debug/
-- [x] Simplify sys/Debug/DebugToolbar*.php classes to Toolbar*.php
-- [x] Move lib/Transport/Panel/Post.php to lib/Panel/PanelPost.php, delete lib/Transport/Panel/ after.
-- [x] Rename sys/Database/Schema/RvnSchemaBuilder.php to SchemaBuilder.php
-- [x] Rename sys/Database/Schema/RvnSchemaBootstrap.php to SchemaBootstrap.php
-- [x] Merge sys/Database/Schema/TableNameResolver.php into lib/Database/TableNameResolver.php
-- [x] Doublecheck that sys/Logger.php can be used for both public+panel routes.
-- [ ] Move sys/Router.php to sys/Routing/Router.php
-- [ ] Move sys/Scheduler.php to lib/Scheduler/Registry.php
-- [ ] Move sys/Routing/SchedulerFallbackRunner.php to sys/Scheduler.php
-- [ ] Consolidate all updater functions to lib/Archive/Update.php, delete lib/Update/ after.
-- [ ] Any purely visual functions in lib/Config/Panel/ should be moved to lib/View/Panel/. Check that anything remaining doesnt belong in lib/Config/ConfigValueWriter.php instead. Any other remaining lib/Config/Panel/ items should go in lib/Panel/.
-- [ ] sys/Config.php should be reduced to bare minimum for reading config to make system work, since it's read on every page read. Offload write functions to lib/Config/ConfigValueWriter.php. Offload anything else unnecessary to public/panel/extension init to lib/Config/*.php.
-- [ ] Make sure all our .php files have the standard 6-line PHPDoc comment just after <?php, and the use maps at the beginning are in alphabetical order.
-
-
+### Library Refactor Next Phase
+- [ ] Need lib/Archive/Types/7z.php for 7zip handling
+- [ ] lib/Archive/Extract.php needs 7z handler
+- [ ] lib/Archive/Compress.php needs 7z, bz2, gz, rar, xz & zst handlers
+- [ ] Extract.php & Compress.php need to support full-archive compression/extraction (all handlers), as well as compression/extraction of individual files/folders on archives that support it (should just be 7z, rar, tar & zip)
+- [ ] lib/Archive/Types/ should be lib/Format/
 
 ## Long Term
 
@@ -72,7 +52,7 @@ Full aggressive security sweep and pentesting run, including (but not limited to
 - [ ] Make a 'security sweep' checklist for maintenance.md that makes sure things like this are checked/enforced on an ongoing basis.
 
 
-### Iron Out Documentation
+### Documentation
 
 #### Doc Generator (`private/bin/rvn-docs`)
 Build a single fast CLI command that auto-generates all reference appendix files from the codebase.
@@ -94,7 +74,7 @@ Targets (generator owns these files — do not hand-edit them):
 - [ ] Do a proper human proofreading sweep once narrative docs are rewritten; replace this section with final authoring task list
 
 #### Delivery Architecture
-- [ ]Use lowercase file names for docs/* files from now on.
+- [ ] Use lowercase file names for docs/* files from now on.
 - [ ] `docs/` is the single source of truth for both the GitHub repo and the live Raven docs site
 - [ ] Docs site: Raven instance on lanterns.io, dedicated channel for Raven docs; other channels for other projects
 - [ ] Git repos mirrored into `private/dat/` so Raven can embed always-current markdown via the markdown content block

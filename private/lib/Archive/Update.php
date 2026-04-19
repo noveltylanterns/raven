@@ -1,12 +1,19 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Archive/Update.php
+ * Compares, plans, and applies package updates from a git source.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Update;
+namespace Raven\Lib\Archive;
 
 use FilesystemIterator;
-use Raven\Lib\Archive\Types\Git;
 use Raven\Core\Database\Schema\SchemaEnsureStateStore;
+use Raven\Lib\Archive\Types\Git;
 use RecursiveCallbackFilterIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -14,8 +21,13 @@ use RuntimeException;
 
 /**
  * Compares, plans, and applies package updates from one git source.
+ *
+ * Fetches remote source state, diffs it against the managed local tree, builds
+ * a file-level action plan (create/update/delete/skip), and can apply that plan
+ * in place — keeping custom themes, extensions, and .gitignore-protected paths
+ * untouched throughout the process.
  */
-final class UpdateWorkflowService
+final class Update
 {
     private string $root;
     private Git $git;
@@ -25,8 +37,10 @@ final class UpdateWorkflowService
     private array $stockExtensionDirectories;
 
     /**
-     * @param array<int, string> $stockThemeSlugs
-     * @param array<int, string> $stockExtensionDirectories
+     * @param string $root Absolute Raven project root path.
+     * @param Git $git Git command runner instance.
+     * @param array<int, string> $stockThemeSlugs Slugs of stock themes to protect from deletion.
+     * @param array<int, string> $stockExtensionDirectories Directory names of stock extensions to protect.
      */
     public function __construct(
         string $root,
@@ -47,14 +61,16 @@ final class UpdateWorkflowService
     }
 
     /**
+     * Compares the local revision against the remote source and returns state info.
+     *
      * @param array{
      *   mode: string,
      *   github_repo: string,
      *   repo_url: string,
      *   source_url: string,
      *   source_label: string
-     * } $source
-     * @return array<string, mixed>
+     * } $source Resolved update source descriptor.
+     * @return array<string, mixed> Comparison result with local/remote state and comparison details.
      */
     public function compare(array $source): array
     {
@@ -79,14 +95,17 @@ final class UpdateWorkflowService
     }
 
     /**
+     * Performs a dry run against the remote source and returns a planned action list.
+     *
      * @param array{
      *   mode: string,
      *   github_repo: string,
      *   repo_url: string,
      *   source_url: string,
      *   source_label: string
-     * } $source
-     * @return array<string, mixed>
+     * } $source Resolved update source descriptor.
+     * @param bool $allowOverwrite Whether to suppress the blocked-count warning when local files differ.
+     * @return array<string, mixed> Dry-run result with planned actions and summary.
      */
     public function dryRun(array $source, bool $allowOverwrite = false): array
     {
@@ -118,14 +137,17 @@ final class UpdateWorkflowService
     }
 
     /**
+     * Applies the update plan from the remote source to the local tree.
+     *
      * @param array{
      *   mode: string,
      *   github_repo: string,
      *   repo_url: string,
      *   source_url: string,
      *   source_label: string
-     * } $source
-     * @return array<string, mixed>
+     * } $source Resolved update source descriptor.
+     * @param bool $allowOverwrite Whether to allow overwriting locally modified managed files.
+     * @return array<string, mixed> Update result with applied action count and final state.
      */
     public function update(array $source, bool $allowOverwrite = false): array
     {
@@ -184,14 +206,12 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @param array{
-     *   mode: string,
-     *   github_repo: string,
-     *   repo_url: string,
-     *   source_url: string,
-     *   source_label: string
-     * } $source
-     * @return array<string, mixed>
+     * Builds a normalized error result payload for a failed update operation.
+     *
+     * @param string $operation Operation key that failed (`check`, `dry_run`, or `update_now`).
+     * @param array<string, mixed> $source Update source descriptor at time of failure.
+     * @param string $message Human-facing error message.
+     * @return array<string, mixed> Normalized error result.
      */
     private function errorResult(string $operation, array $source, string $message): array
     {
@@ -214,20 +234,23 @@ final class UpdateWorkflowService
     }
 
     /**
+     * Clones the remote source into a temporary workspace and resolves comparison state.
+     *
      * @param array{
      *   mode: string,
      *   github_repo: string,
      *   repo_url: string,
      *   source_url: string,
      *   source_label: string
-     * } $source
+     * } $source Resolved update source descriptor.
+     * @param bool $withWorkTree Whether to check out a working tree for file-level diff.
      * @return array{
      *   local: array<string, mixed>,
      *   remote: array<string, mixed>,
      *   comparison: array<string, mixed>,
      *   temp_dir: string,
      *   source_tree?: string
-     * }
+     * } Workspace descriptor including local/remote state and comparison result.
      */
     private function prepareWorkspace(array $source, bool $withWorkTree): array
     {
@@ -311,11 +334,14 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @param array<string, mixed> $workspace
+     * Builds the file-level action plan by diffing source tree against managed local files.
+     *
+     * @param array<string, mixed> $workspace Workspace descriptor from prepareWorkspace().
+     * @param bool $preserveWorkspace Whether to skip temp-dir cleanup after plan build.
      * @return array{
      *   actions: array<int, array<string, mixed>>,
      *   summary: array<string, int>
-     * }
+     * } Action list and summary counters.
      */
     private function buildPlan(array $workspace, bool $preserveWorkspace): array
     {
@@ -424,7 +450,12 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @param array<int, array<string, mixed>> $actions
+     * Applies the planned action list to the local tree by copying/deleting files.
+     *
+     * @param array<int, array<string, mixed>> $actions Planned actions from buildPlan().
+     * @param string $sourceTree Absolute path to the checked-out source tree.
+     * @return int Number of file operations applied.
+     * @throws RuntimeException When any file operation fails.
      */
     private function applyPlan(array $actions, string $sourceTree): int
     {
@@ -485,7 +516,10 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @return array<string, mixed>
+     * Reads local git repository state (branch, revision, timestamp).
+     *
+     * @return array<string, mixed> Local state with `branch`, `revision`, and `timestamp` keys.
+     * @throws RuntimeException When the local install is not inside a git working tree.
      */
     private function localRepositoryState(): array
     {
@@ -511,8 +545,11 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @param array<string, mixed> $source
-     * @return array<string, mixed>
+     * Fetches remote repository state (branch, revision, timestamp) via ls-remote.
+     *
+     * @param array<string, mixed> $source Resolved update source descriptor.
+     * @return array<string, mixed> Remote state with `branch`, `revision`, and `timestamp` keys.
+     * @throws RuntimeException When the remote source URL is missing or the remote HEAD cannot be resolved.
      */
     private function remoteRepositoryState(array $source): array
     {
@@ -556,6 +593,13 @@ final class UpdateWorkflowService
         ];
     }
 
+    /**
+     * Fetches the commit timestamp for the remote HEAD ref via a shallow clone.
+     *
+     * @param string $sourceUrl Resolved remote source URL.
+     * @param string $branchName Remote default branch name.
+     * @return string ISO-8601 committer timestamp, or empty string on failure.
+     */
     private function remoteRevisionTimestamp(string $sourceUrl, string $branchName): string
     {
         $tempDir = $this->tempPath();
@@ -585,9 +629,11 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @param array<string, mixed> $local
-     * @param array<string, mixed> $remote
-     * @return array<string, mixed>
+     * Compares local and remote revision hashes to determine update state.
+     *
+     * @param array<string, mixed> $local Local state from localRepositoryState().
+     * @param array<string, mixed> $remote Remote state from remoteRepositoryState().
+     * @return array<string, mixed> Comparison result with `state`, `label`, and ahead/behind counts.
      */
     private function compareRevisionHeads(array $local, array $remote): array
     {
@@ -612,7 +658,11 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @return array<string, bool>
+     * Builds a map of relative paths that are excluded by .gitignore rules.
+     *
+     * @param array<int, string> $paths Candidate relative paths to check.
+     * @return array<string, bool> Map of ignored relative paths.
+     * @throws RuntimeException When git check-ignore fails with a non-standard exit code.
      */
     private function ignoredPathsMap(array $paths): array
     {
@@ -638,7 +688,9 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @return array<string, bool>
+     * Builds a map of relative paths with uncommitted local changes.
+     *
+     * @return array<string, bool> Map of dirty relative paths.
      */
     private function dirtyPathsMap(): array
     {
@@ -675,7 +727,11 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @return array<string, string>
+     * Collects all files under a directory tree as a relative-path => absolute-path map.
+     *
+     * @param string $basePath Absolute directory root.
+     * @param array<int, string> $excludePrefixes Relative path prefixes to exclude (e.g. `.git`).
+     * @return array<string, string> Sorted map of relative path => absolute path.
      */
     private function collectFiles(string $basePath, array $excludePrefixes = ['.git']): array
     {
@@ -742,7 +798,9 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @return array<string, string>
+     * Lists all tracked and untracked managed files as a relative-path => absolute-path map.
+     *
+     * @return array<string, string> Sorted map of relative path => absolute path.
      */
     private function localManagedFiles(): array
     {
@@ -772,8 +830,15 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @param array<int, string> $stockNames
-     * @return array<int, string>
+     * Returns relative root paths for directories that are NOT in the stock list.
+     *
+     * Used to identify custom themes and extensions that should be protected from
+     * the updater's delete pass.
+     *
+     * @param string $absoluteBase Absolute directory to scan.
+     * @param string $relativeBase Relative prefix used when building result paths.
+     * @param array<int, string> $stockNames Lowercase stock entry names to exclude.
+     * @return array<int, string> Sorted list of custom protected root paths.
      */
     private function customProtectedRoots(string $absoluteBase, string $relativeBase, array $stockNames): array
     {
@@ -843,10 +908,14 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @param array<string, bool> $ignoredPaths
-     * @param array<int, string> $customThemeRoots
-     * @param array<int, string> $customExtensionRoots
+     * Returns a protection reason string for a path, or null when it is safe to update.
+     *
+     * @param string $path Relative path to check.
+     * @param array<string, bool> $ignoredPaths .gitignore-matched paths.
+     * @param array<int, string> $customThemeRoots Custom theme root prefixes.
+     * @param array<int, string> $customExtensionRoots Custom extension root prefixes.
      * @param array<string, bool> $extensionBinAliases Pre-computed map of extension bin symlink paths.
+     * @return string|null Protection reason, or null when the path is safe to update.
      */
     private function protectedPathReason(
         string $path,
@@ -879,7 +948,14 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @return array<string, mixed>
+     * Builds one action row for the plan.
+     *
+     * @param string $path Relative file path.
+     * @param string $operation Action key (`create`, `update`, `delete`, or `skip`).
+     * @param string $detail Human-facing reason for the action.
+     * @param bool $localModified Whether the file has local uncommitted changes.
+     * @param bool $blocked Whether this action is flagged as potentially destructive.
+     * @return array<string, mixed> Action row.
      */
     private function planAction(
         string $path,
@@ -897,6 +973,13 @@ final class UpdateWorkflowService
         ];
     }
 
+    /**
+     * Returns true when two files have the same size and SHA-1 hash.
+     *
+     * @param string $leftPath Absolute path to the first file.
+     * @param string $rightPath Absolute path to the second file.
+     * @return bool True when the files are byte-for-byte identical.
+     */
     private function filesMatch(string $leftPath, string $rightPath): bool
     {
         if (!is_file($leftPath) || !is_file($rightPath)) {
@@ -910,12 +993,24 @@ final class UpdateWorkflowService
         return hash_file('sha1', $leftPath) === hash_file('sha1', $rightPath);
     }
 
+    /**
+     * Normalizes a file path to a forward-slash relative path.
+     *
+     * @param string $path Raw path string from git output or filesystem.
+     * @return string Normalized relative path without leading slash.
+     */
     private function normalizeRelativePath(string $path): string
     {
         $normalized = trim(str_replace('\\', '/', $path));
         return ltrim($normalized, '/');
     }
 
+    /**
+     * Creates and returns a unique temporary directory path under .tmp/update.
+     *
+     * @return string Absolute temporary directory path (not yet created on disk).
+     * @throws RuntimeException When the update workspace root cannot be created or is not writable.
+     */
     private function tempPath(): string
     {
         $updatesRoot = $this->root . '/.tmp/update';
@@ -930,6 +1025,12 @@ final class UpdateWorkflowService
         return rtrim(str_replace('\\', '/', $updatesRoot), '/') . '/raven-update-' . bin2hex(random_bytes(6));
     }
 
+    /**
+     * Walks upward from a deleted file's directory and removes now-empty ancestors.
+     *
+     * @param string $directory Absolute path to start the upward pruning walk from.
+     * @return void
+     */
     private function pruneEmptyDirectories(string $directory): void
     {
         $normalizedRoot = $this->root;
@@ -952,12 +1053,19 @@ final class UpdateWorkflowService
         }
     }
 
+    /**
+     * Removes a directory and all of its contents recursively.
+     *
+     * @param string $directory Absolute path to the directory to remove.
+     * @return void
+     */
     private function deleteDirectoryRecursively(string $directory): void
     {
         if ($directory === '' || !is_dir($directory)) {
             return;
         }
 
+        // CHILD_FIRST ensures files and subdirs are removed before their parent dirs.
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
             RecursiveIteratorIterator::CHILD_FIRST
@@ -974,6 +1082,13 @@ final class UpdateWorkflowService
         @rmdir($directory);
     }
 
+    /**
+     * Advances the local git HEAD to match the applied source state.
+     *
+     * @param string $sourceUrl Resolved remote source URL.
+     * @param string $branch Remote branch name to fetch and reset to.
+     * @return void
+     */
     private function syncLocalRepositoryToSource(string $sourceUrl, string $branch): void
     {
         $this->git->mustRun(['fetch', '--quiet', '--depth', '1', $sourceUrl, $branch], $this->root);
@@ -994,7 +1109,9 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @return array<string, int>
+     * Returns an empty summary counter map.
+     *
+     * @return array<string, int> Zero-initialized summary counters.
      */
     private function emptySummary(): array
     {
@@ -1010,7 +1127,9 @@ final class UpdateWorkflowService
     }
 
     /**
-     * @return array<string, string>
+     * Returns an empty revision info map.
+     *
+     * @return array<string, string> Zero-initialized revision info.
      */
     private function emptyRevisionInfo(): array
     {

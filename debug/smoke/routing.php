@@ -30,7 +30,7 @@ require_once dirname(__DIR__, 2) . '/private/lib/Routing/ChannelRoutePolicy.php'
 require_once dirname(__DIR__, 2) . '/private/lib/Routing/ChannelRecordPolicy.php';
 require_once dirname(__DIR__, 2) . '/private/lib/Routing/ChannelContextService.php';
 require_once dirname(__DIR__, 2) . '/private/lib/Routing/PathScopeLookupService.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Routing/PublicChannelPageRouteService.php';
+require_once dirname(__DIR__, 2) . '/private/sys/Routing/Public/PublicChannelPageRouteService.php';
 require_once dirname(__DIR__, 2) . '/private/lib/Routing/RouteConfigService.php';
 require_once dirname(__DIR__, 2) . '/private/lib/Channel/ChannelFileStoreService.php';
 require_once dirname(__DIR__, 2) . '/private/sys/Repository/ChannelRepository.php';
@@ -39,7 +39,7 @@ require_once dirname(__DIR__, 2) . '/private/sys/Repository/PageRepository.php';
 use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
-use Raven\Lib\Routing\PublicChannelPageRouteService;
+use Raven\Core\Routing\Public\PublicChannelPageRouteService;
 use Raven\Lib\Routing\RouteConfigService;
 use Raven\Lib\Security\InputSanitizer;
 

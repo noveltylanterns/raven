@@ -1,11 +1,18 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Extension/ExtensionStorageCleaner.php
+ * Deletes extension-owned storage directories and database tables during uninstall.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
 
 use PDO;
-use Raven\Lib\Filesystem\DirectoryTreeService;
+use Raven\Lib\Archive\Delete as ArchiveDelete;
 use RuntimeException;
 
 /**
@@ -18,7 +25,7 @@ final class ExtensionStorageCleaner
     private string $driver;
     private string $prefix;
     private ManifestContractValidator $manifestValidator;
-    private DirectoryTreeService $directoryTreeService;
+    private ArchiveDelete $directoryTreeService;
 
     public function __construct(
         string $projectRoot,
@@ -26,14 +33,14 @@ final class ExtensionStorageCleaner
         string $driver,
         string $prefix,
         ?ManifestContractValidator $manifestValidator = null,
-        ?DirectoryTreeService $directoryTreeService = null
+        ?ArchiveDelete $directoryTreeService = null
     ) {
         $this->projectRoot = rtrim($projectRoot, '/\\');
         $this->db = $db;
         $this->driver = strtolower(trim($driver));
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->manifestValidator = $manifestValidator ?? new ManifestContractValidator();
-        $this->directoryTreeService = $directoryTreeService ?? new DirectoryTreeService();
+        $this->directoryTreeService = $directoryTreeService ?? new ArchiveDelete();
     }
 
     /**

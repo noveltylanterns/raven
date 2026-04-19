@@ -15,16 +15,17 @@ use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TagRepository;
-use Raven\Lib\Archive\ArchivePackageService;
-use Raven\Lib\Archive\PackageInstallWorkflowService;
+use Raven\Lib\Archive\Install as ArchiveInstall;
+use Raven\Lib\Archive\Package as ArchivePackage;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Extension\ExtensionRegistry;
+use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Public\PublicThemeRegistry;
 
-require_once dirname(__DIR__) . '/Archive/ArchivePackageService.php';
-require_once dirname(__DIR__) . '/Archive/PackageInstallWorkflowService.php';
+require_once dirname(__DIR__) . '/Archive/Package.php';
+require_once dirname(__DIR__) . '/Archive/Install.php';
 require_once dirname(__DIR__) . '/Archive/Extract.php';
 require_once dirname(__DIR__) . '/Archive/Compress.php';
 require_once dirname(__DIR__) . '/Archive/Types/Zip.php';
@@ -681,14 +682,14 @@ function raven_cli_copy_directory_recursive(string $source, string $target): voi
     }
 }
 
-function raven_cli_archive_packages(string $root): ArchivePackageService
+function raven_cli_archive_packages(string $root): ArchivePackage
 {
-    return new ArchivePackageService($root);
+    return new ArchivePackage($root);
 }
 
-function raven_cli_package_install_workflow(string $root): PackageInstallWorkflowService
+function raven_cli_package_install_workflow(string $root): ArchiveInstall
 {
-    return new PackageInstallWorkflowService(new InputSanitizer(), new Upload(), raven_cli_archive_packages($root));
+    return new ArchiveInstall(new InputSanitizer(), new Upload(), raven_cli_archive_packages($root));
 }
 
 /**
@@ -2997,7 +2998,7 @@ function raven_cli_command_cron(RavenCliContext $context, array $tokens): int
         $root = $context->root;
 
         $scheduler = $rvn['scheduler'] ?? null;
-        if (!$scheduler instanceof \Raven\Core\Scheduler) {
+        if (!$scheduler instanceof SchedulerRegistry) {
             throw new RuntimeException('Scheduler registry not found in app container. Ensure private/raven.php is up to date.');
         }
 

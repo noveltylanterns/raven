@@ -106,14 +106,12 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 
 - `private/sys/Config.php`
   - `Raven\Core\Config` — canonical runtime config instance. Loads `private/dat/config.php` on construct, exposes dot-path `get`/`set`/`replace`/`save`, and writes config changes atomically with `LOCK_EX`. This is the single authoritative config class; `private/lib/Config/` holds reusable parsing/validation helpers only.
-- `private/sys/Router.php`
-  - `Raven\Core\Router` — the core dispatcher: registers routes via `add()`, compiles `{param}` patterns to named-capture regex, and resolves requests via `dispatch()`. Also owns `RouteRequest` and `RouteDispatchResult` value objects in the same directory.
 - `private/sys/Renderer.php`
   - `Raven\Core\Renderer` — core PHP template renderer. Captures output from isolated template includes, injects named variables, and supports layout/wrapper composition. Used by controllers across both panel and public routes.
 - `private/sys/Logger.php`
   - `Raven\Core\Logger` — event logging subsystem. Writes severity-gated entries to the `{prefix}event_log` table, supports syslog mirroring, and exposes query/count/prune/export/clear APIs.
 - `private/sys/Scheduler.php`
-  - `Raven\Core\Scheduler` — task scheduler registry. Registers named tasks with intervals, tracks last-run state in the `{prefix}scheduler` table, and dispatches overdue tasks on request.
+  - `Raven\Core\Scheduler` — fallback web-request scheduler trigger. Throttles passive scheduler execution after public/panel responses and delegates actual job execution to the shared registry in `lib/Scheduler/Registry.php`.
 - `private/sys/Debug/`
   - Debug toolbar infrastructure (`Raven\Core\Debug`). Owns `ToolbarConfigResolver`, `ToolbarDataSanitizer`, `ToolbarMarkupBuilder`, `ToolbarRenderer`, and `DebugToolbarResponseHook`. Injected into responses when debug mode is active.
 - `private/sys/Controller/`
@@ -129,10 +127,10 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Core content/taxonomy/auth-facing persistence repositories (`PageRepository`, `ChannelRepository`, `UserRepository`, `GroupRepository`, `CategoryRepository`, `TagRepository`, `TaxonomyLookupRepository`, `TaxonomySetRepository`, `RedirectRepository`, `PageImageRepository`, `InviteTokenRepository`).
 - `private/sys/Routing/`
   - Raven-owned web entrypoints, runtime builders, and route registrars. Not for extension use.
-  - `SchedulerFallbackRunner` owns shared low-level scheduler bootstrap mechanics; scope decisions stay in the public/panel entrypoints.
-  - `Routing/Public/` — `PublicEntrypoint`, `PublicRuntimeBuilder`, and controller-aligned public route registrars including extension-route loading.
-  - `Routing/Panel/` — `PanelEntrypoint`, `PanelRuntimeBuilder`, controller-aligned panel route registrars, extension-route loading, and panel theme-asset fast path.
-  - Note: `Router.php`, `RouteRequest.php`, and `RouteDispatchResult.php` live at the `sys/` root (see above); `Routing/` holds only entrypoints, runtime builders, and route registrars.
+  - `Router.php` — `Raven\Core\Routing\Router`, the core dispatcher: registers routes via `add()`, compiles `{param}` patterns to named-capture regex, and resolves requests via `dispatch()`.
+  - `Routing/Public/` — `PublicEntrypoint`, `PublicRuntimeBuilder`, controller-aligned public route registrars (including extension-route loading), and `PublicChannelPageRouteService` (wraps `ChannelRoutePolicy` for public content controllers: lookup-target resolution and canonical segment building).
+  - `Routing/Panel/` — `PanelEntrypoint`, `PanelRuntimeBuilder`, controller-aligned panel route registrars, extension-route loading, panel theme-asset fast path, and `RoutingInventoryBuilder` (builds the normalized routing inventory row set for the panel routing diagnostics view).
+  - Note: `Router.php`, `RouteRequest.php`, and `RouteDispatchResult.php` now live together under `sys/Routing/`; `Routing/` also holds the public/panel entrypoints and route registrars.
 
 ### private/lib/
 
@@ -147,12 +145,16 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/lib/Channel/`
   - Channel record normalization policy, root channel constants, slug validation, and channel-context hydration helpers. (`ChannelRecordPolicy`, `ChannelContextService`, `ChannelFileStoreService`.)
 - `private/lib/Config/`
-  - Config validation, editor schema/defaults, and value-parsing primitives. Pure reusable policy; does not own the runtime config instance.
+  - Config validation and value-parsing primitives. Pure reusable policy; does not own the runtime config instance.
   - `ConfigValueParser` — static scalar coercion helpers (`bool`, `int`, `float`) for extension and lib code that needs safe type conversion from raw config values.
-  - `Config/Panel/` — panel-only config helpers: `ConfigEditorNormalizer`, `ConfigEditorSchemaService`, `ConfigSnapshotSanitizer`, `PanelConfigDefaultsService`, `PanelConfigFieldPolicyService`, `PanelMediaConfigService`.
+  - `ConfigValueWriter` — handles the on-disk persistence format for runtime config files: `var_export` serialization, atomic write, stat-cache invalidation, and OPcache eviction; called by `sys/Config::save()`.
 - `private/lib/Archive/`
   - Reusable archive/package helpers for core and extensions.
-  - `ArchivePackageService` — panel/CLI-facing package helper for supported archive checks, manifest slug reads, temp archive allocation, and download streaming.
+  - `Package` — panel/CLI-facing package helper for supported archive checks, manifest slug reads, temp archive allocation, and download streaming.
+  - `Install` — shared package-upload orchestration for theme/extension installs: upload validation, slug resolution, extraction, and wrapper-directory flattening.
+  - `Delete` — recursive directory-removal utility used by theme/extension uninstall and cleanup flows.
+  - `Update` — core update workflow orchestration: git-based compare, dry-run, and apply-update pipelines with schema re-ensure support.
+  - `UpdateSource` — normalizes and validates update-source config (GitHub mirror, custom GitHub repo, custom git URL) from config or POST data.
   - `Extract` — shared archive extraction forwarder for ZIP, TAR-family, and RAR packages, including manifest reads across wrapped package layouts.
   - `Compress` — shared archive compression forwarder for ZIP and TAR-family outputs.
   - `Archive/Types/` — canonical format handlers such as `Zip`, `Tar`, `Gz`, `Bz2`, `Xz`, `Zst`, `Rar`, `Git`, and `Csv`; stock extension exports/imports and panel CSV downloads now route through `Csv`.
@@ -162,6 +164,9 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `TableNameResolver` — resolves logical table names to physical prefixed names for both app-db and auth-db contexts; available to extensions.
   - `SqlUpsertPolicy.php` — driver-aware upsert helper available to extensions.
   - Connection setup and schema orchestration have moved to `sys/Database/` as they are core-only bootstrap concerns.
+- `private/lib/Scheduler/`
+  - Shared scheduler runtime for core and extensions.
+  - `Registry` — system-wide scheduler registry. Registers named jobs, lazy-loads extension `lib/cron.php` sources, tracks last-run state under `.tmp/cron/`, exposes `getStatus()`, and executes due jobs via `runDue()`.
 - `private/lib/Extension/`
   - Extension cataloging, manifests, state, storage provisioning, and lazy runtime bootstrap/service resolution.
   - `ExtensionRegistry` — unified registry with a static metadata API and a per-request instance API.
@@ -174,14 +179,14 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Image upload, validation, variant processing, and path management. All media handling is panel-route-only.
   - `Media/Panel/` — all media classes live here: `AvatarValidator` (avatar upload constraints), `PageImageManager` (page image lifecycle orchestration), `PageImageUploadPolicy`, `ImageVariantProcessor`, `PageImageDeletionService`, and related path/gallery helpers.
 - `private/lib/Panel/`
-  - Panel UI helpers: tab normalization, tab-preserving URL builders, panel path resolution, routing-preview derivations, and panel POST payload normalization (`PanelPost`).
+  - Panel UI and config-editor helpers for panel-only workflows.
+  - UI helpers: tab normalization, tab-preserving URL builders, panel path resolution, routing-preview derivations, and panel POST payload normalization (`PanelPost`).
+  - Config editor: `ConfigEditorNormalizer` (field value normalization), `ConfigEditorSchemaService` (schema, field mapping, and config-tree defaults), `ConfigSnapshotSanitizer` (snapshot cleanup before persistence), `PanelConfigDefaultsService` (defaults orchestration), `PanelConfigFieldPolicyService` (field validation policy), `PanelMediaConfigService` (media config readers and upload-limit display).
 - `private/lib/Routing/`
   - Reusable routing library functions available to extensions and core alike.
   - `ChannelRoutePolicy` — channel route mode (`slug`, `date_slug`, `id`, etc.) and word-separator normalization/resolution policy.
   - `PathScopeLookupService` — generic slug-uniqueness DB lookup for any (slug, channel) scoped table; used by core repositories and available to extensions.
   - `RouteConfigService` — config-aware route-prefix, feed, profile, and group route helpers; consumes `Raven\Core\Config` and exposes normalized policy accessors.
-  - `Routing/Panel/` — panel-only routing helpers: `RoutingInventoryBuilder` (builds the normalized routing inventory row set for the panel routing diagnostics view).
-  - `Routing/Public/` — public-route-only routing helpers: `PublicChannelPageRouteService` (wraps `ChannelRoutePolicy` for public content controllers: lookup-target resolution and canonical segment building).
 - `private/lib/Security/`
   - Security primitives available to core and extensions: CSRF (`Csrf`, `CsrfTokenStoreInterface`), input sanitization (`InputSanitizer`), 2FA (TOTP, WebAuthn, recovery phrase, QR code), captcha, and invite token policy.
 - `private/lib/Support/`

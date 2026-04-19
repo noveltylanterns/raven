@@ -1,8 +1,15 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Panel/ConfigEditorNormalizer.php
+ * Scalar and media field normalization helpers for the panel config editor.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Config\Panel;
+namespace Raven\Lib\Panel;
 
 /**
  * Shared normalization helpers for panel config-editor scalar/media fields.

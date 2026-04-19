@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Router;
+use Raven\Core\Routing\Router;
 
 /**
  * Registers PHP Info routes into the panel router.

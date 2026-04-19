@@ -1,8 +1,15 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Panel/PanelConfigFieldPolicyService.php
+ * Field normalization and validation policy for the panel config editor.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Config\Panel;
+namespace Raven\Lib\Panel;
 
 use Raven\Core\Config;
 use Raven\Lib\Config\ConfigValueParser;

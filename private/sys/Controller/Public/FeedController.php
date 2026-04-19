@@ -14,7 +14,7 @@ namespace Raven\Core\Controller\Public;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\TaxonomyLookupRepository;
-use Raven\Lib\Routing\Public\PublicChannelPageRouteService;
+use Raven\Core\Routing\Public\PublicChannelPageRouteService;
 use Raven\Lib\View\Public\PublicTemplateDecorator;
 use Raven\Lib\View\Public\PublicTemplatePipeline;
 use Raven\Lib\View\Public\PublicTemplateResolver;

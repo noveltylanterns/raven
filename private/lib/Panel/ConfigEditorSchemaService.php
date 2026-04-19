@@ -1,11 +1,17 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Panel/ConfigEditorSchemaService.php
+ * Config-editor schema, field mapping, and config-tree default-seeding service.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Config\Panel;
+namespace Raven\Lib\Panel;
 
 use Raven\Lib\Config\ConfigValueParser;
-
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Security\InputSanitizer;
 

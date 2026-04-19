@@ -1,8 +1,15 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Panel/PanelConfigDefaultsService.php
+ * Orchestrates config-editor default seeding and scalar coercion for panel config workflows.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Config\Panel;
+namespace Raven\Lib\Panel;
 
 /**
  * Shared configuration-editor defaults + scalar coercion bundle.

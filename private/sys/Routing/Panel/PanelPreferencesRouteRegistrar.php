@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Panel;
 
-use Raven\Core\Router;
+use Raven\Core\Routing\Router;
 
 /**
  * Registers current-user preference routes for the panel runtime.

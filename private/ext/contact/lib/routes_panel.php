@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Router;
+use Raven\Core\Routing\Router;
 use Raven\Ext\ContactFormRepository;
 use Raven\Ext\ContactSubmissionRepository;
 use Raven\Lib\Archive\Types\Csv;

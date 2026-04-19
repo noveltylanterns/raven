@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Ext\Cron;
 
-use Raven\Core\Scheduler;
+use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
 
 /**
  * Coordinates scheduled task storage, validation, panel decoration, and execution.
@@ -76,10 +76,10 @@ final class CronTaskService
     /**
      * Returns saved tasks decorated with scheduler status for panel display.
      *
-     * @param Scheduler|null $scheduler Active scheduler when available.
+     * @param SchedulerRegistry|null $scheduler Active scheduler when available.
      * @return array<int, array{slug: string, label: string, command: string, interval: int, enabled: bool, last_run: int|null, next_due: int|null, overdue: bool}>
      */
-    public function tasksForPanel(?Scheduler $scheduler = null): array
+    public function tasksForPanel(?SchedulerRegistry $scheduler = null): array
     {
         $tasks = $this->listTasks();
         if ($tasks === []) {
@@ -258,12 +258,12 @@ final class CronTaskService
     /**
      * Returns scheduler status rows keyed by task slug.
      *
-     * @param Scheduler|null $scheduler Active scheduler when available.
+     * @param SchedulerRegistry|null $scheduler Active scheduler when available.
      * @return array<string, array{owner: string, name: string, interval: int, last_run: int|null, next_due: int|null, overdue: bool}>
      */
-    private function statusMap(?Scheduler $scheduler): array
+    private function statusMap(?SchedulerRegistry $scheduler): array
     {
-        if (!$scheduler instanceof Scheduler) {
+        if (!$scheduler instanceof SchedulerRegistry) {
             return [];
         }
 

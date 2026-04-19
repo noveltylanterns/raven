@@ -13,9 +13,9 @@ namespace Raven\Core\Routing\Public;
 
 use Raven\Core\Debug\DebugToolbarResponseHook;
 use Raven\Core\Debug\ToolbarConfigResolver;
-use Raven\Core\Routing\SchedulerFallbackRunner;
-use Raven\Core\Router;
+use Raven\Core\Scheduler;
 use Raven\Core\Routing\RouteRequest;
+use Raven\Core\Routing\Router;
 use RuntimeException;
 
 use function Raven\Lib\Support\request_path;
@@ -214,7 +214,7 @@ final class PublicEntrypoint
             $publicRequestContext()->notFound();
         }
 
-        SchedulerFallbackRunner::runIfDue(
+        Scheduler::runIfDue(
             $rvn,
             $root,
             $rvn['config']->get('site.scheduler', 'always') === 'always'

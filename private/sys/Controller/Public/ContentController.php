@@ -26,7 +26,7 @@ use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Profile\ProfileContactService;
-use Raven\Lib\Routing\Public\PublicChannelPageRouteService;
+use Raven\Core\Routing\Public\PublicChannelPageRouteService;
 use Raven\Lib\Site\PublicMetaService;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\View\Public\PublicTemplateDecorator;

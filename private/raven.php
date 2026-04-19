@@ -17,8 +17,8 @@ use Raven\Core\Repository\PageRepository;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Extension\ExtensionRegistry;
+use Raven\Lib\Scheduler\Registry;
 use Raven\Core\Logger;
-use Raven\Core\Scheduler;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Auth\SessionCookiePolicy;
@@ -227,7 +227,7 @@ return (static function (): array {
     // Wire the system-wide scheduler.
     // Both core jobs and extension-declared jobs (from lib/cron.php) run through this registry.
     // The scheduler is passive at bootstrap time — jobs only execute when rvn-cron triggers runDue().
-    $scheduler = new Scheduler($root);
+    $scheduler = new Registry($root);
 
     // Built-in core job: flip page publish/draft status based on scheduled publish/expires columns.
     // Interval of 60 s means rvn-cron running every minute covers all scheduled posts promptly.

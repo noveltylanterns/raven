@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Ext\Repo;
 
+use Raven\Lib\Archive\Delete as ArchiveDelete;
 use Raven\Lib\Archive\Types\Git;
-use Raven\Lib\Filesystem\DirectoryTreeService;
 use RuntimeException;
 
 /**
@@ -29,7 +29,7 @@ final class RepoService
     private RepoRegistryStore $registryStore;
     private RepoLogStore $logStore;
     private Git $git;
-    private DirectoryTreeService $directoryTree;
+    private ArchiveDelete $directoryTree;
     private string $localRoot;
     private string $publicRoot;
 
@@ -43,7 +43,7 @@ final class RepoService
         RepoRegistryStore $registryStore,
         RepoLogStore $logStore,
         Git $git,
-        DirectoryTreeService $directoryTree,
+        ArchiveDelete $directoryTree,
         string $localRoot,
         string $publicRoot
     ) {
@@ -373,7 +373,7 @@ final class RepoService
      */
     public function schedulerAvailable(): bool
     {
-        return class_exists(\Raven\Core\Scheduler::class);
+        return class_exists(\Raven\Lib\Scheduler\Registry::class);
     }
 
     /**

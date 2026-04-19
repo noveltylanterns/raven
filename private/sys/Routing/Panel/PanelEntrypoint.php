@@ -13,9 +13,9 @@ namespace Raven\Core\Routing\Panel;
 
 use Raven\Core\Debug\DebugToolbarResponseHook;
 use Raven\Core\Debug\ToolbarConfigResolver;
-use Raven\Core\Routing\SchedulerFallbackRunner;
-use Raven\Core\Router;
+use Raven\Core\Scheduler;
 use Raven\Core\Routing\RouteRequest;
+use Raven\Core\Routing\Router;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Config\ConfigValueParser;
 use Raven\Lib\Panel\PanelUrl;
@@ -382,7 +382,7 @@ final class PanelEntrypoint
             }
         }
 
-        SchedulerFallbackRunner::runIfDue(
+        Scheduler::runIfDue(
             $rvn,
             $root,
             in_array($rvn['config']->get('site.scheduler', 'always'), ['always', 'panel'], true),

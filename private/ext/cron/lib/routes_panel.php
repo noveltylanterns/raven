@@ -10,8 +10,8 @@
 declare(strict_types=1);
 
 use Raven\Ext\Cron\CronTaskService;
-use Raven\Core\Router;
-use Raven\Core\Scheduler;
+use Raven\Core\Routing\Router;
+use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
 
 use function Raven\Lib\Support\redirect;
 
@@ -236,7 +236,7 @@ return static function (Router $router, array $context): void {
 
         $site = $panelSiteData();
         $csrfField = $rvn['csrf']->field();
-        $schedulerAvailable = ($rvn['scheduler'] ?? null) instanceof Scheduler;
+        $schedulerAvailable = ($rvn['scheduler'] ?? null) instanceof SchedulerRegistry;
         $storagePath = $service->storagePath();
 
         ob_start();
@@ -267,7 +267,7 @@ return static function (Router $router, array $context): void {
         if ($tasks === null) {
             /** @var mixed $schedulerRaw */
             $schedulerRaw = $rvn['scheduler'] ?? null;
-            $scheduler = $schedulerRaw instanceof Scheduler ? $schedulerRaw : null;
+            $scheduler = $schedulerRaw instanceof SchedulerRegistry ? $schedulerRaw : null;
             $tasks = $service->tasksForPanel($scheduler);
         }
 

@@ -1,8 +1,15 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Panel/ConfigSnapshotSanitizer.php
+ * Cleanup rules for config snapshots before panel config-editor persistence.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Config\Panel;
+namespace Raven\Lib\Panel;
 
 /**
  * Applies normalized config-snapshot cleanup rules for panel config workflows.

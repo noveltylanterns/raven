@@ -17,17 +17,17 @@ use Raven\Core\Config;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
-use Raven\Lib\Config\Panel\PanelMediaConfigService;
-use Raven\Lib\Transport\Response;
 use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\Panel\PanelEditorTabService;
+use Raven\Lib\Panel\PanelMediaConfigService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\QrCodeService;
 use Raven\Lib\Security\WebAuthnService;
+use Raven\Lib\Transport\Response;
 
 use function Raven\Lib\Support\redirect;
 

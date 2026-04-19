@@ -2,17 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Router.php
+ * ~/private/sys/Routing/Router.php
  * Minimal route registration and dispatch helper.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core;
-
-use Raven\Core\Routing\RouteDispatchResult;
-use Raven\Core\Routing\RouteRequest;
+namespace Raven\Core\Routing;
 
 /**
  * Minimal path router supporting `{param}` placeholders.
@@ -22,6 +19,14 @@ final class Router
     /** @var array<int, array{method: string, regex: string, handler: callable}> */
     private array $routes = [];
 
+    /**
+     * Registers one route handler for a method and path pattern.
+     *
+     * @param string $method HTTP method such as `GET` or `POST`.
+     * @param string $pattern Path pattern, optionally using `{param}` placeholders.
+     * @param callable $handler Route callback invoked with named path params.
+     * @return void
+     */
     public function add(string $method, string $pattern, callable $handler): void
     {
         $this->routes[] = [
@@ -31,6 +36,12 @@ final class Router
         ];
     }
 
+    /**
+     * Dispatches one normalized route request to the first matching handler.
+     *
+     * @param RouteRequest $request Normalized route request value object.
+     * @return RouteDispatchResult Result wrapper containing handled state and params.
+     */
     public function dispatch(RouteRequest $request): RouteDispatchResult
     {
         $normalizedMethod = $request->method();
@@ -59,6 +70,12 @@ final class Router
         return RouteDispatchResult::notHandled();
     }
 
+    /**
+     * Compiles one path pattern into a route-matching regex.
+     *
+     * @param string $pattern Path pattern, optionally using `{param}` placeholders.
+     * @return string PCRE regex anchored to the full normalized path.
+     */
     private function compilePattern(string $pattern): string
     {
         $normalized = RouteRequest::normalizePath($pattern);

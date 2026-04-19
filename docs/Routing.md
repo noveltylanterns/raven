@@ -86,7 +86,7 @@ Export fields include:
   - `private/sys/Routing/Panel/PanelEntrypoint.php`
   - `private/sys/Routing/Panel/Panel*RouteRegistrar.php`
   - `private/sys/Debug/DebugToolbarResponseHook.php`
-  - `private/sys/Routing/SchedulerFallbackRunner.php`
+  - `private/sys/Scheduler.php`
 - Public auth controller:
   - `private/sys/Controller/Public/AuthController.php`
 - Public profile controller:

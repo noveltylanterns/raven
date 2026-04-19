@@ -1,25 +1,40 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/sys/Routing/Panel/RoutingInventoryBuilder.php
+ * Builds normalized routing inventory rows for the panel routing diagnostics view.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Routing\Panel;
+namespace Raven\Core\Routing\Panel;
 
 use Raven\Lib\Channel\ChannelRecordPolicy;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Builds normalized routing inventory rows for panel diagnostics views.
+ *
+ * Aggregates channels, pages, categories, tags, redirects, groups, and users
+ * into a unified inventory and applies conflict detection via path-usage tracking.
  */
 final class RoutingInventoryBuilder
 {
     private InputSanitizer $input;
 
+    /**
+     * @param InputSanitizer $input Shared text/path normalization helper.
+     */
     public function __construct(InputSanitizer $input)
     {
         $this->input = $input;
     }
 
     /**
+     * Builds all routing inventory rows for the panel routing diagnostics view.
+     *
      * @param array{
      *   reserved_prefixes?: array<int, string>,
      *   channel_index_template_exists?: bool,
@@ -52,7 +67,7 @@ final class RoutingInventoryBuilder
      *   panel_url?: callable(string): string,
      *   build_user_route_segment?: callable(array): ?string,
      *   slugify_group_name?: callable(string): string
-     * } $context
+     * } $context Full routing context including data rows and URL-building callables.
      * @return array<int, array{
      *   type_key: string,
      *   type_label: string,
@@ -64,7 +79,8 @@ final class RoutingInventoryBuilder
      *   status_label: string,
      *   notes: string,
      *   is_conflict: bool
-     * }>
+     * }> Normalized inventory rows sorted by public URL.
+     * @throws \RuntimeException When required URL-building callables are missing from context.
      */
     public function buildRows(array $context): array
     {
@@ -518,6 +534,7 @@ final class RoutingInventoryBuilder
             ];
         }
 
+        // Second pass: mark any path that appears more than once as a conflict.
         foreach ($rows as $index => $row) {
             $conflictKey = (string) ($row['_conflict_key'] ?? '');
             if ($conflictKey === '') {
@@ -555,7 +572,12 @@ final class RoutingInventoryBuilder
     }
 
     /**
-     * @param array<int, array<string, mixed>> $pagesForRouting
+     * Returns the best-matching root landing page slug from published root-channel pages.
+     *
+     * Prefers `home` over `index` when both exist, then breaks ties by newest published date.
+     *
+     * @param array<int, array<string, mixed>> $pagesForRouting All routing page rows.
+     * @return string Best slug (`home` or `index`) or empty string when none are published.
      */
     private function rootLandingSlug(array $pagesForRouting): string
     {

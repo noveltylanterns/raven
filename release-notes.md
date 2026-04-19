@@ -2,6 +2,19 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 18, 2026 — library refactor phase 3: Archive consolidation, Config/Panel dissolution, sys/Config delegation
+
+- **`lib/Archive/PackageInstallWorkflowService.php` → `lib/Archive/Install.php`**: class renamed `PackageInstallWorkflowService` → `Install`; namespace unchanged (`Raven\Lib\Archive`). All callers (`CLI.php`, `SystemController`) updated to import via `use … as ArchiveInstall`.
+- **`lib/Archive/ArchivePackageService.php` → `lib/Archive/Package.php`**: class renamed `ArchivePackageService` → `Package`; namespace unchanged. All callers updated to import via `use … as ArchivePackage`.
+- **`lib/Filesystem/DirectoryTreeService.php` → `lib/Archive/Delete.php`**: class renamed `DirectoryTreeService` → `Delete`; namespace changed to `Raven\Lib\Archive`. Callers (`SystemController`, `ExtensionStorageCleaner`, `ext/repo`) updated to import via `use … as ArchiveDelete`. `lib/Filesystem/` deleted.
+- **`lib/Routing/Panel/RoutingInventoryBuilder.php` promoted to `sys/Routing/Panel/`**: class moved to `Raven\Core\Routing\Panel\RoutingInventoryBuilder` — tightly coupled to panel routing, not reusable by extensions. All callers updated.
+- **`lib/Routing/Public/PublicChannelPageRouteService.php` promoted to `sys/Routing/Public/`**: class moved to `Raven\Core\Routing\Public\PublicChannelPageRouteService`. Missing `use Raven\Lib\Routing\ChannelRoutePolicy` import fixed in the new location. `debug/smoke/routing.php` stale references updated.
+- **`lib/Update/UpdateWorkflowService.php` → `lib/Archive/Update.php`**: class renamed `UpdateWorkflowService` → `Update`; namespace changed to `Raven\Lib\Archive`. All callers updated to import via `use … as ArchiveUpdate`.
+- **`lib/Update/UpdateSourceResolver.php` → `lib/Archive/UpdateSource.php`**: class renamed `UpdateSourceResolver` → `UpdateSource`; namespace changed to `Raven\Lib\Archive`. All callers updated. `lib/Update/` deleted.
+- **`lib/Config/Panel/` dissolved into `lib/Panel/`**: all six panel config-editor classes (`ConfigEditorNormalizer`, `ConfigEditorSchemaService`, `ConfigSnapshotSanitizer`, `PanelConfigDefaultsService`, `PanelConfigFieldPolicyService`, `PanelMediaConfigService`) moved to `Raven\Lib\Panel`. Callers (`SystemController`, `UserController`, `PreferencesController`, `PanelRuntimeBuilder`) updated. `lib/Config/Panel/` deleted.
+- **`lib/Config/ConfigValueWriter.php` added**: new class encapsulates the on-disk PHP config file format (var_export, file header, atomic write, opcache invalidation) so `sys/Config` is free of format concerns. `sys/Config::save()` now delegates to `ConfigValueWriter::persist()`.
+- **`docs/Filetree.md` updated**: `lib/Archive/`, `lib/Config/`, `lib/Panel/`, and `sys/Routing/` entries updated to reflect all moves.
+
 ### April 18, 2026 — lib/Archive/Types/: canonical archive and data handlers (phase 1)
 
 Nine canonical type-handler classes added to `private/lib/Archive/Types/` under `Raven\Lib\Archive\Types\`. Each is standalone, requires no configuration, and is available to both core and extensions:
@@ -33,6 +46,8 @@ The remaining archive/upload/CSV consumer migration items for this phase are now
 - Moved `private/lib/Transport/Panel/Post.php` to `private/lib/Panel/PanelPost.php`, updated `ContentController` to use the new class, and pruned the now-empty `lib/Transport/Panel/` helper bucket from the Phase 2 plan.
 - Renamed `private/sys/Database/Schema/RvnSchemaBuilder.php` to `SchemaBuilder.php` and `RvnSchemaBootstrap.php` to `SchemaBootstrap.php`, updated `SchemaComponentFactory` / `SchemaEnsurePipeline` to use the new names, and merged the old schema-local `TableNameResolver` wrapper into `private/lib/Database/TableNameResolver.php` so schema services now consume the shared lib resolver directly.
 - Rechecked `private/sys/Logger.php` against both public bootstrap (`private/raven.php`) and panel log UI wiring. The same core logger class now covers public error-handler usage, scheduled log pruning, and panel log browsing/export without any panel-only assumptions, so the Phase 2 compatibility check is closed.
+- Moved `private/sys/Router.php` to `private/sys/Routing/Router.php` and updated all core/extension route registrars, entrypoints, scaffolds, and docs to import `Raven\Core\Routing\Router`.
+- Moved the scheduler registry from `private/sys/Scheduler.php` to `private/lib/Scheduler/Registry.php`, updated bootstrap/CLI/cron consumers to use `Raven\Lib\Scheduler\Registry`, and promoted the old fallback runner into `private/sys/Scheduler.php` as `Raven\Core\Scheduler`, the core web-request scheduler trigger used by public/panel entrypoints.
 
 ### April 18, 2026 — library refactor: sys/ promotions, lib/ reorganization, Panel/Public segregation
 

@@ -14,48 +14,48 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Config;
 use Raven\Core\Database\ConnectionFactory;
+use Raven\Core\Logger;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\TaxonomySetRepository;
 use Raven\Core\Repository\UserRepository;
-use Raven\Lib\Archive\ArchivePackageService;
-use Raven\Lib\Archive\PackageInstallWorkflowService;
+use Raven\Core\Routing\Panel\RoutingInventoryBuilder;
+use Raven\Lib\Archive\Delete as ArchiveDelete;
+use Raven\Lib\Archive\Install as ArchiveInstall;
+use Raven\Lib\Archive\Package as ArchivePackage;
 use Raven\Lib\Archive\Types\Csv;
 use Raven\Lib\Archive\Types\Git;
+use Raven\Lib\Archive\Update as ArchiveUpdate;
+use Raven\Lib\Archive\UpdateSource;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\Panel\PanelAccess;
-use Raven\Lib\Config\Panel\ConfigEditorNormalizer;
-use Raven\Lib\Config\Panel\ConfigEditorSchemaService;
-use Raven\Lib\Config\Panel\ConfigSnapshotSanitizer;
-use Raven\Lib\Config\Panel\PanelConfigDefaultsService;
-use Raven\Lib\Config\Panel\PanelConfigFieldPolicyService;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
-use Raven\Lib\Extension\Panel\ExtensionCatalogService;
-use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
-use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\ExtensionStorageCleaner;
 use Raven\Lib\Extension\ExtensionStorageProvisioner;
-use Raven\Lib\Filesystem\DirectoryTreeService;
-use Raven\Core\Logger;
+use Raven\Lib\Extension\Panel\ExtensionCatalogService;
+use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
+use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
+use Raven\Lib\Panel\ConfigEditorNormalizer;
+use Raven\Lib\Panel\ConfigEditorSchemaService;
+use Raven\Lib\Panel\ConfigSnapshotSanitizer;
+use Raven\Lib\Panel\PanelConfigDefaultsService;
+use Raven\Lib\Panel\PanelConfigFieldPolicyService;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Panel\PanelRoutingPreviewService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\RouteConfigService;
-use Raven\Lib\Routing\Panel\RoutingInventoryBuilder;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Site\SiteContextBuilder;
 use Raven\Lib\Transport\Upload;
-use Raven\Lib\Update\UpdateSourceResolver;
-use Raven\Lib\Update\UpdateWorkflowService;
-use Raven\Lib\View\Public\PublicThemeRegistry;
 use Raven\Lib\View\Panel\ThemeCatalogService;
 use Raven\Lib\View\Panel\ThemeCloneService;
-use Raven\Lib\View\ThemeFallbackRenderer;
 use Raven\Lib\View\Panel\ThemeScaffoldService;
+use Raven\Lib\View\Public\PublicThemeRegistry;
+use Raven\Lib\View\ThemeFallbackRenderer;
 
 use function Raven\Lib\Support\redirect;
 
@@ -93,7 +93,7 @@ final class SystemController
     /** @var Closure(string): array<string, mixed> */
     private Closure $extensionServicesFor;
     private LoginIdentifierResolver $identifierResolver;
-    private ?ArchivePackageService $archivePackages = null;
+    private ?ArchivePackage $archivePackages = null;
     private ?ExtensionStateStore $extensionStateStore = null;
     private ?ExtensionScaffoldService $extensionScaffoldService = null;
     private ?ThemeScaffoldService $themeScaffoldService = null;
@@ -115,12 +115,12 @@ final class SystemController
     private ?PanelRoutingPreviewService $panelRoutingPreviewService = null;
     private ?ThemeCatalogService $themeCatalogService = null;
     private ?PanelConfigFieldPolicyService $panelConfigFieldPolicyService = null;
-    private ?PackageInstallWorkflowService $packageInstallWorkflowService = null;
-    private ?DirectoryTreeService $directoryTreeService = null;
+    private ?ArchiveInstall $packageInstallWorkflowService = null;
+    private ?ArchiveDelete $directoryTreeService = null;
     private ?Csv $csvHandler = null;
     private ?Git $gitArchiveHandler = null;
-    private ?UpdateSourceResolver $updateSourceResolver = null;
-    private ?UpdateWorkflowService $updateWorkflowService = null;
+    private ?UpdateSource $updateSourceResolver = null;
+    private ?ArchiveUpdate $updateWorkflowService = null;
 
     /**
      * @param RequestContext $context Shared panel request context.
@@ -2710,10 +2710,10 @@ final class SystemController
     /**
      * Returns the archive-package service on first use.
      */
-    private function archivePackages(): ArchivePackageService
+    private function archivePackages(): ArchivePackage
     {
-        if (!$this->archivePackages instanceof ArchivePackageService) {
-            $this->archivePackages = new ArchivePackageService($this->root);
+        if (!$this->archivePackages instanceof ArchivePackage) {
+            $this->archivePackages = new ArchivePackage($this->root);
         }
 
         return $this->archivePackages;
@@ -2802,10 +2802,10 @@ final class SystemController
     /**
      * Returns the package-install workflow service on first use.
      */
-    private function packageInstallWorkflowService(): PackageInstallWorkflowService
+    private function packageInstallWorkflowService(): ArchiveInstall
     {
-        if (!$this->packageInstallWorkflowService instanceof PackageInstallWorkflowService) {
-            $this->packageInstallWorkflowService = new PackageInstallWorkflowService(
+        if (!$this->packageInstallWorkflowService instanceof ArchiveInstall) {
+            $this->packageInstallWorkflowService = new ArchiveInstall(
                 $this->input,
                 new Upload(),
                 $this->archivePackages()
@@ -2818,10 +2818,10 @@ final class SystemController
     /**
      * Returns the directory-tree helper on first use.
      */
-    private function directoryTreeService(): DirectoryTreeService
+    private function directoryTreeService(): ArchiveDelete
     {
-        if (!$this->directoryTreeService instanceof DirectoryTreeService) {
-            $this->directoryTreeService = new DirectoryTreeService();
+        if (!$this->directoryTreeService instanceof ArchiveDelete) {
+            $this->directoryTreeService = new ArchiveDelete();
         }
 
         return $this->directoryTreeService;
@@ -2983,11 +2983,13 @@ final class SystemController
 
     /**
      * Returns the update-source resolver on first use.
+     *
+     * @return UpdateSource Lazily initialized update source resolver.
      */
-    private function updateSourceResolver(): UpdateSourceResolver
+    private function updateSourceResolver(): UpdateSource
     {
-        if (!$this->updateSourceResolver instanceof UpdateSourceResolver) {
-            $this->updateSourceResolver = new UpdateSourceResolver($this->input);
+        if (!$this->updateSourceResolver instanceof UpdateSource) {
+            $this->updateSourceResolver = new UpdateSource($this->input);
         }
 
         return $this->updateSourceResolver;
@@ -2995,11 +2997,13 @@ final class SystemController
 
     /**
      * Returns the update workflow service on first use.
+     *
+     * @return ArchiveUpdate Lazily initialized update workflow service.
      */
-    private function updateWorkflowService(): UpdateWorkflowService
+    private function updateWorkflowService(): ArchiveUpdate
     {
-        if (!$this->updateWorkflowService instanceof UpdateWorkflowService) {
-            $this->updateWorkflowService = new UpdateWorkflowService(
+        if (!$this->updateWorkflowService instanceof ArchiveUpdate) {
+            $this->updateWorkflowService = new ArchiveUpdate(
                 $this->root,
                 $this->gitArchiveHandler(),
                 $this->stockPublicThemeSlugs(),

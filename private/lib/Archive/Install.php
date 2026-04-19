@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Archive/PackageInstallWorkflowService.php
+ * ~/private/lib/Archive/Install.php
  * Shared package-upload workflow helpers for theme and extension installs.
  * Docs: https://raven.lanterns.io
  */
@@ -20,18 +20,18 @@ use Raven\Lib\Transport\Upload;
  * Keeps slug resolution, upload validation, archive extraction, and wrapper
  * directory flattening consistent between the theme and extension managers.
  */
-final class PackageInstallWorkflowService
+final class Install
 {
     private InputSanitizer $input;
     private Upload $uploads;
-    private ArchivePackageService $archives;
+    private Package $archives;
 
     /**
      * @param InputSanitizer $input Shared text/path normalization helper.
      * @param Upload $uploads Shared upload validation policy.
-     * @param ArchivePackageService $archives Shared archive package helper surface.
+     * @param Package $archives Shared archive package helper surface.
      */
-    public function __construct(InputSanitizer $input, Upload $uploads, ArchivePackageService $archives)
+    public function __construct(InputSanitizer $input, Upload $uploads, Package $archives)
     {
         $this->input = $input;
         $this->uploads = $uploads;

@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Archive/ArchivePackageService.php
+ * ~/private/lib/Archive/Package.php
  * Shared archive-package helpers for panel upload and export workflows.
  * Docs: https://raven.lanterns.io
  */
@@ -18,7 +18,7 @@ namespace Raven\Lib\Archive;
  * accept rules, manifest slug reads, and download streaming in one place while
  * delegating actual compression/extraction to the canonical archive handlers.
  */
-final class ArchivePackageService
+final class Package
 {
     private string $projectRoot;
     private Extract $extract;
