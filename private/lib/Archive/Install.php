@@ -69,7 +69,7 @@ final class Install
         if (!$this->archives->isSupportedPackageArchiveName($archiveName)) {
             return [
                 'ok' => false,
-                'error' => $collectionLabel . ' must be uploaded as .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, .7z, or .rar archives.',
+                'error' => $collectionLabel . ' must be uploaded as .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, or .7z archives.',
             ];
         }
 

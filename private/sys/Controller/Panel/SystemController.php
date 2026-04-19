@@ -451,6 +451,8 @@ final class SystemController
             return;
         }
 
+        $archivePackages = $this->archivePackages();
+
         $this->context->renderPanel('panel/themes', [
             'csrfField' => $this->context->csrfField(),
             'flashSuccess' => $this->context->pullFlash('success'),
@@ -459,6 +461,9 @@ final class SystemController
             'themes' => $this->listPublicThemesForPanel(),
             'activeTheme' => $this->activePublicThemeSlug(),
             'themeOptions' => PublicThemeRegistry::options($this->publicThemesRoot()),
+            'packageArchiveAcceptAttribute' => $archivePackages->packageArchiveAcceptAttribute(),
+            'packageArchiveFormats' => $archivePackages->supportedPackageArchiveDisplayFormats(),
+            'exportArchiveFormats' => $archivePackages->exportArchiveFormatOptions(),
         ]);
     }
 
@@ -796,7 +801,7 @@ final class SystemController
     }
 
     /**
-     * Exports an installed public theme as a ZIP archive.
+     * Exports an installed public theme as one downloadable archive.
      *
      * @param array<string, mixed> $query Query-string payload.
      * @return void
@@ -820,15 +825,21 @@ final class SystemController
             redirect($this->context->panelUrl('/themes'));
         }
 
+        $format = strtolower(trim((string) $this->input->text($query['format'] ?? 'zip', 20)));
+
         try {
-            $archivePath = $this->archivePackages()->buildZipArchiveFromDirectory($themePath, $themeSlug);
+            $archive = $this->archivePackages()->buildArchiveFromDirectory($themePath, $themeSlug, $format);
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', 'Theme export failed: ' . $exception->getMessage());
             redirect($this->context->panelUrl('/themes'));
         }
 
-        $downloadFilename = 'theme-' . $themeSlug . '-' . gmdate('Ymd-His') . '.zip';
-        $this->archivePackages()->streamDownloadFile($archivePath, $downloadFilename, 'application/zip');
+        $downloadFilename = $this->archivePackages()->exportDownloadFilename('theme-' . $themeSlug, (string) ($archive['format'] ?? 'zip'));
+        $this->archivePackages()->streamDownloadFile(
+            (string) ($archive['path'] ?? ''),
+            $downloadFilename,
+            (string) ($archive['mime_type'] ?? 'application/octet-stream')
+        );
     }
 
     /**
@@ -900,12 +911,17 @@ final class SystemController
             $extensions = [];
         }
 
+        $archivePackages = $this->archivePackages();
+
         $this->context->renderPanel('panel/extensions', [
             'csrfField' => $this->context->csrfField(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'extensions',
             'extensions' => $extensions,
+            'packageArchiveAcceptAttribute' => $archivePackages->packageArchiveAcceptAttribute(),
+            'packageArchiveFormats' => $archivePackages->supportedPackageArchiveDisplayFormats(),
+            'exportArchiveFormats' => $archivePackages->exportArchiveFormatOptions(),
         ]);
     }
 
@@ -1205,7 +1221,7 @@ final class SystemController
     }
 
     /**
-     * Exports one installed extension directory as a ZIP archive.
+     * Exports one installed extension directory as one downloadable archive.
      *
      * @param array<string, mixed> $query Query-string payload.
      * @return void
@@ -1229,15 +1245,21 @@ final class SystemController
             redirect($this->context->panelUrl('/extensions'));
         }
 
+        $format = strtolower(trim((string) $this->input->text($query['format'] ?? 'zip', 20)));
+
         try {
-            $archivePath = $this->archivePackages()->buildZipArchiveFromDirectory($extensionPath, $extensionName);
+            $archive = $this->archivePackages()->buildArchiveFromDirectory($extensionPath, $extensionName, $format);
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', 'Extension export failed: ' . $exception->getMessage());
             redirect($this->context->panelUrl('/extensions'));
         }
 
-        $downloadFilename = 'extension-' . $extensionName . '-' . gmdate('Ymd-His') . '.zip';
-        $this->archivePackages()->streamDownloadFile($archivePath, $downloadFilename, 'application/zip');
+        $downloadFilename = $this->archivePackages()->exportDownloadFilename('extension-' . $extensionName, (string) ($archive['format'] ?? 'zip'));
+        $this->archivePackages()->streamDownloadFile(
+            (string) ($archive['path'] ?? ''),
+            $downloadFilename,
+            (string) ($archive['mime_type'] ?? 'application/octet-stream')
+        );
     }
 
     /**

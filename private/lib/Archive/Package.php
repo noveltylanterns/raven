@@ -15,8 +15,9 @@ namespace Raven\Lib\Archive;
  * Shared archive-package helpers for package upload/export workflows.
  *
  * Keeps package-specific concerns such as temporary-file allocation, archive
- * accept rules, manifest slug reads, and download streaming in one place while
- * delegating actual compression/extraction to the canonical archive handlers.
+ * accept rules, export metadata, manifest slug reads, and download streaming in
+ * one place while delegating actual compression/extraction to the canonical
+ * archive handlers.
  */
 final class Package
 {
@@ -44,6 +45,56 @@ final class Package
     public function supportedPackageArchiveExtensions(): array
     {
         return $this->extract->supportedPackageExtensions();
+    }
+
+    /**
+     * Returns supported directory-export archive extensions.
+     *
+     * These are the formats Raven can build from a theme/extension directory in
+     * one pass via the shared archive compression surface.
+     *
+     * @return array<int, string> Lowercase extension list without leading dots.
+     */
+    public function supportedExportArchiveExtensions(): array
+    {
+        return $this->compress->supportedDirectoryArchiveExtensions();
+    }
+
+    /**
+     * Returns human-facing package upload format labels for panel help text.
+     *
+     * These labels intentionally keep common alias suffixes visible so upload
+     * documentation matches the archive names operators already have on disk.
+     *
+     * @return array<int, string> Display labels without leading dots.
+     */
+    public function supportedPackageArchiveDisplayFormats(): array
+    {
+        return [
+            'zip',
+            '7z',
+            'tar',
+            'tar.gz/.tgz',
+            'tar.bz2/.tbz2',
+            'tar.xz/.txz',
+            'tar.zst/.tzst',
+        ];
+    }
+
+    /**
+     * Returns export format options keyed by canonical archive format value.
+     *
+     * Theme and extension export UIs use this map to keep the dropdown list in
+     * sync with the actual directory-archive formats `Compress` can build.
+     *
+     * @return array<string, string> Canonical format key => human-facing label.
+     */
+    public function exportArchiveFormatOptions(): array
+    {
+        return array_combine(
+            $this->supportedExportArchiveExtensions(),
+            $this->supportedExportArchiveExtensions()
+        ) ?: [];
     }
 
     /**
@@ -108,22 +159,74 @@ final class Package
     }
 
     /**
-     * Builds a ZIP archive from a source directory and returns the temporary path.
+     * Builds an archive from a source directory and returns export metadata.
      *
-     * ZIP remains the export format for current theme/extension download flows,
-     * but compression is still routed through the shared `Compress` facade so
-     * callers stop talking to `ZipArchive` directly.
+     * Export callers choose one directory-capable format such as `zip`, `7z`,
+     * `tar`, `tar.gz`, `tar.bz2`, `tar.xz`, or `tar.zst`. Compression is
+     * always routed through the shared `Compress` facade so package workflows no
+     * longer hardcode one archive implementation.
      *
      * @param string $sourceDirectory Absolute path to the source directory.
-     * @param string $archiveRoot Preferred archive-root folder name inside the ZIP.
-     * @return string Absolute temporary path to the generated ZIP archive.
+     * @param string $archiveRoot Preferred archive-root folder name inside the archive.
+     * @param string $format Requested archive format key.
+     * @return array{path: string, format: string, suffix: string, mime_type: string} Export metadata.
      */
-    public function buildZipArchiveFromDirectory(string $sourceDirectory, string $archiveRoot): string
+    public function buildArchiveFromDirectory(string $sourceDirectory, string $archiveRoot, string $format = 'zip'): array
     {
-        $temporaryArchivePath = $this->allocateTemporaryArchivePath('.zip');
+        $resolvedFormat = $this->normalizeExportFormat($format);
+        $suffix = $this->archiveSuffix($resolvedFormat);
+        $temporaryArchivePath = $this->allocateTemporaryArchivePath($suffix);
         $this->compress->compressDirectory($sourceDirectory, $archiveRoot, $temporaryArchivePath);
 
-        return $temporaryArchivePath;
+        return [
+            'path' => $temporaryArchivePath,
+            'format' => $resolvedFormat,
+            'suffix' => $suffix,
+            'mime_type' => $this->archiveMimeType($resolvedFormat),
+        ];
+    }
+
+    /**
+     * Returns one browser-facing download filename for an archive export.
+     *
+     * @param string $prefix Download filename stem without timestamp or suffix.
+     * @param string $format Archive format key such as `zip` or `tar.gz`.
+     * @param string|null $timestamp Optional preformatted timestamp; null uses current UTC time.
+     * @return string Browser-facing archive filename.
+     */
+    public function exportDownloadFilename(string $prefix, string $format, ?string $timestamp = null): string
+    {
+        $safePrefix = trim(preg_replace('/[^a-z0-9._-]+/i', '-', $prefix) ?? '', '-_.');
+        if ($safePrefix === '') {
+            $safePrefix = 'package';
+        }
+
+        $resolvedFormat = $this->normalizeExportFormat($format);
+        $stamp = is_string($timestamp) && trim($timestamp) !== ''
+            ? trim($timestamp)
+            : gmdate('Ymd-His');
+
+        return $safePrefix . '-' . $stamp . $this->archiveSuffix($resolvedFormat);
+    }
+
+    /**
+     * Returns the HTTP content type Raven should send for one archive format.
+     *
+     * @param string $format Archive format key.
+     * @return string Response content type.
+     */
+    public function archiveMimeType(string $format): string
+    {
+        return match ($this->normalizeExportFormat($format)) {
+            'zip' => 'application/zip',
+            '7z' => 'application/x-7z-compressed',
+            'tar' => 'application/x-tar',
+            'tar.gz' => 'application/gzip',
+            'tar.bz2' => 'application/x-bzip2',
+            'tar.xz' => 'application/x-xz',
+            'tar.zst' => 'application/zstd',
+            default => 'application/octet-stream',
+        };
     }
 
     /**
@@ -237,11 +340,13 @@ final class Package
             }
 
             if ($suffix === '') {
+                @unlink($path);
                 return $path;
             }
 
             $suffixedPath = $path . $suffix;
             if (@rename($path, $suffixedPath)) {
+                @unlink($suffixedPath);
                 return $suffixedPath;
             }
 
@@ -249,5 +354,52 @@ final class Package
         }
 
         throw new \RuntimeException('Failed to allocate temporary archive path.');
+    }
+
+    /**
+     * Normalizes one requested export format against Raven's supported outputs.
+     *
+     * @param string $format Raw archive format request.
+     * @return string Canonical archive format key.
+     * @throws \RuntimeException When the format is unsupported for directory export.
+     */
+    private function normalizeExportFormat(string $format): string
+    {
+        $resolved = strtolower(trim($format));
+        if ($resolved === 'tgz') {
+            $resolved = 'tar.gz';
+        } elseif ($resolved === 'tbz2') {
+            $resolved = 'tar.bz2';
+        } elseif ($resolved === 'txz') {
+            $resolved = 'tar.xz';
+        } elseif ($resolved === 'tzst') {
+            $resolved = 'tar.zst';
+        }
+
+        if (!in_array($resolved, $this->supportedExportArchiveExtensions(), true)) {
+            throw new \RuntimeException('Unsupported export archive format: ' . $format);
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Returns the canonical filename suffix for one export format.
+     *
+     * @param string $format Canonical archive format key.
+     * @return string Filename suffix including the leading dot.
+     */
+    private function archiveSuffix(string $format): string
+    {
+        return match ($format) {
+            'zip' => '.zip',
+            '7z' => '.7z',
+            'tar' => '.tar',
+            'tar.gz' => '.tar.gz',
+            'tar.bz2' => '.tar.bz2',
+            'tar.xz' => '.tar.xz',
+            'tar.zst' => '.tar.zst',
+            default => '.bin',
+        };
     }
 }

@@ -150,15 +150,15 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `ConfigValueWriter` — handles the on-disk persistence format for runtime config files: `var_export` serialization, atomic write, stat-cache invalidation, and OPcache eviction; called by `sys/Config::save()`.
 - `private/lib/Archive/`
   - Reusable archive/package helpers for core and extensions.
-  - `Package` — panel/CLI-facing package helper for supported archive checks, manifest slug reads, temp archive allocation, and download streaming.
+  - `Package` — panel/CLI-facing package helper for supported archive checks, export-format metadata, manifest slug reads, temp archive allocation, archive building, and download streaming.
   - `Install` — shared package-upload orchestration for theme/extension installs: upload validation, slug resolution, extraction, and wrapper-directory flattening.
   - `Delete` — recursive directory-removal utility used by theme/extension uninstall and cleanup flows.
   - `Update` — core update workflow orchestration: git-based compare, dry-run, and apply-update pipelines with schema re-ensure support.
   - `UpdateSource` — normalizes and validates update-source config (GitHub mirror, custom GitHub repo, custom git URL) from config or POST data.
-  - `Extract` — shared archive extraction forwarder for ZIP, TAR-family, 7Z, RAR, and single-file compression formats; also handles selective file/folder extraction plus manifest reads across wrapped package layouts.
-  - `Compress` — shared archive compression forwarder for ZIP, TAR-family, 7Z, RAR, and single-file compression formats; also handles selective file/folder archive updates where the format supports named entries.
+  - `Extract` — shared archive extraction forwarder for ZIP, TAR-family, 7Z, and single-file compression formats; also handles selective file/folder extraction plus manifest reads across wrapped package layouts.
+  - `Compress` — shared archive compression forwarder for ZIP, TAR-family, 7Z, and single-file compression formats; also handles selective file/folder archive updates where the format supports named entries.
 - `private/lib/Format/`
-  - Canonical reusable format handlers such as `Zip`, `Tar`, `SevenZip`, `Gz`, `Bz2`, `Xz`, `Zst`, `Rar`, `Git`, and `Csv`; stock extension exports/imports and panel CSV downloads now route through `Csv`.
+  - Canonical reusable format handlers such as `Zip`, `Tar`, `Szip`, `Gz`, `Bz2`, `Xz`, `Zst`, `Git`, and `Csv`; stock extension exports/imports and panel CSV downloads now route through `Csv`.
 - `private/lib/Database/`
   - Reusable database primitives for core and extensions.
   - `ProfiledPDO` and `ProfiledPDOStatement` wrap PDO for query-level profiling; `QueryProfilerInterface` is the shared contract.

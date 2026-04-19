@@ -19,9 +19,10 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 
 ### Library Refactor
 Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
-
-
-
+- [x] Remove lib/Format/Rar.php & all Rar handling
+- [x] Rename lib/Format/SevenZip.php to Szip.php
+- [x] Doublecheck that import/export functions in Extension/Theme managers support full range of 7z/zip/tar options
+- [x] Export buttons in Extension/Theme managers need to display a small dropdown for archive format (7z/zip/tar/tar.*)
 
 ## Long Term
 

@@ -13,8 +13,7 @@ namespace Raven\Lib\Archive;
 
 use Raven\Lib\Format\Bz2;
 use Raven\Lib\Format\Gz;
-use Raven\Lib\Format\Rar;
-use Raven\Lib\Format\SevenZip;
+use Raven\Lib\Format\Szip;
 use Raven\Lib\Format\Tar;
 use Raven\Lib\Format\Xz;
 use Raven\Lib\Format\Zip;
@@ -32,8 +31,7 @@ final class Compress
 {
     private Zip $zip;
     private Tar $tar;
-    private SevenZip $sevenZip;
-    private Rar $rar;
+    private Szip $szip;
     private Gz $gz;
     private Bz2 $bz2;
     private Xz $xz;
@@ -42,8 +40,7 @@ final class Compress
     /**
      * @param Zip|null $zip ZIP archive handler override for tests/composition.
      * @param Tar|null $tar TAR archive handler override for tests/composition.
-     * @param SevenZip|null $sevenZip 7-Zip archive handler override for tests/composition.
-     * @param Rar|null $rar RAR archive handler override for tests/composition.
+     * @param Szip|null $szip 7-Zip archive handler override for tests/composition.
      * @param Gz|null $gz Gzip compression handler override for tests/composition.
      * @param Bz2|null $bz2 Bzip2 compression handler override for tests/composition.
      * @param Xz|null $xz XZ compression handler override for tests/composition.
@@ -52,8 +49,7 @@ final class Compress
     public function __construct(
         ?Zip $zip = null,
         ?Tar $tar = null,
-        ?SevenZip $sevenZip = null,
-        ?Rar $rar = null,
+        ?Szip $szip = null,
         ?Gz $gz = null,
         ?Bz2 $bz2 = null,
         ?Xz $xz = null,
@@ -62,8 +58,7 @@ final class Compress
     {
         $this->zip = $zip ?? new Zip();
         $this->tar = $tar ?? new Tar();
-        $this->sevenZip = $sevenZip ?? new SevenZip();
-        $this->rar = $rar ?? new Rar();
+        $this->szip = $szip ?? new Szip();
         $this->gz = $gz ?? new Gz();
         $this->bz2 = $bz2 ?? new Bz2();
         $this->xz = $xz ?? new Xz();
@@ -80,16 +75,11 @@ final class Compress
         return [
             'zip',
             '7z',
-            'rar',
             'tar',
             'tar.gz',
-            'tgz',
             'tar.bz2',
-            'tbz2',
             'tar.xz',
-            'txz',
             'tar.zst',
-            'tzst',
         ];
     }
 
@@ -124,7 +114,7 @@ final class Compress
     /**
      * Compresses a source file or directory into one archive file chosen by suffix.
      *
-     * Container formats (`zip`, `7z`, `rar`, `tar*`) can wrap one source path
+     * Container formats (`zip`, `7z`, `tar*`) can wrap one source path
      * under `$archiveRoot`. Single-file formats (`gz`, `bz2`, `xz`, `zst`)
      * require a file source and ignore `$archiveRoot`.
      *
@@ -140,8 +130,7 @@ final class Compress
 
         match ($type) {
             'zip' => $this->zip->compressPath($sourcePath, $this->entryNameForContainer($sourcePath, $archiveRoot), $outputPath),
-            '7z' => $this->sevenZip->compressPath($sourcePath, $outputPath, $this->entryNameForContainer($sourcePath, $archiveRoot)),
-            'rar' => $this->rar->compressPath($sourcePath, $outputPath, $this->entryNameForContainer($sourcePath, $archiveRoot)),
+            '7z' => $this->szip->compressPath($sourcePath, $outputPath, $this->entryNameForContainer($sourcePath, $archiveRoot)),
             'tar' => $this->tar->compressPath($sourcePath, $outputPath, $this->entryNameForTarFamily($sourcePath, $archiveRoot)),
             'tar.gz' => $this->tar->compressPathGz($sourcePath, $outputPath, $this->entryNameForTarFamily($sourcePath, $archiveRoot)),
             'tar.bz2' => $this->tar->compressPathBz2($sourcePath, $outputPath, $this->entryNameForTarFamily($sourcePath, $archiveRoot)),
@@ -202,7 +191,7 @@ final class Compress
      * Adds or replaces one file or directory inside an existing archive.
      *
      * Selective path updates are supported on container formats that expose
-     * stable entry trees: `7z`, `rar`, `tar`, and `zip` (including compressed
+     * stable entry trees: `7z`, `tar`, and `zip` (including compressed
      * TAR variants via a temporary outer-layer round-trip).
      *
      * @param string $archivePath Absolute path to the archive being modified.
@@ -217,8 +206,7 @@ final class Compress
 
         match ($type) {
             'zip' => $this->zip->addPath($archivePath, $sourcePath, $entryName),
-            '7z' => $this->sevenZip->addPath($archivePath, $sourcePath, $entryName),
-            'rar' => $this->rar->addPath($archivePath, $sourcePath, $entryName),
+            '7z' => $this->szip->addPath($archivePath, $sourcePath, $entryName),
             'tar' => $this->tar->addPath($archivePath, $sourcePath, $entryName),
             'tar.gz' => $this->withMutableCompressedTar($archivePath, 'gz', function (string $tarPath) use ($sourcePath, $entryName): void {
                 $this->tar->addPath($tarPath, $sourcePath, $entryName);
@@ -259,7 +247,6 @@ final class Compress
             '.tar.zst' => 'tar.zst',
             '.tzst' => 'tar.zst',
             '.7z' => '7z',
-            '.rar' => 'rar',
             '.zip' => 'zip',
             '.tar' => 'tar',
         ] as $suffix => $type) {

@@ -13,8 +13,7 @@ namespace Raven\Lib\Archive;
 
 use Raven\Lib\Format\Bz2;
 use Raven\Lib\Format\Gz;
-use Raven\Lib\Format\Rar;
-use Raven\Lib\Format\SevenZip;
+use Raven\Lib\Format\Szip;
 use Raven\Lib\Format\Tar;
 use Raven\Lib\Format\Xz;
 use Raven\Lib\Format\Zip;
@@ -32,8 +31,7 @@ final class Extract
 {
     private Zip $zip;
     private Tar $tar;
-    private Rar $rar;
-    private SevenZip $sevenZip;
+    private Szip $szip;
     private Gz $gz;
     private Bz2 $bz2;
     private Xz $xz;
@@ -42,8 +40,7 @@ final class Extract
     /**
      * @param Zip|null $zip ZIP archive handler override for tests/composition.
      * @param Tar|null $tar TAR archive handler override for tests/composition.
-     * @param Rar|null $rar RAR archive handler override for tests/composition.
-     * @param SevenZip|null $sevenZip 7-Zip archive handler override for tests/composition.
+     * @param Szip|null $szip 7-Zip archive handler override for tests/composition.
      * @param Gz|null $gz Gzip decompression handler override for tests/composition.
      * @param Bz2|null $bz2 Bzip2 decompression handler override for tests/composition.
      * @param Xz|null $xz XZ decompression handler override for tests/composition.
@@ -52,8 +49,7 @@ final class Extract
     public function __construct(
         ?Zip $zip = null,
         ?Tar $tar = null,
-        ?Rar $rar = null,
-        ?SevenZip $sevenZip = null,
+        ?Szip $szip = null,
         ?Gz $gz = null,
         ?Bz2 $bz2 = null,
         ?Xz $xz = null,
@@ -61,8 +57,7 @@ final class Extract
     ) {
         $this->zip = $zip ?? new Zip();
         $this->tar = $tar ?? new Tar();
-        $this->rar = $rar ?? new Rar();
-        $this->sevenZip = $sevenZip ?? new SevenZip();
+        $this->szip = $szip ?? new Szip();
         $this->gz = $gz ?? new Gz();
         $this->bz2 = $bz2 ?? new Bz2();
         $this->xz = $xz ?? new Xz();
@@ -88,7 +83,6 @@ final class Extract
             'tar.zst',
             'tzst',
             '7z',
-            'rar',
         ];
     }
 
@@ -114,14 +108,12 @@ final class Extract
             '.tzst',
             '.zst',
             '.7z',
-            '.rar',
             'application/zip',
             'application/x-tar',
             'application/gzip',
             'application/x-gzip',
             'application/x-bzip2',
             'application/x-7z-compressed',
-            'application/x-rar-compressed',
         ]);
     }
 
@@ -166,8 +158,7 @@ final class Extract
             'tar.zst' => $this->withTemporaryTarFromCompressed($archivePath, 'zst', static function (string $tarPath) use ($targetDir): void {
                 (new Tar())->extractTo($tarPath, $targetDir);
             }),
-            '7z' => $this->sevenZip->extractTo($archivePath, $targetDir),
-            'rar' => $this->rar->extractTo($archivePath, $targetDir),
+            '7z' => $this->szip->extractTo($archivePath, $targetDir),
             default => throw new RuntimeException('Unsupported archive type: ' . $archivePath),
         };
     }
@@ -190,7 +181,7 @@ final class Extract
         $type = $this->requireArchiveType($archivePath);
 
         match ($type) {
-            'zip', 'tar', 'tar.gz', 'tar.bz2', 'tar.xz', 'tar.zst', '7z', 'rar' => $this->extractTo($archivePath, $targetPath),
+            'zip', 'tar', 'tar.gz', 'tar.bz2', 'tar.xz', 'tar.zst', '7z' => $this->extractTo($archivePath, $targetPath),
             'gz' => $this->gz->decompress($archivePath, $this->resolveSingleFileTargetPath($archivePath, $targetPath, '.gz')),
             'bz2' => $this->bz2->decompress($archivePath, $this->resolveSingleFileTargetPath($archivePath, $targetPath, '.bz2')),
             'xz' => $this->xz->decompress($archivePath, $this->resolveSingleFileTargetPath($archivePath, $targetPath, '.xz')),
@@ -227,8 +218,7 @@ final class Extract
             'tar.zst' => $this->withTemporaryTarFromCompressed($archivePath, 'zst', function (string $tarPath) use ($entryName, $targetPath): void {
                 $this->tar->extractFile($tarPath, $entryName, $targetPath);
             }),
-            '7z' => $this->sevenZip->extractFile($archivePath, $entryName, $targetPath),
-            'rar' => $this->rar->extractFile($archivePath, $entryName, $targetPath),
+            '7z' => $this->szip->extractFile($archivePath, $entryName, $targetPath),
             default => throw new RuntimeException('Unsupported archive type: ' . $archivePath),
         };
     }
@@ -237,7 +227,7 @@ final class Extract
      * Extracts one named archive directory into a target directory.
      *
      * Item-level directory extraction only applies to archive formats that
-     * actually store named entries as a directory tree: `7z`, `rar`, `tar`,
+     * actually store named entries as a directory tree: `7z`, `tar`,
      * and `zip` (including compressed TAR variants via temporary outer-layer
      * decompression).
      *
@@ -266,8 +256,7 @@ final class Extract
             'tar.zst' => $this->withTemporaryTarFromCompressed($archivePath, 'zst', function (string $tarPath) use ($entryName, $targetDir): void {
                 $this->tar->extractDirectory($tarPath, $entryName, $targetDir);
             }),
-            '7z' => $this->sevenZip->extractDirectory($archivePath, $entryName, $targetDir),
-            'rar' => $this->rar->extractDirectory($archivePath, $entryName, $targetDir),
+            '7z' => $this->szip->extractDirectory($archivePath, $entryName, $targetDir),
             default => throw new RuntimeException('Unsupported archive type for directory extraction: ' . $archivePath),
         };
     }
@@ -299,7 +288,6 @@ final class Extract
                 return $this->tar->listEntries($tarPath);
             }),
             '7z' => $this->sevenZip->listEntries($archivePath),
-            'rar' => $this->rar->listEntries($archivePath),
             default => throw new RuntimeException('Unsupported archive type: ' . $archivePath),
         };
     }
@@ -451,7 +439,6 @@ final class Extract
             '.7z' => '7z',
             '.zip' => 'zip',
             '.tar' => 'tar',
-            '.rar' => 'rar',
         ] as $suffix => $type) {
             if (str_ends_with($filename, $suffix)) {
                 return $type;

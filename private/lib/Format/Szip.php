@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Format/SevenZip.php
+ * ~/private/lib/Format/Szip.php
  * 7-Zip archive handler via the system `7z` binary.
  * Docs: https://raven.lanterns.io
  */
@@ -21,7 +21,7 @@ use RuntimeException;
  * surface. The same binary also powers selective file/folder extraction, which
  * lets the higher-level archive forwarders expose one consistent API.
  */
-final class SevenZip
+final class Szip
 {
     /** Absolute or PATH-relative path to the 7-Zip binary. */
     private string $binary;
@@ -222,6 +222,8 @@ final class SevenZip
         if (!file_exists($sourcePath)) {
             throw new RuntimeException('7Z source path not found: ' . $sourcePath);
         }
+
+        @unlink($outputPath);
 
         $stagingDirectory = $this->stagePath($sourcePath, $entryName);
 

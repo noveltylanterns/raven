@@ -30,11 +30,11 @@ require_once dirname(__DIR__) . '/Archive/Extract.php';
 require_once dirname(__DIR__) . '/Archive/Compress.php';
 require_once dirname(__DIR__) . '/Format/Zip.php';
 require_once dirname(__DIR__) . '/Format/Tar.php';
+require_once dirname(__DIR__) . '/Format/Szip.php';
 require_once dirname(__DIR__) . '/Format/Gz.php';
 require_once dirname(__DIR__) . '/Format/Bz2.php';
 require_once dirname(__DIR__) . '/Format/Xz.php';
 require_once dirname(__DIR__) . '/Format/Zst.php';
-require_once dirname(__DIR__) . '/Format/Rar.php';
 require_once dirname(__DIR__) . '/Security/InputSanitizer.php';
 
 spl_autoload_register(static function (string $class): void {
@@ -2090,7 +2090,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         $context->info('Actions: list, enable, disable, create, import, uninstall');
         $context->info('Options: --slug, --archive, --type <helper|content|framework|module|system>, --name, --version (optional), --description, --author, --homepage');
         $context->info('Import uses ext.json "slug" when --slug is omitted.');
-        $context->info('Import accepts .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, .7z, and .rar archives.');
+        $context->info('Import accepts .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, and .7z archives.');
         return 0;
     }
 
@@ -2273,7 +2273,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
             $archivePackages = raven_cli_archive_packages($root);
             $packageWorkflow = raven_cli_package_install_workflow($root);
             if (!$archivePackages->isSupportedPackageArchiveName($archivePath)) {
-                throw new RuntimeException('Unsupported archive type. Use .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, .7z, or .rar.');
+                throw new RuntimeException('Unsupported archive type. Use .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, or .7z.');
             }
 
             $slug = strtolower(trim((string) raven_cli_option($options, 'slug', '')));

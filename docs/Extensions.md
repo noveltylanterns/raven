@@ -137,7 +137,7 @@ The Extension Manager (`/extensions`) includes three practical control areas.
 
 Upload modal (`Upload Extension`):
 
-- `Extension Archive (zip)` file input
+- `Extension Archive` file input accepts `.zip`, `.7z`, `.tar`, `.tar.gz/.tgz`, `.tar.bz2/.tbz2`, `.tar.xz/.txz`, and `.tar.zst/.tzst`
 - `Slug Override (optional)` input
 - If slug override is blank, upload slug is read from `ext.json` `slug`.
 - If that derived slug already exists, upload auto-renames using `-copy`.
@@ -158,7 +158,7 @@ Create modal (`Create New Extension`):
 Installed list actions:
 
 - Table columns: `Name`, `Type`, `Author`, `Description`, `Actions`
-- Per extension: `Settings` (when extension is enabled and has a panel route), `Enable/Disable`, and `Uninstall` (when allowed).
+- Per extension: `Settings` (when extension is enabled and has a panel route), `Enable/Disable`, `Export` with archive-format dropdown, and `Uninstall` (when allowed).
 
 ## 8) Manifest Basics
 

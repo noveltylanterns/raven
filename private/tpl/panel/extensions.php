@@ -15,6 +15,9 @@ declare(strict_types=1);
 /** @var string $csrfField */
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
+/** @var string $packageArchiveAcceptAttribute */
+/** @var array<int, string> $packageArchiveFormats */
+/** @var array<string, string> $exportArchiveFormats */
 /** @var array<int, array{
  *   directory: string,
  *   type: string,
@@ -37,6 +40,10 @@ declare(strict_types=1);
 use function Raven\Lib\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
+$packageArchiveHelp = array_map(
+    static fn (string $format): string => '<code>.' . e(ltrim($format, '.')) . '</code>',
+    $packageArchiveFormats
+);
 ?>
 <style>
     body#rvnp #extensions-table thead th[data-sort-key] {
@@ -203,8 +210,18 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                             <i class="bi <?= $enabled ? 'bi-stop-circle-fill' : 'bi-play-circle-fill' ?>" aria-hidden="true"></i>
                                         </button>
                                     </form>
-                                    <form method="get" action="<?= e($panelBase) ?>/extensions/export" class="d-inline m-0">
+                                    <form method="get" action="<?= e($panelBase) ?>/extensions/export" class="d-inline-flex align-items-center gap-1 m-0">
                                         <input type="hidden" name="extension" value="<?= e($directory) ?>">
+                                        <select
+                                            name="format"
+                                            class="form-select form-select-sm"
+                                            title="Archive Format"
+                                            aria-label="Archive Format"
+                                        >
+                                            <?php foreach ($exportArchiveFormats as $formatValue => $formatLabel): ?>
+                                                <option value="<?= e($formatValue) ?>"><?= e($formatLabel) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
                                         <button
                                             type="submit"
                                             class="btn btn-secondary btn-sm"
@@ -252,16 +269,16 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                 <?= $csrfField ?>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="extension_archive" class="form-label"><span class="h6">Extension Archive</span> <small>(zip, tar, tar.*, rar)</small></label>
+                        <label for="extension_archive" class="form-label"><span class="h6">Extension Archive</span> <small>(<?= e(implode(', ', $packageArchiveFormats)) ?>)</small></label>
                         <input
                             id="extension_archive"
                             type="file"
                             name="extension_archive"
                             class="form-control"
-                            accept=".zip,.tar,.tgz,.gz,.tbz2,.bz2,.txz,.xz,.tzst,.zst,.rar,application/zip,application/x-tar,application/gzip,application/x-gzip,application/x-bzip2,application/x-rar-compressed"
+                            accept="<?= e($packageArchiveAcceptAttribute) ?>"
                             required
                         >
-                        <div class="form-text">Archive must contain a valid <code>ext.json</code> manifest. Raven accepts <code>.zip</code>, <code>.tar</code>, <code>.tar.gz/.tgz</code>, <code>.tar.bz2/.tbz2</code>, <code>.tar.xz/.txz</code>, <code>.tar.zst/.tzst</code>, and <code>.rar</code> packages; top-level folder wrappers are supported.</div>
+                        <div class="form-text">Archive must contain a valid <code>ext.json</code> manifest. Raven accepts <?= implode(', ', $packageArchiveHelp) ?> packages; top-level folder wrappers are supported.</div>
                     </div>
                     <div>
                         <label for="extension_upload_slug" class="form-label">Slug Override (optional)</label>

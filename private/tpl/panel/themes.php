@@ -15,6 +15,9 @@ declare(strict_types=1);
 /** @var string|null $flashError */
 /** @var string $activeTheme */
 /** @var array<string, string> $themeOptions */
+/** @var string $packageArchiveAcceptAttribute */
+/** @var array<int, string> $packageArchiveFormats */
+/** @var array<string, string> $exportArchiveFormats */
 /** @var array<int, array{
  *   slug: string,
  *   name: string,
@@ -29,6 +32,10 @@ declare(strict_types=1);
 use function Raven\Lib\Support\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
+$packageArchiveHelp = array_map(
+    static fn (string $format): string => '<code>.' . e(ltrim($format, '.')) . '</code>',
+    $packageArchiveFormats
+);
 ?>
 <header class="card">
     <div class="card-body">
@@ -133,8 +140,18 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                                             <i class="bi <?= $isActive ? 'bi-check-circle-fill' : 'bi-play-circle-fill' ?>" aria-hidden="true"></i>
                                         </button>
                                     </form>
-                                    <form method="get" action="<?= e($panelBase) ?>/themes/export" class="d-inline m-0">
+                                    <form method="get" action="<?= e($panelBase) ?>/themes/export" class="d-inline-flex align-items-center gap-1 m-0">
                                         <input type="hidden" name="theme" value="<?= e($slug) ?>">
+                                        <select
+                                            name="format"
+                                            class="form-select form-select-sm"
+                                            title="Archive Format"
+                                            aria-label="Archive Format"
+                                        >
+                                            <?php foreach ($exportArchiveFormats as $formatValue => $formatLabel): ?>
+                                                <option value="<?= e($formatValue) ?>"><?= e($formatLabel) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
                                         <button
                                             type="submit"
                                             class="btn btn-sm btn-secondary"
@@ -181,16 +198,16 @@ $panelBase = '/' . trim($site['panel_path'], '/');
                 <?= $csrfField ?>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="theme_archive" class="form-label"><span class="h6">Theme Archive</span> <small>(zip, tar, tar.*, rar)</small></label>
+                        <label for="theme_archive" class="form-label"><span class="h6">Theme Archive</span> <small>(<?= e(implode(', ', $packageArchiveFormats)) ?>)</small></label>
                         <input
                             id="theme_archive"
                             type="file"
                             name="theme_archive"
                             class="form-control"
-                            accept=".zip,.tar,.tgz,.gz,.tbz2,.bz2,.txz,.xz,.tzst,.zst,.rar,application/zip,application/x-tar,application/gzip,application/x-gzip,application/x-bzip2,application/x-rar-compressed"
+                            accept="<?= e($packageArchiveAcceptAttribute) ?>"
                             required
                         >
-                        <div class="form-text">Archive must contain a valid <code>theme.json</code> manifest. Raven accepts <code>.zip</code>, <code>.tar</code>, <code>.tar.gz/.tgz</code>, <code>.tar.bz2/.tbz2</code>, <code>.tar.xz/.txz</code>, <code>.tar.zst/.tzst</code>, and <code>.rar</code> packages; top-level folder wrappers are supported.</div>
+                        <div class="form-text">Archive must contain a valid <code>theme.json</code> manifest. Raven accepts <?= implode(', ', $packageArchiveHelp) ?> packages; top-level folder wrappers are supported.</div>
                     </div>
                     <div>
                         <label for="theme_upload_slug" class="form-label">Slug Override (optional)</label>
