@@ -11,14 +11,14 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Panel;
 
-use Raven\Core\Routing\DebugToolbarResponseHook;
+use Raven\Core\Debug\DebugToolbarResponseHook;
+use Raven\Core\Debug\ToolbarConfigResolver;
 use Raven\Core\Routing\SchedulerFallbackRunner;
-use Raven\Lib\Auth\Panel\PanelAccess;
-use Raven\Lib\Config\ConfigValueParser;
-use Raven\Core\Debug\DebugToolbarConfigResolver;
-use Raven\Lib\Panel\PanelUrl;
 use Raven\Core\Router;
 use Raven\Core\Routing\RouteRequest;
+use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Panel\PanelUrl;
 use RuntimeException;
 
 use function Raven\Lib\Support\redirect;
@@ -343,7 +343,7 @@ final class PanelEntrypoint
         );
 
         $method = $requestMethod;
-        $debugToolbarSettings = DebugToolbarConfigResolver::fromConfig($rvn['config']);
+        $debugToolbarSettings = ToolbarConfigResolver::fromConfig($rvn['config']);
         $canRenderPanelDebugToolbar = static function () use ($rvn, $isPanelAuthHelperInternalPath, $internalPath): bool {
             if (!isset($rvn['auth']) || $isPanelAuthHelperInternalPath($internalPath)) {
                 return false;

@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/sys/Debug/ToolbarConfigResolver.php
+ * Shared debug-toolbar config flag resolver.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Core\Debug;
@@ -10,7 +17,7 @@ use Raven\Lib\Config\ConfigValueParser;
 /**
  * Shared resolver for debug-toolbar config flags.
  */
-final class DebugToolbarConfigResolver
+final class ToolbarConfigResolver
 {
     /**
      * @return array{

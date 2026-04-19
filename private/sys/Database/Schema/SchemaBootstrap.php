@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/sys/Database/Schema/SchemaBootstrap.php
+ * Base app schema bootstrap across supported drivers.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Core\Database\Schema;
@@ -9,9 +16,17 @@ use PDO;
 /**
  * Creates base app schema tables/indexes across supported drivers.
  */
-final class RvnSchemaBootstrap
+final class SchemaBootstrap
 {
-    public function ensureRvnSchema(PDO $db, string $driver, string $prefix): void
+    /**
+     * Creates or normalizes the base Raven app schema for one database driver.
+     *
+     * @param PDO $db App database connection.
+     * @param string $driver Active PDO driver name.
+     * @param string $prefix Active Raven table prefix.
+     * @return void
+     */
+    public function ensureSchema(PDO $db, string $driver, string $prefix): void
     {
         if ($driver === 'sqlite') {
             $pagesTable = $prefix . 'pages';

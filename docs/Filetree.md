@@ -115,7 +115,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/sys/Scheduler.php`
   - `Raven\Core\Scheduler` — task scheduler registry. Registers named tasks with intervals, tracks last-run state in the `{prefix}scheduler` table, and dispatches overdue tasks on request.
 - `private/sys/Debug/`
-  - Debug toolbar infrastructure (`Raven\Core\Debug`). Owns `DebugToolbarConfigResolver`, `DebugToolbarDataSanitizer`, `DebugToolbarMarkupBuilder`, and `DebugToolbarRenderer`. Injected into responses by `DebugToolbarResponseHook` when debug mode is active.
+  - Debug toolbar infrastructure (`Raven\Core\Debug`). Owns `ToolbarConfigResolver`, `ToolbarDataSanitizer`, `ToolbarMarkupBuilder`, `ToolbarRenderer`, and `DebugToolbarResponseHook`. Injected into responses when debug mode is active.
 - `private/sys/Controller/`
   - Public/panel/auth controllers and request flow coordination.
   - Split panel sub-controllers live under `private/sys/Controller/Panel/` with a shared `RequestContext`; `DashboardController`, `ContentController`, `TaxonomyController`, `RedirectController`, `UserController`, `GroupController`, `PreferencesController`, and `SystemController` own the panel route seams.
@@ -129,7 +129,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Core content/taxonomy/auth-facing persistence repositories (`PageRepository`, `ChannelRepository`, `UserRepository`, `GroupRepository`, `CategoryRepository`, `TagRepository`, `TaxonomyLookupRepository`, `TaxonomySetRepository`, `RedirectRepository`, `PageImageRepository`, `InviteTokenRepository`).
 - `private/sys/Routing/`
   - Raven-owned web entrypoints, runtime builders, and route registrars. Not for extension use.
-  - Root-level helpers `DebugToolbarResponseHook` and `SchedulerFallbackRunner` own shared low-level web-entry mechanics; scope decisions stay in the public/panel entrypoints.
+  - `SchedulerFallbackRunner` owns shared low-level scheduler bootstrap mechanics; scope decisions stay in the public/panel entrypoints.
   - `Routing/Public/` — `PublicEntrypoint`, `PublicRuntimeBuilder`, and controller-aligned public route registrars including extension-route loading.
   - `Routing/Panel/` — `PanelEntrypoint`, `PanelRuntimeBuilder`, controller-aligned panel route registrars, extension-route loading, and panel theme-asset fast path.
   - Note: `Router.php`, `RouteRequest.php`, and `RouteDispatchResult.php` live at the `sys/` root (see above); `Routing/` holds only entrypoints, runtime builders, and route registrars.
@@ -169,13 +169,12 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `Extension/Public/` — public-route extension runtime contracts: `EmbeddedFormRuntimeInterface`, `EmbeddedFormRuntimeService`, `EmbeddedShortcodeRuntimeInterface` — the contracts extension authors implement for shortcode/form runtime registration.
 - `private/lib/Transport/`
   - HTTP-layer helpers for both panel and public routes: `Response` (response dispatch), `Request` (request context resolution), `Redirect` (redirect-target validation), `Upload` (upload file-set normalization plus shared HTTP-upload validation, size/error policy, and extension checks).
-  - `Transport/Panel/` — panel-only transport helpers: `Post` (panel POST body normalization).
   - Note: session flash has moved to `lib/Auth/SessionFlash.php`; event logging has moved to `sys/Logger.php`.
 - `private/lib/Media/`
   - Image upload, validation, variant processing, and path management. All media handling is panel-route-only.
   - `Media/Panel/` — all media classes live here: `AvatarValidator` (avatar upload constraints), `PageImageManager` (page image lifecycle orchestration), `PageImageUploadPolicy`, `ImageVariantProcessor`, `PageImageDeletionService`, and related path/gallery helpers.
 - `private/lib/Panel/`
-  - Panel UI helpers: tab normalization, tab-preserving URL builders, panel path resolution, and routing-preview derivations.
+  - Panel UI helpers: tab normalization, tab-preserving URL builders, panel path resolution, routing-preview derivations, and panel POST payload normalization (`PanelPost`).
 - `private/lib/Routing/`
   - Reusable routing library functions available to extensions and core alike.
   - `ChannelRoutePolicy` — channel route mode (`slug`, `date_slug`, `id`, etc.) and word-separator normalization/resolution policy.

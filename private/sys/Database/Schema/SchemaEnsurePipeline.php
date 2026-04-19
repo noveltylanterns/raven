@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/sys/Database/Schema/SchemaEnsurePipeline.php
+ * Ordered schema ensure pipeline for app and auth databases.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Core\Database\Schema;
@@ -47,24 +54,24 @@ final class SchemaEnsurePipeline
     public function ensureApp(PDO $rvnDb, string $driver, string $prefix): void
     {
         $components = $this->components;
-        $rvnSchemaBuilder = $components->rvnSchemaBuilder();
+        $schemaBuilder = $components->schemaBuilder();
         $seedInstaller = $components->seedInstaller();
 
         // App schema is always safe to ensure independently from auth setup.
-        $components->rvnSchemaBootstrap()->ensureRvnSchema($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->ensureRootChannelScope($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->ensurePageScheduleColumns($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->ensurePageDescriptionColumn($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->ensurePageDisplayTitleColumn($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->ensurePageGalleryEnabledColumn($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->ensurePageSlugScopeUniqueness($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->ensureRedirectDescriptionColumn($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->ensureGroupRoutingColumns($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->ensureTaxonomySetColumns($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->ensureTaxonomyImageColumns($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->ensureTaxonomyIconColumn($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->ensurePanelPerformanceIndexes($rvnDb, $driver, $prefix);
-        $rvnSchemaBuilder->ensureEventLogTable($rvnDb, $driver, $prefix);
+        $components->schemaBootstrap()->ensureSchema($rvnDb, $driver, $prefix);
+        $schemaBuilder->ensureRootChannelScope($rvnDb, $driver, $prefix);
+        $schemaBuilder->ensurePageScheduleColumns($rvnDb, $driver, $prefix);
+        $schemaBuilder->ensurePageDescriptionColumn($rvnDb, $driver, $prefix);
+        $schemaBuilder->ensurePageDisplayTitleColumn($rvnDb, $driver, $prefix);
+        $schemaBuilder->ensurePageGalleryEnabledColumn($rvnDb, $driver, $prefix);
+        $schemaBuilder->ensurePageSlugScopeUniqueness($rvnDb, $driver, $prefix);
+        $schemaBuilder->ensureRedirectDescriptionColumn($rvnDb, $driver, $prefix);
+        $schemaBuilder->ensureGroupRoutingColumns($rvnDb, $driver, $prefix);
+        $schemaBuilder->ensureTaxonomySetColumns($rvnDb, $driver, $prefix);
+        $schemaBuilder->ensureTaxonomyImageColumns($rvnDb, $driver, $prefix);
+        $schemaBuilder->ensureTaxonomyIconColumn($rvnDb, $driver, $prefix);
+        $schemaBuilder->ensurePanelPerformanceIndexes($rvnDb, $driver, $prefix);
+        $schemaBuilder->ensureEventLogTable($rvnDb, $driver, $prefix);
         $components->extensionSchemaRunner()->ensureEnabledExtensionSchemas($rvnDb, $driver, $prefix);
 
         $seedInstaller->ensureStockGroups($rvnDb, $driver, $prefix);

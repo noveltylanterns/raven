@@ -1,15 +1,22 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Panel/PanelPost.php
+ * Shared panel POST payload normalization helpers.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Transport\Panel;
+namespace Raven\Lib\Panel;
 
 use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Shared panel POST payload normalization helpers for bulk ids and gallery metadata.
  */
-final class Post
+final class PanelPost
 {
     private InputSanitizer $input;
 

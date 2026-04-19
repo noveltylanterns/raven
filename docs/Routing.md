@@ -85,7 +85,7 @@ Export fields include:
 - Panel route bootstrap:
   - `private/sys/Routing/Panel/PanelEntrypoint.php`
   - `private/sys/Routing/Panel/Panel*RouteRegistrar.php`
-  - `private/sys/Routing/DebugToolbarResponseHook.php`
+  - `private/sys/Debug/DebugToolbarResponseHook.php`
   - `private/sys/Routing/SchedulerFallbackRunner.php`
 - Public auth controller:
   - `private/sys/Controller/Public/AuthController.php`

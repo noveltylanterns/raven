@@ -22,6 +22,22 @@ final class TableNameResolver
     /**
      * Returns the prefixed app-database table name for a given base table.
      *
+     * Instance form used by schema/bootstrap services that carry a shared
+     * resolver dependency rather than calling the static helpers directly.
+     *
+     * @param string $driver Database driver identifier (reserved for future quoting strategies).
+     * @param string $prefix Configured table prefix (e.g. `rvn_`).
+     * @param string $table Base table name without prefix.
+     * @return string Fully prefixed table name ready for use in SQL.
+     */
+    public function resolve(string $driver, string $prefix, string $table): string
+    {
+        return self::appTable($driver, $prefix, $table);
+    }
+
+    /**
+     * Returns the prefixed app-database table name for a given base table.
+     *
      * @param string $driver Database driver identifier (reserved for future quoting strategies).
      * @param string $prefix Configured table prefix (e.g. `rvn_`).
      * @param string $table  Base table name without prefix.

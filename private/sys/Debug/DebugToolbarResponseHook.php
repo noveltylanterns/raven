@@ -2,17 +2,16 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Routing/DebugToolbarResponseHook.php
+ * ~/private/sys/Debug/DebugToolbarResponseHook.php
  * Shared debug-toolbar response hook for web entrypoints.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Routing;
+namespace Raven\Core\Debug;
 
 use Raven\Lib\Diagnostics\RequestProfiler;
-use Raven\Core\Debug\DebugToolbarRenderer;
 
 /**
  * Arms the shared debug-toolbar response hook for one web scope.
@@ -56,7 +55,7 @@ final class DebugToolbarResponseHook
         RequestProfiler::enable();
 
         ob_start(static function (string $body) use ($settings, $scope, $requestMethod, $requestPath, $canRenderToolbar): string {
-            if (!RequestProfiler::isEnabled() || !DebugToolbarRenderer::isHtmlResponseCandidate($body)) {
+            if (!RequestProfiler::isEnabled() || !ToolbarRenderer::isHtmlResponseCandidate($body)) {
                 return $body;
             }
 
@@ -65,7 +64,7 @@ final class DebugToolbarResponseHook
                 return $body;
             }
 
-            $toolbarHtml = DebugToolbarRenderer::render(
+            $toolbarHtml = ToolbarRenderer::render(
                 [
                     'show_benchmarks' => (bool) ($settings['show_benchmarks'] ?? true),
                     'show_queries' => (bool) ($settings['show_queries'] ?? true),
@@ -88,7 +87,7 @@ final class DebugToolbarResponseHook
                 return $body;
             }
 
-            return DebugToolbarRenderer::inject($body, $toolbarHtml);
+            return ToolbarRenderer::inject($body, $toolbarHtml);
         });
     }
 }

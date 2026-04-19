@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Diagnostics/Toolbar/DebugToolbarRenderer.php
- * HTML renderer/injector for fixed-bottom debug toolbar output.
+ * ~/private/sys/Debug/ToolbarRenderer.php
+ * HTML renderer and injector for fixed-bottom debug toolbar output.
  * Docs: https://raven.lanterns.io
  */
 
@@ -14,7 +14,7 @@ namespace Raven\Core\Debug;
 /**
  * Produces the debug-toolbar UI and appends it into HTML responses.
  */
-final class DebugToolbarRenderer
+final class ToolbarRenderer
 {
     /**
      * @param array{
@@ -43,7 +43,7 @@ final class DebugToolbarRenderer
      */
     public static function render(array $settings, array $profile, array $context): string
     {
-        return DebugToolbarMarkupBuilder::render($settings, $profile, $context);
+        return ToolbarMarkupBuilder::render($settings, $profile, $context);
     }
 
     /**

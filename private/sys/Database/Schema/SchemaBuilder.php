@@ -1,15 +1,23 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/sys/Database/Schema/SchemaBuilder.php
+ * App-side schema migration and backfill helpers.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Core\Database\Schema;
 
 use PDO;
+use Raven\Lib\Database\TableNameResolver;
 
 /**
  * Applies app-side schema migrations and index/column backfills.
  */
-final class RvnSchemaBuilder
+final class SchemaBuilder
 {
     private SchemaIntrospector $introspector;
     private TableNameResolver $tables;

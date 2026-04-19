@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/sys/Debug/ToolbarDataSanitizer.php
+ * Debug-toolbar request and environment payload sanitizer.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Core\Debug;
@@ -7,7 +14,7 @@ namespace Raven\Core\Debug;
 /**
  * Sanitizes request/environment payloads for debug toolbar rendering.
  */
-final class DebugToolbarDataSanitizer
+final class ToolbarDataSanitizer
 {
     /**
      * @param array<int|string, mixed> $value

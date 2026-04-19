@@ -41,20 +41,20 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 
 ### Library Refactor Phase 2
 Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
+- [x] Move sys/Routing/DebugToolbarResponseHook.php to sys/Debug/
+- [x] Simplify sys/Debug/DebugToolbar*.php classes to Toolbar*.php
+- [x] Move lib/Transport/Panel/Post.php to lib/Panel/PanelPost.php, delete lib/Transport/Panel/ after.
+- [x] Rename sys/Database/Schema/RvnSchemaBuilder.php to SchemaBuilder.php
+- [x] Rename sys/Database/Schema/RvnSchemaBootstrap.php to SchemaBootstrap.php
+- [x] Merge sys/Database/Schema/TableNameResolver.php into lib/Database/TableNameResolver.php
+- [x] Doublecheck that sys/Logger.php can be used for both public+panel routes.
 - [ ] Move sys/Router.php to sys/Routing/Router.php
-- [ ] Move sys/Routing/DebugToolbarResponseHook.php to sys/Debug/
 - [ ] Move sys/Scheduler.php to lib/Scheduler/Registry.php
 - [ ] Move sys/Routing/SchedulerFallbackRunner.php to sys/Scheduler.php
-- [ ] Move lib/Transport/Panel/Post.php to lib/Panel/PanelPost.php, delete lib/Transport/Panel/ after.
-- [ ] Simplify sys/Debug/DebugToolbar*.php classes to Toolbar*.php
 - [ ] Consolidate all updater functions to lib/Archive/Update.php, delete lib/Update/ after.
-- [ ] Rename sys/Database/Schema/RvnSchemaBuilder.php to SchemaBuilder.php
-- [ ] Rename sys/Database/Schema/RvnSchemaBootstrap.php to SchemaBootstrap.php
-- [ ] Merge sys/Database/Schema/TableNameResolver.php into lib/Database/TableNameResolver.php
-- [ ] Make sure all our .php files have the standard 6-line PHPDoc comment just after <?php, and the use maps at the beginning are in alphabetical order.
-- [ ] Doublecheck that sys/Logger.php can be used for both public+panel routes.
-- [ ] sys/Config.php should be reduced to bare minimum for reading config to make system work, since it's read on every page read. Offload write functions to lib/Config/ConfigValueWriter.php. Offload anything else unnecessary to public/panel/extension init to lib/Config/*.php.
 - [ ] Any purely visual functions in lib/Config/Panel/ should be moved to lib/View/Panel/. Check that anything remaining doesnt belong in lib/Config/ConfigValueWriter.php instead. Any other remaining lib/Config/Panel/ items should go in lib/Panel/.
+- [ ] sys/Config.php should be reduced to bare minimum for reading config to make system work, since it's read on every page read. Offload write functions to lib/Config/ConfigValueWriter.php. Offload anything else unnecessary to public/panel/extension init to lib/Config/*.php.
+- [ ] Make sure all our .php files have the standard 6-line PHPDoc comment just after <?php, and the use maps at the beginning are in alphabetical order.
 
 
 
@@ -80,7 +80,7 @@ Pure PHP — Reflection API + lightweight PHPDoc regex, no extra composer deps. 
 Targets (generator owns these files — do not hand-edit them):
 - [ ] `docs/appendix/libraries.md` — reflect on all public repository methods; pull `@param`/`@return`/first docline per method; group by service key in `context['rvn']`
 - [ ] `docs/appendix/config.md` — parse `private/dat/config.php.dist` key tree + reflect on `ConfigEditorSchemaService` for descriptions and defaults
-- [ ] `docs/appendix/database.md` — reflect on `RvnSchemaBuilder`/`AuthSchemaBuilder` method names + annotations to enumerate tables and columns; include column purposes and the full chain of variables/routes/forms that map to each column
+- [ ] `docs/appendix/database.md` — reflect on `SchemaBuilder`/`AuthSchemaBuilder` method names + annotations to enumerate tables and columns; include column purposes and the full chain of variables/routes/forms that map to each column
 - [ ] `docs/cli.md` — shell each `private/bin/rvn-*` with `--help` and format output as markdown; replaces current hand-written content
 - [ ] Wire into release checklist once generator is built
 

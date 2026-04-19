@@ -1,11 +1,19 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/sys/Database/Schema/SeedInstaller.php
+ * Seed row installer for stock groups and starter pages.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Core\Database\Schema;
 
 use PDO;
 use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\Database\TableNameResolver;
 
 /**
  * Installs/normalizes seed rows for stock groups and starter pages.

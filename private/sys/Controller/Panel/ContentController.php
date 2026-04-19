@@ -28,10 +28,10 @@ use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
-use Raven\Lib\Transport\Panel\Post;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\PageImageManager;
 use Raven\Lib\Panel\PanelEditorTabService;
+use Raven\Lib\Panel\PanelPost;
 use Raven\Lib\Panel\PanelPageAuthorOptionBuilder;
 use Raven\Lib\Routing\ChannelRoutePolicy;
 use Raven\Lib\Routing\RouteConfigService;
@@ -82,7 +82,7 @@ final class ContentController
     private ?BodyBlockPolicy $bodyBlockPolicy = null;
     private ?PageBodyBlockCodec $pageBodyBlockCodec = null;
     private ?Upload $uploadFileSetNormalizer = null;
-    private ?Post $panelPostNormalizer = null;
+    private ?PanelPost $panelPostNormalizer = null;
     private ?PanelPageAuthorOptionBuilder $pageAuthorOptionBuilder = null;
     private ?LoginIdentifierResolver $identifierResolver = null;
     private ?ExtensionStateStore $extensionStateStore = null;
@@ -881,12 +881,12 @@ final class ContentController
     /**
      * Returns the panel POST normalizer on first use.
      *
-     * @return Post Normalizer for complex panel form POST payloads.
+     * @return PanelPost Normalizer for complex panel form POST payloads.
      */
-    private function panelPostNormalizer(): Post
+    private function panelPostNormalizer(): PanelPost
     {
-        if (!$this->panelPostNormalizer instanceof Post) {
-            $this->panelPostNormalizer = new Post($this->input);
+        if (!$this->panelPostNormalizer instanceof PanelPost) {
+            $this->panelPostNormalizer = new PanelPost($this->input);
         }
 
         return $this->panelPostNormalizer;

@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/sys/Debug/ToolbarMarkupBuilder.php
+ * Debug-toolbar HTML markup builder.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Core\Debug;
@@ -7,7 +14,7 @@ namespace Raven\Core\Debug;
 /**
  * Builds debug toolbar HTML markup from normalized profiler payloads.
  */
-final class DebugToolbarMarkupBuilder
+final class ToolbarMarkupBuilder
 {
     /**
      * @param array{
@@ -197,7 +204,7 @@ final class DebugToolbarMarkupBuilder
         foreach ($queries as $query) {
             $bindings = $query['params'] ?? [];
             $bindingsText = is_array($bindings) && $bindings !== []
-                ? DebugToolbarDataSanitizer::prettyJson($bindings)
+                ? ToolbarDataSanitizer::prettyJson($bindings)
                 : '[]';
             $sql = (string) ($query['sql'] ?? '');
             $duration = number_format((float) ($query['duration_ms'] ?? 0.0), 3) . ' ms';
@@ -233,14 +240,14 @@ final class DebugToolbarMarkupBuilder
     private static function renderRequestData(): string
     {
         $payload = [
-            '_GET' => DebugToolbarDataSanitizer::sanitizeArray($_GET),
-            '_POST' => DebugToolbarDataSanitizer::sanitizeArray($_POST),
-            '_FILES' => DebugToolbarDataSanitizer::sanitizeArray(DebugToolbarDataSanitizer::normalizeFiles($_FILES)),
-            '_COOKIE' => DebugToolbarDataSanitizer::sanitizeArray($_COOKIE),
-            '_SERVER' => DebugToolbarDataSanitizer::sanitizeServer($_SERVER),
+            '_GET' => ToolbarDataSanitizer::sanitizeArray($_GET),
+            '_POST' => ToolbarDataSanitizer::sanitizeArray($_POST),
+            '_FILES' => ToolbarDataSanitizer::sanitizeArray(ToolbarDataSanitizer::normalizeFiles($_FILES)),
+            '_COOKIE' => ToolbarDataSanitizer::sanitizeArray($_COOKIE),
+            '_SERVER' => ToolbarDataSanitizer::sanitizeServer($_SERVER),
         ];
 
-        return '<pre>' . self::e(DebugToolbarDataSanitizer::prettyJson($payload)) . '</pre>';
+        return '<pre>' . self::e(ToolbarDataSanitizer::prettyJson($payload)) . '</pre>';
     }
 
     private static function renderEnvironment(string $scope, string $hostname, string $requestPath): string
@@ -256,7 +263,7 @@ final class DebugToolbarMarkupBuilder
             'included_files_count' => count(get_included_files()),
         ];
 
-        return '<pre>' . self::e(DebugToolbarDataSanitizer::prettyJson($info)) . '</pre>';
+        return '<pre>' . self::e(ToolbarDataSanitizer::prettyJson($info)) . '</pre>';
     }
 
     private static function section(string $title, string $body): string

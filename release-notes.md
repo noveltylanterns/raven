@@ -26,6 +26,14 @@ The remaining archive/upload/CSV consumer migration items for this phase are now
 
 - Finished the remaining library-refactor stragglers around uploads and CSVs. `private/lib/Transport/Upload.php` now owns shared HTTP-upload validation, size/error policy, and client-extension checks; `PackageInstallWorkflowService` now validates package uploads through that helper before delegating extraction to the archive forwarders; `private/ext/contact/lib/routes_panel.php`, `private/ext/signups/lib/routes_panel.php`, and the panel routing/log exports in `private/sys/Controller/Panel/SystemController.php` now stream/read CSV exclusively through `private/lib/Archive/Types/Csv.php` instead of ad-hoc `fputcsv` / `fgetcsv` flows.
 
+### April 18, 2026 — library refactor phase 2: easy rename/move pass
+
+- Moved `private/sys/Routing/DebugToolbarResponseHook.php` into `private/sys/Debug/DebugToolbarResponseHook.php` so the full toolbar stack now lives under `Raven\Core\Debug`.
+- Renamed the debug toolbar support classes from `DebugToolbar*` to `Toolbar*` (`ToolbarConfigResolver`, `ToolbarDataSanitizer`, `ToolbarMarkupBuilder`, `ToolbarRenderer`) and updated both public/panel entrypoints accordingly.
+- Moved `private/lib/Transport/Panel/Post.php` to `private/lib/Panel/PanelPost.php`, updated `ContentController` to use the new class, and pruned the now-empty `lib/Transport/Panel/` helper bucket from the Phase 2 plan.
+- Renamed `private/sys/Database/Schema/RvnSchemaBuilder.php` to `SchemaBuilder.php` and `RvnSchemaBootstrap.php` to `SchemaBootstrap.php`, updated `SchemaComponentFactory` / `SchemaEnsurePipeline` to use the new names, and merged the old schema-local `TableNameResolver` wrapper into `private/lib/Database/TableNameResolver.php` so schema services now consume the shared lib resolver directly.
+- Rechecked `private/sys/Logger.php` against both public bootstrap (`private/raven.php`) and panel log UI wiring. The same core logger class now covers public error-handler usage, scheduled log pruning, and panel log browsing/export without any panel-only assumptions, so the Phase 2 compatibility check is closed.
+
 ### April 18, 2026 — library refactor: sys/ promotions, lib/ reorganization, Panel/Public segregation
 
 - **`sys/Routing/Router.php` promoted to `sys/Router.php`**: `Router`, `RouteRequest`, and `RouteDispatchResult` now live at the `sys/` root under `Raven\Core`. `Routing/` now holds only entrypoints, runtime builders, and route registrars. All 27+ callers across sys/, lib/, ext/, and bin/ updated.

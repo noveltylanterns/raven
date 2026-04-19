@@ -11,9 +11,9 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Public;
 
-use Raven\Core\Routing\DebugToolbarResponseHook;
+use Raven\Core\Debug\DebugToolbarResponseHook;
+use Raven\Core\Debug\ToolbarConfigResolver;
 use Raven\Core\Routing\SchedulerFallbackRunner;
-use Raven\Core\Debug\DebugToolbarConfigResolver;
 use Raven\Core\Router;
 use Raven\Core\Routing\RouteRequest;
 use RuntimeException;
@@ -91,7 +91,7 @@ final class PublicEntrypoint
         $rvn = PublicRuntimeBuilder::build($rvn);
 
         $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-        $debugToolbarSettings = DebugToolbarConfigResolver::fromConfig($rvn['config']);
+        $debugToolbarSettings = ToolbarConfigResolver::fromConfig($rvn['config']);
         $isPublicAuthHelperPath = static function (string $path) use ($requestPath): bool {
             $normalized = trim($path !== '' ? $path : $requestPath);
             $normalized = (string) parse_url($normalized, PHP_URL_PATH);
