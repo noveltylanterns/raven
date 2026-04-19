@@ -14,8 +14,7 @@ use Raven\Lib\Security\InputSanitizer;
  *
  * Discovers two kinds of shortcode runtime:
  *   - EmbeddedShortcodeRuntimeInterface — general content (registered as `shortcode_runtimes`)
- *   - EmbeddedFormRuntimeInterface      — form-capable variant (registered as `embedded_form_runtimes`
- *     for backwards compatibility; `shortcode_runtimes` is now the canonical key for both)
+ *   - EmbeddedFormRuntimeInterface      — form-capable variant (also registered in `shortcode_runtimes`)
  *
  * Both are resolved from extension_services at runtime and merged into one type-keyed map.
  * At render time, form runtimes get a full form context (definition, CSRF, captcha);
@@ -43,9 +42,10 @@ final class EmbeddedFormRuntimeService
     /**
      * Discovers all registered shortcode runtimes from the extension services container.
      *
-     * Collects from both `shortcode_runtimes` (canonical, all types) and
-     * `embedded_form_runtimes` (legacy key kept for backwards compatibility).
-     * First registration wins per type token so one extension cannot shadow another.
+     * Collects from the canonical `shortcode_runtimes` bucket only. Form-capable
+     * runtimes use the same registry key as content-only runtimes and are
+     * distinguished by interface at dispatch time. First registration wins per
+     * type token so one extension cannot shadow another.
      *
      * @param array<string, mixed> $extensionServices
      * @return array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface>
@@ -59,33 +59,30 @@ final class EmbeddedFormRuntimeService
                 continue;
             }
 
-            // Accept both the canonical new key and the legacy form-only key.
-            foreach (['shortcode_runtimes', 'embedded_form_runtimes'] as $bucketKey) {
-                /** @var mixed $rawCandidates */
-                $rawCandidates = $serviceBucket[$bucketKey] ?? [];
-                if (is_object($rawCandidates)) {
-                    $rawCandidates = [$rawCandidates];
-                }
-                if (!is_array($rawCandidates)) {
+            /** @var mixed $rawCandidates */
+            $rawCandidates = $serviceBucket['shortcode_runtimes'] ?? [];
+            if (is_object($rawCandidates)) {
+                $rawCandidates = [$rawCandidates];
+            }
+            if (!is_array($rawCandidates)) {
+                continue;
+            }
+
+            foreach ($rawCandidates as $candidate) {
+                // Accept either interface; EmbeddedFormRuntimeInterface is not required to
+                // extend EmbeddedShortcodeRuntimeInterface so we check both explicitly.
+                if (!$candidate instanceof EmbeddedShortcodeRuntimeInterface
+                    && !$candidate instanceof EmbeddedFormRuntimeInterface) {
                     continue;
                 }
 
-                foreach ($rawCandidates as $candidate) {
-                    // Accept either interface; EmbeddedFormRuntimeInterface is not required to
-                    // extend EmbeddedShortcodeRuntimeInterface so we check both explicitly.
-                    if (!$candidate instanceof EmbeddedShortcodeRuntimeInterface
-                        && !$candidate instanceof EmbeddedFormRuntimeInterface) {
-                        continue;
-                    }
+                $type = strtolower(trim($candidate->type()));
+                if ($type === '' || $this->input->slug($type) === null) {
+                    continue;
+                }
 
-                    $type = strtolower(trim($candidate->type()));
-                    if ($type === '' || $this->input->slug($type) === null) {
-                        continue;
-                    }
-
-                    if (!isset($runtimes[$type])) {
-                        $runtimes[$type] = $candidate;
-                    }
+                if (!isset($runtimes[$type])) {
+                    $runtimes[$type] = $candidate;
                 }
             }
         }

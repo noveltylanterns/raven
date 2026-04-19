@@ -15,11 +15,9 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 
 ### Library Refactor
 Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
-- [ ] `raven.php` should have the PSR path Raven\Bootstrap
 
 
 ### Misc
-- [ ] Extension runtime refactor cleanup: settle the embedded-form/shortcode runtime contract, then remove legacy `embedded_form_runtimes` support from `private/lib/Extension/EmbeddedFormRuntimeService.php`.
 
 
 
@@ -46,7 +44,7 @@ We need to generate better documentation. This is going to be a whole project.
 - [ ] The description line in *EVERY* .php file's PHPDoc intro needs to be double-checked for accuracy.
 - [ ] EVERY class and EVERY function in sys/lib needs a detailed inline comment describing what it does, it is missing in some of them. The existing ones need to be double-checked for accuracy.
 - [ ] EVERY if/try/foreach in sys/lib needs a quick inline comment describing what it does, it is missing in some of them. The existing ones need to be double-checked for accuracy.
-- [ ] Need more consistently detailed inline comments in `private/raven.php` & `public/install.php`, it is great in some spots and missing in others.
+- [ ] Need more consistently detailed inline comments in `private/Raven.php` & `public/install.php`, it is great in some spots and missing in others.
 - [ ] ALL docs/ files need to use lowercase filenames from now on.
 
 #### Doc Generator Script
@@ -106,13 +104,10 @@ Items below are the remaining classified legacy/compatibility lanes after the cu
 
 ---
 
-- `DEFER FOR EXTENSION RUNTIME REFACTOR`
-	- `private/lib/Extension/EmbeddedFormRuntimeService.php`
-	- Accepts legacy `embedded_form_runtimes` alongside canonical `shortcode_runtimes`; defer removal until the extension form/runtime contract is intentionally rebuilt.
 - `DEFER FOR EXTENSION LAYOUT MIGRATION`
 	- `private/lib/Extension/Layout.php`
 	- Provider/path resolution still falls back from canonical root-level extension files (`routes_panel.php`, `schema.php`, `cron.php`, etc.) to the legacy `lib/*.php` layout so third-party packages keep loading during the migration window.
 - `DEFER FOR EXTENSION LAYOUT MIGRATION`
-	- `private/raven.php`
+	- `private/Raven.php`
 	- `Raven\Ext\*` autoloading now prefers `private/ext/{slug}/lib/` but still falls back to legacy `src/` roots until external extensions have been rebuilt around the new class layout.
 ---

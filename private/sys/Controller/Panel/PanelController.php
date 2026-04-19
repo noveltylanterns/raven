@@ -52,8 +52,9 @@ final class PanelController
     public static function handle(): void
     {
         $root = self::rootPath();
+        require_once $root . '/private/Raven.php';
         /** @var array<string, mixed> $rvn */
-        $rvn = require $root . '/private/raven.php';
+        $rvn = \Raven\Raven::boot();
         $rvn = PanelRuntimeBuilder::build($rvn);
 
         /** @var callable(): object $authController */

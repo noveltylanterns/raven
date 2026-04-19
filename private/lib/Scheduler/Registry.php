@@ -26,7 +26,7 @@ namespace Raven\Lib\Scheduler;
  *
  * Core-owned jobs (for example the built-in page-schedule job that flips
  * publish/draft status) are registered directly via `registerJob()` during
- * `private/raven.php` bootstrap.
+ * `private/Raven.php` bootstrap.
  */
 final class Registry
 {

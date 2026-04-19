@@ -442,7 +442,8 @@ PHP;
      */
     private function createUserWithMask(string $suffix, int $mask): array
     {
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $groupSlug = 'nav-smoke-' . $suffix . '-' . $this->runId;
@@ -941,7 +942,8 @@ PHP;
             return;
         }
 
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         foreach (array_reverse($this->createdUsers) as $userId) {
             try {
@@ -957,7 +959,8 @@ PHP;
             return;
         }
 
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         foreach (array_reverse($this->createdGroups) as $groupId) {
             try {

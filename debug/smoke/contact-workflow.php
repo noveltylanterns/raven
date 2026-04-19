@@ -370,7 +370,8 @@ final class ContactWorkflowSmokeRunner
      */
     private function createTempPanelUser(): void
     {
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
 
@@ -408,7 +409,8 @@ final class ContactWorkflowSmokeRunner
             return;
         }
 
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $userRepo->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
@@ -423,7 +425,8 @@ final class ContactWorkflowSmokeRunner
             return;
         }
 
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         $contactRepositories = $this->contactRepositories($rvn);
         $forms = $contactRepositories['forms']->listAll();
         $filtered = array_values(array_filter(
@@ -668,7 +671,8 @@ final class ContactWorkflowSmokeRunner
             $this->events[] = 'public_submit_stderr=' . preg_replace('/\s+/', ' ', $submit['stderr']);
         }
 
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         $contactRepositories = $this->contactRepositories($rvn);
         $count = (int) $contactRepositories['submissions']->countByFormSlug($this->formSlug);
         if ($count < 1) {

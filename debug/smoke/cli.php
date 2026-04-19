@@ -197,7 +197,8 @@ final class CliSmokeRunner
         ]);
         $this->events[] = 'redirect_delete=' . $redirectId;
 
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         $originalCreator = (string) $rvn['config']->get('meta.twitter.creator', '');
         $originalSiteTheme = trim((string) $rvn['config']->get('site.theme', $rvn['config']->get('site.default_theme', 'raven')));
         if ($originalSiteTheme === '') {

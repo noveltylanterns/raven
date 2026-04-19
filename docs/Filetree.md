@@ -31,14 +31,15 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `panel/index.php`
   - Panel/dashboard entry shim.
   - Should stay limited to universal panel-entry delegation only.
-- `private/raven.php`
-  - Shared core bootstrap/container wiring used by both web roots.
+- `private/Raven.php`
+  - `Raven\Raven` shared bootstrap class and container builder.
   - Owns autoloading, config/session/database/auth startup, lazy service registration, extension metadata, and scheduler wiring.
 
 ## Namespace Map (PSR-4)
 
 | Prefix | Root | Purpose |
 |---|---|---|
+| `Raven\` | `private/` | Top-level bootstrap entrypoints such as `Raven\Raven` |
 | `Raven\Core\` | `private/sys/` | Core runtime orchestration — entrypoints, routing, controllers, repositories, bootstrap-only database machinery |
 | `Raven\Lib\` | `private/lib/` | Reusable shared modules — auth, media, view/theme, security, content, config, routing primitives, and other domain services usable by both core and extensions |
 | `Raven\Ext\` | `private/ext/{slug}/lib/` | Extension-owned classes |

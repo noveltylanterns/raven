@@ -104,16 +104,13 @@ final class RavenCliContext
             );
         }
 
-        $bootstrapPath = $this->root . '/private/raven.php';
+        $bootstrapPath = $this->root . '/private/Raven.php';
         if (!is_file($bootstrapPath)) {
-            throw new RuntimeException('Missing private/raven.php bootstrap file.');
+            throw new RuntimeException('Missing private/Raven.php bootstrap file.');
         }
 
-        /** @var mixed $loaded */
-        $loaded = require $bootstrapPath;
-        if (!is_array($loaded)) {
-            throw new RuntimeException('private/raven.php did not return a valid Raven container.');
-        }
+        require_once $bootstrapPath;
+        $loaded = \Raven\Raven::boot();
 
         $this->rvn = $loaded;
         return $loaded;
@@ -3001,7 +2998,7 @@ function raven_cli_command_cron(RavenCliContext $context, array $tokens): int
 
         $scheduler = $rvn['scheduler'] ?? null;
         if (!$scheduler instanceof SchedulerRegistry) {
-            throw new RuntimeException('Scheduler registry not found in app container. Ensure private/raven.php is up to date.');
+            throw new RuntimeException('Scheduler registry not found in app container. Ensure private/Raven.php is up to date.');
         }
 
         if ($action === 'status') {

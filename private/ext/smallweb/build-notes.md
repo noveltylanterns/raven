@@ -4,7 +4,7 @@ Notes on unclear or underdocumented behaviors encountered during extension devel
 
 ## 1. Autoloader namespace-to-path mapping for extension `lib/` classes
 
-**Problem**: The extension service belongs under the `Raven\Ext\Smallweb\SmallwebService` namespace, and the autoloader in `private/raven.php` resolves the remainder of that namespace as a path relative to the extension's `lib/` root. That means the class must live at `lib/Smallweb/SmallwebService.php`.
+**Problem**: The extension service belongs under the `Raven\Ext\Smallweb\SmallwebService` namespace, and the autoloader in `private/Raven.php` resolves the remainder of that namespace as a path relative to the extension's `lib/` root. That means the class must live at `lib/Smallweb/SmallwebService.php`.
 
 **What happened**: The class was previously placed flat instead of under `lib/Smallweb/`. Autoload resolution missed it, the service never booted, and routes silently bailed out with a 404.
 

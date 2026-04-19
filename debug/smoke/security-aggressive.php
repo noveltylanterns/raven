@@ -370,7 +370,8 @@ final class AggressiveSecuritySmokeRunner
      */
     private function findRedirectBySlug(string $slug): ?array
     {
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
         $rows = (new RedirectRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo))->listAll();
         if (!is_array($rows)) {
@@ -398,7 +399,8 @@ final class AggressiveSecuritySmokeRunner
             return;
         }
 
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
         $redirectRepo = new RedirectRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
         foreach ($this->createdRedirectSlugs as $slug) {
@@ -416,7 +418,8 @@ final class AggressiveSecuritySmokeRunner
 
     private function createTempSuperUser(): void
     {
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
 
@@ -451,7 +454,8 @@ final class AggressiveSecuritySmokeRunner
             return;
         }
 
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $userRepo->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
@@ -459,7 +463,8 @@ final class AggressiveSecuritySmokeRunner
 
     private function clearAuthThrottleBuckets(): void
     {
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         $auth = $rvn['auth'] ?? null;
         if (!is_object($auth) || !method_exists($auth, 'clearFailedLoginAttempts')) {
             return;

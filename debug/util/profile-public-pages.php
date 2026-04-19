@@ -505,7 +505,8 @@ final class PublicRouteProfilerRunner
         }
 
         /** @var array<string, mixed> $rvn */
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
 
         return PublicRuntimeBuilder::build($rvn);
     }

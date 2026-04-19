@@ -71,7 +71,8 @@ final class PanelListProfilerRunner
     public function run(): void
     {
         $this->enablePanelDebugToolbar();
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         if (is_callable($rvn['boot_extensions'] ?? null)) {
             /** @var callable(): array<string, mixed> $bootExtensions */
             $bootExtensions = $rvn['boot_extensions'];
@@ -235,7 +236,8 @@ final class PanelListProfilerRunner
             return;
         }
 
-        $rvn = require $this->root . '/private/raven.php';
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
         $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $userRepo->deleteById($this->tempUserId);
         $this->events[] = 'temp_user_deleted=' . $this->tempUserId;

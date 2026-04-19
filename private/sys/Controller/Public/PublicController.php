@@ -94,8 +94,9 @@ final class PublicController
             exit;
         }
 
+        require_once $root . '/private/Raven.php';
         /** @var array<string, mixed> $rvn */
-        $rvn = require $root . '/private/raven.php';
+        $rvn = \Raven\Raven::boot();
         $rvn = PublicRuntimeBuilder::build($rvn);
 
         $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));

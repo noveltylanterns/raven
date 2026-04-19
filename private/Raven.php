@@ -2,33 +2,43 @@
 
 /**
  * RAVEN CMS
- * ~/private/raven.php
- * Application bootstrap wiring config and services.
+ * ~/private/Raven.php
+ * Shared Raven bootstrap container and service wiring.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
+namespace Raven;
+
+use PDO;
 use Raven\Core\Config;
 use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\Schema\SchemaManager;
+use Raven\Core\Logger;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Lib\Auth\AuthService;
+use Raven\Lib\Auth\SessionCookiePolicy;
 use Raven\Lib\Config\ConfigParser;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Scheduler\Registry;
-use Raven\Core\Logger;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Auth\SessionCookiePolicy;
 
 /**
- * Shared bootstrap for all web roots.
- *
- * Returns service container array used by front controllers.
+ * Shared Raven bootstrap entrypoint.
  */
-return (static function (): array {
+final class Raven
+{
+    /**
+     * Builds and returns the shared Raven service container.
+     *
+     * @return array<string, mixed> Shared Raven bootstrap container.
+     */
+    public static function boot(): array
+    {
+        return (static function (): array {
     $root = dirname(__DIR__);
     require_once $root . '/private/lib/Extension/ExtensionRegistry.php';
     require_once $root . '/private/lib/Extension/Layout.php';
@@ -262,4 +272,6 @@ return (static function (): array {
     $rvn['scheduler'] = $scheduler;
 
     return $rvn;
-})();
+        })();
+    }
+}

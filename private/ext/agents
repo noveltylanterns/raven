@@ -460,10 +460,9 @@ declare(strict_types=1);
   ```php
   $rvn['extension_services']['{slug}']['shortcode_runtimes'][] = $myRuntime;
   ```
-- Core also accepts the legacy key `embedded_form_runtimes` for backwards compatibility; prefer `shortcode_runtimes` for new code.
 - Interface locations:
-  - `private/sys/Core/Extension/EmbeddedShortcodeRuntimeInterface.php` (content-only)
-  - `private/sys/Core/Extension/EmbeddedFormRuntimeInterface.php` (form-capable)
+  - `private/lib/Extension/Public/EmbeddedShortcodeRuntimeInterface.php` (content-only)
+  - `private/lib/Extension/Public/EmbeddedFormRuntimeInterface.php` (form-capable)
 - `EmbeddedShortcodeRuntimeInterface` required methods:
   - `type(): string` — shortcode type token (e.g., `gallery`)
   - `extensionKey(): string` — owning extension directory name
