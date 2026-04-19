@@ -41,7 +41,7 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 - [ ] Delete lib/Site/ when emptied.
 - [ ] There should be dedicated sys/Controller/(Public|Panel)/AuthController.php file, rather than a shared controller for both routes, for security/isolation reasons.
 - [ ] Rename lib/Support/CountryOptions.php to Countries.php
-- [ ] Rename lib/Support/ to lib/Misc/
+- [ ] Rename lib/Support/ to lib/Extra/
 
 
 ### Extension Cleanup
