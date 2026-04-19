@@ -305,7 +305,7 @@ final class ConfigController
                     $rawValue,
                     $nextConfig,
                     fn (string $value): string => $this->editor->normalizeBodyTextEditorOption($value),
-                    fn (string $value): string => $this->normalizeGlobalRouteSeparator($value),
+                    fn (string $value): string => Mode::normalizeGlobalSeparator($value),
                     fn (string $theme, bool $allowDefault): ?string => $this->editor->normalizePanelThemeChoice($theme, $allowDefault),
                     $publicThemeOptions,
                     $channelRoutingOptions,
@@ -1341,7 +1341,7 @@ final class ConfigController
 
         $content['editor'] = $this->editor->normalizeBodyTextEditorOption((string) ($content['editor'] ?? 'tinymce'));
         $content['mode'] = $this->normalizeGlobalPageRouteMode((string) ($content['mode'] ?? 'slug'));
-        $content['separator'] = $this->normalizeGlobalRouteSeparator((string) ($content['separator'] ?? '-'));
+        $content['separator'] = Mode::normalizeGlobalSeparator((string) ($content['separator'] ?? '-'));
 
         $feed = $config['feed'] ?? null;
         if (!is_array($feed)) {
@@ -2207,17 +2207,6 @@ final class ConfigController
         }
 
         return $value;
-    }
-
-    /**
-     * Normalizes the global route separator choice.
-     *
-     * @param string $value Submitted separator choice.
-     * @return string Canonical separator.
-     */
-    private function normalizeGlobalRouteSeparator(string $value): string
-    {
-        return Mode::normalizeGlobalSeparator($value);
     }
 
     /**

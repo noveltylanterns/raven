@@ -35,10 +35,7 @@ use function Raven\Lib\Extra\e;
 use Raven\Lib\Auth\Panel\PanelAccess;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
-$loginIdentifierMode = strtolower(trim((string) ($loginIdentifierMode ?? 'email')));
-if (!in_array($loginIdentifierMode, ['email', 'username'], true)) {
-    $loginIdentifierMode = 'email';
-}
+$loginIdentifierMode = (string) ($loginIdentifierMode ?? 'email');
 $usernameRequiredForAuth = $loginIdentifierMode === 'username';
 // Shared create/edit derivations keep template branching shallow.
 $userName = trim((string) ($userRow['username'] ?? ''));

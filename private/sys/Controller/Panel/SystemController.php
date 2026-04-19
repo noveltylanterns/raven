@@ -2454,27 +2454,6 @@ final class SystemController
     }
 
     /**
-     * Normalizes panel-theme identifiers to valid theme slugs.
-     */
-    private function normalizePanelThemeChoice(string $theme, bool $allowDefault): ?string
-    {
-        $normalized = strtolower(trim($theme));
-        if ($normalized === '') {
-            return $allowDefault ? 'default' : 'corp';
-        }
-
-        if ($allowDefault && $normalized === 'default') {
-            return 'default';
-        }
-
-        if (in_array($normalized, ['corp', 'ice', 'midnight'], true)) {
-            return $normalized;
-        }
-
-        return null;
-    }
-
-    /**
      * Returns the archive-package service on first use.
      */
     private function archivePackages(): ArchivePackage

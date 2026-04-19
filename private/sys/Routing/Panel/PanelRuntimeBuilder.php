@@ -522,6 +522,7 @@ final class PanelRuntimeBuilder
                 new SessionFlash('_raven_flash'),
                 $categoryEnabled,
                 $tagEnabled,
+                $rvn['panel_editor'],
                 static function () use (&$systemController, &$rvn): void {
                     if ($systemController instanceof SystemController) {
                         $systemController->renderPublicNotFound();
@@ -641,6 +642,7 @@ final class PanelRuntimeBuilder
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
                 new Route($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
+                $rvn['panel_editor'],
                 new Upload()
             );
 

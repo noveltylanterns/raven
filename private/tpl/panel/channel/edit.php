@@ -36,18 +36,9 @@ $channelSlug = trim((string) ($channel['slug'] ?? ''));
 $feedEnabled = (bool) ($channel['feed_enabled'] ?? false);
 $selectedCategorySets = is_array($channel['category_sets'] ?? null) ? $channel['category_sets'] : [];
 $selectedTagSets = is_array($channel['tag_sets'] ?? null) ? $channel['tag_sets'] : [];
-$editorOverride = strtolower(trim((string) ($channel['editor_override'] ?? 'inherit')));
-if (!in_array($editorOverride, ['inherit', 'tinymce', 'plaintext', 'autobr', 'markdown'], true)) {
-    $editorOverride = 'inherit';
-}
-$routeMode = strtolower(trim((string) ($channel['route_mode'] ?? 'inherit')));
-if (!in_array($routeMode, ['inherit', 'slug', 'date_slug', 'month_slug', 'id', 'date_id', 'month_id'], true)) {
-    $routeMode = 'inherit';
-}
-$routeSeparator = trim((string) ($channel['route_separator'] ?? 'inherit'));
-if (!in_array($routeSeparator, ['inherit', '-', '_'], true)) {
-    $routeSeparator = 'inherit';
-}
+$editorOverride = (string) ($channel['editor_override'] ?? 'inherit');
+$routeMode = (string) ($channel['route_mode'] ?? 'inherit');
+$routeSeparator = (string) ($channel['route_separator'] ?? 'inherit');
 $activeTab = (string) ($activeTab ?? 'basic');
 $taxonomyAssignmentsEnabled = $categoryEnabled || $tagEnabled;
 $deleteFormId = 'delete-channel-form';

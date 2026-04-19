@@ -119,6 +119,69 @@ Duplicated editor utility methods across multiple controllers:
 - [x] 13. Update `docs/Filetree.md` to document `Editor.php` alongside `EditorTabs.php` and `EditorAuthor.php`
 
 
+### Editor.php Universalization
+
+All panel editor normalizers must live in `lib/View/Panel/Editor*.php` and be injectable by extensions. No duplicated normalization logic in controllers or templates.
+
+#### Audit Findings
+
+Controllers with known duplications not yet resolved:
+- `SharedController` — has own `normalizePanelThemeChoice()` (duplicate of `Editor.php` canonical)
+- `SystemController` — has own `normalizePanelThemeChoice()` (duplicate) AND own `normalizeChannelEditorOverride()` (not yet in `Editor.php`)
+- `TaxonomyController` — has own `normalizeChannelEditorOverride()` (not yet in `Editor.php`)
+- `ContentController` — has own `normalizeChannelEditorOverride()` (not yet in `Editor.php`)
+
+Templates with known residual inline normalization:
+- `private/tpl/panel/channel/edit.php` — defensive editor-override, route-mode, separator normalizations
+- `private/tpl/panel/user/edit.php` — defensive 2FA type + login-identifier-mode normalizations
+
+Thin controller wrappers that delegate to existing shared services (candidate for removal):
+- `ContentController::normalizeChannelRouteMode()` — delegates to `Route` service
+- `ContentController::normalizeChannelRouteSeparator()` — delegates to `Mode` service
+- `ContentController::normalizeGlobalRouteSeparator()` — delegates to `Mode` service
+- `TaxonomyController::normalizeChannelRouteMode()` — duplicate delegation
+- `TaxonomyController::normalizeChannelRouteSeparator()` — duplicate delegation
+- `TaxonomyController::normalizeTaxonomySetSelection()` — delegates to `SetContext` service
+
+#### Phase 1: Extract `normalizeChannelEditorOverride()` to `Editor.php`
+
+- [x] Add `normalizeChannelEditorOverride(string $value): string` to `Editor.php` (allowed: `inherit`, `tinymce`, `plaintext`, `autobr`, `markdown`; default: `inherit`) with full PHPDoc
+- [x] Inject `Editor` into `TaxonomyController` — add constructor param + update `PanelRuntimeBuilder` factory
+- [x] Update `ContentController`: replace `$this->normalizeChannelEditorOverride()` → `$this->editor->normalizeChannelEditorOverride()`; remove private method
+- [x] Update `TaxonomyController`: replace `$this->normalizeChannelEditorOverride()` → `$this->editor->normalizeChannelEditorOverride()`; remove private method
+- [x] Update `SystemController`: `normalizeChannelEditorOverride()` was never called there — confirmed dead; no change needed
+
+#### Phase 2: Remove duplicate `normalizePanelThemeChoice()` from `SharedController` and `SystemController`
+
+- [x] Audit how `SharedController` and `SystemController` are constructed — Editor injected via `PanelRuntimeBuilder` for SharedController; SystemController's copy was dead (never called)
+- [x] Inject `Editor` into `SharedController`; replace `$this->normalizePanelThemeChoice()` with `$this->editor->normalizePanelThemeChoice()`; remove private method; fix `defaultPanelTheme()` bug (`'light'`→`'corp'` corrected to `'light'`→`'ice'` via Bootstrap alias map)
+- [x] `SystemController::normalizePanelThemeChoice()` was a dead private method — removed; no injection needed
+
+#### Phase 3: Remove thin routing-wrapper private methods from controllers
+
+- [x] `ContentController`: confirmed `normalizeChannelRouteMode()`, `normalizeChannelRouteSeparator()`, `normalizeGlobalRouteSeparator()`, `normalizeTaxonomySetSelection()` were pure pass-throughs; inlined all call sites; removed all four methods
+- [x] `TaxonomyController`: confirmed `normalizeChannelRouteMode()`, `normalizeChannelRouteSeparator()`, `normalizeTaxonomySetSelection()` were pure pass-throughs; inlined all call sites; removed all three methods
+- [x] `ConfigController`: confirmed `normalizeGlobalRouteSeparator()` was a pure pass-through to `Mode::normalizeGlobalSeparator()`; inlined two call sites; removed the method
+
+#### Phase 4: Template normalization cleanup
+
+- [x] `private/tpl/panel/channel/edit.php` — removed defensive editor-override, route-mode, and separator inline normalization; values now trusted from controller
+- [x] `private/tpl/panel/user/edit.php` — removed `$loginIdentifierMode` defensive guard; `LoginIdentifierResolver` in controllers guarantees a pre-normalized value
+- [x] No other panel templates had residual inline normalization beyond `$activeTab` fallback guards (already correct)
+
+#### Phase 5: Assess remaining normalizers — extract or leave
+
+- [x] `user/edit.php` `$loginIdentifierMode` guard removed; 2FA type is passed as a pre-built options array (`$twoFactorTypeOptions`), not a raw string — no normalization in template was present
+- [x] `ConfigController` private normalizers (`normalizeFieldValue`, `normalizeSiteProtocol`, etc.) confirmed non-duplicated and config-editor–specific; intentionally stay local
+- [x] No new `Editor*.php` file warranted; all extractions fit cleanly in `Editor.php`; also added correct Bootstrap theme alias map (`light`→`ice`, `dark`→`midnight`) to `normalizePanelThemeChoice()`
+
+#### Phase 6: Verify and document
+
+- [x] Run `php -l` on all modified PHP files — all clean
+- [ ] Verify panel editor flows in browser for all affected routes: channel edit, config, system, user/preferences, content page edit
+- [ ] Write release notes
+
+
 ## Long Term
 
 ### Environment Hardening

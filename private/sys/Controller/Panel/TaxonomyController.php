@@ -18,6 +18,7 @@ use Raven\Core\Repository\TagRepository;
 use Raven\Core\Repository\TaxonomySetRepository;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
+use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\Directory\Mode;
 use Raven\Lib\Directory\Route;
@@ -56,6 +57,7 @@ final class TaxonomyController
     private TaxonomyImageService $taxonomyImageService;
     private Route $routeConfigService;
     private EditorTabs $editorTabs;
+    private Editor $editor;
     private Upload $uploadFileSetNormalizer;
 
     /**
@@ -71,6 +73,7 @@ final class TaxonomyController
      * @param TaxonomyImageService $taxonomyImageService Service for taxonomy image uploads and path management.
      * @param Route $routeConfigService Route configuration reader for channel/category/tag route mode and prefix helpers.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
+     * @param Editor $editor Shared panel editor normalizers (channel editor override, etc.).
      * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
      * @return void
      */
@@ -87,6 +90,7 @@ final class TaxonomyController
         TaxonomyImageService $taxonomyImageService,
         Route $routeConfigService,
         EditorTabs $editorTabs,
+        Editor $editor,
         Upload $uploadFileSetNormalizer
     ) {
         $this->context = $context;
@@ -101,6 +105,7 @@ final class TaxonomyController
         $this->taxonomyImageService = $taxonomyImageService;
         $this->routeConfigService = $routeConfigService;
         $this->editorTabs = $editorTabs;
+        $this->editor = $editor;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
     }
 
@@ -167,15 +172,15 @@ final class TaxonomyController
 
         if (is_array($channel)) {
             $channel['feed_enabled'] = (bool) ($channel['feed_enabled'] ?? false);
-            $channel['category_sets'] = $this->normalizeTaxonomySetSelection($channel['category_sets'] ?? [], false);
-            $channel['tag_sets'] = $this->normalizeTaxonomySetSelection($channel['tag_sets'] ?? [], false);
-            $channel['editor_override'] = $this->normalizeChannelEditorOverride(
+            $channel['category_sets'] = SetContext::normalizeSelection($channel['category_sets'] ?? [], false);
+            $channel['tag_sets'] = SetContext::normalizeSelection($channel['tag_sets'] ?? [], false);
+            $channel['editor_override'] = $this->editor->normalizeChannelEditorOverride(
                 (string) ($channel['editor_override'] ?? 'inherit')
             );
-            $channel['route_mode'] = $this->normalizeChannelRouteMode(
+            $channel['route_mode'] = $this->routeConfigService->normalizeChannelRouteMode(
                 (string) ($channel['route_mode'] ?? 'inherit')
             );
-            $channel['route_separator'] = $this->normalizeChannelRouteSeparator(
+            $channel['route_separator'] = Mode::normalizeChannelSeparator(
                 (string) ($channel['route_separator'] ?? 'inherit')
             );
         }
@@ -233,13 +238,13 @@ final class TaxonomyController
             $slug = $persistedSlug !== '' ? $persistedSlug : null;
         }
         $description = $this->input->text($post['description'] ?? null, 2000);
-        $editorOverride = $this->normalizeChannelEditorOverride(
+        $editorOverride = $this->editor->normalizeChannelEditorOverride(
             (string) ($post['editor_override'] ?? 'inherit')
         );
-        $routeMode = $this->normalizeChannelRouteMode(
+        $routeMode = $this->routeConfigService->normalizeChannelRouteMode(
             (string) ($post['route_mode'] ?? 'inherit')
         );
-        $routeSeparator = $this->normalizeChannelRouteSeparator(
+        $routeSeparator = Mode::normalizeChannelSeparator(
             (string) ($post['route_separator'] ?? 'inherit')
         );
         $feedsEnabled = $this->routeConfigService->feedEnabled();
@@ -1635,54 +1640,6 @@ final class TaxonomyController
     }
 
     /**
-     * Normalizes one channel editor-override value.
-     *
-     * @param string $value Raw editor override from form or record.
-     * @return string Normalized value; defaults to 'inherit'.
-     */
-    private function normalizeChannelEditorOverride(string $value): string
-    {
-        $editor = strtolower(trim($value));
-        return in_array($editor, ['inherit', 'tinymce', 'plaintext', 'autobr', 'markdown'], true)
-            ? $editor
-            : 'inherit';
-    }
-
-    /**
-     * Normalizes one channel route-mode value via Route.
-     *
-     * @param string $value Raw route-mode from form or record.
-     * @return string Normalized route mode.
-     */
-    private function normalizeChannelRouteMode(string $value): string
-    {
-        return $this->routeConfigService->normalizeChannelRouteMode($value);
-    }
-
-    /**
-     * Normalizes one channel route-separator option via the Directory mode policy.
-     *
-     * @param string $value Raw route-separator from form or record.
-     * @return string Normalized separator.
-     */
-    private function normalizeChannelRouteSeparator(string $value): string
-    {
-        return Mode::normalizeChannelSeparator($value);
-    }
-
-    /**
-     * Normalizes a raw taxonomy-set selection into a canonical id array.
-     *
-     * @param mixed $raw Raw selection value (array of ids or 'all'/'default' sentinel).
-     * @param bool $defaultAll Whether to default to all-sets when the selection is empty.
-     * @return array<int, int|string> Normalized selection.
-     */
-    private function normalizeTaxonomySetSelection(mixed $raw, bool $defaultAll = true): array
-    {
-        return SetContext::normalizeSelection($raw, $defaultAll);
-    }
-
-    /**
      * Validates and normalizes a submitted set-selection against the known option list.
      *
      * Strips unknown ids, promotes to all-sets sentinel when every option is selected,
@@ -1701,7 +1658,7 @@ final class TaxonomyController
             }
         }
 
-        $selection = $this->normalizeTaxonomySetSelection($submitted, false);
+        $selection = SetContext::normalizeSelection($submitted, false);
         if (SetContext::selectionIncludesAll($selection)) {
             return [SetContext::ALL_SET_ID];
         }

@@ -278,13 +278,13 @@ final class ContentController
             $channelOption['category_sets'] = $this->allowedTaxonomySetIdsForChannel($channelOption, 'category');
             $channelOption['tag_sets'] = $this->allowedTaxonomySetIdsForChannel($channelOption, 'tag');
 
-            $channelOption['editor_override'] = $this->normalizeChannelEditorOverride(
+            $channelOption['editor_override'] = $this->editor->normalizeChannelEditorOverride(
                 (string) ($channelOption['editor_override'] ?? 'inherit')
             );
-            $channelOption['route_mode'] = $this->normalizeChannelRouteMode(
+            $channelOption['route_mode'] = $this->routeConfigService->normalizeChannelRouteMode(
                 (string) ($channelOption['route_mode'] ?? 'inherit')
             );
-            $channelOption['route_separator'] = $this->normalizeChannelRouteSeparator(
+            $channelOption['route_separator'] = Mode::normalizeChannelSeparator(
                 (string) ($channelOption['route_separator'] ?? 'inherit')
             );
         }
@@ -337,7 +337,7 @@ final class ContentController
                 (string) $this->config->get('content.editor', 'tinymce')
             ),
             'routeModeDefault' => $this->globalPageRouteMode(),
-            'routeSeparatorDefault' => $this->normalizeGlobalRouteSeparator(
+            'routeSeparatorDefault' => Mode::normalizeGlobalSeparator(
                 (string) $this->config->get('content.separator', '-')
             ),
             'bodyBlockTypeDefinitions' => $this->pageEditorBodyBlockTypeDefinitions(),
@@ -1093,65 +1093,6 @@ final class ContentController
     }
 
     /**
-     * Normalizes one channel editor-override value.
-     *
-     * @param string $value Raw editor override from channel record or form input.
-     * @return string One of: inherit, tinymce, plaintext, autobr, markdown.
-     */
-    private function normalizeChannelEditorOverride(string $value): string
-    {
-        $editor = strtolower(trim($value));
-        return in_array($editor, ['inherit', 'tinymce', 'plaintext', 'autobr', 'markdown'], true)
-            ? $editor
-            : 'inherit';
-    }
-
-    /**
-     * Normalizes one channel route-mode value.
-     *
-     * @param string $value Raw route-mode from channel record or form input.
-     * @return string Normalized channel route-mode slug.
-     */
-    private function normalizeChannelRouteMode(string $value): string
-    {
-        return $this->routeConfigService->normalizeChannelRouteMode($value);
-    }
-
-    /**
-     * Normalizes one channel route-separator option.
-     *
-     * @param string $value Raw separator from channel record or form input.
-     * @return string Normalized separator value for channel-level routing.
-     */
-    private function normalizeChannelRouteSeparator(string $value): string
-    {
-        return Mode::normalizeChannelSeparator($value);
-    }
-
-    /**
-     * Normalizes one global route-separator option.
-     *
-     * @param string $value Raw separator from config or form input.
-     * @return string Normalized separator value for global routing.
-     */
-    private function normalizeGlobalRouteSeparator(string $value): string
-    {
-        return Mode::normalizeGlobalSeparator($value);
-    }
-
-    /**
-     * Normalizes a raw taxonomy-set selection from a channel record or form input.
-     *
-     * @param mixed $raw Raw selection value (array of ids or ALL_SET_ID sentinel).
-     * @param bool $defaultAll Whether an empty selection should resolve to all-sets.
-     * @return array<int, int|string> Normalized set id list.
-     */
-    private function normalizeTaxonomySetSelection(mixed $raw, bool $defaultAll = true): array
-    {
-        return SetContext::normalizeSelection($raw, $defaultAll);
-    }
-
-    /**
      * Returns true when the selection represents an all-sets access grant.
      *
      * @param array<int, int|string> $selection Normalized set id list.
@@ -1202,7 +1143,7 @@ final class ContentController
         }
 
         $field = strtolower(trim($kind)) === 'tag' ? 'tag_sets' : 'category_sets';
-        $selection = $this->normalizeTaxonomySetSelection($channelRecord[$field] ?? [], false);
+        $selection = SetContext::normalizeSelection($channelRecord[$field] ?? [], false);
         if ($this->selectionAllowsAllSets($selection)) {
             return [SetContext::ALL_SET_ID];
         }
