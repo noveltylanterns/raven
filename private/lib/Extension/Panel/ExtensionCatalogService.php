@@ -6,6 +6,7 @@ namespace Raven\Lib\Extension\Panel;
 
 use Raven\Core\Config;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
+use Raven\Lib\Extension\Layout;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\ManifestContractValidator;
@@ -90,7 +91,7 @@ final class ExtensionCatalogService
             $manifest = $this->readManifest($extensionPath, $formsProvider);
             $isValid = (bool) ($manifest['valid'] ?? false);
             $isEnabled = $isValid && !empty($enabledMap[$entry]);
-            $hasPanelRoutes = is_file($extensionPath . '/lib/routes_panel.php');
+            $hasPanelRoutes = Layout::hasProvider($extensionPath, 'routes_panel.php');
             $isStock = $this->isStockExtensionDirectory($entry);
             $canUninstall = !$isEnabled;
             $uninstallBlockReason = '';
@@ -334,7 +335,7 @@ final class ExtensionCatalogService
             if ($shortcodesError !== null) {
                 return [
                     'valid' => false,
-                    'invalid_reason' => 'Invalid lib/shortcodes.php: ' . $shortcodesError,
+                    'invalid_reason' => 'Invalid shortcodes.php: ' . $shortcodesError,
                     'type' => $type,
                     'panel_path' => $panelPath,
                     'name' => $name,
@@ -358,7 +359,7 @@ final class ExtensionCatalogService
             if ($fieldsError !== null) {
                 return [
                     'valid' => false,
-                    'invalid_reason' => 'Invalid lib/fields.php: ' . $fieldsError,
+                    'invalid_reason' => 'Invalid fields.php: ' . $fieldsError,
                     'type' => $type,
                     'panel_path' => $panelPath,
                     'name' => $name,
@@ -425,7 +426,7 @@ final class ExtensionCatalogService
      */
     public function stockExtensionDirectories(): array
     {
-        return ['contact', 'cron', 'database', 'phpinfo', 'repo', 'signups', 'smallweb'];
+        return ['contact', 'cron', 'database', 'phpinfo', 'signups'];
     }
 
     public function isStockExtensionDirectory(string $directoryName): bool

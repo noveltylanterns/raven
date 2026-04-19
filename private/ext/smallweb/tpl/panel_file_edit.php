@@ -162,8 +162,9 @@ $dirQuery = $subdir !== '' ? '?dir=' . rawurlencode($subdir) : '';
             <label for="file_content" class="form-label">Content</label>
             <textarea class="form-control font-monospace" id="file_content" name="content" form="sw-file-form"
                 rows="20"
+                wrap="soft"
                 spellcheck="false"
-                style="tab-size: 4; white-space: pre; overflow-wrap: normal; overflow-x: auto;"
+                style="tab-size: 4; white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden;"
             ><?= e($fileContent) ?></textarea>
         </div>
     </div>

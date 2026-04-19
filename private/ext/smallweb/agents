@@ -1,0 +1,6 @@
+# Agent Directives for Raven CMS Smallweb Extension
+
+Follow the project root guide plus `private/ext/AGENTS.md` for Raven-wide architecture and extension contracts.
+
+If any part of Raven's generic extension-building process is vague or unclear, note it in this directory's `build-notes.md` so it can be handed back to core maintenance.
+

@@ -2133,8 +2133,8 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                     'valid' => $manifest !== null,
                     'name' => $manifest['name'] ?? $entry,
                     'type' => $manifest['type'] ?? 'invalid',
-                    'has_panel_routes' => is_file($path . '/lib/routes_panel.php'),
-                    'has_public_routes' => is_file($path . '/lib/routes_public.php'),
+                    'has_panel_routes' => \Raven\Lib\Extension\Layout::hasProvider($path, 'routes_panel.php'),
+                    'has_public_routes' => \Raven\Lib\Extension\Layout::hasProvider($path, 'routes_public.php'),
                 ];
             }
 
@@ -2215,7 +2215,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 throw new RuntimeException('Extension slug is invalid.');
             }
 
-            if (in_array($slug, ['contact', 'cron', 'database', 'phpinfo', 'repo', 'signups', 'smallweb'], true)) {
+            if (in_array($slug, ['contact', 'cron', 'database', 'phpinfo', 'signups'], true)) {
                 throw new RuntimeException('Stock extension cannot be uninstalled: ' . $slug);
             }
 
@@ -2387,21 +2387,23 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 throw $exception;
             }
 
-            $createdFiles = ['ext.json', 'ext.php', 'lib/schema.php'];
+            $createdFiles = ['ext.json', 'ext.php', 'schema.php'];
             if (in_array($type, ['content', 'module'], true)) {
-                $createdFiles[] = 'lib/shortcodes.php';
-                $createdFiles[] = 'lib/fields.php';
+                $createdFiles[] = 'shortcodes.php';
+                $createdFiles[] = 'fields.php';
             }
             if ($type !== 'framework') {
-                $createdFiles[] = 'lib/routes_panel.php';
+                $createdFiles[] = 'routes_panel.php';
                 $createdFiles[] = 'tpl/panel_index.php';
             }
             if ($type === 'module') {
-                $createdFiles[] = 'lib/routes_public.php';
+                $createdFiles[] = 'routes_public.php';
                 $createdFiles[] = 'tpl/public_index.php';
             }
             if ($withAgents) {
-                $createdFiles[] = 'AGENTS.md';
+                $createdFiles[] = 'agents';
+                $createdFiles[] = 'AGENTS.md -> agents';
+                $createdFiles[] = 'CLAUDE.md -> agents';
             }
             if ($withComposer) {
                 $createdFiles[] = 'composer.json';

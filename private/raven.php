@@ -31,6 +31,7 @@ use Raven\Lib\Auth\SessionCookiePolicy;
 return (static function (): array {
     $root = dirname(__DIR__);
     require_once $root . '/private/lib/Extension/ExtensionRegistry.php';
+    require_once $root . '/private/lib/Extension/Layout.php';
     $enabledExtensionDirectories = ExtensionRegistry::enabledDirectories($root, true);
 
     // Load per-package handlers instead of the full Composer autoloader.
@@ -67,7 +68,8 @@ return (static function (): array {
             return;
         }
 
-        // Extension classes: Raven\Ext\* maps to enabled extension src/ directories.
+        // Extension classes now resolve from each extension's canonical `lib/`
+        // namespace root, with `src/` retained as a legacy migration fallback.
         $extPrefix = 'Raven\\Ext\\';
         if (!str_starts_with($class, $extPrefix)) {
             return;
@@ -75,15 +77,17 @@ return (static function (): array {
 
         $relative = str_replace('\\', '/', substr($class, strlen($extPrefix)));
         foreach ($enabledExtensionDirectories as $directory) {
-            $extensionSourcePath = $root . '/private/ext/' . $directory . '/src/';
-            if (!is_dir($extensionSourcePath)) {
-                continue;
-            }
+            $extensionRoot = $root . '/private/ext/' . $directory;
+            foreach (\Raven\Lib\Extension\Layout::classRoots($extensionRoot) as $classRoot) {
+                if (!is_dir($classRoot)) {
+                    continue;
+                }
 
-            $file = $extensionSourcePath . $relative . '.php';
-            if (is_file($file)) {
-                require_once $file;
-                return;
+                $file = $classRoot . '/' . $relative . '.php';
+                if (is_file($file)) {
+                    require_once $file;
+                    return;
+                }
             }
         }
     });
@@ -225,7 +229,7 @@ return (static function (): array {
     };
 
     // Wire the system-wide scheduler.
-    // Both core jobs and extension-declared jobs (from lib/cron.php) run through this registry.
+    // Both core jobs and extension-declared jobs (from extension `cron.php`) run through this registry.
     // The scheduler is passive at bootstrap time — jobs only execute when rvn-cron triggers runDue().
     $scheduler = new Registry($root);
 
@@ -250,7 +254,7 @@ return (static function (): array {
         $logger->pruneOlderThan($logger->retentionDays());
     });
 
-    // Register extension sources; lib/cron.php files are loaded lazily on first runDue()/getStatus().
+    // Register extension sources; extension cron providers are loaded lazily on first runDue()/getStatus().
     foreach ($schedulerExtensions as $schedulerDirectory) {
         $scheduler->addExtensionSource($schedulerDirectory);
     }

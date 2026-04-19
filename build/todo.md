@@ -15,21 +15,7 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 
 ### Library Refactor
 Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
-
-
-### Extension System Updates
-- [ ] Updated private/ext/CLAUDE.md guidance needs be be merged into private/ext/agents, then CLAUDE.md needs to be deleted and symlinked to agents like AGENTS.md is.
-- [ ] Replace "Generates AGENTS.md?" in Extension Manager with "Generate Agent Guidance?". Instead of making `AGENTS.md`, it will just make `agents`, and symlink both `AGENTS.md` and `CLAUDE.md` to `agents`.
-- [ ] Replace "Generates AGENTS.md?" in Theme Manager with "Generate Agent Guidance?". Instead of making `AGENTS.md`, it will just make `agents`, and symlink both `AGENTS.md` and `CLAUDE.md` to `agents`.
-- [ ] Unset Repositories & Smallweb as stock extensions, but leave bundled.
-- [ ] The textareas for our page content in the Smallweb extension do not word wrap, instead open horizontal scrollbar. They need to word wrap like our page editor content blocks.
-- [ ] Folder creation/deletion/modification functions in Smallweb should be merged into (and called from) universal folder handler in lib/Archive/Folder.php
-- [ ] Make sure all import/export & file handler functions in our extensions are using our lib/Format/ libraries when applicable. If something can be extracted from an extension and made part of a universal handler in lib/Format/, do so. (Probably need a lib/Format/Txt.php for many of our Smallweb .txt/.gmi/etc files)
-- [ ] private/ext/{slug}/lib/ contents should be relocated to private/ext/{slug}/
-- [ ] private/ext/{slug}/src/ contents should be relocated to private/ext/{slug}/lib/
-- [ ] Raven\Ext\ PSR maps should use ext/{slug}/lib/ instead of src/ from now on
-- [ ] private/ext/{slug}/src/ should be deleted.
-- [ ] Make sure all extensions, Extension Manager & Generator are all updated to match these new updates & rules.
+- [ ] `raven.php` should have the PSR path Raven\Bootstrap
 
 
 ### Misc
@@ -123,4 +109,10 @@ Items below are the remaining classified legacy/compatibility lanes after the cu
 - `DEFER FOR EXTENSION RUNTIME REFACTOR`
 	- `private/lib/Extension/EmbeddedFormRuntimeService.php`
 	- Accepts legacy `embedded_form_runtimes` alongside canonical `shortcode_runtimes`; defer removal until the extension form/runtime contract is intentionally rebuilt.
+- `DEFER FOR EXTENSION LAYOUT MIGRATION`
+	- `private/lib/Extension/Layout.php`
+	- Provider/path resolution still falls back from canonical root-level extension files (`routes_panel.php`, `schema.php`, `cron.php`, etc.) to the legacy `lib/*.php` layout so third-party packages keep loading during the migration window.
+- `DEFER FOR EXTENSION LAYOUT MIGRATION`
+	- `private/raven.php`
+	- `Raven\Ext\*` autoloading now prefers `private/ext/{slug}/lib/` but still falls back to legacy `src/` roots until external extensions have been rebuilt around the new class layout.
 ---

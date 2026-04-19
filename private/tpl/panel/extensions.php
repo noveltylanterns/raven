@@ -422,10 +422,10 @@ $packageArchiveHelp = array_map(
                                             class="form-check-input"
                                             checked
                                         >
-                                        <label for="extension_generate_agents" class="form-check-label">Generate AGENTS.md?</label>
+                                        <label for="extension_generate_agents" class="form-check-label">Generate Agent Guidance?</label>
                                     </div>
                                     <div class="form-text mb-3">
-                                        Creates <code>private/ext/{slug}/AGENTS.md</code> with extension-local guidance and a reference to <code>private/ext/AGENTS.md</code>.
+                                        Creates <code>private/ext/{slug}/agents</code>, plus <code>AGENTS.md</code> and <code>CLAUDE.md</code> symlinks that both point to it.
                                     </div>
                                     <div class="form-check">
                                         <input
@@ -590,22 +590,22 @@ $packageArchiveHelp = array_map(
                 generatedFilesList.innerHTML = '';
                 return;
             }
-            var files = ['ext.json', 'ext.php', 'lib/schema.php'];
+            var files = ['ext.json', 'ext.php', 'schema.php'];
             if (type === 'content' || type === 'module') {
-                files.push('lib/shortcodes.php');
+                files.push('shortcodes.php');
             }
             if (type === 'content' || type === 'module') {
-                files.push('lib/fields.php');
+                files.push('fields.php');
             }
             if (type !== 'framework') {
-                files.push('lib/routes_panel.php', 'tpl/panel_index.php');
+                files.push('routes_panel.php', 'tpl/panel_index.php');
             }
             if (type === 'module') {
-                files.push('lib/routes_public.php');
+                files.push('routes_public.php');
                 files.push('tpl/public_index.php');
             }
             if (generateAgentsCheckbox instanceof HTMLInputElement && generateAgentsCheckbox.checked) {
-                files.push('AGENTS.md');
+                files.push('agents', 'AGENTS.md -> agents', 'CLAUDE.md -> agents');
             }
             if (generateComposerCheckbox instanceof HTMLInputElement && generateComposerCheckbox.checked) {
                 files.push('composer.json');

@@ -14,6 +14,7 @@ namespace Raven\Core\Database\Schema;
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
+use Raven\Lib\Extension\Layout;
 use Raven\Lib\Extension\ExtensionRegistry;
 
 /**
@@ -58,8 +59,9 @@ final class ExtensionSchemaRunner
                 continue;
             }
 
-            $schemaPath = $root . '/private/ext/' . $directory . '/lib/schema.php';
-            if (!is_file($schemaPath)) {
+            $extensionRoot = $root . '/private/ext/' . $directory;
+            $schemaPath = Layout::providerPath($extensionRoot, 'schema.php');
+            if ($schemaPath === null) {
                 continue;
             }
 

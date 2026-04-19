@@ -147,7 +147,7 @@ Extension management:
 - `import --archive <zip_path> [--slug <slug>]`
 - `uninstall --slug <slug> [--force]`
 
-`create` writes extension scaffolds under `private/ext/{slug}/` using current route/view conventions (`ext.php`, `ext.json`, `lib/*.php`, `tpl/*.php`), and sets `ext.json.slug` to the directory slug.
+`create` writes extension scaffolds under `private/ext/{slug}/` using current route/view conventions (`ext.php`, `ext.json`, root-level provider files, `lib/*` classes, `tpl/*` views), and sets `ext.json.slug` to the directory slug.
 `import` uses `ext.json.slug` when `--slug` is omitted.
 Legacy compatibility note: `rvn-ext delete --slug <slug>` is accepted as an alias for `uninstall`.
 ### `rvn-theme`
@@ -223,6 +223,6 @@ Use your local validation workflow to verify CLI basics:
 - category/channel/tag/redirect create-delete flow
 - config set/get/restore behavior
 - extension list/create/uninstall behavior
-- destructive-guard behavior (stock group delete blocked, stock extensions such as `contact`, `database`, `phpinfo`, `signups`, and `smallweb` blocked from uninstall, active-theme uninstall blocked)
+- destructive-guard behavior (stock group delete blocked, protected stock extensions such as `contact`, `cron`, `database`, `phpinfo`, and `signups` blocked from uninstall; bundled `repo` and `smallweb` remain removable, active-theme uninstall blocked)
 - unsafe-input behavior (path-traversal slugs rejected, unsafe ZIP entry paths rejected on import)
 - dedicated web-security smoke runner for CSRF/auth/XSS-escape/SQLi-baseline checks

@@ -30,6 +30,7 @@ use Raven\Core\Routing\Panel\PanelThemeAssetResponder;
 use Raven\Core\Routing\Panel\PanelUserRouteRegistrar;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Config\ConfigParser;
+use Raven\Lib\Extension\Layout;
 use Raven\Lib\Panel\PanelUrl;
 use RuntimeException;
 
@@ -237,8 +238,9 @@ final class PanelController
                     $type = 'plugin';
                 }
 
-                $panelRoutesFile = $rvn['root'] . '/private/ext/' . $directoryName . '/lib/routes_panel.php';
-                if (!is_file($panelRoutesFile)) {
+                $extensionRoot = $rvn['root'] . '/private/ext/' . $directoryName;
+                $panelRoutesFile = Layout::providerPath($extensionRoot, 'routes_panel.php');
+                if ($panelRoutesFile === null) {
                     continue;
                 }
 

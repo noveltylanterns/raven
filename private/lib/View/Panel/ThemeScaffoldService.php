@@ -116,7 +116,7 @@ final class ThemeScaffoldService
         $this->writeScaffoldFile($themePath . '/tpl/wrapper.php', $wrapper);
         $this->writeScaffoldFile($themePath . '/tpl/home.php', $home);
         if ($generateAgentsFile) {
-            $this->writeScaffoldFile($themePath . '/AGENTS.md', $this->agentsFileContent($meta));
+            $this->writeAgentGuidanceBundle($themePath, $meta);
         }
         if ($generateComposerFile) {
             $this->writeScaffoldFile($themePath . '/composer.json', $this->composerFileContent($meta));
@@ -159,6 +159,25 @@ final class ThemeScaffoldService
         $content .= "- Use escaped brace tags by default; reserve `{raw:...}` for trusted HTML only.\n";
 
         return $content;
+    }
+
+    /**
+     * Writes the canonical theme guidance file plus compatibility symlinks.
+     *
+     * @param string $themePath Absolute theme directory path.
+     * @param array{
+     *   slug: string,
+     *   name: string,
+     *   is_child_theme?: bool,
+     *   parent_theme?: string
+     * } $meta Theme metadata used for the guidance body.
+     * @return void
+     */
+    public function writeAgentGuidanceBundle(string $themePath, array $meta): void
+    {
+        $this->writeScaffoldFile($themePath . '/agents', $this->agentsFileContent($meta));
+        $this->writeRelativeSymlink($themePath . '/AGENTS.md', 'agents');
+        $this->writeRelativeSymlink($themePath . '/CLAUDE.md', 'agents');
     }
 
     /**
@@ -274,5 +293,23 @@ final class ThemeScaffoldService
         }
 
         @chmod($targetPath, 0644);
+    }
+
+    /**
+     * Writes or replaces one relative symlink.
+     *
+     * @param string $linkPath Absolute link path to create.
+     * @param string $target Relative symlink target.
+     * @return void
+     */
+    private function writeRelativeSymlink(string $linkPath, string $target): void
+    {
+        if (is_link($linkPath) || is_file($linkPath)) {
+            @unlink($linkPath);
+        }
+
+        if (!@symlink($target, $linkPath)) {
+            throw new \RuntimeException('Failed to write symlink: ' . $linkPath);
+        }
     }
 }

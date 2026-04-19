@@ -16,10 +16,10 @@ At minimum, each extension needs:
 
 - `ext.json` (required manifest)
 - optional `ext.php` (service provider)
-- optional `lib/schema.php` (schema provider)
-- optional `lib/routes_panel.php` (panel route registrar)
-- optional `lib/routes_public.php` (public route registrar)
-- optional `lib/shortcodes.php` (page editor shortcode provider)
+- optional `schema.php` (schema provider)
+- optional `routes_panel.php` (panel route registrar)
+- optional `routes_public.php` (public route registrar)
+- optional `shortcodes.php` (page editor shortcode provider)
 - optional `tpl/` (extension-owned panel templates; panel-routable types only)
 - optional extension-local state files when needed by your extension
 
@@ -30,8 +30,8 @@ Core panel bootstrap (`panel/index.php`) does this:
 1. Reads extension enablement state from `private/dat/ext/.state.php` (with legacy fallback from `private/ext/.state.php` on older installs).
 2. Validates extension directory names and manifests.
 3. Builds nav items from extension directory slug and manifest type/name.
-4. Loads optional extension providers (`ext.php`, `lib/schema.php`, route registrars) for enabled, valid extensions.
-   `lib/schema.php` runs when the extension requests storage in `ext.php`.
+4. Loads optional extension providers (`ext.php`, `schema.php`, route registrars) for enabled, valid extensions.
+   `schema.php` runs when the extension requests storage in `ext.php`.
 5. Injects a context object (`app`, `panelUrl`, `requirePanelLogin`, etc.) for route registration.
 
 ## 3) Enablement And Permission Model
@@ -74,7 +74,7 @@ So the correct model is:
 
 ## 5) Public Runtime Reality (Current)
 
-Panel extension routing is generic (`lib/routes_panel.php` contract).
+Panel extension routing is generic (`routes_panel.php` contract).
 
 Public extension runtime is currently not generic:
 
@@ -84,7 +84,7 @@ Public extension runtime is currently not generic:
 
 Page Editor shortcode insertion is generic for enabled extensions:
 
-- Extensions may optionally provide `private/ext/{slug}/lib/shortcodes.php`.
+- Extensions may optionally provide `private/ext/{slug}/shortcodes.php`.
 - That provider can return shortcode items (`label` + literal `shortcode`) for the editor's `Extensions` button dropdown.
 - When the provider is callable, Raven passes a small context array including:
   - `extension` => current extension directory slug
@@ -112,10 +112,10 @@ Also:
 
 1. Create `private/ext/{slug}/`.
 2. Add `ext.json` first.
-3. Add `ext.php` and `lib/schema.php` for service/storage behavior.
-4. Add `lib/routes_panel.php` + `tpl/` only when panel pages are needed.
-5. Add `lib/routes_public.php` only for `module` extensions that need public endpoints.
-6. Add `lib/shortcodes.php` only when editor shortcode insertion is needed.
+3. Add `ext.php` and `schema.php` for service/storage behavior.
+4. Add `routes_panel.php` + `tpl/` only when panel pages are needed.
+5. Add `routes_public.php` only for `module` extensions that need public endpoints.
+6. Add `shortcodes.php` only when editor shortcode insertion is needed.
    It may accept a context array so shortcode options can react to config without manually bootstrapping `ext.php`.
 7. Add extension-local state files only when necessary.
 8. Enable extension in Extension Manager.
@@ -124,12 +124,12 @@ Also:
 Alternative bootstrap path:
 
 - Use Extension Manager -> **Create New Extension** to generate a starter scaffold.
-- `helper`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
-- `content`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
-- `framework`: `ext.json`, `ext.php`, `lib/schema.php`
-- `module`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `lib/routes_public.php`, `tpl/panel_index.php`, `tpl/public_index.php`
-- `system`: `ext.json`, `ext.php`, `lib/schema.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
-- Optional in that same modal: `Generate AGENTS.md?` to create `private/ext/{slug}/AGENTS.md` with extension-local guidance that points back to [private/ext/AGENTS.md](../private/ext/AGENTS.md) for missing context.
+- `helper`: `ext.json`, `ext.php`, `schema.php`, `routes_panel.php`, `tpl/panel_index.php`
+- `content`: `ext.json`, `ext.php`, `schema.php`, `shortcodes.php`, `fields.php`, `routes_panel.php`, `tpl/panel_index.php`
+- `framework`: `ext.json`, `ext.php`, `schema.php`
+- `module`: `ext.json`, `ext.php`, `schema.php`, `shortcodes.php`, `fields.php`, `routes_panel.php`, `routes_public.php`, `tpl/panel_index.php`, `tpl/public_index.php`
+- `system`: `ext.json`, `ext.php`, `schema.php`, `routes_panel.php`, `tpl/panel_index.php`
+- Optional in that same modal: `Generate Agent Guidance?` to create `private/ext/{slug}/agents`, plus `AGENTS.md` and `CLAUDE.md` symlinks for tool compatibility.
 
 ### Extension Manager Panel Options
 
@@ -152,7 +152,7 @@ Create modal (`Create New Extension`):
 - `Author`
 - `Homepage URL`
 - `Description`
-- `Generate AGENTS.md?`
+- `Generate Agent Guidance?`
 - Footer actions: `Cancel`, `Create Extension`
 
 Installed list actions:
@@ -177,11 +177,11 @@ Notes:
 
 - `panel_path` and `panel_section` are legacy manifest keys and are ignored.
 - Panel route/nav identity comes from the extension directory slug.
-- Current bundled stock extensions are `contact`, `database`, `phpinfo`, `signups`, and `smallweb`.
+- Protected stock extensions are `contact`, `cron`, `database`, `phpinfo`, and `signups`. Bundled but removable extensions include `repo` and `smallweb`.
 - `ext.php` may request storage with an array contract:
   `local`, `table`, `tables`, `aux`, `panel`, `public`.
 - `local` provisions `private/dat/ext/{slug}/`.
-- `table` and `tables` allow `lib/schema.php` to manage `{prefix}ext_{slug}` / `{prefix}ext_{slug}_*`.
+- `table` and `tables` allow `schema.php` to manage `{prefix}ext_{slug}` / `{prefix}ext_{slug}_*`.
 - `aux` provisions one or more sanctioned root-level folders such as `/{name}`.
 - `panel` provisions `panel/ext/{slug}/`; `public` provisions `public/uploads/ext/{slug}/` (`module` only).
 - Disabling an extension leaves storage intact; uninstalling a non-stock extension removes the storage it explicitly opted into and removes the package files, while stock extension uninstall only purges the opted-in storage and keeps the bundled extension files.

@@ -1273,7 +1273,7 @@ final class ContentController
     /**
      * Returns body-block type definitions provided by enabled extensions.
      *
-     * Each enabled content/module extension may define `lib/fields.php` returning
+     * Each enabled content/module extension may define `fields.php` returning
      * block definitions. Core definitions always take precedence over extension ones.
      *
      * @param array<string, bool> $enabledMap Enabled extension slug → true map.

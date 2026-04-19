@@ -171,7 +171,7 @@ final class ExtensionPermissionCatalogService
             }
 
             $extensionPath = $this->stateStore->basePath() . '/' . $entry;
-            if (!is_dir($extensionPath) || !is_file($extensionPath . '/lib/routes_panel.php')) {
+            if (!is_dir($extensionPath) || !\Raven\Lib\Extension\Layout::hasProvider($extensionPath, 'routes_panel.php')) {
                 continue;
             }
 

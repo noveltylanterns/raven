@@ -6,7 +6,7 @@ Updated: 2026-03-29
 This file captures anything vague, blocked, or likely to require Raven core work rather than extension-local changes.
 
 ## Resolved Since Initial Build
-- Raven core now provides the shared scheduler contract. The repo extension uses `scheduler: true` plus `lib/cron.php` for automated sync passes.
+- Raven core now provides the shared scheduler contract. The repo extension uses `scheduler: true` plus `cron.php` for automated sync passes.
 - Raven core now provides generic content shortcode runtimes. The repo extension registers a live `[repo ...]` runtime under `shortcode_runtimes`.
 - Raven core now provides the `renderPublicExtension` helper for module routes. The repo extension no longer hand-builds its public wrapper output.
 - Raven core now provides `bin` storage. The repo extension now requests `bin => true` and ships `rvn-repo` as an extension-owned CLI companion.

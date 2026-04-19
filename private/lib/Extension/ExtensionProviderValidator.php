@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Extension;
 
 /**
- * Validates extension provider files (`lib/shortcodes.php`, `lib/fields.php`).
+ * Validates extension provider files (`shortcodes.php`, `fields.php`).
  */
 final class ExtensionProviderValidator
 {
@@ -38,8 +38,9 @@ final class ExtensionProviderValidator
             ];
         }
 
-        $providerPath = rtrim($root, '/') . '/private/ext/' . $directoryName . '/lib/shortcodes.php';
-        if (!is_file($providerPath)) {
+        $extensionRoot = rtrim($root, '/') . '/private/ext/' . $directoryName;
+        $providerPath = Layout::providerPath($extensionRoot, 'shortcodes.php');
+        if ($providerPath === null) {
             return [
                 'valid' => true,
                 'error' => '',
@@ -53,7 +54,7 @@ final class ExtensionProviderValidator
         } catch (\Throwable) {
             return [
                 'valid' => false,
-                'error' => 'lib/shortcodes.php threw an error while loading.',
+                'error' => 'shortcodes.php threw an error while loading.',
                 'items' => [],
             ];
         }
@@ -72,14 +73,14 @@ final class ExtensionProviderValidator
                 } catch (\Throwable) {
                     return [
                         'valid' => false,
-                        'error' => 'lib/shortcodes.php callable threw an error while executing.',
+                        'error' => 'shortcodes.php callable threw an error while executing.',
                         'items' => [],
                     ];
                 }
             } catch (\Throwable) {
                 return [
                     'valid' => false,
-                    'error' => 'lib/shortcodes.php callable threw an error while executing.',
+                    'error' => 'shortcodes.php callable threw an error while executing.',
                     'items' => [],
                 ];
             }
@@ -88,7 +89,7 @@ final class ExtensionProviderValidator
         if (!is_array($provider)) {
             return [
                 'valid' => false,
-                'error' => 'lib/shortcodes.php must return an array (or callable returning an array).',
+                'error' => 'shortcodes.php must return an array (or callable returning an array).',
                 'items' => [],
             ];
         }
@@ -153,8 +154,9 @@ final class ExtensionProviderValidator
             ];
         }
 
-        $providerPath = rtrim($root, '/') . '/private/ext/' . $directoryName . '/lib/fields.php';
-        if (!is_file($providerPath)) {
+        $extensionRoot = rtrim($root, '/') . '/private/ext/' . $directoryName;
+        $providerPath = Layout::providerPath($extensionRoot, 'fields.php');
+        if ($providerPath === null) {
             return [
                 'valid' => true,
                 'error' => '',
@@ -168,7 +170,7 @@ final class ExtensionProviderValidator
         } catch (\Throwable) {
             return [
                 'valid' => false,
-                'error' => 'lib/fields.php threw an error while loading.',
+                'error' => 'fields.php threw an error while loading.',
                 'items' => [],
             ];
         }
@@ -184,14 +186,14 @@ final class ExtensionProviderValidator
                 } catch (\Throwable) {
                     return [
                         'valid' => false,
-                        'error' => 'lib/fields.php callable threw an error while executing.',
+                        'error' => 'fields.php callable threw an error while executing.',
                         'items' => [],
                     ];
                 }
             } catch (\Throwable) {
                 return [
                     'valid' => false,
-                    'error' => 'lib/fields.php callable threw an error while executing.',
+                    'error' => 'fields.php callable threw an error while executing.',
                     'items' => [],
                 ];
             }
@@ -200,7 +202,7 @@ final class ExtensionProviderValidator
         if (!is_array($provider)) {
             return [
                 'valid' => false,
-                'error' => 'lib/fields.php must return an array (or callable returning an array).',
+                'error' => 'fields.php must return an array (or callable returning an array).',
                 'items' => [],
             ];
         }
@@ -245,7 +247,7 @@ final class ExtensionProviderValidator
             if (isset($seenSlugs[$slug])) {
                 return [
                     'valid' => false,
-                    'error' => 'Field slugs must be unique within lib/fields.php.',
+                    'error' => 'Field slugs must be unique within fields.php.',
                     'items' => [],
                 ];
             }

@@ -2,13 +2,13 @@
 
 Notes on unclear or underdocumented behaviors encountered during extension development.
 
-## 1. Autoloader namespace-to-path mapping for extension `src/` classes
+## 1. Autoloader namespace-to-path mapping for extension `lib/` classes
 
-**Problem**: The extension's `src/SmallwebService.php` was namespaced as `Raven\Smallweb\SmallwebService`, but the autoloader in `private/raven.php` strips the `Raven\` prefix and uses the remainder as a file path relative to `src/`. This means `Raven\Smallweb\SmallwebService` resolves to `src/Smallweb/SmallwebService.php` — a subdirectory is required.
+**Problem**: The extension service belongs under the `Raven\Ext\Smallweb\SmallwebService` namespace, and the autoloader in `private/raven.php` resolves the remainder of that namespace as a path relative to the extension's `lib/` root. That means the class must live at `lib/Smallweb/SmallwebService.php`.
 
-**What happened**: File was placed at `src/SmallwebService.php` (flat). Autoloader looked for `src/Smallweb/SmallwebService.php`. Class was never found. The extension bootstrapped silently without the service, and routes silently bailed out, producing a 404.
+**What happened**: The class was previously placed flat instead of under `lib/Smallweb/`. Autoload resolution missed it, the service never booted, and routes silently bailed out with a 404.
 
-**What the docs should say**: Extension `src/` classes under namespace `Raven\{ExtensionName}\ClassName` must live at `src/{ExtensionName}/ClassName.php`. The autoloader does NOT flatten the namespace for extension source files (it only flattens `Repository/` prefixes for core). The `AGENTS.md` scaffold section shows `src/` as the source directory but never specifies the required subdirectory structure or the PSR-4-like mapping rule.
+**What the docs should say**: Extension `lib/` classes under namespace `Raven\Ext\{ExtensionName}\ClassName` must live at `lib/{ExtensionName}/ClassName.php`. The autoloader does NOT flatten the namespace path. The extension guidance should explicitly call out `lib/` as the class root and document the PSR-4-like mapping rule.
 
 **Suggested doc location**: `private/ext/AGENTS.md` under "Extension Directory Contract" or a new "Extension Autoloading" section.
 

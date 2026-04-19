@@ -41,7 +41,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 |---|---|---|
 | `Raven\Core\` | `private/sys/` | Core runtime orchestration — entrypoints, routing, controllers, repositories, bootstrap-only database machinery |
 | `Raven\Lib\` | `private/lib/` | Reusable shared modules — auth, media, view/theme, security, content, config, routing primitives, and other domain services usable by both core and extensions |
-| `Raven\Ext\` | `private/ext/{slug}/src/` | Extension-owned classes |
+| `Raven\Ext\` | `private/ext/{slug}/lib/` | Extension-owned classes |
 
 ## Core Ownership
 
@@ -62,7 +62,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 
 - `private/ext/`
   - Extensions live here.
-  - Each extension owns its own `ext.json`, `ext.php`, `lib/`, `src/`, and `tpl/` files.
+  - Each extension owns its own `ext.json`, `ext.php`, root-level provider files, `lib/` class tree, and `tpl/` files.
   - Extension authoring rules are in `private/ext/AGENTS.md`.
 - `public/theme/`
   - Public themes live here.
@@ -173,7 +173,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Connection setup and schema orchestration have moved to `sys/Database/` as they are core-only bootstrap concerns.
 - `private/lib/Scheduler/`
   - Shared scheduler runtime for core and extensions.
-  - `Registry` — system-wide scheduler registry. Registers named jobs, lazy-loads extension `lib/cron.php` sources, tracks last-run state under `.tmp/cron/`, exposes `getStatus()`, and executes due jobs via `runDue()`.
+  - `Registry` — system-wide scheduler registry. Registers named jobs, lazy-loads extension `cron.php` sources, tracks last-run state under `.tmp/cron/`, exposes `getStatus()`, and executes due jobs via `runDue()`.
 - `private/lib/Extension/`
   - Extension cataloging, manifests, state, storage provisioning, and lazy runtime bootstrap/service resolution.
   - `ExtensionRegistry` — unified registry with a static metadata API and a per-request instance API.

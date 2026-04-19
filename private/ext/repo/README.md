@@ -26,7 +26,7 @@ This Raven `module` extension manages read-only Git repository mirrors with pane
 - `[repo ...]` shortcodes embed public repository trees or public files and link visitors back to the canonical `/repo/{slug}` browser.
 
 ## Scheduler And CLI
-- `lib/cron.php` registers the extension's `auto-sync` scheduler job.
+- `cron.php` registers the extension's `auto-sync` scheduler job.
 - Raven's fallback scheduler can trigger due jobs from request traffic when `site.scheduler` is set to `panel` or `always`.
 - When `site.scheduler` is `off`, point server cron at `php private/bin/rvn-cron run` or invoke that command manually.
 - Inspect scheduler state with `php private/bin/rvn-cron status`.

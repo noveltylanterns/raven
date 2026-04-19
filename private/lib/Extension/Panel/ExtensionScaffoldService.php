@@ -45,8 +45,8 @@ final class ExtensionScaffoldService
             throw new \RuntimeException('Failed to create extension directory.');
         }
 
-        $libPath = $extensionPath . '/lib';
-        if (!mkdir($libPath, 0700, true) && !is_dir($libPath)) {
+        $classLibPath = $extensionPath . '/lib';
+        if (!mkdir($classLibPath, 0700, true) && !is_dir($classLibPath)) {
             throw new \RuntimeException('Failed to create extension lib directory.');
         }
 
@@ -57,15 +57,15 @@ final class ExtensionScaffoldService
 
         $manifestPath = $extensionPath . '/ext.json';
         $bootstrapPath = $extensionPath . '/ext.php';
-        $routesPath = $extensionPath . '/lib/routes_panel.php';
-        $publicRoutesPath = $extensionPath . '/lib/routes_public.php';
-        $schemaPath = $extensionPath . '/lib/schema.php';
-        $shortcodesPath = $extensionPath . '/lib/shortcodes.php';
-        $fieldsPath = $extensionPath . '/lib/fields.php';
+        $routesPath = $extensionPath . '/routes_panel.php';
+        $publicRoutesPath = $extensionPath . '/routes_public.php';
+        $schemaPath = $extensionPath . '/schema.php';
+        $shortcodesPath = $extensionPath . '/shortcodes.php';
+        $fieldsPath = $extensionPath . '/fields.php';
         $composerPath = $extensionPath . '/composer.json';
         $panelIndexViewPath = $visPath . '/panel_index.php';
         $publicIndexViewPath = $visPath . '/public_index.php';
-        $agentsFilePath = $extensionPath . '/AGENTS.md';
+        $agentsFilePath = $extensionPath . '/agents';
 
         $manifestContent = $this->renderExtensionManifestJson($meta);
         $bootstrapContent = $this->renderExtensionBootstrapSkeleton($meta);
@@ -85,15 +85,15 @@ final class ExtensionScaffoldService
         }
 
         if (file_put_contents($schemaPath, $schemaContent, LOCK_EX) === false) {
-            throw new \RuntimeException('Failed to write lib/schema.php.');
+            throw new \RuntimeException('Failed to write schema.php.');
         }
 
         if ($generatesShortcodes && file_put_contents($shortcodesPath, $shortcodesContent, LOCK_EX) === false) {
-            throw new \RuntimeException('Failed to write lib/shortcodes.php.');
+            throw new \RuntimeException('Failed to write shortcodes.php.');
         }
 
         if ($generatesContentBlocks && file_put_contents($fieldsPath, $fieldsContent, LOCK_EX) === false) {
-            throw new \RuntimeException('Failed to write lib/fields.php.');
+            throw new \RuntimeException('Failed to write fields.php.');
         }
 
         if ($generateComposerFile && file_put_contents($composerPath, $composerContent, LOCK_EX) === false) {
@@ -105,7 +105,7 @@ final class ExtensionScaffoldService
             $viewContent = $this->renderExtensionPanelViewSkeleton($meta);
 
             if (file_put_contents($routesPath, $routesContent, LOCK_EX) === false) {
-                throw new \RuntimeException('Failed to write lib/routes_panel.php.');
+                throw new \RuntimeException('Failed to write routes_panel.php.');
             }
 
             if (file_put_contents($panelIndexViewPath, $viewContent, LOCK_EX) === false) {
@@ -115,14 +115,18 @@ final class ExtensionScaffoldService
         if ($generatesPublicRoutes) {
             $publicRoutesContent = $this->renderExtensionPublicRoutesSkeleton($meta);
             if (file_put_contents($publicRoutesPath, $publicRoutesContent, LOCK_EX) === false) {
-                throw new \RuntimeException('Failed to write lib/routes_public.php.');
+                throw new \RuntimeException('Failed to write routes_public.php.');
             }
             if (file_put_contents($publicIndexViewPath, $publicViewContent, LOCK_EX) === false) {
                 throw new \RuntimeException('Failed to write tpl/public_index.php.');
             }
         }
         if ($generateAgentsFile && file_put_contents($agentsFilePath, $agentsContent, LOCK_EX) === false) {
-            throw new \RuntimeException('Failed to write AGENTS.md.');
+            throw new \RuntimeException('Failed to write agents.');
+        }
+        if ($generateAgentsFile) {
+            $this->writeRelativeSymlink($extensionPath . '/AGENTS.md', 'agents');
+            $this->writeRelativeSymlink($extensionPath . '/CLAUDE.md', 'agents');
         }
 
         // Keep scaffold file modes aligned with private-directory policy.
@@ -136,7 +140,7 @@ final class ExtensionScaffoldService
         if ($generatesContentBlocks) {
             @chmod($fieldsPath, 0600);
         }
-        @chmod($libPath, 0700);
+        @chmod($classLibPath, 0700);
         if ($generatesPanelRoutes) {
             @chmod($visPath, 0700);
             @chmod($routesPath, 0600);
@@ -333,7 +337,7 @@ PHP;
     }
 
     /**
-     * Returns generated `lib/routes_panel.php` scaffold content.
+     * Returns generated `routes_panel.php` scaffold content.
      *
      * @param array{
      *   directory: string,
@@ -356,7 +360,7 @@ PHP;
 
 /**
  * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/lib/routes_panel.php
+ * ~/private/ext/__DIRECTORY__/routes_panel.php
  * __NAME_DOC__ extension panel route registration.
  * Docs: https://raven.lanterns.io
  */
@@ -512,7 +516,7 @@ PHP;
     }
 
     /**
-     * Returns generated `lib/routes_public.php` scaffold content.
+     * Returns generated `routes_public.php` scaffold content.
      *
      * @param array{
      *   directory: string,
@@ -527,7 +531,7 @@ PHP;
 
 /**
  * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/lib/routes_public.php
+ * ~/private/ext/__DIRECTORY__/routes_public.php
  * __NAME_DOC__ extension public route registration.
  * Docs: https://raven.lanterns.io
  */
@@ -562,7 +566,7 @@ PHP;
     }
 
     /**
-     * Returns generated `lib/schema.php` scaffold content.
+     * Returns generated `schema.php` scaffold content.
      *
      * @param array{
      *   directory: string,
@@ -577,7 +581,7 @@ PHP;
 
 /**
  * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/lib/schema.php
+ * ~/private/ext/__DIRECTORY__/schema.php
  * __NAME_DOC__ extension schema provider.
  * Docs: https://raven.lanterns.io
  */
@@ -626,7 +630,7 @@ PHP;
     }
 
     /**
-     * Returns generated `lib/shortcodes.php` scaffold content.
+     * Returns generated `shortcodes.php` scaffold content.
      *
      * @param array{
      *   directory: string,
@@ -641,7 +645,7 @@ PHP;
 
 /**
  * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/lib/shortcodes.php
+ * ~/private/ext/__DIRECTORY__/shortcodes.php
  * __NAME_DOC__ extension shortcode provider.
  * Docs: https://raven.lanterns.io
  */
@@ -676,7 +680,7 @@ PHP;
     }
 
     /**
-     * Returns generated `lib/fields.php` scaffold content for content/module extensions.
+     * Returns generated `fields.php` scaffold content for content/module extensions.
      *
      * @param array{
      *   directory: string,
@@ -691,7 +695,7 @@ PHP;
 
 /**
  * RAVEN CMS
- * ~/private/ext/__DIRECTORY__/lib/fields.php
+ * ~/private/ext/__DIRECTORY__/fields.php
  * __NAME_DOC__ fields provider.
  * Docs: https://raven.lanterns.io
  */
@@ -794,21 +798,21 @@ PHP;
         $generatesContentBlocks = in_array($type, ['content', 'module'], true);
         $starterFiles = [
             'private/ext/__DIRECTORY__/ext.php',
-            'private/ext/__DIRECTORY__/lib/schema.php',
+            'private/ext/__DIRECTORY__/schema.php',
         ];
         if ($generatesPanelRoutes) {
-            $starterFiles[] = 'private/ext/__DIRECTORY__/lib/routes_panel.php';
+            $starterFiles[] = 'private/ext/__DIRECTORY__/routes_panel.php';
             $starterFiles[] = 'private/ext/__DIRECTORY__/tpl/panel_index.php';
         }
         if ($generatesPublicRoutes) {
-            $starterFiles[] = 'private/ext/__DIRECTORY__/lib/routes_public.php';
+            $starterFiles[] = 'private/ext/__DIRECTORY__/routes_public.php';
             $starterFiles[] = 'private/ext/__DIRECTORY__/tpl/public_index.php';
         }
         if ($generatesShortcodes) {
-            $starterFiles[] = 'private/ext/__DIRECTORY__/lib/shortcodes.php';
+            $starterFiles[] = 'private/ext/__DIRECTORY__/shortcodes.php';
         }
         if ($generatesContentBlocks) {
-            $starterFiles[] = 'private/ext/__DIRECTORY__/lib/fields.php';
+            $starterFiles[] = 'private/ext/__DIRECTORY__/fields.php';
         }
         $starterFilesListHtml = '';
         foreach ($starterFiles as $starterFile) {
@@ -883,7 +887,7 @@ PHP;
     }
 
     /**
-     * Returns generated `AGENTS.md` extension-local guidance.
+     * Returns generated `agents` extension-local guidance.
      *
      * @param array{
      *   name: string,
@@ -914,22 +918,25 @@ PHP;
         $starterFiles = [
             '- `ext.json`',
             '- `ext.php`',
-            '- `lib/schema.php`',
+            '- `schema.php`',
         ];
         if ($generatesPanelRoutes) {
-            $starterFiles[] = '- `lib/routes_panel.php`';
+            $starterFiles[] = '- `routes_panel.php`';
             $starterFiles[] = '- `tpl/panel_index.php`';
         }
         if ($generatesPublicRoutes) {
-            $starterFiles[] = '- `lib/routes_public.php`';
+            $starterFiles[] = '- `routes_public.php`';
             $starterFiles[] = '- `tpl/public_index.php`';
         }
         if ($generatesShortcodes) {
-            $starterFiles[] = '- `lib/shortcodes.php`';
+            $starterFiles[] = '- `shortcodes.php`';
         }
         if ($generatesContentBlocks) {
-            $starterFiles[] = '- `lib/fields.php`';
+            $starterFiles[] = '- `fields.php`';
         }
+        $starterFiles[] = '- `agents`';
+        $starterFiles[] = '- `AGENTS.md` and `CLAUDE.md` symlinks pointing to `agents`';
+        $starterFiles[] = '- `lib/` for extension-owned PHP classes';
         $starterFilesMarkdown = implode("\n", $starterFiles);
 
         $content = <<<'MARKDOWN'
@@ -963,6 +970,24 @@ MARKDOWN;
             [$name, $directory, $starterFilesMarkdown],
             $content
         ) . "\n";
+    }
+
+    /**
+     * Writes or replaces one relative symlink.
+     *
+     * @param string $linkPath Absolute path to the symlink entry.
+     * @param string $target Relative symlink target.
+     * @return void
+     */
+    private function writeRelativeSymlink(string $linkPath, string $target): void
+    {
+        if (is_link($linkPath) || is_file($linkPath)) {
+            @unlink($linkPath);
+        }
+
+        if (!@symlink($target, $linkPath)) {
+            throw new \RuntimeException('Failed to write symlink: ' . $linkPath);
+        }
     }
 
 }

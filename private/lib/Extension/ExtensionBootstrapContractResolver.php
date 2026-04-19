@@ -99,7 +99,7 @@ final class ExtensionBootstrapContractResolver
             ];
         }
 
-        // Whether this extension opts in to the scheduler (causes core to load lib/cron.php via rvn-cron).
+        // Whether this extension opts in to the scheduler (causes core to load cron.php via rvn-cron).
         $scheduler = $this->boolish($provider['scheduler'] ?? false);
 
         $storage = $this->normalizeStorageRequest($provider['storage'] ?? null, $type);

@@ -302,10 +302,10 @@ $packageArchiveHelp = array_map(
                                     value="1"
                                     class="form-check-input"
                                 >
-                                <label for="theme_generate_agents" class="form-check-label">Generate AGENTS.md?</label>
+                                <label for="theme_generate_agents" class="form-check-label">Generate Agent Guidance?</label>
                             </div>
                             <div class="form-text mb-2">
-                                Creates <code>public/theme/{slug}/AGENTS.md</code> with theme-local guidance.
+                                Creates <code>public/theme/{slug}/agents</code>, plus <code>AGENTS.md</code> and <code>CLAUDE.md</code> symlinks that both point to it.
                             </div>
                             <div class="form-check">
                                 <input

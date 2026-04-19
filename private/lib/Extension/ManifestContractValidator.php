@@ -26,25 +26,25 @@ final class ManifestContractValidator
 
     public function typeContractError(string $extensionRoot, string $type): ?string
     {
-        $hasPanelRoutes = is_file($extensionRoot . '/lib/routes_panel.php');
-        $hasPublicRoutes = is_file($extensionRoot . '/lib/routes_public.php');
-        $hasShortcodes = is_file($extensionRoot . '/lib/shortcodes.php');
-        $hasFields = is_file($extensionRoot . '/lib/fields.php');
+        $hasPanelRoutes = Layout::hasProvider($extensionRoot, 'routes_panel.php');
+        $hasPublicRoutes = Layout::hasProvider($extensionRoot, 'routes_public.php');
+        $hasShortcodes = Layout::hasProvider($extensionRoot, 'shortcodes.php');
+        $hasFields = Layout::hasProvider($extensionRoot, 'fields.php');
 
         if ($hasPanelRoutes && $type === 'framework') {
-            return 'Framework extensions may not define lib/routes_panel.php.';
+            return 'Framework extensions may not define routes_panel.php.';
         }
 
         if ($hasPublicRoutes && $type !== 'module') {
-            return 'Only module extensions may define lib/routes_public.php.';
+            return 'Only module extensions may define routes_public.php.';
         }
 
         if ($hasShortcodes && !in_array($type, ['content', 'module'], true)) {
-            return 'Only content/module extensions may define lib/shortcodes.php.';
+            return 'Only content/module extensions may define shortcodes.php.';
         }
 
         if ($hasFields && !in_array($type, ['content', 'module'], true)) {
-            return 'Only content/module extensions may define lib/fields.php.';
+            return 'Only content/module extensions may define fields.php.';
         }
 
         return null;

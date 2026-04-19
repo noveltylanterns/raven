@@ -187,7 +187,7 @@ final class SchemaBootstrap
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $loginFailuresTable . '_bucket_hash ON ' . $loginFailuresTable . ' (bucket_hash)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $loginFailuresTable . '_locked_until ON ' . $loginFailuresTable . ' (locked_until)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $loginFailuresTable . '_last_failed ON ' . $loginFailuresTable . ' (last_failed)');
-            // Shortcode registry is extension-owned via `{slug}/lib/shortcodes.php`; drop deprecated table when present.
+            // Shortcode registry is extension-owned via `{slug}/shortcodes.php`; drop deprecated table when present.
             $db->exec('DROP TABLE IF EXISTS ' . $prefix . 'shortcodes');
             return;
         }
@@ -350,7 +350,7 @@ final class SchemaBootstrap
                 INDEX idx_' . $prefix . 'auth_failures_last_failed (last_failed)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
-            // Shortcode registry is extension-owned via `{slug}/lib/shortcodes.php`; drop deprecated table when present.
+            // Shortcode registry is extension-owned via `{slug}/shortcodes.php`; drop deprecated table when present.
             $db->exec('DROP TABLE IF EXISTS ' . $prefix . 'shortcodes');
             return;
         }
@@ -499,7 +499,7 @@ final class SchemaBootstrap
         $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $prefix . 'auth_failures_bucket_hash ON ' . $prefix . 'auth_failures (bucket_hash)');
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'auth_failures_locked_until ON ' . $prefix . 'auth_failures (locked_until)');
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'auth_failures_last_failed ON ' . $prefix . 'auth_failures (last_failed)');
-        // Shortcode registry is extension-owned via `{slug}/lib/shortcodes.php`; drop deprecated table when present.
+        // Shortcode registry is extension-owned via `{slug}/shortcodes.php`; drop deprecated table when present.
         $db->exec('DROP TABLE IF EXISTS ' . $prefix . 'shortcodes');
     }
 

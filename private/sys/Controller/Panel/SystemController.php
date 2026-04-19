@@ -604,14 +604,14 @@ final class SystemController
                 );
 
                 if ($generateAgentsFile) {
-                    $this->writePublicThemeScaffoldFile(
-                        $themePath . '/AGENTS.md',
-                        $this->publicThemeAgentsFileContent([
+                    $this->writePublicThemeAgentBundle(
+                        $themePath,
+                        [
                             'slug' => $themeSlug,
                             'name' => $themeName,
                             'is_child_theme' => $isChildTheme,
                             'parent_theme' => $isChildTheme ? $resolvedParentTheme : '',
-                        ])
+                        ]
                     );
                 }
                 if ($generateComposerFile) {
@@ -671,7 +671,9 @@ final class SystemController
         if ($generateAgentsFile || $generateComposerFile || $generatePackageFile) {
             $generated = [];
             if ($generateAgentsFile) {
-                $generated[] = 'AGENTS.md';
+                $generated[] = 'agents';
+                $generated[] = 'AGENTS.md -> agents';
+                $generated[] = 'CLAUDE.md -> agents';
             }
             if ($generateComposerFile) {
                 $generated[] = 'composer.json';
@@ -1396,17 +1398,22 @@ final class SystemController
             redirect($this->context->panelUrl('/extensions'));
         }
 
-        $createdFiles = ['ext.json', 'ext.php', 'lib/schema.php'];
+        $createdFiles = ['ext.json', 'ext.php', 'schema.php'];
         if (in_array($type, ['content', 'module'], true)) {
-            $createdFiles[] = 'lib/shortcodes.php';
-            $createdFiles[] = 'lib/fields.php';
+            $createdFiles[] = 'shortcodes.php';
+            $createdFiles[] = 'fields.php';
         }
         if ($type !== 'framework') {
-            $createdFiles = array_merge($createdFiles, ['lib/routes_panel.php', 'tpl/panel_index.php']);
+            $createdFiles = array_merge($createdFiles, ['routes_panel.php', 'tpl/panel_index.php']);
         }
         if ($type === 'module') {
-            $createdFiles[] = 'lib/routes_public.php';
+            $createdFiles[] = 'routes_public.php';
             $createdFiles[] = 'tpl/public_index.php';
+        }
+        if ($generateAgentsFile) {
+            $createdFiles[] = 'agents';
+            $createdFiles[] = 'AGENTS.md -> agents';
+            $createdFiles[] = 'CLAUDE.md -> agents';
         }
         if ($generateComposerFile) {
             $createdFiles[] = 'composer.json';
@@ -1425,7 +1432,7 @@ final class SystemController
             'success',
             'Extension scaffold created at private/ext/' . $extensionName
             . '/ with ' . $createdList
-            . ($generateAgentsFile ? ', plus AGENTS.md.' : '.')
+            . '.'
         );
         redirect($this->context->panelUrl('/extensions'));
     }
@@ -2228,6 +2235,23 @@ final class SystemController
     private function publicThemeAgentsFileContent(array $meta): string
     {
         return $this->themeScaffoldService()->agentsFileContent($meta);
+    }
+
+    /**
+     * Writes theme-local agent guidance plus compatibility symlinks.
+     *
+     * @param string $themePath Absolute theme directory path.
+     * @param array{
+     *   slug: string,
+     *   name: string,
+     *   is_child_theme?: bool,
+     *   parent_theme?: string
+     * } $meta Theme metadata.
+     * @return void
+     */
+    private function writePublicThemeAgentBundle(string $themePath, array $meta): void
+    {
+        $this->themeScaffoldService()->writeAgentGuidanceBundle($themePath, $meta);
     }
 
     /**

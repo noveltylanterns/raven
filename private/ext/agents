@@ -28,7 +28,7 @@ NOTE: All paths relative to project root. (../ from the perspective of this dire
 ## Agent Safe Mode (Mandatory)
 - If your model is unsure, do not improvise. Follow only the explicit contracts in this file.
 - Do not invent extra files, extra manifest keys, or custom bootstrap flows outside this contract.
-- Do not rename required files (`ext.json`, `ext.php`, `lib/schema.php`, route providers) unless requested by the operator.
+- Do not rename required files (`ext.json`, `ext.php`, `schema.php`, route providers) unless requested by the operator.
 - Do not hand-build a fresh extension directory from scratch when Raven CLI scaffolding is available.
 - Build the smallest valid extension first, then add features in small steps.
 - After each step, run validation checks (JSON parse and `php -l`) before continuing.
@@ -39,11 +39,11 @@ NOTE: All paths relative to project root. (../ from the perspective of this dire
 2. Inspect the generated scaffold and keep its file layout intact.
 3. Fill in `ext.json` metadata and validate JSON syntax.
 4. Implement `ext.php` service registration only when the extension actually needs services.
-5. Implement `lib/routes_panel.php` and `tpl/panel_*.php` for panel-facing pages.
-6. Implement `lib/routes_public.php` and `tpl/public_*.php` only for `module` extensions.
-7. Implement `lib/shortcodes.php` only for `content` or `module` types.
-8. Implement `lib/fields.php` only for `content` or `module` types.
-9. Implement `lib/cron.php` only when the extension needs scheduled background jobs (requires `scheduler: true` in `ext.php`).
+5. Implement `routes_panel.php` and `tpl/panel_*.php` for panel-facing pages.
+6. Implement `routes_public.php` and `tpl/public_*.php` only for `module` extensions.
+7. Implement `shortcodes.php` only for `content` or `module` types.
+8. Implement `fields.php` only for `content` or `module` types.
+9. Implement `cron.php` only when the extension needs scheduled background jobs (requires `scheduler: true` in `ext.php`).
 10. Run validation checks (`php -l`, manifest validation) before enabling the extension.
 11. Only after files are valid, enable the extension from Extension Manager or `rvn-ext enable`.
 
@@ -132,8 +132,8 @@ return [
         // 'public' => true,  // module only
         // 'bin' => true,     // symlinks private/bin/ -> private/ext/{slug}/bin/
     ],
-    // Set to true to declare that this extension provides lib/cron.php.
-    // Core registers extension as a scheduler source; rvn-cron loads lib/cron.php at run time.
+    // Set to true to declare that this extension provides cron.php.
+    // Core registers extension as a scheduler source; rvn-cron loads cron.php at run time.
     // 'scheduler' => true,
     'boot' => static function (array &$rvn): void {
         // Use $rvn['extension_storage']['{slug}'] for resolved storage roots.
@@ -144,12 +144,12 @@ return [
     },
 ];
 ```
-- `lib/schema.php`:
+- `schema.php`:
 ```php
 <?php
 /**
  * RAVEN CMS
- * ~/private/ext/{slug}/lib/schema.php
+ * ~/private/ext/{slug}/schema.php
  * Extension schema ensure provider.
  * docs: /private/ext/AGENTS.md
  */
@@ -159,12 +159,12 @@ return static function (array $context): void {
     // Keep schema work idempotent; use $context['table'](...) for table naming.
 };
 ```
-- `lib/routes_panel.php` (all extension types):
+- `routes_panel.php` (all extension types):
 ```php
 <?php
 /**
  * RAVEN CMS
- * ~/private/ext/{slug}/lib/routes_panel.php
+ * ~/private/ext/{slug}/routes_panel.php
  * Extension panel route registrar.
  * docs: /private/ext/AGENTS.md
  */
@@ -176,12 +176,12 @@ return static function (Router $router, array $context): void {
     // Register panel routes here.
 };
 ```
-- `lib/routes_public.php` (module only):
+- `routes_public.php` (module only):
 ```php
 <?php
 /**
  * RAVEN CMS
- * ~/private/ext/{slug}/lib/routes_public.php
+ * ~/private/ext/{slug}/routes_public.php
  * Extension public route registrar.
  * docs: /private/ext/AGENTS.md
  */
@@ -193,12 +193,12 @@ return static function (Router $router, array $context): void {
     // Register public routes here.
 };
 ```
-- `lib/shortcodes.php` (optional for all types):
+- `shortcodes.php` (optional for all types):
 ```php
 <?php
 /**
  * RAVEN CMS
- * ~/private/ext/{slug}/lib/shortcodes.php
+ * ~/private/ext/{slug}/shortcodes.php
  * Page Editor shortcode provider.
  * docs: /private/ext/AGENTS.md
  */
@@ -208,12 +208,12 @@ return static function (array $context = []): array {
     return [];
 };
 ```
-- `lib/cron.php` (optional, requires `scheduler: true` in `ext.php`):
+- `cron.php` (optional, requires `scheduler: true` in `ext.php`):
 ```php
 <?php
 /**
  * RAVEN CMS
- * ~/private/ext/{slug}/lib/cron.php
+ * ~/private/ext/{slug}/cron.php
  * Extension scheduler job provider.
  * docs: /private/ext/AGENTS.md
  */
@@ -254,16 +254,16 @@ declare(strict_types=1);
 - `ext.json` parses as JSON object and includes non-empty `name`.
 - `ext.json` includes valid `slug` (`[a-z0-9][a-z0-9_-]{0,119}`).
 - `type` is exactly one of: `helper`, `content`, `framework`, `module`, `system`.
-- `lib/routes_public.php` is used only by `module` extensions.
-- `lib/routes_panel.php` is not used by `framework` extensions.
-- `lib/shortcodes.php` is used only by `content` or `module` extensions.
-- `lib/fields.php` is used only by `content` or `module` extensions.
-- `lib/shortcodes.php` (when present) returns valid universal rows: `array<int, array{label: string, shortcode: string}>` or callable returning that shape.
-- `lib/fields.php` (when present) returns valid universal rows: `array<int, array{slug: string, label: string, editor: string}>` or callable returning that shape.
-- `lib/fields.php` `editor` values are only: `tinymce`, `plaintext`, `autobr`, `markdown`, `markdown_file`.
-- `lib/cron.php` is only present when `scheduler: true` is set in `ext.php`.
-- `lib/cron.php` (when present) returns an array of job definition maps, each with `name` (slug), `interval` (int ≥ 1), and `run` (callable).
-- `scheduler: true` in `ext.php` without a valid `lib/cron.php` is allowed (no jobs will be loaded); but `lib/cron.php` without `scheduler: true` in `ext.php` is a dead file and will never be loaded.
+- `routes_public.php` is used only by `module` extensions.
+- `routes_panel.php` is not used by `framework` extensions.
+- `shortcodes.php` is used only by `content` or `module` extensions.
+- `fields.php` is used only by `content` or `module` extensions.
+- `shortcodes.php` (when present) returns valid universal rows: `array<int, array{label: string, shortcode: string}>` or callable returning that shape.
+- `fields.php` (when present) returns valid universal rows: `array<int, array{slug: string, label: string, editor: string}>` or callable returning that shape.
+- `fields.php` `editor` values are only: `tinymce`, `plaintext`, `autobr`, `markdown`, `markdown_file`.
+- `cron.php` is only present when `scheduler: true` is set in `ext.php`.
+- `cron.php` (when present) returns an array of job definition maps, each with `name` (slug), `interval` (int ≥ 1), and `run` (callable).
+- `scheduler: true` in `ext.php` without a valid `cron.php` is allowed (no jobs will be loaded); but `cron.php` without `scheduler: true` in `ext.php` is a dead file and will never be loaded.
 - `bin/` directory is only present when `bin: true` is in `ext.php` storage. Filenames in `bin/` must match `^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$`.
 - Every PHP file in the extension directory passes `php -l`.
 - No extension change depends on edits in `private/sys/*`, `panel/index.php`, or `public/index.php`.
@@ -290,23 +290,23 @@ declare(strict_types=1);
 - Allowed extension directory name regex: `^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$`
 - Required manifest: `private/ext/{directory_name}/ext.json`
 - Optional extension service provider: `private/ext/{directory_name}/ext.php`
-- Optional extension schema provider: `private/ext/{directory_name}/lib/schema.php`
-- Optional panel routes registrar: `private/ext/{directory_name}/lib/routes_panel.php`
-- Optional public routes registrar: `private/ext/{directory_name}/lib/routes_public.php`
-- Optional page-editor shortcode provider: `private/ext/{directory_name}/lib/shortcodes.php`
-- Optional scheduler job provider: `private/ext/{directory_name}/lib/cron.php` (requires `scheduler: true` in `ext.php`)
+- Optional extension schema provider: `private/ext/{directory_name}/schema.php`
+- Optional panel routes registrar: `private/ext/{directory_name}/routes_panel.php`
+- Optional public routes registrar: `private/ext/{directory_name}/routes_public.php`
+- Optional page-editor shortcode provider: `private/ext/{directory_name}/shortcodes.php`
+- Optional scheduler job provider: `private/ext/{directory_name}/cron.php` (requires `scheduler: true` in `ext.php`)
 - Optional extension-local state file(s) when needed by your extension
 - Optional extension-owned panel templates: `private/ext/{directory_name}/tpl/*.php`
 - Optional extension-owned public templates: `private/ext/{directory_name}/tpl/public_*.php` (module only)
 - Optional bin directory: `private/ext/{directory_name}/bin/` (requires `bin: true` in `ext.php` storage)
 
 ## Extension Autoloading
-- Enabled extensions may autoload PHP classes from `private/ext/{slug}/src/`.
-- Namespace-to-path mapping is PSR-4-like from that `src/` root.
+- Enabled extensions may autoload PHP classes from `private/ext/{slug}/lib/`.
+- Namespace-to-path mapping is PSR-4-like from that `lib/` root.
 - Example:
-- class `Raven\Smallweb\SmallwebService` must live at `private/ext/smallweb/src/Smallweb/SmallwebService.php`
-- class `Raven\Acme\Admin\Controller` must live at `private/ext/acme/src/Acme/Admin/Controller.php`
-- Do not flatten namespaced classes directly into `src/` unless the namespace path is also flat.
+- class `Raven\Ext\Smallweb\SmallwebService` must live at `private/ext/smallweb/lib/Smallweb/SmallwebService.php`
+- class `Raven\Ext\Acme\Admin\Controller` must live at `private/ext/acme/lib/Acme/Admin/Controller.php`
+- Do not flatten namespaced classes directly into `lib/` unless the namespace path is also flat.
 - If an extension service class is not loading, check the namespace/path match first.
 
 ## Extension Enablement State
@@ -352,7 +352,7 @@ declare(strict_types=1);
 - Non-system extension panel pages enforce the extension's configured permission mask from `private/dat/ext/.state.php` (`permissions` map).
 
 ## Panel Route Registration Contract
-- If enabled, Raven attempts to load `private/ext/{name}/lib/routes_panel.php`.
+- If enabled, Raven attempts to load `private/ext/{name}/routes_panel.php`.
 - File must return a callable:
 - `function (Router $router, array $context): void`
 - Provided context keys:
@@ -368,7 +368,7 @@ declare(strict_types=1);
 - Registration happens after core panel routes are added.
 
 ## Public Route Registration Contract
-- If enabled and manifest `type` is `module`, Raven attempts to load `private/ext/{name}/lib/routes_public.php`.
+- If enabled and manifest `type` is `module`, Raven attempts to load `private/ext/{name}/routes_public.php`.
 - File must return a callable:
 - `function (Router $router, array $context): void`
 - Provided context keys:
@@ -389,14 +389,14 @@ declare(strict_types=1);
 - If enabled, Raven attempts to load `private/ext/{name}/ext.php` during `private/raven.php`.
 - File must return an array with these optional top-level keys:
 - `storage` => array of storage options (see Extension Storage Contract)
-- `scheduler` => bool — set `true` to declare this extension provides `lib/cron.php` scheduler jobs
+- `scheduler` => bool — set `true` to declare this extension provides `cron.php` scheduler jobs
 - `boot` => callable `function (array &$rvn): void`
 - `boot` callable should register extension services into the shared app container (repositories, controllers, shortcode runtimes, etc.).
 - Bootstrap providers are loaded only for enabled extensions listed in `private/dat/ext/.state.php` with valid directory names.
-- Extension source autoloading (`private/ext/{name}/src/`) is also enabled only for extensions marked enabled in `.state.php`.
+- Extension source autoloading (`private/ext/{name}/lib/`) is also enabled only for extensions marked enabled in `.state.php`.
 
 ## Extension Schema Contract
-- If enabled, Raven attempts to load `private/ext/{name}/lib/schema.php` during core schema ensure.
+- If enabled, Raven attempts to load `private/ext/{name}/schema.php` during core schema ensure.
 - File must return a callable:
 - `function (array $context): void`
 - Provided context keys:
@@ -492,7 +492,7 @@ declare(strict_types=1);
 
 ## Optional Page-Editor Shortcode Provider
 - Enabled extensions may expose insertable shortcodes to the Page Editor by adding:
-- `private/ext/{directory_name}/lib/shortcodes.php`
+- `private/ext/{directory_name}/shortcodes.php`
 - Provider file may return either:
 - `array<int, array{label: string, shortcode: string}>`
 - `callable(array{extension?: string, forms?: callable(string): array<int, array{name: string, slug: string}>, config?: \Raven\Core\Config}): array<int, array{label: string, shortcode: string}>`
@@ -501,13 +501,13 @@ declare(strict_types=1);
 - `label`: shown in the Page Editor `Extensions` dropdown
 - `shortcode`: literal shortcode text to insert (for example `[my_extension slug="example"]`)
 - `shortcode` must start with `[` and end with `]`.
-- Missing `lib/shortcodes.php` is valid.
-- Invalid `lib/shortcodes.php` is hard-invalid: extension enablement is refused.
+- Missing `shortcodes.php` is valid.
+- Invalid `shortcodes.php` is hard-invalid: extension enablement is refused.
 - If no shortcode items are available, the Page Editor `Extensions` button is hidden.
 
 ## Optional Page-Editor Fields Provider
 - Enabled extensions may expose custom body-block types by adding:
-- `private/ext/{directory_name}/lib/fields.php`
+- `private/ext/{directory_name}/fields.php`
 - Provider file may return either:
 - `array<int, array{slug: string, label: string, editor: string}>`
 - `callable(array{extension?: string}): array<int, array{slug: string, label: string, editor: string}>`
@@ -516,8 +516,8 @@ declare(strict_types=1);
 - `slug`: extension-local block slug (`[a-z0-9][a-z0-9_-]*`)
 - `label`: panel-visible label
 - `editor`: one of `tinymce`, `plaintext`, `autobr`, `markdown`, `markdown_file`
-- Missing `lib/fields.php` is valid.
-- Invalid `lib/fields.php` is hard-invalid: extension enablement is refused.
+- Missing `fields.php` is valid.
+- Invalid `fields.php` is hard-invalid: extension enablement is refused.
 
 ## Extension List/Table UI Convention
 - For extension-owned panel list tables, follow panel conventions:
@@ -545,13 +545,13 @@ declare(strict_types=1);
 
 ## Extension Upload/Packaging Rules
 - Extension Manager can generate a new extension scaffold directly in `private/ext/{name}/`:
-- helper scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
-- content scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
-- framework scaffold: `ext.json`, `ext.php`, `lib/schema.php`
-- module scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/shortcodes.php`, `lib/fields.php`, `lib/routes_panel.php`, `lib/routes_public.php`, `tpl/panel_index.php`, `tpl/public_index.php`
-- system scaffold: `ext.json`, `ext.php`, `lib/schema.php`, `lib/routes_panel.php`, `tpl/panel_index.php`
+- helper scaffold: `ext.json`, `ext.php`, `schema.php`, `routes_panel.php`, `tpl/panel_index.php`
+- content scaffold: `ext.json`, `ext.php`, `schema.php`, `shortcodes.php`, `fields.php`, `routes_panel.php`, `tpl/panel_index.php`
+- framework scaffold: `ext.json`, `ext.php`, `schema.php`
+- module scaffold: `ext.json`, `ext.php`, `schema.php`, `shortcodes.php`, `fields.php`, `routes_panel.php`, `routes_public.php`, `tpl/panel_index.php`, `tpl/public_index.php`
+- system scaffold: `ext.json`, `ext.php`, `schema.php`, `routes_panel.php`, `tpl/panel_index.php`
 - generated header card pulls version/author/description/docs URL from `ext.json`.
-- The same modal can optionally generate `private/ext/{name}/AGENTS.md` with extension-local guidance and a backlink to this file for missing/global context.
+- The same modal can optionally generate `private/ext/{name}/agents`, plus `AGENTS.md` and `CLAUDE.md` symlinks pointing to it, for extension-local guidance.
 - Uploads are ZIP-only through Extension Manager.
 - ZIP upload size limit is 50MB.
 - If `Slug Override` is blank, upload derives target directory name from `ext.json` `slug`.
@@ -563,7 +563,8 @@ declare(strict_types=1);
 
 ## Deletion/Protection Rules
 - Stock extension directories are protected from file removal during uninstall.
-- Current stock list: `contact`, `cron`, `database`, `phpinfo`, `repo`, `signups`, `smallweb`.
+- Current protected stock list: `contact`, `cron`, `database`, `phpinfo`, `signups`.
+- Bundled but removable extensions currently include `repo` and `smallweb`.
 - Enabled extensions must be disabled before uninstall.
 
 ## Extension Storage Contract
@@ -578,7 +579,7 @@ declare(strict_types=1);
 - `public` => public-served assets at `public/uploads/ext/{slug}/` (`module` only)
 - `bin` => symlinks in `private/bin/` pointing to files in `private/ext/{slug}/bin/`; links are created on enable and removed on disable/uninstall
 - `framework` may not request `panel` or `public`.
-- `lib/schema.php` receives resolved storage roots in `$context['storage']`, plus:
+- `schema.php` receives resolved storage roots in `$context['storage']`, plus:
 - `$context['storage']['aux']` for resolved root-level aux directories (`name => absolute path`)
 - `$context['table']()` for the primary `{prefix}ext_{slug}` table
 - `$context['tables']('suffix')` for declared suffix tables
@@ -588,7 +589,7 @@ declare(strict_types=1);
 - Uninstalling a non-stock extension purges opted-in storage and removes the package directory.
 
 ## Public Runtime Integration (Current Reality)
-- Public routes can now be registered by enabled `module` extensions via `lib/routes_public.php`.
+- Public routes can now be registered by enabled `module` extensions via `routes_public.php`.
 - Use `$context['renderPublicExtension']($template, $data, $layout)` in public route closures to render templates through the site theme pipeline without hand-assembling the site context payload.
 - Embedded form submit behavior is extension-agnostic:
   - Core public submit endpoint is `POST /forms/submit` and dispatches by runtime type + slug.
@@ -601,8 +602,8 @@ declare(strict_types=1);
 ## Extension Scheduler Contract
 - Extensions opt in to background scheduling by setting `scheduler: true` in `ext.php`.
 - When opted in, core registers the extension as a scheduler source during `private/raven.php` bootstrap.
-- The scheduler lazily loads `private/ext/{name}/lib/cron.php` the first time `rvn-cron run` or `rvn-cron status` is invoked.
-- `lib/cron.php` must return an array of job definition maps. Each entry requires:
+- The scheduler lazily loads `private/ext/{name}/cron.php` the first time `rvn-cron run` or `rvn-cron status` is invoked.
+- `cron.php` must return an array of job definition maps. Each entry requires:
   - `name` (string) — job name slug (`^[a-z0-9][a-z0-9_-]{0,63}$`).
   - `interval` (int) — minimum seconds between runs (must be ≥ 1).
   - `run` (callable) — called with `array $context` when the job is due.
@@ -620,7 +621,7 @@ declare(strict_types=1);
 - the extension service failed to bootstrap
 - the route file returned early because an expected service/container entry was missing
 - the current user lacks the extension permission bit
-- If an extension class is not found, verify the `src/` namespace-to-path mapping before changing route logic.
+- If an extension class is not found, verify the `lib/` namespace-to-path mapping before changing route logic.
 - If a panel template returns a raw 404 immediately, remove any `RAVEN_VIEW_RENDER_CONTEXT` guard from directly-required extension panel templates.
 
 ## Coexistence Goal
@@ -633,8 +634,8 @@ declare(strict_types=1);
 ## Update-Safe Workflow
 - Create `private/ext/{new_extension}/`.
 - Add `ext.json` first.
-- Add `lib/routes_panel.php` and `tpl/` for panel pages.
-- Add `lib/routes_public.php` and `tpl/public_index.php` only for `module` extensions.
+- Add `routes_panel.php` and `tpl/` for panel pages.
+- Add `routes_public.php` and `tpl/public_index.php` only for `module` extensions.
 - Persist extension-specific state in extension-owned files.
 - Enable through Extension Manager only after manifest/routes validate.
 - Repeated warning: do not modify core to ship extension features.

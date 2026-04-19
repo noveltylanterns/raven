@@ -21,7 +21,7 @@ namespace Raven\Lib\Scheduler;
  *
  * Extensions opt in to the scheduler by setting `scheduler: true` in ext.php.
  * When opted in, core calls `addExtensionSource()` during bootstrap, and the
- * scheduler lazily loads `lib/cron.php` from that extension the first time a
+ * scheduler lazily loads `cron.php` from that extension the first time a
  * run or status check is requested.
  *
  * Core-owned jobs (for example the built-in page-schedule job that flips
@@ -40,14 +40,14 @@ final class Registry
     private array $jobs = [];
 
     /**
-     * Extension directory names whose lib/cron.php files have not yet been loaded.
+     * Extension directory names whose cron providers have not yet been loaded.
      *
      * @var array<int, string>
      */
     private array $pendingExtensions = [];
 
     /**
-     * Whether all pending extension lib/cron.php files have been loaded.
+     * Whether all pending extension cron providers have been loaded.
      *
      * Prevents repeated filesystem hits when multiple callers trigger the load.
      */
@@ -65,7 +65,7 @@ final class Registry
      * Registers one job directly into the scheduler.
      *
      * Use this for core-owned jobs or for extension boot hooks that need
-     * to register jobs inline rather than via lib/cron.php.
+     * to register jobs inline rather than via extension `cron.php`.
      *
      * @param string   $owner    Logical owner key (for example `core` or an extension directory name).
      * @param string   $name     Job name slug (`^[a-z0-9][a-z0-9_-]{0,63}$`).
@@ -92,7 +92,7 @@ final class Registry
     }
 
     /**
-     * Marks an extension directory as having a lib/cron.php to load.
+     * Marks an extension directory as having a cron provider to load.
      *
      * The file is not loaded immediately — it is deferred until the first
      * `runDue()` or `getStatus()` call, keeping the main bootstrap lean.
@@ -122,7 +122,7 @@ final class Registry
     /**
      * Runs all jobs that are currently due and returns a per-job result map.
      *
-     * Triggers a lazy load of all pending extension lib/cron.php files before
+     * Triggers a lazy load of all pending extension cron providers before
      * checking which jobs need to run.
      *
      * Result entries are keyed by `"{owner}::{name}"` and contain:
@@ -169,7 +169,7 @@ final class Registry
     /**
      * Returns a status snapshot for all registered jobs.
      *
-     * Triggers a lazy load of all pending extension lib/cron.php files.
+     * Triggers a lazy load of all pending extension cron providers.
      *
      * Each entry is keyed by `"{owner}::{name}"` and contains:
      *   - `owner`      (string)   — owner key.
@@ -229,7 +229,7 @@ final class Registry
     }
 
     /**
-     * Loads all pending extension lib/cron.php files and registers their jobs.
+     * Loads all pending extension cron providers and registers their jobs.
      *
      * Called lazily before any operation that inspects or runs jobs.
      * Safe to call multiple times — subsequent calls are no-ops once all
@@ -249,7 +249,7 @@ final class Registry
     }
 
     /**
-     * Loads `lib/cron.php` for one extension and registers valid job definitions.
+     * Loads `cron.php` for one extension and registers valid job definitions.
      *
      * The file must return an array of job definition maps. Each entry requires:
      *   - `name`     (string)   — job name slug (`^[a-z0-9][a-z0-9_-]{0,63}$`).
@@ -263,8 +263,9 @@ final class Registry
      */
     private function loadExtensionCronFile(string $directoryName): void
     {
-        $cronPath = $this->root . '/private/ext/' . $directoryName . '/lib/cron.php';
-        if (!is_file($cronPath)) {
+        $extensionRoot = $this->root . '/private/ext/' . $directoryName;
+        $cronPath = \Raven\Lib\Extension\Layout::providerPath($extensionRoot, 'cron.php');
+        if ($cronPath === null) {
             return;
         }
 
@@ -273,7 +274,7 @@ final class Registry
             $raw = require $cronPath;
         } catch (\Throwable $exception) {
             error_log(
-                'Raven scheduler failed to load lib/cron.php for extension "' . $directoryName . '": '
+                'Raven scheduler failed to load cron.php for extension "' . $directoryName . '": '
                 . $exception->getMessage()
             );
             return;

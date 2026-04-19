@@ -13,6 +13,7 @@ namespace Raven\Core\Routing\Panel;
 
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Auth\Panel\PanelSessionGuard;
+use Raven\Lib\Extension\Layout;
 use Raven\Lib\Panel\PanelUrl;
 use Raven\Core\Routing\Router;
 
@@ -190,8 +191,9 @@ final class PanelExtensionRouteRegistrar
         };
 
         foreach (array_keys($enabledExtensions) as $extensionName) {
-            $routesFile = $rvn['root'] . '/private/ext/' . $extensionName . '/lib/routes_panel.php';
-            if (!is_file($routesFile)) {
+            $extensionRoot = $rvn['root'] . '/private/ext/' . $extensionName;
+            $routesFile = Layout::providerPath($extensionRoot, 'routes_panel.php');
+            if ($routesFile === null) {
                 continue;
             }
 

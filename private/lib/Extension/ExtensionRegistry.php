@@ -253,14 +253,14 @@ final class ExtensionRegistry
             return null;
         }
 
-        // `lib/shortcodes.php` is optional, but when present it must return the canonical
+        // `shortcodes.php` is optional, but when present it must return the canonical
         // shortcode item format so extension behavior stays deterministic.
         if (self::shortcodesValidationError($root, $directoryName) !== null) {
             self::$manifestCache[$cacheKey] = null;
             return null;
         }
 
-        // `lib/fields.php` is optional, but when present it must return canonical
+        // `fields.php` is optional, but when present it must return canonical
         // body-block field definitions.
         if (self::fieldsValidationError($root, $directoryName) !== null) {
             self::$manifestCache[$cacheKey] = null;
@@ -272,7 +272,7 @@ final class ExtensionRegistry
     }
 
     /**
-     * Returns normalized extension shortcode items from `private/ext/{slug}/lib/shortcodes.php`.
+     * Returns normalized extension shortcode items from `private/ext/{slug}/shortcodes.php`.
      *
      * Missing provider file is valid and returns an empty list.
      * Invalid providers return null.
@@ -298,7 +298,7 @@ final class ExtensionRegistry
     }
 
     /**
-     * Returns one provider-validation error when `lib/shortcodes.php` is invalid.
+     * Returns one provider-validation error when `shortcodes.php` is invalid.
      *
      * Missing provider file is treated as valid and returns null.
      *
@@ -318,7 +318,7 @@ final class ExtensionRegistry
     }
 
     /**
-     * Returns normalized extension field items from `private/ext/{slug}/lib/fields.php`.
+     * Returns normalized extension field items from `private/ext/{slug}/fields.php`.
      *
      * Missing provider file is valid and returns an empty list.
      * Invalid providers return null.
@@ -340,7 +340,7 @@ final class ExtensionRegistry
     }
 
     /**
-     * Returns one provider-validation error when `lib/fields.php` is invalid.
+     * Returns one provider-validation error when `fields.php` is invalid.
      *
      * Missing provider file is treated as valid and returns null.
      *

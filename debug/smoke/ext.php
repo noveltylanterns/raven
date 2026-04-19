@@ -12,9 +12,68 @@ declare(strict_types=1);
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
 
-require_once __DIR__ . '/../../private/sys/Core/Extension/ExtensionRegistry.php';
+$root = dirname(__DIR__, 2);
+
+// Keep extension smoke checks independent from the full Raven bootstrap while
+// still following the same class resolution rules as the live runtime.
+spl_autoload_register(static function (string $class) use ($root): void {
+    $libPrefix = 'Raven\\Lib\\';
+    if (str_starts_with($class, $libPrefix)) {
+        $relative = str_replace('\\', '/', substr($class, strlen($libPrefix)));
+        $path = $root . '/private/lib/' . $relative . '.php';
+        if (is_file($path)) {
+            require_once $path;
+        }
+        return;
+    }
+
+    $corePrefix = 'Raven\\Core\\';
+    if (str_starts_with($class, $corePrefix)) {
+        $relative = str_replace('\\', '/', substr($class, strlen($corePrefix)));
+        $path = $root . '/private/sys/' . $relative . '.php';
+        if (is_file($path)) {
+            require_once $path;
+        }
+        return;
+    }
+
+    $extPrefix = 'Raven\\Ext\\';
+    if (str_starts_with($class, $extPrefix)) {
+        $relative = str_replace('\\', '/', substr($class, strlen($extPrefix)));
+        $entries = scandir($root . '/private/ext');
+        if (!is_array($entries)) {
+            return;
+        }
+
+        foreach ($entries as $entry) {
+            if (!is_string($entry) || $entry === '' || $entry[0] === '.') {
+                continue;
+            }
+
+            $extensionRoot = $root . '/private/ext/' . $entry;
+            if (!is_dir($extensionRoot)) {
+                continue;
+            }
+
+            foreach (\Raven\Lib\Extension\Layout::classRoots($extensionRoot) as $classRoot) {
+                if (!is_dir($classRoot)) {
+                    continue;
+                }
+
+                $path = $classRoot . '/' . $relative . '.php';
+                if (is_file($path)) {
+                    require_once $path;
+                    return;
+                }
+            }
+        }
+
+        return;
+    }
+});
 
 use Raven\Lib\Extension\ExtensionRegistry;
+use Raven\Lib\Extension\Layout;
 
 /**
  * Validates extension type contracts and optionally manages local debug fixtures.
@@ -22,18 +81,22 @@ use Raven\Lib\Extension\ExtensionRegistry;
 final class ExtensionBoundarySmokeRunner
 {
     private string $root;
+
     /** @var array<string, string> */
     private array $dummyTypes = [
         'debug-helper' => 'helper',
         'debug-content' => 'content',
-        'debug-plugin' => 'plugin',
+        'debug-framework' => 'framework',
         'debug-module' => 'module',
         'debug-system' => 'system',
     ];
+
     /** @var array<int, string> */
     private array $events = [];
+
     /** @var array<int, string> */
     private array $errors = [];
+
     /** @var array<int, string> */
     private array $warnings = [];
 
@@ -127,13 +190,14 @@ final class ExtensionBoundarySmokeRunner
                 $options['seed_dummies'] = true;
                 continue;
             }
+
             if ($arg === '--clean-dummies') {
                 $options['clean_dummies'] = true;
                 continue;
             }
+
             if ($arg === '--only-dummies') {
                 $options['only_dummies'] = true;
-                continue;
             }
         }
 
@@ -175,15 +239,23 @@ final class ExtensionBoundarySmokeRunner
 
     private function validateOneExtension(string $directory, bool $isEnabled): void
     {
-        $manifestPath = $this->root . '/private/ext/' . $directory . '/extension.json';
+        $extensionRoot = $this->root . '/private/ext/' . $directory;
+        $manifestPath = $extensionRoot . '/ext.json';
         $rawType = $this->manifestType($manifestPath);
         $type = $this->normalizeType($rawType);
         $isDummy = array_key_exists($directory, $this->dummyTypes);
 
-        $hasPublicRoutes = is_file($this->root . '/private/ext/' . $directory . '/routes/public.php');
-        $hasShortcodes = is_file($this->root . '/private/ext/' . $directory . '/shortcodes.php');
-        $hasFields = is_file($this->root . '/private/ext/' . $directory . '/fields.php');
-        $contractError = $this->typeContractError($type, $hasPublicRoutes, $hasShortcodes, $hasFields);
+        $hasPanelRoutes = Layout::hasProvider($extensionRoot, 'routes_panel.php');
+        $hasPublicRoutes = Layout::hasProvider($extensionRoot, 'routes_public.php');
+        $hasShortcodes = Layout::hasProvider($extensionRoot, 'shortcodes.php');
+        $hasFields = Layout::hasProvider($extensionRoot, 'fields.php');
+        $contractError = $this->typeContractError(
+            $type,
+            $hasPanelRoutes,
+            $hasPublicRoutes,
+            $hasShortcodes,
+            $hasFields
+        );
 
         if ($contractError !== null) {
             $this->errors[] = $directory . ': ' . $contractError;
@@ -222,58 +294,69 @@ final class ExtensionBoundarySmokeRunner
         }
 
         if ($type === 'module' && !$hasPublicRoutes) {
-            $this->warnings[] = $directory . ': Module has no routes/public.php (allowed, but public behavior is absent).';
+            $this->warnings[] = $directory . ': Module has no routes_public.php (allowed, but public behavior is absent).';
         }
 
-        $line = 'extension=' . $directory
+        $this->events[] = 'extension=' . $directory
             . ' type=' . $type
             . ' enabled=' . ($isEnabled ? '1' : '0')
+            . ' panel_routes=' . ($hasPanelRoutes ? '1' : '0')
             . ' shortcodes=' . ($hasShortcodes ? '1' : '0')
             . ' fields=' . ($hasFields ? '1' : '0')
             . ' public_routes=' . ($hasPublicRoutes ? '1' : '0')
             . ' fixture=' . ($isDummy ? '1' : '0');
-        $this->events[] = $line;
     }
 
     private function manifestType(string $manifestPath): string
     {
         if (!is_file($manifestPath)) {
-            return 'plugin';
+            return 'content';
         }
 
         $raw = file_get_contents($manifestPath);
         if (!is_string($raw) || trim($raw) === '') {
-            return 'plugin';
+            return 'content';
         }
 
         /** @var mixed $decoded */
         $decoded = json_decode($raw, true);
         if (!is_array($decoded)) {
-            return 'plugin';
+            return 'content';
         }
 
-        return strtolower(trim((string) ($decoded['type'] ?? 'plugin')));
+        return strtolower(trim((string) ($decoded['type'] ?? 'content')));
     }
 
     private function normalizeType(string $rawType): string
     {
-        if (in_array($rawType, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
+        if (in_array($rawType, ['helper', 'content', 'framework', 'module', 'system'], true)) {
             return $rawType;
         }
 
-        return 'plugin';
+        return 'content';
     }
 
-    private function typeContractError(string $type, bool $hasPublicRoutes, bool $hasShortcodes, bool $hasFields): ?string
-    {
+    private function typeContractError(
+        string $type,
+        bool $hasPanelRoutes,
+        bool $hasPublicRoutes,
+        bool $hasShortcodes,
+        bool $hasFields
+    ): ?string {
+        if ($hasPanelRoutes && $type === 'framework') {
+            return 'Framework extensions may not define routes_panel.php.';
+        }
+
         if ($hasPublicRoutes && $type !== 'module') {
-            return 'Only module extensions may define routes/public.php.';
+            return 'Only module extensions may define routes_public.php.';
         }
-        if ($hasShortcodes && !in_array($type, ['helper', 'plugin', 'module'], true)) {
-            return 'Only helper/plugin/module extensions may define shortcodes.php.';
+
+        if ($hasShortcodes && !in_array($type, ['content', 'module'], true)) {
+            return 'Only content/module extensions may define shortcodes.php.';
         }
-        if ($hasFields && !in_array($type, ['content', 'plugin', 'module'], true)) {
-            return 'Only content/plugin/module extensions may define fields.php.';
+
+        if ($hasFields && !in_array($type, ['content', 'module'], true)) {
+            return 'Only content/module extensions may define fields.php.';
         }
 
         return null;
@@ -338,6 +421,7 @@ final class ExtensionBoundarySmokeRunner
     {
         $displayName = ucwords(str_replace('-', ' ', $directory));
         $manifest = [
+            'slug' => $directory,
             'name' => $displayName,
             'version' => '0.8.2',
             'description' => 'Local debug fixture extension for subtype contract smoke tests.',
@@ -350,21 +434,23 @@ final class ExtensionBoundarySmokeRunner
         }
 
         $files = [
-            'extension.json' => $manifestJson . "\n",
-            'bootstrap.php' => "<?php\n\ndeclare(strict_types=1);\n\nreturn static function (array &\$rvn): void {\n};\n",
+            'ext.json' => $manifestJson . "\n",
+            'ext.php' => "<?php\n\ndeclare(strict_types=1);\n\nreturn [\n    'boot' => static function (array &\$rvn): void {\n    },\n];\n",
             'schema.php' => "<?php\n\ndeclare(strict_types=1);\n\nreturn static function (array \$context): void {\n};\n",
-            'routes/panel.php' => $this->panelRouteSkeleton($directory, $displayName),
-            'vis/panel_index.php' => "<?php\n\ndeclare(strict_types=1);\n\nif (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {\n    http_response_code(404);\n    exit;\n}\n?>\n<section class=\"card\"><div class=\"card-body\"><h1>" . $this->escapePhpString($displayName) . "</h1><p class=\"text-muted mb-0\">Debug fixture extension.</p></div></section>\n",
         ];
 
-        if (in_array($type, ['helper', 'plugin', 'module'], true)) {
-            $files['shortcodes.php'] = "<?php\n\ndeclare(strict_types=1);\n\nreturn static function (array \$context = []): array {\n    \$extension = trim((string) (\$context['extension'] ?? '" . $this->escapePhpString($directory) . "'));\n    if (\$extension === '') {\n        \$extension = '" . $this->escapePhpString($directory) . "';\n    }\n\n    return [[\n        'label' => 'Debug shortcode (' . \$extension . ')',\n        'shortcode' => '[' . \$extension . ']',\n    ]];\n};\n";
+        if ($type !== 'framework') {
+            $files['routes_panel.php'] = $this->panelRouteSkeleton($directory, $displayName);
+            $files['tpl/panel_index.php'] = "<?php\n\ndeclare(strict_types=1);\n\nif (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {\n    http_response_code(404);\n    exit;\n}\n?>\n<section class=\"card\"><div class=\"card-body\"><h1>" . $this->escapePhpString($displayName) . "</h1><p class=\"text-muted mb-0\">Debug fixture extension.</p></div></section>\n";
         }
-        if (in_array($type, ['content', 'plugin', 'module'], true)) {
+
+        if (in_array($type, ['content', 'module'], true)) {
+            $files['shortcodes.php'] = "<?php\n\ndeclare(strict_types=1);\n\nreturn static function (array \$context = []): array {\n    \$extension = trim((string) (\$context['extension'] ?? '" . $this->escapePhpString($directory) . "'));\n    if (\$extension === '') {\n        \$extension = '" . $this->escapePhpString($directory) . "';\n    }\n\n    return [[\n        'label' => 'Debug shortcode (' . \$extension . ')',\n        'shortcode' => '[' . \$extension . ']',\n    ]];\n};\n";
             $files['fields.php'] = "<?php\n\ndeclare(strict_types=1);\n\nreturn static function (array \$context = []): array {\n    return [[\n        'slug' => 'debug_text',\n        'label' => 'Debug Text',\n        'editor' => 'plaintext',\n    ]];\n};\n";
         }
+
         if ($type === 'module') {
-            $files['routes/public.php'] = "<?php\n\ndeclare(strict_types=1);\n\nuse Raven\Core\\Core\\Routing\\Router;\n\nreturn static function (Router \$router, array \$context): void {\n    \$router->add('GET', '/" . $this->escapePhpString($directory) . "/ping', static function (): void {\n        header('Content-Type: text/plain; charset=UTF-8');\n        echo 'ok';\n    });\n};\n";
+            $files['routes_public.php'] = "<?php\n\ndeclare(strict_types=1);\n\nuse Raven\\Core\\Routing\\Router;\n\nreturn static function (Router \$router, array \$context): void {\n    \$router->add('GET', '/" . $this->escapePhpString($directory) . "/ping', static function (): void {\n        header('Content-Type: text/plain; charset=UTF-8');\n        echo 'ok';\n    });\n};\n";
         }
 
         return $files;
@@ -372,7 +458,7 @@ final class ExtensionBoundarySmokeRunner
 
     private function panelRouteSkeleton(string $directory, string $displayName): string
     {
-        return "<?php\n\ndeclare(strict_types=1);\n\nuse Raven\Core\\Core\\Routing\\Router;\n\nreturn static function (Router \$router, array \$context): void {\n    /** @var callable(): void \$requirePanelLogin */\n    \$requirePanelLogin = is_callable(\$context['requirePanelLogin'] ?? null)\n        ? \$context['requirePanelLogin']\n        : static function (): void {};\n\n    \$router->add('GET', '/" . $this->escapePhpString($directory) . "', static function () use (\$requirePanelLogin): void {\n        \$requirePanelLogin();\n        echo '<section class=\"card\"><div class=\"card-body\"><h1>" . $this->escapeHtml($displayName) . "</h1><p class=\"text-muted mb-0\">Debug dummy extension route is active.</p></div></section>';\n    });\n};\n";
+        return "<?php\n\ndeclare(strict_types=1);\n\nuse Raven\\Core\\Routing\\Router;\n\nreturn static function (Router \$router, array \$context): void {\n    /** @var callable(): void \$requirePanelLogin */\n    \$requirePanelLogin = is_callable(\$context['requirePanelLogin'] ?? null)\n        ? \$context['requirePanelLogin']\n        : static function (): void {};\n\n    \$router->add('GET', '/" . $this->escapePhpString($directory) . "', static function () use (\$requirePanelLogin): void {\n        \$requirePanelLogin();\n        echo '<section class=\"card\"><div class=\"card-body\"><h1>" . $this->escapeHtml($displayName) . "</h1><p class=\"text-muted mb-0\">Debug dummy extension route is active.</p></div></section>';\n    });\n};\n";
     }
 
     private function deleteDirectory(string $directory): void
@@ -424,7 +510,7 @@ final class ExtensionBoundarySmokeRunner
 }
 
 $options = ExtensionBoundarySmokeRunner::parseOptions($argv);
-$runner = new ExtensionBoundarySmokeRunner(dirname(__DIR__, 2));
+$runner = new ExtensionBoundarySmokeRunner($root);
 $exitCode = $runner->run($options);
 
 foreach ($runner->events() as $event) {
