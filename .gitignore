@@ -27,6 +27,7 @@
 # Local dev tools
 /build/legacy/
 /private/ext/debug-*/
+/.codex
 
 # Editor swap/backup artifacts
 *.swp
