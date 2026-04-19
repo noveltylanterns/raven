@@ -12,7 +12,7 @@ declare(strict_types=1);
 use Raven\Ext\Repo\RepoService;
 use Raven\Core\Routing\Router;
 
-use function Raven\Lib\Extra\redirect;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Registers Repo extension panel routes.
@@ -367,7 +367,7 @@ return static function (Router $router, array $context): void {
         $requirePanelLogin();
         if (!$rvn['csrf']->validate((string) ($_POST['_csrf'] ?? ''))) {
             $flash('error', 'The settings form token was invalid.');
-            redirect($settingsPath, 303);
+            Redirect::redirect($settingsPath, 303);
             return;
         }
 
@@ -390,7 +390,7 @@ return static function (Router $router, array $context): void {
             $flash('error', $exception->getMessage());
         }
 
-        redirect($settingsPath, 303);
+        Redirect::redirect($settingsPath, 303);
     });
 
     $router->add('GET', '/repo/edit/{slug}', static function (array $params) use (
@@ -450,7 +450,7 @@ return static function (Router $router, array $context): void {
         $requirePanelLogin();
         if (!$rvn['csrf']->validate((string) ($_POST['_csrf'] ?? ''))) {
             $flash('error', 'The repository form token was invalid.');
-            redirect($indexPath, 303);
+            Redirect::redirect($indexPath, 303);
             return;
         }
 
@@ -528,7 +528,7 @@ return static function (Router $router, array $context): void {
             $flash('error', $exception->getMessage());
         }
 
-        redirect($redirectPath, 303);
+        Redirect::redirect($redirectPath, 303);
     });
 
     $router->add('POST', '/repo/sync/{slug}', static function (array $params) use (
@@ -543,14 +543,14 @@ return static function (Router $router, array $context): void {
         $requirePanelLogin();
         if (!$rvn['csrf']->validate((string) ($_POST['_csrf'] ?? ''))) {
             $flash('error', 'The sync request token was invalid.');
-            redirect($indexPath, 303);
+            Redirect::redirect($indexPath, 303);
             return;
         }
 
         $slug = $normalizeRepoSlug($params['slug'] ?? null);
         if ($slug === '') {
             $flash('error', 'Repository slug is invalid.');
-            redirect($indexPath, 303);
+            Redirect::redirect($indexPath, 303);
             return;
         }
 
@@ -564,7 +564,7 @@ return static function (Router $router, array $context): void {
         $returnTo = !empty($_POST['return_to']) && (string) $_POST['return_to'] === 'index'
             ? $indexPath
             : ($editBasePath . '/' . rawurlencode($slug));
-        redirect($returnTo, 303);
+        Redirect::redirect($returnTo, 303);
     });
 
     $router->add('POST', '/repo/delete/{slug}', static function (array $params) use (
@@ -578,14 +578,14 @@ return static function (Router $router, array $context): void {
         $requirePanelLogin();
         if (!$rvn['csrf']->validate((string) ($_POST['_csrf'] ?? ''))) {
             $flash('error', 'The delete request token was invalid.');
-            redirect($indexPath, 303);
+            Redirect::redirect($indexPath, 303);
             return;
         }
 
         $slug = $normalizeRepoSlug($params['slug'] ?? null);
         if ($slug === '') {
             $flash('error', 'Repository slug is invalid.');
-            redirect($indexPath, 303);
+            Redirect::redirect($indexPath, 303);
             return;
         }
 
@@ -600,7 +600,7 @@ return static function (Router $router, array $context): void {
             $flash('error', $exception->getMessage());
         }
 
-        redirect($indexPath, 303);
+        Redirect::redirect($indexPath, 303);
     });
     $router->add('GET', '/repo/logs', static function () use (
         $requirePanelLogin,

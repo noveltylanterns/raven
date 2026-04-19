@@ -15,7 +15,7 @@ use Raven\Ext\SignupSubmissionRepository;
 use Raven\Lib\Format\Csv;
 use Raven\Lib\Transport\Upload;
 
-use function Raven\Lib\Extra\redirect;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Registers Signup Sheets extension routes into the panel router.
@@ -380,12 +380,12 @@ return static function (Router $router, array $context): void {
 
         $slug = $rvn['input']->slug((string) ($params['slug'] ?? ''));
         if ($slug === null) {
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         $formData = $findFormBySlug($slug);
         if ($formData === null) {
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         $renderView([
@@ -429,12 +429,12 @@ return static function (Router $router, array $context): void {
 
         $slug = $rvn['input']->slug((string) ($params['slug'] ?? ''));
         if ($slug === null) {
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         $formData = $findFormBySlug($slug);
         if ($formData === null) {
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         $searchQuery = $rvn['input']->text((string) ($_GET['q'] ?? ''), 160);
@@ -456,7 +456,7 @@ return static function (Router $router, array $context): void {
             }
         } catch (RuntimeException $exception) {
             $flash('error', $exception->getMessage());
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         $renderView([
@@ -504,11 +504,11 @@ return static function (Router $router, array $context): void {
 
         $slug = $rvn['input']->slug((string) ($params['slug'] ?? ''));
         if ($slug === null) {
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         if ($findFormBySlug($slug) === null) {
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         $searchQuery = $rvn['input']->text((string) ($_GET['q'] ?? ''), 160);
@@ -516,7 +516,7 @@ return static function (Router $router, array $context): void {
             $rows = $signupsRepository->listForExportByFormSlug($slug, $searchQuery);
         } catch (RuntimeException $exception) {
             $flash('error', $exception->getMessage());
-            redirect($submissionsListPath($slug, $searchQuery, 1));
+            Redirect::redirect($submissionsListPath($slug, $searchQuery, 1));
         }
 
         $safeFileSlug = preg_replace('/[^a-z0-9_-]+/i', '-', $slug) ?? 'signups';
@@ -568,19 +568,19 @@ return static function (Router $router, array $context): void {
 
         if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         $slug = $rvn['input']->slug((string) ($_POST['slug'] ?? ''));
         $searchQuery = $rvn['input']->text((string) ($_POST['return_q'] ?? ''), 160);
         if ($slug === null) {
             $flash('error', 'Invalid form slug.');
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         if ($findFormBySlug($slug) === null) {
             $flash('error', 'Selected signup sheet form does not exist.');
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         /** @var mixed $rawUpload */
@@ -592,7 +592,7 @@ return static function (Router $router, array $context): void {
         ]);
         if (($validatedUpload['ok'] ?? false) !== true) {
             $flash('error', (string) ($validatedUpload['error'] ?? 'CSV upload failed.'));
-            redirect($submissionsListPath($slug, $searchQuery, 1));
+            Redirect::redirect($submissionsListPath($slug, $searchQuery, 1));
         }
 
         /** @var array<string, mixed> $upload */
@@ -601,7 +601,7 @@ return static function (Router $router, array $context): void {
         $originalName = strtolower(trim((string) ($upload['name'] ?? '')));
         if ($originalName !== '' && !$uploads->filenameUsesAllowedExtension($originalName, ['csv'])) {
             $flash('error', 'Signup submissions import currently supports .csv files only.');
-            redirect($submissionsListPath($slug, $searchQuery, 1));
+            Redirect::redirect($submissionsListPath($slug, $searchQuery, 1));
         }
 
         $normalizeHeader = static function (string $value): string {
@@ -803,7 +803,7 @@ return static function (Router $router, array $context): void {
         } catch (RuntimeException $exception) {
             $message = trim($exception->getMessage());
             $flash('error', $message !== '' ? $message : 'Failed to open uploaded CSV file.');
-            redirect($submissionsListPath($slug, $searchQuery, 1));
+            Redirect::redirect($submissionsListPath($slug, $searchQuery, 1));
         }
 
         $skippedCount = $duplicateCount + $invalidCount + $errorCount;
@@ -848,7 +848,7 @@ return static function (Router $router, array $context): void {
             $flash('error', implode(' ', $rowErrors));
         }
 
-        redirect($submissionsListPath($slug, $searchQuery, 1));
+        Redirect::redirect($submissionsListPath($slug, $searchQuery, 1));
     });
 
     $router->add('POST', '/signups/submissions/delete', static function () use (
@@ -870,7 +870,7 @@ return static function (Router $router, array $context): void {
 
         if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         $slug = $rvn['input']->slug((string) ($_POST['slug'] ?? ''));
@@ -880,12 +880,12 @@ return static function (Router $router, array $context): void {
 
         if ($slug === null || $signupId === null) {
             $flash('error', 'Invalid signup submission request.');
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         if ($findFormBySlug($slug) === null) {
             $flash('error', 'Selected signup sheet form does not exist.');
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         try {
@@ -899,7 +899,7 @@ return static function (Router $router, array $context): void {
             $flash('error', $exception->getMessage());
         }
 
-        redirect($submissionsListPath($slug, $searchQuery, $page));
+        Redirect::redirect($submissionsListPath($slug, $searchQuery, $page));
     });
 
     $router->add('POST', '/signups/submissions/clear', static function () use (
@@ -921,19 +921,19 @@ return static function (Router $router, array $context): void {
 
         if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         $slug = $rvn['input']->slug((string) ($_POST['slug'] ?? ''));
         $searchQuery = $rvn['input']->text((string) ($_POST['return_q'] ?? ''), 160);
         if ($slug === null) {
             $flash('error', 'Invalid form slug.');
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         if ($findFormBySlug($slug) === null) {
             $flash('error', 'Selected signup sheet form does not exist.');
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         try {
@@ -943,7 +943,7 @@ return static function (Router $router, array $context): void {
             $flash('error', $exception->getMessage());
         }
 
-        redirect($submissionsListPath($slug, $searchQuery, 1));
+        Redirect::redirect($submissionsListPath($slug, $searchQuery, 1));
     });
 
     $router->add('POST', '/signups/save', static function () use (
@@ -966,7 +966,7 @@ return static function (Router $router, array $context): void {
 
         if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         $name = $rvn['input']->text((string) ($_POST['name'] ?? ''), 160);
@@ -1060,16 +1060,16 @@ return static function (Router $router, array $context): void {
 
                 if ($fieldLabel === '' || $fieldName === '') {
                     $flash('error', 'Each additional field must include both label and field name.');
-                    redirect($redirectPath);
+                    Redirect::redirect($redirectPath);
                 }
 
                 if (isset($seenAdditionalFieldNames[$fieldName])) {
                     $flash('error', 'Additional field names must be unique.');
-                    redirect($redirectPath);
+                    Redirect::redirect($redirectPath);
                 }
                 if (in_array($fieldType, ['radio', 'select'], true) && $fieldOptions === []) {
                     $flash('error', 'Radio and dropdown additional fields must include one or more options.');
-                    redirect($redirectPath);
+                    Redirect::redirect($redirectPath);
                 }
 
                 $seenAdditionalFieldNames[$fieldName] = true;
@@ -1086,7 +1086,7 @@ return static function (Router $router, array $context): void {
 
         if ($name === '' || $slug === null) {
             $flash('error', 'Name and a valid slug are required.');
-            redirect($redirectPath);
+            Redirect::redirect($redirectPath);
         }
 
         $forms = $loadForms();
@@ -1097,7 +1097,7 @@ return static function (Router $router, array $context): void {
             $existingSlug = (string) ($form['slug'] ?? '');
             if ($existingSlug === $slug && $existingSlug !== (string) $originalSlug) {
                 $flash('error', 'A signup sheet form with that slug already exists.');
-                redirect($redirectPath);
+                Redirect::redirect($redirectPath);
             }
 
             if ($originalSlug !== null && $existingSlug === $originalSlug) {
@@ -1125,7 +1125,7 @@ return static function (Router $router, array $context): void {
             $saveForms($forms);
         } catch (RuntimeException $exception) {
             $flash('error', $exception->getMessage());
-            redirect($redirectPath);
+            Redirect::redirect($redirectPath);
         }
 
         if ($updated && $updatedFromSlug !== null) {
@@ -1133,12 +1133,12 @@ return static function (Router $router, array $context): void {
                 $signupsRepository->syncFormIdentity($updatedFromSlug, $slug);
             } catch (RuntimeException $exception) {
                 $flash('error', 'Form saved but submission metadata sync failed: ' . $exception->getMessage());
-                redirect($editBasePath . '/' . rawurlencode($slug));
+                Redirect::redirect($editBasePath . '/' . rawurlencode($slug));
             }
         }
 
         $flash('success', 'Signup sheet form saved.');
-        redirect($editBasePath . '/' . rawurlencode($slug));
+        Redirect::redirect($editBasePath . '/' . rawurlencode($slug));
     });
 
     $router->add('POST', '/signups/delete', static function () use (
@@ -1160,13 +1160,13 @@ return static function (Router $router, array $context): void {
 
         if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         $slug = $rvn['input']->slug((string) ($_POST['slug'] ?? ''));
         if ($slug === null) {
             $flash('error', 'Invalid form slug.');
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         $forms = array_values(array_filter($loadForms(), static function (array $form) use ($slug): bool {
@@ -1178,10 +1178,10 @@ return static function (Router $router, array $context): void {
             $signupsRepository->deleteAllByFormSlug($slug);
         } catch (RuntimeException $exception) {
             $flash('error', $exception->getMessage());
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
         }
 
         $flash('success', 'Signup sheet form deleted.');
-        redirect($indexPath);
+        Redirect::redirect($indexPath);
     });
 };

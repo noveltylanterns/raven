@@ -18,7 +18,7 @@ use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Extra\Countries;
 
-use function Raven\Lib\Extra\redirect;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Owns Signup Sheets shortcode rendering and submit pipeline.
@@ -265,19 +265,19 @@ final class SignupPublicFormRuntime implements EmbeddedFormRuntimeInterface
     {
         $normalizedSlug = $this->input->slug($slug);
         if ($normalizedSlug === null || $normalizedSlug === '') {
-            redirect($returnPath);
+            Redirect::redirect($returnPath);
         }
 
         $redirectTo = $returnPath . '#' . $this->anchorId($normalizedSlug);
         if (!$this->csrf->validate($_POST['_csrf'] ?? null)) {
             $this->pushFlash($normalizedSlug, 'error', 'Your session token is invalid. Please retry and submit again.');
-            redirect($redirectTo);
+            Redirect::redirect($redirectTo);
         }
 
         $definition = $this->findEnabledDefinitionBySlug($normalizedSlug);
         if ($definition === null) {
             $this->pushFlash($normalizedSlug, 'error', 'This signup sheet form is unavailable right now.');
-            redirect($redirectTo);
+            Redirect::redirect($redirectTo);
         }
 
         $displayName = $this->input->text((string) ($_POST['signups_display_name'] ?? ''), 160);
@@ -453,13 +453,13 @@ final class SignupPublicFormRuntime implements EmbeddedFormRuntimeInterface
 
         if ($errors !== []) {
             $this->pushFlash($normalizedSlug, 'error', implode(' ', $errors), $oldValues);
-            redirect($redirectTo);
+            Redirect::redirect($redirectTo);
         }
 
         $captchaError = $validateCaptcha();
         if (is_string($captchaError) && $captchaError !== '') {
             $this->pushFlash($normalizedSlug, 'error', $captchaError, $oldValues);
-            redirect($redirectTo);
+            Redirect::redirect($redirectTo);
         }
 
         $ipAddress = $this->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
@@ -492,11 +492,11 @@ final class SignupPublicFormRuntime implements EmbeddedFormRuntimeInterface
             }
 
             $this->pushFlash($normalizedSlug, 'error', $message, $oldValues);
-            redirect($redirectTo);
+            Redirect::redirect($redirectTo);
         }
 
         $this->pushFlash($normalizedSlug, 'success', 'Thanks, your signup has been received.');
-        redirect($redirectTo);
+        Redirect::redirect($redirectTo);
     }
 
     /**

@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Panel/PanelMediaConfigService.php
+ * ~/private/lib/View/Panel/PanelMediaConfigService.php
  * Media config readers and upload-limit display helpers for panel controllers.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Panel;
+namespace Raven\Lib\View\Panel;
 
 use Raven\Core\Config;
 
@@ -20,11 +20,24 @@ final class PanelMediaConfigService
 {
     private Config $config;
 
+    /**
+     * Stores the runtime config reader used for avatar and media policy lookups.
+     *
+     * @param Config $config Runtime config reader for panel media settings.
+     * @return void
+     */
     public function __construct(Config $config)
     {
         $this->config = $config;
     }
 
+    /**
+     * Resolves the effective max upload size for one panel media target.
+     *
+     * @param string $target Logical media target such as `avatars` or `images`.
+     * @param int $defaultBytes Fallback byte limit when config does not define a target-specific value.
+     * @return int Effective max upload size in bytes.
+     */
     public function resolveMediaMaxFilesizeBytes(string $target, int $defaultBytes): int
     {
         $config = $this->config->all();
@@ -53,6 +66,11 @@ final class PanelMediaConfigService
         return max(1, $defaultBytes);
     }
 
+    /**
+     * Resolves the avatar upload allowlist CSV with avatar-specific config taking precedence.
+     *
+     * @return string Raw comma-separated extension allowlist for avatar uploads.
+     */
     public function resolveAvatarAllowedExtensionsCsv(): string
     {
         $avatarAllowList = trim((string) $this->config->get('user.avatar.allowed_extensions', ''));
@@ -63,6 +81,11 @@ final class PanelMediaConfigService
         return trim((string) $this->config->get('media.allowed_extensions', ''));
     }
 
+    /**
+     * Formats the avatar extension allowlist into a concise panel-facing label.
+     *
+     * @return string Slash-delimited extension label or `none` when no supported extensions remain.
+     */
     public function avatarAllowedExtensionsLabel(): string
     {
         $raw = strtolower(trim($this->resolveAvatarAllowedExtensionsCsv()));
@@ -88,6 +111,11 @@ final class PanelMediaConfigService
         return implode('/', array_values($allowed));
     }
 
+    /**
+     * Builds the avatar upload helper text shown in panel profile forms.
+     *
+     * @return string Human-readable size, dimension, and extension note for avatar uploads.
+     */
     public function avatarUploadLimitsNote(): string
     {
         $maxBytes = $this->resolveMediaMaxFilesizeBytes('avatars', 1048576);

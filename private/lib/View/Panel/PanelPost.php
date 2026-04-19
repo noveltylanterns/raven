@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Panel/PanelPost.php
+ * ~/private/lib/View/Panel/PanelPost.php
  * Shared panel POST payload normalization helpers.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Panel;
+namespace Raven\Lib\View\Panel;
 
 use Raven\Lib\Security\InputSanitizer;
 
@@ -20,14 +20,23 @@ final class PanelPost
 {
     private InputSanitizer $input;
 
+    /**
+     * Stores the shared input sanitizer used to normalize panel form payloads.
+     *
+     * @param InputSanitizer $input Shared request sanitizer for integer, text, and slug coercion.
+     * @return void
+     */
     public function __construct(InputSanitizer $input)
     {
         $this->input = $input;
     }
 
     /**
-     * @param array<string, mixed> $post
-     * @return array<int>
+     * Extracts a unique sorted integer-id list from one panel POST payload key.
+     *
+     * @param array<string, mixed> $post Submitted POST payload containing checkbox id arrays.
+     * @param string $key POST key that stores one selected-id array.
+     * @return array<int> Unique sorted integer ids that survived sanitization.
      */
     public function selectedIdsFromPost(array $post, string $key = 'selected_ids'): array
     {
@@ -52,6 +61,8 @@ final class PanelPost
     }
 
     /**
+     * Normalizes gallery-image metadata edits from the nested page-editor POST payload.
+     *
      * @param mixed $raw
      * @return array<int, array{
      *   alt_text: string,
@@ -64,7 +75,7 @@ final class PanelPost
      *   sort_order: int,
      *   is_cover: bool,
      *   include_in_gallery: bool
-     * }>
+     * }> Normalized image-update rows keyed by image id and ordered by sanitized sort priority.
      */
     public function normalizeGalleryImageUpdates(mixed $raw): array
     {
@@ -128,6 +139,14 @@ final class PanelPost
         return $updates;
     }
 
+    /**
+     * Normalizes one optional float field while rejecting blanks and out-of-range values.
+     *
+     * @param mixed $value Raw numeric form value.
+     * @param float $min Lowest allowed value for the field.
+     * @param float $max Highest allowed value for the field.
+     * @return float|null Sanitized float when the value is valid, otherwise null.
+     */
     private function normalizeNullableFloat(mixed $value, float $min, float $max): ?float
     {
         if (is_string($value) && trim($value) === '') {

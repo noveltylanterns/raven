@@ -30,7 +30,6 @@ use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\PageImageManager;
-use Raven\Lib\Panel\PanelPost;
 use Raven\Lib\Directory\Mode;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
@@ -39,9 +38,10 @@ use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorAuthor;
 use Raven\Lib\View\Panel\EditorMCE;
 use Raven\Lib\View\Panel\EditorMDE;
+use Raven\Lib\View\Panel\PanelPost;
 use Raven\Lib\View\Panel\EditorTabs;
 
-use function Raven\Lib\Extra\redirect;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Handles panel page content management routes.
@@ -386,7 +386,7 @@ final class ContentController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/page'));
+            Redirect::redirect($this->context->panelUrl('/page'));
         }
 
         $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['content', 'meta', 'media'], 'content');
@@ -404,7 +404,7 @@ final class ContentController
         $authorUserId = $this->input->int($post['author_user_id'] ?? null, 1);
         if ($authorUserId !== null && $this->userRepo->findById($authorUserId) === null) {
             $this->context->flash('error', 'Selected author account was not found.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
         }
         if ($authorUserId === null) {
             $authorUserId = $this->context->auth()->userId();
@@ -456,7 +456,7 @@ final class ContentController
             foreach ($categorySetIdsById as $setId) {
                 if (!in_array($setId, $allowedCategorySets, true)) {
                     $this->context->flash('error', 'One or more selected categories are outside the allowed sets for this channel.');
-                    redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
+                    Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
                 }
             }
         }
@@ -466,19 +466,19 @@ final class ContentController
             foreach ($tagSetIdsById as $setId) {
                 if (!in_array($setId, $allowedTagSets, true)) {
                     $this->context->flash('error', 'One or more selected tags are outside the allowed sets for this channel.');
-                    redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
+                    Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
                 }
             }
         }
 
         if ($title === '' || $slug === null) {
             $this->context->flash('error', 'Title and valid slug are required.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'content'));
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'content'));
         }
 
         if (!in_array($status, ['published', 'draft'], true)) {
             $this->context->flash('error', 'Status must be Published or Draft.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'content'));
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'content'));
         }
 
         // Normalize panel form input into repository payload shape.
@@ -508,11 +508,11 @@ final class ContentController
             );
         } catch (\Throwable $exception) {
             $this->context->flash('error', $exception->getMessage() ?: 'Failed to save page.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'content'));
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'content'));
         }
 
         $this->context->flash('success', 'Changes saved.');
-        redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $savedId, $activeTab, 'content'));
+        Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $savedId, $activeTab, 'content'));
     }
 
     /**
@@ -531,13 +531,13 @@ final class ContentController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/page'));
+            Redirect::redirect($this->context->panelUrl('/page'));
         }
 
         $pageId = $this->input->int($post['id'] ?? null, 1);
         if ($pageId === null || !$this->pageImages->pageExists($pageId)) {
             $this->context->flash('error', 'Save the page before uploading gallery images.');
-            redirect($this->context->panelUrl('/page'));
+            Redirect::redirect($this->context->panelUrl('/page'));
         }
 
         /** @var mixed $rawUploads */
@@ -546,7 +546,7 @@ final class ContentController
 
         if ($uploads === []) {
             $this->context->flash('error', 'Please select one or more images to upload.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/page/edit',
                 $pageId,
@@ -562,7 +562,7 @@ final class ContentController
                 'error',
                 'You selected ' . count($uploads) . ' image(s), but the max per upload is ' . $maxFilesPerUpload . '.'
             );
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/page/edit',
                 $pageId,
@@ -596,7 +596,7 @@ final class ContentController
             $this->context->flash('error', implode(' ', array_values(array_unique($errors))));
         }
 
-        redirect($this->editorTabs->panelEditorUrlWithTab(
+        Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/page/edit',
                 $pageId,
@@ -624,7 +624,7 @@ final class ContentController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/page'));
+            Redirect::redirect($this->context->panelUrl('/page'));
         }
 
         $pageId = $this->input->int($post['id'] ?? null, 1);
@@ -633,14 +633,14 @@ final class ContentController
 
         if ($pageId === null) {
             $this->context->flash('error', 'Invalid image delete request.');
-            redirect($this->context->panelUrl('/page'));
+            Redirect::redirect($this->context->panelUrl('/page'));
         }
 
         // Single-row delete action has priority when explicit image id is posted.
         if ($imageId !== null) {
             if (!$this->pageImageManager()->deleteImageForPage($pageId, $imageId)) {
                 $this->context->flash('error', 'Image not found or already deleted.');
-                redirect($this->editorTabs->panelEditorUrlWithTab(
+                Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/page/edit',
                 $pageId,
@@ -651,7 +651,7 @@ final class ContentController
             }
 
             $this->context->flash('success', 'Image deleted.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/page/edit',
                 $pageId,
@@ -664,7 +664,7 @@ final class ContentController
         // Bulk-delete path is used by Media-tab "Delete Selected" controls.
         if ($selectedImageIds === []) {
             $this->context->flash('error', 'No gallery images selected.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/page/edit',
                 $pageId,
@@ -695,7 +695,7 @@ final class ContentController
             $this->context->flash('error', 'Failed to delete selected images.');
         }
 
-        redirect($this->editorTabs->panelEditorUrlWithTab(
+        Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/page/edit',
                 $pageId,
@@ -723,7 +723,7 @@ final class ContentController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/page'));
+            Redirect::redirect($this->context->panelUrl('/page'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
@@ -734,18 +734,18 @@ final class ContentController
                 $this->pageRepo->deleteById($id);
             } catch (\Throwable) {
                 $this->context->flash('error', 'Failed to delete page.');
-                redirect($this->context->panelUrl('/page'));
+                Redirect::redirect($this->context->panelUrl('/page'));
             }
 
             $this->context->flash('success', 'Page deleted.');
-            redirect($this->context->panelUrl('/page'));
+            Redirect::redirect($this->context->panelUrl('/page'));
         }
 
         // Bulk-delete mode is used by the list-level "Delete" buttons.
         $selectedIds = $this->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->context->flash('error', 'No pages selected.');
-            redirect($this->context->panelUrl('/page'));
+            Redirect::redirect($this->context->panelUrl('/page'));
         }
 
         $deletedCount = 0;
@@ -772,7 +772,7 @@ final class ContentController
             $this->context->flash('error', 'Failed to delete selected pages.');
         }
 
-        redirect($this->context->panelUrl('/page'));
+        Redirect::redirect($this->context->panelUrl('/page'));
     }
 
     // -------------------------------------------------------------------------

@@ -13,22 +13,12 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extra;
 
-use Raven\Lib\Transport\Response;
-
 /**
  * Escapes text for safe HTML output.
  */
 function e(string $value): string
 {
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-}
-
-/**
- * Sends HTTP redirect and immediately stops script execution.
- */
-function redirect(string $to, int $status = 302): never
-{
-    Response::redirect($to, $status);
 }
 
 /**

@@ -25,7 +25,7 @@ use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Directory\SetContext;
 
-use function Raven\Lib\Extra\redirect;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Handles channel, category, category-set, tag, and tag-set management routes.
@@ -166,7 +166,7 @@ final class TaxonomyController
 
             if ($channel === null) {
                 $this->context->flash('error', 'Channel not found.');
-                redirect($this->context->panelUrl('/channel'));
+                Redirect::redirect($this->context->panelUrl('/channel'));
             }
         }
 
@@ -225,7 +225,7 @@ final class TaxonomyController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/channel'));
+            Redirect::redirect($this->context->panelUrl('/channel'));
         }
 
         $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['basic', 'meta', 'media'], 'basic');
@@ -259,7 +259,7 @@ final class TaxonomyController
 
         if ($name === '' || $slug === null) {
             $this->context->flash('error', 'Channel name and valid slug are required.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/channel/edit',
                 $id,
@@ -289,7 +289,7 @@ final class TaxonomyController
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->context->flash('error', $message !== '' ? $message : 'Failed to save channel. Slug may already exist.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/channel/edit',
                 $id,
@@ -318,7 +318,7 @@ final class TaxonomyController
 
         if (count($coverUploads) > 1 || count($previewUploads) > 1) {
             $this->context->flash('error', 'Please upload only one cover image and one preview image.');
-            redirect($savedEditUrl);
+            Redirect::redirect($savedEditUrl);
         }
 
         $removeCover = isset($post['remove_cover_image']) && (string) $post['remove_cover_image'] === '1';
@@ -340,7 +340,7 @@ final class TaxonomyController
             if (!$coverResult['ok']) {
                 $this->taxonomyImageService->cleanupPathSets('channels', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
-                redirect($savedEditUrl);
+                Redirect::redirect($savedEditUrl);
             }
 
             $coverStorage = is_array($coverResult['record'] ?? null) ? $coverResult['record'] : [];
@@ -354,7 +354,7 @@ final class TaxonomyController
             if (!$previewResult['ok']) {
                 $this->taxonomyImageService->cleanupPathSets('channels', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($previewResult['error'] ?? 'Failed to upload preview image.'));
-                redirect($savedEditUrl);
+                Redirect::redirect($savedEditUrl);
             }
 
             $previewStorage = is_array($previewResult['record'] ?? null) ? $previewResult['record'] : [];
@@ -369,7 +369,7 @@ final class TaxonomyController
             // Keep DB and filesystem in sync when image-path persistence fails.
             $this->taxonomyImageService->cleanupPathSets('channels', $savedId, $newPathSets);
             $this->context->flash('error', 'Failed to save channel image selections.');
-            redirect($savedEditUrl);
+            Redirect::redirect($savedEditUrl);
         }
 
         $nextPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('channels', $savedId, $nextStorage);
@@ -377,7 +377,7 @@ final class TaxonomyController
         $this->taxonomyImageService->deleteStoredPaths('channels', $savedId, $obsoletePaths);
 
         $this->context->flash('success', 'Changes saved.');
-        redirect($savedEditUrl);
+        Redirect::redirect($savedEditUrl);
     }
 
     /**
@@ -395,7 +395,7 @@ final class TaxonomyController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/channel'));
+            Redirect::redirect($this->context->panelUrl('/channel'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
@@ -407,7 +407,7 @@ final class TaxonomyController
             } catch (\Throwable $exception) {
                 $message = trim($exception->getMessage());
                 $this->context->flash('error', $message !== '' ? $message : 'Failed to delete channel.');
-                redirect($this->context->panelUrl('/channel'));
+                Redirect::redirect($this->context->panelUrl('/channel'));
             }
 
             if ($record !== null) {
@@ -419,14 +419,14 @@ final class TaxonomyController
             }
 
             $this->context->flash('success', 'Channel deleted.');
-            redirect($this->context->panelUrl('/channel'));
+            Redirect::redirect($this->context->panelUrl('/channel'));
         }
 
         // Bulk-delete mode is used by the list-level "Delete" buttons.
         $selectedIds = $this->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->context->flash('error', 'No channels selected.');
-            redirect($this->context->panelUrl('/channel'));
+            Redirect::redirect($this->context->panelUrl('/channel'));
         }
 
         $deletedCount = 0;
@@ -460,7 +460,7 @@ final class TaxonomyController
             $this->context->flash('error', 'Failed to delete selected channels.');
         }
 
-        redirect($this->context->panelUrl('/channel'));
+        Redirect::redirect($this->context->panelUrl('/channel'));
     }
 
     // -------------------------------------------------------------------------
@@ -555,7 +555,7 @@ final class TaxonomyController
 
             if ($category === null) {
                 $this->context->flash('error', 'Category not found.');
-                redirect($this->context->panelUrl('/category'));
+                Redirect::redirect($this->context->panelUrl('/category'));
             }
         }
 
@@ -598,7 +598,7 @@ final class TaxonomyController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/category'));
+            Redirect::redirect($this->context->panelUrl('/category'));
         }
 
         $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
@@ -609,7 +609,7 @@ final class TaxonomyController
 
         if ($name === '' || $slug === null || $setId === null || !$this->categorySetRepo()->existsId($setId)) {
             $this->context->flash('error', 'Category name, valid slug, and valid set are required.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/category/edit',
                 $id,
@@ -629,7 +629,7 @@ final class TaxonomyController
             ]);
         } catch (\Throwable) {
             $this->context->flash('error', 'Failed to save category. Slug may already exist.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/category/edit',
                 $id,
@@ -659,7 +659,7 @@ final class TaxonomyController
 
         if (count($coverUploads) > 1 || count($previewUploads) > 1 || count($iconUploads) > 1) {
             $this->context->flash('error', 'Please upload only one image per slot.');
-            redirect($savedEditUrl);
+            Redirect::redirect($savedEditUrl);
         }
 
         $removeCover = isset($post['remove_cover_image']) && (string) $post['remove_cover_image'] === '1';
@@ -687,7 +687,7 @@ final class TaxonomyController
             if (!$coverResult['ok']) {
                 $this->taxonomyImageService->cleanupPathSets('categories', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
-                redirect($savedEditUrl);
+                Redirect::redirect($savedEditUrl);
             }
 
             $coverStorage = is_array($coverResult['record'] ?? null) ? $coverResult['record'] : [];
@@ -701,7 +701,7 @@ final class TaxonomyController
             if (!$previewResult['ok']) {
                 $this->taxonomyImageService->cleanupPathSets('categories', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($previewResult['error'] ?? 'Failed to upload preview image.'));
-                redirect($savedEditUrl);
+                Redirect::redirect($savedEditUrl);
             }
 
             $previewStorage = is_array($previewResult['record'] ?? null) ? $previewResult['record'] : [];
@@ -715,7 +715,7 @@ final class TaxonomyController
             if (!$iconResult['ok']) {
                 $this->taxonomyImageService->cleanupPathSets('categories', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
-                redirect($savedEditUrl);
+                Redirect::redirect($savedEditUrl);
             }
 
             $iconStorage = is_array($iconResult['record'] ?? null) ? $iconResult['record'] : [];
@@ -730,7 +730,7 @@ final class TaxonomyController
             // Keep DB and filesystem in sync when image-path persistence fails.
             $this->taxonomyImageService->cleanupPathSets('categories', $savedId, $newPathSets);
             $this->context->flash('error', 'Failed to save category image selections.');
-            redirect($savedEditUrl);
+            Redirect::redirect($savedEditUrl);
         }
 
         $nextPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('categories', $savedId, $nextStorage);
@@ -738,7 +738,7 @@ final class TaxonomyController
         $this->taxonomyImageService->deleteStoredPaths('categories', $savedId, $obsoletePaths);
 
         $this->context->flash('success', 'Changes saved.');
-        redirect($savedEditUrl);
+        Redirect::redirect($savedEditUrl);
     }
 
     /**
@@ -760,7 +760,7 @@ final class TaxonomyController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/category'));
+            Redirect::redirect($this->context->panelUrl('/category'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
@@ -771,7 +771,7 @@ final class TaxonomyController
                 $this->categoryRepo()->deleteById($id);
             } catch (\Throwable) {
                 $this->context->flash('error', 'Failed to delete category.');
-                redirect($this->context->panelUrl('/category'));
+                Redirect::redirect($this->context->panelUrl('/category'));
             }
 
             if ($record !== null) {
@@ -783,14 +783,14 @@ final class TaxonomyController
             }
 
             $this->context->flash('success', 'Category deleted.');
-            redirect($this->context->panelUrl('/category'));
+            Redirect::redirect($this->context->panelUrl('/category'));
         }
 
         // Bulk-delete mode is used by the list-level "Delete" buttons.
         $selectedIds = $this->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->context->flash('error', 'No categories selected.');
-            redirect($this->context->panelUrl('/category'));
+            Redirect::redirect($this->context->panelUrl('/category'));
         }
 
         $deletedCount = 0;
@@ -824,7 +824,7 @@ final class TaxonomyController
             $this->context->flash('error', 'Failed to delete selected categories.');
         }
 
-        redirect($this->context->panelUrl('/category'));
+        Redirect::redirect($this->context->panelUrl('/category'));
     }
 
     // -------------------------------------------------------------------------
@@ -889,7 +889,7 @@ final class TaxonomyController
             $set = $this->categorySetRepo()->findById($id);
             if ($set === null) {
                 $this->context->flash('error', 'Category set not found.');
-                redirect($this->context->panelUrl('/category/set'));
+                Redirect::redirect($this->context->panelUrl('/category/set'));
             }
         }
 
@@ -924,7 +924,7 @@ final class TaxonomyController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/category/set'));
+            Redirect::redirect($this->context->panelUrl('/category/set'));
         }
 
         // Preserve existing slug when edit form does not re-submit the slug field.
@@ -939,7 +939,7 @@ final class TaxonomyController
 
         if ($name === '' || ($id !== 0 && $slug === null)) {
             $this->context->flash('error', 'Set name and valid slug are required.');
-            redirect($this->context->panelUrl('/category/set/edit' . ($id !== null ? '/' . $id : '')));
+            Redirect::redirect($this->context->panelUrl('/category/set/edit' . ($id !== null ? '/' . $id : '')));
         }
 
         try {
@@ -952,11 +952,11 @@ final class TaxonomyController
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->context->flash('error', $message !== '' ? $message : 'Failed to save category set.');
-            redirect($this->context->panelUrl('/category/set/edit' . ($id !== null ? '/' . $id : '')));
+            Redirect::redirect($this->context->panelUrl('/category/set/edit' . ($id !== null ? '/' . $id : '')));
         }
 
         $this->context->flash('success', 'Changes saved.');
-        redirect($this->context->panelUrl('/category/set/edit/' . $savedId));
+        Redirect::redirect($this->context->panelUrl('/category/set/edit/' . $savedId));
     }
 
     /**
@@ -978,18 +978,18 @@ final class TaxonomyController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/category/set'));
+            Redirect::redirect($this->context->panelUrl('/category/set'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 0);
         if ($id === null) {
             $this->context->flash('error', 'Category set not found.');
-            redirect($this->context->panelUrl('/category/set'));
+            Redirect::redirect($this->context->panelUrl('/category/set'));
         }
 
         if ($this->channelRepo->countExplicitTaxonomySetAssignments('category', $id) > 0) {
             $this->context->flash('error', 'Cannot delete a category set that is still assigned to one or more channels.');
-            redirect($this->context->panelUrl('/category/set'));
+            Redirect::redirect($this->context->panelUrl('/category/set'));
         }
 
         // Reassign any remaining categories in this set to the default set before deleting.
@@ -1003,11 +1003,11 @@ final class TaxonomyController
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->context->flash('error', $message !== '' ? $message : 'Failed to delete category set.');
-            redirect($this->context->panelUrl('/category/set'));
+            Redirect::redirect($this->context->panelUrl('/category/set'));
         }
 
         $this->context->flash('success', $categoryCount > 0 ? 'Category set deleted. ' . $categoryCount . ' ' . ($categoryCount === 1 ? 'category was' : 'categories were') . ' moved to the default set.' : 'Category set deleted.');
-        redirect($this->context->panelUrl('/category/set'));
+        Redirect::redirect($this->context->panelUrl('/category/set'));
     }
 
     // -------------------------------------------------------------------------
@@ -1102,7 +1102,7 @@ final class TaxonomyController
 
             if ($tag === null) {
                 $this->context->flash('error', 'Tag not found.');
-                redirect($this->context->panelUrl('/tag'));
+                Redirect::redirect($this->context->panelUrl('/tag'));
             }
         }
 
@@ -1145,7 +1145,7 @@ final class TaxonomyController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/tag'));
+            Redirect::redirect($this->context->panelUrl('/tag'));
         }
 
         $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
@@ -1156,7 +1156,7 @@ final class TaxonomyController
 
         if ($name === '' || $slug === null || $setId === null || !$this->tagSetRepo()->existsId($setId)) {
             $this->context->flash('error', 'Tag name, valid slug, and valid set are required.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/tag/edit',
                 $id,
@@ -1176,7 +1176,7 @@ final class TaxonomyController
             ]);
         } catch (\Throwable) {
             $this->context->flash('error', 'Failed to save tag. Slug may already exist.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/tag/edit',
                 $id,
@@ -1206,7 +1206,7 @@ final class TaxonomyController
 
         if (count($coverUploads) > 1 || count($previewUploads) > 1 || count($iconUploads) > 1) {
             $this->context->flash('error', 'Please upload only one image per slot.');
-            redirect($savedEditUrl);
+            Redirect::redirect($savedEditUrl);
         }
 
         $removeCover = isset($post['remove_cover_image']) && (string) $post['remove_cover_image'] === '1';
@@ -1234,7 +1234,7 @@ final class TaxonomyController
             if (!$coverResult['ok']) {
                 $this->taxonomyImageService->cleanupPathSets('tags', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
-                redirect($savedEditUrl);
+                Redirect::redirect($savedEditUrl);
             }
 
             $coverStorage = is_array($coverResult['record'] ?? null) ? $coverResult['record'] : [];
@@ -1248,7 +1248,7 @@ final class TaxonomyController
             if (!$previewResult['ok']) {
                 $this->taxonomyImageService->cleanupPathSets('tags', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($previewResult['error'] ?? 'Failed to upload preview image.'));
-                redirect($savedEditUrl);
+                Redirect::redirect($savedEditUrl);
             }
 
             $previewStorage = is_array($previewResult['record'] ?? null) ? $previewResult['record'] : [];
@@ -1262,7 +1262,7 @@ final class TaxonomyController
             if (!$iconResult['ok']) {
                 $this->taxonomyImageService->cleanupPathSets('tags', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
-                redirect($savedEditUrl);
+                Redirect::redirect($savedEditUrl);
             }
 
             $iconStorage = is_array($iconResult['record'] ?? null) ? $iconResult['record'] : [];
@@ -1277,7 +1277,7 @@ final class TaxonomyController
             // Keep DB and filesystem in sync when image-path persistence fails.
             $this->taxonomyImageService->cleanupPathSets('tags', $savedId, $newPathSets);
             $this->context->flash('error', 'Failed to save tag image selections.');
-            redirect($savedEditUrl);
+            Redirect::redirect($savedEditUrl);
         }
 
         $nextPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('tags', $savedId, $nextStorage);
@@ -1285,7 +1285,7 @@ final class TaxonomyController
         $this->taxonomyImageService->deleteStoredPaths('tags', $savedId, $obsoletePaths);
 
         $this->context->flash('success', 'Changes saved.');
-        redirect($savedEditUrl);
+        Redirect::redirect($savedEditUrl);
     }
 
     /**
@@ -1307,7 +1307,7 @@ final class TaxonomyController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/tag'));
+            Redirect::redirect($this->context->panelUrl('/tag'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
@@ -1318,7 +1318,7 @@ final class TaxonomyController
                 $this->tagRepo()->deleteById($id);
             } catch (\Throwable) {
                 $this->context->flash('error', 'Failed to delete tag.');
-                redirect($this->context->panelUrl('/tag'));
+                Redirect::redirect($this->context->panelUrl('/tag'));
             }
 
             if ($record !== null) {
@@ -1330,14 +1330,14 @@ final class TaxonomyController
             }
 
             $this->context->flash('success', 'Tag deleted.');
-            redirect($this->context->panelUrl('/tag'));
+            Redirect::redirect($this->context->panelUrl('/tag'));
         }
 
         // Bulk-delete mode is used by the list-level "Delete" buttons.
         $selectedIds = $this->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->context->flash('error', 'No tags selected.');
-            redirect($this->context->panelUrl('/tag'));
+            Redirect::redirect($this->context->panelUrl('/tag'));
         }
 
         $deletedCount = 0;
@@ -1371,7 +1371,7 @@ final class TaxonomyController
             $this->context->flash('error', 'Failed to delete selected tags.');
         }
 
-        redirect($this->context->panelUrl('/tag'));
+        Redirect::redirect($this->context->panelUrl('/tag'));
     }
 
     // -------------------------------------------------------------------------
@@ -1436,7 +1436,7 @@ final class TaxonomyController
             $set = $this->tagSetRepo()->findById($id);
             if ($set === null) {
                 $this->context->flash('error', 'Tag set not found.');
-                redirect($this->context->panelUrl('/tag/set'));
+                Redirect::redirect($this->context->panelUrl('/tag/set'));
             }
         }
 
@@ -1471,7 +1471,7 @@ final class TaxonomyController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/tag/set'));
+            Redirect::redirect($this->context->panelUrl('/tag/set'));
         }
 
         $name = $this->input->text($post['name'] ?? null, 255);
@@ -1480,7 +1480,7 @@ final class TaxonomyController
 
         if ($name === '' || ($id !== 0 && $slug === null)) {
             $this->context->flash('error', 'Set name and valid slug are required.');
-            redirect($this->context->panelUrl('/tag/set/edit' . ($id !== null ? '/' . $id : '')));
+            Redirect::redirect($this->context->panelUrl('/tag/set/edit' . ($id !== null ? '/' . $id : '')));
         }
 
         try {
@@ -1493,11 +1493,11 @@ final class TaxonomyController
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->context->flash('error', $message !== '' ? $message : 'Failed to save tag set.');
-            redirect($this->context->panelUrl('/tag/set/edit' . ($id !== null ? '/' . $id : '')));
+            Redirect::redirect($this->context->panelUrl('/tag/set/edit' . ($id !== null ? '/' . $id : '')));
         }
 
         $this->context->flash('success', 'Changes saved.');
-        redirect($this->context->panelUrl('/tag/set/edit/' . $savedId));
+        Redirect::redirect($this->context->panelUrl('/tag/set/edit/' . $savedId));
     }
 
     /**
@@ -1519,18 +1519,18 @@ final class TaxonomyController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/tag/set'));
+            Redirect::redirect($this->context->panelUrl('/tag/set'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 0);
         if ($id === null) {
             $this->context->flash('error', 'Tag set not found.');
-            redirect($this->context->panelUrl('/tag/set'));
+            Redirect::redirect($this->context->panelUrl('/tag/set'));
         }
 
         if ($this->channelRepo->countExplicitTaxonomySetAssignments('tag', $id) > 0) {
             $this->context->flash('error', 'Cannot delete a tag set that is still assigned to one or more channels.');
-            redirect($this->context->panelUrl('/tag/set'));
+            Redirect::redirect($this->context->panelUrl('/tag/set'));
         }
 
         // Reassign any remaining tags in this set to the default set before deleting.
@@ -1544,11 +1544,11 @@ final class TaxonomyController
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->context->flash('error', $message !== '' ? $message : 'Failed to delete tag set.');
-            redirect($this->context->panelUrl('/tag/set'));
+            Redirect::redirect($this->context->panelUrl('/tag/set'));
         }
 
         $this->context->flash('success', $tagCount > 0 ? 'Tag set deleted. ' . $tagCount . ' ' . ($tagCount === 1 ? 'tag was' : 'tags were') . ' moved to the default set.' : 'Tag set deleted.');
-        redirect($this->context->panelUrl('/tag/set'));
+        Redirect::redirect($this->context->panelUrl('/tag/set'));
     }
 
     // -------------------------------------------------------------------------

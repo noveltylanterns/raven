@@ -34,7 +34,6 @@ use Raven\Lib\Extension\Layout;
 use Raven\Lib\Directory\Panel;
 use RuntimeException;
 
-use function Raven\Lib\Extra\redirect;
 use function Raven\Lib\Extra\request_path;
 
 /**

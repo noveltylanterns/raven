@@ -12,7 +12,7 @@ declare(strict_types=1);
 use Raven\Ext\Smallweb\SmallwebService;
 use Raven\Core\Routing\Router;
 
-use function Raven\Lib\Extra\redirect;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Registers Smallweb extension routes into the panel router.
@@ -209,12 +209,12 @@ return static function (Router $router, array $context): void {
 
     $requireEnabledProtocol = static function (string $protocol) use ($svc, $indexPath): bool {
         if (!$svc->isValidProtocol($protocol)) {
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
             return false;
         }
         $settings = $svc->getProtocolSettings($protocol);
         if (!($settings['enabled'] ?? false)) {
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
             return false;
         }
         return true;
@@ -319,7 +319,7 @@ return static function (Router $router, array $context): void {
 
         if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
-            redirect($indexPath);
+            Redirect::redirect($indexPath);
             return;
         }
 
@@ -349,7 +349,7 @@ return static function (Router $router, array $context): void {
             $flash('error', 'Failed to save settings.');
         }
 
-        redirect($indexPath);
+        Redirect::redirect($indexPath);
     });
 
     // ══════════════════════════════════════════════════════════════
@@ -425,7 +425,7 @@ return static function (Router $router, array $context): void {
 
         $filename = (string) ($params['filename'] ?? '');
         if (!$svc->isValidFilename($filename)) {
-            redirect($editorTabs !== null
+            Redirect::redirect($editorTabs !== null
                 ? $editorTabs->panelPathTabUrl($panelUrl, '/smallweb', $protocol)
                 : $panelUrl('/smallweb/' . $protocol));
             return;
@@ -438,7 +438,7 @@ return static function (Router $router, array $context): void {
 
         $content = $svc->readProtocolFile($protocol, $filename, $subdir);
         if ($content === null) {
-            redirect($editorTabs !== null
+            Redirect::redirect($editorTabs !== null
                 ? $editorTabs->panelPathTabUrl($panelUrl, '/smallweb', $protocol)
                 : $panelUrl('/smallweb/' . $protocol));
             return;
@@ -508,7 +508,7 @@ return static function (Router $router, array $context): void {
 
         if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
@@ -527,7 +527,7 @@ return static function (Router $router, array $context): void {
 
         if (!$svc->isValidSlug($slug)) {
             $flash('error', 'Invalid slug. Use lowercase letters, numbers, hyphens, and underscores. Must start with a letter or number.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
@@ -538,7 +538,7 @@ return static function (Router $router, array $context): void {
         $conflict = $svc->findConflictingFile($protocol, $slug, $type, $hidden, $subdir);
         if ($conflict !== null && $conflict !== $originalFilename) {
             $flash('error', 'A file named "' . $conflict . '" already exists with that slug.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
@@ -548,21 +548,21 @@ return static function (Router $router, array $context): void {
         // If renaming, check new filename doesn't collide with a different file.
         if ($isEdit && $newFilename !== $originalFilename && $svc->protocolFileExists($protocol, $newFilename, $subdir)) {
             $flash('error', 'A file named "' . $newFilename . '" already exists.');
-            redirect($editPath . '/' . rawurlencode($originalFilename) . $dirQuery);
+            Redirect::redirect($editPath . '/' . rawurlencode($originalFilename) . $dirQuery);
             return;
         }
 
         // If not editing, check file doesn't already exist.
         if (!$isEdit && $svc->protocolFileExists($protocol, $newFilename, $subdir)) {
             $flash('error', 'A file named "' . $newFilename . '" already exists.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
         // Write the new file.
         if (!$svc->writeProtocolFile($protocol, $slug, $type, $content, $hidden, $executable, $subdir)) {
             $flash('error', 'Failed to write file.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
@@ -572,7 +572,7 @@ return static function (Router $router, array $context): void {
         }
 
         $flash('success', 'Page saved: ' . $newFilename);
-        redirect($editPath . '/' . rawurlencode($newFilename) . $dirQuery);
+        Redirect::redirect($editPath . '/' . rawurlencode($newFilename) . $dirQuery);
     });
 
     // ══════════════════════════════════════════════════════════════
@@ -597,14 +597,14 @@ return static function (Router $router, array $context): void {
 
         if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
         $filename = trim((string) ($_POST['filename'] ?? ''));
         if (!$svc->isValidFilename($filename)) {
             $flash('error', 'Invalid filename.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
@@ -619,7 +619,7 @@ return static function (Router $router, array $context): void {
             $flash('error', 'Failed to delete file.');
         }
 
-        redirect($tabUrl);
+        Redirect::redirect($tabUrl);
     });
 
     // ══════════════════════════════════════════════════════════════
@@ -645,13 +645,13 @@ return static function (Router $router, array $context): void {
 
         if (!$svc->protocolSupportsDirectories($protocol)) {
             $flash('error', 'This protocol does not support directories.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
         if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
@@ -660,13 +660,13 @@ return static function (Router $router, array $context): void {
 
         if (!$svc->isValidSlug($slug)) {
             $flash('error', 'Invalid folder name. Use lowercase letters, numbers, hyphens, and underscores.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
         if (!$svc->isValidSubdirPath($parent)) {
             $flash('error', 'Invalid parent directory.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
@@ -677,7 +677,7 @@ return static function (Router $router, array $context): void {
             $flash('error', 'Failed to create folder. It may already exist.');
         }
 
-        redirect($tabUrl);
+        Redirect::redirect($tabUrl);
     });
 
     // ══════════════════════════════════════════════════════════════
@@ -702,20 +702,20 @@ return static function (Router $router, array $context): void {
 
         if (!$svc->protocolSupportsDirectories($protocol)) {
             $flash('error', 'This protocol does not support directories.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
         if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
         $subdir = trim((string) ($_POST['subdir'] ?? ''));
         if ($subdir === '' || !$svc->isValidSubdirPath($subdir)) {
             $flash('error', 'Invalid directory path.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
@@ -725,7 +725,7 @@ return static function (Router $router, array $context): void {
             $flash('error', 'Failed to delete folder. It must be empty first.');
         }
 
-        redirect($tabUrl);
+        Redirect::redirect($tabUrl);
     });
 
     // ══════════════════════════════════════════════════════════════
@@ -750,13 +750,13 @@ return static function (Router $router, array $context): void {
 
         if (!$svc->protocolSupportsUpload($protocol)) {
             $flash('error', 'This protocol does not support file uploads.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
         if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
             $flash('error', 'Invalid CSRF token.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
@@ -767,7 +767,7 @@ return static function (Router $router, array $context): void {
 
         if (!isset($_FILES['upload_file']) || $_FILES['upload_file']['error'] !== UPLOAD_ERR_OK) {
             $flash('error', 'No file uploaded or upload failed.');
-            redirect($tabUrl);
+            Redirect::redirect($tabUrl);
             return;
         }
 
@@ -783,6 +783,6 @@ return static function (Router $router, array $context): void {
             $flash('error', 'Upload failed. File may already exist or extension not allowed. Allowed: ' . $allowed);
         }
 
-        redirect($tabUrl);
+        Redirect::redirect($tabUrl);
     });
 };

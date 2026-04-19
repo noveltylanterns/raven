@@ -34,8 +34,6 @@ use Raven\Lib\View\Public\PublicTemplatePipeline;
 use Raven\Lib\View\Public\PublicTemplateResolver;
 use Raven\Lib\View\Panel\ThemeCatalogService;
 
-use function Raven\Lib\Extra\redirect;
-
 /**
  * Handles split public homepage and page-routing routes.
  */
@@ -256,10 +254,10 @@ final class ContentController
         );
         if ($channelSlug !== null) {
             if ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedSlug) !== 0) {
-                redirect('/' . rawurlencode($channelSlug) . '/' . rawurlencode($canonicalSegment), 301);
+                Redirect::redirect('/' . rawurlencode($channelSlug) . '/' . rawurlencode($canonicalSegment), 301);
             }
         } elseif ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedSlug) !== 0) {
-            redirect('/' . rawurlencode($canonicalSegment), 301);
+            Redirect::redirect('/' . rawurlencode($canonicalSegment), 301);
         }
 
         $page = $this->renderPageContentBlocks($page);
@@ -524,7 +522,7 @@ final class ContentController
         }
 
         // Default behavior remains temporary until route status configuration is introduced.
-        redirect($targetUrl, 302);
+        Redirect::redirect($targetUrl, 302);
         return true;
     }
 

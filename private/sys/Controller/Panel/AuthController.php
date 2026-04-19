@@ -25,7 +25,7 @@ use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\SiteContextBuilder;
 
-use function Raven\Lib\Extra\redirect;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Handles dashboard authentication and logout actions.
@@ -69,11 +69,11 @@ final class AuthController
             $userId = $this->auth->userId();
             if ($userId !== null && !$this->auth->isTwoFactorVerifiedForUser($userId)) {
                 if ($this->auth->pendingTwoFactorUserId() === $userId) {
-                    redirect($this->panelUrl('/login/2fa'));
+                    Redirect::redirect($this->panelUrl('/login/2fa'));
                 }
             }
 
-            redirect($this->panelUrl('/'));
+            Redirect::redirect($this->panelUrl('/'));
         }
 
         $loginIdentifierMode = $this->loginIdentifierMode();
@@ -101,7 +101,7 @@ final class AuthController
 
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/login'));
+            Redirect::redirect($this->panelUrl('/login'));
         }
 
         $result = $this->loginAttemptWorkflowService()->attempt(
@@ -118,15 +118,15 @@ final class AuthController
         );
 
         if (($result['status'] ?? '') === 'two_factor_required') {
-            redirect($this->panelUrl('/login/2fa'));
+            Redirect::redirect($this->panelUrl('/login/2fa'));
         }
 
         if (($result['status'] ?? '') === 'verified') {
-            redirect($this->consumePostLoginRedirectOrDefault());
+            Redirect::redirect($this->consumePostLoginRedirectOrDefault());
         }
 
         $this->flash('error', (string) ($result['message'] ?? 'Login failed.'));
-        redirect($this->panelUrl('/login'));
+        Redirect::redirect($this->panelUrl('/login'));
     }
 
     /**
@@ -138,14 +138,14 @@ final class AuthController
         if ($userId === null || !$this->auth->canAccessPanel($userId)) {
             $this->auth->logout();
             $this->loginUiState()->clearAll();
-            redirect($this->panelUrl('/login'));
+            Redirect::redirect($this->panelUrl('/login'));
         }
 
         $viewState = $this->loginChallengeWorkflowService()->buildViewState($this->auth, $this->loginUiState());
         if (!(bool) ($viewState['ok'] ?? false)) {
             $this->auth->logout();
             $this->loginUiState()->clearAll();
-            redirect($this->panelUrl('/login'));
+            Redirect::redirect($this->panelUrl('/login'));
         }
 
         $this->view->render('panel/auth/login_2fa', [
@@ -169,7 +169,7 @@ final class AuthController
     {
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/login/2fa'));
+            Redirect::redirect($this->panelUrl('/login/2fa'));
         }
 
         $result = $this->loginChallengeWorkflowService()->verifyCodeChallenge($this->auth, $this->loginUiState(), $post);
@@ -177,20 +177,20 @@ final class AuthController
             $this->auth->logout();
             $this->loginUiState()->clearAll();
             $this->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
-            redirect($this->panelUrl('/login'));
+            Redirect::redirect($this->panelUrl('/login'));
         }
 
         if (($result['status'] ?? '') === 'email_sent') {
             $this->flash('success', (string) ($result['message'] ?? 'Check your email for a verification code.'));
-            redirect($this->panelUrl('/login/2fa'));
+            Redirect::redirect($this->panelUrl('/login/2fa'));
         }
 
         if (($result['status'] ?? '') !== 'verified') {
             $this->flash('error', (string) ($result['message'] ?? 'Verification failed.'));
-            redirect($this->panelUrl('/login/2fa'));
+            Redirect::redirect($this->panelUrl('/login/2fa'));
         }
 
-        redirect($this->consumePostLoginRedirectOrDefault());
+        Redirect::redirect($this->consumePostLoginRedirectOrDefault());
     }
 
     /**
@@ -200,7 +200,7 @@ final class AuthController
     {
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
-            redirect($this->panelUrl('/login/2fa'));
+            Redirect::redirect($this->panelUrl('/login/2fa'));
         }
 
         $result = $this->loginChallengeWorkflowService()->selectMethod($this->auth, $this->loginUiState(), $post);
@@ -208,14 +208,14 @@ final class AuthController
             $this->auth->logout();
             $this->loginUiState()->clearAll();
             $this->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
-            redirect($this->panelUrl('/login'));
+            Redirect::redirect($this->panelUrl('/login'));
         }
 
         if (($result['status'] ?? '') === 'invalid_method') {
             $this->flash('error', (string) ($result['message'] ?? 'Selected verification method is invalid.'));
         }
 
-        redirect($this->panelUrl('/login/2fa'));
+        Redirect::redirect($this->panelUrl('/login/2fa'));
     }
 
     /**
@@ -283,7 +283,7 @@ final class AuthController
 
         $this->auth->logout();
         $this->loginUiState()->clearAll();
-        redirect($this->panelUrl('/login'));
+        Redirect::redirect($this->panelUrl('/login'));
     }
 
     /**

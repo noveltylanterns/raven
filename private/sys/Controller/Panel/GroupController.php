@@ -22,7 +22,7 @@ use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
 
-use function Raven\Lib\Extra\redirect;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Handles split group-management routes.
@@ -130,7 +130,7 @@ final class GroupController
             $group = $this->groupRepo->findById($id);
             if ($group === null) {
                 $this->context->flash('error', 'Group not found.');
-                redirect($this->context->panelUrl('/group'));
+                Redirect::redirect($this->context->panelUrl('/group'));
             }
         }
 
@@ -171,7 +171,7 @@ final class GroupController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/group'));
+            Redirect::redirect($this->context->panelUrl('/group'));
         }
 
         $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media', 'permissions'], 'basic');
@@ -192,7 +192,7 @@ final class GroupController
             $slug = $this->input->slug($slugRaw) ?? '';
             if ($slug === '') {
                 $this->context->flash('error', 'Group slug must be a valid slug.');
-                redirect($editUrl);
+                Redirect::redirect($editUrl);
             }
         }
 
@@ -246,7 +246,7 @@ final class GroupController
             : 0;
         if (!$actorIsAdmin && $requestedSystemBits !== $existingSystemBits) {
             $this->context->flash('error', 'Only Admin users can change system administration permissions.');
-            redirect($editUrl);
+            Redirect::redirect($editUrl);
         }
         if (!$actorIsAdmin) {
             $permissionMask = ($permissionMask & (~$systemBitsMask)) | $existingSystemBits;
@@ -259,7 +259,7 @@ final class GroupController
 
         if ($id === null && $name === '') {
             $this->context->flash('error', 'Group name is required.');
-            redirect($editUrl);
+            Redirect::redirect($editUrl);
         }
 
         try {
@@ -272,7 +272,7 @@ final class GroupController
             ]);
         } catch (\Throwable $exception) {
             $this->context->flash('error', $exception->getMessage() ?: 'Failed to save group.');
-            redirect($editUrl);
+            Redirect::redirect($editUrl);
         }
 
         $savedEditUrl = $this->editorTabs->panelEditorUrlWithTab(
@@ -293,7 +293,7 @@ final class GroupController
 
         if (count($coverUploads) > 1 || count($iconUploads) > 1) {
             $this->context->flash('error', 'Please upload only one image per slot.');
-            redirect($savedEditUrl);
+            Redirect::redirect($savedEditUrl);
         }
 
         $removeCover = isset($post['remove_cover_image']) && (string) $post['remove_cover_image'] === '1';
@@ -315,7 +315,7 @@ final class GroupController
             if (!(bool) ($coverResult['ok'] ?? false)) {
                 $this->taxonomyImageService->cleanupPathSets('groups', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
-                redirect($savedEditUrl);
+                Redirect::redirect($savedEditUrl);
             }
 
             $coverStorage = is_array($coverResult['record'] ?? null) ? $coverResult['record'] : [];
@@ -328,7 +328,7 @@ final class GroupController
             if (!(bool) ($iconResult['ok'] ?? false)) {
                 $this->taxonomyImageService->cleanupPathSets('groups', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
-                redirect($savedEditUrl);
+                Redirect::redirect($savedEditUrl);
             }
 
             $iconStorage = is_array($iconResult['record'] ?? null) ? $iconResult['record'] : [];
@@ -341,7 +341,7 @@ final class GroupController
         } catch (\Throwable) {
             $this->taxonomyImageService->cleanupPathSets('groups', $savedId, $newPathSets);
             $this->context->flash('error', 'Failed to save group image selections.');
-            redirect($savedEditUrl);
+            Redirect::redirect($savedEditUrl);
         }
 
         $nextPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('groups', $savedId, $nextStorage);
@@ -349,7 +349,7 @@ final class GroupController
         $this->taxonomyImageService->deleteStoredPaths('groups', $savedId, $obsoletePaths);
 
         $this->context->flash('success', 'Changes saved.');
-        redirect($savedEditUrl);
+        Redirect::redirect($savedEditUrl);
     }
 
     /**
@@ -367,7 +367,7 @@ final class GroupController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/group'));
+            Redirect::redirect($this->context->panelUrl('/group'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
@@ -376,17 +376,17 @@ final class GroupController
                 $this->groupRepo->deleteById($id);
             } catch (\Throwable $exception) {
                 $this->context->flash('error', $exception->getMessage() ?: 'Failed to delete group.');
-                redirect($this->context->panelUrl('/group'));
+                Redirect::redirect($this->context->panelUrl('/group'));
             }
 
             $this->context->flash('success', 'Group deleted.');
-            redirect($this->context->panelUrl('/group'));
+            Redirect::redirect($this->context->panelUrl('/group'));
         }
 
         $selectedIds = $this->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->context->flash('error', 'No groups selected.');
-            redirect($this->context->panelUrl('/group'));
+            Redirect::redirect($this->context->panelUrl('/group'));
         }
 
         $deletedCount = 0;
@@ -410,7 +410,7 @@ final class GroupController
             $this->context->flash('error', 'Failed to delete selected groups.');
         }
 
-        redirect($this->context->panelUrl('/group'));
+        Redirect::redirect($this->context->panelUrl('/group'));
     }
 
     /**

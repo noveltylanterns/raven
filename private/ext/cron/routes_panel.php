@@ -13,7 +13,7 @@ use Raven\Ext\Cron\CronTaskService;
 use Raven\Core\Routing\Router;
 use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
 
-use function Raven\Lib\Extra\redirect;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Registers Scheduled Tasks routes into the panel router.
@@ -290,7 +290,7 @@ return static function (Router $router, array $context): void {
 
         if (!$rvn['csrf']->validate((string) ($_POST['_csrf'] ?? ''))) {
             $flash('error', 'The scheduled tasks form token was invalid.');
-            redirect($indexPath, 303);
+            Redirect::redirect($indexPath, 303);
             return;
         }
 
@@ -305,7 +305,7 @@ return static function (Router $router, array $context): void {
         if ($validation['errors'] !== []) {
             $storeOldRows($validation['rows']);
             $flash('error', $validation['errors'][0]);
-            redirect($indexPath, 303);
+            Redirect::redirect($indexPath, 303);
             return;
         }
 
@@ -323,6 +323,6 @@ return static function (Router $router, array $context): void {
             $flash('error', $exception->getMessage());
         }
 
-        redirect($indexPath, 303);
+        Redirect::redirect($indexPath, 303);
     });
 };

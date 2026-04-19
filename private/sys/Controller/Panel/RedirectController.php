@@ -13,10 +13,9 @@ namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\RedirectRepository;
+use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Panel\Editor;
-
-use function Raven\Lib\Extra\redirect;
 
 /**
  * Handles redirect management routes for the panel.
@@ -108,7 +107,7 @@ final class RedirectController
 
         if ($id !== null && $redirectRow === null) {
             $this->context->flash('error', 'Redirect not found.');
-            redirect($this->context->panelUrl('/redirect'));
+            Redirect::redirect($this->context->panelUrl('/redirect'));
         }
 
         $this->context->renderPanel('panel/redirect/edit', [
@@ -138,7 +137,7 @@ final class RedirectController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/redirect'));
+            Redirect::redirect($this->context->panelUrl('/redirect'));
         }
 
         $title = $this->input->text($post['title'] ?? null, 255);
@@ -150,29 +149,29 @@ final class RedirectController
 
         if ($title === '' || $slug === null) {
             $this->context->flash('error', 'Redirect title and valid slug are required.');
-            redirect($this->editUrl($id));
+            Redirect::redirect($this->editUrl($id));
         }
 
         if (!in_array($status, ['active', 'inactive'], true)) {
             $this->context->flash('error', 'Status must be Active or Inactive.');
-            redirect($this->editUrl($id));
+            Redirect::redirect($this->editUrl($id));
         }
 
         // Prevent root redirects from hijacking reserved public prefixes.
         if ($channelSlug === null && $this->isReservedPublicRootSlug($slug)) {
             $this->context->flash('error', 'This slug is reserved and cannot be used at root level.');
-            redirect($this->editUrl($id));
+            Redirect::redirect($this->editUrl($id));
         }
 
         // Channel dropdown should only post known channel slugs.
         if ($channelSlug !== null && !$this->channelRepo->slugExists($channelSlug)) {
             $this->context->flash('error', 'Selected channel does not exist.');
-            redirect($this->editUrl($id));
+            Redirect::redirect($this->editUrl($id));
         }
 
         if (!$this->isAllowedRedirectTargetUrl($targetUrl)) {
             $this->context->flash('error', 'Target URL must be an absolute http(s) URL or a root-relative path.');
-            redirect($this->editUrl($id));
+            Redirect::redirect($this->editUrl($id));
         }
 
         try {
@@ -188,11 +187,11 @@ final class RedirectController
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->context->flash('error', $message !== '' ? $message : 'Failed to save redirect.');
-            redirect($this->editUrl($id));
+            Redirect::redirect($this->editUrl($id));
         }
 
         $this->context->flash('success', 'Changes saved.');
-        redirect($this->context->panelUrl('/redirect/edit/' . $savedId));
+        Redirect::redirect($this->context->panelUrl('/redirect/edit/' . $savedId));
     }
 
     /**
@@ -210,7 +209,7 @@ final class RedirectController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/redirect'));
+            Redirect::redirect($this->context->panelUrl('/redirect'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
@@ -219,17 +218,17 @@ final class RedirectController
                 $this->redirectRepo->deleteById($id);
             } catch (\Throwable) {
                 $this->context->flash('error', 'Failed to delete redirect.');
-                redirect($this->context->panelUrl('/redirect'));
+                Redirect::redirect($this->context->panelUrl('/redirect'));
             }
 
             $this->context->flash('success', 'Redirect deleted.');
-            redirect($this->context->panelUrl('/redirect'));
+            Redirect::redirect($this->context->panelUrl('/redirect'));
         }
 
         $selectedIds = $this->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->context->flash('error', 'No redirects selected.');
-            redirect($this->context->panelUrl('/redirect'));
+            Redirect::redirect($this->context->panelUrl('/redirect'));
         }
 
         $deletedCount = 0;
@@ -254,7 +253,7 @@ final class RedirectController
             $this->context->flash('error', 'Failed to delete selected redirects.');
         }
 
-        redirect($this->context->panelUrl('/redirect'));
+        Redirect::redirect($this->context->panelUrl('/redirect'));
     }
 
     /**

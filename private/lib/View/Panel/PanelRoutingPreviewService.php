@@ -1,13 +1,19 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/View/Panel/PanelRoutingPreviewService.php
+ * Shared routing-preview derivation helpers for panel diagnostics.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Panel;
+namespace Raven\Lib\View\Panel;
 
 use Raven\Core\Config;
 use Raven\Lib\Directory\Mode;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\Panel\ThemeCatalogService;
 
 /**
  * Shared helpers for panel routing-preview derivations.
@@ -18,6 +24,14 @@ final class PanelRoutingPreviewService
     private InputSanitizer $input;
     private ThemeCatalogService $themeCatalog;
 
+    /**
+     * Stores the dependencies used to derive routing-preview values for the panel.
+     *
+     * @param string $projectRoot Project root used for fallback template checks.
+     * @param InputSanitizer $input Shared sanitizer for route-preview slug normalization.
+     * @param ThemeCatalogService $themeCatalog Shared theme catalog for inheritance-aware template checks.
+     * @return void
+     */
     public function __construct(string $projectRoot, InputSanitizer $input, ThemeCatalogService $themeCatalog)
     {
         $this->projectRoot = rtrim($projectRoot, '/\\');
@@ -25,6 +39,18 @@ final class PanelRoutingPreviewService
         $this->themeCatalog = $themeCatalog;
     }
 
+    /**
+     * Builds the public-facing preview path for one page under the current routing rules.
+     *
+     * @param string $pageSlug Raw page slug.
+     * @param int $pageId Page id used by id-bearing route modes.
+     * @param string $channelSlug Raw channel slug for channel-scoped routes.
+     * @param string $publishedAt Published timestamp string used by dated route modes.
+     * @param string $channelPageRouteMode Configured route mode for channel pages.
+     * @param string $channelPageUrlSeparator Configured separator for channel page routes.
+     * @param string $contentSeparator Fallback content separator when route policy needs one.
+     * @return string Root-relative preview path for the current routing settings.
+     */
     public function routingPublicPathForPage(
         string $pageSlug,
         int $pageId,
@@ -62,8 +88,10 @@ final class PanelRoutingPreviewService
     }
 
     /**
+     * Picks the best landing-page slug per channel from one page row set.
+     *
      * @param array<int, array<string, mixed>> $pagesForRouting
-     * @return array<string, string>
+     * @return array<string, string> Map of channel slug to chosen landing-page slug.
      */
     public function channelLandingMapFromPages(array $pagesForRouting): array
     {
@@ -127,6 +155,12 @@ final class PanelRoutingPreviewService
         return $result;
     }
 
+    /**
+     * Detects whether the active public-theme chain provides a channel index template.
+     *
+     * @param Config $config Runtime config reader used to resolve the active public theme.
+     * @return bool True when the theme chain or core fallback supplies `channel/index.php`.
+     */
     public function channelIndexTemplateExists(Config $config): bool
     {
         $themeSlug = $this->themeCatalog->activeSlugFromConfig($config);
@@ -141,8 +175,10 @@ final class PanelRoutingPreviewService
     }
 
     /**
+     * Normalizes the reserved public-prefix list used by routing diagnostics.
+     *
      * @param array<int, string> $routePrefixes
-     * @return array<int, string>
+     * @return array<int, string> Deduplicated lowercase reserved prefixes.
      */
     public function reservedPublicPrefixes(string $panelPath, array $routePrefixes = []): array
     {

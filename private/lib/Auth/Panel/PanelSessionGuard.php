@@ -1,11 +1,18 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Auth/Panel/PanelSessionGuard.php
+ * Shared panel login gate and session-identity synchronizer.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Auth\Panel;
 
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Transport\Response;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Shared panel-login guard and session identity synchronization helper.
@@ -24,7 +31,7 @@ final class PanelSessionGuard
     ): void {
         if (!$auth->isLoggedIn()) {
             if ($isGuestLoginEntryRequest) {
-                Response::redirect($loginUrl);
+                Redirect::redirect($loginUrl);
             }
 
             $renderPublicNotFound();
@@ -34,7 +41,7 @@ final class PanelSessionGuard
         if (!$auth->canAccessPanel()) {
             $auth->logout();
             if ($isGuestLoginEntryRequest) {
-                Response::redirect($loginUrl);
+                Redirect::redirect($loginUrl);
             }
 
             $renderPublicNotFound();
@@ -44,12 +51,12 @@ final class PanelSessionGuard
         $userId = $auth->userId();
         if ($userId !== null && !$auth->isTwoFactorVerifiedForUser($userId)) {
             if ($auth->pendingTwoFactorUserId() === $userId) {
-                Response::redirect($twoFactorUrl);
+                Redirect::redirect($twoFactorUrl);
             }
 
             $auth->logout();
             if ($isGuestLoginEntryRequest) {
-                Response::redirect($loginUrl);
+                Redirect::redirect($loginUrl);
             }
 
             $renderPublicNotFound();

@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Transport/Response.php
+ * Thin shared response helper for JSON and common cache headers.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Transport;
@@ -9,14 +16,13 @@ namespace Raven\Lib\Transport;
  */
 final class Response
 {
-    public static function redirect(string $to, int $status = 302): never
-    {
-        header('Location: ' . $to, true, $status);
-        exit;
-    }
-
     /**
+     * Emits a JSON response payload with optional no-store cache headers.
+     *
      * @param array<string, mixed> $payload
+     * @param int $status HTTP status code to emit for the JSON response.
+     * @param bool $noStore Whether the response should opt out of client/proxy caching.
+     * @return void
      */
     public static function json(array $payload, int $status = 200, bool $noStore = true): void
     {
@@ -34,6 +40,11 @@ final class Response
         }
     }
 
+    /**
+     * Applies the shared no-store cache headers Raven uses for sensitive responses.
+     *
+     * @return void
+     */
     public static function applyNoStoreHeaders(): void
     {
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');

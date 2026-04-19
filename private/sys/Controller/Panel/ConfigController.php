@@ -24,7 +24,7 @@ use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\ThemeCatalogService;
 
-use function Raven\Lib\Extra\redirect;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Handles the panel configuration editor routes.
@@ -240,7 +240,7 @@ final class ConfigController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/configuration',
                 null,
@@ -253,7 +253,7 @@ final class ConfigController
         $rawConfigValues = $post['config_values'] ?? [];
         if (!is_array($rawConfigValues)) {
             $this->context->flash('error', 'Invalid configuration payload.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/configuration',
                 null,
@@ -316,7 +316,7 @@ final class ConfigController
             }
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', $exception->getMessage());
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/configuration',
                 null,
@@ -329,7 +329,7 @@ final class ConfigController
         $panelPath = $this->input->slug((string) ($nextConfig['panel']['path'] ?? ''));
         if ($domain === '' || $panelPath === null) {
             $this->context->flash('error', 'site.domain and panel.path are required.');
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/configuration',
                 null,
@@ -354,7 +354,7 @@ final class ConfigController
         $this->persistConfigSnapshot($nextConfig);
 
         $this->context->flash('success', 'Configuration saved.');
-        redirect($this->editorTabs->panelEditorUrlWithTab(
+        Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/configuration',
                 null,

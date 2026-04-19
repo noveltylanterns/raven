@@ -23,14 +23,14 @@ use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\Panel\PanelMediaConfigService;
+use Raven\Lib\View\Panel\PanelMediaConfigService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\QrCodeService;
 use Raven\Lib\Security\WebAuthnService;
 use Raven\Lib\Transport\Response;
 
-use function Raven\Lib\Extra\redirect;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Handles the current user's panel preferences routes.
@@ -110,13 +110,13 @@ final class PreferencesController
 
         $userId = $this->context->auth()->userId();
         if ($userId === null) {
-            redirect($this->context->panelUrl('/login'));
+            Redirect::redirect($this->context->panelUrl('/login'));
         }
 
         $preferences = $this->context->auth()->userPreferences($userId);
         if ($preferences === null) {
             $this->context->flash('error', 'Unable to load your preferences.');
-            redirect($this->context->panelUrl('/'));
+            Redirect::redirect($this->context->panelUrl('/'));
         }
 
         $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['account', 'profile', 'security'], 'account');
@@ -167,18 +167,18 @@ final class PreferencesController
 
         $userId = $this->context->auth()->userId();
         if ($userId === null) {
-            redirect($this->context->panelUrl('/login'));
+            Redirect::redirect($this->context->panelUrl('/login'));
         }
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($preferencesUrl);
+            Redirect::redirect($preferencesUrl);
         }
 
         $current = $this->context->auth()->userPreferences($userId);
         if ($current === null) {
             $this->context->flash('error', 'Unable to load your current profile data.');
-            redirect($preferencesUrl);
+            Redirect::redirect($preferencesUrl);
         }
 
         $loginIdentifierMode = $this->panelLoginIdentifierMode();
@@ -345,7 +345,7 @@ final class PreferencesController
             }
 
             $this->context->flash('error', implode(' ', $errors));
-            redirect($preferencesUrl);
+            Redirect::redirect($preferencesUrl);
         }
 
         $update = $this->context->auth()->updateUserPreferences($userId, [
@@ -372,7 +372,7 @@ final class PreferencesController
             }
 
             $this->context->flash('error', implode(' ', $update['errors']));
-            redirect($preferencesUrl);
+            Redirect::redirect($preferencesUrl);
         }
 
         $oldAvatar = $current['avatar'] ?? null;
@@ -386,7 +386,7 @@ final class PreferencesController
         $this->context->auth()->markTwoFactorVerified($userId);
 
         $this->context->flash('success', 'User preferences updated.');
-        redirect($preferencesUrl);
+        Redirect::redirect($preferencesUrl);
     }
 
     /**

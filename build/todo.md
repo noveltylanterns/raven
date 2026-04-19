@@ -25,6 +25,8 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 - [x] Move lib/Panel/PanelPageAuthorOptionBuilder.php to lib/View/Panel/EditorAuthor.php
 - [x] Move lib/Panel/PanelUrl.php to lib/Directory/Panel.php
 - [x] Rename lib/Diagnostics/ to lib/Diagnostic/
+- [x] Merge `lib/Extra` redirect helper into `lib/Transport/Redirect.php` so redirect send + target validation live on one canonical transport seam
+- [x] Move the remaining `lib/Panel/` classes (`PanelPost`, `PanelMediaConfigService`, `PanelRoutingPreviewService`) into `lib/View/Panel/` and remove the now-empty `lib/Panel/` bucket
 
 
 
@@ -179,7 +181,7 @@ Thin controller wrappers that delegate to existing shared services (candidate fo
 
 - [x] Run `php -l` on all modified PHP files — all clean
 - [ ] Verify panel editor flows in browser for all affected routes: channel edit, config, system, user/preferences, content page edit
-- [ ] Write release notes
+- [x] Write release notes
 
 
 ## Long Term

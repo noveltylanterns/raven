@@ -23,8 +23,6 @@ use Raven\Lib\Auth\LoginUiStateService;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Security\LoginTwoFactorFlowService;
 
-use function Raven\Lib\Extra\redirect;
-
 /**
  * Handles split public auth routes.
  */
@@ -70,12 +68,12 @@ final class AuthController
     {
         $redirectPath = $this->publicPostLoginRedirectFromRequest();
         if ($this->context->auth()->isLoggedIn() && $this->context->auth()->isTwoFactorVerifiedForUser()) {
-            redirect($redirectPath);
+            Redirect::redirect($redirectPath);
         }
 
         if ($this->context->auth()->pendingTwoFactorUserId() !== null) {
             $this->storePublicPostLoginRedirect($redirectPath);
-            redirect($this->loginTwoFactorPathWithRedirect($redirectPath));
+            Redirect::redirect($this->loginTwoFactorPathWithRedirect($redirectPath));
         }
 
         $loginIdentifierMode = $this->identifierResolver->modeFromConfig($this->context->config());
@@ -106,7 +104,7 @@ final class AuthController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->loginPathWithRedirect($requestedRedirect));
+            Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
         }
 
         $result = $this->loginAttemptWorkflowService()->attempt(
@@ -117,11 +115,11 @@ final class AuthController
         );
 
         if (($result['status'] ?? '') === 'two_factor_required') {
-            redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
+            Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
         if (($result['status'] ?? '') === 'verified') {
-            redirect($this->consumePublicPostLoginRedirectOrDefault());
+            Redirect::redirect($this->consumePublicPostLoginRedirectOrDefault());
         }
 
         if (($result['status'] ?? '') === 'missing_user') {
@@ -130,7 +128,7 @@ final class AuthController
         }
 
         $this->context->flash('error', (string) ($result['message'] ?? 'Login failed.'));
-        redirect($this->loginPathWithRedirect($requestedRedirect));
+        Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
     }
 
     /**
@@ -150,7 +148,7 @@ final class AuthController
             $this->context->auth()->logout();
             $this->clearPublicPostLoginRedirect();
             $this->context->flash('error', (string) ($viewState['message'] ?? 'Your login session expired. Please log in again.'));
-            redirect($this->loginPathWithRedirect($redirectPath));
+            Redirect::redirect($this->loginPathWithRedirect($redirectPath));
         }
 
         $this->context->renderPublic('auth/login_2fa', [
@@ -181,7 +179,7 @@ final class AuthController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
+            Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
         $result = $this->loginChallengeWorkflowService()->verifyCodeChallenge($this->context->auth(), $this->loginUiState(), $post);
@@ -189,27 +187,27 @@ final class AuthController
             $this->context->auth()->logout();
             $this->clearPublicPostLoginRedirect();
             $this->context->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
-            redirect($this->loginPathWithRedirect($requestedRedirect));
+            Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
         }
 
         if (($result['status'] ?? '') === 'email_sent') {
             $this->context->flash('success', (string) ($result['message'] ?? 'Check your email for a verification code.'));
-            redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
+            Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
         if (($result['status'] ?? '') === 'unsupported') {
             $this->context->auth()->logout();
             $this->clearPublicPostLoginRedirect();
             $this->context->flash('error', 'This verification method is not supported in the public login form.');
-            redirect($this->loginPathWithRedirect($requestedRedirect));
+            Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
         }
 
         if (($result['status'] ?? '') !== 'verified') {
             $this->context->flash('error', (string) ($result['message'] ?? 'Verification failed.'));
-            redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
+            Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
-        redirect($this->consumePublicPostLoginRedirectOrDefault());
+        Redirect::redirect($this->consumePublicPostLoginRedirectOrDefault());
     }
 
     /**
@@ -225,7 +223,7 @@ final class AuthController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
+            Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
         $result = $this->loginChallengeWorkflowService()->selectMethod($this->context->auth(), $this->loginUiState(), $post);
@@ -233,14 +231,14 @@ final class AuthController
             $this->context->auth()->logout();
             $this->clearPublicPostLoginRedirect();
             $this->context->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
-            redirect($this->loginPathWithRedirect($requestedRedirect));
+            Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
         }
 
         if (($result['status'] ?? '') === 'invalid_method') {
             $this->context->flash('error', (string) ($result['message'] ?? 'Selected verification method is invalid.'));
         }
 
-        redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
+        Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
     }
 
     /**
@@ -335,18 +333,18 @@ final class AuthController
     {
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect('/register');
+            Redirect::redirect('/register');
         }
 
         $registrationMode = $this->context->routeConfigService()->registrationMode();
         if ($registrationMode === 'closed') {
             $this->context->flash('error', 'Registration is currently closed.');
-            redirect('/register');
+            Redirect::redirect('/register');
         }
 
         if ($this->isRegistrationTemporarilyLocked()) {
             $this->context->flash('error', 'Too many registration attempts. Please wait a few minutes and try again.');
-            redirect('/register');
+            Redirect::redirect('/register');
         }
 
         $input = $this->context->input();
@@ -402,7 +400,7 @@ final class AuthController
         if ($errors !== []) {
             $this->recordRegistrationFailure();
             $this->context->flash('error', implode(' ', $errors));
-            redirect('/register');
+            Redirect::redirect('/register');
         }
 
         $savedUserId = null;
@@ -437,7 +435,7 @@ final class AuthController
 
                     $this->recordRegistrationFailure();
                     $this->context->flash('error', 'Invite token is no longer available. Please request a new token.');
-                    redirect('/register');
+                    Redirect::redirect('/register');
                 }
             }
         } catch (\Throwable $exception) {
@@ -449,12 +447,12 @@ final class AuthController
                 . $exception->getMessage()
             );
             $this->context->flash('error', 'Unable to create account with the provided details. Please review your submission and try again.');
-            redirect('/register');
+            Redirect::redirect('/register');
         }
 
         $this->clearRegistrationFailures();
         $this->context->flash('success', 'Account created. You can sign in if your account has dashboard access.');
-        redirect('/login');
+        Redirect::redirect('/login');
     }
 
     /**

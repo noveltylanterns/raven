@@ -49,7 +49,6 @@ use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\PageImageManager;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Media\Panel\UserMediaPathService;
-use Raven\Lib\Panel\PanelMediaConfigService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\View\SiteContextBuilder;
@@ -57,6 +56,7 @@ use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorMCE;
 use Raven\Lib\View\Panel\EditorMDE;
 use Raven\Lib\View\Panel\EditorTabs;
+use Raven\Lib\View\Panel\PanelMediaConfigService;
 use Raven\Lib\Transport\Upload;
 use RuntimeException;
 

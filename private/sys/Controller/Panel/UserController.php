@@ -27,12 +27,12 @@ use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\Panel\PanelMediaConfigService;
+use Raven\Lib\View\Panel\PanelMediaConfigService;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
 
-use function Raven\Lib\Extra\redirect;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Handles split user-management routes.
@@ -206,7 +206,7 @@ final class UserController
 
         if ($id !== null && $user === null) {
             $this->context->flash('error', 'User not found.');
-            redirect($this->context->panelUrl('/user'));
+            Redirect::redirect($this->context->panelUrl('/user'));
         }
 
         $groupOptions = is_array($editData['group_options'] ?? null) ? $editData['group_options'] : [];
@@ -259,7 +259,7 @@ final class UserController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/user'));
+            Redirect::redirect($this->context->panelUrl('/user'));
         }
 
         $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['account', 'permissions', 'profile', 'security'], 'account');
@@ -304,7 +304,7 @@ final class UserController
             $existingUser = $this->userRepo->findById($id);
             if ($existingUser === null) {
                 $this->context->flash('error', 'User not found.');
-                redirect($this->context->panelUrl('/user'));
+                Redirect::redirect($this->context->panelUrl('/user'));
             }
 
             $existingPreferences = $this->context->auth()->userPreferences($id);
@@ -361,7 +361,7 @@ final class UserController
             $requestedAdmin = in_array(1, $groupIds, true);
             if ($requestedAdmin && !$targetAlreadyHasAdmin) {
                 $this->context->flash('error', 'Only Admin users can assign the Admin group.');
-                redirect($editUrl);
+                Redirect::redirect($editUrl);
             }
 
             if ($targetAlreadyHasAdmin && !in_array(1, $groupIds, true)) {
@@ -388,7 +388,7 @@ final class UserController
 
                 if ($newConfigurationAssignments !== []) {
                     $this->context->flash('error', 'Only Admin users can assign groups with Manage System Configuration.');
-                    redirect($editUrl);
+                    Redirect::redirect($editUrl);
                 }
             }
         }
@@ -408,27 +408,27 @@ final class UserController
                     ? 'Valid username, email, and theme are required.'
                     : 'Valid optional username, email, and theme are required.'
             );
-            redirect($editUrl);
+            Redirect::redirect($editUrl);
         }
 
         if ($id === null && strlen($password) < 8) {
             $this->context->flash('error', 'New users require a password of at least 8 characters.');
-            redirect($editUrl);
+            Redirect::redirect($editUrl);
         }
 
         if ($id === null && !hash_equals($password, $passwordConfirm)) {
             $this->context->flash('error', 'Password confirmation does not match.');
-            redirect($securityTabUrl);
+            Redirect::redirect($securityTabUrl);
         }
 
         if ($id !== null && $password !== '' && strlen($password) < 8) {
             $this->context->flash('error', 'Password must be at least 8 characters.');
-            redirect($editUrl);
+            Redirect::redirect($editUrl);
         }
 
         if ($id !== null && $password !== '' && !hash_equals($password, $passwordConfirm)) {
             $this->context->flash('error', 'Password confirmation does not match.');
-            redirect($securityTabUrl);
+            Redirect::redirect($securityTabUrl);
         }
 
         if ($primaryGroupId < 1) {
@@ -443,7 +443,7 @@ final class UserController
 
         if ($primaryGroupId < 1 || $groupIds === []) {
             $this->context->flash('error', 'At least one user group is required.');
-            redirect($editUrl);
+            Redirect::redirect($editUrl);
         }
 
         $avatarSet = false;
@@ -478,19 +478,19 @@ final class UserController
 
             if (!(bool) $result['ok']) {
                 $this->context->flash('error', (string) ($result['error'] ?? 'Avatar upload failed.'));
-                redirect($editUrl);
+                Redirect::redirect($editUrl);
             }
 
             $normalizedExtension = $this->avatarUploadService->normalizeExtension((string) ($result['extension'] ?? ''));
             if ($normalizedExtension === null) {
                 $this->context->flash('error', 'Avatar upload format is not supported.');
-                redirect($editUrl);
+                Redirect::redirect($editUrl);
             }
 
             if ($id !== null) {
                 if ($currentUserString === null) {
                     $this->context->flash('error', 'User string is missing for this account.');
-                    redirect($editUrl);
+                    Redirect::redirect($editUrl);
                 }
 
                 $avatarsDir = $this->userMediaPathService->avatarStorageDirectory($this->root);
@@ -500,7 +500,7 @@ final class UserController
                 $storeError = $this->avatarUploadService->storeSanitizedUpload($avatarUpload, $destination);
                 if ($storeError !== null) {
                     $this->context->flash('error', $storeError);
-                    redirect($editUrl);
+                    Redirect::redirect($editUrl);
                 }
 
                 $avatarSet = true;
@@ -519,19 +519,19 @@ final class UserController
             $coverResult = $this->validateUserCoverUpload($coverUpload);
             if (!(bool) $coverResult['ok']) {
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Cover image upload failed.'));
-                redirect($editUrl);
+                Redirect::redirect($editUrl);
             }
 
             $normalizedExtension = $this->avatarUploadService->normalizeExtension((string) ($coverResult['extension'] ?? ''));
             if ($normalizedExtension === null) {
                 $this->context->flash('error', 'Cover image upload format is not supported.');
-                redirect($editUrl);
+                Redirect::redirect($editUrl);
             }
 
             if ($id !== null) {
                 if ($currentUserString === null) {
                     $this->context->flash('error', 'User string is missing for this account.');
-                    redirect($editUrl);
+                    Redirect::redirect($editUrl);
                 }
 
                 $coversDir = $this->userMediaPathService->coverStorageDirectory($this->root);
@@ -541,7 +541,7 @@ final class UserController
                 $storeError = $this->avatarUploadService->storeSanitizedImageUpload($coverUpload, $destination);
                 if ($storeError !== null) {
                     $this->context->flash('error', $storeError);
-                    redirect($editUrl);
+                    Redirect::redirect($editUrl);
                 }
 
                 $uploadedCoverFilename = $coverImage;
@@ -657,7 +657,7 @@ final class UserController
             }
 
             $this->context->flash('error', $exception->getMessage() ?: 'Failed to save user.');
-            redirect($editUrl);
+            Redirect::redirect($editUrl);
         }
 
         $twoFactorUpdateError = null;
@@ -692,7 +692,7 @@ final class UserController
 
         if ($twoFactorUpdateError !== null) {
             $this->context->flash('error', $twoFactorUpdateError);
-            redirect($this->editorTabs->panelEditorUrlWithTab(
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/user/edit',
                 $savedId,
@@ -702,7 +702,7 @@ final class UserController
         }
 
         $this->context->flash('success', 'Changes saved.');
-        redirect($this->editorTabs->panelEditorUrlWithTab(
+        Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
             fn (string $suffix): string => $this->context->panelUrl($suffix),
             '/user/edit',
             $savedId,
@@ -726,7 +726,7 @@ final class UserController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/user'));
+            Redirect::redirect($this->context->panelUrl('/user'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
@@ -735,24 +735,24 @@ final class UserController
         if ($id !== null) {
             if ($currentUserId === $id) {
                 $this->context->flash('error', 'You cannot delete your currently logged-in account.');
-                redirect($this->context->panelUrl('/user'));
+                Redirect::redirect($this->context->panelUrl('/user'));
             }
 
             try {
                 $this->userRepo->deleteById($id);
             } catch (\Throwable $exception) {
                 $this->context->flash('error', $exception->getMessage() ?: 'Failed to delete user.');
-                redirect($this->context->panelUrl('/user'));
+                Redirect::redirect($this->context->panelUrl('/user'));
             }
 
             $this->context->flash('success', 'User deleted.');
-            redirect($this->context->panelUrl('/user'));
+            Redirect::redirect($this->context->panelUrl('/user'));
         }
 
         $selectedIds = $this->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->context->flash('error', 'No users selected.');
-            redirect($this->context->panelUrl('/user'));
+            Redirect::redirect($this->context->panelUrl('/user'));
         }
 
         $deletedCount = 0;
@@ -790,7 +790,7 @@ final class UserController
             }
         }
 
-        redirect($this->context->panelUrl('/user'));
+        Redirect::redirect($this->context->panelUrl('/user'));
     }
 
     /**
@@ -839,7 +839,7 @@ final class UserController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/user/invites'));
+            Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
 
         $isReusable = $this->panelInvitePolicyService->isReusableInviteType($post['invite_type'] ?? 'single');
@@ -855,19 +855,19 @@ final class UserController
             $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', $exception->getMessage());
-            redirect($this->context->panelUrl('/user/invites'));
+            Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
 
         try {
             $token = $this->inviteTokens()->createToken($isReusable, $expiresAt, $this->context->auth()->userId(), $manualToken);
         } catch (\Throwable $exception) {
             $this->context->flash('error', 'Failed to create invite token: ' . ($exception->getMessage() ?: 'Unknown error.'));
-            redirect($this->context->panelUrl('/user/invites'));
+            Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
 
         $this->context->flash('success', $isReusable ? 'Reusable invite token created.' : 'Single-use invite token created.');
         $this->flashList('generated_invites', [$token]);
-        redirect($this->context->panelUrl('/user/invites'));
+        Redirect::redirect($this->context->panelUrl('/user/invites'));
     }
 
     /**
@@ -888,7 +888,7 @@ final class UserController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/user/invites'));
+            Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
 
         $count = $this->panelInvitePolicyService->normalizeBatchCount($post['count'] ?? null, 10, 1, 100);
@@ -897,19 +897,19 @@ final class UserController
             $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', $exception->getMessage());
-            redirect($this->context->panelUrl('/user/invites'));
+            Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
 
         try {
             $tokens = $this->inviteTokens()->createSingleUseBatch($count, $expiresAt, $this->context->auth()->userId());
         } catch (\Throwable $exception) {
             $this->context->flash('error', 'Failed to generate invite tokens: ' . ($exception->getMessage() ?: 'Unknown error.'));
-            redirect($this->context->panelUrl('/user/invites'));
+            Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
 
         $this->context->flash('success', 'Generated ' . count($tokens) . ' single-use invite token' . (count($tokens) === 1 ? '' : 's') . '.');
         $this->flashList('generated_invites', $tokens);
-        redirect($this->context->panelUrl('/user/invites'));
+        Redirect::redirect($this->context->panelUrl('/user/invites'));
     }
 
     /**
@@ -930,22 +930,22 @@ final class UserController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/user/invites'));
+            Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id === null) {
             $this->context->flash('error', 'Invite token id is required.');
-            redirect($this->context->panelUrl('/user/invites'));
+            Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
 
         if (!$this->inviteTokens()->deleteById($id)) {
             $this->context->flash('error', 'Invite token was not found.');
-            redirect($this->context->panelUrl('/user/invites'));
+            Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
 
         $this->context->flash('success', 'Invite token deleted.');
-        redirect($this->context->panelUrl('/user/invites'));
+        Redirect::redirect($this->context->panelUrl('/user/invites'));
     }
 
     /**
@@ -1053,7 +1053,7 @@ final class UserController
         }
 
         $this->context->flash('error', 'User invite tokens are available only when public registration mode is set to Invite.');
-        redirect($this->context->panelUrl('/user'));
+        Redirect::redirect($this->context->panelUrl('/user'));
         return false;
     }
 

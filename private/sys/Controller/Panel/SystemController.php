@@ -39,18 +39,18 @@ use Raven\Lib\Extension\ExtensionStorageProvisioner;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
-use Raven\Lib\Panel\PanelRoutingPreviewService;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\Transport\Upload;
+use Raven\Lib\View\Panel\PanelRoutingPreviewService;
 use Raven\Lib\View\Panel\ThemeCatalogService;
 use Raven\Lib\View\Panel\ThemeCloneService;
 use Raven\Lib\View\Panel\ThemeScaffoldService;
 use Raven\Lib\View\Public\PublicThemeRegistry;
 use Raven\Lib\View\ThemeFallbackRenderer;
 
-use function Raven\Lib\Extra\redirect;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Handles split panel system-management routes.
@@ -357,19 +357,19 @@ final class SystemController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($post['theme'] ?? null, 80)));
         if (!$this->isSafePublicThemeSlug($themeSlug)) {
             $this->context->flash('error', 'Invalid theme identifier.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $availableThemes = $this->publicThemeOptions();
         if (!isset($availableThemes[$themeSlug])) {
             $this->context->flash('error', 'Theme "' . $themeSlug . '" is not available.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         try {
@@ -377,11 +377,11 @@ final class SystemController
             $this->config = new Config($this->config->path());
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', 'Failed to update active theme: ' . $exception->getMessage());
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $this->context->flash('success', 'Active public theme set to "' . ($availableThemes[$themeSlug] ?? $themeSlug) . '".');
-        redirect($this->context->panelUrl('/themes'));
+        Redirect::redirect($this->context->panelUrl('/themes'));
     }
 
     /**
@@ -399,31 +399,31 @@ final class SystemController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $themeName = trim((string) $this->input->text($post['name'] ?? null, 120));
         if ($themeName === '') {
             $this->context->flash('error', 'Theme name is required.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($post['slug'] ?? null, 80)));
         if (!$this->isSafePublicThemeSlug($themeSlug)) {
             $this->context->flash('error', 'Theme slug must use lowercase letters, numbers, underscores, or dashes.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $parentTheme = strtolower(trim((string) $this->input->text($post['parent_theme'] ?? null, 80)));
         if ($parentTheme !== '' && !$this->isSafePublicThemeSlug($parentTheme)) {
             $this->context->flash('error', 'Parent theme slug is invalid.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $cloneTheme = strtolower(trim((string) $this->input->text($post['clone_theme'] ?? null, 80)));
         if ($cloneTheme !== '' && !$this->isSafePublicThemeSlug($cloneTheme)) {
             $this->context->flash('error', 'Clone-source theme slug is invalid.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $themesRoot = $this->publicThemesRoot();
@@ -431,15 +431,15 @@ final class SystemController
         $themeManifests = PublicThemeRegistry::manifests($themesRoot);
         if ($parentTheme !== '' && !isset($themeOptions[$parentTheme])) {
             $this->context->flash('error', 'Selected parent theme was not found.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
         if ($cloneTheme !== '' && !isset($themeOptions[$cloneTheme])) {
             $this->context->flash('error', 'Selected clone-source theme was not found.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
         if ($parentTheme === $themeSlug) {
             $this->context->flash('error', 'A child theme cannot use itself as parent.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $generateAgentsFile = isset($post['generate_agents']) && (string) $post['generate_agents'] === '1';
@@ -449,7 +449,7 @@ final class SystemController
         $themePath = $themesRoot . '/' . $themeSlug;
         if (file_exists($themePath)) {
             $this->context->flash('error', 'A theme directory with this slug already exists.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $isChildTheme = $parentTheme !== '';
@@ -524,7 +524,7 @@ final class SystemController
         } catch (\RuntimeException $exception) {
             $this->directoryTreeService()->removeTree($themePath);
             $this->context->flash('error', 'Failed to create theme scaffold: ' . $exception->getMessage());
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         if ($setActive) {
@@ -534,7 +534,7 @@ final class SystemController
             } catch (\RuntimeException $exception) {
                 $this->directoryTreeService()->removeTree($themePath);
                 $this->context->flash('error', 'Theme scaffold created, but activation failed: ' . $exception->getMessage());
-                redirect($this->context->panelUrl('/themes'));
+                Redirect::redirect($this->context->panelUrl('/themes'));
             }
         }
 
@@ -560,7 +560,7 @@ final class SystemController
         }
 
         $this->context->flash('success', $message);
-        redirect($this->context->panelUrl('/themes'));
+        Redirect::redirect($this->context->panelUrl('/themes'));
     }
 
     /**
@@ -579,7 +579,7 @@ final class SystemController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $upload = $this->packageInstallWorkflowService()->validateUpload(
@@ -589,7 +589,7 @@ final class SystemController
         );
         if (!(bool) ($upload['ok'] ?? false)) {
             $this->context->flash('error', (string) ($upload['error'] ?? 'Theme upload failed.'));
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $tmpPath = (string) ($upload['tmp_path'] ?? '');
@@ -618,20 +618,20 @@ final class SystemController
             }
 
             $this->context->flash('error', $slugError);
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
         $themeSlug = (string) ($slugResult['name'] ?? '');
 
         $themesRoot = $this->publicThemesRoot();
         if (!is_dir($themesRoot) && !mkdir($themesRoot, 0775, true) && !is_dir($themesRoot)) {
             $this->context->flash('error', 'Failed to initialize public/theme directory.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $targetDirectory = $themesRoot . '/' . $themeSlug;
         if (!mkdir($targetDirectory, 0775, true) && !is_dir($targetDirectory)) {
             $this->context->flash('error', 'Failed to create theme directory.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $extractError = $this->packageInstallWorkflowService()->extractTo(
@@ -644,28 +644,28 @@ final class SystemController
         );
         if (is_string($extractError)) {
             $this->context->flash('error', $extractError);
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $flattenError = $this->packageInstallWorkflowService()->flattenRoot($targetDirectory);
         if (is_string($flattenError)) {
             $this->directoryTreeService()->removeTree($targetDirectory);
             $this->context->flash('error', $flattenError);
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $manifestPath = $targetDirectory . '/theme.json';
         if (!is_file($manifestPath)) {
             $this->directoryTreeService()->removeTree($targetDirectory);
             $this->context->flash('error', 'Theme upload failed: archive must include theme.json at archive root.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $manifests = PublicThemeRegistry::manifests($themesRoot);
         if (!isset($manifests[$themeSlug])) {
             $this->directoryTreeService()->removeTree($targetDirectory);
             $this->context->flash('error', 'Theme upload failed: theme.json is missing required/valid metadata.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $message = 'Theme uploaded to public/theme/' . $themeSlug . '/. Enable it from the Installed Themes list when ready.';
@@ -674,7 +674,7 @@ final class SystemController
         }
 
         $this->context->flash('success', $message);
-        redirect($this->context->panelUrl('/themes'));
+        Redirect::redirect($this->context->panelUrl('/themes'));
     }
 
     /**
@@ -693,13 +693,13 @@ final class SystemController
         $themeSlug = strtolower(trim((string) $this->input->text($query['theme'] ?? null, 80)));
         if (!$this->isSafePublicThemeSlug($themeSlug)) {
             $this->context->flash('error', 'Invalid theme identifier.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $themePath = $this->publicThemesRoot() . '/' . $themeSlug;
         if (!is_dir($themePath)) {
             $this->context->flash('error', 'Theme directory was not found on disk.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $format = strtolower(trim((string) $this->input->text($query['format'] ?? 'zip', 20)));
@@ -708,7 +708,7 @@ final class SystemController
             $archive = $this->archivePackages()->exportDir($themePath, $themeSlug, $format);
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', 'Theme export failed: ' . $exception->getMessage());
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $downloadFilename = $this->archivePackages()->downloadName('theme-' . $themeSlug, (string) ($archive['format'] ?? 'zip'));
@@ -734,39 +734,39 @@ final class SystemController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($post['theme'] ?? null, 80)));
         if (!$this->isSafePublicThemeSlug($themeSlug)) {
             $this->context->flash('error', 'Invalid theme identifier.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         if ($this->isStockPublicThemeSlug($themeSlug)) {
             $this->context->flash('error', 'Stock themes cannot be uninstalled.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $themePath = $this->publicThemesRoot() . '/' . $themeSlug;
         if (!is_dir($themePath)) {
             $this->context->flash('error', 'Theme directory was not found on disk.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         if ($this->activePublicThemeSlug() === $themeSlug) {
             $this->context->flash('error', 'Active theme cannot be uninstalled. Enable another theme first.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $this->directoryTreeService()->removeTree($themePath);
         if (is_dir($themePath)) {
             $this->context->flash('error', 'Failed to uninstall theme directory from disk.');
-            redirect($this->context->panelUrl('/themes'));
+            Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $this->context->flash('success', 'Theme "' . $themeSlug . '" uninstalled.');
-        redirect($this->context->panelUrl('/themes'));
+        Redirect::redirect($this->context->panelUrl('/themes'));
     }
 
     /**
@@ -817,19 +817,19 @@ final class SystemController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $extensionName = $this->input->text($post['extension'] ?? null, 120);
         if (!$this->isSafeExtensionDirectoryName((string) $extensionName)) {
             $this->context->flash('error', 'Invalid extension identifier.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $extensionPath = $this->extensionsBasePath() . '/' . $extensionName;
         if (!is_dir($extensionPath)) {
             $this->context->flash('error', 'Extension directory was not found on disk.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $manifest = $this->readExtensionManifest($extensionPath);
@@ -842,13 +842,13 @@ final class SystemController
 
             $reason = (string) ($manifest['invalid_reason'] ?? 'Invalid extension metadata.');
             $this->context->flash('error', 'Extension is invalid: ' . $reason);
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $enabledRaw = strtolower((string) $this->input->text($post['enabled'] ?? null, 10));
         if (!in_array($enabledRaw, ['1', '0', 'true', 'false', 'yes', 'no', 'on', 'off'], true)) {
             $this->context->flash('error', 'Invalid extension toggle value.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $enable = in_array($enabledRaw, ['1', 'true', 'yes', 'on'], true);
@@ -868,11 +868,11 @@ final class SystemController
             $this->saveExtensionStateMap($enabledMap);
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', $exception->getMessage());
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $this->context->flash('success', 'Extension "' . $extensionName . '" ' . ($enable ? 'enabled' : 'disabled') . '.');
-        redirect($this->context->panelUrl('/extensions'));
+        Redirect::redirect($this->context->panelUrl('/extensions'));
     }
 
     /**
@@ -890,11 +890,11 @@ final class SystemController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $this->context->flash('error', 'Extension permission levels are managed in Groups > Permissions.');
-        redirect($this->context->panelUrl('/extensions'));
+        Redirect::redirect($this->context->panelUrl('/extensions'));
     }
 
     /**
@@ -912,19 +912,19 @@ final class SystemController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $extensionName = $this->input->text($post['extension'] ?? null, 120);
         if (!$this->isSafeExtensionDirectoryName((string) $extensionName)) {
             $this->context->flash('error', 'Invalid extension identifier.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $extensionPath = $this->extensionsBasePath() . '/' . $extensionName;
         if (!is_dir($extensionPath)) {
             $this->context->flash('error', 'Extension directory was not found on disk.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $manifest = $this->readExtensionManifest($extensionPath);
@@ -935,25 +935,25 @@ final class SystemController
         $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
         if (!empty($enabledMap[$extensionName])) {
             $this->context->flash('error', 'Disable the extension before uninstalling it.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         try {
             $this->deleteExtensionStorage((string) $extensionName, $manifest);
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', 'Failed to uninstall extension storage: ' . $exception->getMessage());
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         if ($isStockExtension) {
             $this->context->flash('success', 'Stock extension "' . $extensionName . '" data purged. Bundled extension files were kept.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $this->directoryTreeService()->removeTree($extensionPath);
         if (is_dir($extensionPath)) {
             $this->context->flash('error', 'Failed to uninstall extension directory from disk.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         if (
@@ -966,12 +966,12 @@ final class SystemController
                 $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
             } catch (\RuntimeException $exception) {
                 $this->context->flash('error', 'Extension uninstalled, but state cleanup failed: ' . $exception->getMessage());
-                redirect($this->context->panelUrl('/extensions'));
+                Redirect::redirect($this->context->panelUrl('/extensions'));
             }
         }
 
         $this->context->flash('success', 'Extension "' . $extensionName . '" uninstalled.');
-        redirect($this->context->panelUrl('/extensions'));
+        Redirect::redirect($this->context->panelUrl('/extensions'));
     }
 
     /**
@@ -990,7 +990,7 @@ final class SystemController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $upload = $this->packageInstallWorkflowService()->validateUpload(
@@ -1000,7 +1000,7 @@ final class SystemController
         );
         if (!(bool) ($upload['ok'] ?? false)) {
             $this->context->flash('error', (string) ($upload['error'] ?? 'Extension upload failed.'));
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $tmpPath = (string) ($upload['tmp_path'] ?? '');
@@ -1025,7 +1025,7 @@ final class SystemController
             }
 
             $this->context->flash('error', $nameError);
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
         $extensionName = (string) ($nameResult['name'] ?? '');
 
@@ -1033,13 +1033,13 @@ final class SystemController
             $this->ensureExtensionsDirectory();
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', $exception->getMessage());
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $targetDirectory = $this->extensionsBasePath() . '/' . $extensionName;
         if (!mkdir($targetDirectory, 0775, true) && !is_dir($targetDirectory)) {
             $this->context->flash('error', 'Failed to create extension directory.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $extractError = $this->packageInstallWorkflowService()->extractTo(
@@ -1052,14 +1052,14 @@ final class SystemController
         );
         if (is_string($extractError)) {
             $this->context->flash('error', $extractError);
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $flattenError = $this->packageInstallWorkflowService()->flattenRoot($targetDirectory);
         if (is_string($flattenError)) {
             $this->directoryTreeService()->removeTree($targetDirectory);
             $this->context->flash('error', $flattenError);
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $manifest = $this->readExtensionManifest($targetDirectory);
@@ -1067,7 +1067,7 @@ final class SystemController
             $this->directoryTreeService()->removeTree($targetDirectory);
             $reason = (string) ($manifest['invalid_reason'] ?? 'Missing required extension metadata.');
             $this->context->flash('error', 'Extension upload failed: ' . $reason);
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         try {
@@ -1085,7 +1085,7 @@ final class SystemController
         } catch (\RuntimeException $exception) {
             $this->directoryTreeService()->removeTree($targetDirectory);
             $this->context->flash('error', 'Extension upload failed: ' . $exception->getMessage());
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $message = 'Extension uploaded to private/ext/' . $extensionName . '/. It is disabled by default.';
@@ -1094,7 +1094,7 @@ final class SystemController
         }
 
         $this->context->flash('success', $message);
-        redirect($this->context->panelUrl('/extensions'));
+        Redirect::redirect($this->context->panelUrl('/extensions'));
     }
 
     /**
@@ -1113,13 +1113,13 @@ final class SystemController
         $extensionName = strtolower(trim((string) $this->input->text($query['extension'] ?? null, 120)));
         if (!$this->isSafeExtensionDirectoryName($extensionName)) {
             $this->context->flash('error', 'Invalid extension identifier.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $extensionPath = $this->extensionsBasePath() . '/' . $extensionName;
         if (!is_dir($extensionPath)) {
             $this->context->flash('error', 'Extension directory was not found on disk.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $format = strtolower(trim((string) $this->input->text($query['format'] ?? 'zip', 20)));
@@ -1128,7 +1128,7 @@ final class SystemController
             $archive = $this->archivePackages()->exportDir($extensionPath, $extensionName, $format);
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', 'Extension export failed: ' . $exception->getMessage());
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $downloadFilename = $this->archivePackages()->downloadName('extension-' . $extensionName, (string) ($archive['format'] ?? 'zip'));
@@ -1154,24 +1154,24 @@ final class SystemController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $extensionName = strtolower(trim((string) $this->input->text($post['extension'] ?? null, 120)));
         if ($extensionName === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $extensionName) !== 1) {
             $this->context->flash('error', 'Extension directory must use lowercase letters, numbers, underscores, or dashes.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         if ($this->isStockExtensionDirectory($extensionName)) {
             $this->context->flash('error', 'That extension directory name is reserved by a stock extension.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $displayName = $this->input->text($post['name'] ?? null, 120);
         if ($displayName === '') {
             $this->context->flash('error', 'Extension name is required.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $type = strtolower(trim((string) $this->input->text($post['type'] ?? null, 20)));
@@ -1188,13 +1188,13 @@ final class SystemController
         if ($homepageRaw !== '') {
             if (filter_var($homepageRaw, FILTER_VALIDATE_URL) === false) {
                 $this->context->flash('error', 'Author URL must be a valid absolute URL.');
-                redirect($this->context->panelUrl('/extensions'));
+                Redirect::redirect($this->context->panelUrl('/extensions'));
             }
 
             $scheme = strtolower((string) parse_url($homepageRaw, PHP_URL_SCHEME));
             if (!in_array($scheme, ['http', 'https'], true)) {
                 $this->context->flash('error', 'Author URL must use http or https.');
-                redirect($this->context->panelUrl('/extensions'));
+                Redirect::redirect($this->context->panelUrl('/extensions'));
             }
 
             $homepage = $homepageRaw;
@@ -1205,13 +1205,13 @@ final class SystemController
         if ($docsRaw !== '') {
             if (filter_var($docsRaw, FILTER_VALIDATE_URL) === false) {
                 $this->context->flash('error', 'Documentation URL must be a valid absolute URL.');
-                redirect($this->context->panelUrl('/extensions'));
+                Redirect::redirect($this->context->panelUrl('/extensions'));
             }
 
             $scheme = strtolower((string) parse_url($docsRaw, PHP_URL_SCHEME));
             if (!in_array($scheme, ['http', 'https'], true)) {
                 $this->context->flash('error', 'Documentation URL must use http or https.');
-                redirect($this->context->panelUrl('/extensions'));
+                Redirect::redirect($this->context->panelUrl('/extensions'));
             }
 
             $docs = $docsRaw;
@@ -1224,13 +1224,13 @@ final class SystemController
             $this->ensureExtensionsDirectory();
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', $exception->getMessage());
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $extensionPath = $this->extensionsBasePath() . '/' . $extensionName;
         if (file_exists($extensionPath)) {
             $this->context->flash('error', 'An extension directory with this name already exists.');
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         try {
@@ -1252,7 +1252,7 @@ final class SystemController
         } catch (\Throwable $exception) {
             $this->directoryTreeService()->removeTree($extensionPath);
             $this->context->flash('error', 'Failed to create extension scaffold: ' . $exception->getMessage());
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         try {
@@ -1270,7 +1270,7 @@ final class SystemController
         } catch (\RuntimeException $exception) {
             $this->directoryTreeService()->removeTree($extensionPath);
             $this->context->flash('error', 'Extension scaffold created, but state finalization failed: ' . $exception->getMessage());
-            redirect($this->context->panelUrl('/extensions'));
+            Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
         $createdFiles = ['ext.json', 'ext.php', 'schema.php'];
@@ -1309,7 +1309,7 @@ final class SystemController
             . '/ with ' . $createdList
             . '.'
         );
-        redirect($this->context->panelUrl('/extensions'));
+        Redirect::redirect($this->context->panelUrl('/extensions'));
     }
 
     /**
@@ -1427,12 +1427,12 @@ final class SystemController
         $post = $_POST;
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
-            redirect($this->context->panelUrl('/logs'));
+            Redirect::redirect($this->context->panelUrl('/logs'));
         }
 
         $deleted = $this->logger()->clear();
         $this->context->flash('success', 'Event log cleared (' . $deleted . ' ' . ($deleted === 1 ? 'entry' : 'entries') . ' removed).');
-        redirect($this->context->panelUrl('/logs'));
+        Redirect::redirect($this->context->panelUrl('/logs'));
     }
 
     /**

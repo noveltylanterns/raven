@@ -185,20 +185,16 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `Extension/Panel/` — panel-only extension management: `ExtensionCatalogService`, `ExtensionPermissionCatalogService`, `ExtensionScaffoldService`.
   - `Extension/Public/` — public-route extension runtime contracts: `EmbeddedFormRuntimeInterface`, `EmbeddedFormRuntimeService`, `EmbeddedShortcodeRuntimeInterface` — the contracts extension authors implement for shortcode/form runtime registration.
 - `private/lib/Transport/`
-  - HTTP-layer helpers for both panel and public routes: `Response` (response dispatch), `Request` (request context resolution), `Redirect` (redirect-target validation), `Upload` (upload file-set normalization plus shared HTTP-upload validation, size/error policy, and extension checks).
+  - HTTP-layer helpers for both panel and public routes: `Response` (JSON/common header dispatch), `Request` (request context resolution), `Redirect` (redirect dispatch plus redirect-target validation), `Upload` (upload file-set normalization plus shared HTTP-upload validation, size/error policy, and extension checks).
   - Note: session flash has moved to `lib/Auth/SessionFlash.php`; event logging has moved to `sys/Logger.php`.
 - `private/lib/Media/`
   - Image upload, validation, variant processing, and path management. All media handling is panel-route-only.
   - `Media/Panel/` — all media classes live here: `AvatarValidator` (avatar upload constraints), `PageImageManager` (page image lifecycle orchestration), `PageImageUploadPolicy`, `ImageVariantProcessor`, `PageImageDeletionService`, and related path/gallery helpers.
-- `private/lib/Panel/`
-  - Panel UI and config-editor helpers for panel-only workflows.
-  - Panel runtime helpers here are now mostly request/workflow-specific utilities such as `PanelPost`, `PanelMediaConfigService`, and `PanelRoutingPreviewService`.
-  - `PanelMediaConfigService` stays here because avatar/media policy is shared by user/preferences routes; the config-editor-only normalization stack has been moved out of `lib/` and into the dedicated panel config controller.
 - `private/lib/Security/`
   - Security primitives available to core and extensions: CSRF (`Csrf`, `CsrfTokenStoreInterface`), input sanitization (`InputSanitizer`), 2FA (TOTP, WebAuthn, recovery phrase, QR code), captcha, and invite token policy.
 - `private/lib/Extra/`
   - Global helper functions and small shared utility catalogs.
-  - `Helpers.php` — defines `e()` (HTML-escape), `redirect()`, and `request_path()` in the `Raven\Lib\Extra` namespace; loaded at bootstrap via `require_once` and imported via `use function` throughout templates, controllers, and extensions.
+  - `Helpers.php` — defines `e()` (HTML-escape) and `request_path()` in the `Raven\Lib\Extra` namespace; loaded at bootstrap via `require_once` and imported via `use function` throughout templates, controllers, and extensions.
   - `Countries.php` — ISO country list lookup used by signup forms, profile fields, and panel reporting.
 - `private/lib/View/`
   - Theme discovery, inheritance, content rendering, and template utilities.
@@ -206,7 +202,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `SiteContextBuilder`, `BodyBlockPolicy`, `MarkdownRenderer`, `PageBodyBlockCodec`, `PagePersistenceService`, `PageTaxonomyAssignmentService`, `PageTaxonomyQueryService`, and `PublicPageBodyRenderer` now live directly under `View/` as the shared content/view surface.
   - `ThemeDiscoveryService`, `ThemeInheritanceResolver`, `ThemeFallbackRenderer` — shared theme infrastructure used by both panel and public contexts.
   - `Pagination.php` — reusable pagination value object and helper; available to both panel and public controllers.
-  - `View/Panel/` — panel-only view/theme helpers: `Editor` (shared body-text editor and theme-normalization utilities), `EditorTabs` (shared tab normalization and tab-preserving URL helpers), `EditorAuthor`, `ThemeCatalogService`, `ThemeCloneService`, `ThemeScaffoldService`, `ThemeManifestValidator`.
+  - `View/Panel/` — panel-only view/theme helpers: `Editor` (shared body-text editor and theme-normalization utilities), `EditorTabs` (shared tab normalization and tab-preserving URL helpers), `EditorAuthor`, `PanelPost`, `PanelMediaConfigService`, `PanelRoutingPreviewService`, `ThemeCatalogService`, `ThemeCloneService`, `ThemeScaffoldService`, `ThemeManifestValidator`.
   - `View/Public/` — public-route-only view/theme rendering: `PublicThemeRegistry` (discovers and validates installed public themes), `PublicRouteRenderService`, `PublicTemplateDecorator`, `PublicTemplatePipeline`, `PublicTemplateResolver`, and `PublicMetaService`.
 
 ## Reading Order

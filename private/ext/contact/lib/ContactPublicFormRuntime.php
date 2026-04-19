@@ -18,7 +18,7 @@ use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 
-use function Raven\Lib\Extra\redirect;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Owns Contact embedded shortcode rendering and submit pipeline.
@@ -258,25 +258,25 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
     {
         $normalizedSlug = $this->input->slug($slug);
         if ($normalizedSlug === null || $normalizedSlug === '') {
-            redirect($returnPath);
+            Redirect::redirect($returnPath);
         }
 
         $redirectTo = $returnPath . '#' . $this->anchorId($normalizedSlug);
         if (!$this->csrf->validate($_POST['_csrf'] ?? null)) {
             $this->pushFlash($normalizedSlug, 'error', 'Your session token is invalid. Please retry and submit again.');
-            redirect($redirectTo);
+            Redirect::redirect($redirectTo);
         }
 
         $definition = $this->findEnabledDefinitionBySlug($normalizedSlug);
         if ($definition === null) {
             $this->pushFlash($normalizedSlug, 'error', 'This contact form is unavailable right now.');
-            redirect($redirectTo);
+            Redirect::redirect($redirectTo);
         }
 
         $destinations = $this->parseDestinations((string) ($definition['destination'] ?? ''));
         if ($destinations === []) {
             $this->pushFlash($normalizedSlug, 'error', 'This contact form has no valid destination address configured.');
-            redirect($redirectTo);
+            Redirect::redirect($redirectTo);
         }
         $ccRecipients = $this->parseDestinations((string) ($definition['cc'] ?? ''));
         $bccRecipients = $this->parseDestinations((string) ($definition['bcc'] ?? ''));
@@ -444,13 +444,13 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
 
         if ($errors !== []) {
             $this->pushFlash($normalizedSlug, 'error', implode(' ', $errors), $oldValues);
-            redirect($redirectTo);
+            Redirect::redirect($redirectTo);
         }
 
         $captchaError = $validateCaptcha();
         if (is_string($captchaError) && $captchaError !== '') {
             $this->pushFlash($normalizedSlug, 'error', $captchaError, $oldValues);
-            redirect($redirectTo);
+            Redirect::redirect($redirectTo);
         }
 
         $formName = $this->input->text((string) ($definition['name'] ?? 'Contact Form'), 160);
@@ -521,7 +521,7 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
             }
 
             $this->pushFlash($normalizedSlug, 'error', trim($errorMessage), $oldValues);
-            redirect($redirectTo);
+            Redirect::redirect($redirectTo);
         }
 
         if ($saveMailLocally && !$savedLocally) {
@@ -530,11 +530,11 @@ final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
                 $notice .= ' ' . $localSaveError;
             }
             $this->pushFlash($normalizedSlug, 'success', $notice);
-            redirect($redirectTo);
+            Redirect::redirect($redirectTo);
         }
 
         $this->pushFlash($normalizedSlug, 'success', 'Thanks, your message has been sent.');
-        redirect($redirectTo);
+        Redirect::redirect($redirectTo);
     }
 
     /**
