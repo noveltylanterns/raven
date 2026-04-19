@@ -15,29 +15,42 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 
 ### Library Refactor
 Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
-- [ ] Do lib/Archive/(Compress|Delete|Extract).php work for any archive/directory, or only for ones being used by the Theme/Extension managers? Because those should be generic for everything so extension devs can use them. Theme/Extension Manager specific logic should be in lib/Archive/(Install|Package).php
+- [ ] Do lib/Archive/(Compress|Extract).php work for any archive/directory, or only for ones being used by the Theme/Extension managers? Because those should be generic for everything so extension devs can use them. Theme/Extension Manager specific logic should be in lib/Archive/(Install|Package).php
+- [ ] Rename lib/Archive/Delete.php to Folder.php
+- [ ] Rename lib/Archive/UpdateSource.php to Upstream.php
+- [ ] Rename lib/Config/ConfigValue*.php to Config*.php
+- [ ] Move all lib/Content/ classes into lib/View/
+- [ ] Delete lib/Content/ when emtpied.
 - [ ] Our three lib/Channel/*.php libraries should be consolidated into lib/Directory/ChannelContext.php
 - [ ] Delete lib/Channel/ when emptied.
 - [ ] Our two lib/Taxonomy/TaxonomySet*.php libraries should be consolidated into lib/Directory/SetContext.php
 - [ ] Delete lib/Taxonomy/ when emptied.
 - [ ] Move Channel functions out of lib/Routing/RouteConfigService.php to lib/Directory/Channel.php, Group functions to Group.php, Feed/Atom/RSS fucntions to Feed.php, etc, etc.
+- [ ] Move reduced lib/Routing/RouteConfigService.php to lib/Directory/Route.php
 - [ ] Move lib/Routing/ChannelRoutePolicy.php to lib/Directory/Mode.php
-- [ ] Move lib/Routing/RouteConfigService.php to lib/Directory/Route.php
 - [ ] Move lib/Routing/PathScopeLookupService.php to lib/Directory/Duplicate.php
 - [ ] Delete lib/Routing/ when emptied.
 - [ ] Rename sys/Routing/RouteRequest.php to Request.php, and RouteDispatchResult.php to Result.php
-- [ ] Rename sys/Routing/Public/PublicEntrypoint.php to Entry.php
-- [ ] Rename sys/Routing/Panel/PanelEntrypoint.php to Entry.php
+- [ ] Move sys/Routing/Public/PublicEntrypoint.php to sys/Controller/Public/PublicController.php
+- [ ] Move sys/Routing/Panel/PanelEntrypoint.php to sys/Controller/Panel/PanelController.php
+- [ ] Rename sys/Controller/Public/RequestContext.php to SharedController.php
+- [ ] Rename sys/Controller/Panel/RequestContext.php to SharedController.php
 - [ ] Rename sys/Debug/DebugToolbarResponseHook.php to ToolbarResponseHook.php
 - [ ] Move lib/Site/PublicMetaService.php to lib/View/Public/
 - [ ] Move lib/Site/SiteContextBuilder.php to lib/View/
 - [ ] Delete lib/Site/ when emptied.
 - [ ] There should be dedicated sys/Controller/(Public|Panel)/AuthController.php file, rather than a shared controller for both routes, for security/isolation reasons.
+- [ ] Rename lib/Support/CountryOptions.php to Countries.php
+- [ ] Rename lib/Support/ to lib/Misc/
 
 
 ### Extension Cleanup
+- [ ] Updated private/ext/CLAUDE.md guidance needs be be merged into private/ext/agents, then CLAUDE.md needs to be deleted and symlinked to agents like AGENTS.md is.
+- [ ] Replace "Generates AGENTS.md?" in Extension Manager with "Generate Agent Guidance?". Instead of making `AGENTS.md`, it will just make `agents`, and symlink both `AGENTS.md` and `CLAUDE.md` to `agents`.
+- [ ] Replace "Generates AGENTS.md?" in Theme Manager with "Generate Agent Guidance?". Instead of making `AGENTS.md`, it will just make `agents`, and symlink both `AGENTS.md` and `CLAUDE.md` to `agents`.
 - [ ] Unset Repositories & Smallweb as stock extensions so I can work on them separately with a different agent. I'll merge them back in here later.
 - [ ] The textareas for our page content in the Smallweb extension do not word wrap, instead open horizontal scrollbar. They need to word wrap like our page editor content blocks.
+- [ ] Folder creation/deletion/modification functions in Smallweb should be merged into (and called from) universal folder handler in lib/Archive/Folder.php
 - [ ] Make sure all import/export & file handler functions in our extensions are using our lib/Format/ libraries when applicable. If something can be extracted from an extension and made part of a universal handler in lib/Format/, do so. (Probably need a lib/Format/Txt.php for many of our Smallweb .txt/.gmi/etc files)
 - [ ] Extension runtime refactor cleanup: settle the embedded-form/shortcode runtime contract, then remove legacy `embedded_form_runtimes` support from `private/lib/Extension/EmbeddedFormRuntimeService.php`.
 
@@ -58,7 +71,14 @@ Full aggressive security sweep and pentesting run, including (but not limited to
 - [ ] Make a 'security sweep' checklist for maintenance.md that makes sure things like this are checked/enforced on an ongoing basis.
 
 
-### Documentation
+### Documentation Rewrite
+We need to generate better documentation. This is going to be a whole project.
+
+#### Prep Work
+- [ ] The top of *EVERY* .php file should begin with <?php, followed by the standard 6-line PHPDoc intro (update Docs: url to https://lanterns.io/raven), and our declare declaration, namespace declaration, and alphabetized use maps, in that order, with no blank lines in between these elements. Leave an empty line BETWEEN this intro block and whatever follows.
+- [ ] The description line in *EVERY* .php file's PHPDoc intro needs to be double-checked for accuracy.
+- [ ] EVERY class and EVERY function in sys/lib needs an inline comment describing what it does, it is missing in some of them.
+- [ ] ALL docs/ files need to use lowercase filenames from now on.
 
 #### Doc Generator (`private/bin/rvn-docs`)
 Build a single fast CLI command that auto-generates all reference appendix files from the codebase.
@@ -68,24 +88,21 @@ Targets (generator owns these files — do not hand-edit them):
 - [ ] `docs/appendix/config.md` — parse `private/dat/config.php.dist` key tree + reflect on `ConfigEditorSchemaService` for descriptions and defaults
 - [ ] `docs/appendix/database.md` — reflect on `SchemaBuilder`/`AuthSchemaBuilder` method names + annotations to enumerate tables and columns; include column purposes and the full chain of variables/routes/forms that map to each column
 - [ ] `docs/cli.md` — shell each `private/bin/rvn-*` with `--help` and format output as markdown; replaces current hand-written content
+- [ ] `docs/extensions/` folder — per-extension docs for bundled stock extensions (contact, signups, database, etc.)
 - [ ] Wire into release checklist once generator is built
 
-#### Hand-Authored Docs
+#### Hand-Authored Docs & Cleanup
 - [ ] `docs/appendix/architecture.md` - Finer details of why Raven is structured the way that it is, and what this structure enables.
-- [ ] `docs/introduction.md` — project overview, philosophy, and quick-start
+- [ ] `docs/intro.md` — project overview, philosophy, and quick-start
 - [ ] `docs/api.md` — top-level index linking all developer-facing surfaces (Extensions, Libraries, CLI, Theming); summary paragraph per surface; grows to link more appendix pages over time
 - [ ] Narrative docs (`pages.md`, `routing.md`, `configuration.md`, etc.) — AI-authored drafts exist but are unverified Codex output; needs full accuracy sweep and rewrite pass against actual codebase
-- [ ] `docs/extensions/` folder — per-extension docs for bundled stock extensions (contact, signups, database, etc.)
 - [ ] `docs/screenshots/` folder — UI screenshots for operator-facing docs
 - [ ] Do a proper human proofreading sweep once narrative docs are rewritten; replace this section with final authoring task list
 
-#### Delivery Architecture
-- [ ] Use lowercase file names for docs/* files from now on.
-- [ ] `docs/` is the single source of truth for both the GitHub repo and the live Raven docs site
-- [ ] Docs site: Raven instance on lanterns.io, dedicated channel for Raven docs; other channels for other projects
-- [ ] Git repos mirrored into `private/dat/` so Raven can embed always-current markdown via the markdown content block
-- [ ] Raven's per-page title-display flag lets embedded markdown files use their own `#` headings natively
-- [ ] Long-term: build a `git-mirror` extension to automate repo pulls into `private/dat/` on a schedule
+#### Delivery Architecture Notes
+- `docs/` is the single source of truth for both the GitHub repo and the live Raven docs site
+- Docs site: Raven instance on lanterns.io, dedicated /raven/ channel for Raven docs. Master Raven git repo mirrored into `private/dat/` with Repositories extension, so Raven can embed always-current docs via the markdown content block
+- Raven's per-page title-display flag lets embedded markdown files use their own `#` headings natively
 
 
 ### Finish Updater
