@@ -15,7 +15,7 @@ use Raven\Ext\SignupSubmissionRepository;
 use Raven\Lib\Format\Csv;
 use Raven\Lib\Transport\Upload;
 
-use function Raven\Lib\Support\redirect;
+use function Raven\Lib\Extra\redirect;
 
 /**
  * Registers Signup Sheets extension routes into the panel router.

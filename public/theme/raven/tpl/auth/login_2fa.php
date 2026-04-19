@@ -12,7 +12,7 @@ if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
     exit('Not Found');
 }
 
-use function Raven\Lib\Support\e;
+use function Raven\Lib\Extra\e;
 
 $verifyPath = trim((string) ($verifyPath ?? '/login/2fa'));
 $selectPath = trim((string) ($selectPath ?? '/login/2fa/select'));

@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Public;
 
-use Raven\Lib\Routing\ChannelRoutePolicy;
+use Raven\Lib\Directory\Mode;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -42,7 +42,7 @@ final class PublicChannelPageRouteService
      */
     public function normalizeRouteMode(string $value): string
     {
-        return ChannelRoutePolicy::normalizeRouteMode($value);
+        return Mode::normalizeRouteMode($value);
     }
 
     /**
@@ -54,7 +54,7 @@ final class PublicChannelPageRouteService
      */
     public function resolveWordSeparator(string $channelValue, string $globalSeparator): string
     {
-        return ChannelRoutePolicy::resolveSeparator($channelValue, $globalSeparator);
+        return Mode::resolveSeparator($channelValue, $globalSeparator);
     }
 
     /**
@@ -67,7 +67,7 @@ final class PublicChannelPageRouteService
      */
     public function resolveLookupTarget(string $requestedSlug, string $routeMode, string $wordSeparator): ?array
     {
-        return ChannelRoutePolicy::resolveLookupTarget($this->input, $requestedSlug, $routeMode, $wordSeparator);
+        return Mode::resolveLookupTarget($this->input, $requestedSlug, $routeMode, $wordSeparator);
     }
 
     /**
@@ -89,7 +89,7 @@ final class PublicChannelPageRouteService
         string $wordSeparator,
         string $globalSeparator
     ): string {
-        return ChannelRoutePolicy::buildRouteSegment(
+        return Mode::buildRouteSegment(
             $this->input,
             $slug,
             $pageId,

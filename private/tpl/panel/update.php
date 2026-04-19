@@ -11,7 +11,7 @@ declare(strict_types=1);
 /** @var bool $allowOverwrite */
 /** @var array<string, string> $updateSourceModes */
 
-use function Raven\Lib\Support\e;
+use function Raven\Lib\Extra\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $updateSource = is_array($updateSource ?? null) ? $updateSource : [];

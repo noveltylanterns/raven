@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core;
 
-use Raven\Lib\Config\ConfigValueWriter;
+use Raven\Lib\Config\ConfigWriter;
 use RuntimeException;
 
 /**
@@ -20,11 +20,11 @@ use RuntimeException;
  * Owns the request-lifecycle config contract: loading a PHP array file into
  * memory, reading and writing values via dot-notation, and replacing the
  * entire in-memory tree. On-disk persistence format is delegated to
- * `Raven\Lib\Config\ConfigValueWriter::persist()`.
+ * `Raven\Lib\Config\ConfigWriter::persist()`.
  *
  * Static type-coercion helpers (`bool`, `int`, `float`) belong in
- * `Raven\Lib\Config\ConfigValueParser` and are intentionally absent from this
- * class. Extension code needing value parsing should import `ConfigValueParser`
+ * `Raven\Lib\Config\ConfigParser` and are intentionally absent from this
+ * class. Extension code needing value parsing should import `ConfigParser`
  * directly alongside `Raven\Core\Config` for instance access.
  */
 class Config
@@ -143,13 +143,13 @@ class Config
     /**
      * Persists the current in-memory config tree back to disk.
      *
-     * Delegates all on-disk format concerns to `Raven\Lib\Config\ConfigValueWriter::persist()`.
+     * Delegates all on-disk format concerns to `Raven\Lib\Config\ConfigWriter::persist()`.
      *
      * @throws RuntimeException When the file cannot be written.
      * @return void
      */
     public function save(): void
     {
-        ConfigValueWriter::persist($this->path, $this->data);
+        ConfigWriter::persist($this->path, $this->data);
     }
 }

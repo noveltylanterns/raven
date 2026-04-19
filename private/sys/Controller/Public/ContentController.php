@@ -17,9 +17,9 @@ use Raven\Core\Repository\PageImageRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\UserRepository;
-use Raven\Lib\Content\BodyBlockPolicy;
-use Raven\Lib\Content\MarkdownRenderer;
-use Raven\Lib\Content\PublicPageBodyRenderer;
+use Raven\Lib\View\BodyBlockPolicy;
+use Raven\Lib\View\MarkdownRenderer;
+use Raven\Lib\View\PublicPageBodyRenderer;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeService;
 use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
@@ -27,21 +27,21 @@ use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Core\Routing\Public\PublicChannelPageRouteService;
-use Raven\Lib\Site\PublicMetaService;
-use Raven\Lib\Site\SiteContextBuilder;
+use Raven\Lib\View\Public\PublicMetaService;
+use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\View\Public\PublicTemplateDecorator;
 use Raven\Lib\View\Public\PublicTemplatePipeline;
 use Raven\Lib\View\Public\PublicTemplateResolver;
 use Raven\Lib\View\Panel\ThemeCatalogService;
 
-use function Raven\Lib\Support\redirect;
+use function Raven\Lib\Extra\redirect;
 
 /**
  * Handles split public homepage and page-routing routes.
  */
 final class ContentController
 {
-    private RequestContext $context;
+    private SharedController $context;
     private ChannelRepository $channelRepo;
     private PageImageRepository $pageImages;
     private PageRepository $pageRepo;
@@ -67,7 +67,7 @@ final class ContentController
     private ?PublicChannelPageRouteService $publicChannelPageRouteService = null;
 
     /**
-     * @param RequestContext $context Shared public request context.
+     * @param SharedController $context Shared public request context.
      * @param ChannelRepository $channelRepo Channel repository for public channel-route lookups.
      * @param PageImageRepository $pageImages Page-image repository for gallery rendering and page meta images.
      * @param PageRepository $pageRepo Page repository for homepage, channel, and page lookups.
@@ -77,7 +77,7 @@ final class ContentController
      * @return void
      */
     public function __construct(
-        RequestContext $context,
+        SharedController $context,
         ChannelRepository $channelRepo,
         PageImageRepository $pageImages,
         PageRepository $pageRepo,

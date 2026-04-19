@@ -14,10 +14,9 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Channel\ChannelContextService;
-use Raven\Lib\Channel\ChannelRecordPolicy;
+use Raven\Lib\Directory\ChannelContext;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Routing\PathScopeLookupService;
+use Raven\Lib\Directory\Duplicate;
 use RuntimeException;
 
 /**
@@ -455,7 +454,7 @@ final class RedirectRepository
      */
     private function pathExists(string $slug, ?int $channelId, ?int $ignoreId = null): bool
     {
-        return PathScopeLookupService::exists(
+        return Duplicate::exists(
             $this->db,
             $this->table('redirects'),
             $slug,
@@ -471,7 +470,7 @@ final class RedirectRepository
      */
     private function channelsByIdMap(): array
     {
-        return ChannelContextService::channelsByIdMap($this->channelRepo->listRecords());
+        return ChannelContext::channelsByIdMap($this->channelRepo->listRecords());
     }
 
     /**
@@ -489,7 +488,7 @@ final class RedirectRepository
         $row['created'] = (string) ($row['created'] ?? '');
         $row['updated'] = (string) ($row['updated'] ?? '');
 
-        return ChannelContextService::applyBasicChannelContext($row, $channel);
+        return ChannelContext::applyBasicChannelContext($row, $channel);
     }
 
     /**
@@ -497,11 +496,11 @@ final class RedirectRepository
      */
     private function channelIdBySlug(?string $slug): ?int
     {
-        if (ChannelRecordPolicy::isRootChannelSlug((string) ($slug ?? ''))) {
+        if (ChannelContext::isRootChannelSlug((string) ($slug ?? ''))) {
             return 0;
         }
 
-        return ChannelContextService::resolveChannelIdBySlug(
+        return ChannelContext::resolveChannelIdBySlug(
             $slug,
             fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),
             'Selected channel does not exist.'

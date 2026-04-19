@@ -18,7 +18,7 @@ use Raven\Lib\View\TemplateTagCompiler;
 use Raven\Lib\View\TemplateTagPathResolver;
 use RuntimeException;
 
-use function Raven\Lib\Support\e;
+use function Raven\Lib\Extra\e;
 
 /**
  * Compiles EE-style brace tags into PHP once, then renders from cache.

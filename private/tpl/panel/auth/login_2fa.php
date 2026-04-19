@@ -25,7 +25,7 @@
 /** @var string $selectedEmailInput */
 /** @var string $panelBaseUrl */
 
-use function Raven\Lib\Support\e;
+use function Raven\Lib\Extra\e;
 
 $panelBase = trim((string) ($panelBaseUrl ?? ''), '/');
 if ($panelBase === '') {

@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Channel\ChannelContextService;
+use Raven\Lib\Directory\ChannelContext;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Media\Panel\TaxonomyImagePathResolver;
 
@@ -251,7 +251,7 @@ final class TaxonomyLookupRepository
                     'active' => (int) ($row['active'] ?? 0),
                     'target' => (string) ($row['target'] ?? ''),
                 ];
-                $result['redirect_rows'][] = ChannelContextService::applyBasicChannelContext($redirectRow, $channel);
+                $result['redirect_rows'][] = ChannelContext::applyBasicChannelContext($redirectRow, $channel);
             }
         }
 
@@ -377,7 +377,7 @@ final class TaxonomyLookupRepository
      */
     private function channelsByIdMap(): array
     {
-        return ChannelContextService::channelsByIdMap($this->channelRepo->listRecords());
+        return ChannelContext::channelsByIdMap($this->channelRepo->listRecords());
     }
 
     /**

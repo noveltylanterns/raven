@@ -23,7 +23,7 @@ declare(strict_types=1);
 /** @var string|null $flashError */
 /** @var string $csrfField */
 
-use function Raven\Lib\Support\e;
+use function Raven\Lib\Extra\e;
 
 $formName = (string) ($formData['name'] ?? '');
 $formSlug = (string) ($formData['slug'] ?? '');

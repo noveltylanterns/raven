@@ -25,7 +25,7 @@ use Raven\Lib\View\Panel\ThemeCatalogService;
  */
 final class FeedController
 {
-    private RequestContext $context;
+    private SharedController $context;
     private ChannelRepository $channelRepo;
     private PageRepository $pageRepo;
     private TaxonomyLookupRepository $taxonomyLookupRepo;
@@ -36,14 +36,14 @@ final class FeedController
     private ?PublicTemplatePipeline $publicTemplatePipeline = null;
 
     /**
-     * @param RequestContext $context Shared public request context.
+     * @param SharedController $context Shared public request context.
      * @param ChannelRepository $channelRepo Channel repository for feed/channel label lookups.
      * @param PageRepository $pageRepo Page repository for feed and taxonomy listing rows.
      * @param TaxonomyLookupRepository $taxonomyLookupRepo Taxonomy lookup repository for category/tag resolution.
      * @return void
      */
     public function __construct(
-        RequestContext $context,
+        SharedController $context,
         ChannelRepository $channelRepo,
         PageRepository $pageRepo,
         TaxonomyLookupRepository $taxonomyLookupRepo

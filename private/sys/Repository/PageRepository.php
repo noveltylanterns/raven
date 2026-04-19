@@ -12,16 +12,15 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Channel\ChannelContextService;
-use Raven\Lib\Channel\ChannelRecordPolicy;
-use Raven\Lib\Content\PageBodyBlockCodec;
-use Raven\Lib\Content\PagePanelFilterClauseBuilder;
-use Raven\Lib\Content\PagePersistenceService;
-use Raven\Lib\Content\PageTaxonomyAssignmentService;
-use Raven\Lib\Content\PageTaxonomyQueryService;
+use Raven\Lib\Directory\ChannelContext;
+use Raven\Lib\View\PageBodyBlockCodec;
+use Raven\Lib\View\PagePanelFilterClauseBuilder;
+use Raven\Lib\View\PagePersistenceService;
+use Raven\Lib\View\PageTaxonomyAssignmentService;
+use Raven\Lib\View\PageTaxonomyQueryService;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Media\Panel\PageEditorGalleryHydrator;
-use Raven\Lib\Routing\PathScopeLookupService;
+use Raven\Lib\Directory\Duplicate;
 use RuntimeException;
 
 /**
@@ -357,7 +356,7 @@ final class PageRepository
         ];
 
         $channel = null;
-        if ($normalizedChannelSlug === ChannelRecordPolicy::ROOT_CHANNEL_SLUG) {
+        if ($normalizedChannelSlug === ChannelContext::ROOT_CHANNEL_SLUG) {
             $sql .= ' AND p.channel = 0';
         } elseif ($normalizedChannelSlug !== '') {
             $channel = $this->channelRepo->findBySlug($normalizedChannelSlug);
@@ -434,8 +433,8 @@ final class PageRepository
         ];
 
         $clauses = [];
-        $includeRoot = isset($normalizedSlugs[ChannelRecordPolicy::ROOT_CHANNEL_SLUG]);
-        unset($normalizedSlugs[ChannelRecordPolicy::ROOT_CHANNEL_SLUG]);
+        $includeRoot = isset($normalizedSlugs[ChannelContext::ROOT_CHANNEL_SLUG]);
+        unset($normalizedSlugs[ChannelContext::ROOT_CHANNEL_SLUG]);
 
         if ($includeRoot) {
             $clauses[] = 'p.channel = 0';
@@ -1017,7 +1016,7 @@ final class PageRepository
      */
     private function pathExists(string $slug, ?int $channelId, ?int $excludeId = null): bool
     {
-        return PathScopeLookupService::exists(
+        return Duplicate::exists(
             $this->db,
             $this->table('pages'),
             $slug,
@@ -1426,7 +1425,7 @@ final class PageRepository
      */
     private function channelsByIdMap(): array
     {
-        return ChannelContextService::channelsByIdMap($this->channelRepo->listRecords());
+        return ChannelContext::channelsByIdMap($this->channelRepo->listRecords());
     }
 
     /**
@@ -1448,7 +1447,7 @@ final class PageRepository
             }
         }
 
-        return ChannelContextService::applyPageChannelContext($row, $resolvedChannel);
+        return ChannelContext::applyPageChannelContext($row, $resolvedChannel);
     }
 
     /**
@@ -1456,11 +1455,11 @@ final class PageRepository
      */
     private function channelIdBySlug(string $slug): ?int
     {
-        if (ChannelRecordPolicy::isRootChannelSlug($slug)) {
+        if (ChannelContext::isRootChannelSlug($slug)) {
             throw new RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
         }
 
-        return ChannelContextService::resolveChannelIdBySlug(
+        return ChannelContext::resolveChannelIdBySlug(
             $slug,
             fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),
             'Selected channel does not exist.'

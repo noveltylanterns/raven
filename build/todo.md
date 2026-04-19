@@ -19,36 +19,36 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 - [ ] Rename lib/Archive/Delete.php to Folder.php
 - [ ] Rename lib/Archive/UpdateSource.php to Upstream.php
 - [ ] Rename lib/Config/ConfigValue*.php to Config*.php
-- [ ] Move all lib/Content/ classes into lib/View/
-- [ ] Delete lib/Content/ when emtpied.
-- [ ] Our three lib/Channel/*.php libraries should be consolidated into lib/Directory/ChannelContext.php
-- [ ] Delete lib/Channel/ when emptied.
-- [ ] Our two lib/Taxonomy/TaxonomySet*.php libraries should be consolidated into lib/Directory/SetContext.php
-- [ ] Delete lib/Taxonomy/ when emptied.
-- [ ] Move Channel functions out of lib/Routing/RouteConfigService.php to lib/Directory/Channel.php, Group functions to Group.php, Feed/Atom/RSS fucntions to Feed.php, etc, etc.
-- [ ] Move reduced lib/Routing/RouteConfigService.php to lib/Directory/Route.php
-- [ ] Move lib/Routing/ChannelRoutePolicy.php to lib/Directory/Mode.php
-- [ ] Move lib/Routing/PathScopeLookupService.php to lib/Directory/Duplicate.php
-- [ ] Delete lib/Routing/ when emptied.
+- [x] Move all lib/Content/ classes into lib/View/
+- [x] Delete lib/Content/ when emptied.
+- [x] Our three lib/Channel/*.php libraries should be consolidated into lib/Directory/ChannelContext.php
+- [x] Delete lib/Channel/ when emptied.
+- [x] Our two lib/Taxonomy/TaxonomySet*.php libraries should be consolidated into lib/Directory/SetContext.php
+- [x] Delete lib/Taxonomy/ when emptied.
+- [x] Move Channel functions out of lib/Routing/RouteConfigService.php to lib/Directory/Channel.php, Group functions to Group.php, Feed/Atom/RSS functions to Feed.php, etc.
+- [x] Move reduced lib/Routing/RouteConfigService.php to lib/Directory/Route.php
+- [x] Move lib/Routing/ChannelRoutePolicy.php to lib/Directory/Mode.php
+- [x] Move lib/Routing/PathScopeLookupService.php to lib/Directory/Duplicate.php
+- [x] Delete lib/Routing/ when emptied.
 - [ ] Rename sys/Routing/RouteRequest.php to Request.php, and RouteDispatchResult.php to Result.php
-- [ ] Move sys/Routing/Public/PublicEntrypoint.php to sys/Controller/Public/PublicController.php
-- [ ] Move sys/Routing/Panel/PanelEntrypoint.php to sys/Controller/Panel/PanelController.php
-- [ ] Rename sys/Controller/Public/RequestContext.php to SharedController.php
-- [ ] Rename sys/Controller/Panel/RequestContext.php to SharedController.php
+- [x] Move sys/Routing/Public/PublicEntrypoint.php to sys/Controller/Public/PublicController.php
+- [x] Move sys/Routing/Panel/PanelEntrypoint.php to sys/Controller/Panel/PanelController.php
+- [x] Rename sys/Controller/Public/RequestContext.php to SharedController.php
+- [x] Rename sys/Controller/Panel/RequestContext.php to SharedController.php
 - [ ] Rename sys/Debug/DebugToolbarResponseHook.php to ToolbarResponseHook.php
-- [ ] Move lib/Site/PublicMetaService.php to lib/View/Public/
-- [ ] Move lib/Site/SiteContextBuilder.php to lib/View/
-- [ ] Delete lib/Site/ when emptied.
-- [ ] There should be dedicated sys/Controller/(Public|Panel)/AuthController.php file, rather than a shared controller for both routes, for security/isolation reasons.
-- [ ] Rename lib/Support/CountryOptions.php to Countries.php
-- [ ] Rename lib/Support/ to lib/Extra/
+- [x] Move lib/Site/PublicMetaService.php to lib/View/Public/
+- [x] Move lib/Site/SiteContextBuilder.php to lib/View/
+- [x] Delete lib/Site/ when emptied.
+- [x] There should be dedicated sys/Controller/(Public|Panel)/AuthController.php file, rather than a shared controller for both routes, for security/isolation reasons.
+- [x] Rename lib/Support/CountryOptions.php to Countries.php
+- [x] Rename lib/Support/ to lib/Extra/
 
 
 ### Extension System Updates
 - [ ] Updated private/ext/CLAUDE.md guidance needs be be merged into private/ext/agents, then CLAUDE.md needs to be deleted and symlinked to agents like AGENTS.md is.
 - [ ] Replace "Generates AGENTS.md?" in Extension Manager with "Generate Agent Guidance?". Instead of making `AGENTS.md`, it will just make `agents`, and symlink both `AGENTS.md` and `CLAUDE.md` to `agents`.
 - [ ] Replace "Generates AGENTS.md?" in Theme Manager with "Generate Agent Guidance?". Instead of making `AGENTS.md`, it will just make `agents`, and symlink both `AGENTS.md` and `CLAUDE.md` to `agents`.
-- [ ] Unset Repositories & Smallweb as stock extensions so I can work on them separately with a different agent. I'll merge them back in here later.
+- [ ] Unset Repositories & Smallweb as stock extensions, but leave bundled.
 - [ ] The textareas for our page content in the Smallweb extension do not word wrap, instead open horizontal scrollbar. They need to word wrap like our page editor content blocks.
 - [ ] Folder creation/deletion/modification functions in Smallweb should be merged into (and called from) universal folder handler in lib/Archive/Folder.php
 - [ ] Make sure all import/export & file handler functions in our extensions are using our lib/Format/ libraries when applicable. If something can be extracted from an extension and made part of a universal handler in lib/Format/, do so. (Probably need a lib/Format/Txt.php for many of our Smallweb .txt/.gmi/etc files)

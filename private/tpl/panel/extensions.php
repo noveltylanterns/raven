@@ -37,7 +37,7 @@ declare(strict_types=1);
  *   uninstall_block_reason: string
  * }> $extensions */
 
-use function Raven\Lib\Support\e;
+use function Raven\Lib\Extra\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $packageArchiveHelp = array_map(

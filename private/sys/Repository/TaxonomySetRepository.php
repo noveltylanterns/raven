@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Repository;
 
-use Raven\Lib\Taxonomy\TaxonomySetFileStoreService;
-use Raven\Lib\Taxonomy\TaxonomySetRecordPolicy;
+use Raven\Lib\Directory\SetContext;
 use RuntimeException;
 
 /**
@@ -14,14 +13,14 @@ use RuntimeException;
 final class TaxonomySetRepository
 {
     private string $taxonomyType;
-    private TaxonomySetFileStoreService $fileStore;
+    private SetContext $fileStore;
     /** @var array<int, array<string, mixed>>|null */
     private ?array $cache = null;
 
     public function __construct(string $taxonomyType, string $setDirectory)
     {
         $this->taxonomyType = strtolower(trim($taxonomyType));
-        $this->fileStore = new TaxonomySetFileStoreService($setDirectory, $this->taxonomyType);
+        $this->fileStore = new SetContext($setDirectory, $this->taxonomyType);
     }
 
     /**
@@ -44,7 +43,7 @@ final class TaxonomySetRepository
 
             $setId = (int) ($loaded['id'] ?? -1);
             $raw = is_array($loaded['raw'] ?? null) ? $loaded['raw'] : [];
-            if ($setId < TaxonomySetRecordPolicy::DEFAULT_SET_ID || $raw === []) {
+            if ($setId < SetContext::DEFAULT_SET_ID || $raw === []) {
                 continue;
             }
 
@@ -54,7 +53,7 @@ final class TaxonomySetRepository
         usort($rows, static function (array $left, array $right): int {
             $leftId = (int) ($left['id'] ?? 0);
             $rightId = (int) ($right['id'] ?? 0);
-            if ($leftId === TaxonomySetRecordPolicy::DEFAULT_SET_ID || $rightId === TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
+            if ($leftId === SetContext::DEFAULT_SET_ID || $rightId === SetContext::DEFAULT_SET_ID) {
                 return $leftId <=> $rightId;
             }
 
@@ -81,7 +80,7 @@ final class TaxonomySetRepository
                 'id' => (int) ($row['id'] ?? 0),
                 'name' => (string) ($row['name'] ?? ''),
                 'slug' => (string) ($row['slug'] ?? ''),
-                'is_root' => (int) ($row['id'] ?? -1) === TaxonomySetRecordPolicy::DEFAULT_SET_ID,
+                'is_root' => (int) ($row['id'] ?? -1) === SetContext::DEFAULT_SET_ID,
             ];
         }
 
@@ -109,19 +108,19 @@ final class TaxonomySetRepository
 
     public function save(array $data): int
     {
-        $providedId = TaxonomySetRecordPolicy::normalizeSetId($data['id'] ?? null);
+        $providedId = SetContext::normalizeSetId($data['id'] ?? null);
         $setId = $providedId ?? $this->fileStore->nextAvailableId();
         $name = trim((string) ($data['name'] ?? ''));
         $description = trim((string) ($data['description'] ?? ''));
-        $slug = TaxonomySetRecordPolicy::normalizeSlug((string) ($data['slug'] ?? ''));
+        $slug = SetContext::normalizeSlug((string) ($data['slug'] ?? ''));
 
-        if ($setId === TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
-            $name = TaxonomySetRecordPolicy::defaultSetName($this->taxonomyType);
-            $slug = TaxonomySetRecordPolicy::DEFAULT_SET_SLUG;
-            $description = TaxonomySetRecordPolicy::defaultSetDescription($this->taxonomyType);
+        if ($setId === SetContext::DEFAULT_SET_ID) {
+            $name = SetContext::defaultSetName($this->taxonomyType);
+            $slug = SetContext::DEFAULT_SET_SLUG;
+            $description = SetContext::defaultSetDescription($this->taxonomyType);
         }
 
-        if ($name === '' || !TaxonomySetRecordPolicy::isValidSlug($slug)) {
+        if ($name === '' || !SetContext::isValidSlug($slug)) {
             throw new RuntimeException('Set name and valid slug are required.');
         }
 
@@ -147,7 +146,7 @@ final class TaxonomySetRepository
             'name' => $name,
             'slug' => $slug,
             'description' => $description,
-            'is_stock' => $setId === TaxonomySetRecordPolicy::DEFAULT_SET_ID,
+            'is_stock' => $setId === SetContext::DEFAULT_SET_ID,
             'created_at' => $createdAt,
         ];
 
@@ -158,7 +157,7 @@ final class TaxonomySetRepository
 
     public function deleteById(int $id): void
     {
-        if ($id === TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
+        if ($id === SetContext::DEFAULT_SET_ID) {
             throw new RuntimeException('The stock default set cannot be deleted.');
         }
 
@@ -173,20 +172,20 @@ final class TaxonomySetRepository
     private function canonicalizeRecord(int $id, array $raw): array
     {
         $name = trim((string) ($raw['name'] ?? ''));
-        $slug = TaxonomySetRecordPolicy::normalizeSlug((string) ($raw['slug'] ?? ''));
+        $slug = SetContext::normalizeSlug((string) ($raw['slug'] ?? ''));
         $description = trim((string) ($raw['description'] ?? ''));
         $createdAt = trim((string) ($raw['created_at'] ?? ''));
 
-        if ($id === TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
-            $name = TaxonomySetRecordPolicy::defaultSetName($this->taxonomyType);
-            $slug = TaxonomySetRecordPolicy::DEFAULT_SET_SLUG;
-            $description = TaxonomySetRecordPolicy::defaultSetDescription($this->taxonomyType);
+        if ($id === SetContext::DEFAULT_SET_ID) {
+            $name = SetContext::defaultSetName($this->taxonomyType);
+            $slug = SetContext::DEFAULT_SET_SLUG;
+            $description = SetContext::defaultSetDescription($this->taxonomyType);
         } else {
             if ($name === '') {
                 $name = ucwords(str_replace('-', ' ', $slug !== '' ? $slug : ('set-' . $id)));
             }
             if ($slug === '') {
-                $slug = TaxonomySetRecordPolicy::normalizeSlug($name);
+                $slug = SetContext::normalizeSlug($name);
             }
             if ($slug === '') {
                 $slug = 'set-' . $id;
@@ -202,7 +201,7 @@ final class TaxonomySetRepository
             'name' => $name,
             'slug' => $slug,
             'description' => $description,
-            'is_stock' => $id === TaxonomySetRecordPolicy::DEFAULT_SET_ID,
+            'is_stock' => $id === SetContext::DEFAULT_SET_ID,
             'created_at' => $createdAt,
         ];
     }
@@ -213,10 +212,10 @@ final class TaxonomySetRepository
     private function rootRecord(): array
     {
         return [
-            'id' => TaxonomySetRecordPolicy::DEFAULT_SET_ID,
-            'name' => TaxonomySetRecordPolicy::defaultSetName($this->taxonomyType),
-            'slug' => TaxonomySetRecordPolicy::DEFAULT_SET_SLUG,
-            'description' => TaxonomySetRecordPolicy::defaultSetDescription($this->taxonomyType),
+            'id' => SetContext::DEFAULT_SET_ID,
+            'name' => SetContext::defaultSetName($this->taxonomyType),
+            'slug' => SetContext::DEFAULT_SET_SLUG,
+            'description' => SetContext::defaultSetDescription($this->taxonomyType),
             'is_stock' => true,
             'created_at' => gmdate('Y-m-d H:i:s'),
         ];

@@ -18,7 +18,7 @@ use Raven\Core\Controller\Public\ContentController as PublicContentController;
 use Raven\Core\Controller\Public\FeedController as PublicFeedController;
 use Raven\Core\Controller\Public\FormController as PublicFormController;
 use Raven\Core\Controller\Public\ProfileController as PublicProfileController;
-use Raven\Core\Controller\Public\RequestContext;
+use Raven\Core\Controller\Public\SharedController;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\InviteTokenRepository;
@@ -29,7 +29,7 @@ use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Config\ConfigParser;
 use RuntimeException;
 
 /**
@@ -58,7 +58,7 @@ final class PublicRuntimeBuilder
         $publicFeedController = null;
         $publicFormController = null;
         $publicProfileController = null;
-        $publicRequestContext = null;
+        $publicSharedController = null;
         $extensionServices = null;
         $inviteTokens = null;
         $taxonomyLookup = null;
@@ -70,8 +70,8 @@ final class PublicRuntimeBuilder
         $userRepository = null;
 
         $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
-        $categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', false), false);
-        $tagEnabled = ConfigValueParser::bool($rvn['config']->get('tag.enabled', false), false);
+        $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', false), false);
+        $tagEnabled = ConfigParser::bool($rvn['config']->get('tag.enabled', false), false);
 
         // Public entry closures ($canRenderPublicDebugToolbar) capture $rvn by value and call
         // $rvn['auth']->method() directly, so auth must be a concrete AuthService before
@@ -346,19 +346,19 @@ final class PublicRuntimeBuilder
         /**
          * Builds the shared request context for split public sub-controllers.
          */
-        $rvn['public_request_context'] = static function () use (&$publicRequestContext, $rvn, $resolveAuth): RequestContext {
-            if ($publicRequestContext instanceof RequestContext) {
-                return $publicRequestContext;
+        $rvn['public_request_context'] = static function () use (&$publicSharedController, $rvn, $resolveAuth): SharedController {
+            if ($publicSharedController instanceof SharedController) {
+                return $publicSharedController;
             }
 
-            $publicRequestContext = new RequestContext(
+            $publicSharedController = new SharedController(
                 $rvn['config'],
                 $resolveAuth(),
                 $rvn['input'],
                 $rvn['csrf']
             );
 
-            return $publicRequestContext;
+            return $publicSharedController;
         };
 
         /**
@@ -369,7 +369,7 @@ final class PublicRuntimeBuilder
                 return $publicAuthController;
             }
 
-            /** @var callable(): RequestContext $requestContextFactory */
+            /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['public_request_context'];
             $authDomain = $publicAuthDomain();
             $publicAuthController = new PublicAuthController(
@@ -390,7 +390,7 @@ final class PublicRuntimeBuilder
                 return $publicProfileController;
             }
 
-            /** @var callable(): RequestContext $requestContextFactory */
+            /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['public_request_context'];
             $authDomain = $publicAuthDomain();
             $publicProfileController = new PublicProfileController(
@@ -410,7 +410,7 @@ final class PublicRuntimeBuilder
                 return $publicFormController;
             }
 
-            /** @var callable(): RequestContext $requestContextFactory */
+            /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['public_request_context'];
             $formDomain = $publicFormDomain();
             $publicFormController = new PublicFormController(
@@ -429,7 +429,7 @@ final class PublicRuntimeBuilder
                 return $publicFeedController;
             }
 
-            /** @var callable(): RequestContext $requestContextFactory */
+            /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['public_request_context'];
             $contentDomain = $publicContentDomain();
             $publicFeedController = new PublicFeedController(
@@ -450,7 +450,7 @@ final class PublicRuntimeBuilder
                 return $publicContentController;
             }
 
-            /** @var callable(): RequestContext $requestContextFactory */
+            /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['public_request_context'];
             $contentDomain = $publicContentDomain();
             $authDomain = $publicAuthDomain();

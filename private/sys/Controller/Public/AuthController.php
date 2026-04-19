@@ -23,14 +23,14 @@ use Raven\Lib\Auth\LoginUiStateService;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Security\LoginTwoFactorFlowService;
 
-use function Raven\Lib\Support\redirect;
+use function Raven\Lib\Extra\redirect;
 
 /**
  * Handles split public auth routes.
  */
 final class AuthController
 {
-    private RequestContext $context;
+    private SharedController $context;
     private GroupRepository $groupRepo;
     private UserRepository $userRepo;
     private Closure $inviteTokensResolver;
@@ -42,14 +42,14 @@ final class AuthController
     private ?LoginChallengeWorkflowService $loginChallengeWorkflowService = null;
 
     /**
-     * @param RequestContext $context Shared public request context.
+     * @param SharedController $context Shared public request context.
      * @param GroupRepository $groupRepo Group repository for registration target-group resolution.
      * @param UserRepository $userRepo User repository for registration persistence.
      * @param callable(): InviteTokenRepository $inviteTokensResolver Lazy invite-token repository resolver.
      * @return void
      */
     public function __construct(
-        RequestContext $context,
+        SharedController $context,
         GroupRepository $groupRepo,
         UserRepository $userRepo,
         callable $inviteTokensResolver

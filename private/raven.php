@@ -15,7 +15,7 @@ use Raven\Core\Database\Schema\SchemaManager;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Config\ConfigParser;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Scheduler\Registry;
 use Raven\Core\Logger;
@@ -89,7 +89,7 @@ return (static function (): array {
     });
 
     // Load global helper functions.
-    require_once $root . '/private/lib/Support/Helpers.php';
+    require_once $root . '/private/lib/Extra/Helpers.php';
 
     $config = new Config($root . '/private/dat/config.php');
 
@@ -132,8 +132,8 @@ return (static function (): array {
     };
 
     $input = new InputSanitizer();
-    $categoryEnabled = ConfigValueParser::bool($config->get('category.enabled', false), false);
-    $tagEnabled = ConfigValueParser::bool($config->get('tag.enabled', false), false);
+    $categoryEnabled = ConfigParser::bool($config->get('category.enabled', false), false);
+    $tagEnabled = ConfigParser::bool($config->get('tag.enabled', false), false);
     $loggingConfig = (array) $config->get('logging', []);
     $logger = null;
     $loggerResolver = static function () use (&$logger, $rvnDb, $driver, $prefix, $loggingConfig): Logger {

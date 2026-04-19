@@ -2,6 +2,14 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 19, 2026 — library refactor cleanup: Directory/Extra finalization, renamed core surfaces, route regressions fixed
+
+- **Library rename/finalization pass completed across Archive, Config, and utility helpers**: `private/lib/Archive/Delete.php` → `Folder.php`, `UpdateSource.php` → `Upstream.php`, `private/lib/Config/ConfigValueParser.php` / `ConfigValueWriter.php` → `ConfigParser.php` / `ConfigWriter.php`, and `private/lib/Support/` → `private/lib/Extra/` with `CountryOptions.php` → `Countries.php` and helper-function imports now using `Raven\Lib\Extra`.
+- **Channel/taxonomy/routing helper consolidation completed under `private/lib/Directory/`**: the old `lib/Channel/`, `lib/Taxonomy/`, and `lib/Routing/` surfaces were dissolved into `ChannelContext`, `SetContext`, `Channel`, `Group`, `Feed`, `Route`, `Mode`, and `Duplicate`, while the remaining view/content helpers now live under `private/lib/View/`.
+- **Core routing/controller names were brought in line with the refactor layout**: `private/sys/Routing/RouteRequest.php` / `RouteDispatchResult.php` are now `Request.php` / `Result.php`, `private/sys/Debug/DebugToolbarResponseHook.php` is now `ToolbarResponseHook.php`, and the public/panel front controllers now live in `private/sys/Controller/Public/PublicController.php` and `private/sys/Controller/Panel/PanelController.php` with scope-local `SharedController` coordinators.
+- **Fresh post-refactor 500s were fixed across public and panel routes**: `private/raven.php` now loads `private/lib/Extra/Helpers.php`, the stock public auth templates import `Raven\Lib\Extra\e`, the public/panel front controllers once again import their routing builders and registrars from `Raven\Core\Routing\*`, `private/lib/View/Public/PublicMetaService.php` now imports `Raven\Lib\View\SiteContextBuilder`, and `private/sys/Controller/Panel/UserController.php` now references `Raven\Lib\Auth\Panel\PanelAccess` instead of an invalid escaped core path. CLI smoke checks now complete for `/`, `/login`, and `/panel/login` without fatal errors.
+- **`docs/Filetree.md` synced to the refactor**: updated the `sys/Debug`, `sys/Controller`, `sys/Routing`, `lib/Archive`, `lib/Config`, `lib/Directory`, `lib/Extra`, and `lib/View` sections so the filetree matches the current namespace/layout instead of the removed pre-refactor paths.
+
 ### April 18, 2026 — library refactor phase 3: Archive consolidation, Config/Panel dissolution, sys/Config delegation
 
 - **`lib/Archive/PackageInstallWorkflowService.php` → `lib/Archive/Install.php`**: class renamed `PackageInstallWorkflowService` → `Install`; namespace unchanged (`Raven\Lib\Archive`). All callers (`CLI.php`, `SystemController`) updated to import via `use … as ArchiveInstall`.

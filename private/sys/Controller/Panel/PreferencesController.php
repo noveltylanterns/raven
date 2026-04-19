@@ -29,7 +29,7 @@ use Raven\Lib\Security\QrCodeService;
 use Raven\Lib\Security\WebAuthnService;
 use Raven\Lib\Transport\Response;
 
-use function Raven\Lib\Support\redirect;
+use function Raven\Lib\Extra\redirect;
 
 /**
  * Handles the current user's panel preferences routes.
@@ -38,7 +38,7 @@ final class PreferencesController
 {
     private const SESSION_WEBAUTHN_PREFERENCES_CHALLENGE = '_raven_preferences_webauthn_challenge';
 
-    private RequestContext $context;
+    private SharedController $context;
     private Config $config;
     private InputSanitizer $input;
     private string $root;
@@ -52,7 +52,7 @@ final class PreferencesController
     private PasswordChangePolicy $passwordChangePolicy;
 
     /**
-     * @param RequestContext $context Shared panel request context.
+     * @param SharedController $context Shared panel request context.
      * @param Config $config Runtime configuration reader.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for user-media storage helpers.
@@ -67,7 +67,7 @@ final class PreferencesController
      * @return void
      */
     public function __construct(
-        RequestContext $context,
+        SharedController $context,
         Config $config,
         InputSanitizer $input,
         string $root,

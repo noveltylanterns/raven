@@ -17,6 +17,7 @@ use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\InviteTokenRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Auth\Panel\PanelInvitePolicyService;
 use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\SessionFlash;
@@ -27,20 +28,20 @@ use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Panel\PanelMediaConfigService;
 use Raven\Lib\Profile\ProfileContactService;
-use Raven\Lib\Routing\RouteConfigService;
+use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
 
-use function Raven\Lib\Support\redirect;
+use function Raven\Lib\Extra\redirect;
 
 /**
  * Handles split user-management routes.
  *
  * The whole panel user seam lives here: list/edit/save/delete plus invite
- * management. Session/auth state still stays in RequestContext/bootstrap.
+ * management. Session/auth state still stays in SharedController/bootstrap.
  */
 final class UserController
 {
-    private RequestContext $context;
+    private SharedController $context;
     private Config $config;
     private InputSanitizer $input;
     private string $root;
@@ -49,7 +50,7 @@ final class UserController
     private Closure $inviteTokensResolver;
     private ?InviteTokenRepository $inviteTokens = null;
     private SessionFlash $flashList;
-    private RouteConfigService $routeConfigService;
+    private Route $routeConfigService;
     private PanelInvitePolicyService $panelInvitePolicyService;
     private LoginIdentifierResolver $loginIdentifierResolver;
     private PanelEditorTabService $panelEditorTabService;
@@ -60,7 +61,7 @@ final class UserController
     private UserMediaPathService $userMediaPathService;
 
     /**
-     * @param RequestContext $context Shared panel request context.
+     * @param SharedController $context Shared panel request context.
      * @param Config $config Runtime configuration reader.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for user-media storage helpers.
@@ -68,7 +69,7 @@ final class UserController
      * @param UserRepository $userRepo User repository for panel user CRUD.
      * @param callable(): InviteTokenRepository $inviteTokensResolver Lazy invite-token repository resolver.
      * @param SessionFlash $flashList List-style flash store for generated token batches.
-     * @param RouteConfigService $routeConfigService Shared route-configuration helper.
+     * @param Route $routeConfigService Shared route-configuration helper.
      * @param PanelInvitePolicyService $panelInvitePolicyService Shared invite-form parsing helper.
      * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
      * @param PanelEditorTabService $panelEditorTabService Shared editor-tab normalization helper.
@@ -80,7 +81,7 @@ final class UserController
      * @return void
      */
     public function __construct(
-        RequestContext $context,
+        SharedController $context,
         Config $config,
         InputSanitizer $input,
         string $root,
@@ -88,7 +89,7 @@ final class UserController
         UserRepository $userRepo,
         callable $inviteTokensResolver,
         SessionFlash $flashList,
-        RouteConfigService $routeConfigService,
+        Route $routeConfigService,
         PanelInvitePolicyService $panelInvitePolicyService,
         LoginIdentifierResolver $loginIdentifierResolver,
         PanelEditorTabService $panelEditorTabService,
@@ -351,7 +352,7 @@ final class UserController
 
         if (!$actorIsAdmin) {
             $configurationGroupIds = [];
-            $systemPanelBitsMask = \\Raven\\Core\\Auth\\PanelAccess::maskFromBits(\\Raven\\Core\\Auth\\PanelAccess::systemPanelBits());
+            $systemPanelBitsMask = PanelAccess::maskFromBits(PanelAccess::systemPanelBits());
             foreach ($groupPermissionMasks as $groupIdKey => $mask) {
                 if (($mask & $systemPanelBitsMask) !== 0) {
                     $configurationGroupIds[] = $groupIdKey;

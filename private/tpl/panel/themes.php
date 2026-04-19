@@ -29,7 +29,7 @@ declare(strict_types=1);
  *   inheritance_chain: string
  * }> $themes */
 
-use function Raven\Lib\Support\e;
+use function Raven\Lib\Extra\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $packageArchiveHelp = array_map(

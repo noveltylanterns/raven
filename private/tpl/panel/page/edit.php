@@ -36,7 +36,7 @@ declare(strict_types=1);
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
-use function Raven\Lib\Support\e;
+use function Raven\Lib\Extra\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $pageId = (int) ($page['id'] ?? 0);
@@ -191,7 +191,7 @@ if ($permalinkBase !== '' && !preg_match('#^https?://#i', $permalinkBase)) {
 $permalinkBase = rtrim($permalinkBase, '/');
 $permalinkPathParts = [];
 $routeSegment = trim(
-    \Raven\Lib\Routing\ChannelRoutePolicy::buildRouteSegment(
+    \Raven\Lib\Directory\Mode::buildRouteSegment(
         new \Raven\Lib\Security\InputSanitizer(),
         $pageSlug,
         $pageId,

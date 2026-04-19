@@ -22,8 +22,8 @@ use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\TaxonomySetRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Content\BodyBlockPolicy;
-use Raven\Lib\Content\PageBodyBlockCodec;
+use Raven\Lib\View\BodyBlockPolicy;
+use Raven\Lib\View\PageBodyBlockCodec;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
@@ -33,12 +33,12 @@ use Raven\Lib\Media\Panel\PageImageManager;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Panel\PanelPost;
 use Raven\Lib\Panel\PanelPageAuthorOptionBuilder;
-use Raven\Lib\Routing\ChannelRoutePolicy;
-use Raven\Lib\Routing\RouteConfigService;
+use Raven\Lib\Directory\Mode;
+use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Taxonomy\TaxonomySetRecordPolicy;
+use Raven\Lib\Directory\SetContext;
 
-use function Raven\Lib\Support\redirect;
+use function Raven\Lib\Extra\redirect;
 
 /**
  * Handles panel page content management routes.
@@ -50,14 +50,14 @@ use function Raven\Lib\Support\redirect;
  */
 final class ContentController
 {
-    private RequestContext $context;
+    private SharedController $context;
     private Config $config;
     private InputSanitizer $input;
     private PageRepository $pageRepo;
     private ChannelRepository $channelRepo;
     private PageImageRepository $pageImages;
     private UserRepository $userRepo;
-    private RouteConfigService $routeConfigService;
+    private Route $routeConfigService;
     private PanelEditorTabService $panelEditorTabService;
     /** @var Closure(): PageImageManager */
     private Closure $pageImageManagerResolver;
@@ -93,7 +93,7 @@ final class ContentController
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
 
     /**
-     * @param RequestContext $context Shared panel request context for auth, CSRF, flash, and rendering.
+     * @param SharedController $context Shared panel request context for auth, CSRF, flash, and rendering.
      * @param Config $config Runtime configuration reader for media and content settings.
      * @param InputSanitizer $input Shared input sanitizer for panel request values.
      * @param PageRepository $pageRepo Page repository for content CRUD.
@@ -106,13 +106,13 @@ final class ContentController
      * @param callable $tagSetRepoResolver Lazy tag-set repository resolver; resolved only on set-validation flows.
      * @param callable $taxonomyLookupRepoResolver Lazy taxonomy lookup resolver; resolved only on page-editor option-set queries.
      * @param UserRepository $userRepo User repository for author validation and author select options.
-     * @param RouteConfigService $routeConfigService Route configuration service for route-mode and separator helpers.
+     * @param Route $routeConfigService Route configuration service for route-mode and separator helpers.
      * @param PanelEditorTabService $panelEditorTabService Panel editor tab normalization and tab-preserving URL builder.
      * @param callable $extensionServicesFor Extension services resolver used to load per-extension shortcode and body-block contributions.
      * @return void
      */
     public function __construct(
-        RequestContext $context,
+        SharedController $context,
         Config $config,
         InputSanitizer $input,
         PageRepository $pageRepo,
@@ -125,7 +125,7 @@ final class ContentController
         callable $tagSetRepoResolver,
         callable $taxonomyLookupRepoResolver,
         UserRepository $userRepo,
-        RouteConfigService $routeConfigService,
+        Route $routeConfigService,
         PanelEditorTabService $panelEditorTabService,
         callable $extensionServicesFor
     ) {
@@ -1068,7 +1068,7 @@ final class ContentController
      */
     private function normalizeChannelRouteSeparator(string $value): string
     {
-        return ChannelRoutePolicy::normalizeChannelSeparator($value);
+        return Mode::normalizeChannelSeparator($value);
     }
 
     /**
@@ -1079,7 +1079,7 @@ final class ContentController
      */
     private function normalizeGlobalRouteSeparator(string $value): string
     {
-        return ChannelRoutePolicy::normalizeGlobalSeparator($value);
+        return Mode::normalizeGlobalSeparator($value);
     }
 
     /**
@@ -1091,7 +1091,7 @@ final class ContentController
      */
     private function normalizeTaxonomySetSelection(mixed $raw, bool $defaultAll = true): array
     {
-        return TaxonomySetRecordPolicy::normalizeSelection($raw, $defaultAll);
+        return SetContext::normalizeSelection($raw, $defaultAll);
     }
 
     /**
@@ -1102,7 +1102,7 @@ final class ContentController
      */
     private function selectionAllowsAllSets(array $selection): bool
     {
-        return TaxonomySetRecordPolicy::selectionIncludesAll($selection);
+        return SetContext::selectionIncludesAll($selection);
     }
 
     /**
@@ -1119,9 +1119,9 @@ final class ContentController
         $isTag = strtolower(trim($kind)) === 'tag';
         $path = $isTag ? 'tag.set' : 'category.set';
         $repo = $isTag ? $this->tagSetRepo() : $this->categorySetRepo();
-        $configuredId = $this->input->int($this->config->get($path, TaxonomySetRecordPolicy::DEFAULT_SET_ID), TaxonomySetRecordPolicy::DEFAULT_SET_ID);
+        $configuredId = $this->input->int($this->config->get($path, SetContext::DEFAULT_SET_ID), SetContext::DEFAULT_SET_ID);
         if ($configuredId === null || !$repo->existsId($configuredId)) {
-            return TaxonomySetRecordPolicy::DEFAULT_SET_ID;
+            return SetContext::DEFAULT_SET_ID;
         }
 
         return $configuredId;
@@ -1147,7 +1147,7 @@ final class ContentController
         $field = strtolower(trim($kind)) === 'tag' ? 'tag_sets' : 'category_sets';
         $selection = $this->normalizeTaxonomySetSelection($channelRecord[$field] ?? [], false);
         if ($this->selectionAllowsAllSets($selection)) {
-            return [TaxonomySetRecordPolicy::ALL_SET_ID];
+            return [SetContext::ALL_SET_ID];
         }
         if ($selection === []) {
             return [$this->configuredDefaultTaxonomySetId($kind)];

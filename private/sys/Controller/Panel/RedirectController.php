@@ -15,7 +15,7 @@ use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Lib\Security\InputSanitizer;
 
-use function Raven\Lib\Support\redirect;
+use function Raven\Lib\Extra\redirect;
 
 /**
  * Handles redirect management routes for the panel.
@@ -26,20 +26,20 @@ use function Raven\Lib\Support\redirect;
  */
 final class RedirectController
 {
-    private RequestContext $context;
+    private SharedController $context;
     private InputSanitizer $input;
     private ChannelRepository $channelRepo;
     private RedirectRepository $redirectRepo;
 
     /**
-     * @param RequestContext $context Shared panel request context.
+     * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param ChannelRepository $channelRepo Channel repository for redirect scope validation.
      * @param RedirectRepository $redirectRepo Redirect repository for redirect CRUD.
      * @return void
      */
     public function __construct(
-        RequestContext $context,
+        SharedController $context,
         InputSanitizer $input,
         ChannelRepository $channelRepo,
         RedirectRepository $redirectRepo

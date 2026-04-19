@@ -19,12 +19,12 @@ use Raven\Core\Repository\TaxonomySetRepository;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Panel\PanelEditorTabService;
-use Raven\Lib\Routing\ChannelRoutePolicy;
-use Raven\Lib\Routing\RouteConfigService;
+use Raven\Lib\Directory\Mode;
+use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Taxonomy\TaxonomySetRecordPolicy;
+use Raven\Lib\Directory\SetContext;
 
-use function Raven\Lib\Support\redirect;
+use function Raven\Lib\Extra\redirect;
 
 /**
  * Handles channel, category, category-set, tag, and tag-set management routes.
@@ -36,7 +36,7 @@ use function Raven\Lib\Support\redirect;
  */
 final class TaxonomyController
 {
-    private RequestContext $context;
+    private SharedController $context;
     private InputSanitizer $input;
     private ChannelRepository $channelRepo;
     /** @var ?CategoryRepository */
@@ -54,12 +54,12 @@ final class TaxonomyController
     private bool $categoryEnabled;
     private bool $tagEnabled;
     private TaxonomyImageService $taxonomyImageService;
-    private RouteConfigService $routeConfigService;
+    private Route $routeConfigService;
     private PanelEditorTabService $panelEditorTabService;
     private Upload $uploadFileSetNormalizer;
 
     /**
-     * @param RequestContext $context Shared panel request context.
+     * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param ChannelRepository $channelRepo Channel repository for channel CRUD and taxonomy-set assignment counts.
      * @param callable $categoryRepoResolver Lazy category repository resolver; only resolved on category routes.
@@ -69,13 +69,13 @@ final class TaxonomyController
      * @param bool $categoryEnabled Whether category features are enabled in runtime config.
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Service for taxonomy image uploads and path management.
-     * @param RouteConfigService $routeConfigService Route configuration reader for channel/category/tag route mode and prefix helpers.
+     * @param Route $routeConfigService Route configuration reader for channel/category/tag route mode and prefix helpers.
      * @param PanelEditorTabService $panelEditorTabService Panel editor tab normalization and tab-preserving URL builder.
      * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
      * @return void
      */
     public function __construct(
-        RequestContext $context,
+        SharedController $context,
         InputSanitizer $input,
         ChannelRepository $channelRepo,
         callable $categoryRepoResolver,
@@ -85,7 +85,7 @@ final class TaxonomyController
         bool $categoryEnabled,
         bool $tagEnabled,
         TaxonomyImageService $taxonomyImageService,
-        RouteConfigService $routeConfigService,
+        Route $routeConfigService,
         PanelEditorTabService $panelEditorTabService,
         Upload $uploadFileSetNormalizer
     ) {
@@ -1002,7 +1002,7 @@ final class TaxonomyController
         // Reassign any remaining categories in this set to the default set before deleting.
         $categoryCount = (int) ($this->categoryRepo()->countsBySetId()[$id] ?? 0);
         if ($categoryCount > 0) {
-            $this->categoryRepo()->reassignSetToDefault($id, TaxonomySetRecordPolicy::DEFAULT_SET_ID);
+            $this->categoryRepo()->reassignSetToDefault($id, SetContext::DEFAULT_SET_ID);
         }
 
         try {
@@ -1558,7 +1558,7 @@ final class TaxonomyController
         // Reassign any remaining tags in this set to the default set before deleting.
         $tagCount = (int) ($this->tagRepo()->countsBySetId()[$id] ?? 0);
         if ($tagCount > 0) {
-            $this->tagRepo()->reassignSetToDefault($id, TaxonomySetRecordPolicy::DEFAULT_SET_ID);
+            $this->tagRepo()->reassignSetToDefault($id, SetContext::DEFAULT_SET_ID);
         }
 
         try {
@@ -1676,7 +1676,7 @@ final class TaxonomyController
     }
 
     /**
-     * Normalizes one channel route-mode value via RouteConfigService.
+     * Normalizes one channel route-mode value via Route.
      *
      * @param string $value Raw route-mode from form or record.
      * @return string Normalized route mode.
@@ -1694,7 +1694,7 @@ final class TaxonomyController
      */
     private function normalizeChannelRouteSeparator(string $value): string
     {
-        return ChannelRoutePolicy::normalizeChannelSeparator($value);
+        return Mode::normalizeChannelSeparator($value);
     }
 
     /**
@@ -1706,7 +1706,7 @@ final class TaxonomyController
      */
     private function normalizeTaxonomySetSelection(mixed $raw, bool $defaultAll = true): array
     {
-        return TaxonomySetRecordPolicy::normalizeSelection($raw, $defaultAll);
+        return SetContext::normalizeSelection($raw, $defaultAll);
     }
 
     /**
@@ -1729,14 +1729,14 @@ final class TaxonomyController
         }
 
         $selection = $this->normalizeTaxonomySetSelection($submitted, false);
-        if (TaxonomySetRecordPolicy::selectionIncludesAll($selection)) {
-            return [TaxonomySetRecordPolicy::ALL_SET_ID];
+        if (SetContext::selectionIncludesAll($selection)) {
+            return [SetContext::ALL_SET_ID];
         }
 
         $allowedIds = [];
         foreach ($options as $option) {
             $allowedId = (int) ($option['id'] ?? -1);
-            if ($allowedId >= TaxonomySetRecordPolicy::DEFAULT_SET_ID) {
+            if ($allowedId >= SetContext::DEFAULT_SET_ID) {
                 $allowedIds[$allowedId] = true;
             }
         }
@@ -1755,7 +1755,7 @@ final class TaxonomyController
 
         ksort($normalized, SORT_NUMERIC);
         if (count($normalized) === count($allowedIds) && $allowedIds !== []) {
-            return [TaxonomySetRecordPolicy::ALL_SET_ID];
+            return [SetContext::ALL_SET_ID];
         }
 
         return array_values($normalized);

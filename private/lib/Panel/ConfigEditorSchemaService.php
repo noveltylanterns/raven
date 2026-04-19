@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Panel;
 
-use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Config\ConfigParser;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -282,7 +282,7 @@ final class ConfigEditorSchemaService
         if (!array_key_exists('enabled', $feed)) {
             $feed['enabled'] = false;
         } else {
-            $feed['enabled'] = ConfigValueParser::bool($feed['enabled'], false);
+            $feed['enabled'] = ConfigParser::bool($feed['enabled'], false);
         }
         $channelsWereExplicit = array_key_exists('channels', $feed);
         $rawChannels = $feed['channels'] ?? null;
@@ -429,7 +429,7 @@ final class ConfigEditorSchemaService
         if (!array_key_exists('enabled', $category)) {
             $category['enabled'] = false;
         } else {
-            $category['enabled'] = ConfigValueParser::bool($category['enabled'], false);
+            $category['enabled'] = ConfigParser::bool($category['enabled'], false);
         }
 
         if (!array_key_exists('set', $category)) {
@@ -469,7 +469,7 @@ final class ConfigEditorSchemaService
         if (!array_key_exists('enabled', $tag)) {
             $tag['enabled'] = false;
         } else {
-            $tag['enabled'] = ConfigValueParser::bool($tag['enabled'], false);
+            $tag['enabled'] = ConfigParser::bool($tag['enabled'], false);
         }
 
         if (!array_key_exists('set', $tag)) {
@@ -910,13 +910,13 @@ final class ConfigEditorSchemaService
             $debug = [];
         }
 
-        $debug['show_public'] = ConfigValueParser::bool($debug['show_public'] ?? false, false);
-        $debug['show_private'] = ConfigValueParser::bool($debug['show_private'] ?? false, false);
-        $debug['show_benchmarks'] = ConfigValueParser::bool($debug['show_benchmarks'] ?? true, true);
-        $debug['show_queries'] = ConfigValueParser::bool($debug['show_queries'] ?? true, true);
-        $debug['show_trace'] = ConfigValueParser::bool($debug['show_trace'] ?? true, true);
-        $debug['show_request'] = ConfigValueParser::bool($debug['show_request'] ?? true, true);
-        $debug['show_environment'] = ConfigValueParser::bool($debug['show_environment'] ?? true, true);
+        $debug['show_public'] = ConfigParser::bool($debug['show_public'] ?? false, false);
+        $debug['show_private'] = ConfigParser::bool($debug['show_private'] ?? false, false);
+        $debug['show_benchmarks'] = ConfigParser::bool($debug['show_benchmarks'] ?? true, true);
+        $debug['show_queries'] = ConfigParser::bool($debug['show_queries'] ?? true, true);
+        $debug['show_trace'] = ConfigParser::bool($debug['show_trace'] ?? true, true);
+        $debug['show_request'] = ConfigParser::bool($debug['show_request'] ?? true, true);
+        $debug['show_environment'] = ConfigParser::bool($debug['show_environment'] ?? true, true);
 
         $config['debug'] = $debug;
         return $config;

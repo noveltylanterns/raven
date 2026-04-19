@@ -11,6 +11,6 @@ declare(strict_types=1);
 
 // Keep the panel webroot limited to universal entry delegation only.
 // Route-specific registration and runtime wiring belong under `private/sys/`.
-require_once dirname(__DIR__) . '/private/sys/Routing/Panel/PanelEntrypoint.php';
+require_once dirname(__DIR__) . '/private/sys/Controller/Panel/PanelController.php';
 
-\Raven\Core\Routing\Panel\PanelEntrypoint::handle();
+\Raven\Core\Controller\Panel\PanelController::handle();

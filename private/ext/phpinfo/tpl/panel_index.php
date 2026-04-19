@@ -17,7 +17,7 @@ declare(strict_types=1);
 /** @var string $phpInfoHtml */
 /** @var string $phpInfoCss */
 
-use function Raven\Lib\Support\e;
+use function Raven\Lib\Extra\e;
 
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'PHP Info'));
 $extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));

@@ -33,7 +33,7 @@ declare(strict_types=1);
 /** @var string|null $flashError */
 /** @var string $csrfField */
 
-use function Raven\Lib\Support\e;
+use function Raven\Lib\Extra\e;
 
 $isEditMode = is_array($formData);
 $formName = (string) ($formData['name'] ?? '');

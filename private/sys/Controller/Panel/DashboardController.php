@@ -16,13 +16,13 @@ namespace Raven\Core\Controller\Panel;
  */
 final class DashboardController
 {
-    private RequestContext $context;
+    private SharedController $context;
 
     /**
-     * @param RequestContext $context Shared panel request context.
+     * @param SharedController $context Shared panel request context.
      * @return void
      */
-    public function __construct(RequestContext $context)
+    public function __construct(SharedController $context)
     {
         $this->context = $context;
     }

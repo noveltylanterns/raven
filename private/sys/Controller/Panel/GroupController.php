@@ -18,20 +18,20 @@ use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Panel\PanelEditorTabService;
-use Raven\Lib\Routing\RouteConfigService;
+use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
 
-use function Raven\Lib\Support\redirect;
+use function Raven\Lib\Extra\redirect;
 
 /**
  * Handles split group-management routes.
  */
 final class GroupController
 {
-    private RequestContext $context;
+    private SharedController $context;
     private InputSanitizer $input;
     private GroupRepository $groupRepo;
-    private RouteConfigService $routeConfigService;
+    private Route $routeConfigService;
     private PanelEditorTabService $panelEditorTabService;
     private TaxonomyImageService $taxonomyImageService;
     private PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog;
@@ -39,10 +39,10 @@ final class GroupController
     private Closure $panelPermissionMapProvider;
 
     /**
-     * @param RequestContext $context Shared panel request context.
+     * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param GroupRepository $groupRepo Group repository for panel CRUD.
-     * @param RouteConfigService $routeConfigService Shared route-configuration helper.
+     * @param Route $routeConfigService Shared route-configuration helper.
      * @param PanelEditorTabService $panelEditorTabService Shared editor-tab helper.
      * @param TaxonomyImageService $taxonomyImageService Shared group image upload/storage pipeline.
      * @param PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog Shared panel permission-definition catalog.
@@ -51,10 +51,10 @@ final class GroupController
      * @return void
      */
     public function __construct(
-        RequestContext $context,
+        SharedController $context,
         InputSanitizer $input,
         GroupRepository $groupRepo,
-        RouteConfigService $routeConfigService,
+        Route $routeConfigService,
         PanelEditorTabService $panelEditorTabService,
         TaxonomyImageService $taxonomyImageService,
         PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog,

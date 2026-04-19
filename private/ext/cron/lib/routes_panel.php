@@ -13,7 +13,7 @@ use Raven\Ext\Cron\CronTaskService;
 use Raven\Core\Routing\Router;
 use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
 
-use function Raven\Lib\Support\redirect;
+use function Raven\Lib\Extra\redirect;
 
 /**
  * Registers Scheduled Tasks routes into the panel router.

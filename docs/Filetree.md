@@ -113,11 +113,11 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/sys/Scheduler.php`
   - `Raven\Core\Scheduler` — fallback web-request scheduler trigger. Throttles passive scheduler execution after public/panel responses and delegates actual job execution to the shared registry in `lib/Scheduler/Registry.php`.
 - `private/sys/Debug/`
-  - Debug toolbar infrastructure (`Raven\Core\Debug`). Owns `ToolbarConfigResolver`, `ToolbarDataSanitizer`, `ToolbarMarkupBuilder`, `ToolbarRenderer`, and `DebugToolbarResponseHook`. Injected into responses when debug mode is active.
+  - Debug toolbar infrastructure (`Raven\Core\Debug`). Owns `ToolbarConfigResolver`, `ToolbarDataSanitizer`, `ToolbarMarkupBuilder`, `ToolbarRenderer`, and `ToolbarResponseHook`. Injected into responses when debug mode is active.
 - `private/sys/Controller/`
   - Public/panel/auth controllers and request flow coordination.
-  - Split panel sub-controllers live under `private/sys/Controller/Panel/` with a shared `RequestContext`; `DashboardController`, `ContentController`, `TaxonomyController`, `RedirectController`, `UserController`, `GroupController`, `PreferencesController`, and `SystemController` own the panel route seams.
-  - Public split controllers live under `private/sys/Controller/Public/` with their own shared `RequestContext`; `AuthController`, `ProfileController`, `FormController`, `FeedController`, and `ContentController` own the public route seams.
+  - `Controller/Panel/` now holds both the panel front controller (`PanelController`) and the split panel sub-controllers, all coordinated through `SharedController`; `AuthController`, `DashboardController`, `ContentController`, `TaxonomyController`, `RedirectController`, `UserController`, `GroupController`, `PreferencesController`, and `SystemController` own the panel route seams.
+  - `Controller/Public/` now holds both the public front controller (`PublicController`) and the split public sub-controllers, all coordinated through `SharedController`; `AuthController`, `ProfileController`, `FormController`, `FeedController`, and `ContentController` own the public route seams.
 - `private/sys/Database/`
   - Bootstrap-only database machinery. Not for extension use.
   - `ConnectionFactory` — creates app and auth PDO connections from config; uses `Connection/` helpers.
@@ -126,11 +126,12 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/sys/Repository/`
   - Core content/taxonomy/auth-facing persistence repositories (`PageRepository`, `ChannelRepository`, `UserRepository`, `GroupRepository`, `CategoryRepository`, `TagRepository`, `TaxonomyLookupRepository`, `TaxonomySetRepository`, `RedirectRepository`, `PageImageRepository`, `InviteTokenRepository`).
 - `private/sys/Routing/`
-  - Raven-owned web entrypoints, runtime builders, and route registrars. Not for extension use.
+  - Raven-owned request-dispatch primitives, runtime builders, and route registrars. Not for extension use.
   - `Router.php` — `Raven\Core\Routing\Router`, the core dispatcher: registers routes via `add()`, compiles `{param}` patterns to named-capture regex, and resolves requests via `dispatch()`.
-  - `Routing/Public/` — `PublicEntrypoint`, `PublicRuntimeBuilder`, controller-aligned public route registrars (including extension-route loading), and `PublicChannelPageRouteService` (wraps `ChannelRoutePolicy` for public content controllers: lookup-target resolution and canonical segment building).
-  - `Routing/Panel/` — `PanelEntrypoint`, `PanelRuntimeBuilder`, controller-aligned panel route registrars, extension-route loading, panel theme-asset fast path, and `RoutingInventoryBuilder` (builds the normalized routing inventory row set for the panel routing diagnostics view).
-  - Note: `Router.php`, `RouteRequest.php`, and `RouteDispatchResult.php` now live together under `sys/Routing/`; `Routing/` also holds the public/panel entrypoints and route registrars.
+  - `Request.php` / `Result.php` — the immutable routing request/result value objects used by the dispatcher.
+  - `Routing/Public/` — `PublicRuntimeBuilder`, controller-aligned public route registrars (including extension-route loading), `PublicRouteConfig`, and `PublicChannelPageRouteService` (wraps `Raven\Lib\Directory\Mode` for public content controllers: lookup-target resolution and canonical segment building).
+  - `Routing/Panel/` — `PanelRuntimeBuilder`, controller-aligned panel route registrars, extension-route loading, panel theme-asset fast path, and `RoutingInventoryBuilder` (builds the normalized routing inventory row set for the panel routing diagnostics view).
+  - Note: the actual public/panel front controllers now live under `private/sys/Controller/Public/PublicController.php` and `private/sys/Controller/Panel/PanelController.php`; `sys/Routing/` now owns only shared routing primitives plus scope-specific builders/registrars.
 
 ### private/lib/
 
@@ -142,19 +143,24 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `SessionFlash.php` — session-backed flash message store; used by both panel and public routes.
   - `SessionCookiePolicy.php` — session cookie configuration policy; applied at bootstrap.
   - Note: `sys/Auth/` may be re-introduced later as a lean internal-only auth package; for now everything lives here.
-- `private/lib/Channel/`
-  - Channel record normalization policy, root channel constants, slug validation, and channel-context hydration helpers. (`ChannelRecordPolicy`, `ChannelContextService`, `ChannelFileStoreService`.)
+- `private/lib/Directory/`
+  - Consolidated route-prefix, route-mode, channel, group, feed, and taxonomy-set helpers that were previously split across `lib/Channel/`, `lib/Routing/`, and `lib/Taxonomy/`.
+  - `ChannelContext` — combined channel record policy, context hydration, and PHP-file store for `private/dat/channel/`.
+  - `SetContext` — combined taxonomy-set normalization policy and PHP-file store for `private/dat/category-set/` and `private/dat/tag-set/`.
+  - `Route` — unified route-config reader composed from `Channel`, `Group`, and `Feed` helpers.
+  - `Mode` — static channel route-mode and separator normalization helpers.
+  - `Duplicate` — shared `(slug, channel)` uniqueness lookup helper for repositories.
 - `private/lib/Config/`
   - Config validation and value-parsing primitives. Pure reusable policy; does not own the runtime config instance.
-  - `ConfigValueParser` — static scalar coercion helpers (`bool`, `int`, `float`) for extension and lib code that needs safe type conversion from raw config values.
-  - `ConfigValueWriter` — handles the on-disk persistence format for runtime config files: `var_export` serialization, atomic write, stat-cache invalidation, and OPcache eviction; called by `sys/Config::save()`.
+  - `ConfigParser` — static scalar coercion helpers (`bool`, `int`, `float`) for extension and lib code that needs safe type conversion from raw config values.
+  - `ConfigWriter` — handles the on-disk persistence format for runtime config files: `var_export` serialization, atomic write, stat-cache invalidation, and OPcache eviction; called by `sys/Config::save()`.
 - `private/lib/Archive/`
   - Reusable archive/package helpers for core and extensions.
   - `Package` — panel/CLI-facing package helper for supported archive checks, export-format metadata, manifest slug reads, temp archive allocation, archive building, and download streaming.
   - `Install` — shared package-upload orchestration for theme/extension installs: upload validation, slug resolution, extraction, and wrapper-directory flattening.
-  - `Delete` — recursive directory-removal utility used by theme/extension uninstall and cleanup flows.
+  - `Folder` — recursive directory-removal utility used by theme/extension uninstall, cleanup, and general folder operations.
   - `Update` — core update workflow orchestration: git-based compare, dry-run, and apply-update pipelines with schema re-ensure support.
-  - `UpdateSource` — normalizes and validates update-source config (GitHub mirror, custom GitHub repo, custom git URL) from config or POST data.
+  - `Upstream` — normalizes and validates update-source config (GitHub mirror, custom GitHub repo, custom git URL) from config or POST data.
   - `Extract` — shared archive extraction forwarder for ZIP, TAR-family, 7Z, and single-file compression formats; also handles selective file/folder extraction plus manifest reads across wrapped package layouts.
   - `Compress` — shared archive compression forwarder for ZIP, TAR-family, 7Z, and single-file compression formats; also handles selective file/folder archive updates where the format supports named entries.
 - `private/lib/Format/`
@@ -183,26 +189,20 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Panel UI and config-editor helpers for panel-only workflows.
   - UI helpers: tab normalization, tab-preserving URL builders, panel path resolution, routing-preview derivations, and panel POST payload normalization (`PanelPost`).
   - Config editor: `ConfigEditorNormalizer` (field value normalization), `ConfigEditorSchemaService` (schema, field mapping, and config-tree defaults), `ConfigSnapshotSanitizer` (snapshot cleanup before persistence), `PanelConfigDefaultsService` (defaults orchestration), `PanelConfigFieldPolicyService` (field validation policy), `PanelMediaConfigService` (media config readers and upload-limit display).
-- `private/lib/Routing/`
-  - Reusable routing library functions available to extensions and core alike.
-  - `ChannelRoutePolicy` — channel route mode (`slug`, `date_slug`, `id`, etc.) and word-separator normalization/resolution policy.
-  - `PathScopeLookupService` — generic slug-uniqueness DB lookup for any (slug, channel) scoped table; used by core repositories and available to extensions.
-  - `RouteConfigService` — config-aware route-prefix, feed, profile, and group route helpers; consumes `Raven\Core\Config` and exposes normalized policy accessors.
 - `private/lib/Security/`
   - Security primitives available to core and extensions: CSRF (`Csrf`, `CsrfTokenStoreInterface`), input sanitization (`InputSanitizer`), 2FA (TOTP, WebAuthn, recovery phrase, QR code), captcha, and invite token policy.
-- `private/lib/Support/`
-  - Global helper functions and shared utility data.
-  - `Helpers.php` — defines `e()` (HTML-escape), `redirect()`, and `request_path()` in the `Raven\Lib\Support` namespace; loaded at bootstrap via `require_once` and imported via `use function` throughout templates, controllers, and extensions.
-  - `CountryOptions.php` — ISO country list lookup used by signup forms and profile fields.
-- `private/lib/Taxonomy/`
-  - File-backed taxonomy-set policies and persistence helpers shared by channels/categories/tags.
+- `private/lib/Extra/`
+  - Global helper functions and small shared utility catalogs.
+  - `Helpers.php` — defines `e()` (HTML-escape), `redirect()`, and `request_path()` in the `Raven\Lib\Extra` namespace; loaded at bootstrap via `require_once` and imported via `use function` throughout templates, controllers, and extensions.
+  - `Countries.php` — ISO country list lookup used by signup forms, profile fields, and panel reporting.
 - `private/lib/View/`
-  - Theme discovery, inheritance, and template rendering utilities.
+  - Theme discovery, inheritance, content rendering, and template utilities.
   - `TemplateTagEngine` — core template tag processor used by the public theme renderer.
+  - `SiteContextBuilder`, `BodyBlockPolicy`, `MarkdownRenderer`, `PageBodyBlockCodec`, `PagePersistenceService`, `PageTaxonomyAssignmentService`, `PageTaxonomyQueryService`, and `PublicPageBodyRenderer` now live directly under `View/` as the shared content/view surface.
   - `ThemeDiscoveryService`, `ThemeInheritanceResolver`, `ThemeFallbackRenderer` — shared theme infrastructure used by both panel and public contexts.
   - `Pagination.php` — reusable pagination value object and helper; available to both panel and public controllers.
   - `View/Panel/` — panel-only view/theme management: `ThemeCatalogService`, `ThemeCloneService`, `ThemeScaffoldService`, `ThemeManifestValidator`.
-  - `View/Public/` — public-route-only view/theme rendering: `PublicThemeRegistry` (discovers and validates installed public themes), `PublicRouteRenderService`, `PublicTemplateDecorator`, `PublicTemplatePipeline`, `PublicTemplateResolver`.
+  - `View/Public/` — public-route-only view/theme rendering: `PublicThemeRegistry` (discovers and validates installed public themes), `PublicRouteRenderService`, `PublicTemplateDecorator`, `PublicTemplatePipeline`, `PublicTemplateResolver`, and `PublicMetaService`.
 
 ## Reading Order
 

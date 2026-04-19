@@ -23,7 +23,7 @@ declare(strict_types=1);
 /** @var string $csrfField */
 /** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string} $extensionMeta */
 
-use function Raven\Lib\Support\e;
+use function Raven\Lib\Extra\e;
 
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Contact Forms'));
 $extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));

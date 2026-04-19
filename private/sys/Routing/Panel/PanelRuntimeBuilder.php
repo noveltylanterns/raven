@@ -13,13 +13,13 @@ namespace Raven\Core\Routing\Panel;
 
 use Closure;
 use PDO;
-use Raven\Core\Controller\AuthController;
+use Raven\Core\Controller\Panel\AuthController;
 use Raven\Core\Controller\Panel\ContentController;
 use Raven\Core\Controller\Panel\DashboardController;
 use Raven\Core\Controller\Panel\GroupController;
 use Raven\Core\Controller\Panel\PreferencesController;
 use Raven\Core\Controller\Panel\RedirectController;
-use Raven\Core\Controller\Panel\RequestContext;
+use Raven\Core\Controller\Panel\SharedController;
 use Raven\Core\Controller\Panel\SystemController;
 use Raven\Core\Controller\Panel\TaxonomyController;
 use Raven\Core\Controller\Panel\UserController;
@@ -43,7 +43,7 @@ use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Config\ConfigParser;
 use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\PageImageManager;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
@@ -51,8 +51,8 @@ use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Panel\PanelMediaConfigService;
 use Raven\Lib\Profile\ProfileContactService;
-use Raven\Lib\Routing\RouteConfigService;
-use Raven\Lib\Site\SiteContextBuilder;
+use Raven\Lib\Directory\Route;
+use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\Transport\Upload;
 use RuntimeException;
 
@@ -92,7 +92,7 @@ final class PanelRuntimeBuilder
         $dashboardController = null;
         $groupController = null;
         $preferencesController = null;
-        $panelRequestContext = null;
+        $panelSharedController = null;
         $panelRuntime = null;
         $redirectController = null;
         $systemController = null;
@@ -114,8 +114,8 @@ final class PanelRuntimeBuilder
         $userRepository = null;
 
         $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
-        $categoryEnabled = ConfigValueParser::bool($rvn['config']->get('category.enabled', true), true);
-        $tagEnabled = ConfigValueParser::bool($rvn['config']->get('tag.enabled', true), true);
+        $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', true), true);
+        $tagEnabled = ConfigParser::bool($rvn['config']->get('tag.enabled', true), true);
 
         /**
          * Resolves the lazy auth DB handle only for panel factories that truly need it.
@@ -501,12 +501,12 @@ final class PanelRuntimeBuilder
         /**
          * Builds the shared request context for split panel sub-controllers.
          */
-        $rvn['panel_request_context'] = static function () use (&$panelRequestContext, &$systemController, &$rvn, $categoryEnabled, $tagEnabled, $resolveAuth): RequestContext {
-            if ($panelRequestContext instanceof RequestContext) {
-                return $panelRequestContext;
+        $rvn['panel_request_context'] = static function () use (&$panelSharedController, &$systemController, &$rvn, $categoryEnabled, $tagEnabled, $resolveAuth): SharedController {
+            if ($panelSharedController instanceof SharedController) {
+                return $panelSharedController;
             }
 
-            $panelRequestContext = new RequestContext(
+            $panelSharedController = new SharedController(
                 $rvn['view'],
                 $rvn['config'],
                 $resolveAuth(),
@@ -531,7 +531,7 @@ final class PanelRuntimeBuilder
                 }
             );
 
-            return $panelRequestContext;
+            return $panelSharedController;
         };
 
         /**
@@ -542,7 +542,7 @@ final class PanelRuntimeBuilder
                 return $dashboardController;
             }
 
-            /** @var callable(): RequestContext $requestContextFactory */
+            /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $dashboardController = new DashboardController($requestContextFactory());
             return $dashboardController;
@@ -557,7 +557,7 @@ final class PanelRuntimeBuilder
                 return $contentController;
             }
 
-            /** @var callable(): RequestContext $requestContextFactory */
+            /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $contentDomain = $panelContentDomain();
             $taxonomyDomain = $panelTaxonomyDomain();
@@ -575,7 +575,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['tag_set'],
                 $taxonomyDomain['taxonomy_lookup'],
                 $contentDomain['user'],
-                new RouteConfigService($rvn['config'], $rvn['input']),
+                new Route($rvn['config'], $rvn['input']),
                 new PanelEditorTabService($rvn['input']),
                 is_callable($rvn['extension_services_for'] ?? null)
                     ? $rvn['extension_services_for']
@@ -594,7 +594,7 @@ final class PanelRuntimeBuilder
                 return $redirectController;
             }
 
-            /** @var callable(): RequestContext $requestContextFactory */
+            /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $taxonomyDomain = $panelTaxonomyDomain();
             $redirectController = new RedirectController(
@@ -616,7 +616,7 @@ final class PanelRuntimeBuilder
                 return $taxonomyController;
             }
 
-            /** @var callable(): RequestContext $requestContextFactory */
+            /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $taxonomyDomain = $panelTaxonomyDomain();
             $taxonomyController = new TaxonomyController(
@@ -630,7 +630,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['category_enabled'],
                 $taxonomyDomain['tag_enabled'],
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
-                new RouteConfigService($rvn['config'], $rvn['input']),
+                new Route($rvn['config'], $rvn['input']),
                 new PanelEditorTabService($rvn['input']),
                 new Upload()
             );
@@ -646,7 +646,7 @@ final class PanelRuntimeBuilder
                 return $userController;
             }
 
-            /** @var callable(): RequestContext $requestContextFactory */
+            /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $userDomain = $panelUserDomain();
             $userController = new UserController(
@@ -658,7 +658,7 @@ final class PanelRuntimeBuilder
                 $userDomain['user'],
                 $userDomain['invite_tokens'],
                 new SessionFlash('_raven_flash_list'),
-                new RouteConfigService($rvn['config'], $rvn['input']),
+                new Route($rvn['config'], $rvn['input']),
                 new PanelInvitePolicyService($rvn['input']),
                 new LoginIdentifierResolver(),
                 new PanelEditorTabService($rvn['input']),
@@ -680,14 +680,14 @@ final class PanelRuntimeBuilder
                 return $groupController;
             }
 
-            /** @var callable(): RequestContext $requestContextFactory */
+            /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $groupDomain = $panelUserDomain();
             $groupController = new GroupController(
                 $requestContextFactory(),
                 $rvn['input'],
                 $groupDomain['group'],
-                new RouteConfigService($rvn['config'], $rvn['input']),
+                new Route($rvn['config'], $rvn['input']),
                 new PanelEditorTabService($rvn['input']),
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
                 new PanelPermissionDefinitionCatalog(),
@@ -714,7 +714,7 @@ final class PanelRuntimeBuilder
                 return $preferencesController;
             }
 
-            /** @var callable(): RequestContext $requestContextFactory */
+            /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $preferencesController = new PreferencesController(
                 $requestContextFactory(),
@@ -743,7 +743,7 @@ final class PanelRuntimeBuilder
                 return $systemController;
             }
 
-            /** @var callable(): RequestContext $requestContextFactory */
+            /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $systemDomain = $panelSystemDomain();
             $systemController = new SystemController(

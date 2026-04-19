@@ -23,7 +23,7 @@ use Raven\Lib\View\Public\PublicTemplateDecorator;
  */
 final class ProfileController
 {
-    private RequestContext $context;
+    private SharedController $context;
     private GroupRepository $groupRepo;
     private UserRepository $userRepo;
     private LoginIdentifierResolver $loginIdentifierResolver;
@@ -32,13 +32,13 @@ final class ProfileController
     private PublicTemplateDecorator $publicTemplateDecorator;
 
     /**
-     * @param RequestContext $context Shared public request context.
+     * @param SharedController $context Shared public request context.
      * @param GroupRepository $groupRepo Group repository for public group routes.
      * @param UserRepository $userRepo User repository for public profile routes.
      * @return void
      */
     public function __construct(
-        RequestContext $context,
+        SharedController $context,
         GroupRepository $groupRepo,
         UserRepository $userRepo
     ) {

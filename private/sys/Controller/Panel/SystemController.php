@@ -22,13 +22,13 @@ use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\TaxonomySetRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Core\Routing\Panel\RoutingInventoryBuilder;
-use Raven\Lib\Archive\Delete as ArchiveDelete;
+use Raven\Lib\Archive\Folder as ArchiveDelete;
 use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
 use Raven\Lib\Format\Csv;
 use Raven\Lib\Format\Git;
 use Raven\Lib\Archive\Update as ArchiveUpdate;
-use Raven\Lib\Archive\UpdateSource;
+use Raven\Lib\Archive\Upstream;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
@@ -46,10 +46,10 @@ use Raven\Lib\Panel\PanelConfigFieldPolicyService;
 use Raven\Lib\Panel\PanelEditorTabService;
 use Raven\Lib\Panel\PanelRoutingPreviewService;
 use Raven\Lib\Profile\ProfileContactService;
-use Raven\Lib\Routing\ChannelRoutePolicy;
-use Raven\Lib\Routing\RouteConfigService;
+use Raven\Lib\Directory\Mode;
+use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Site\SiteContextBuilder;
+use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Panel\ThemeCatalogService;
 use Raven\Lib\View\Panel\ThemeCloneService;
@@ -57,7 +57,7 @@ use Raven\Lib\View\Panel\ThemeScaffoldService;
 use Raven\Lib\View\Public\PublicThemeRegistry;
 use Raven\Lib\View\ThemeFallbackRenderer;
 
-use function Raven\Lib\Support\redirect;
+use function Raven\Lib\Extra\redirect;
 
 /**
  * Handles split panel system-management routes.
@@ -65,12 +65,12 @@ use function Raven\Lib\Support\redirect;
  * Owns the remaining panel administration seam: configuration, updater,
  * routing inventory, event logs, public-theme management, and extension
  * management. The shared auth/flash/render state stays centralized in
- * RequestContext, while this controller keeps the system-specific services and
+ * SharedController, while this controller keeps the system-specific services and
  * filesystem workflows localized to one place.
  */
 final class SystemController
 {
-    private RequestContext $context;
+    private SharedController $context;
     private Config $config;
     private InputSanitizer $input;
     private string $root;
@@ -109,7 +109,7 @@ final class SystemController
     private ?SiteContextBuilder $siteContextBuilder = null;
     private ?ConfigEditorSchemaService $configEditorSchemaService = null;
     private ?ProfileContactService $profileContactService = null;
-    private ?RouteConfigService $routeConfigService = null;
+    private ?Route $routeConfigService = null;
     private ?ExtensionCatalogService $extensionCatalogService = null;
     private ?PanelEditorTabService $panelEditorTabService = null;
     private ?PanelRoutingPreviewService $panelRoutingPreviewService = null;
@@ -119,11 +119,11 @@ final class SystemController
     private ?ArchiveDelete $directoryTreeService = null;
     private ?Csv $csvHandler = null;
     private ?Git $gitArchiveHandler = null;
-    private ?UpdateSource $updateSourceResolver = null;
+    private ?Upstream $updateSourceResolver = null;
     private ?ArchiveUpdate $updateWorkflowService = null;
 
     /**
-     * @param RequestContext $context Shared panel request context.
+     * @param SharedController $context Shared panel request context.
      * @param Config $config Runtime configuration reader.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for filesystem-backed admin workflows.
@@ -139,7 +139,7 @@ final class SystemController
      * @return void
      */
     public function __construct(
-        RequestContext $context,
+        SharedController $context,
         Config $config,
         InputSanitizer $input,
         string $root,
@@ -344,7 +344,7 @@ final class SystemController
         }
 
         try {
-            $this->persistUpdateSourceConfig($source);
+            $this->persistUpstreamConfig($source);
         } catch (\RuntimeException $exception) {
             $error = 'Failed to save updater source settings: ' . $exception->getMessage();
             $result = $this->updateWorkflowService()->compare($source);
@@ -1735,7 +1735,7 @@ final class SystemController
      */
     private function normalizeGlobalRouteSeparator(string $value): string
     {
-        return ChannelRoutePolicy::normalizeGlobalSeparator($value);
+        return Mode::normalizeGlobalSeparator($value);
     }
 
     /**
@@ -2878,10 +2878,10 @@ final class SystemController
     /**
      * Returns the route-config service on first use.
      */
-    private function routeConfigService(): RouteConfigService
+    private function routeConfigService(): Route
     {
-        if (!$this->routeConfigService instanceof RouteConfigService) {
-            $this->routeConfigService = new RouteConfigService($this->config, $this->input);
+        if (!$this->routeConfigService instanceof Route) {
+            $this->routeConfigService = new Route($this->config, $this->input);
         }
 
         return $this->routeConfigService;
@@ -3006,12 +3006,12 @@ final class SystemController
     /**
      * Returns the update-source resolver on first use.
      *
-     * @return UpdateSource Lazily initialized update source resolver.
+     * @return Upstream Lazily initialized update source resolver.
      */
-    private function updateSourceResolver(): UpdateSource
+    private function updateSourceResolver(): Upstream
     {
-        if (!$this->updateSourceResolver instanceof UpdateSource) {
-            $this->updateSourceResolver = new UpdateSource($this->input);
+        if (!$this->updateSourceResolver instanceof Upstream) {
+            $this->updateSourceResolver = new Upstream($this->input);
         }
 
         return $this->updateSourceResolver;
@@ -3144,7 +3144,7 @@ final class SystemController
      * @param array<string, mixed> $source Resolved update source settings.
      * @return void
      */
-    private function persistUpdateSourceConfig(array $source): void
+    private function persistUpstreamConfig(array $source): void
     {
         $nextConfig = $this->config->all();
         $nextConfig['update'] = is_array($nextConfig['update'] ?? null) ? $nextConfig['update'] : [];

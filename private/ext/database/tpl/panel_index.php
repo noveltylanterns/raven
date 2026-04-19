@@ -27,7 +27,7 @@ declare(strict_types=1);
  * } $databaseSummary */
 /** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string} $extensionMeta */
 
-use function Raven\Lib\Support\e;
+use function Raven\Lib\Extra\e;
 
 $driver = strtolower((string) ($databaseSummary['driver'] ?? 'sqlite'));
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Database Manager'));

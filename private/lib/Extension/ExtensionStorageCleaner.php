@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Extension;
 
 use PDO;
-use Raven\Lib\Archive\Delete as ArchiveDelete;
+use Raven\Lib\Archive\Folder as ArchiveDelete;
 use RuntimeException;
 
 /**

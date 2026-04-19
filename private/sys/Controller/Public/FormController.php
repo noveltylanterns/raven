@@ -21,7 +21,7 @@ use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
  */
 final class FormController
 {
-    private RequestContext $context;
+    private SharedController $context;
     private Closure $extensionServicesProvider;
     /** @var array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> */
     private array $embeddedFormRuntimes = [];
@@ -29,11 +29,11 @@ final class FormController
     private ?EmbeddedFormRuntimeService $embeddedFormRuntimeService = null;
 
     /**
-     * @param RequestContext $context Shared public request context.
+     * @param SharedController $context Shared public request context.
      * @param callable(?string=): array<string, mixed> $extensionServicesProvider Lazy extension-services resolver.
      * @return void
      */
-    public function __construct(RequestContext $context, callable $extensionServicesProvider)
+    public function __construct(SharedController $context, callable $extensionServicesProvider)
     {
         $this->context = $context;
         $this->extensionServicesProvider = Closure::fromCallable($extensionServicesProvider);

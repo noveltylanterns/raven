@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-use function Raven\Lib\Support\e;
+use function Raven\Lib\Extra\e;
 
 $repo = is_array($repo ?? null) ? $repo : [];
 $payload = is_array($payload ?? null) ? $payload : [];

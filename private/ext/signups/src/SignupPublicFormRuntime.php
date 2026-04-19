@@ -16,9 +16,9 @@ use Raven\Ext\SignupSubmissionRepository;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Support\CountryOptions;
+use Raven\Lib\Extra\Countries;
 
-use function Raven\Lib\Support\redirect;
+use function Raven\Lib\Extra\redirect;
 
 /**
  * Owns Signup Sheets shortcode rendering and submit pipeline.
@@ -524,7 +524,7 @@ final class SignupPublicFormRuntime implements EmbeddedFormRuntimeInterface
      */
     private function countryOptions(): array
     {
-        return CountryOptions::list(true);
+        return Countries::list(true);
     }
 
     /**

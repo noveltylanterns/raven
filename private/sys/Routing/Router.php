@@ -39,10 +39,10 @@ final class Router
     /**
      * Dispatches one normalized route request to the first matching handler.
      *
-     * @param RouteRequest $request Normalized route request value object.
-     * @return RouteDispatchResult Result wrapper containing handled state and params.
+     * @param Request $request Normalized route request value object.
+     * @return Result Result wrapper containing handled state and params.
      */
-    public function dispatch(RouteRequest $request): RouteDispatchResult
+    public function dispatch(Request $request): Result
     {
         $normalizedMethod = $request->method();
         $normalizedPath = $request->path();
@@ -64,10 +64,10 @@ final class Router
             }
 
             $response = ($route['handler'])($params);
-            return RouteDispatchResult::handled($params, $response);
+            return Result::handled($params, $response);
         }
 
-        return RouteDispatchResult::notHandled();
+        return Result::notHandled();
     }
 
     /**
@@ -78,7 +78,7 @@ final class Router
      */
     private function compilePattern(string $pattern): string
     {
-        $normalized = RouteRequest::normalizePath($pattern);
+        $normalized = Request::normalizePath($pattern);
 
         $regex = preg_replace_callback(
             '/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/',

@@ -14,7 +14,7 @@ use Raven\Ext\Repo\RepoRegistryStore;
 use Raven\Ext\Repo\RepoService;
 use Raven\Ext\Repo\RepoSettingsStore;
 use Raven\Ext\Repo\RepoShortcodeRuntime;
-use Raven\Lib\Archive\Delete as ArchiveDelete;
+use Raven\Lib\Archive\Folder as ArchiveDelete;
 use Raven\Lib\Format\Git;
 
 /**
