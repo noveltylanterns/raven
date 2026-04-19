@@ -17,16 +17,28 @@ use RuntimeException;
 /**
  * Canonical TAR archive handler for Raven core and extensions.
  *
- * Handles safe extraction, whole-archive creation, selective file/folder
- * extraction, and path addition for `.tar` archives via PHP's PharData. For
- * `.tar.gz`, `.tar.bz2`, `.tar.xz`, and `.tar.zst`, the higher-level archive
- * forwarders still peel off or apply the outer single-file compression layer.
+ * Extraction and listing use PHP's PharData for the shared read surface, while
+ * archive creation/update use the system `tar` binary so exported tarballs keep
+ * source modification times intact. For `.tar.gz`, `.tar.bz2`, `.tar.xz`, and
+ * `.tar.zst`, the higher-level archive forwarders still peel off or apply the
+ * outer single-file compression layer.
  *
  * Path traversal safety: PharData rejects `..` segments natively during
  * extraction. For single-file extraction, entry names are validated before use.
  */
 final class Tar
 {
+    /** Absolute or PATH-relative path to the tar binary. */
+    private string $binary;
+
+    /**
+     * @param string $binary Path to the tar binary; defaults to `tar`.
+     */
+    public function __construct(string $binary = 'tar')
+    {
+        $this->binary = $binary !== '' ? $binary : 'tar';
+    }
+
     /**
      * Extracts all entries from a TAR (or .tar.gz) archive into a directory.
      *
@@ -163,30 +175,19 @@ final class Tar
 
         @unlink($outputPath);
 
+        $staging = $this->stagePathPreservingMetadata($sourcePath, $entryName);
+
         try {
-            $phar = new PharData($outputPath);
-
-            if (is_dir($sourcePath)) {
-                $sourceRoot = realpath($sourcePath);
-                if ($sourceRoot === false || !is_dir($sourceRoot)) {
-                    throw new RuntimeException('TAR source directory could not be resolved: ' . $sourcePath);
-                }
-
-                if ($entryName === null || trim($entryName) === '') {
-                    $phar->buildFromDirectory($sourceRoot);
-                    return;
-                }
-
-                $this->addDirectoryTreeToArchive($phar, $sourceRoot, $this->normalizeEntryName($entryName));
-                return;
+            $result = $this->runBinary([
+                '-cf',
+                $outputPath,
+                '-C',
+                $staging['directory'],
+                $staging['target'],
+            ]);
+            if (!$result['ok']) {
+                throw new RuntimeException($result['stderr'] !== '' ? $result['stderr'] : $result['stdout']);
             }
-
-            $entry = is_string($entryName) && trim($entryName) !== ''
-                ? $this->normalizeEntryName($entryName)
-                : trim(basename($sourcePath), '/');
-
-            $this->ensureArchiveParentDirectories($phar, $entry);
-            $phar->addFile($sourcePath, $entry);
         } catch (\Throwable $e) {
             @unlink($outputPath);
             throw new RuntimeException(
@@ -194,6 +195,8 @@ final class Tar
                 0,
                 $e
             );
+        } finally {
+            $this->deleteDirectoryRecursively($staging['directory']);
         }
     }
 
@@ -388,30 +391,28 @@ final class Tar
             throw new RuntimeException('Failed to create TAR archive directory.');
         }
 
+        $staging = $this->stagePathPreservingMetadata($sourcePath, $entryName);
+
         try {
-            $phar = new PharData($archivePath);
-
-            if (is_dir($sourcePath)) {
-                $entry = is_string($entryName) && trim($entryName) !== ''
-                    ? $this->normalizeEntryName($entryName)
-                    : trim(basename($sourcePath), '/');
-
-                $this->addDirectoryTreeToArchive($phar, $sourcePath, $entry);
-                return;
+            $command = [
+                is_file($archivePath) ? '-rf' : '-cf',
+                $archivePath,
+                '-C',
+                $staging['directory'],
+                $staging['target'],
+            ];
+            $result = $this->runBinary($command);
+            if (!$result['ok']) {
+                throw new RuntimeException($result['stderr'] !== '' ? $result['stderr'] : $result['stdout']);
             }
-
-            $entry = is_string($entryName) && trim($entryName) !== ''
-                ? $this->normalizeEntryName($entryName)
-                : trim(basename($sourcePath), '/');
-
-            $this->ensureArchiveParentDirectories($phar, $entry);
-            $phar->addFile($sourcePath, $entry);
         } catch (\Throwable $e) {
             throw new RuntimeException(
                 'Failed to update TAR archive: ' . $e->getMessage(),
                 0,
                 $e
             );
+        } finally {
+            $this->deleteDirectoryRecursively($staging['directory']);
         }
     }
 
@@ -522,19 +523,57 @@ final class Tar
      */
     private function allocateTemporaryTarPath(): string
     {
-        $path = tempnam(sys_get_temp_dir(), 'rvn-tar-');
-        if (!is_string($path) || $path === '') {
-            throw new RuntimeException('Failed to allocate temporary TAR path.');
+        foreach ($this->temporaryDirectoryRoots() as $directory) {
+            $path = @tempnam($directory, 'rvn-tar-');
+            if (!is_string($path) || $path === '') {
+                continue;
+            }
+
+            // PharData expects to create a fresh archive file itself; leaving the
+            // tempnam placeholder in place causes it to interpret an empty file as
+            // a truncated TAR. Remove the placeholder and return a fresh suffix path.
+            if (!@unlink($path)) {
+                continue;
+            }
+
+            return $path . '.tar';
         }
 
-        // PharData expects to create a fresh archive file itself; leaving the
-        // tempnam placeholder in place causes it to interpret an empty file as
-        // a truncated TAR. Remove the placeholder and return a fresh suffix path.
-        if (!@unlink($path)) {
-            throw new RuntimeException('Failed to prepare temporary TAR path.');
+        throw new RuntimeException('Failed to allocate temporary TAR path.');
+    }
+
+    /**
+     * Returns writable directory roots Raven can use for staged TAR-family work.
+     *
+     * @return array<int, string> Writable temporary directory roots.
+     */
+    private function temporaryDirectoryRoots(): array
+    {
+        $projectRoot = dirname(__DIR__, 3);
+        $candidates = [
+            trim((string) sys_get_temp_dir()),
+            $projectRoot . '/.tmp',
+            $projectRoot . '/.tmp/archives',
+        ];
+        $directories = [];
+
+        foreach ($candidates as $candidate) {
+            if ($candidate === '') {
+                continue;
+            }
+
+            if (!is_dir($candidate) && !@mkdir($candidate, 0775, true) && !is_dir($candidate)) {
+                continue;
+            }
+
+            if (!is_writable($candidate)) {
+                continue;
+            }
+
+            $directories[] = rtrim($candidate, '/\\');
         }
 
-        return $path . '.tar';
+        return array_values(array_unique($directories));
     }
 
     /**
@@ -599,27 +638,126 @@ final class Tar
     }
 
     /**
-     * Adds one directory tree to an open TAR archive under a given root path.
+     * Stages one source file or directory under the requested archive entry path.
      *
-     * @param PharData $phar Open TAR archive handle.
-     * @param string $sourceDir Absolute source directory path.
-     * @param string $entryRoot Archive-internal destination root.
-     * @return void
-     * @throws RuntimeException When one directory or file cannot be added.
+     * TAR creation uses the system `tar` binary, so Raven stages the source tree
+     * first when it needs a custom archive root name. The staging copy preserves
+     * mtimes and modes so the final tarball reflects the original source tree.
+     *
+     * @param string $sourcePath Absolute source file or directory path.
+     * @param string|null $entryName Optional archive-internal destination path.
+     * @return array{directory: string, target: string} Staging directory and tar command target.
+     * @throws RuntimeException When the source cannot be staged.
      */
-    private function addDirectoryTreeToArchive(PharData $phar, string $sourceDir, string $entryRoot): void
+    private function stagePathPreservingMetadata(string $sourcePath, ?string $entryName): array
     {
-        $sourceRoot = realpath($sourceDir);
-        if ($sourceRoot === false || !is_dir($sourceRoot)) {
-            throw new RuntimeException('TAR source directory could not be resolved: ' . $sourceDir);
+        $stagingDirectory = $this->allocateTemporaryDirectory();
+        $stagedEntryPath = $this->stagedEntryPath($sourcePath, $entryName);
+        $destinationPath = $stagingDirectory . '/' . $stagedEntryPath;
+        $destinationDirectory = dirname($destinationPath);
+
+        if (!is_dir($destinationDirectory) && !mkdir($destinationDirectory, 0775, true) && !is_dir($destinationDirectory)) {
+            $this->deleteDirectoryRecursively($stagingDirectory);
+            throw new RuntimeException('Failed to prepare TAR staging directory.');
         }
 
-        $phar->addEmptyDir($entryRoot);
+        try {
+            if (is_dir($sourcePath)) {
+                $this->copyDirectoryRecursivelyPreservingMetadata($sourcePath, $destinationPath);
+            } else {
+                $this->copyFilePreservingMetadata($sourcePath, $destinationPath);
+            }
+        } catch (\Throwable $exception) {
+            $this->deleteDirectoryRecursively($stagingDirectory);
+            throw $exception;
+        }
+
+        return [
+            'directory' => $stagingDirectory,
+            'target' => $this->stagedCommandTarget($sourcePath, $entryName),
+        ];
+    }
+
+    /**
+     * Returns the staged relative path for one source path.
+     *
+     * @param string $sourcePath Absolute file or directory path to stage.
+     * @param string|null $entryName Optional archive-internal root path.
+     * @return string Relative path inside the temporary staging directory.
+     */
+    private function stagedEntryPath(string $sourcePath, ?string $entryName): string
+    {
+        if (is_string($entryName) && trim($entryName) !== '') {
+            return $this->normalizeEntryName($entryName);
+        }
+
+        return trim(basename($sourcePath), '/');
+    }
+
+    /**
+     * Returns the top-level staging target the tar command should archive.
+     *
+     * Nested entry names are staged under their requested parent directories, so
+     * the command only needs the first path segment to include the full tree.
+     *
+     * @param string $sourcePath Absolute file or directory path to stage.
+     * @param string|null $entryName Optional archive-internal root path.
+     * @return string Relative staging target for the tar command.
+     */
+    private function stagedCommandTarget(string $sourcePath, ?string $entryName): string
+    {
+        $stagedEntryPath = $this->stagedEntryPath($sourcePath, $entryName);
+        $segments = explode('/', $stagedEntryPath);
+
+        return $segments[0] !== '' ? $segments[0] : trim(basename($sourcePath), '/');
+    }
+
+    /**
+     * Allocates one unique temporary directory for TAR staging work.
+     *
+     * @return string Absolute temporary directory path.
+     * @throws RuntimeException When the directory cannot be created.
+     */
+    private function allocateTemporaryDirectory(): string
+    {
+        foreach ($this->temporaryDirectoryRoots() as $directory) {
+            for ($attempt = 0; $attempt < 5; $attempt++) {
+                $path = $directory . '/rvn-tar-stage-' . bin2hex(random_bytes(6));
+                if (mkdir($path, 0775, true)) {
+                    return $path;
+                }
+
+                if (is_dir($path)) {
+                    return $path;
+                }
+            }
+        }
+
+        throw new RuntimeException('Failed to allocate temporary TAR directory.');
+    }
+
+    /**
+     * Copies one directory tree recursively while preserving mtimes and modes.
+     *
+     * Symlinks are skipped so archive exports do not escape the source tree or
+     * encode environment-specific link targets into shipped packages.
+     *
+     * @param string $sourceDir Absolute source directory.
+     * @param string $targetDir Absolute destination directory.
+     * @return void
+     * @throws RuntimeException When one file or directory cannot be copied.
+     */
+    private function copyDirectoryRecursivelyPreservingMetadata(string $sourceDir, string $targetDir): void
+    {
+        if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
+            throw new RuntimeException('Failed to create TAR staging directory.');
+        }
 
         $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($sourceRoot, \FilesystemIterator::SKIP_DOTS),
+            new \RecursiveDirectoryIterator($sourceDir, \FilesystemIterator::SKIP_DOTS),
             \RecursiveIteratorIterator::SELF_FIRST
         );
+        $directoryMetadata = [];
 
         foreach ($iterator as $item) {
             /** @var \SplFileInfo $item */
@@ -628,53 +766,136 @@ final class Tar
             }
 
             $absolutePath = $item->getPathname();
-            $relativePath = ltrim(substr($absolutePath, strlen($sourceRoot)), DIRECTORY_SEPARATOR);
+            $relativePath = ltrim(substr($absolutePath, strlen($sourceDir)), DIRECTORY_SEPARATOR);
             if ($relativePath === '') {
                 continue;
             }
 
-            $archivePath = $entryRoot . '/' . str_replace('\\', '/', $relativePath);
+            $destinationPath = $targetDir . '/' . str_replace('\\', '/', $relativePath);
             if ($item->isDir()) {
-                $phar->addEmptyDir($archivePath);
+                if (!is_dir($destinationPath) && !mkdir($destinationPath, 0775, true) && !is_dir($destinationPath)) {
+                    throw new RuntimeException('Failed to create TAR staging directory path.');
+                }
+
+                $directoryMetadata[] = [
+                    'path' => $destinationPath,
+                    'mode' => $item->getPerms() & 0777,
+                    'mtime' => $item->getMTime(),
+                ];
                 continue;
             }
 
-            $this->ensureArchiveParentDirectories($phar, $archivePath);
-            $phar->addFile($absolutePath, $archivePath);
+            $this->copyFilePreservingMetadata($absolutePath, $destinationPath);
         }
+
+        // Directories get their mtime bumped while files are copied into them,
+        // so restore them from deepest path to root after staging completes.
+        usort($directoryMetadata, static function (array $left, array $right): int {
+            return substr_count((string) $right['path'], '/') <=> substr_count((string) $left['path'], '/');
+        });
+
+        foreach ($directoryMetadata as $directory) {
+            @chmod((string) $directory['path'], (int) $directory['mode']);
+            @touch((string) $directory['path'], (int) $directory['mtime']);
+        }
+
+        @chmod($targetDir, fileperms($sourceDir) & 0777);
+        @touch($targetDir, filemtime($sourceDir) ?: time());
     }
 
     /**
-     * Ensures parent directories exist inside the TAR archive before adding a path.
+     * Copies one file while preserving its mtime and filesystem mode.
      *
-     * @param PharData $phar Open TAR archive handle.
-     * @param string $entryPath Archive-internal file path.
+     * @param string $sourcePath Absolute source file path.
+     * @param string $destinationPath Absolute destination file path.
+     * @return void
+     * @throws RuntimeException When the file cannot be copied.
+     */
+    private function copyFilePreservingMetadata(string $sourcePath, string $destinationPath): void
+    {
+        $destinationDirectory = dirname($destinationPath);
+        if (!is_dir($destinationDirectory) && !mkdir($destinationDirectory, 0775, true) && !is_dir($destinationDirectory)) {
+            throw new RuntimeException('Failed to create TAR staging parent directory.');
+        }
+
+        if (!@copy($sourcePath, $destinationPath)) {
+            throw new RuntimeException('Failed to copy file into TAR staging directory.');
+        }
+
+        @chmod($destinationPath, fileperms($sourcePath) & 0777);
+        @touch($destinationPath, filemtime($sourcePath) ?: time());
+    }
+
+    /**
+     * Deletes one temporary directory tree recursively.
+     *
+     * @param string $directory Absolute directory path to delete.
      * @return void
      */
-    private function ensureArchiveParentDirectories(PharData $phar, string $entryPath): void
+    private function deleteDirectoryRecursively(string $directory): void
     {
-        $directory = trim((string) pathinfo($entryPath, PATHINFO_DIRNAME), '.');
-        if ($directory === '') {
+        if ($directory === '' || !is_dir($directory)) {
             return;
         }
 
-        $segments = explode('/', $directory);
-        $current = '';
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
 
-        foreach ($segments as $segment) {
-            if ($segment === '') {
+        foreach ($iterator as $item) {
+            /** @var \SplFileInfo $item */
+            $path = $item->getPathname();
+            if ($item->isDir()) {
+                @rmdir($path);
                 continue;
             }
 
-            $current = $current === '' ? $segment : $current . '/' . $segment;
-
-            try {
-                $phar->addEmptyDir($current);
-            } catch (\Throwable) {
-                // PharData throws when the directory already exists; the archive
-                // only needs the directory to be present, so duplicates are safe.
-            }
+            @unlink($path);
         }
+
+        @rmdir($directory);
+    }
+
+    /**
+     * Runs the tar binary without shell interpolation.
+     *
+     * @param array<int, string> $arguments Binary arguments excluding the executable.
+     * @param string|null $workingDirectory Optional working directory.
+     * @return array{ok: bool, stdout: string, stderr: string, exit_code: int}
+     */
+    private function runBinary(array $arguments, ?string $workingDirectory = null): array
+    {
+        $command = array_merge([$this->binary], $arguments);
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $process = @proc_open($command, $descriptors, $pipes, $workingDirectory);
+        if (!is_resource($process)) {
+            return [
+                'ok' => false,
+                'stdout' => '',
+                'stderr' => 'Failed to start tar process.',
+                'exit_code' => 1,
+            ];
+        }
+
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($process);
+
+        return [
+            'ok' => $exitCode === 0,
+            'stdout' => is_string($stdout) ? trim($stdout) : '',
+            'stderr' => is_string($stderr) ? trim($stderr) : '',
+            'exit_code' => is_int($exitCode) ? $exitCode : 1,
+        ];
     }
 
     /**

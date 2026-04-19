@@ -184,17 +184,6 @@ $packageArchiveHelp = array_map(
                                             <span class="visually-hidden">Read Documentation</span>
                                         </a>
                                     <?php endif; ?>
-                                    <?php if ($canOpenSettings): ?>
-                                        <a
-                                            href="<?= e($panelTarget) ?>"
-                                            class="btn btn-primary btn-sm"
-                                            aria-label="Settings"
-                                            title="Settings"
-                                        >
-                                            <i class="bi bi-gear-fill" aria-hidden="true"></i>
-                                            <span class="visually-hidden">Settings</span>
-                                        </a>
-                                    <?php endif; ?>
                                     <form method="post" action="<?= e($panelBase) ?>/extensions/toggle" class="d-inline m-0">
                                         <?= $csrfField ?>
                                         <input type="hidden" name="extension" value="<?= e($directory) ?>">
@@ -210,27 +199,40 @@ $packageArchiveHelp = array_map(
                                             <i class="bi <?= $enabled ? 'bi-stop-circle-fill' : 'bi-play-circle-fill' ?>" aria-hidden="true"></i>
                                         </button>
                                     </form>
-                                    <form method="get" action="<?= e($panelBase) ?>/extensions/export" class="d-inline-flex align-items-center gap-1 m-0">
-                                        <input type="hidden" name="extension" value="<?= e($directory) ?>">
-                                        <select
-                                            name="format"
-                                            class="form-select form-select-sm"
-                                            title="Archive Format"
-                                            aria-label="Archive Format"
-                                        >
-                                            <?php foreach ($exportArchiveFormats as $formatValue => $formatLabel): ?>
-                                                <option value="<?= e($formatValue) ?>"><?= e($formatLabel) ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
+                                    <div class="dropdown d-inline-block" data-rvn-portal-dropdown="1">
                                         <button
-                                            type="submit"
-                                            class="btn btn-secondary btn-sm"
+                                            type="button"
+                                            class="btn btn-secondary btn-sm dropdown-toggle"
+                                            data-bs-toggle="dropdown"
+                                            data-bs-display="static"
+                                            aria-expanded="false"
                                             title="Export"
                                             aria-label="Export"
                                         >
                                             <i class="bi bi-download" aria-hidden="true"></i>
                                         </button>
-                                    </form>
+                                        <ul class="dropdown-menu dropdown-menu-end" data-rvn-portal-dropdown-menu="1">
+                                            <?php foreach ($exportArchiveFormats as $formatValue => $formatLabel): ?>
+                                                <li>
+                                                    <a
+                                                        class="dropdown-item"
+                                                        href="<?= e($panelBase . '/extensions/export?extension=' . rawurlencode($directory) . '&format=' . rawurlencode($formatValue)) ?>"
+                                                    ><?= e($formatLabel) ?></a>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                    <?php if ($canOpenSettings): ?>
+                                        <a
+                                            href="<?= e($panelTarget) ?>"
+                                            class="btn btn-primary btn-sm"
+                                            aria-label="Settings"
+                                            title="Settings"
+                                        >
+                                            <i class="bi bi-gear-fill" aria-hidden="true"></i>
+                                            <span class="visually-hidden">Settings</span>
+                                        </a>
+                                    <?php endif; ?>
                                     <?php if ($canUninstall): ?>
                                         <form method="post" action="<?= e($panelBase) ?>/extensions/uninstall" class="d-inline m-0">
                                             <?= $csrfField ?>

@@ -140,27 +140,29 @@ $packageArchiveHelp = array_map(
                                             <i class="bi <?= $isActive ? 'bi-check-circle-fill' : 'bi-play-circle-fill' ?>" aria-hidden="true"></i>
                                         </button>
                                     </form>
-                                    <form method="get" action="<?= e($panelBase) ?>/themes/export" class="d-inline-flex align-items-center gap-1 m-0">
-                                        <input type="hidden" name="theme" value="<?= e($slug) ?>">
-                                        <select
-                                            name="format"
-                                            class="form-select form-select-sm"
-                                            title="Archive Format"
-                                            aria-label="Archive Format"
-                                        >
-                                            <?php foreach ($exportArchiveFormats as $formatValue => $formatLabel): ?>
-                                                <option value="<?= e($formatValue) ?>"><?= e($formatLabel) ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
+                                    <div class="dropdown d-inline-block" data-rvn-portal-dropdown="1">
                                         <button
-                                            type="submit"
-                                            class="btn btn-sm btn-secondary"
+                                            type="button"
+                                            class="btn btn-sm btn-secondary dropdown-toggle"
+                                            data-bs-toggle="dropdown"
+                                            data-bs-display="static"
+                                            aria-expanded="false"
                                             title="Export"
                                             aria-label="Export"
                                         >
                                             <i class="bi bi-download" aria-hidden="true"></i>
                                         </button>
-                                    </form>
+                                        <ul class="dropdown-menu dropdown-menu-end" data-rvn-portal-dropdown-menu="1">
+                                            <?php foreach ($exportArchiveFormats as $formatValue => $formatLabel): ?>
+                                                <li>
+                                                    <a
+                                                        class="dropdown-item"
+                                                        href="<?= e($panelBase . '/themes/export?theme=' . rawurlencode($slug) . '&format=' . rawurlencode($formatValue)) ?>"
+                                                    ><?= e($formatLabel) ?></a>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
                                     <?php if (!$isActive && !$isStock): ?>
                                         <form method="post" action="<?= e($panelBase) ?>/themes/uninstall" class="d-inline m-0">
                                             <?= $csrfField ?>

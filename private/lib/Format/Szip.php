@@ -486,12 +486,58 @@ final class Szip
      */
     private function allocateTemporaryDirectory(): string
     {
-        $path = sys_get_temp_dir() . '/rvn-7z-' . bin2hex(random_bytes(6));
-        if (!mkdir($path, 0775, true) && !is_dir($path)) {
-            throw new RuntimeException('Failed to allocate temporary 7Z directory.');
+        foreach ($this->temporaryDirectoryRoots() as $directory) {
+            for ($attempt = 0; $attempt < 5; $attempt++) {
+                $path = $directory . '/rvn-7z-' . bin2hex(random_bytes(6));
+                if (mkdir($path, 0775, true)) {
+                    return $path;
+                }
+
+                if (is_dir($path)) {
+                    return $path;
+                }
+            }
         }
 
-        return $path;
+        throw new RuntimeException('Failed to allocate temporary 7Z directory.');
+    }
+
+    /**
+     * Returns writable directory roots Raven can use for temporary 7-Zip work.
+     *
+     * Exports often run under locked-down PHP temp settings, so falling back to
+     * project-local `.tmp` directories keeps archive creation working when the
+     * system temp directory is unavailable to the current runtime user.
+     *
+     * @return array<int, string> Writable temporary directory roots.
+     */
+    private function temporaryDirectoryRoots(): array
+    {
+        $projectRoot = dirname(__DIR__, 3);
+        $candidates = [
+            trim((string) sys_get_temp_dir()),
+            $projectRoot . '/.tmp',
+            $projectRoot . '/.tmp/archives',
+        ];
+        $directories = [];
+
+        foreach ($candidates as $candidate) {
+            if ($candidate === '') {
+                continue;
+            }
+
+            if (!is_dir($candidate) && !@mkdir($candidate, 0775, true) && !is_dir($candidate)) {
+                continue;
+            }
+
+            if (!is_writable($candidate)) {
+                continue;
+            }
+
+            $directories[] = rtrim($candidate, '/\\');
+        }
+
+        return array_values(array_unique($directories));
     }
 
     /**

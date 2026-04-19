@@ -435,21 +435,58 @@ final class Compress
      */
     private function temporaryFilePath(string $suffix = ''): string
     {
-        $path = tempnam(sys_get_temp_dir(), 'rvn-archive-');
-        if (!is_string($path) || $path === '') {
-            throw new RuntimeException('Failed to allocate temporary archive path.');
-        }
+        foreach ($this->temporaryDirectoryRoots() as $directory) {
+            $path = @tempnam($directory, 'rvn-archive-');
+            if (!is_string($path) || $path === '') {
+                continue;
+            }
 
-        if ($suffix === '') {
-            return $path;
-        }
+            if ($suffix === '') {
+                return $path;
+            }
 
-        $suffixedPath = $path . $suffix;
-        if (!@rename($path, $suffixedPath)) {
+            $suffixedPath = $path . $suffix;
+            if (@rename($path, $suffixedPath)) {
+                return $suffixedPath;
+            }
+
             @unlink($path);
-            throw new RuntimeException('Failed to prepare temporary archive path.');
         }
 
-        return $suffixedPath;
+        throw new RuntimeException('Failed to prepare temporary archive path.');
+    }
+
+    /**
+     * Returns writable temporary directory roots for staged archive mutation work.
+     *
+     * @return array<int, string> Writable temporary directory roots.
+     */
+    private function temporaryDirectoryRoots(): array
+    {
+        $projectRoot = dirname(__DIR__, 3);
+        $candidates = [
+            trim((string) sys_get_temp_dir()),
+            $projectRoot . '/.tmp',
+            $projectRoot . '/.tmp/archives',
+        ];
+        $directories = [];
+
+        foreach ($candidates as $candidate) {
+            if ($candidate === '') {
+                continue;
+            }
+
+            if (!is_dir($candidate) && !@mkdir($candidate, 0775, true) && !is_dir($candidate)) {
+                continue;
+            }
+
+            if (!is_writable($candidate)) {
+                continue;
+            }
+
+            $directories[] = rtrim($candidate, '/\\');
+        }
+
+        return array_values(array_unique($directories));
     }
 }

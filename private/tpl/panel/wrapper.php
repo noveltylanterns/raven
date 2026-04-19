@@ -787,6 +787,130 @@ $includePanelLayoutScripts = $section !== 'login';
 <script src="/bootstrap.bundle.min.js"></script>
 <script>
     (function () {
+        function setupPortaledDropdowns() {
+            var activePortaledDropdown = null;
+
+            function restorePortaledDropdown(dropdown) {
+                if (!(dropdown instanceof HTMLElement)) {
+                    return;
+                }
+
+                var menu = dropdown._rvnPortaledMenu;
+                var placeholder = dropdown._rvnPortaledPlaceholder;
+                if (!(menu instanceof HTMLElement) || !(placeholder instanceof Comment) || !placeholder.parentNode) {
+                    return;
+                }
+
+                placeholder.parentNode.insertBefore(menu, placeholder);
+                placeholder.parentNode.removeChild(placeholder);
+                menu.style.position = '';
+                menu.style.top = '';
+                menu.style.left = '';
+                menu.style.right = '';
+                menu.style.bottom = '';
+                menu.style.minWidth = '';
+                menu.style.maxWidth = '';
+                menu.style.maxHeight = '';
+                menu.style.overflowY = '';
+                menu.style.zIndex = '';
+                delete dropdown._rvnPortaledMenu;
+                delete dropdown._rvnPortaledPlaceholder;
+                delete dropdown._rvnPortaledReposition;
+            }
+
+            function positionPortaledDropdown(dropdown) {
+                if (!(dropdown instanceof HTMLElement)) {
+                    return;
+                }
+
+                var menu = dropdown._rvnPortaledMenu;
+                var toggle = dropdown.querySelector('[data-bs-toggle="dropdown"]');
+                if (!(menu instanceof HTMLElement) || !(toggle instanceof HTMLElement)) {
+                    return;
+                }
+
+                var rect = toggle.getBoundingClientRect();
+                var menuWidth = Math.max(rect.width, menu.offsetWidth, 168);
+                var viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+                var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+                var left = rect.right - menuWidth;
+                if (left < 8) {
+                    left = 8;
+                }
+
+                if (left + menuWidth > viewportWidth - 8) {
+                    left = Math.max(8, viewportWidth - menuWidth - 8);
+                }
+
+                var top = rect.bottom + 4;
+                var maxHeight = Math.max(120, viewportHeight - top - 8);
+                if (maxHeight < 160 && rect.top > viewportHeight - rect.bottom) {
+                    top = Math.max(8, rect.top - menu.offsetHeight - 4);
+                    maxHeight = Math.max(120, top - 8);
+                }
+
+                menu.style.position = 'fixed';
+                menu.style.top = Math.round(top) + 'px';
+                menu.style.left = Math.round(left) + 'px';
+                menu.style.minWidth = Math.round(rect.width) + 'px';
+                menu.style.maxWidth = Math.max(220, viewportWidth - 16) + 'px';
+                menu.style.zIndex = '2000';
+                menu.style.maxHeight = Math.round(maxHeight) + 'px';
+                menu.style.overflowY = 'auto';
+            }
+
+            document.querySelectorAll('[data-rvn-portal-dropdown="1"]').forEach(function (dropdown) {
+                if (!(dropdown instanceof HTMLElement)) {
+                    return;
+                }
+
+                dropdown.addEventListener('shown.bs.dropdown', function () {
+                    var menu = dropdown.querySelector('[data-rvn-portal-dropdown-menu="1"]');
+                    if (!(menu instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    if (activePortaledDropdown && activePortaledDropdown !== dropdown) {
+                        restorePortaledDropdown(activePortaledDropdown);
+                    }
+
+                    if (!(dropdown._rvnPortaledPlaceholder instanceof Comment)) {
+                        var placeholder = document.createComment('rvn-portaled-dropdown');
+                        menu.parentNode.insertBefore(placeholder, menu);
+                        document.body.appendChild(menu);
+                        dropdown._rvnPortaledPlaceholder = placeholder;
+                        dropdown._rvnPortaledMenu = menu;
+                    }
+
+                    dropdown._rvnPortaledReposition = function () {
+                        positionPortaledDropdown(dropdown);
+                    };
+
+                    positionPortaledDropdown(dropdown);
+                    activePortaledDropdown = dropdown;
+                });
+
+                dropdown.addEventListener('hide.bs.dropdown', function () {
+                    restorePortaledDropdown(dropdown);
+                    if (activePortaledDropdown === dropdown) {
+                        activePortaledDropdown = null;
+                    }
+                });
+            });
+
+            window.addEventListener('resize', function () {
+                if (activePortaledDropdown && typeof activePortaledDropdown._rvnPortaledReposition === 'function') {
+                    activePortaledDropdown._rvnPortaledReposition();
+                }
+            });
+
+            window.addEventListener('scroll', function () {
+                if (activePortaledDropdown && typeof activePortaledDropdown._rvnPortaledReposition === 'function') {
+                    activePortaledDropdown._rvnPortaledReposition();
+                }
+            }, true);
+        }
+
         function tabButtons(nav) {
             if (!(nav instanceof HTMLElement)) {
                 return [];
@@ -794,6 +918,8 @@ $includePanelLayoutScripts = $section !== 'login';
 
             return Array.prototype.slice.call(nav.querySelectorAll('button[data-bs-toggle="tab"]'));
         }
+
+        setupPortaledDropdowns();
 
         function syncTabGroup(group, targetSelector) {
             if (group === '' || targetSelector === '') {
