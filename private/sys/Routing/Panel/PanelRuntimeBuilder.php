@@ -54,6 +54,8 @@ use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\View\Panel\Editor;
+use Raven\Lib\View\Panel\EditorMCE;
+use Raven\Lib\View\Panel\EditorMDE;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\Transport\Upload;
 use RuntimeException;
@@ -124,6 +126,11 @@ final class PanelRuntimeBuilder
         // controller factory so that extensions can also access panel_editor_tabs.
         $rvn['panel_editor_tabs'] = new EditorTabs($rvn['input']);
         $rvn['panel_editor'] = new Editor();
+        // TinyMCE and EasyMDE helpers are registered here for extension access but
+        // only injected into ContentController, which is the sole controller that
+        // serves the rich page body editor.
+        $rvn['panel_editor_mce'] = new EditorMCE();
+        $rvn['panel_editor_mde'] = new EditorMDE();
 
         /**
          * Resolves the lazy auth DB handle only for panel factories that truly need it.
@@ -586,6 +593,8 @@ final class PanelRuntimeBuilder
                 new Route($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
+                $rvn['panel_editor_mce'],
+                $rvn['panel_editor_mde'],
                 is_callable($rvn['extension_services_for'] ?? null)
                     ? $rvn['extension_services_for']
                     : static fn (?string $extensionDirectory = null): array => []
@@ -610,7 +619,8 @@ final class PanelRuntimeBuilder
                 $requestContextFactory(),
                 $rvn['input'],
                 $taxonomyDomain['channel'],
-                $taxonomyDomain['redirect']
+                $taxonomyDomain['redirect'],
+                $rvn['panel_editor']
             );
 
             return $redirectController;
@@ -700,6 +710,7 @@ final class PanelRuntimeBuilder
                 $groupDomain['group'],
                 new Route($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
+                $rvn['panel_editor'],
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
                 new PanelPermissionDefinitionCatalog(),
                 new Upload(),

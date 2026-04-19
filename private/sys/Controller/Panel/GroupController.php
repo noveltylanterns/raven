@@ -17,6 +17,7 @@ use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
+use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
@@ -33,6 +34,7 @@ final class GroupController
     private GroupRepository $groupRepo;
     private Route $routeConfigService;
     private EditorTabs $editorTabs;
+    private Editor $editor;
     private TaxonomyImageService $taxonomyImageService;
     private PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog;
     private Upload $uploadFileSetNormalizer;
@@ -43,7 +45,8 @@ final class GroupController
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param GroupRepository $groupRepo Group repository for panel CRUD.
      * @param Route $routeConfigService Shared route-configuration helper.
-     * @param EditorTabs $editorTabs Shared editor-tab helper.
+     * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
+     * @param Editor $editor Shared panel editor utility methods.
      * @param TaxonomyImageService $taxonomyImageService Shared group image upload/storage pipeline.
      * @param PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog Shared panel permission-definition catalog.
      * @param Upload $uploadFileSetNormalizer Shared upload payload flattener.
@@ -56,6 +59,7 @@ final class GroupController
         GroupRepository $groupRepo,
         Route $routeConfigService,
         EditorTabs $editorTabs,
+        Editor $editor,
         TaxonomyImageService $taxonomyImageService,
         PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog,
         Upload $uploadFileSetNormalizer,
@@ -66,6 +70,7 @@ final class GroupController
         $this->groupRepo = $groupRepo;
         $this->routeConfigService = $routeConfigService;
         $this->editorTabs = $editorTabs;
+        $this->editor = $editor;
         $this->taxonomyImageService = $taxonomyImageService;
         $this->panelPermissionDefinitionCatalog = $panelPermissionDefinitionCatalog;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;

@@ -25,6 +25,12 @@ declare(strict_types=1);
 /** @var bool $categoryEnabled */
 /** @var bool $tagEnabled */
 /** @var array<int, array<string, mixed>> $galleryImages */
+/** @var array<int, array{id: int, label: string, alt_text: string, caption: string, variants: array{original: string, sm: string, md: string, lg: string}}> $tinyMceGalleryItems */
+/** @var string $mceScriptUrl */
+/** @var string $mdeCssUrl */
+/** @var string $mdeScriptUrl */
+/** @var array<int, string> $mdeCssFallbackPaths */
+/** @var array<int, string> $mdeJsFallbackPaths */
 /** @var string $imageUploadTarget */
 /** @var int $imageMaxFilesPerUpload */
 /** @var string $editorDefault */
@@ -59,9 +65,7 @@ $expireAtInputValue = $rawExpireAt !== '' ? substr(str_replace(' ', 'T', $rawExp
 $displayTitle = !array_key_exists('display_title', (array) ($page ?? []))
     || (int) ($page['display_title'] ?? 1) === 1;
 $galleryEnabled = (int) ($page['gallery_enabled'] ?? 0) === 1;
-$editorDefault = in_array($editorDefault ?? '', ['tinymce', 'plaintext', 'autobr', 'markdown'], true)
-    ? (string) $editorDefault
-    : 'tinymce';
+$editorDefault = (string) ($editorDefault ?? 'tinymce');
 $routeModeDefault = in_array($routeModeDefault ?? 'slug', ['slug', 'id'], true)
     ? (string) $routeModeDefault
     : 'slug';
@@ -212,31 +216,9 @@ if ($selectedStatus === 'published' && $permalinkBase !== '' && $routeSegment !=
     $publishedPermalink = $permalinkBase . '/' . implode('/', $permalinkPathParts);
 }
 
-// Prepare a compact JSON payload used by TinyMCE custom gallery button.
-$tinyMceGalleryItems = [];
-foreach ($galleryImages as $galleryImage) {
-    if ((string) ($galleryImage['status'] ?? '') !== 'ready') {
-        continue;
-    }
-    if (array_key_exists('include_in_gallery', $galleryImage) && empty($galleryImage['include_in_gallery'])) {
-        continue;
-    }
-
-    $variants = is_array($galleryImage['variants'] ?? null) ? $galleryImage['variants'] : [];
-
-    $tinyMceGalleryItems[] = [
-        'id' => (int) ($galleryImage['id'] ?? 0),
-        'label' => (string) (($galleryImage['title_text'] ?? '') !== '' ? $galleryImage['title_text'] : ($galleryImage['original_filename'] ?? 'Image')),
-        'alt_text' => (string) ($galleryImage['alt_text'] ?? ''),
-        'caption' => (string) ($galleryImage['caption'] ?? ''),
-        'variants' => [
-            'original' => (string) ($galleryImage['url'] ?? ''),
-            'sm' => (string) (($variants['sm']['url'] ?? '') ?: ''),
-            'md' => (string) (($variants['md']['url'] ?? '') ?: ''),
-            'lg' => (string) (($variants['lg']['url'] ?? '') ?: ''),
-        ],
-    ];
-}
+// Gallery items for the TinyMCE gallery button are built by EditorMCE::galleryItems()
+// in ContentController and passed in as $tinyMceGalleryItems.
+$tinyMceGalleryItems = is_array($tinyMceGalleryItems ?? null) ? $tinyMceGalleryItems : [];
 $bodyBlocks = [];
 $rawContentBlocks = $page['content_blocks'] ?? null;
 if (is_array($rawContentBlocks)) {
@@ -1381,10 +1363,10 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
 </style>
 
 <!-- TinyMCE loaded locally from Nginx /mce/ mapping (no CDN). -->
-<script src="/mce/tinymce.min.js"></script>
+<script src="<?= e($mceScriptUrl ?? '/mce/tinymce.min.js') ?>"></script>
 <!-- Markdown editor assets are loaded locally from Composer install path (no CDN). -->
-<link rel="stylesheet" href="/mde/easymde.min.css">
-<script src="/mde/easymde.min.js"></script>
+<link rel="stylesheet" href="<?= e($mdeCssUrl ?? '/mde/easymde.min.css') ?>">
+<script src="<?= e($mdeScriptUrl ?? '/mde/easymde.min.js') ?>"></script>
 <script>
   // If browser validation fails in a hidden tab, switch to that tab automatically.
   (function () {
@@ -3135,13 +3117,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
   }
 
   function ensureEasyMdeStylesheetFallback() {
-    var cssCandidates = [
-      '/mde/easymde.min.css',
-      '/mde/lib/easymde.min.css',
-      '/mde/dist/easymde.min.css',
-      '/composer/tualo/easymde/lib/easymde.min.css',
-      '/composer/tualo/easymde/dist/easymde.min.css'
-    ];
+    var cssCandidates = <?= json_encode($mdeCssFallbackPaths ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) ?>;
 
     cssCandidates.forEach(function (href, index) {
       var normalizedHref = String(href || '').trim();
@@ -3230,13 +3206,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
     ensureEasyMdeStylesheetFallback();
 
     loadEasyMdeScriptCandidates(
-      [
-        '/mde/easymde.min.js',
-        '/mde/lib/easymde.min.js',
-        '/mde/dist/easymde.min.js',
-        '/composer/tualo/easymde/lib/easymde.min.js',
-        '/composer/tualo/easymde/dist/easymde.min.js'
-      ],
+      <?= json_encode($mdeJsFallbackPaths ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) ?>,
       0,
       function (ready) {
         ravenEasyMdeLoaderState.loading = false;

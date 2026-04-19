@@ -37,6 +37,8 @@ use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Directory\SetContext;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorAuthor;
+use Raven\Lib\View\Panel\EditorMCE;
+use Raven\Lib\View\Panel\EditorMDE;
 use Raven\Lib\View\Panel\EditorTabs;
 
 use function Raven\Lib\Extra\redirect;
@@ -61,6 +63,8 @@ final class ContentController
     private Route $routeConfigService;
     private EditorTabs $editorTabs;
     private Editor $editor;
+    private EditorMCE $editorMce;
+    private EditorMDE $editorMde;
     /** @var Closure(): PageImageManager */
     private Closure $pageImageManagerResolver;
     private ?PageImageManager $pageImageManager = null;
@@ -111,6 +115,8 @@ final class ContentController
      * @param Route $routeConfigService Route configuration service for route-mode and separator helpers.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor utility methods (body-text editor normalization).
+     * @param EditorMCE $editorMce TinyMCE-specific helpers for asset URL and gallery-item payload building.
+     * @param EditorMDE $editorMde EasyMDE-specific helpers for asset URLs and JS fallback path lists.
      * @param callable $extensionServicesFor Extension services resolver used to load per-extension shortcode and body-block contributions.
      * @return void
      */
@@ -131,6 +137,8 @@ final class ContentController
         Route $routeConfigService,
         EditorTabs $editorTabs,
         Editor $editor,
+        EditorMCE $editorMce,
+        EditorMDE $editorMde,
         callable $extensionServicesFor
     ) {
         $this->context = $context;
@@ -149,6 +157,8 @@ final class ContentController
         $this->routeConfigService = $routeConfigService;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
+        $this->editorMce = $editorMce;
+        $this->editorMde = $editorMde;
         $this->extensionServicesFor = Closure::fromCallable($extensionServicesFor);
     }
 
@@ -331,6 +341,12 @@ final class ContentController
             'categoryEnabled' => $categoryEnabled,
             'tagEnabled' => $tagEnabled,
             'galleryImages' => $galleryImages,
+            'tinyMceGalleryItems' => $this->editorMce->galleryItems($galleryImages),
+            'mceScriptUrl' => $this->editorMce->scriptUrl(),
+            'mdeCssUrl' => $this->editorMde->cssUrl(),
+            'mdeScriptUrl' => $this->editorMde->scriptUrl(),
+            'mdeCssFallbackPaths' => $this->editorMde->cssFallbackPaths(),
+            'mdeJsFallbackPaths' => $this->editorMde->jsFallbackPaths(),
             'imageUploadTarget' => (string) $this->config->get('media.upload_target', 'local'),
             'imageMaxFilesPerUpload' => max(0, (int) $this->config->get('media.max_files_per_upload', 10)),
             'editorDefault' => $this->editor->normalizeBodyTextEditorOption(
