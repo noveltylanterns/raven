@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Ext\Repo;
 
 use Raven\Lib\Archive\Delete as ArchiveDelete;
-use Raven\Lib\Archive\Types\Git;
+use Raven\Lib\Format\Git;
 use RuntimeException;
 
 /**

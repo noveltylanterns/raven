@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Archive/Types/Git.php
+ * ~/private/lib/Format/Git.php
  * Canonical Git command and repository handler for Raven core and extensions.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Archive\Types;
+namespace Raven\Lib\Format;
 
 use RuntimeException;
 

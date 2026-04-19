@@ -155,9 +155,10 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `Delete` — recursive directory-removal utility used by theme/extension uninstall and cleanup flows.
   - `Update` — core update workflow orchestration: git-based compare, dry-run, and apply-update pipelines with schema re-ensure support.
   - `UpdateSource` — normalizes and validates update-source config (GitHub mirror, custom GitHub repo, custom git URL) from config or POST data.
-  - `Extract` — shared archive extraction forwarder for ZIP, TAR-family, and RAR packages, including manifest reads across wrapped package layouts.
-  - `Compress` — shared archive compression forwarder for ZIP and TAR-family outputs.
-  - `Archive/Types/` — canonical format handlers such as `Zip`, `Tar`, `Gz`, `Bz2`, `Xz`, `Zst`, `Rar`, `Git`, and `Csv`; stock extension exports/imports and panel CSV downloads now route through `Csv`.
+  - `Extract` — shared archive extraction forwarder for ZIP, TAR-family, 7Z, RAR, and single-file compression formats; also handles selective file/folder extraction plus manifest reads across wrapped package layouts.
+  - `Compress` — shared archive compression forwarder for ZIP, TAR-family, 7Z, RAR, and single-file compression formats; also handles selective file/folder archive updates where the format supports named entries.
+- `private/lib/Format/`
+  - Canonical reusable format handlers such as `Zip`, `Tar`, `SevenZip`, `Gz`, `Bz2`, `Xz`, `Zst`, `Rar`, `Git`, and `Csv`; stock extension exports/imports and panel CSV downloads now route through `Csv`.
 - `private/lib/Database/`
   - Reusable database primitives for core and extensions.
   - `ProfiledPDO` and `ProfiledPDOStatement` wrap PDO for query-level profiling; `QueryProfilerInterface` is the shared contract.

@@ -156,7 +156,7 @@ Panel counterpart:
 Theme upload notes:
 
 - Upload archive must include `theme.json` at archive root.
-- Theme Manager accepts `.zip`, `.tar`, `.tar.gz/.tgz`, `.tar.bz2/.tbz2`, `.tar.xz/.txz`, `.tar.zst/.tzst`, and `.rar` packages.
+- Theme Manager accepts `.zip`, `.tar`, `.tar.gz/.tgz`, `.tar.bz2/.tbz2`, `.tar.xz/.txz`, `.tar.zst/.tzst`, `.7z`, and `.rar` packages.
 - If slug override is blank, Theme Manager derives slug from `theme.json` `slug` (fallback: archive filename).
 - If that derived slug already exists, Theme Manager auto-renames with `-copy`.
 - Uploaded themes are not auto-enabled; activate them from Theme Manager or `rvn-theme enable`.

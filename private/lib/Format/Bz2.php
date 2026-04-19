@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Archive/Types/Bz2.php
+ * ~/private/lib/Format/Bz2.php
  * Bzip2 single-file compression and decompression handler.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Archive\Types;
+namespace Raven\Lib\Format;
 
 use RuntimeException;
 

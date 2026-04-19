@@ -12,7 +12,7 @@ declare(strict_types=1);
 use Raven\Core\Routing\Router;
 use Raven\Ext\ContactFormRepository;
 use Raven\Ext\ContactSubmissionRepository;
-use Raven\Lib\Archive\Types\Csv;
+use Raven\Lib\Format\Csv;
 
 use function Raven\Lib\Support\redirect;
 

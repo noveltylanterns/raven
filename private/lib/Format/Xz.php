@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Archive/Types/Xz.php
+ * ~/private/lib/Format/Xz.php
  * XZ single-file compression and decompression handler via the xz binary.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Archive\Types;
+namespace Raven\Lib\Format;
 
 use RuntimeException;
 

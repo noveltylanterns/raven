@@ -13,7 +13,7 @@ namespace Raven\Lib\Archive;
 
 use FilesystemIterator;
 use Raven\Core\Database\Schema\SchemaEnsureStateStore;
-use Raven\Lib\Archive\Types\Git;
+use Raven\Lib\Format\Git;
 use RecursiveCallbackFilterIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;

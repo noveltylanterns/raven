@@ -19,24 +19,9 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 
 ### Library Refactor
 Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
-- [x] Rename lib/Archive/PackageInstallWorkflowService.php to Install.php
-- [x] Rename lib/Archive/ArchivePackageService.php to Package.php
-- [x] Move lib/Filesystem/DirectoryTreeService to lib/Archive/Delete.php, delete lib/Filesystem/ after.
-- [x] Merge lib/Routing/Panel/ into sys/Routing/Panel/
-- [x] Merge lib/Routing/Public/ into sys/Routing/Public/
-- [x] Install.php & Package.php should be using our new canonical Archive/Types/*.php handlers instead of hardcoded zip functions, if they are not already.
-- [x] Consolidate all updater functions to lib/Archive/Update.php, delete lib/Update/ after.
-- [x] Any purely visual functions in lib/Config/Panel/ should be moved to lib/View/Panel/. Check that anything remaining doesnt belong in lib/Config/ConfigValueWriter.php instead. Any other remaining lib/Config/Panel/ items should go in lib/Panel/.
-- [x] sys/Config.php should be reduced to bare minimum for reading config to make system work, since it's read on every page read. Offload write functions to lib/Config/ConfigValueWriter.php. Offload anything else unnecessary to public/panel/extension init to lib/Config/*.php.
-- [x] Make sure all our .php files have the standard 6-line PHPDoc comment just after <?php, and the use maps at the beginning are in alphabetical order.
 
 
-### Library Refactor Next Phase
-- [ ] Need lib/Archive/Types/7z.php for 7zip handling
-- [ ] lib/Archive/Extract.php needs 7z handler
-- [ ] lib/Archive/Compress.php needs 7z, bz2, gz, rar, xz & zst handlers
-- [ ] Extract.php & Compress.php need to support full-archive compression/extraction (all handlers), as well as compression/extraction of individual files/folders on archives that support it (should just be 7z, rar, tar & zip)
-- [ ] lib/Archive/Types/ should be lib/Format/
+
 
 ## Long Term
 

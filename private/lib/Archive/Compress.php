@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Archive/Compress.php
- * Archive compression forwarder for ZIP and TAR-family package archives.
+ * Archive compression forwarder for Raven's supported container and single-file formats.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,30 +11,63 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Archive;
 
-use Raven\Lib\Archive\Types\Tar;
-use Raven\Lib\Archive\Types\Zip;
+use Raven\Lib\Format\Bz2;
+use Raven\Lib\Format\Gz;
+use Raven\Lib\Format\Rar;
+use Raven\Lib\Format\SevenZip;
+use Raven\Lib\Format\Tar;
+use Raven\Lib\Format\Xz;
+use Raven\Lib\Format\Zip;
+use Raven\Lib\Format\Zst;
 use RuntimeException;
 
 /**
  * Routes archive-building requests to the canonical format handlers.
  *
  * This facade keeps package/export code out of format-specific branching while
- * still letting Raven expose ZIP and TAR-family archive generation through one
- * stable library surface.
+ * still letting Raven expose one stable compression surface for full-archive
+ * creation, single-file compression, and selective file/folder updates.
  */
 final class Compress
 {
     private Zip $zip;
     private Tar $tar;
+    private SevenZip $sevenZip;
+    private Rar $rar;
+    private Gz $gz;
+    private Bz2 $bz2;
+    private Xz $xz;
+    private Zst $zst;
 
     /**
      * @param Zip|null $zip ZIP archive handler override for tests/composition.
      * @param Tar|null $tar TAR archive handler override for tests/composition.
+     * @param SevenZip|null $sevenZip 7-Zip archive handler override for tests/composition.
+     * @param Rar|null $rar RAR archive handler override for tests/composition.
+     * @param Gz|null $gz Gzip compression handler override for tests/composition.
+     * @param Bz2|null $bz2 Bzip2 compression handler override for tests/composition.
+     * @param Xz|null $xz XZ compression handler override for tests/composition.
+     * @param Zst|null $zst Zstandard compression handler override for tests/composition.
      */
-    public function __construct(?Zip $zip = null, ?Tar $tar = null)
+    public function __construct(
+        ?Zip $zip = null,
+        ?Tar $tar = null,
+        ?SevenZip $sevenZip = null,
+        ?Rar $rar = null,
+        ?Gz $gz = null,
+        ?Bz2 $bz2 = null,
+        ?Xz $xz = null,
+        ?Zst $zst = null
+    )
     {
         $this->zip = $zip ?? new Zip();
         $this->tar = $tar ?? new Tar();
+        $this->sevenZip = $sevenZip ?? new SevenZip();
+        $this->rar = $rar ?? new Rar();
+        $this->gz = $gz ?? new Gz();
+        $this->bz2 = $bz2 ?? new Bz2();
+        $this->xz = $xz ?? new Xz();
+        $this->zst = $zst ?? new Zst();
     }
 
     /**
@@ -46,6 +79,8 @@ final class Compress
     {
         return [
             'zip',
+            '7z',
+            'rar',
             'tar',
             'tar.gz',
             'tgz',
@@ -59,30 +94,86 @@ final class Compress
     }
 
     /**
+     * Returns supported single-file compression extensions.
+     *
+     * @return array<int, string> Lowercase extension list without leading dots.
+     */
+    public function supportedFileArchiveExtensions(): array
+    {
+        return [
+            'gz',
+            'bz2',
+            'xz',
+            'zst',
+        ];
+    }
+
+    /**
+     * Returns every archive extension supported by the shared compression surface.
+     *
+     * @return array<int, string> Lowercase extension list without leading dots.
+     */
+    public function supportedArchiveExtensions(): array
+    {
+        return array_values(array_unique([
+            ...$this->supportedDirectoryArchiveExtensions(),
+            ...$this->supportedFileArchiveExtensions(),
+        ]));
+    }
+
+    /**
+     * Compresses a source file or directory into one archive file chosen by suffix.
+     *
+     * Container formats (`zip`, `7z`, `rar`, `tar*`) can wrap one source path
+     * under `$archiveRoot`. Single-file formats (`gz`, `bz2`, `xz`, `zst`)
+     * require a file source and ignore `$archiveRoot`.
+     *
+     * @param string $sourcePath Absolute path to the source file or directory.
+     * @param string $archiveRoot Preferred archive-internal root name where supported.
+     * @param string $outputPath Absolute output archive path.
+     * @return void
+     * @throws RuntimeException When the output suffix is unsupported or archiving fails.
+     */
+    public function compressPath(string $sourcePath, string $archiveRoot, string $outputPath): void
+    {
+        $type = $this->requireArchiveType($outputPath);
+
+        match ($type) {
+            'zip' => $this->zip->compressPath($sourcePath, $this->entryNameForContainer($sourcePath, $archiveRoot), $outputPath),
+            '7z' => $this->sevenZip->compressPath($sourcePath, $outputPath, $this->entryNameForContainer($sourcePath, $archiveRoot)),
+            'rar' => $this->rar->compressPath($sourcePath, $outputPath, $this->entryNameForContainer($sourcePath, $archiveRoot)),
+            'tar' => $this->tar->compressPath($sourcePath, $outputPath, $this->entryNameForTarFamily($sourcePath, $archiveRoot)),
+            'tar.gz' => $this->tar->compressPathGz($sourcePath, $outputPath, $this->entryNameForTarFamily($sourcePath, $archiveRoot)),
+            'tar.bz2' => $this->tar->compressPathBz2($sourcePath, $outputPath, $this->entryNameForTarFamily($sourcePath, $archiveRoot)),
+            'tar.xz' => $this->tar->compressPathXz($sourcePath, $outputPath, $this->entryNameForTarFamily($sourcePath, $archiveRoot)),
+            'tar.zst' => $this->tar->compressPathZst($sourcePath, $outputPath, $this->entryNameForTarFamily($sourcePath, $archiveRoot)),
+            'gz' => $this->gz->compress($this->requireFileSource($sourcePath, $type), $outputPath),
+            'bz2' => $this->bz2->compress($this->requireFileSource($sourcePath, $type), $outputPath),
+            'xz' => $this->xz->compress($this->requireFileSource($sourcePath, $type), $outputPath),
+            'zst' => $this->zst->compress($this->requireFileSource($sourcePath, $type), $outputPath),
+            default => throw new RuntimeException('Unsupported archive type: ' . $outputPath),
+        };
+    }
+
+    /**
      * Compresses a source directory into one archive file chosen by output suffix.
      *
-     * ZIP archives honor `$archiveRoot` as their internal wrapper-directory name.
-     * TAR-family outputs currently preserve the source directory contents directly.
+     * This directory-focused wrapper remains the package/export entrypoint used
+     * by existing callers, while `compressPath()` now covers file sources too.
      *
      * @param string $sourceDir Absolute path to the source directory.
      * @param string $archiveRoot Preferred archive root wrapper name where supported.
      * @param string $outputPath Absolute output archive path.
      * @return void
-     * @throws RuntimeException When the output suffix is unsupported or archiving fails.
+     * @throws RuntimeException When the source is not a directory or archiving fails.
      */
     public function compressDirectory(string $sourceDir, string $archiveRoot, string $outputPath): void
     {
-        $type = $this->requireDirectoryArchiveType($outputPath);
+        if (!is_dir($sourceDir)) {
+            throw new RuntimeException('Directory archive compression requires a directory source: ' . $sourceDir);
+        }
 
-        match ($type) {
-            'zip' => $this->zip->compressDirectory($sourceDir, $archiveRoot, $outputPath),
-            'tar' => $this->tar->compressDirectory($sourceDir, $outputPath),
-            'tar.gz' => $this->tar->compressDirectoryGz($sourceDir, $outputPath),
-            'tar.bz2' => $this->tar->compressDirectoryBz2($sourceDir, $outputPath),
-            'tar.xz' => $this->tar->compressDirectoryXz($sourceDir, $outputPath),
-            'tar.zst' => $this->tar->compressDirectoryZst($sourceDir, $outputPath),
-            default => throw new RuntimeException('Unsupported archive type: ' . $outputPath),
-        };
+        $this->compressPath($sourceDir, $archiveRoot, $outputPath);
     }
 
     /**
@@ -94,6 +185,55 @@ final class Compress
     public function isSupportedDirectoryArchiveName(string $filename): bool
     {
         return $this->detectDirectoryArchiveType($filename) !== null;
+    }
+
+    /**
+     * Returns true when the output filename uses any supported archive suffix.
+     *
+     * @param string $filename Output filename or archive path to inspect.
+     * @return bool True when `compressPath()` can handle the requested format.
+     */
+    public function isSupportedArchiveName(string $filename): bool
+    {
+        return $this->detectArchiveType($filename) !== null;
+    }
+
+    /**
+     * Adds or replaces one file or directory inside an existing archive.
+     *
+     * Selective path updates are supported on container formats that expose
+     * stable entry trees: `7z`, `rar`, `tar`, and `zip` (including compressed
+     * TAR variants via a temporary outer-layer round-trip).
+     *
+     * @param string $archivePath Absolute path to the archive being modified.
+     * @param string $sourcePath Absolute path to the file or directory to add.
+     * @param string $entryName Archive-internal destination path.
+     * @return void
+     * @throws RuntimeException When the archive type cannot support path updates.
+     */
+    public function addPath(string $archivePath, string $sourcePath, string $entryName): void
+    {
+        $type = $this->requireDirectoryArchiveType($archivePath);
+
+        match ($type) {
+            'zip' => $this->zip->addPath($archivePath, $sourcePath, $entryName),
+            '7z' => $this->sevenZip->addPath($archivePath, $sourcePath, $entryName),
+            'rar' => $this->rar->addPath($archivePath, $sourcePath, $entryName),
+            'tar' => $this->tar->addPath($archivePath, $sourcePath, $entryName),
+            'tar.gz' => $this->withMutableCompressedTar($archivePath, 'gz', function (string $tarPath) use ($sourcePath, $entryName): void {
+                $this->tar->addPath($tarPath, $sourcePath, $entryName);
+            }),
+            'tar.bz2' => $this->withMutableCompressedTar($archivePath, 'bz2', function (string $tarPath) use ($sourcePath, $entryName): void {
+                $this->tar->addPath($tarPath, $sourcePath, $entryName);
+            }),
+            'tar.xz' => $this->withMutableCompressedTar($archivePath, 'xz', function (string $tarPath) use ($sourcePath, $entryName): void {
+                $this->tar->addPath($tarPath, $sourcePath, $entryName);
+            }),
+            'tar.zst' => $this->withMutableCompressedTar($archivePath, 'zst', function (string $tarPath) use ($sourcePath, $entryName): void {
+                $this->tar->addPath($tarPath, $sourcePath, $entryName);
+            }),
+            default => throw new RuntimeException('Unsupported archive type for path updates: ' . $archivePath),
+        };
     }
 
     /**
@@ -118,8 +258,42 @@ final class Compress
             '.txz' => 'tar.xz',
             '.tar.zst' => 'tar.zst',
             '.tzst' => 'tar.zst',
+            '.7z' => '7z',
+            '.rar' => 'rar',
             '.zip' => 'zip',
             '.tar' => 'tar',
+        ] as $suffix => $type) {
+            if (str_ends_with($filename, $suffix)) {
+                return $type;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Detects and returns one supported archive type from a filename/path.
+     *
+     * @param string $archivePath Archive filename or absolute path.
+     * @return string|null Canonical archive type key, or null when unsupported.
+     */
+    private function detectArchiveType(string $archivePath): ?string
+    {
+        $directoryType = $this->detectDirectoryArchiveType($archivePath);
+        if ($directoryType !== null) {
+            return $directoryType;
+        }
+
+        $filename = strtolower(trim((string) pathinfo($archivePath, PATHINFO_BASENAME)));
+        if ($filename === '') {
+            return null;
+        }
+
+        foreach ([
+            '.gz' => 'gz',
+            '.bz2' => 'bz2',
+            '.xz' => 'xz',
+            '.zst' => 'zst',
         ] as $suffix => $type) {
             if (str_ends_with($filename, $suffix)) {
                 return $type;
@@ -144,5 +318,151 @@ final class Compress
         }
 
         return $type;
+    }
+
+    /**
+     * Returns one supported archive type or throws for unsupported names.
+     *
+     * @param string $archivePath Archive filename or absolute path.
+     * @return string Canonical archive type key.
+     * @throws RuntimeException When the filename/path does not use a supported suffix.
+     */
+    private function requireArchiveType(string $archivePath): string
+    {
+        $type = $this->detectArchiveType($archivePath);
+        if ($type === null) {
+            throw new RuntimeException('Unsupported archive type: ' . $archivePath);
+        }
+
+        return $type;
+    }
+
+    /**
+     * Returns the preferred archive entry name for container formats.
+     *
+     * @param string $sourcePath Absolute source path.
+     * @param string $archiveRoot Preferred archive root name from the caller.
+     * @return string Archive-internal root name.
+     */
+    private function entryNameForContainer(string $sourcePath, string $archiveRoot): string
+    {
+        $root = trim(str_replace('\\', '/', $archiveRoot), '/');
+        if ($root !== '') {
+            return $root;
+        }
+
+        return trim(basename($sourcePath), '/');
+    }
+
+    /**
+     * Returns the preferred archive entry name for TAR-family formats.
+     *
+     * Directory TAR archives preserve contents directly by default, so Raven
+     * only wraps them when the caller explicitly requests one archive root.
+     *
+     * @param string $sourcePath Absolute source path.
+     * @param string $archiveRoot Preferred archive root name from the caller.
+     * @return string|null Archive-internal root name, or null for bare directory contents.
+     */
+    private function entryNameForTarFamily(string $sourcePath, string $archiveRoot): ?string
+    {
+        $root = trim(str_replace('\\', '/', $archiveRoot), '/');
+        if ($root !== '') {
+            return $root;
+        }
+
+        if (is_dir($sourcePath)) {
+            return null;
+        }
+
+        return trim(basename($sourcePath), '/');
+    }
+
+    /**
+     * Ensures one source path is a file for single-file compression formats.
+     *
+     * @param string $sourcePath Absolute source path to validate.
+     * @param string $type Human-readable archive type key for errors.
+     * @return string Absolute validated file path.
+     * @throws RuntimeException When the source is not a regular file.
+     */
+    private function requireFileSource(string $sourcePath, string $type): string
+    {
+        if (!is_file($sourcePath)) {
+            throw new RuntimeException(strtoupper($type) . ' compression requires a file source: ' . $sourcePath);
+        }
+
+        return $sourcePath;
+    }
+
+    /**
+     * Opens a compressed TAR archive for in-place mutation through a temporary `.tar`.
+     *
+     * The archive is decompressed to a temporary tarball when it already exists,
+     * mutated by the caller, then recompressed back to the original output path.
+     *
+     * @template T
+     * @param string $archivePath Absolute path to the compressed TAR archive.
+     * @param string $compressionType Compression key: `gz`, `bz2`, `xz`, or `zst`.
+     * @param callable(string): T $operation Callback that mutates the temporary `.tar`.
+     * @return T Callback result.
+     * @throws RuntimeException When decompression or recompression fails.
+     */
+    private function withMutableCompressedTar(string $archivePath, string $compressionType, callable $operation): mixed
+    {
+        $temporaryTarPath = $this->temporaryFilePath('.tar');
+
+        try {
+            if (is_file($archivePath)) {
+                match ($compressionType) {
+                    'gz' => $this->gz->decompress($archivePath, $temporaryTarPath),
+                    'bz2' => $this->bz2->decompress($archivePath, $temporaryTarPath),
+                    'xz' => $this->xz->decompress($archivePath, $temporaryTarPath),
+                    'zst' => $this->zst->decompress($archivePath, $temporaryTarPath),
+                    default => throw new RuntimeException('Unsupported compressed TAR type: ' . $compressionType),
+                };
+            }
+
+            $result = $operation($temporaryTarPath);
+
+            match ($compressionType) {
+                'gz' => $this->gz->compress($temporaryTarPath, $archivePath),
+                'bz2' => $this->bz2->compress($temporaryTarPath, $archivePath),
+                'xz' => $this->xz->compress($temporaryTarPath, $archivePath),
+                'zst' => $this->zst->compress($temporaryTarPath, $archivePath),
+                default => throw new RuntimeException('Unsupported compressed TAR type: ' . $compressionType),
+            };
+
+            return $result;
+        } finally {
+            @unlink($temporaryTarPath);
+        }
+    }
+
+    /**
+     * Allocates one temporary file path, optionally with a stable suffix.
+     *
+     * @param string $suffix Optional suffix such as `.tar`.
+     * @return string Absolute temporary file path reserved for this process.
+     * @throws RuntimeException When no temporary file path can be created.
+     */
+    private function temporaryFilePath(string $suffix = ''): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'rvn-archive-');
+        if (!is_string($path) || $path === '') {
+            throw new RuntimeException('Failed to allocate temporary archive path.');
+        }
+
+        if ($suffix === '') {
+            return $path;
+        }
+
+        $suffixedPath = $path . $suffix;
+        if (!@rename($path, $suffixedPath)) {
+            @unlink($path);
+            throw new RuntimeException('Failed to prepare temporary archive path.');
+        }
+
+        return $suffixedPath;
     }
 }

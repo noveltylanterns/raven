@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Archive/Types/Csv.php
+ * ~/private/lib/Format/Csv.php
  * Generic CSV handler — read, write, and stream CSV data.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Archive\Types;
+namespace Raven\Lib\Format;
 
 use Generator;
 use RuntimeException;

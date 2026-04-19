@@ -12,7 +12,7 @@ declare(strict_types=1);
 use Raven\Core\Routing\Router;
 use Raven\Ext\SignupFormRepository;
 use Raven\Ext\SignupSubmissionRepository;
-use Raven\Lib\Archive\Types\Csv;
+use Raven\Lib\Format\Csv;
 use Raven\Lib\Transport\Upload;
 
 use function Raven\Lib\Support\redirect;

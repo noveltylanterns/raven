@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Archive/Types/Zst.php
+ * ~/private/lib/Format/Zst.php
  * Zstandard single-file compression and decompression handler via the zstd binary.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Archive\Types;
+namespace Raven\Lib\Format;
 
 use RuntimeException;
 
