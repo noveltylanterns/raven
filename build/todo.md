@@ -13,12 +13,33 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 
 ## Short Term
 
-### General Organization & Consolidation
-- [ ] Extension runtime refactor cleanup: settle the embedded-form/shortcode runtime contract, then remove legacy `embedded_form_runtimes` support from `private/lib/Extension/EmbeddedFormRuntimeService.php`.
-
-
 ### Library Refactor
 Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
+- [ ] Do lib/Archive/(Compress|Delete|Extract).php work for any archive/directory, or only for ones being used by the Theme/Extension managers? Because those should be generic for everything so extension devs can use them. Theme/Extension Manager specific logic should be in lib/Archive/(Install|Package).php
+- [ ] Our three lib/Channel/*.php libraries should be consolidated into lib/Directory/ChannelContext.php
+- [ ] Delete lib/Channel/ when emptied.
+- [ ] Our two lib/Taxonomy/TaxonomySet*.php libraries should be consolidated into lib/Directory/SetContext.php
+- [ ] Delete lib/Taxonomy/ when emptied.
+- [ ] Move Channel functions out of lib/Routing/RouteConfigService.php to lib/Directory/Channel.php, Group functions to Group.php, Feed/Atom/RSS fucntions to Feed.php, etc, etc.
+- [ ] Move lib/Routing/ChannelRoutePolicy.php to lib/Directory/Mode.php
+- [ ] Move lib/Routing/RouteConfigService.php to lib/Directory/Route.php
+- [ ] Move lib/Routing/PathScopeLookupService.php to lib/Directory/Duplicate.php
+- [ ] Delete lib/Routing/ when emptied.
+- [ ] Rename sys/Routing/RouteRequest.php to Request.php, and RouteDispatchResult.php to Result.php
+- [ ] Rename sys/Routing/Public/PublicEntrypoint.php to Entry.php
+- [ ] Rename sys/Routing/Panel/PanelEntrypoint.php to Entry.php
+- [ ] Rename sys/Debug/DebugToolbarResponseHook.php to ToolbarResponseHook.php
+- [ ] Move lib/Site/PublicMetaService.php to lib/View/Public/
+- [ ] Move lib/Site/SiteContextBuilder.php to lib/View/
+- [ ] Delete lib/Site/ when emptied.
+- [ ] There should be dedicated sys/Controller/(Public|Panel)/AuthController.php file, rather than a shared controller for both routes, for security/isolation reasons.
+
+
+### Extension Cleanup
+- [ ] Unset Repositories & Smallweb as stock extensions so I can work on them separately with a different agent. I'll merge them back in here later.
+- [ ] The textareas for our page content in the Smallweb extension do not word wrap, instead open horizontal scrollbar. They need to word wrap like our page editor content blocks.
+- [ ] Make sure all import/export & file handler functions in our extensions are using our lib/Format/ libraries when applicable. If something can be extracted from an extension and made part of a universal handler in lib/Format/, do so. (Probably need a lib/Format/Txt.php for many of our Smallweb .txt/.gmi/etc files)
+- [ ] Extension runtime refactor cleanup: settle the embedded-form/shortcode runtime contract, then remove legacy `embedded_form_runtimes` support from `private/lib/Extension/EmbeddedFormRuntimeService.php`.
 
 
 
