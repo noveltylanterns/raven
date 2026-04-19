@@ -75,9 +75,11 @@ Full aggressive security sweep and pentesting run, including (but not limited to
 We need to generate better documentation. This is going to be a whole project.
 
 #### Prep Work
-- [ ] The top of *EVERY* .php file should begin with <?php, followed by the standard 6-line PHPDoc intro (update Docs: url to https://lanterns.io/raven), and our declare declaration, namespace declaration, and alphabetized use maps, in that order, with no blank lines in between these elements. Leave an empty line BETWEEN this intro block and whatever follows.
+- [ ] The top of *EVERY* .php file should begin with <?php, followed by the standard 6-line PHPDoc intro (update Docs: url to https://lanterns.io/raven) and if applicable the declare declaration, namespace declaration, and alphabetized use maps (not all files have these) in that order, with no blank lines in between these elements. Leave an empty line BETWEEN this intro block and whatever follows.
 - [ ] The description line in *EVERY* .php file's PHPDoc intro needs to be double-checked for accuracy.
-- [ ] EVERY class and EVERY function in sys/lib needs an inline comment describing what it does, it is missing in some of them.
+- [ ] EVERY class and EVERY function in sys/lib needs a detailed inline comment describing what it does, it is missing in some of them. The existing ones need to be double-checked for accuracy.
+- [ ] EVERY if/try/foreach in sys/lib needs a quick inline comment describing what it does, it is missing in some of them. The existing ones need to be double-checked for accuracy.
+- [ ] Need more consistently detailed inline comments in private/raven.php & public/install.php, it is great in some spots and missing in others.
 - [ ] ALL docs/ files need to use lowercase filenames from now on.
 
 #### Doc Generator (`private/bin/rvn-docs`)
