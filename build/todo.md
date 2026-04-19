@@ -44,7 +44,7 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 - [ ] Rename lib/Support/ to lib/Extra/
 
 
-### Extension Cleanup
+### Extension System Updates
 - [ ] Updated private/ext/CLAUDE.md guidance needs be be merged into private/ext/agents, then CLAUDE.md needs to be deleted and symlinked to agents like AGENTS.md is.
 - [ ] Replace "Generates AGENTS.md?" in Extension Manager with "Generate Agent Guidance?". Instead of making `AGENTS.md`, it will just make `agents`, and symlink both `AGENTS.md` and `CLAUDE.md` to `agents`.
 - [ ] Replace "Generates AGENTS.md?" in Theme Manager with "Generate Agent Guidance?". Instead of making `AGENTS.md`, it will just make `agents`, and symlink both `AGENTS.md` and `CLAUDE.md` to `agents`.
@@ -52,6 +52,14 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 - [ ] The textareas for our page content in the Smallweb extension do not word wrap, instead open horizontal scrollbar. They need to word wrap like our page editor content blocks.
 - [ ] Folder creation/deletion/modification functions in Smallweb should be merged into (and called from) universal folder handler in lib/Archive/Folder.php
 - [ ] Make sure all import/export & file handler functions in our extensions are using our lib/Format/ libraries when applicable. If something can be extracted from an extension and made part of a universal handler in lib/Format/, do so. (Probably need a lib/Format/Txt.php for many of our Smallweb .txt/.gmi/etc files)
+- [ ] private/ext/{slug}/lib/ contents should be relocated to private/ext/{slug}/
+- [ ] private/ext/{slug}/src/ contents should be relocated to private/ext/{slug}/lib/
+- [ ] Raven\Ext\ PSR maps should use ext/{slug}/lib/ instead of src/ from now on
+- [ ] private/ext/{slug}/src/ should be deleted.
+- [ ] Make sure all extensions, Extension Manager & Generator are all updated to match these new updates & rules.
+
+
+### Misc
 - [ ] Extension runtime refactor cleanup: settle the embedded-form/shortcode runtime contract, then remove legacy `embedded_form_runtimes` support from `private/lib/Extension/EmbeddedFormRuntimeService.php`.
 
 
@@ -75,28 +83,31 @@ Full aggressive security sweep and pentesting run, including (but not limited to
 We need to generate better documentation. This is going to be a whole project.
 
 #### Prep Work
-- [ ] The top of *EVERY* .php file should begin with <?php, followed by the standard 6-line PHPDoc intro (update Docs: url to https://lanterns.io/raven) and if applicable the declare declaration, namespace declaration, and alphabetized use maps (not all files have these) in that order, with no blank lines in between these elements. Leave an empty line BETWEEN this intro block and whatever follows.
+- [ ] The top of *EVERY* .php file within private/public/panel should begin with <?php, followed by the standard 6-line PHPDoc intro (update Docs: url to https://lanterns.io/raven) and if applicable the declare declaration, namespace declaration, and alphabetized use maps (not all files have these) in that order, with no blank lines in between these elements. Leave an empty line BETWEEN this intro block and whatever follows.
 - [ ] The description line in *EVERY* .php file's PHPDoc intro needs to be double-checked for accuracy.
 - [ ] EVERY class and EVERY function in sys/lib needs a detailed inline comment describing what it does, it is missing in some of them. The existing ones need to be double-checked for accuracy.
 - [ ] EVERY if/try/foreach in sys/lib needs a quick inline comment describing what it does, it is missing in some of them. The existing ones need to be double-checked for accuracy.
-- [ ] Need more consistently detailed inline comments in private/raven.php & public/install.php, it is great in some spots and missing in others.
+- [ ] Need more consistently detailed inline comments in `private/raven.php` & `public/install.php`, it is great in some spots and missing in others.
 - [ ] ALL docs/ files need to use lowercase filenames from now on.
 
-#### Doc Generator (`private/bin/rvn-docs`)
+#### Doc Generator Script
 Build a single fast CLI command that auto-generates all reference appendix files from the codebase.
 Pure PHP — Reflection API + lightweight PHPDoc regex, no extra composer deps. Run at release time.
+- [ ] Store generator as `build/docgen.(php or sh?)`
 Targets (generator owns these files — do not hand-edit them):
-- [ ] `docs/appendix/libraries.md` — reflect on all public repository methods; pull `@param`/`@return`/first docline per method; group by service key in `context['rvn']`
+- [ ] `docs/appendix/libraries.md` — reflect on all lib/* classes & functions; pull `@param`/`@return`/first docline per function; group by service key in `context['rvn']`
+- [ ] `docs/appendix/core.md` — reflect on all sys/* classes & functions; pull `@param`/`@return`/first docline per function; group by service key in `context['rvn']` if applicable.
 - [ ] `docs/appendix/config.md` — parse `private/dat/config.php.dist` key tree + reflect on `ConfigEditorSchemaService` for descriptions and defaults
 - [ ] `docs/appendix/database.md` — reflect on `SchemaBuilder`/`AuthSchemaBuilder` method names + annotations to enumerate tables and columns; include column purposes and the full chain of variables/routes/forms that map to each column
 - [ ] `docs/cli.md` — shell each `private/bin/rvn-*` with `--help` and format output as markdown; replaces current hand-written content
 - [ ] `docs/extensions/` folder — per-extension docs for bundled stock extensions (contact, signups, database, etc.)
-- [ ] Wire into release checklist once generator is built
+- [ ] Wire `docgen` into maintenance checklist once generator is built
 
 #### Hand-Authored Docs & Cleanup
-- [ ] `docs/appendix/architecture.md` - Finer details of why Raven is structured the way that it is, and what this structure enables.
 - [ ] `docs/intro.md` — project overview, philosophy, and quick-start
-- [ ] `docs/api.md` — top-level index linking all developer-facing surfaces (Extensions, Libraries, CLI, Theming); summary paragraph per surface; grows to link more appendix pages over time
+- [ ] `docs/filetree.md` - This one should be mostly up to date already. Doublecheck & move to `docs/appendix/`
+- [ ] `docs/appendix/architecture.md` - Finer details of why Raven is structured the way that it is, and what this structure enables.
+- [ ] `docs/appendix/api.md` — index linking all developer-facing surfaces (Extensions, Libraries, CLI, Theming); summary paragraph per surface; grows to link more appendix pages over time
 - [ ] Narrative docs (`pages.md`, `routing.md`, `configuration.md`, etc.) — AI-authored drafts exist but are unverified Codex output; needs full accuracy sweep and rewrite pass against actual codebase
 - [ ] `docs/screenshots/` folder — UI screenshots for operator-facing docs
 - [ ] Do a proper human proofreading sweep once narrative docs are rewritten; replace this section with final authoring task list
