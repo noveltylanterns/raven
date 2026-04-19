@@ -12,15 +12,35 @@ declare(strict_types=1);
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
 
-require_once dirname(__DIR__, 2) . '/private/sys/Core/Support/Helpers.php';
-require_once dirname(__DIR__, 2) . '/private/sys/Core/View/TemplateTagEngine.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Security/InputSanitizer.php';
-require_once dirname(__DIR__, 2) . '/private/lib/View/PublicTemplateResolver.php';
-require_once dirname(__DIR__, 2) . '/private/lib/View/PublicTemplatePipeline.php';
+$root = dirname(__DIR__, 2);
+require_once $root . '/private/lib/Extra/Helpers.php';
+
+// Keep smoke scripts independent from the full runtime bootstrap while still
+// following the same Core/Lib PSR-4 layout as the live app.
+spl_autoload_register(static function (string $class) use ($root): void {
+    $prefixes = [
+        'Raven\\Core\\' => $root . '/private/sys/',
+        'Raven\\Lib\\' => $root . '/private/lib/',
+    ];
+
+    foreach ($prefixes as $prefix => $basePath) {
+        if (!str_starts_with($class, $prefix)) {
+            continue;
+        }
+
+        $relative = str_replace('\\', '/', substr($class, strlen($prefix)));
+        $path = $basePath . $relative . '.php';
+        if (is_file($path)) {
+            require_once $path;
+        }
+
+        return;
+    }
+});
 
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\PublicTemplatePipeline;
-use Raven\Lib\View\PublicTemplateResolver;
+use Raven\Lib\View\Public\PublicTemplatePipeline;
+use Raven\Lib\View\Public\PublicTemplateResolver;
 use Raven\Lib\View\TemplateTagEngine;
 
 final class ThemeTemplateSmokeRunner

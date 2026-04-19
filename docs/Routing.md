@@ -6,7 +6,7 @@ This document explains Raven's Routing Table screen for both panel users and dev
 
 Maintenance note: keep this file updated whenever Routing Table routes, row-building/conflict logic, export behavior, or Routing Table panel views change (`private/tpl/panel/routing.php`, `SystemController::routing*`, or routing inventory composition helpers).
 
-Public-routing note: public entry orchestration now lives in `private/sys/Routing/Public/`, where controller-aligned registrars map stock public route families onto the split handlers under `private/sys/Controller/Public/`. Shared low-level web-entry helpers such as the debug-toolbar response hook and scheduler fallback runner live in `private/sys/Routing/`, while scope-specific gating stays in the public/panel entrypoints. Keep those files and `public/theme/AGENTS.md` in sync when public route families are added or changed.
+Public-routing note: public entry orchestration now lives in `private/sys/Controller/Public/PublicController.php`, where controller-aligned registrars from `private/sys/Routing/Public/` map stock public route families onto the split handlers under `private/sys/Controller/Public/`. Shared low-level routing primitives live in `private/sys/Routing/`, while scope-specific gating stays in the public/panel front controllers. Keep those files and `public/theme/AGENTS.md` in sync when public route families are added or changed.
 
 ## 1) Panel Guide (Routing Table)
 
@@ -80,12 +80,12 @@ Export fields include:
 - Panel controller:
   - `private/sys/Controller/Panel/SystemController.php`
 - Public route bootstrap:
-  - `private/sys/Routing/Public/PublicEntrypoint.php`
+  - `private/sys/Controller/Public/PublicController.php`
   - `private/sys/Routing/Public/Public*RouteRegistrar.php`
 - Panel route bootstrap:
-  - `private/sys/Routing/Panel/PanelEntrypoint.php`
+  - `private/sys/Controller/Panel/PanelController.php`
   - `private/sys/Routing/Panel/Panel*RouteRegistrar.php`
-  - `private/sys/Debug/DebugToolbarResponseHook.php`
+  - `private/sys/Debug/ToolbarResponseHook.php`
   - `private/sys/Scheduler.php`
 - Public auth controller:
   - `private/sys/Controller/Public/AuthController.php`
@@ -98,11 +98,11 @@ Export fields include:
 - Public content controller:
   - `private/sys/Controller/Public/ContentController.php`
 - Shared public request context:
-  - `private/sys/Controller/Public/RequestContext.php`
+  - `private/sys/Controller/Public/SharedController.php`
 
 ### Panel Routes
 
-Declared through `private/sys/Routing/Panel/PanelSystemRouteRegistrar.php` and wired by `private/sys/Routing/Panel/PanelEntrypoint.php`:
+Declared through `private/sys/Routing/Panel/PanelSystemRouteRegistrar.php` and wired by `private/sys/Controller/Panel/PanelController.php`:
 
 - `GET /routing` -> routing inventory screen
 - `GET /routing/export` -> CSV export

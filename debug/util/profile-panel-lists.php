@@ -16,7 +16,7 @@ use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TagRepository;
 use Raven\Core\Repository\UserRepository;
-use Raven\Lib\Config\ConfigValueParser;
+use Raven\Lib\Config\ConfigParser;
 use Raven\Lib\Diagnostics\RequestProfiler;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
@@ -194,7 +194,7 @@ final class PanelListProfilerRunner
      */
     private function featureEnabled(array $rvn, string $key, bool $default = true): bool
     {
-        return ConfigValueParser::bool($rvn['config']->get($key, $default), $default);
+        return ConfigParser::bool($rvn['config']->get($key, $default), $default);
     }
 
     /**

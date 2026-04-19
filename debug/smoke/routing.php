@@ -12,35 +12,36 @@ declare(strict_types=1);
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
 
-require_once dirname(__DIR__, 2) . '/private/lib/Config/ConfigFileStore.php';
-require_once dirname(__DIR__, 2) . '/private/sys/Core/Config.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Config/ConfigValueParser.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Security/InputSanitizer.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Database/SqlUpsertPolicy.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Database/Runtime/TableNameResolver.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Content/BodyBlockPolicy.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Content/PageBodyBlockCodec.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Content/PagePanelFilterClauseBuilder.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Content/PageTaxonomyAssignmentService.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Content/PageTaxonomyQueryService.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Content/PagePersistenceService.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Media/PageEditorGalleryHydrator.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Taxonomy/TaxonomySetRecordPolicy.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Routing/ChannelRoutePolicy.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Routing/ChannelRecordPolicy.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Routing/ChannelContextService.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Routing/PathScopeLookupService.php';
-require_once dirname(__DIR__, 2) . '/private/sys/Routing/Public/PublicChannelPageRouteService.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Routing/RouteConfigService.php';
-require_once dirname(__DIR__, 2) . '/private/lib/Channel/ChannelFileStoreService.php';
-require_once dirname(__DIR__, 2) . '/private/sys/Repository/ChannelRepository.php';
-require_once dirname(__DIR__, 2) . '/private/sys/Repository/PageRepository.php';
+$root = dirname(__DIR__, 2);
+
+// Keep smoke scripts independent from the full runtime bootstrap while still
+// following the same Core/Lib PSR-4 layout as the live app.
+spl_autoload_register(static function (string $class) use ($root): void {
+    $prefixes = [
+        'Raven\\Core\\' => $root . '/private/sys/',
+        'Raven\\Lib\\' => $root . '/private/lib/',
+    ];
+
+    foreach ($prefixes as $prefix => $basePath) {
+        if (!str_starts_with($class, $prefix)) {
+            continue;
+        }
+
+        $relative = str_replace('\\', '/', substr($class, strlen($prefix)));
+        $path = $basePath . $relative . '.php';
+        if (is_file($path)) {
+            require_once $path;
+        }
+
+        return;
+    }
+});
 
 use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Core\Routing\Public\PublicChannelPageRouteService;
-use Raven\Lib\Routing\RouteConfigService;
+use Raven\Lib\Directory\Route;
 use Raven\Lib\Security\InputSanitizer;
 
 final class RoutingSmokeRunner
@@ -83,7 +84,7 @@ final class RoutingSmokeRunner
 
         $config = new Config($configPath);
         $input = new InputSanitizer();
-        $routeConfig = new RouteConfigService($config, $input);
+        $routeConfig = new Route($config, $input);
         $routeService = new PublicChannelPageRouteService($input);
         $channels = new ChannelRepository($db, 'sqlite', '', $channelDirectory);
         $pages = new PageRepository($db, 'sqlite', '', $channels, false, false);
@@ -231,7 +232,7 @@ PHP;
      */
     private function resolvePublicPath(
         Config $config,
-        RouteConfigService $routeConfig,
+        Route $routeConfig,
         PublicChannelPageRouteService $routeService,
         ChannelRepository $channels,
         PageRepository $pages,
@@ -278,7 +279,7 @@ PHP;
         $canonicalSegment = $routeService->canonicalSegment(
             (string) ($page['slug'] ?? ''),
             (int) ($page['id'] ?? 0),
-            (string) ($page['published_at'] ?? ''),
+            (string) ($page['created'] ?? ($page['created_at'] ?? '')),
             $routeMode,
             $wordSeparator,
             (string) $config->get('content.separator', $config->get('content.route_separator', '-'))

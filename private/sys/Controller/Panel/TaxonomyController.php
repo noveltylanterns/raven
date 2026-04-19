@@ -1687,7 +1687,7 @@ final class TaxonomyController
     }
 
     /**
-     * Normalizes one channel route-separator option via ChannelRoutePolicy.
+     * Normalizes one channel route-separator option via the Directory mode policy.
      *
      * @param string $value Raw route-separator from form or record.
      * @return string Normalized separator.

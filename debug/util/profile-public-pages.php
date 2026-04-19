@@ -12,7 +12,7 @@ declare(strict_types=1);
 use Raven\Core\Controller\Public\ContentController;
 use Raven\Core\Controller\Public\FeedController;
 use Raven\Core\Controller\Public\ProfileController;
-use Raven\Core\Controller\Public\RequestContext;
+use Raven\Core\Controller\Public\SharedController;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\PageRepository;
@@ -37,7 +37,7 @@ final class PublicProfileControllerAdapter
         private readonly ContentController $content,
         private readonly FeedController $feed,
         private readonly ProfileController $profile,
-        private readonly RequestContext $requestContext
+        private readonly SharedController $requestContext
     ) {
     }
 
@@ -481,7 +481,7 @@ final class PublicRouteProfilerRunner
         $feedFactory = $rvn['public_feed_controller'];
         /** @var callable(): ProfileController $profileFactory */
         $profileFactory = $rvn['public_profile_controller'];
-        /** @var callable(): RequestContext $requestContextFactory */
+        /** @var callable(): SharedController $requestContextFactory */
         $requestContextFactory = $rvn['public_request_context'];
 
         return new PublicProfileControllerAdapter(

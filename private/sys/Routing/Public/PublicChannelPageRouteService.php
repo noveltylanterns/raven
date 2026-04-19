@@ -19,8 +19,8 @@ use Raven\Lib\Security\InputSanitizer;
  *
  * A thin coordination surface that delegates all route normalization,
  * separator resolution, lookup-target resolution, and canonical segment
- * building to `ChannelRoutePolicy`, keeping the calling controllers decoupled
- * from the policy details.
+ * building to `Raven\Lib\Directory\Mode`, keeping the calling controllers
+ * decoupled from the policy details.
  */
 final class PublicChannelPageRouteService
 {

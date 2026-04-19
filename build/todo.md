@@ -15,33 +15,6 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 
 ### Library Refactor
 Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
-- [ ] Do lib/Archive/(Compress|Extract).php work for any archive/directory, or only for ones being used by the Theme/Extension managers? Because those should be generic for everything so extension devs can use them. Theme/Extension Manager specific logic should be in lib/Archive/(Install|Package).php
-- [ ] Rename lib/Archive/Delete.php to Folder.php
-- [ ] Rename lib/Archive/UpdateSource.php to Upstream.php
-- [ ] Rename lib/Config/ConfigValue*.php to Config*.php
-- [x] Move all lib/Content/ classes into lib/View/
-- [x] Delete lib/Content/ when emptied.
-- [x] Our three lib/Channel/*.php libraries should be consolidated into lib/Directory/ChannelContext.php
-- [x] Delete lib/Channel/ when emptied.
-- [x] Our two lib/Taxonomy/TaxonomySet*.php libraries should be consolidated into lib/Directory/SetContext.php
-- [x] Delete lib/Taxonomy/ when emptied.
-- [x] Move Channel functions out of lib/Routing/RouteConfigService.php to lib/Directory/Channel.php, Group functions to Group.php, Feed/Atom/RSS functions to Feed.php, etc.
-- [x] Move reduced lib/Routing/RouteConfigService.php to lib/Directory/Route.php
-- [x] Move lib/Routing/ChannelRoutePolicy.php to lib/Directory/Mode.php
-- [x] Move lib/Routing/PathScopeLookupService.php to lib/Directory/Duplicate.php
-- [x] Delete lib/Routing/ when emptied.
-- [ ] Rename sys/Routing/RouteRequest.php to Request.php, and RouteDispatchResult.php to Result.php
-- [x] Move sys/Routing/Public/PublicEntrypoint.php to sys/Controller/Public/PublicController.php
-- [x] Move sys/Routing/Panel/PanelEntrypoint.php to sys/Controller/Panel/PanelController.php
-- [x] Rename sys/Controller/Public/RequestContext.php to SharedController.php
-- [x] Rename sys/Controller/Panel/RequestContext.php to SharedController.php
-- [ ] Rename sys/Debug/DebugToolbarResponseHook.php to ToolbarResponseHook.php
-- [x] Move lib/Site/PublicMetaService.php to lib/View/Public/
-- [x] Move lib/Site/SiteContextBuilder.php to lib/View/
-- [x] Delete lib/Site/ when emptied.
-- [x] There should be dedicated sys/Controller/(Public|Panel)/AuthController.php file, rather than a shared controller for both routes, for security/isolation reasons.
-- [x] Rename lib/Support/CountryOptions.php to Countries.php
-- [x] Rename lib/Support/ to lib/Extra/
 
 
 ### Extension System Updates
