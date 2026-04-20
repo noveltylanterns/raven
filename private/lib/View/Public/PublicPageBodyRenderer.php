@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\View;
+namespace Raven\Lib\View\Public;
 
 /**
  * Renders public page body-block content by normalized editor mode.

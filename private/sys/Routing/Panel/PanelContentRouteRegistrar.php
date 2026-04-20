@@ -25,12 +25,14 @@ final class PanelContentRouteRegistrar
      * @param Router $router Mutable router receiving content routes.
      * @param callable(): object $panelContentController Lazy content controller factory.
      * @param InputSanitizer $input Shared input normalizer for route params.
+     * @param callable(): void $renderNotFound Renders a 404 response when a route param is invalid.
      * @return void
      */
     public static function register(
         Router $router,
         callable $panelContentController,
-        InputSanitizer $input
+        InputSanitizer $input,
+        callable $renderNotFound
     ): void {
         $router->add('GET', '/page', static function () use ($panelContentController): void {
             $panelContentController()->pageList();
@@ -40,12 +42,11 @@ final class PanelContentRouteRegistrar
             $panelContentController()->pageEdit(null);
         });
 
-        $router->add('GET', '/page/edit/{id}', static function (array $params) use ($panelContentController, $input): void {
+        $router->add('GET', '/page/edit/{id}', static function (array $params) use ($panelContentController, $input, $renderNotFound): void {
             $id = $input->int($params['id'] ?? null, 1);
 
             if ($id === null) {
-                http_response_code(404);
-                echo 'Not Found';
+                $renderNotFound();
                 return;
             }
 

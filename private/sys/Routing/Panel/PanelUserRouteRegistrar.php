@@ -25,12 +25,14 @@ final class PanelUserRouteRegistrar
      * @param Router $router Mutable router receiving user routes.
      * @param callable(): object $panelUserController Lazy user controller factory.
      * @param InputSanitizer $input Shared input normalizer for route params.
+     * @param callable(): void $renderNotFound Renders a 404 response when a route param is invalid.
      * @return void
      */
     public static function register(
         Router $router,
         callable $panelUserController,
-        InputSanitizer $input
+        InputSanitizer $input,
+        callable $renderNotFound
     ): void {
         $router->add('GET', '/user', static function () use ($panelUserController): void {
             $panelUserController()->userList();
@@ -40,12 +42,11 @@ final class PanelUserRouteRegistrar
             $panelUserController()->userEdit(null);
         });
 
-        $router->add('GET', '/user/edit/{id}', static function (array $params) use ($panelUserController, $input): void {
+        $router->add('GET', '/user/edit/{id}', static function (array $params) use ($panelUserController, $input, $renderNotFound): void {
             $id = $input->int($params['id'] ?? null, 1);
 
             if ($id === null) {
-                http_response_code(404);
-                echo 'Not Found';
+                $renderNotFound();
                 return;
             }
 

@@ -49,14 +49,13 @@ use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Parser\TagRouteParser;
 use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Panel\PanelRoutingPreviewService;
 use Raven\Lib\View\Panel\ThemeCatalogService;
 use Raven\Lib\View\Panel\ThemeCloneService;
 use Raven\Lib\View\Panel\ThemeScaffoldService;
+use Raven\Lib\View\Error as ViewError;
 use Raven\Lib\View\Public\PublicThemeRegistry;
-use Raven\Lib\View\ThemeFallbackRenderer;
 
 use Raven\Lib\Transport\Redirect;
 
@@ -103,8 +102,6 @@ final class SystemController
     private ?ExtensionStorageProvisioner $extensionStorageProvisioner = null;
     private ?ExtensionBootstrapContractResolver $extensionBootstrapContractResolver = null;
     private ?ThemeCloneService $themeCloneService = null;
-    private ?ThemeFallbackRenderer $publicFallbackRenderer = null;
-    private ?SiteContextBuilder $siteContextBuilder = null;
     private ?ChannelDataParser $channelParser = null;
     private ?FeedRouteParser $feedParser = null;
     private ?GroupRouteParser $groupParser = null;
@@ -1477,32 +1474,7 @@ final class SystemController
      */
     public function renderPublicNotFound(): void
     {
-        http_response_code(404);
-
-        $renderer = $this->publicFallbackRenderer();
-        $activeTheme = $this->activePublicThemeSlug();
-        $templateFile = $renderer->resolveTemplateFile('status/404', $activeTheme);
-        if ($templateFile === null) {
-            header('Content-Type: text/plain; charset=utf-8');
-            echo 'Not Found';
-            return;
-        }
-
-        $site = $this->publicSiteDataForNotFound();
-        $content = $renderer->renderFile($templateFile, [
-            'site' => $site,
-        ]);
-
-        $layoutFile = $renderer->resolveTemplateFile('wrapper', $activeTheme);
-        if ($layoutFile === null) {
-            echo $content;
-            return;
-        }
-
-        echo $renderer->renderFile($layoutFile, [
-            'site' => $site,
-            'content' => $content,
-        ]);
+        (new ViewError($this->config, $this->root))->render404();
     }
 
     /**
@@ -2767,49 +2739,6 @@ final class SystemController
         }
 
         return $this->themeCloneService;
-    }
-
-    /**
-     * Returns the public fallback renderer on first use.
-     */
-    private function publicFallbackRenderer(): ThemeFallbackRenderer
-    {
-        if (!$this->publicFallbackRenderer instanceof ThemeFallbackRenderer) {
-            $this->publicFallbackRenderer = new ThemeFallbackRenderer(
-                $this->publicThemesRoot(),
-                $this->root . '/private/tpl',
-                $this->root . '/.tmp/template_tag_cache'
-            );
-        }
-
-        return $this->publicFallbackRenderer;
-    }
-
-    /**
-     * Returns the site-context builder on first use.
-     */
-    private function siteContextBuilder(): SiteContextBuilder
-    {
-        if (!$this->siteContextBuilder instanceof SiteContextBuilder) {
-            $this->siteContextBuilder = new SiteContextBuilder();
-        }
-
-        return $this->siteContextBuilder;
-    }
-
-    /**
-     * Returns site context passed to public fallback templates.
-     *
-     * @return array<string, string> Public fallback site payload.
-     */
-    private function publicSiteDataForNotFound(): array
-    {
-        $publicTheme = $this->activePublicThemeSlug();
-        return $this->siteContextBuilder()->publicFallback(
-            $this->config,
-            $publicTheme,
-            $this->themeCatalogService()->cssSlug($publicTheme)
-        );
     }
 
     /**

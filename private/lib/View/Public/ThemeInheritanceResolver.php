@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\View;
+namespace Raven\Lib\View\Public;
 
 /**
  * Resolves child-to-parent public theme inheritance chains.

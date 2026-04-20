@@ -9,13 +9,11 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\View;
+namespace Raven\Lib\View\Public;
 
-require_once __DIR__ . '/TemplateTagPathResolver.php';
-require_once __DIR__ . '/TemplateTagCompiler.php';
 
-use Raven\Lib\View\TemplateTagCompiler;
-use Raven\Lib\View\TemplateTagPathResolver;
+use Raven\Lib\View\Public\TemplateTagCompiler;
+use Raven\Lib\View\Public\TemplateTagPathResolver;
 use RuntimeException;
 
 use function Raven\Lib\Security\e;

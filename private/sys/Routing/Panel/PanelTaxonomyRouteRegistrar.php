@@ -27,6 +27,7 @@ final class PanelTaxonomyRouteRegistrar
      * @param InputSanitizer $input Shared input normalizer for route params.
      * @param bool $categoryEnabled Whether category routes are enabled for this request.
      * @param bool $tagEnabled Whether tag routes are enabled for this request.
+     * @param callable(): void $renderNotFound Renders a 404 response when a route param is invalid.
      * @return void
      */
     public static function register(
@@ -34,7 +35,8 @@ final class PanelTaxonomyRouteRegistrar
         callable $panelTaxonomyController,
         InputSanitizer $input,
         bool $categoryEnabled,
-        bool $tagEnabled
+        bool $tagEnabled,
+        callable $renderNotFound
     ): void {
         $router->add('GET', '/channel', static function () use ($panelTaxonomyController): void {
             $panelTaxonomyController()->channelList();
@@ -44,12 +46,11 @@ final class PanelTaxonomyRouteRegistrar
             $panelTaxonomyController()->channelEdit(null);
         });
 
-        $router->add('GET', '/channel/edit/{id}', static function (array $params) use ($panelTaxonomyController, $input): void {
+        $router->add('GET', '/channel/edit/{id}', static function (array $params) use ($panelTaxonomyController, $input, $renderNotFound): void {
             $id = $input->int($params['id'] ?? null, 1);
 
             if ($id === null) {
-                http_response_code(404);
-                echo 'Not Found';
+                $renderNotFound();
                 return;
             }
 
@@ -73,12 +74,11 @@ final class PanelTaxonomyRouteRegistrar
                 $panelTaxonomyController()->categoryEdit(null);
             });
 
-            $router->add('GET', '/category/edit/{id}', static function (array $params) use ($panelTaxonomyController, $input): void {
+            $router->add('GET', '/category/edit/{id}', static function (array $params) use ($panelTaxonomyController, $input, $renderNotFound): void {
                 $id = $input->int($params['id'] ?? null, 1);
 
                 if ($id === null) {
-                    http_response_code(404);
-                    echo 'Not Found';
+                    $renderNotFound();
                     return;
                 }
 
@@ -101,12 +101,11 @@ final class PanelTaxonomyRouteRegistrar
                 $panelTaxonomyController()->categorySetEdit(null);
             });
 
-            $router->add('GET', '/category/set/edit/{id}', static function (array $params) use ($panelTaxonomyController, $input): void {
+            $router->add('GET', '/category/set/edit/{id}', static function (array $params) use ($panelTaxonomyController, $input, $renderNotFound): void {
                 $id = $input->int($params['id'] ?? null, 0);
 
                 if ($id === null) {
-                    http_response_code(404);
-                    echo 'Not Found';
+                    $renderNotFound();
                     return;
                 }
 
@@ -131,12 +130,11 @@ final class PanelTaxonomyRouteRegistrar
                 $panelTaxonomyController()->tagEdit(null);
             });
 
-            $router->add('GET', '/tag/edit/{id}', static function (array $params) use ($panelTaxonomyController, $input): void {
+            $router->add('GET', '/tag/edit/{id}', static function (array $params) use ($panelTaxonomyController, $input, $renderNotFound): void {
                 $id = $input->int($params['id'] ?? null, 1);
 
                 if ($id === null) {
-                    http_response_code(404);
-                    echo 'Not Found';
+                    $renderNotFound();
                     return;
                 }
 
@@ -159,12 +157,11 @@ final class PanelTaxonomyRouteRegistrar
                 $panelTaxonomyController()->tagSetEdit(null);
             });
 
-            $router->add('GET', '/tag/set/edit/{id}', static function (array $params) use ($panelTaxonomyController, $input): void {
+            $router->add('GET', '/tag/set/edit/{id}', static function (array $params) use ($panelTaxonomyController, $input, $renderNotFound): void {
                 $id = $input->int($params['id'] ?? null, 0);
 
                 if ($id === null) {
-                    http_response_code(404);
-                    echo 'Not Found';
+                    $renderNotFound();
                     return;
                 }
 

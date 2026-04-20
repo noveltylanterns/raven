@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\View;
+namespace Raven\Lib\View\Public;
 
 /**
  * Shared lightweight markdown-to-HTML renderer used by public content blocks.

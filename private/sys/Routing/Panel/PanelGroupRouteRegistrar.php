@@ -25,12 +25,14 @@ final class PanelGroupRouteRegistrar
      * @param Router $router Mutable router receiving group routes.
      * @param callable(): object $panelGroupController Lazy group controller factory.
      * @param InputSanitizer $input Shared input normalizer for route params.
+     * @param callable(): void $renderNotFound Renders a 404 response when a route param is invalid.
      * @return void
      */
     public static function register(
         Router $router,
         callable $panelGroupController,
-        InputSanitizer $input
+        InputSanitizer $input,
+        callable $renderNotFound
     ): void {
         $router->add('GET', '/group', static function () use ($panelGroupController): void {
             $panelGroupController()->groupList();
@@ -40,12 +42,11 @@ final class PanelGroupRouteRegistrar
             $panelGroupController()->groupEdit(null);
         });
 
-        $router->add('GET', '/group/edit/{id}', static function (array $params) use ($panelGroupController, $input): void {
+        $router->add('GET', '/group/edit/{id}', static function (array $params) use ($panelGroupController, $input, $renderNotFound): void {
             $id = $input->int($params['id'] ?? null, 1);
 
             if ($id === null) {
-                http_response_code(404);
-                echo 'Not Found';
+                $renderNotFound();
                 return;
             }
 

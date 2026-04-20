@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\View;
+namespace Raven\Lib\View\Public;
 
 /**
  * Resolves scoped template-tag paths (`foo:bar:baz`) to runtime values.

@@ -341,14 +341,18 @@ final class PanelController
             $_SESSION['_raven_nav_page_create_channels'] = [];
         }
 
+        $renderNotFound = static function () use ($panelSystemController): void {
+            $panelSystemController()->renderPublicNotFound();
+        };
+
         $router = new Router();
         PanelAuthRouteRegistrar::register($router, $authController);
         PanelDashboardRouteRegistrar::register($router, $panelDashboardController);
-        PanelContentRouteRegistrar::register($router, $panelContentController, $rvn['input']);
-        PanelTaxonomyRouteRegistrar::register($router, $panelTaxonomyController, $rvn['input'], $categoryEnabled, $tagEnabled);
-        PanelRedirectRouteRegistrar::register($router, $panelRedirectController, $rvn['input']);
-        PanelUserRouteRegistrar::register($router, $panelUserController, $rvn['input']);
-        PanelGroupRouteRegistrar::register($router, $panelGroupController, $rvn['input']);
+        PanelContentRouteRegistrar::register($router, $panelContentController, $rvn['input'], $renderNotFound);
+        PanelTaxonomyRouteRegistrar::register($router, $panelTaxonomyController, $rvn['input'], $categoryEnabled, $tagEnabled, $renderNotFound);
+        PanelRedirectRouteRegistrar::register($router, $panelRedirectController, $rvn['input'], $renderNotFound);
+        PanelUserRouteRegistrar::register($router, $panelUserController, $rvn['input'], $renderNotFound);
+        PanelGroupRouteRegistrar::register($router, $panelGroupController, $rvn['input'], $renderNotFound);
         PanelPreferencesRouteRegistrar::register($router, $panelPreferencesController);
         PanelSystemRouteRegistrar::register($router, $panelConfigController, $panelSystemController);
 

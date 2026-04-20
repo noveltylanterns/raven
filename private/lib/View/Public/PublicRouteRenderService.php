@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Raven\Lib\View\Public;
 
 /**
- * Shared route-to-template/status rendering decisions for public controllers.
+ * Shared route-to-template/status rendering decisions for public profile and group controllers.
  */
 final class PublicRouteRenderService
 {
     /**
-     * @param array<string, string> $siteData
+     * Returns the render payload for an unavailable user profile page.
+     *
+     * @param string               $error    Error key: 'permission_denied' for 403, any other value for 404.
+     * @param string               $mode     Visibility mode ('public', 'private', or 'disabled') of the profile.
+     * @param array<string, string> $siteData Assembled site context to pass to the template.
      * @return array{status: int, template: string, layout: string, data: array<string, mixed>}
      */
     public function profileUnavailablePayload(string $error, string $mode, array $siteData): array
@@ -27,7 +31,11 @@ final class PublicRouteRenderService
     }
 
     /**
-     * @param array<string, string> $siteData
+     * Returns the render payload for an unavailable group page.
+     *
+     * @param string               $error    Error key: 'permission_denied' for 403, any other value for 404.
+     * @param string               $mode     Visibility mode ('public', 'private', or 'disabled') of the group.
+     * @param array<string, string> $siteData Assembled site context to pass to the template.
      * @return array{status: int, template: string, layout: string, data: array<string, mixed>}
      */
     public function groupUnavailablePayload(string $error, string $mode, array $siteData): array
@@ -40,102 +48,6 @@ final class PublicRouteRenderService
                 'site' => $siteData,
                 'group_denied' => $error === 'permission_denied' && $mode === 'private',
             ],
-        ];
-    }
-
-    /**
-     * @param array<string, string> $siteData
-     * @return array{
-     *   allowed: bool,
-     *   status: int|null,
-     *   template: string|null,
-     *   layout: string|null,
-     *   data: array<string, mixed>
-     * }
-     */
-    public function availabilityGatePayload(
-        string $mode,
-        bool $isLoggedIn,
-        bool $canViewDisabledSite,
-        bool $canViewPrivateSite,
-        bool $canViewPublicSite,
-        array $siteData
-    ): array {
-        if ($mode === 'disabled') {
-            if ($isLoggedIn && $canViewDisabledSite) {
-                return $this->allowPayload();
-            }
-
-            return $this->blockedPayload(503, 'status/disabled', $siteData);
-        }
-
-        if ($mode === 'private') {
-            if (!$isLoggedIn || !$canViewPrivateSite) {
-                return $this->blockedPayload(403, 'status/denied', $siteData);
-            }
-
-            return $this->allowPayload();
-        }
-
-        if (!$canViewPublicSite) {
-            return $this->blockedPayload(403, 'status/denied', $siteData);
-        }
-
-        return $this->allowPayload();
-    }
-
-    /**
-     * @param array<string, string> $siteData
-     * @return array{status: int, template: string, layout: string, data: array<string, mixed>}
-     */
-    public function notFoundPayload(array $siteData): array
-    {
-        return [
-            'status' => 404,
-            'template' => 'status/404',
-            'layout' => 'wrapper',
-            'data' => ['site' => $siteData],
-        ];
-    }
-
-    /**
-     * @return array{
-     *   allowed: bool,
-     *   status: int|null,
-     *   template: string|null,
-     *   layout: string|null,
-     *   data: array<string, mixed>
-     * }
-     */
-    private function allowPayload(): array
-    {
-        return [
-            'allowed' => true,
-            'status' => null,
-            'template' => null,
-            'layout' => null,
-            'data' => [],
-        ];
-    }
-
-    /**
-     * @param array<string, string> $siteData
-     * @return array{
-     *   allowed: bool,
-     *   status: int|null,
-     *   template: string|null,
-     *   layout: string|null,
-     *   data: array<string, mixed>
-     * }
-     */
-    private function blockedPayload(int $status, string $template, array $siteData): array
-    {
-        return [
-            'allowed' => false,
-            'status' => $status,
-            'template' => $template,
-            'layout' => 'wrapper',
-            'data' => ['site' => $siteData],
         ];
     }
 }

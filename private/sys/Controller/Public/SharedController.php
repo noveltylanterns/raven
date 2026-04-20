@@ -23,13 +23,13 @@ use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\CaptchaService;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\View\Error as ViewError;
 use Raven\Lib\View\Public\PublicMetaService;
 use Raven\Lib\View\SiteContextBuilder;
-use Raven\Lib\View\Public\PublicRouteRenderService;
 use Raven\Lib\View\Public\PublicTemplateDecorator;
 use Raven\Lib\View\Public\PublicTemplatePipeline;
 use Raven\Lib\View\Public\PublicTemplateResolver;
-use Raven\Lib\View\TemplateTagEngine;
+use Raven\Lib\View\Public\TemplateTagEngine;
 use Raven\Lib\View\Panel\ThemeCatalogService;
 
 /**
@@ -55,7 +55,6 @@ final class SharedController
     private ?PublicTemplateDecorator $publicTemplateDecorator = null;
     private ?PublicTemplateResolver $publicTemplateResolver = null;
     private ?PublicTemplatePipeline $publicTemplatePipeline = null;
-    private ?PublicRouteRenderService $publicRouteRenderService = null;
 
     /**
      * @param Config $config Runtime configuration reader.
@@ -236,17 +235,15 @@ final class SharedController
      */
     public function notFound(): void
     {
-        $payload = $this->publicRouteRenderService()->notFoundPayload($this->siteData());
-        http_response_code((int) ($payload['status'] ?? 404));
-        $this->renderPublic(
-            (string) ($payload['template'] ?? 'status/404'),
-            is_array($payload['data'] ?? null) ? $payload['data'] : [],
-            (string) ($payload['layout'] ?? 'wrapper')
-        );
+        (new ViewError($this->config, dirname(__DIR__, 4)))->render404();
     }
 
     /**
      * Enforces global frontend availability mode before route handling.
+     *
+     * Renders a public-themed error response and returns false when the site is
+     * disabled or the current visitor lacks permission to view the site. Returns
+     * true without rendering when the request is permitted to proceed.
      *
      * @return bool True when the current request may proceed.
      */
@@ -257,26 +254,31 @@ final class SharedController
             $mode = 'public';
         }
 
+        $error = new ViewError($this->config, dirname(__DIR__, 4));
         $isLoggedIn = $this->auth->isLoggedIn();
-        $payload = $this->publicRouteRenderService()->availabilityGatePayload(
-            $mode,
-            $isLoggedIn,
-            $isLoggedIn && $this->auth->canViewDisabledSite(),
-            $isLoggedIn && $this->auth->canViewPrivateSite(),
-            $this->auth->canViewPublicSite(),
-            $this->siteData()
-        );
-        if ((bool) ($payload['allowed'] ?? false)) {
-            return true;
+
+        if ($mode === 'disabled') {
+            if ($isLoggedIn && $this->auth->canViewDisabledSite()) {
+                return true;
+            }
+            $error->renderDisabled();
+            return false;
         }
 
-        http_response_code((int) ($payload['status'] ?? 403));
-        $this->renderPublic(
-            (string) ($payload['template'] ?? 'status/denied'),
-            is_array($payload['data'] ?? null) ? $payload['data'] : [],
-            (string) ($payload['layout'] ?? 'wrapper')
-        );
-        return false;
+        if ($mode === 'private') {
+            if ($isLoggedIn && $this->auth->canViewPrivateSite()) {
+                return true;
+            }
+            $error->renderDenied();
+            return false;
+        }
+
+        if (!$this->auth->canViewPublicSite()) {
+            $error->renderDenied();
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -418,20 +420,6 @@ final class SharedController
         }
 
         return $this->publicTemplateDecorator;
-    }
-
-    /**
-     * Returns the cached public-route renderer.
-     *
-     * @return PublicRouteRenderService Shared public-route renderer.
-     */
-    private function publicRouteRenderService(): PublicRouteRenderService
-    {
-        if (!$this->publicRouteRenderService instanceof PublicRouteRenderService) {
-            $this->publicRouteRenderService = new PublicRouteRenderService();
-        }
-
-        return $this->publicRouteRenderService;
     }
 
     /**

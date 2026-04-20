@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/View/PublicThemeRegistry.php
+ * ~/private/lib/View/Public/PublicThemeRegistry.php
  * Discovers and validates public theme manifests.
  * Docs: https://raven.lanterns.io
  */
@@ -11,11 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\View\Public;
 
-require_once dirname(__DIR__) . '/ThemeDiscoveryService.php';
-require_once dirname(__DIR__) . '/ThemeInheritanceResolver.php';
-
-use Raven\Lib\View\ThemeDiscoveryService;
-use Raven\Lib\View\ThemeInheritanceResolver;
+use Raven\Lib\View\Public\ThemeDiscoveryService;
+use Raven\Lib\View\Public\ThemeInheritanceResolver;
 
 /**
  * Enumerates public themes from `public/theme/{slug}/theme.json`.

@@ -25,12 +25,14 @@ final class PanelRedirectRouteRegistrar
      * @param Router $router Mutable router receiving redirect routes.
      * @param callable(): object $panelRedirectController Lazy redirect controller factory.
      * @param InputSanitizer $input Shared input normalizer for route params.
+     * @param callable(): void $renderNotFound Renders a 404 response when a route param is invalid.
      * @return void
      */
     public static function register(
         Router $router,
         callable $panelRedirectController,
-        InputSanitizer $input
+        InputSanitizer $input,
+        callable $renderNotFound
     ): void {
         $router->add('GET', '/redirect', static function () use ($panelRedirectController): void {
             $panelRedirectController()->redirectList();
@@ -40,12 +42,11 @@ final class PanelRedirectRouteRegistrar
             $panelRedirectController()->redirectEdit(null);
         });
 
-        $router->add('GET', '/redirect/edit/{id}', static function (array $params) use ($panelRedirectController, $input): void {
+        $router->add('GET', '/redirect/edit/{id}', static function (array $params) use ($panelRedirectController, $input, $renderNotFound): void {
             $id = $input->int($params['id'] ?? null, 1);
 
             if ($id === null) {
-                http_response_code(404);
-                echo 'Not Found';
+                $renderNotFound();
                 return;
             }
 

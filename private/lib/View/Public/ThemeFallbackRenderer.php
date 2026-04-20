@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\View;
+namespace Raven\Lib\View\Public;
 
 use Raven\Lib\View\Public\PublicThemeRegistry;
-use Raven\Lib\View\TemplateTagEngine;
+use Raven\Lib\View\Public\TemplateTagEngine;
 
 /**
  * Shared resolver/renderer for public-theme fallback template files.
