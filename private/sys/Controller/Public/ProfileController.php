@@ -25,7 +25,6 @@ final class ProfileController
 {
     private SharedController $context;
     private GroupRepository $groupRepo;
-    private UserRepository $userRepo;
     private LoginIdentifierResolver $loginIdentifierResolver;
     private UserParser $profileContactService;
     private PublicRouteRenderService $publicRouteRenderService;
@@ -44,9 +43,8 @@ final class ProfileController
     ) {
         $this->context = $context;
         $this->groupRepo = $groupRepo;
-        $this->userRepo = $userRepo;
         $this->loginIdentifierResolver = new LoginIdentifierResolver();
-        $this->profileContactService = new UserParser($context->input());
+        $this->profileContactService = new UserParser($context->input(), $userRepo);
         $this->publicRouteRenderService = new PublicRouteRenderService();
         $this->publicTemplateDecorator = new PublicTemplateDecorator(
             $context->config(),
@@ -224,7 +222,7 @@ final class ProfileController
                 return null;
             }
 
-            return $this->userRepo->findPublicProfileById($userId);
+            return $this->profileContactService->findPublicProfileById($userId);
         }
 
         if ($selector === 'string') {
@@ -233,7 +231,7 @@ final class ProfileController
                 return null;
             }
 
-            return $this->userRepo->findPublicProfileByString($normalizedString);
+            return $this->profileContactService->findPublicProfileByString($normalizedString);
         }
 
         $normalizedUsername = $this->loginIdentifierResolver->normalizeUsernameOrEmail($this->context->input(), $routeSegment);
@@ -241,6 +239,6 @@ final class ProfileController
             return null;
         }
 
-        return $this->userRepo->findPublicProfileByUsername($normalizedUsername);
+        return $this->profileContactService->findPublicProfileByUsername($normalizedUsername);
     }
 }

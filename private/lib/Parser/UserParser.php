@@ -11,10 +11,12 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Parser;
 
+use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Security\InputSanitizer;
+use RuntimeException;
 
 /**
- * Shared profile-contact option normalization and social metadata helpers.
+ * Shared profile-contact normalization and repository-backed user read helper.
  */
 final class UserParser
 {
@@ -26,10 +28,99 @@ final class UserParser
     ];
 
     private InputSanitizer $input;
+    private ?UserRepository $userRepo;
 
-    public function __construct(InputSanitizer $input)
+    /**
+     * Prepares the user parser for contact normalization and optional user reads.
+     *
+     * @param InputSanitizer      $input    Shared input sanitizer for contact/profile value normalization.
+     * @param UserRepository|null $userRepo Optional user repository used for read-only user/profile lookups.
+     */
+    public function __construct(InputSanitizer $input, ?UserRepository $userRepo = null)
     {
         $this->input = $input;
+        $this->userRepo = $userRepo;
+    }
+
+    /**
+     * @return array<string, array{label: string, prefix: string}>
+     */
+    public function listAll(): array
+    {
+        return $this->userRepo()->listAll();
+    }
+
+    /**
+     * @return array{
+     *   group_rows: array<int, array<string, mixed>>,
+     *   user_rows: array<int, array<string, mixed>>
+     * }
+     */
+    public function listRoutingData(bool $includeGroups, bool $includeUsers): array
+    {
+        return $this->userRepo()->listRoutingData($includeGroups, $includeUsers);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findById(int $id): ?array
+    {
+        if ($id < 1) {
+            return null;
+        }
+
+        return $this->userRepo()->findById($id);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findPublicProfileByUsername(string $username): ?array
+    {
+        $normalizedUsername = trim($username);
+        if ($normalizedUsername === '') {
+            return null;
+        }
+
+        return $this->userRepo()->findPublicProfileByUsername($normalizedUsername);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findPublicProfileById(int $userId): ?array
+    {
+        if ($userId < 1) {
+            return null;
+        }
+
+        return $this->userRepo()->findPublicProfileById($userId);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findPublicProfileByString(string $userString): ?array
+    {
+        $normalizedString = trim($userString);
+        if ($normalizedString === '' || preg_match('/^[a-zA-Z0-9]+$/', $normalizedString) !== 1) {
+            return null;
+        }
+
+        return $this->userRepo()->findPublicProfileByString($normalizedString);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listPublicProfilesByGroupId(int $groupId): array
+    {
+        if ($groupId < 1) {
+            return [];
+        }
+
+        return $this->userRepo()->listPublicProfilesByGroupId($groupId);
     }
 
     /**
@@ -390,5 +481,17 @@ final class UserParser
         }
 
         return $candidate;
+    }
+
+    /**
+     * @return UserRepository
+     */
+    private function userRepo(): UserRepository
+    {
+        if (!$this->userRepo instanceof UserRepository) {
+            throw new RuntimeException('UserParser requires a UserRepository for repository-backed reads.');
+        }
+
+        return $this->userRepo;
     }
 }

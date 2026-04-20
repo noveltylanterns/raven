@@ -42,6 +42,8 @@ use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
 use Raven\Lib\Parser\ChannelParser;
 use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Parser\GroupParser;
+use Raven\Lib\Parser\PageParser;
+use Raven\Lib\Parser\UserParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\Transport\Upload;
@@ -102,6 +104,8 @@ final class SystemController
     private ?ChannelParser $channelParser = null;
     private ?FeedParser $feedParser = null;
     private ?GroupParser $groupParser = null;
+    private ?PageParser $pageParser = null;
+    private ?UserParser $userParser = null;
     private ?ExtensionCatalogService $extensionCatalogService = null;
     private ?PanelRoutingPreviewService $panelRoutingPreviewService = null;
     private ?ThemeCatalogService $themeCatalogService = null;
@@ -1693,7 +1697,7 @@ final class SystemController
 
         $groupRoutingEnabled = $groupRoutesEnabled && $groupPrefix !== '';
         $userRoutingEnabled = $profileRoutesEnabled && $profilePrefix !== '';
-        $routingAuthData = $this->userRepo->listRoutingData($groupRoutingEnabled, $userRoutingEnabled);
+        $routingAuthData = $this->userParser()->listRoutingData($groupRoutingEnabled, $userRoutingEnabled);
         $routingGroups = is_array($routingAuthData['group_rows'] ?? null) ? $routingAuthData['group_rows'] : [];
         $routingUsers = is_array($routingAuthData['user_rows'] ?? null) ? $routingAuthData['user_rows'] : [];
         $taxonomyRoutingOptionSets = $this->routingInventoryTaxonomyOptionSets($categoryPrefix, $tagPrefix);
@@ -1732,7 +1736,7 @@ final class SystemController
             'redirect_routing_rows' => is_array($taxonomyRoutingOptionSets['redirect_rows'] ?? null)
                 ? $taxonomyRoutingOptionSets['redirect_rows']
                 : [],
-            'pages_for_routing' => $this->pageRepo->listAllForRouting(),
+            'pages_for_routing' => $this->pageParser()->listAllForRouting(),
             'build_page_url' => fn (
                 string $pageSlug,
                 int $pageId,
@@ -2581,6 +2585,30 @@ final class SystemController
         }
 
         return $this->groupParser;
+    }
+
+    /**
+     * Returns the page parser on first use for routing inventory reads.
+     */
+    private function pageParser(): PageParser
+    {
+        if (!$this->pageParser instanceof PageParser) {
+            $this->pageParser = new PageParser($this->input, $this->pageRepo);
+        }
+
+        return $this->pageParser;
+    }
+
+    /**
+     * Returns the user parser on first use for routing inventory reads.
+     */
+    private function userParser(): UserParser
+    {
+        if (!$this->userParser instanceof UserParser) {
+            $this->userParser = new UserParser($this->input, $this->userRepo);
+        }
+
+        return $this->userParser;
     }
 
     /**

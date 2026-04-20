@@ -152,7 +152,8 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `ChannelContextParser` and `SetParser` own the channel/set record normalization policy plus the PHP-file-backed stores for `private/dat/channel/`, `private/dat/category-set/`, and `private/dat/tag-set/`.
   - `DuplicateParser` is the shared `(slug, channel)` uniqueness lookup helper for repositories.
   - `ConfigParser` owns dot-path config reads, scalar coercion, nested-form reads, and config-field stringification.
-  - `UserParser` owns read-only profile-contact normalization and related social metadata parsing.
+  - `UserParser` now pairs profile-contact normalization with repository-backed user/profile reads.
+  - `CategoryParser`, `TagParser`, and `PageParser` are the canonical read-side façades over category/tag/page repositories for public routing, panel lists, and other repository-backed lookup flows.
 - `private/lib/Scribe/`
   - Canonical write-side helpers that pair with the parser layer.
   - `ConfigScribe` owns nested config writes, single-key persistence, full-file `var_export` serialization, atomic save, stat-cache invalidation, and OPcache eviction. `sys/Config` remains read-only.

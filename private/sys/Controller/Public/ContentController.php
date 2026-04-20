@@ -24,6 +24,7 @@ use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeService;
 use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
+use Raven\Lib\Parser\PageParser;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Parser\UserParser;
 use Raven\Core\Routing\Public\PublicChannelPageRouteService;
@@ -42,9 +43,9 @@ final class ContentController
     private SharedController $context;
     private ChannelRepository $channelRepo;
     private PageImageRepository $pageImages;
-    private PageRepository $pageRepo;
+    private PageParser $pageParser;
     private RedirectRepository $redirectRepo;
-    private UserRepository $userRepo;
+    private UserParser $userParser;
     private Closure $extensionServicesProvider;
     /** @var array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> */
     private array $embeddedFormRuntimes = [];
@@ -86,9 +87,9 @@ final class ContentController
         $this->context = $context;
         $this->channelRepo = $channelRepo;
         $this->pageImages = $pageImages;
-        $this->pageRepo = $pageRepo;
+        $this->pageParser = new PageParser($context->input(), $pageRepo);
         $this->redirectRepo = $redirectRepo;
-        $this->userRepo = $userRepo;
+        $this->userParser = new UserParser($context->input(), $userRepo);
         $this->extensionServicesProvider = Closure::fromCallable($extensionServicesProvider);
     }
 
@@ -99,7 +100,7 @@ final class ContentController
      */
     public function home(): void
     {
-        $page = $this->pageRepo->findHomepage();
+        $page = $this->pageParser->findHomepage();
         if ($page === null) {
             $this->context->notFound();
             return;
@@ -127,7 +128,7 @@ final class ContentController
     {
         // findChannelHomepage() returns null when the channel does not exist, or a
         // ['channel' => ..., 'page' => ...] tuple — page is null when no homepage exists.
-        $result = $this->pageRepo->findChannelHomepage($channelSlug);
+        $result = $this->pageParser->findChannelHomepage($channelSlug);
         if ($result === null || $result['page'] === null) {
             $this->page($channelSlug, null);
             return;
@@ -229,9 +230,9 @@ final class ContentController
 
         $page = null;
         if (is_array($lookupTarget) && (string) ($lookupTarget['type'] ?? '') === 'id') {
-            $page = $this->pageRepo->findPublicPageById((int) ($lookupTarget['id'] ?? 0), $channelSlug);
+            $page = $this->pageParser->findPublicPageById((int) ($lookupTarget['id'] ?? 0), $channelSlug);
         } else {
-            $page = $this->pageRepo->findPublicPage($lookupSlug, $channelSlug);
+            $page = $this->pageParser->findPublicPage($lookupSlug, $channelSlug);
         }
 
         if ($page === null) {
@@ -292,7 +293,7 @@ final class ContentController
             $page,
             $this->context->siteData(),
             fn (int $pageId): ?string => $this->pageImages->coverImageUrlForPage($pageId),
-            fn (int $authorUserId): ?array => $this->userRepo->findById($authorUserId),
+            fn (int $authorUserId): ?array => $this->userParser->findById($authorUserId),
             $profileContactOptions
         );
     }

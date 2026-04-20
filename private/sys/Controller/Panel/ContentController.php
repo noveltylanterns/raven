@@ -30,10 +30,14 @@ use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\PageImageManager;
+use Raven\Lib\Parser\CategoryParser;
 use Raven\Lib\Parser\ChannelParser;
 use Raven\Lib\Parser\ModeParser;
+use Raven\Lib\Parser\PageParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Parser\SetParser;
+use Raven\Lib\Parser\TagParser;
+use Raven\Lib\Parser\UserParser;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorAuthor;
 use Raven\Lib\View\Panel\EditorBlocks;
@@ -70,15 +74,18 @@ final class ContentController
     /** @var Closure(): PageImageManager */
     private Closure $pageImageManagerResolver;
     private ?PageImageManager $pageImageManager = null;
+    private ?PageParser $pageParser = null;
     /** @var Closure(): CategoryRepository */
     private Closure $categoryRepoResolver;
     private ?CategoryRepository $categoryRepo = null;
+    private ?CategoryParser $categoryParser = null;
     /** @var Closure(): TaxonomySetRepository */
     private Closure $categorySetRepoResolver;
     private ?TaxonomySetRepository $categorySetRepo = null;
     /** @var Closure(): TagRepository */
     private Closure $tagRepoResolver;
     private ?TagRepository $tagRepo = null;
+    private ?TagParser $tagParser = null;
     /** @var Closure(): TaxonomySetRepository */
     private Closure $tagSetRepoResolver;
     private ?TaxonomySetRepository $tagSetRepo = null;
@@ -93,6 +100,7 @@ final class ContentController
     private ?PanelPost $panelPostNormalizer = null;
     private ?EditorAuthor $pageAuthorOptionBuilder = null;
     private ?LoginIdentifierResolver $identifierResolver = null;
+    private ?UserParser $userParser = null;
     private ?ExtensionStateStore $extensionStateStore = null;
     private ?ExtensionPermissionCatalogService $extensionPermissionCatalogService = null;
     private ?ExtensionCatalogService $extensionCatalogService = null;
@@ -194,7 +202,7 @@ final class ContentController
         }
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->pageRepo->listPageForPanel(
+        $pageResult = $this->pageParser()->listPageForPanel(
             $perPage,
             ($requestedPage - 1) * $perPage,
             $prefilterChannel !== '' ? $prefilterChannel : null,
@@ -205,7 +213,7 @@ final class ContentController
         $pageRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->pageRepo->listPageForPanel(
+            $pageResult = $this->pageParser()->listPageForPanel(
                 $perPage,
                 $pagination['offset'],
                 $prefilterChannel !== '' ? $prefilterChannel : null,
@@ -272,7 +280,7 @@ final class ContentController
         $page = null;
         $galleryImages = [];
         if ($id !== null) {
-            $editData = $this->pageRepo->editFormDataById($id);
+            $editData = $this->pageParser()->editFormDataById($id);
             if (is_array($editData)) {
                 $page = is_array($editData['page'] ?? null) ? $editData['page'] : null;
                 $galleryImages = is_array($editData['gallery_images'] ?? null) ? $editData['gallery_images'] : [];
@@ -408,7 +416,7 @@ final class ContentController
         $galleryEnabled = $this->pageBodyBlocksIncludeGallery($contentBlocks)
             || (isset($post['gallery_enabled']) && (string) $post['gallery_enabled'] === '1');
         $authorUserId = $this->input->int($post['author_user_id'] ?? null, 1);
-        if ($authorUserId !== null && $this->userRepo->findById($authorUserId) === null) {
+        if ($authorUserId !== null && $this->userParser()->findById($authorUserId) === null) {
             $this->context->flash('error', 'Selected author account was not found.');
             Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
         }
@@ -449,8 +457,8 @@ final class ContentController
         }
 
         // Only keep ids that currently exist, preventing stale/manual post values.
-        $categoryIds = $categoryEnabled ? $this->categoryRepo()->existingIds($categoryIds) : [];
-        $tagIds = $tagEnabled ? $this->tagRepo()->existingIds($tagIds) : [];
+        $categoryIds = $categoryEnabled ? $this->categoryParser()->existingIds($categoryIds) : [];
+        $tagIds = $tagEnabled ? $this->tagParser()->existingIds($tagIds) : [];
         $channelRecord = $channelSlug !== null && $channelSlug !== ''
             ? $this->channelRepo->findBySlug($channelSlug)
             : null;
@@ -458,7 +466,7 @@ final class ContentController
         $allowedTagSets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'tag');
 
         if ($categoryEnabled && !$this->selectionAllowsAllSets($allowedCategorySets)) {
-            $categorySetIdsById = $this->categoryRepo()->setIdsByIds($categoryIds);
+            $categorySetIdsById = $this->categoryParser()->setIdsByIds($categoryIds);
             foreach ($categorySetIdsById as $setId) {
                 if (!in_array($setId, $allowedCategorySets, true)) {
                     $this->context->flash('error', 'One or more selected categories are outside the allowed sets for this channel.');
@@ -468,7 +476,7 @@ final class ContentController
         }
 
         if ($tagEnabled && !$this->selectionAllowsAllSets($allowedTagSets)) {
-            $tagSetIdsById = $this->tagRepo()->setIdsByIds($tagIds);
+            $tagSetIdsById = $this->tagParser()->setIdsByIds($tagIds);
             foreach ($tagSetIdsById as $setId) {
                 if (!in_array($setId, $allowedTagSets, true)) {
                     $this->context->flash('error', 'One or more selected tags are outside the allowed sets for this channel.');
@@ -828,6 +836,18 @@ final class ContentController
     }
 
     /**
+     * @return CategoryParser
+     */
+    private function categoryParser(): CategoryParser
+    {
+        if (!$this->categoryParser instanceof CategoryParser) {
+            $this->categoryParser = new CategoryParser($this->input, $this->categoryRepo());
+        }
+
+        return $this->categoryParser;
+    }
+
+    /**
      * Returns the category-set repository on first use so non-taxonomy routes
      * do not instantiate file-backed taxonomy set storage.
      *
@@ -867,6 +887,18 @@ final class ContentController
 
         $this->tagRepo = $tagRepo;
         return $this->tagRepo;
+    }
+
+    /**
+     * @return TagParser
+     */
+    private function tagParser(): TagParser
+    {
+        if (!$this->tagParser instanceof TagParser) {
+            $this->tagParser = new TagParser($this->input, $this->tagRepo());
+        }
+
+        return $this->tagParser;
     }
 
     /**
@@ -1421,7 +1453,7 @@ final class ContentController
     private function pageAuthorOptions(): array
     {
         return $this->pageAuthorOptionBuilder()->build(
-            $this->userRepo->listAll(),
+            $this->userParser()->listAll(),
             $this->input,
             fn (string $value): ?string => $this->normalizeUserIdentifierValue($value)
         );
@@ -1436,6 +1468,30 @@ final class ContentController
     private function normalizeUserIdentifierValue(string $rawValue): ?string
     {
         return $this->identifierResolver()->normalizeUsernameOrEmail($this->input, $rawValue);
+    }
+
+    /**
+     * @return PageParser
+     */
+    private function pageParser(): PageParser
+    {
+        if (!$this->pageParser instanceof PageParser) {
+            $this->pageParser = new PageParser($this->input, $this->pageRepo);
+        }
+
+        return $this->pageParser;
+    }
+
+    /**
+     * @return UserParser
+     */
+    private function userParser(): UserParser
+    {
+        if (!$this->userParser instanceof UserParser) {
+            $this->userParser = new UserParser($this->input, $this->userRepo);
+        }
+
+        return $this->userParser;
     }
 
     // -------------------------------------------------------------------------

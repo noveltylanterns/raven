@@ -15,6 +15,7 @@ use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Routing\Public\PublicChannelPageRouteService;
+use Raven\Lib\Parser\PageParser;
 use Raven\Lib\View\Public\PublicTemplateDecorator;
 use Raven\Lib\View\Public\PublicTemplatePipeline;
 use Raven\Lib\View\Public\PublicTemplateResolver;
@@ -27,7 +28,7 @@ final class FeedController
 {
     private SharedController $context;
     private ChannelRepository $channelRepo;
-    private PageRepository $pageRepo;
+    private PageParser $pageParser;
     private TaxonomyLookupRepository $taxonomyLookupRepo;
     private PublicTemplateDecorator $publicTemplateDecorator;
     private PublicChannelPageRouteService $publicChannelPageRouteService;
@@ -50,7 +51,7 @@ final class FeedController
     ) {
         $this->context = $context;
         $this->channelRepo = $channelRepo;
-        $this->pageRepo = $pageRepo;
+        $this->pageParser = new PageParser($context->input(), $pageRepo);
         $this->taxonomyLookupRepo = $taxonomyLookupRepo;
         $this->publicTemplateDecorator = new PublicTemplateDecorator(
             $context->config(),
@@ -89,7 +90,7 @@ final class FeedController
         $perPage = max(1, (int) $this->context->config()->get('category.pagination', 10));
         $pageNumber = max(1, $pageNumber);
         $offset = ($pageNumber - 1) * $perPage;
-        $pageResult = $this->pageRepo->listPageByCategorySlug($categorySlug, $perPage, $offset);
+        $pageResult = $this->pageParser->listPageByCategorySlug($categorySlug, $perPage, $offset);
         $total = (int) ($pageResult['total'] ?? 0);
         $totalPages = max(1, (int) ceil($total / $perPage));
 
@@ -146,7 +147,7 @@ final class FeedController
         $perPage = max(1, (int) $this->context->config()->get('tag.pagination', 10));
         $pageNumber = max(1, $pageNumber);
         $offset = ($pageNumber - 1) * $perPage;
-        $pageResult = $this->pageRepo->listPageByTagSlug($tagSlug, $perPage, $offset);
+        $pageResult = $this->pageParser->listPageByTagSlug($tagSlug, $perPage, $offset);
         $total = (int) ($pageResult['total'] ?? 0);
         $totalPages = max(1, (int) ceil($total / $perPage));
 
@@ -291,10 +292,10 @@ final class FeedController
             $scopeLabel = $this->feedChannelLabel($feedChannelSlug);
             $scopeType = 'channel';
             $scopeSlug = $feedChannelSlug;
-            $pages = $this->pageRepo->listRecentPublished($feedParser->feedItems(), $feedChannelSlug);
+            $pages = $this->pageParser->listRecentPublished($feedParser->feedItems(), $feedChannelSlug);
         } else {
             if (in_array('all', $configuredFeedChannels, true)) {
-                $pages = $this->pageRepo->listRecentPublished($feedParser->feedItems(), null);
+                $pages = $this->pageParser->listRecentPublished($feedParser->feedItems(), null);
             } else {
                 $selectedFeedChannels = array_values(array_filter(
                     $configuredFeedChannels,
@@ -310,7 +311,7 @@ final class FeedController
                     $scopeType = 'channels';
                 }
 
-                $pages = $this->pageRepo->listRecentPublishedForChannels(
+                $pages = $this->pageParser->listRecentPublishedForChannels(
                     $feedParser->feedItems(),
                     $selectedFeedChannels
                 );
@@ -388,7 +389,7 @@ final class FeedController
                 return;
             }
 
-            $pageResult = $this->pageRepo->listPageByCategorySlug($normalizedSlug, $feedParser->feedItems(), 0);
+            $pageResult = $this->pageParser->listPageByCategorySlug($normalizedSlug, $feedParser->feedItems(), 0);
             $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
             $scopeLabel = $this->taxonomyFeedLabel($category, $normalizedSlug);
             $routeSuffix = [$categoryPrefix, $normalizedSlug];
@@ -405,7 +406,7 @@ final class FeedController
                 return;
             }
 
-            $pageResult = $this->pageRepo->listPageByTagSlug($normalizedSlug, $feedParser->feedItems(), 0);
+            $pageResult = $this->pageParser->listPageByTagSlug($normalizedSlug, $feedParser->feedItems(), 0);
             $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
             $scopeLabel = $this->taxonomyFeedLabel($tag, $normalizedSlug);
             $routeSuffix = [$tagPrefix, $normalizedSlug];
