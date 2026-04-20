@@ -12,6 +12,7 @@ declare(strict_types=1);
 use Raven\Ext\Cron\CronTaskService;
 use Raven\Core\Routing\Router;
 use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
+use Raven\Lib\View\Panel\EditorBlocks;
 
 use Raven\Lib\Transport\Redirect;
 
@@ -238,6 +239,9 @@ return static function (Router $router, array $context): void {
         $csrfField = $rvn['csrf']->field();
         $schedulerAvailable = ($rvn['scheduler'] ?? null) instanceof SchedulerRegistry;
         $storagePath = $service->storagePath();
+        $editorBlocks = ($rvn['panel_editor_blocks'] ?? null) instanceof EditorBlocks
+            ? $rvn['panel_editor_blocks']
+            : new EditorBlocks();
 
         ob_start();
         require $viewFile;

@@ -36,6 +36,7 @@ use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Directory\SetContext;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorAuthor;
+use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorMCE;
 use Raven\Lib\View\Panel\EditorMDE;
 use Raven\Lib\View\Panel\PanelPost;
@@ -63,6 +64,7 @@ final class ContentController
     private Route $routeConfigService;
     private EditorTabs $editorTabs;
     private Editor $editor;
+    private EditorBlocks $editorBlocks;
     private EditorMCE $editorMce;
     private EditorMDE $editorMde;
     /** @var Closure(): PageImageManager */
@@ -115,6 +117,7 @@ final class ContentController
      * @param Route $routeConfigService Route configuration service for route-mode and separator helpers.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor utility methods (body-text editor normalization).
+     * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param EditorMCE $editorMce TinyMCE-specific helpers for asset URL and gallery-item payload building.
      * @param EditorMDE $editorMde EasyMDE-specific helpers for asset URLs and JS fallback path lists.
      * @param callable $extensionServicesFor Extension services resolver used to load per-extension shortcode and body-block contributions.
@@ -137,6 +140,7 @@ final class ContentController
         Route $routeConfigService,
         EditorTabs $editorTabs,
         Editor $editor,
+        EditorBlocks $editorBlocks,
         EditorMCE $editorMce,
         EditorMDE $editorMde,
         callable $extensionServicesFor
@@ -157,6 +161,7 @@ final class ContentController
         $this->routeConfigService = $routeConfigService;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
+        $this->editorBlocks = $editorBlocks;
         $this->editorMce = $editorMce;
         $this->editorMde = $editorMde;
         $this->extensionServicesFor = Closure::fromCallable($extensionServicesFor);
@@ -358,6 +363,7 @@ final class ContentController
             ),
             'bodyBlockTypeDefinitions' => $this->pageEditorBodyBlockTypeDefinitions(),
             'shortcodeInsertItems' => $this->pageEditorInsertableShortcodes(),
+            'editorBlocks' => $this->editorBlocks,
             'activeTab' => $activeTab,
             'csrfField' => $this->context->csrfField(),
             'flashSuccess' => $this->context->pullFlash('success'),

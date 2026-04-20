@@ -27,6 +27,7 @@
 /** @var string $avatarUploadLimitsNote */
 /** @var string $coverImageUrl */
 /** @var int $bioMaxLength */
+/** @var \Raven\Lib\View\Panel\EditorBlocks $editorBlocks */
 /** @var string $csrfField */
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
@@ -35,6 +36,9 @@ use function Raven\Lib\Extra\e;
 use Raven\Lib\Auth\Panel\PanelAccess;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
+$editorBlocks = ($editorBlocks ?? null) instanceof \Raven\Lib\View\Panel\EditorBlocks
+    ? $editorBlocks
+    : new \Raven\Lib\View\Panel\EditorBlocks();
 $loginIdentifierMode = (string) ($loginIdentifierMode ?? 'email');
 $usernameRequiredForAuth = $loginIdentifierMode === 'username';
 // Shared create/edit derivations keep template branching shallow.
@@ -169,6 +173,8 @@ usort($twoFactorMethods, static function (array $left, array $right): int {
 
     return ((int) ($left['existing_index'] ?? 0)) <=> ((int) ($right['existing_index'] ?? 0));
 });
+$contactBlockLayout = $editorBlocks->layout('contact');
+$securityBlockLayout = $editorBlocks->layout('security');
 $normalizedDomain = trim((string) ($site['domain'] ?? ''));
 $publicBase = $normalizedDomain;
 if ($publicBase !== '' && !preg_match('#^https?://#i', $publicBase)) {
@@ -493,7 +499,7 @@ $themeLabels = [
                         $contactType = (string) ($contactProfile['type'] ?? '');
                         $contactValue = (string) ($contactProfile['value'] ?? '');
                         ?>
-                        <div class="border rounded p-2 mb-2" data-user-contact-row="1">
+                        <div class="<?= e($contactBlockLayout['row_class']) ?>" data-user-contact-row="1">
                             <div class="row g-2 align-items-end">
                                 <div class="col-md-4">
                                     <label class="form-label">Type</label>
@@ -528,7 +534,7 @@ $themeLabels = [
                                     </div>
                                 </div>
                                 <div class="col-auto ps-md-0 d-flex align-items-end">
-                                    <button type="button" class="btn btn-danger ms-2" data-user-contact-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                                    <button type="button" class="<?= e($contactBlockLayout['remove_button_class']) ?>" data-user-contact-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
                                 </div>
                             </div>
                         </div>
@@ -595,7 +601,7 @@ $themeLabels = [
                             $methodDetail = trim((string) ($method['detail'] ?? ''));
                             $methodDescription = trim($methodStatus . ($methodDetail !== '' ? ' | ' . $methodDetail : ''));
                             ?>
-                            <div class="border rounded p-2 mb-2" data-preferences-two-factor-row="1" data-user-two-factor-row="1">
+                            <div class="<?= e($securityBlockLayout['row_class']) ?>" data-preferences-two-factor-row="1" data-user-two-factor-row="1">
                                 <input
                                     type="hidden"
                                     data-user-two-factor-key="existing_index"
@@ -616,7 +622,7 @@ $themeLabels = [
                                         <input type="text" class="form-control" value="<?= e($methodDescription) ?>" placeholder="Configured method" disabled>
                                     </div>
                                     <div class="col-auto ps-md-0 d-flex align-items-end">
-                                        <button type="button" class="btn btn-danger" data-user-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                                        <button type="button" class="<?= e($securityBlockLayout['compact_remove_button_class']) ?>" data-user-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
                                     </div>
                                 </div>
                             </div>
@@ -714,7 +720,7 @@ $themeLabels = [
 
 <?php if ($profileContactOptions !== []): ?>
 <template id="user-contact-profile-template">
-    <div class="border rounded p-2 mb-2" data-user-contact-row="1">
+    <div class="<?= e($contactBlockLayout['row_class']) ?>" data-user-contact-row="1">
         <div class="row g-2 align-items-end">
             <div class="col-md-4">
                 <label class="form-label">Type</label>
@@ -739,144 +745,53 @@ $themeLabels = [
                 </div>
             </div>
             <div class="col-auto ps-md-0 d-flex align-items-end">
-                <button type="button" class="btn btn-danger ms-2" data-user-contact-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                <button type="button" class="<?= e($contactBlockLayout['remove_button_class']) ?>" data-user-contact-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
             </div>
         </div>
     </div>
 </template>
-<script>
-  (function () {
-    var list = document.getElementById('user-contact-profiles-list');
-    var addButton = document.getElementById('user-contact-profiles-add');
-    var template = document.getElementById('user-contact-profile-template');
-
-    if (!(list instanceof HTMLElement) || !(addButton instanceof HTMLButtonElement) || !(template instanceof HTMLTemplateElement)) {
-      return;
-    }
-
-    function reindexRows() {
-      var rows = list.querySelectorAll('[data-user-contact-row="1"]');
-      rows.forEach(function (row, index) {
-        if (!(row instanceof HTMLElement)) {
-          return;
-        }
-        var typeField = row.querySelector('[data-user-contact-key="type"]');
-        var valueField = row.querySelector('[data-user-contact-key="value"]');
-        if (typeField instanceof HTMLSelectElement) {
-          typeField.name = 'contact_profiles[' + index + '][type]';
-        }
-        if (valueField instanceof HTMLInputElement) {
-          valueField.name = 'contact_profiles[' + index + '][value]';
-        }
-        syncPrefixAddon(row);
-      });
-    }
-
-    function syncPrefixAddon(row) {
-      if (!(row instanceof HTMLElement)) {
-        return;
-      }
-      var typeField = row.querySelector('[data-user-contact-key="type"]');
-      var prefixAddon = row.querySelector('[data-user-contact-prefix-addon="1"]');
-      if (!(typeField instanceof HTMLSelectElement) || !(prefixAddon instanceof HTMLElement)) {
-        return;
-      }
-      var option = typeField.options[typeField.selectedIndex];
-      var prefix = option instanceof HTMLOptionElement ? String(option.getAttribute('data-url-prefix') || '').trim() : '';
-      if (prefix === '') {
-        prefixAddon.textContent = '';
-        prefixAddon.classList.add('d-none');
-        return;
-      }
-      prefixAddon.textContent = prefix;
-      prefixAddon.classList.remove('d-none');
-    }
-
-    function appendRow() {
-      var fragment = template.content.cloneNode(true);
-      list.appendChild(fragment);
-      reindexRows();
-    }
-
-    addButton.addEventListener('click', function () {
-      appendRow();
-    });
-
-    list.addEventListener('change', function (event) {
-      var target = event.target;
-      if (!(target instanceof HTMLSelectElement) || target.getAttribute('data-user-contact-key') !== 'type') {
-        return;
-      }
-      var row = target.closest('[data-user-contact-row="1"]');
-      syncPrefixAddon(row);
-    });
-
-    list.addEventListener('click', function (event) {
-      var target = event.target;
-      if (!(target instanceof Element)) {
-        return;
-      }
-      var removeButton = target.closest('[data-user-contact-remove="1"]');
-      if (!(removeButton instanceof HTMLElement)) {
-        return;
-      }
-      var row = removeButton.closest('[data-user-contact-row="1"]');
-      if (!(row instanceof HTMLElement)) {
-        return;
-      }
-      row.remove();
-      reindexRows();
-    });
-
-    reindexRows();
-  })();
-</script>
 <?php endif; ?>
 
-<script>
-  (function () {
-    var list = document.getElementById('user-two-factor-methods-list');
-    if (!(list instanceof HTMLElement)) {
-      return;
-    }
-
-    function reindexRows() {
-      var rows = list.querySelectorAll('[data-user-two-factor-row="1"]');
-      rows.forEach(function (row, index) {
-        if (!(row instanceof HTMLElement)) {
-          return;
-        }
-
-        var indexField = row.querySelector('[data-user-two-factor-key="existing_index"]');
-        if (indexField instanceof HTMLInputElement) {
-          indexField.name = 'two_factor_methods[' + index + '][existing_index]';
-        }
-      });
-    }
-
-    list.addEventListener('click', function (event) {
-      var target = event.target;
-      if (!(target instanceof Element)) {
-        return;
-      }
-
-      var removeButton = target.closest('[data-user-two-factor-remove="1"]');
-      if (!(removeButton instanceof HTMLElement)) {
-        return;
-      }
-
-      var row = removeButton.closest('[data-user-two-factor-row="1"]');
-      if (!(row instanceof HTMLElement)) {
-        return;
-      }
-
-      row.remove();
-      reindexRows();
-    });
-
-    reindexRows();
-  })();
-</script>
+<?php
+$editorBlocksBoot = [];
+if ($profileContactOptions !== []) {
+    $editorBlocksBoot[] = [
+        'list_id' => 'user-contact-profiles-list',
+        'template_id' => 'user-contact-profile-template',
+        'add_button_id' => 'user-contact-profiles-add',
+        'row_selector' => '[data-user-contact-row="1"]',
+        'remove_selector' => '[data-user-contact-remove="1"]',
+        'fields' => [
+            ['selector' => '[data-user-contact-key="type"]', 'name' => 'contact_profiles[{index}][type]'],
+            ['selector' => '[data-user-contact-key="value"]', 'name' => 'contact_profiles[{index}][value]'],
+        ],
+        'reindex_sync' => [
+            [
+                'action' => 'select-prefix',
+                'select_selector' => '[data-user-contact-key="type"]',
+                'addon_selector' => '[data-user-contact-prefix-addon="1"]',
+            ],
+        ],
+        'change_sync' => [
+            [
+                'action' => 'select-prefix',
+                'selector' => '[data-user-contact-key="type"]',
+                'select_selector' => '[data-user-contact-key="type"]',
+                'addon_selector' => '[data-user-contact-prefix-addon="1"]',
+            ],
+        ],
+    ];
+}
+$editorBlocksBoot[] = [
+    'list_id' => 'user-two-factor-methods-list',
+    'row_selector' => '[data-user-two-factor-row="1"]',
+    'remove_selector' => '[data-user-two-factor-remove="1"]',
+    'fields' => [
+        ['selector' => '[data-user-two-factor-key="existing_index"]', 'name' => 'two_factor_methods[{index}][existing_index]'],
+    ],
+];
+require dirname(__DIR__) . '/partial/editor_blocks.php';
+?>
 
 <script>
   (function () {

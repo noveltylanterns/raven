@@ -26,6 +26,7 @@ use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\View\Panel\Editor;
+use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\PanelMediaConfigService;
 use Raven\Lib\Profile\ProfileContactService;
@@ -56,6 +57,7 @@ final class UserController
     private LoginIdentifierResolver $loginIdentifierResolver;
     private EditorTabs $editorTabs;
     private Editor $editor;
+    private EditorBlocks $editorBlocks;
     private PanelMediaConfigService $panelMediaConfigService;
     private ProfileContactService $profileContactService;
     private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
@@ -76,6 +78,7 @@ final class UserController
      * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
      * @param Editor $editor Shared panel editor utility methods (theme normalization).
+     * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param PanelMediaConfigService $panelMediaConfigService Shared media-limit helper.
      * @param ProfileContactService $profileContactService Shared profile-contact normalizer.
      * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA list normalizer.
@@ -97,6 +100,7 @@ final class UserController
         LoginIdentifierResolver $loginIdentifierResolver,
         EditorTabs $editorTabs,
         Editor $editor,
+        EditorBlocks $editorBlocks,
         PanelMediaConfigService $panelMediaConfigService,
         ProfileContactService $profileContactService,
         PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,
@@ -116,6 +120,7 @@ final class UserController
         $this->loginIdentifierResolver = $loginIdentifierResolver;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
+        $this->editorBlocks = $editorBlocks;
         $this->panelMediaConfigService = $panelMediaConfigService;
         $this->profileContactService = $profileContactService;
         $this->panelTwoFactorPreferencesService = $panelTwoFactorPreferencesService;
@@ -233,6 +238,7 @@ final class UserController
             'canAssignAdmin' => $actorIsAdmin,
             'canAssignConfigurationGroups' => $actorIsAdmin,
             'themeOptions' => ['default', 'corp', 'ice', 'midnight'],
+            'editorBlocks' => $this->editorBlocks,
             'activeTab' => $activeTab,
             'csrfField' => $this->context->csrfField(),
             'flashSuccess' => $this->context->pullFlash('success'),

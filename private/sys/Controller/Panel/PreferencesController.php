@@ -22,6 +22,7 @@ use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\View\Panel\Editor;
+use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\PanelMediaConfigService;
 use Raven\Lib\Profile\ProfileContactService;
@@ -46,6 +47,7 @@ final class PreferencesController
     private LoginIdentifierResolver $loginIdentifierResolver;
     private EditorTabs $editorTabs;
     private Editor $editor;
+    private EditorBlocks $editorBlocks;
     private PanelMediaConfigService $panelMediaConfigService;
     private ProfileContactService $profileContactService;
     private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
@@ -61,6 +63,7 @@ final class PreferencesController
      * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
      * @param Editor $editor Shared panel editor utility methods (theme normalization).
+     * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param PanelMediaConfigService $panelMediaConfigService Shared media-limit helper.
      * @param ProfileContactService $profileContactService Shared profile-contact normalizer.
      * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA helper set.
@@ -77,6 +80,7 @@ final class PreferencesController
         LoginIdentifierResolver $loginIdentifierResolver,
         EditorTabs $editorTabs,
         Editor $editor,
+        EditorBlocks $editorBlocks,
         PanelMediaConfigService $panelMediaConfigService,
         ProfileContactService $profileContactService,
         PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,
@@ -91,6 +95,7 @@ final class PreferencesController
         $this->loginIdentifierResolver = $loginIdentifierResolver;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
+        $this->editorBlocks = $editorBlocks;
         $this->panelMediaConfigService = $panelMediaConfigService;
         $this->profileContactService = $profileContactService;
         $this->panelTwoFactorPreferencesService = $panelTwoFactorPreferencesService;
@@ -138,6 +143,7 @@ final class PreferencesController
             'avatarTemplateData' => $this->avatarTemplateData((string) ($preferences['avatar'] ?? '')),
             'avatarUploadLimitsNote' => $this->avatarUploadLimitsNote(),
             'coverImageUrl' => $this->coverPublicUrl((string) ($preferences['cover_image'] ?? '')),
+            'editorBlocks' => $this->editorBlocks,
             'activeTab' => $activeTab,
             'section' => 'preferences',
             'csrfField' => $this->context->csrfField(),

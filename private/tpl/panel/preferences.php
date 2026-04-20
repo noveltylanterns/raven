@@ -22,10 +22,14 @@
 /** @var string $avatarUploadLimitsNote */
 /** @var string $coverImageUrl */
 /** @var int $bioMaxLength */
+/** @var \Raven\Lib\View\Panel\EditorBlocks $editorBlocks */
 
 use function Raven\Lib\Extra\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
+$editorBlocks = ($editorBlocks ?? null) instanceof \Raven\Lib\View\Panel\EditorBlocks
+    ? $editorBlocks
+    : new \Raven\Lib\View\Panel\EditorBlocks();
 $loginIdentifierMode = strtolower(trim((string) ($loginIdentifierMode ?? 'email')));
 if (!in_array($loginIdentifierMode, ['email', 'username'], true)) {
     $loginIdentifierMode = 'email';
@@ -64,6 +68,8 @@ foreach ($contactProfilesRaw as $entry) {
         'value' => $value,
     ];
 }
+$contactBlockLayout = $editorBlocks->layout('contact');
+$securityBlockLayout = $editorBlocks->layout('security');
 $activeTab = (string) ($activeTab ?? 'account');
 $twoFactorMethodsRaw = is_array($preferences['two_factor'] ?? null) ? $preferences['two_factor'] : [];
 $twoFactorMethods = [];
@@ -140,7 +146,7 @@ $themeLabels = [
 
 <template id="preferences-two-factor-template">
     <div
-        class="border rounded p-2 mb-2"
+        class="<?= e($securityBlockLayout['row_class']) ?>"
         data-preferences-two-factor-row="1"
         data-preferences-two-factor-status=""
         data-preferences-totp-provisioning-uri=""
@@ -248,7 +254,7 @@ $themeLabels = [
                 >Generate a phrase and click it to copy.</div>
             </div>
             <div class="col-auto ps-md-0 d-flex align-items-end">
-                <button type="button" class="btn btn-danger btn-sm" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                <button type="button" class="<?= e($securityBlockLayout['compact_remove_button_class']) ?>" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
             </div>
         </div>
     </div>
@@ -1740,7 +1746,7 @@ $themeLabels = [
                         $contactType = (string) ($contactProfile['type'] ?? '');
                         $contactValue = (string) ($contactProfile['value'] ?? '');
                         ?>
-                        <div class="border rounded p-2 mb-2" data-preferences-contact-row="1">
+                        <div class="<?= e($contactBlockLayout['row_class']) ?>" data-preferences-contact-row="1">
                             <div class="row g-2 align-items-end pb-4">
                                 <div class="col-md-4">
                                     <label class="form-label">Type</label>
@@ -1775,7 +1781,7 @@ $themeLabels = [
                                     </div>
                                 </div>
                                 <div class="col-auto ps-md-0 d-flex align-items-end">
-                                    <button type="button" class="btn btn-danger ms-2" data-preferences-contact-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                                    <button type="button" class="<?= e($contactBlockLayout['remove_button_class']) ?>" data-preferences-contact-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
                                 </div>
                             </div>
                         </div>
@@ -1852,7 +1858,7 @@ $themeLabels = [
                         };
                         ?>
                         <div
-                            class="border rounded p-2 mb-2"
+                            class="<?= e($securityBlockLayout['row_class']) ?>"
                             data-preferences-two-factor-row="1"
                             data-preferences-two-factor-status="<?= e($methodStatus) ?>"
                             data-preferences-totp-provisioning-uri="<?= e($methodProvisioningUri) ?>"
@@ -2035,7 +2041,7 @@ $themeLabels = [
                                     ><?= e($methodRecoveryHint) ?></div>
                                 </div>
                                 <div class="col-auto ps-md-0 d-flex align-items-end">
-                                    <button type="button" class="btn btn-danger btn-sm" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                                    <button type="button" class="<?= e($securityBlockLayout['compact_remove_button_class']) ?>" data-preferences-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
                                 </div>
                             </div>
                         </div>
@@ -2123,7 +2129,7 @@ $themeLabels = [
 
 <?php if ($profileContactOptions !== []): ?>
 <template id="preferences-contact-profile-template">
-    <div class="border rounded p-2 mb-2" data-preferences-contact-row="1">
+    <div class="<?= e($contactBlockLayout['row_class']) ?>" data-preferences-contact-row="1">
         <div class="row g-2 align-items-end">
             <div class="col-md-4">
                 <label class="form-label">Type</label>
@@ -2148,96 +2154,42 @@ $themeLabels = [
                 </div>
             </div>
             <div class="col-auto pe-md-0 d-flex align-items-end">
-                <button type="button" class="btn btn-danger ms-2" data-preferences-contact-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                <button type="button" class="<?= e($contactBlockLayout['remove_button_class']) ?>" data-preferences-contact-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
             </div>
         </div>
     </div>
 </template>
-<script>
-  (function () {
-    var list = document.getElementById('preferences-contact-profiles-list');
-    var addButton = document.getElementById('preferences-contact-profiles-add');
-    var template = document.getElementById('preferences-contact-profile-template');
-
-    if (!(list instanceof HTMLElement) || !(addButton instanceof HTMLButtonElement) || !(template instanceof HTMLTemplateElement)) {
-      return;
-    }
-
-    function reindexRows() {
-      var rows = list.querySelectorAll('[data-preferences-contact-row="1"]');
-      rows.forEach(function (row, index) {
-        if (!(row instanceof HTMLElement)) {
-          return;
-        }
-        var typeField = row.querySelector('[data-preferences-contact-key="type"]');
-        var valueField = row.querySelector('[data-preferences-contact-key="value"]');
-        if (typeField instanceof HTMLSelectElement) {
-          typeField.name = 'contact_profiles[' + index + '][type]';
-        }
-        if (valueField instanceof HTMLInputElement) {
-          valueField.name = 'contact_profiles[' + index + '][value]';
-        }
-        syncPrefixAddon(row);
-      });
-    }
-
-    function syncPrefixAddon(row) {
-      if (!(row instanceof HTMLElement)) {
-        return;
-      }
-      var typeField = row.querySelector('[data-preferences-contact-key="type"]');
-      var prefixAddon = row.querySelector('[data-preferences-contact-prefix-addon="1"]');
-      if (!(typeField instanceof HTMLSelectElement) || !(prefixAddon instanceof HTMLElement)) {
-        return;
-      }
-      var option = typeField.options[typeField.selectedIndex];
-      var prefix = option instanceof HTMLOptionElement ? String(option.getAttribute('data-url-prefix') || '').trim() : '';
-      if (prefix === '') {
-        prefixAddon.textContent = '';
-        prefixAddon.classList.add('d-none');
-        return;
-      }
-      prefixAddon.textContent = prefix;
-      prefixAddon.classList.remove('d-none');
-    }
-
-    function appendRow() {
-      var fragment = template.content.cloneNode(true);
-      list.appendChild(fragment);
-      reindexRows();
-    }
-
-    addButton.addEventListener('click', function () {
-      appendRow();
-    });
-
-    list.addEventListener('change', function (event) {
-      var target = event.target;
-      if (!(target instanceof HTMLSelectElement) || target.getAttribute('data-preferences-contact-key') !== 'type') {
-        return;
-      }
-      var row = target.closest('[data-preferences-contact-row="1"]');
-      syncPrefixAddon(row);
-    });
-
-    list.addEventListener('click', function (event) {
-      var target = event.target;
-      if (!(target instanceof Element)) {
-        return;
-      }
-      var removeButton = target.closest('[data-preferences-contact-remove="1"]');
-      if (!(removeButton instanceof HTMLElement)) {
-        return;
-      }
-      var row = removeButton.closest('[data-preferences-contact-row="1"]');
-      if (!(row instanceof HTMLElement)) {
-        return;
-      }
-      row.remove();
-      reindexRows();
-    });
-
-    reindexRows();
-  })();
-</script>
 <?php endif; ?>
+
+<?php
+$editorBlocksBoot = [];
+if ($profileContactOptions !== []) {
+    $editorBlocksBoot[] = [
+        'list_id' => 'preferences-contact-profiles-list',
+        'template_id' => 'preferences-contact-profile-template',
+        'add_button_id' => 'preferences-contact-profiles-add',
+        'row_selector' => '[data-preferences-contact-row="1"]',
+        'remove_selector' => '[data-preferences-contact-remove="1"]',
+        'fields' => [
+            ['selector' => '[data-preferences-contact-key="type"]', 'name' => 'contact_profiles[{index}][type]'],
+            ['selector' => '[data-preferences-contact-key="value"]', 'name' => 'contact_profiles[{index}][value]'],
+        ],
+        'reindex_sync' => [
+            [
+                'action' => 'select-prefix',
+                'select_selector' => '[data-preferences-contact-key="type"]',
+                'addon_selector' => '[data-preferences-contact-prefix-addon="1"]',
+            ],
+        ],
+        'change_sync' => [
+            [
+                'action' => 'select-prefix',
+                'selector' => '[data-preferences-contact-key="type"]',
+                'select_selector' => '[data-preferences-contact-key="type"]',
+                'addon_selector' => '[data-preferences-contact-prefix-addon="1"]',
+            ],
+        ],
+    ];
+}
+require __DIR__ . '/partial/editor_blocks.php';
+?>

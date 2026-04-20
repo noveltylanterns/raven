@@ -32,9 +32,13 @@ declare(strict_types=1);
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 /** @var string $csrfField */
+/** @var \Raven\Lib\View\Panel\EditorBlocks $editorBlocks */
 
 use function Raven\Lib\Extra\e;
 
+$editorBlocks = ($editorBlocks ?? null) instanceof \Raven\Lib\View\Panel\EditorBlocks
+    ? $editorBlocks
+    : new \Raven\Lib\View\Panel\EditorBlocks();
 $isEditMode = is_array($formData);
 $formName = (string) ($formData['name'] ?? '');
 $formSlug = (string) ($formData['slug'] ?? '');
@@ -47,6 +51,7 @@ $formCc = (string) ($formData['cc'] ?? '');
 $formBcc = (string) ($formData['bcc'] ?? '');
 $shortcodeValue = $formSlug !== '' ? '[contact slug="' . $formSlug . '"]' : '';
 $additionalFields = is_array($formData['additional_fields'] ?? null) ? (array) $formData['additional_fields'] : [];
+$customFieldBlockLayout = $editorBlocks->layout('contact');
 $deleteFormId = 'delete-contact-form';
 ?>
 <header class="card">
@@ -252,7 +257,7 @@ $deleteFormId = 'delete-contact-form';
                         }
                         $showOptionsForType = in_array($fieldType, ['radio', 'checkbox', 'select'], true);
                         ?>
-                        <div class="border rounded p-2 mb-2" data-contact-additional-row="1">
+                        <div class="<?= e($customFieldBlockLayout['row_class']) ?>" data-contact-additional-row="1">
                             <div class="row g-2 align-items-end">
                                 <div class="col-md-4">
                                     <label class="form-label">Type</label>
@@ -308,7 +313,7 @@ $deleteFormId = 'delete-contact-form';
                                 <div class="col-auto ps-md-0 d-flex align-items-end">
                                     <button
                                         type="button"
-                                        class="btn btn-danger ms-2"
+                                        class="<?= e($customFieldBlockLayout['remove_button_class']) ?>"
                                         data-contact-remove-field="1"
                                         aria-label="Remove field"
                                         title="Remove field"
@@ -362,7 +367,7 @@ $deleteFormId = 'delete-contact-form';
 </form>
 
 <template id="contact-additional-field-template">
-    <div class="border rounded p-2 mb-2" data-contact-additional-row="1">
+    <div class="<?= e($customFieldBlockLayout['row_class']) ?>" data-contact-additional-row="1">
         <div class="row g-2 align-items-end">
             <div class="col-md-4">
                 <label class="form-label">Type</label>
@@ -402,7 +407,7 @@ $deleteFormId = 'delete-contact-form';
             <div class="col-auto ps-md-0 d-flex align-items-end">
                 <button
                     type="button"
-                    class="btn btn-danger ms-2"
+                    class="<?= e($customFieldBlockLayout['remove_button_class']) ?>"
                     data-contact-remove-field="1"
                     aria-label="Remove field"
                     title="Remove field"
@@ -545,101 +550,37 @@ $deleteFormId = 'delete-contact-form';
   })();
 </script>
 
-<script>
-  (function () {
-    var list = document.getElementById('contact-additional-fields');
-    var addButton = document.getElementById('contact-additional-field-add');
-    var template = document.getElementById('contact-additional-field-template');
-
-    if (!(list instanceof HTMLElement) || !(addButton instanceof HTMLButtonElement) || !(template instanceof HTMLTemplateElement)) {
-      return;
-    }
-
-    function typeUsesOptions(typeValue) {
-      return typeValue === 'radio' || typeValue === 'checkbox' || typeValue === 'select';
-    }
-
-    function updateOptionsVisibility(row) {
-      if (!(row instanceof HTMLElement)) {
-        return;
-      }
-
-      var typeSelect = row.querySelector('[data-contact-field-key="type"]');
-      var optionsWrap = row.querySelector('[data-contact-field-options-wrap="1"]');
-      if (!(typeSelect instanceof HTMLSelectElement) || !(optionsWrap instanceof HTMLElement)) {
-        return;
-      }
-
-      var typeValue = String(typeSelect.value || '').toLowerCase();
-      if (typeUsesOptions(typeValue)) {
-        optionsWrap.classList.remove('d-none');
-        return;
-      }
-
-      optionsWrap.classList.add('d-none');
-    }
-
-    function reindexRows() {
-      var rows = list.querySelectorAll('[data-contact-additional-row="1"]');
-      rows.forEach(function (row, index) {
-        if (!(row instanceof HTMLElement)) {
-          return;
-        }
-
-        var controls = row.querySelectorAll('[data-contact-field-key]');
-        controls.forEach(function (control) {
-          if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement)) {
-            return;
-          }
-
-          var key = String(control.getAttribute('data-contact-field-key') || '');
-          if (key === '') {
-            return;
-          }
-
-          control.name = 'additional_fields[' + index + '][' + key + ']';
-        });
-      });
-    }
-
-    function bindRow(row) {
-      if (!(row instanceof HTMLElement)) {
-        return;
-      }
-
-      var typeSelect = row.querySelector('[data-contact-field-key="type"]');
-      if (typeSelect instanceof HTMLSelectElement) {
-        typeSelect.addEventListener('change', function () {
-          updateOptionsVisibility(row);
-        });
-      }
-
-      var removeButton = row.querySelector('[data-contact-remove-field="1"]');
-      if (removeButton instanceof HTMLButtonElement) {
-        removeButton.addEventListener('click', function () {
-          row.remove();
-          reindexRows();
-        });
-      }
-
-      updateOptionsVisibility(row);
-    }
-
-    addButton.addEventListener('click', function () {
-      var fragment = template.content.cloneNode(true);
-      var row = fragment.querySelector('[data-contact-additional-row="1"]');
-      if (!(row instanceof HTMLElement)) {
-        return;
-      }
-
-      list.appendChild(fragment);
-      bindRow(list.lastElementChild);
-      reindexRows();
-    });
-
-    list.querySelectorAll('[data-contact-additional-row="1"]').forEach(function (row) {
-      bindRow(row);
-    });
-    reindexRows();
-  })();
-</script>
+<?php
+$editorBlocksBoot = [
+    [
+        'list_id' => 'contact-additional-fields',
+        'template_id' => 'contact-additional-field-template',
+        'add_button_id' => 'contact-additional-field-add',
+        'row_selector' => '[data-contact-additional-row="1"]',
+        'remove_selector' => '[data-contact-remove-field="1"]',
+        'fields' => [
+            ['selector' => '[data-contact-field-key="required"]', 'name_prefix' => 'additional_fields[{index}]', 'key_attribute' => 'data-contact-field-key'],
+            ['selector' => '[data-contact-field-key="type"]', 'name_prefix' => 'additional_fields[{index}]', 'key_attribute' => 'data-contact-field-key'],
+            ['selector' => '[data-contact-field-key="label"]', 'name_prefix' => 'additional_fields[{index}]', 'key_attribute' => 'data-contact-field-key'],
+            ['selector' => '[data-contact-field-key="name"]', 'name_prefix' => 'additional_fields[{index}]', 'key_attribute' => 'data-contact-field-key'],
+            ['selector' => '[data-contact-field-key="options"]', 'name_prefix' => 'additional_fields[{index}]', 'key_attribute' => 'data-contact-field-key'],
+        ],
+        'reindex_sync' => [
+            [
+                'action' => 'toggle-options',
+                'select_selector' => '[data-contact-field-key="type"]',
+                'wrap_selector' => '[data-contact-field-options-wrap="1"]',
+            ],
+        ],
+        'change_sync' => [
+            [
+                'action' => 'toggle-options',
+                'selector' => '[data-contact-field-key="type"]',
+                'select_selector' => '[data-contact-field-key="type"]',
+                'wrap_selector' => '[data-contact-field-options-wrap="1"]',
+            ],
+        ],
+    ],
+];
+require dirname(__DIR__, 3) . '/tpl/panel/partial/editor_blocks.php';
+?>

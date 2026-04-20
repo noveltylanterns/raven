@@ -53,6 +53,7 @@ use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Directory\Route;
 use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\View\Panel\Editor;
+use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorMCE;
 use Raven\Lib\View\Panel\EditorMDE;
 use Raven\Lib\View\Panel\EditorTabs;
@@ -126,6 +127,7 @@ final class PanelRuntimeBuilder
         // controller factory so that extensions can also access panel_editor_tabs.
         $rvn['panel_editor_tabs'] = new EditorTabs($rvn['input']);
         $rvn['panel_editor'] = new Editor();
+        $rvn['panel_editor_blocks'] = new EditorBlocks();
         // TinyMCE and EasyMDE helpers are registered here for extension access but
         // only injected into ContentController, which is the sole controller that
         // serves the rich page body editor.
@@ -593,6 +595,7 @@ final class PanelRuntimeBuilder
                 new Route($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
+                $rvn['panel_editor_blocks'],
                 $rvn['panel_editor_mce'],
                 $rvn['panel_editor_mde'],
                 is_callable($rvn['extension_services_for'] ?? null)
@@ -683,6 +686,7 @@ final class PanelRuntimeBuilder
                 new LoginIdentifierResolver(),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
+                $rvn['panel_editor_blocks'],
                 new PanelMediaConfigService($rvn['config']),
                 new ProfileContactService($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
@@ -746,6 +750,7 @@ final class PanelRuntimeBuilder
                 new LoginIdentifierResolver(),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
+                $rvn['panel_editor_blocks'],
                 new PanelMediaConfigService($rvn['config']),
                 new ProfileContactService($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
@@ -778,7 +783,8 @@ final class PanelRuntimeBuilder
                 $systemDomain['category_set'],
                 $systemDomain['tag_set'],
                 $rvn['panel_editor_tabs'],
-                $rvn['panel_editor']
+                $rvn['panel_editor'],
+                $rvn['panel_editor_blocks']
             );
 
             return $configController;

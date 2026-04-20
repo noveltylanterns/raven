@@ -14,6 +14,7 @@ use Raven\Ext\SignupFormRepository;
 use Raven\Ext\SignupSubmissionRepository;
 use Raven\Lib\Format\Csv;
 use Raven\Lib\Transport\Upload;
+use Raven\Lib\View\Panel\EditorBlocks;
 
 use Raven\Lib\Transport\Redirect;
 
@@ -289,6 +290,9 @@ return static function (Router $router, array $context): void {
 
         // Extension partials render forms directly and require a CSRF hidden field token.
         $csrfField = $rvn['csrf']->field();
+        $viewData['editorBlocks'] = ($rvn['panel_editor_blocks'] ?? null) instanceof EditorBlocks
+            ? $rvn['panel_editor_blocks']
+            : new EditorBlocks();
         extract($viewData, EXTR_SKIP);
         ob_start();
         require $viewFile;

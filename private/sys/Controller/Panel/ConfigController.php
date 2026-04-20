@@ -21,6 +21,7 @@ use Raven\Lib\Directory\Mode;
 use Raven\Lib\Profile\ProfileContactService;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Panel\Editor;
+use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\ThemeCatalogService;
 
@@ -141,6 +142,7 @@ final class ConfigController
     private ProfileContactService $profileContacts;
     private EditorTabs $editorTabs;
     private Editor $editor;
+    private EditorBlocks $editorBlocks;
     /** @var array<string, string>|null */
     private ?array $publicThemeOptionsCache = null;
     /** @var array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>|null */
@@ -161,6 +163,7 @@ final class ConfigController
      * @param callable(): TaxonomySetRepository $tagSetRepoResolver Lazy tag-set resolver.
      * @param EditorTabs $editorTabs Shared panel editor-tab normalization and URL builder.
      * @param Editor $editor Shared panel editor utility methods (body-text editor, theme normalization).
+     * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @return void
      */
     public function __construct(
@@ -172,7 +175,8 @@ final class ConfigController
         callable $categorySetRepoResolver,
         callable $tagSetRepoResolver,
         EditorTabs $editorTabs,
-        Editor $editor
+        Editor $editor,
+        EditorBlocks $editorBlocks
     ) {
         $this->context = $context;
         $this->config = $config;
@@ -184,6 +188,7 @@ final class ConfigController
         $this->profileContacts = new ProfileContactService($input);
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
+        $this->editorBlocks = $editorBlocks;
     }
 
     /**
@@ -219,6 +224,7 @@ final class ConfigController
             'channelOptions' => $this->channelRoutingOptions(),
             'categorySetOptions' => $this->categorySetOptions(),
             'tagSetOptions' => $this->tagSetOptions(),
+            'editorBlocks' => $this->editorBlocks,
             'activeTab' => $activeTab,
         ]);
     }

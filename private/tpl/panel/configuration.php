@@ -26,10 +26,14 @@
 /** @var array<int, array{id: int, name: string, slug: string, is_root: bool}>|null $categorySetOptions */
 /** @var array<int, array{id: int, name: string, slug: string, is_root: bool}>|null $tagSetOptions */
 /** @var string $activeTab */
+/** @var \Raven\Lib\View\Panel\EditorBlocks $editorBlocks */
 
 use function Raven\Lib\Extra\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
+$editorBlocks = ($editorBlocks ?? null) instanceof \Raven\Lib\View\Panel\EditorBlocks
+    ? $editorBlocks
+    : new \Raven\Lib\View\Panel\EditorBlocks();
 $configSnapshot = $configSnapshot ?? null;
 $configFields = $configFields ?? [];
 $channelOptions = is_array($channelOptions ?? null) ? $channelOptions : [];
@@ -477,8 +481,8 @@ if ($sessionProfileConfigFields !== []) {
     );
 }
 
-$profileContactOptionRows = [];
 $protectedProfileContactOptionTypes = ['email', 'phone', 'homepage', 'x'];
+$profileContactOptionRows = [];
 $rawProfileContactOptions = $configSnapshot['user']['contact'] ?? null;
 if (is_array($rawProfileContactOptions)) {
     foreach ($rawProfileContactOptions as $optionType => $optionConfig) {
@@ -507,6 +511,7 @@ if (is_array($rawProfileContactOptions)) {
             'type' => $normalizedType,
             'label' => $label,
             'prefix' => $urlPrefix,
+            'protected' => in_array($normalizedType, $protectedProfileContactOptionTypes, true),
         ];
 
         if (count($profileContactOptionRows) >= 100) {
@@ -514,6 +519,7 @@ if (is_array($rawProfileContactOptions)) {
         }
     }
 }
+$configContactBlockLayout = $editorBlocks->layout('contact');
 
 if ($sessionCookieConfigFields !== []) {
     $sessionGeneralOrder = [
@@ -1475,9 +1481,9 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                     $rowType = trim((string) ($contactOption['type'] ?? ''));
                                     $rowLabel = trim((string) ($contactOption['label'] ?? ''));
                                     $rowUrlPrefix = trim((string) ($contactOption['prefix'] ?? ''));
-                                    $isProtectedType = in_array(strtolower($rowType), $protectedProfileContactOptionTypes, true);
+                                    $isProtectedType = (bool) ($contactOption['protected'] ?? false);
                                     ?>
-                                    <div class="border rounded p-2 mb-2" data-rvn-contact-option-row="1"<?= $isProtectedType ? ' data-rvn-contact-option-protected="1"' : '' ?>>
+                                    <div class="<?= e($configContactBlockLayout['row_class']) ?>" data-rvn-contact-option-row="1"<?= $isProtectedType ? ' data-rvn-contact-option-protected="1"' : '' ?>>
                                         <div class="row g-2 align-items-end">
                                             <div class="col-md-3">
                                                 <label class="form-label">Type Slug</label>
@@ -1514,7 +1520,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                                 >
                                             </div>
                                             <div class="col-auto ps-md-0 d-flex align-items-end">
-                                                <button type="button" class="btn btn-danger ms-2" data-rvn-contact-option-remove="1" aria-label="Remove contact option" title="<?= $isProtectedType ? 'Required contact option cannot be removed' : 'Remove contact option' ?>"<?= $isProtectedType ? ' disabled' : '' ?>><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                                                <button type="button" class="<?= e($configContactBlockLayout['remove_button_class']) ?>" data-rvn-contact-option-remove="1" aria-label="Remove contact option" title="<?= $isProtectedType ? 'Required contact option cannot be removed' : 'Remove contact option' ?>"<?= $isProtectedType ? ' disabled' : '' ?>><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
                                             </div>
                                         </div>
                                     </div>
@@ -1538,7 +1544,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
     </nav>
 </form>
 <template id="config-contact-option-template">
-    <div class="border rounded p-2 mb-2" data-rvn-contact-option-row="1">
+    <div class="<?= e($configContactBlockLayout['row_class']) ?>" data-rvn-contact-option-row="1">
         <div class="row g-2 align-items-end">
             <div class="col-md-3">
                 <label class="form-label">Type Slug</label>
@@ -1568,89 +1574,34 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                 >
             </div>
             <div class="col-auto ps-md-0 d-flex align-items-end">
-                <button type="button" class="btn btn-danger ms-2" data-rvn-contact-option-remove="1" aria-label="Remove contact option" title="Remove contact option"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                <button type="button" class="<?= e($configContactBlockLayout['remove_button_class']) ?>" data-rvn-contact-option-remove="1" aria-label="Remove contact option" title="Remove contact option"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
             </div>
         </div>
     </div>
 </template>
-<script>
-  (function () {
-    var list = document.getElementById('config-contact-options-list');
-    var addButton = document.getElementById('config-contact-option-add');
-    var template = document.getElementById('config-contact-option-template');
-
-    if (!(list instanceof HTMLElement) || !(addButton instanceof HTMLButtonElement) || !(template instanceof HTMLTemplateElement)) {
-      return;
-    }
-
-    function normalizeTypeSlug(value) {
-      return String(value || '')
-        .toLowerCase()
-        .replace(/[^a-z0-9-]+/g, '-')
-        .replace(/-{2,}/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 80);
-    }
-
-    function reindexRows() {
-      var rows = list.querySelectorAll('[data-rvn-contact-option-row="1"]');
-      rows.forEach(function (row, index) {
-        if (!(row instanceof HTMLElement)) {
-          return;
-        }
-
-        var typeField = row.querySelector('[data-rvn-contact-option-key="type"]');
-        var labelField = row.querySelector('[data-rvn-contact-option-key="label"]');
-        var prefixField = row.querySelector('[data-rvn-contact-option-key="prefix"]');
-        if (typeField instanceof HTMLInputElement) {
-          typeField.name = 'profile_contact_options[' + index + '][type]';
-        }
-        if (labelField instanceof HTMLInputElement) {
-          labelField.name = 'profile_contact_options[' + index + '][label]';
-        }
-        if (prefixField instanceof HTMLInputElement) {
-          prefixField.name = 'profile_contact_options[' + index + '][prefix]';
-        }
-      });
-    }
-
-    addButton.addEventListener('click', function () {
-      var fragment = template.content.cloneNode(true);
-      list.appendChild(fragment);
-      reindexRows();
-    });
-
-    list.addEventListener('change', function (event) {
-      var target = event.target;
-      if (!(target instanceof HTMLInputElement) || target.getAttribute('data-rvn-contact-option-key') !== 'type') {
-        return;
-      }
-      target.value = normalizeTypeSlug(target.value);
-    });
-
-    list.addEventListener('click', function (event) {
-      var target = event.target;
-      if (!(target instanceof Element)) {
-        return;
-      }
-      var removeButton = target.closest('[data-rvn-contact-option-remove="1"]');
-      if (!(removeButton instanceof HTMLElement)) {
-        return;
-      }
-      var row = removeButton.closest('[data-rvn-contact-option-row="1"]');
-      if (!(row instanceof HTMLElement)) {
-        return;
-      }
-      if (row.getAttribute('data-rvn-contact-option-protected') === '1' || removeButton.hasAttribute('disabled')) {
-        return;
-      }
-      row.remove();
-      reindexRows();
-    });
-
-    reindexRows();
-  })();
-</script>
+<?php
+$editorBlocksBoot = [
+    [
+        'list_id' => 'config-contact-options-list',
+        'template_id' => 'config-contact-option-template',
+        'add_button_id' => 'config-contact-option-add',
+        'row_selector' => '[data-rvn-contact-option-row="1"]',
+        'remove_selector' => '[data-rvn-contact-option-remove="1"]',
+        'fields' => [
+            ['selector' => '[data-rvn-contact-option-key="type"]', 'name' => 'profile_contact_options[{index}][type]'],
+            ['selector' => '[data-rvn-contact-option-key="label"]', 'name' => 'profile_contact_options[{index}][label]'],
+            ['selector' => '[data-rvn-contact-option-key="prefix"]', 'name' => 'profile_contact_options[{index}][prefix]'],
+        ],
+        'change_sync' => [
+            [
+                'action' => 'normalize-type-slug',
+                'selector' => '[data-rvn-contact-option-key="type"]',
+            ],
+        ],
+    ],
+];
+require __DIR__ . '/partial/editor_blocks.php';
+?>
 <script>
   // Shows only config fields for the selected DB driver.
   (function () {

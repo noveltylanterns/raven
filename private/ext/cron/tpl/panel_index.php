@@ -11,6 +11,11 @@ declare(strict_types=1);
 
 use function Raven\Lib\Extra\e;
 
+/** @var \Raven\Lib\View\Panel\EditorBlocks $editorBlocks */
+
+$editorBlocks = ($editorBlocks ?? null) instanceof \Raven\Lib\View\Panel\EditorBlocks
+    ? $editorBlocks
+    : new \Raven\Lib\View\Panel\EditorBlocks();
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Scheduled Tasks'));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
@@ -39,6 +44,7 @@ $formatTimestamp = static function (?int $timestamp): string {
 $taskListId = 'cron-task-list';
 $taskAddButtonId = 'cron-task-add';
 $taskTemplateId = 'cron-task-template';
+$taskBlockLayout = $editorBlocks->layout('task');
 ?>
 <header class="card mb-3">
     <div class="card-body">
@@ -115,7 +121,7 @@ $taskTemplateId = 'cron-task-template';
                     $nextDue = is_int($task['next_due'] ?? null) ? $task['next_due'] : null;
                     $overdue = !empty($task['overdue']);
                     ?>
-                    <div class="border rounded p-2 mb-2" data-cron-task-row="1">
+                    <div class="<?= e($taskBlockLayout['row_class']) ?>" data-cron-task-row="1">
                         <div class="row g-2 align-items-end pb-2">
                             <div class="col-md-4">
                                 <label class="form-label">Label</label>
@@ -181,7 +187,7 @@ $taskTemplateId = 'cron-task-template';
                                 >
                             </div>
                             <div class="col-auto ps-md-0 d-flex align-items-end">
-                                <button type="button" class="btn btn-danger ms-2" data-cron-task-remove="1" aria-label="Remove scheduled task row">
+                                <button type="button" class="<?= e($taskBlockLayout['remove_button_class']) ?>" data-cron-task-remove="1" aria-label="Remove scheduled task row">
                                     <i class="bi bi-x-circle-fill" aria-hidden="true"></i>
                                 </button>
                             </div>
@@ -211,7 +217,7 @@ $taskTemplateId = 'cron-task-template';
 </div>
 
 <template id="<?= e($taskTemplateId) ?>">
-    <div class="border rounded p-2 mb-2" data-cron-task-row="1">
+    <div class="<?= e($taskBlockLayout['row_class']) ?>" data-cron-task-row="1">
         <div class="row g-2 align-items-end pb-2">
             <div class="col-md-4">
                 <label class="form-label">Label</label>
@@ -238,7 +244,7 @@ $taskTemplateId = 'cron-task-template';
                 <input type="text" class="form-control" data-cron-task-key="command" maxlength="4000" value="" placeholder="php private/bin/rvn-sys extensions">
             </div>
             <div class="col-auto ps-md-0 d-flex align-items-end">
-                <button type="button" class="btn btn-danger ms-2" data-cron-task-remove="1" aria-label="Remove scheduled task row">
+                <button type="button" class="<?= e($taskBlockLayout['remove_button_class']) ?>" data-cron-task-remove="1" aria-label="Remove scheduled task row">
                     <i class="bi bi-x-circle-fill" aria-hidden="true"></i>
                 </button>
             </div>
@@ -247,84 +253,23 @@ $taskTemplateId = 'cron-task-template';
     </div>
 </template>
 
-<script>
-  (function () {
-    var list = document.getElementById('<?= e($taskListId) ?>');
-    var addButton = document.getElementById('<?= e($taskAddButtonId) ?>');
-    var template = document.getElementById('<?= e($taskTemplateId) ?>');
-
-    if (!(list instanceof HTMLElement) || !(addButton instanceof HTMLButtonElement) || !(template instanceof HTMLTemplateElement)) {
-      return;
-    }
-
-    function reindexRows() {
-      var rows = list.querySelectorAll('[data-cron-task-row="1"]');
-      rows.forEach(function (row, index) {
-        if (!(row instanceof HTMLElement)) {
-          return;
-        }
-        var labelField = row.querySelector('[data-cron-task-key="label"]');
-        var slugField = row.querySelector('[data-cron-task-key="slug"]');
-        var intervalField = row.querySelector('[data-cron-task-key="interval"]');
-        var enabledField = row.querySelector('[data-cron-task-key="enabled"]');
-        var commandField = row.querySelector('[data-cron-task-key="command"]');
-
-        if (labelField instanceof HTMLInputElement) {
-          labelField.name = 'tasks[' + index + '][label]';
-        }
-        if (slugField instanceof HTMLInputElement) {
-          slugField.name = 'tasks[' + index + '][slug]';
-        }
-        if (intervalField instanceof HTMLInputElement) {
-          intervalField.name = 'tasks[' + index + '][interval]';
-        }
-        if (enabledField instanceof HTMLInputElement) {
-          enabledField.name = 'tasks[' + index + '][enabled]';
-        }
-        if (commandField instanceof HTMLInputElement) {
-          commandField.name = 'tasks[' + index + '][command]';
-        }
-      });
-    }
-
-    function appendRow() {
-      var fragment = template.content.cloneNode(true);
-      list.appendChild(fragment);
-      reindexRows();
-    }
-
-    function ensureAtLeastOneRow() {
-      if (list.querySelector('[data-cron-task-row="1"]')) {
-        return;
-      }
-      appendRow();
-    }
-
-    addButton.addEventListener('click', function () {
-      appendRow();
-    });
-
-    list.addEventListener('click', function (event) {
-      var target = event.target;
-      if (!(target instanceof Element)) {
-        return;
-      }
-      var removeButton = target.closest('[data-cron-task-remove="1"]');
-      if (!(removeButton instanceof HTMLElement)) {
-        return;
-      }
-      var row = removeButton.closest('[data-cron-task-row="1"]');
-      if (!(row instanceof HTMLElement)) {
-        return;
-      }
-      row.remove();
-      if (!list.querySelector('[data-cron-task-row="1"]')) {
-        appendRow();
-        return;
-      }
-      reindexRows();
-    });
-
-    reindexRows();
-  })();
-</script>
+<?php
+$editorBlocksBoot = [
+    [
+        'list_id' => $taskListId,
+        'template_id' => $taskTemplateId,
+        'add_button_id' => $taskAddButtonId,
+        'row_selector' => '[data-cron-task-row="1"]',
+        'remove_selector' => '[data-cron-task-remove="1"]',
+        'ensure_one_row' => true,
+        'fields' => [
+            ['selector' => '[data-cron-task-key="label"]', 'name' => 'tasks[{index}][label]'],
+            ['selector' => '[data-cron-task-key="slug"]', 'name' => 'tasks[{index}][slug]'],
+            ['selector' => '[data-cron-task-key="interval"]', 'name' => 'tasks[{index}][interval]'],
+            ['selector' => '[data-cron-task-key="enabled"]', 'name' => 'tasks[{index}][enabled]'],
+            ['selector' => '[data-cron-task-key="command"]', 'name' => 'tasks[{index}][command]'],
+        ],
+    ],
+];
+require dirname(__DIR__, 3) . '/tpl/panel/partial/editor_blocks.php';
+?>

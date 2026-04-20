@@ -57,6 +57,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/tpl/`
   - Core fallback templates only.
   - Includes feed XML fallbacks such as `private/tpl/feeds/rss.php` and `private/tpl/feeds/atom.php`.
+  - Shared route-scoped panel view partials such as `private/tpl/panel/partial/editor_blocks.php` live here with the core templates they support; reusable PHP logic still belongs in `lib/`.
   - Business logic should not accumulate here.
 
 ## Customization Boundaries
@@ -202,7 +203,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `SiteContextBuilder`, `BodyBlockPolicy`, `MarkdownRenderer`, `PageBodyBlockCodec`, `PagePersistenceService`, `PageTaxonomyAssignmentService`, `PageTaxonomyQueryService`, and `PublicPageBodyRenderer` now live directly under `View/` as the shared content/view surface.
   - `ThemeDiscoveryService`, `ThemeInheritanceResolver`, `ThemeFallbackRenderer` — shared theme infrastructure used by both panel and public contexts.
   - `Pagination.php` — reusable pagination value object and helper; available to both panel and public controllers.
-  - `View/Panel/` — panel-only view/theme helpers: `Editor` (shared body-text editor and theme-normalization utilities), `EditorTabs` (shared tab normalization and tab-preserving URL helpers), `EditorAuthor`, `PanelPost`, `PanelMediaConfigService`, `PanelRoutingPreviewService`, `ThemeCatalogService`, `ThemeCloneService`, `ThemeScaffoldService`, `ThemeManifestValidator`.
+  - `View/Panel/` — panel-only view/theme helpers: `Editor` (shared body-text editor and theme-normalization utilities), `EditorBlocks` (shared repeater-row wrapper class variants for modular editor blocks), `EditorTabs` (shared tab normalization and tab-preserving URL helpers), `EditorAuthor`, `PanelPost`, `PanelMediaConfigService`, `PanelRoutingPreviewService`, `ThemeCatalogService`, `ThemeCloneService`, `ThemeScaffoldService`, `ThemeManifestValidator`.
   - `View/Public/` — public-route-only view/theme rendering: `PublicThemeRegistry` (discovers and validates installed public themes), `PublicRouteRenderService`, `PublicTemplateDecorator`, `PublicTemplatePipeline`, `PublicTemplateResolver`, and `PublicMetaService`.
 
 ## Reading Order

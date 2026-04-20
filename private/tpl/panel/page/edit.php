@@ -38,6 +38,7 @@ declare(strict_types=1);
 /** @var string $routeSeparatorDefault */
 /** @var array<string, array{label?: string, editor?: string}> $bodyBlockTypeDefinitions */
 /** @var array<int, array{extension: string, label: string, shortcode: string}> $shortcodeInsertItems */
+/** @var \Raven\Lib\View\Panel\EditorBlocks $editorBlocks */
 /** @var string $csrfField */
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
@@ -45,6 +46,9 @@ declare(strict_types=1);
 use function Raven\Lib\Extra\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
+$editorBlocks = ($editorBlocks ?? null) instanceof \Raven\Lib\View\Panel\EditorBlocks
+    ? $editorBlocks
+    : new \Raven\Lib\View\Panel\EditorBlocks();
 $pageId = (int) ($page['id'] ?? 0);
 $hasPersistedPage = $pageId > 0;
 $currentUserId = max(0, (int) ($currentUserId ?? 0));
@@ -128,6 +132,7 @@ foreach ($bodyBlockTypeDefinitions as $typeKey => $definition) {
 usort($customAddBodyItems, static function (array $left, array $right): int {
     return strcasecmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? ''));
 });
+$pageBodyBlockLayout = $editorBlocks->layout('page_body');
 $bodyBlockTypeJson = json_encode(
     $bodyBlockTypeDefinitions,
     JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES
@@ -459,8 +464,8 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                 $isPathBlock = $blockEditor === 'markdown_file';
                                 $isGalleryBlock = $blockEditor === 'gallery';
                                 ?>
-                                <div class="border rounded p-3 mb-3" data-rvn-body-row="1">
-                                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                                <div class="<?= e($pageBodyBlockLayout['row_class']) ?>" data-rvn-body-row="1">
+                                    <div class="<?= e($pageBodyBlockLayout['toolbar_class']) ?>">
                                         <div class="d-flex flex-wrap align-items-center gap-2">
                                             <span class="text-muted drag" title="Drag to reorder" aria-hidden="true" data-rvn-body-drag-handle="1" draggable="true"><i class="bi bi-grip-vertical"></i></span>
                                             <input
@@ -484,7 +489,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                                             >
                                             <span class="badge text-bg-secondary" data-rvn-body-type-label="1"><?= $blockTypeLabel ?></span>
                                         </div>
-                                        <button type="button" class="btn btn-danger btn-sm" data-rvn-body-remove="1" aria-label="Remove block" title="Remove block"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+                                        <button type="button" class="<?= e($pageBodyBlockLayout['compact_remove_button_class']) ?>" data-rvn-body-remove="1" aria-label="Remove block" title="Remove block"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
                                     </div>
                                     <input type="hidden" data-rvn-body-type-input="1" name="content_blocks[<?= (int) $bodyIndex ?>][type]" value="<?= e($blockType) ?>">
                                     <textarea
@@ -985,8 +990,8 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
 </form>
 
 <template id="page-body-block-template">
-    <div class="border rounded p-3 mb-3" data-rvn-body-row="1">
-        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+    <div class="<?= e($pageBodyBlockLayout['row_class']) ?>" data-rvn-body-row="1">
+        <div class="<?= e($pageBodyBlockLayout['toolbar_class']) ?>">
             <div class="d-flex flex-wrap align-items-center gap-2">
                 <span class="text-muted drag" title="Drag to reorder" aria-hidden="true" data-rvn-body-drag-handle="1" draggable="true"><i class="bi bi-grip-vertical"></i></span>
                 <input
@@ -1006,7 +1011,7 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
                 >
                 <span class="badge text-bg-secondary" data-rvn-body-type-label="1">Rich Text</span>
             </div>
-            <button type="button" class="btn btn-danger btn-sm" data-rvn-body-remove="1" aria-label="Remove block" title="Remove block"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
+            <button type="button" class="<?= e($pageBodyBlockLayout['compact_remove_button_class']) ?>" data-rvn-body-remove="1" aria-label="Remove block" title="Remove block"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
         </div>
         <input type="hidden" value="tinymce" data-rvn-body-type-input="1">
         <textarea
@@ -1027,14 +1032,12 @@ $pageTitle = trim((string) ($page['title'] ?? ''));
     </div>
 </template>
 
-<style>
-  /* Match body-block row styling to Media file rows. */
-  body#rvnp #rvnp-editor-pane-content [data-rvn-body-row] {
-    border-color: var(--raven-border) !important;
-    background: var(--raven-surface-soft);
-    padding: 0.9rem !important;
-  }
+<?php
+$editorBlocksBoot = [];
+require __DIR__ . '/../partial/editor_blocks.php';
+?>
 
+<style>
   /* Match TinyMCE frame border/radius with Bootstrap form-control styling. */
   .tox.tox-tinymce {
     border: var(--bs-border-width, 1px) solid var(--raven-border) !important;

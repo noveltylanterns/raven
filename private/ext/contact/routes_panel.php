@@ -14,6 +14,7 @@ use Raven\Ext\ContactFormRepository;
 use Raven\Ext\ContactSubmissionRepository;
 use Raven\Lib\Format\Csv;
 use Raven\Lib\Transport\Redirect;
+use Raven\Lib\View\Panel\EditorBlocks;
 
 /**
  * Registers Contact Forms extension routes into the panel router.
@@ -351,6 +352,9 @@ return static function (Router $router, array $context): void {
 
         // Extension partials render forms directly and require a CSRF hidden field token.
         $csrfField = $rvn['csrf']->field();
+        $viewData['editorBlocks'] = ($rvn['panel_editor_blocks'] ?? null) instanceof EditorBlocks
+            ? $rvn['panel_editor_blocks']
+            : new EditorBlocks();
         extract($viewData, EXTR_SKIP);
         ob_start();
         require $viewFile;
