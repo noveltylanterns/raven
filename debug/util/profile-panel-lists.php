@@ -70,7 +70,7 @@ final class PanelListProfilerRunner
 
     public function run(): void
     {
-        $this->enablePanelDebugToolbar();
+        $this->enablePanelProfiler();
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
         if (is_callable($rvn['boot_extensions'] ?? null)) {
@@ -118,7 +118,7 @@ final class PanelListProfilerRunner
         return $sessionName;
     }
 
-    private function enablePanelDebugToolbar(): void
+    private function enablePanelProfiler(): void
     {
         $raw = file_get_contents($this->configPath);
         if (!is_string($raw) || trim($raw) === '') {

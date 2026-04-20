@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Panel;
 
-use Raven\Core\Debug\ToolbarResponseHook;
-use Raven\Core\Debug\ToolbarConfigResolver;
+use Raven\Core\Debug\ProfilerResponseHook;
+use Raven\Core\Debug\ProfilerConfigResolver;
 use Raven\Core\Scheduler;
 use Raven\Core\Routing\Request;
 use Raven\Core\Routing\Router;
@@ -363,8 +363,8 @@ final class PanelController
         );
 
         $method = $requestMethod;
-        $debugToolbarSettings = ToolbarConfigResolver::fromConfig($rvn['config']);
-        $canRenderPanelDebugToolbar = static function () use ($rvn, $isPanelAuthHelperInternalPath, $internalPath): bool {
+        $profilerSettings = ProfilerConfigResolver::fromConfig($rvn['config']);
+        $canRenderPanelProfiler = static function () use ($rvn, $isPanelAuthHelperInternalPath, $internalPath): bool {
             if (!isset($rvn['auth']) || $isPanelAuthHelperInternalPath($internalPath)) {
                 return false;
             }
@@ -377,19 +377,19 @@ final class PanelController
             return $rvn['auth']->isTwoFactorVerifiedForUser($userId);
         };
 
-        ToolbarResponseHook::arm(
+        ProfilerResponseHook::arm(
             [
-                'show_benchmarks' => (bool) ($debugToolbarSettings['show_benchmarks'] ?? true),
-                'show_queries' => (bool) ($debugToolbarSettings['show_queries'] ?? true),
-                'show_stack_trace' => (bool) ($debugToolbarSettings['show_stack_trace'] ?? true),
-                'show_request' => (bool) ($debugToolbarSettings['show_request'] ?? true),
-                'show_environment' => (bool) ($debugToolbarSettings['show_environment'] ?? true),
+                'show_benchmarks' => (bool) ($profilerSettings['show_benchmarks'] ?? true),
+                'show_queries' => (bool) ($profilerSettings['show_queries'] ?? true),
+                'show_stack_trace' => (bool) ($profilerSettings['show_stack_trace'] ?? true),
+                'show_request' => (bool) ($profilerSettings['show_request'] ?? true),
+                'show_environment' => (bool) ($profilerSettings['show_environment'] ?? true),
             ],
             'panel',
             $method,
             $internalPath,
-            (bool) ($debugToolbarSettings['show_on_panel'] ?? false),
-            $canRenderPanelDebugToolbar
+            (bool) ($profilerSettings['show_on_panel'] ?? false),
+            $canRenderPanelProfiler
         );
 
         $dispatchResult = $router->dispatch(new Request($method, $internalPath));

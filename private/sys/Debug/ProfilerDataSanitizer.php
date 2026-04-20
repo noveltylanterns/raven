@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Debug/ToolbarDataSanitizer.php
- * Debug-toolbar request and environment payload sanitizer.
+ * ~/private/sys/Debug/ProfilerDataSanitizer.php
+ * Output profiler request and environment payload sanitizer.
  * Docs: https://raven.lanterns.io
  */
 
@@ -12,9 +12,9 @@ declare(strict_types=1);
 namespace Raven\Core\Debug;
 
 /**
- * Sanitizes request/environment payloads for debug toolbar rendering.
+ * Sanitizes request/environment payloads for output profiler rendering.
  */
-final class ToolbarDataSanitizer
+final class ProfilerDataSanitizer
 {
     /**
      * @param array<int|string, mixed> $value

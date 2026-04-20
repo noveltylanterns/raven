@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Debug/ToolbarResponseHook.php
- * Shared debug-toolbar response hook for web entrypoints.
+ * ~/private/sys/Debug/ProfilerResponseHook.php
+ * Output profiler response hook for web entrypoints.
  * Docs: https://raven.lanterns.io
  */
 
@@ -14,9 +14,9 @@ namespace Raven\Core\Debug;
 use Raven\Lib\Diagnostic\RequestProfiler;
 
 /**
- * Arms the shared debug-toolbar response hook for one web scope.
+ * Arms the output profiler response hook for one web scope.
  */
-final class ToolbarResponseHook
+final class ProfilerResponseHook
 {
     /**
      * Starts request profiling and installs one response wrapper when toolbar rendering is allowed.
@@ -36,7 +36,7 @@ final class ToolbarResponseHook
      * @param string $requestMethod Active HTTP method.
      * @param string $requestPath Scope-local request path shown in the toolbar.
      * @param bool $enabledForScope Whether the current scope is configured to show the toolbar.
-     * @param callable(): bool $canRenderToolbar Scope-specific callback that re-checks current auth/path rules.
+     * @param callable(): bool $canRenderProfiler Scope-specific callback that re-checks current auth/path rules.
      * @return void
      */
     public static function arm(
@@ -45,26 +45,26 @@ final class ToolbarResponseHook
         string $requestMethod,
         string $requestPath,
         bool $enabledForScope,
-        callable $canRenderToolbar
+        callable $canRenderProfiler
     ): void {
-        if ($requestMethod !== 'GET' || !$enabledForScope || !$canRenderToolbar()) {
+        if ($requestMethod !== 'GET' || !$enabledForScope || !$canRenderProfiler()) {
             return;
         }
 
         RequestProfiler::start((float) ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true)), $scope);
         RequestProfiler::enable();
 
-        ob_start(static function (string $body) use ($settings, $scope, $requestMethod, $requestPath, $canRenderToolbar): string {
-            if (!RequestProfiler::isEnabled() || !ToolbarRenderer::isHtmlResponseCandidate($body)) {
+        ob_start(static function (string $body) use ($settings, $scope, $requestMethod, $requestPath, $canRenderProfiler): string {
+            if (!RequestProfiler::isEnabled() || !ProfilerRenderer::isHtmlResponseCandidate($body)) {
                 return $body;
             }
 
             // Defense-in-depth: always re-check current auth/path permission before rendering.
-            if (!$canRenderToolbar()) {
+            if (!$canRenderProfiler()) {
                 return $body;
             }
 
-            $toolbarHtml = ToolbarRenderer::render(
+            $profilerHtml = ProfilerRenderer::render(
                 [
                     'show_benchmarks' => (bool) ($settings['show_benchmarks'] ?? true),
                     'show_queries' => (bool) ($settings['show_queries'] ?? true),
@@ -83,11 +83,11 @@ final class ToolbarResponseHook
                 ]
             );
 
-            if ($toolbarHtml === '') {
+            if ($profilerHtml === '') {
                 return $body;
             }
 
-            return ToolbarRenderer::inject($body, $toolbarHtml);
+            return ProfilerRenderer::inject($body, $profilerHtml);
         });
     }
 }

@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Debug/ToolbarRenderer.php
- * HTML renderer and injector for fixed-bottom debug toolbar output.
+ * ~/private/sys/Debug/ProfilerRenderer.php
+ * HTML renderer and injector for fixed-bottom output profiler UI.
  * Docs: https://raven.lanterns.io
  */
 
@@ -12,9 +12,9 @@ declare(strict_types=1);
 namespace Raven\Core\Debug;
 
 /**
- * Produces the debug-toolbar UI and appends it into HTML responses.
+ * Produces the output profiler UI and appends it into HTML responses.
  */
-final class ToolbarRenderer
+final class ProfilerRenderer
 {
     /**
      * @param array{
@@ -23,7 +23,7 @@ final class ToolbarRenderer
      *   show_stack_trace: bool,
      *   show_request: bool,
      *   show_environment: bool
-     * } $settings Toolbar visibility toggles for the current response.
+     * } $settings Output profiler visibility toggles for the current response.
      * @param array{
      *   enabled: bool,
      *   scope: string,
@@ -43,7 +43,7 @@ final class ToolbarRenderer
      */
     public static function render(array $settings, array $profile, array $context): string
     {
-        return ToolbarMarkupBuilder::render($settings, $profile, $context);
+        return ProfilerMarkupBuilder::render($settings, $profile, $context);
     }
 
     /**
@@ -84,17 +84,17 @@ final class ToolbarRenderer
      * Injects toolbar HTML before the closing body tag when possible.
      *
      * @param string $body Current buffered response body.
-     * @param string $toolbarHtml Toolbar markup to append into the response.
+     * @param string $profilerHtml Output profiler markup to append into the response.
      * @return string Response body with toolbar markup injected.
      */
-    public static function inject(string $body, string $toolbarHtml): string
+    public static function inject(string $body, string $profilerHtml): string
     {
         $needle = '</body>';
         $offset = strripos($body, $needle);
         if ($offset === false) {
-            return $body . $toolbarHtml;
+            return $body . $profilerHtml;
         }
 
-        return substr($body, 0, $offset) . $toolbarHtml . substr($body, $offset);
+        return substr($body, 0, $offset) . $profilerHtml . substr($body, $offset);
     }
 }

@@ -33,8 +33,8 @@ NOTE: All paths relative to project root. (../ from the perspective of this dire
 - `php debug/util/check-config-sync.php`
 - Contact extension smoke workflow:
 - `php debug/smoke/contact-workflow.php`
-- Debug toolbar smoke matrix:
-- `php debug/smoke/debug-toolbar.php`
+- Output profiler smoke matrix:
+- `php debug/smoke/output-profiler.php`
 - Documentation smoke checks:
 - `php debug/smoke/docs.php`
 - Shared auth login/2FA smoke:

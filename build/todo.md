@@ -62,13 +62,17 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	- [ ] Likewise we need a lib/View/Panel/Footer.php to store a standardized dynamic footer, which is just going to be a single embedded line of small muted text + links. Below that, Footer.php needs an invisible spot for controllers/libraries/etc to inject custom route-specific javascript/css, which our heavy MCE/MDE editor scripting will probably have to be ported to use, instead of whatever localized bullshit they're doing now. Again, no route-specific logic in Footer.php, and unlike Header.php there is no opening for local modification of the text per-route, just an opening for outside insertion of route-specific js/css.
 	- [ ] Need lib/View/Panel/Nagivation.php to house all our sidebar & mobilenav logic. Consolidate it all from whereever it is, to that class.
 	- [ ] Need lib/View/Panel/List.php to house a generic universal list wrapper with the search bar & filter options. All list-type pages in the panel should be updated to use this consistent wrapper. Whatever can be universalized from individual templates/controllers, do so and port into List.php. List.php should have NO ROUTE-SPECIFIC LOGIC - that all belongs in views/controllers. All non-extension list-type routes should be using this universal List.php when done, no exceptions.
-- [ ] is lib/COmposer/tualo/easymde.php called from anything BESIDES lib/View/Panel/EditorMDE.php? if so, doublecheck that area for things that need to be extracted and moved into EditorMDE.php
+- [x] is lib/COmposer/tualo/easymde.php called from anything BESIDES lib/View/Panel/EditorMDE.php? — confirmed: only EditorMDE.php requires it; template-side EasyMDE references are JS-only and do not touch this helper.
 - [x] `lib/Extra/Helpers.php` — `request_path()` → `lib/Transport/Request::path()` done; `e()` → `lib/Security/OutputEncoder.php` done; all 53 template/class callers updated to `Raven\Lib\Security\e`; dead `Extra\request_path` import removed from `PublicController`; `lib/Extra/` deleted.
 - [x] Move lib/Extra/Countries.php to lib/View/FormCountries.php — done; `lib/Extra/` deleted.
 - [x] Move lib/Config/ConfigParser.php to lib/Parser/ConfigParser.php — done; `lib/Config/` deleted.
 - [x] Move lib/Config/ConfigWriter.php to lib/Scribe/ConfigScribe.php — done; `lib/Config/` deleted.
 - [x] Merge lib/Profile/ProfileContactService.php into lib/Parser/UserParser.php — done; `lib/Profile/` deleted.
-- [ ] Stop referring to Output Profiler as Debug Toolbar. It's confusing with other toolbars around. Update language, variables, class names, everything relevant so it all standardizes on Output Profiler and/or Profiler. (Note other "Profilers" in lib/sys so we can rename+sort them after.)
+- [x] Stop referring to Output Profiler as Debug Toolbar. It's confusing with other toolbars around. Update language, variables, class names, everything relevant so it all standardizes on Output Profiler and/or Profiler. (Note other "Profilers" in lib/sys so we can rename+sort them after.)
+	- [x] `sys/Debug/Toolbar*` → `sys/Debug/Profiler*` — all five classes renamed (ProfilerConfigResolver, ProfilerDataSanitizer, ProfilerMarkupBuilder, ProfilerRenderer, ProfilerResponseHook); callers in PanelController and PublicController updated.
+	- [x] `$debugToolbarSettings` → `$profilerSettings`; `$canRenderPanel/PublicDebugToolbar` → `$canRenderPanel/PublicProfiler`; `ensureDebugToolbarConfig()` → `ensureProfilerConfig()` in ConfigController.
+	- [x] `debug/smoke/debug-toolbar.php` renamed to `debug/smoke/output-profiler.php`; debug/agents reference updated.
+	- [x] All remaining "debug toolbar" comment/label language updated to "output profiler" across sys/Debug/, templates, and debug utilities.
 - [ ] Need a lib/View/Panel/Toolbar.php as a universal generic wrapper for the mirrored row of buttons that goes on the top+bottom of most panel pages.
 
 

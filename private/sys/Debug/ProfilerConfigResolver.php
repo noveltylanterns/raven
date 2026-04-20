@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Debug/ToolbarConfigResolver.php
- * Shared debug-toolbar config flag resolver.
+ * ~/private/sys/Debug/ProfilerConfigResolver.php
+ * Output profiler config flag resolver.
  * Docs: https://raven.lanterns.io
  */
 
@@ -15,9 +15,9 @@ use Raven\Core\Config;
 use Raven\Lib\Parser\ConfigParser;
 
 /**
- * Shared resolver for debug-toolbar config flags.
+ * Shared resolver for output profiler config flags.
  */
-final class ToolbarConfigResolver
+final class ProfilerConfigResolver
 {
     /**
      * @return array{

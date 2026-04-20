@@ -123,7 +123,7 @@ $writeResult = static function () use ($outputPath): void {
     $body = '';
     if (ob_get_level() > 0) {
         // Flush nested output handlers into the runner's root buffer so
-        // callback-based transforms (for example debug toolbar injection)
+        // callback-based transforms (for example output profiler injection)
         // are applied before we capture response body text.
         while (ob_get_level() > 1) {
             ob_end_flush();

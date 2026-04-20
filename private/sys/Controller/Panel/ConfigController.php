@@ -557,7 +557,7 @@ final class ConfigController
         $config = $this->ensurePanelBrandingConfig($config, $normalizePanelThemeChoice);
         $config = $this->ensureCaptchaConfig($config);
         $config = $this->ensureMailConfig($config);
-        $config = $this->ensureDebugToolbarConfig($config);
+        $config = $this->ensureProfilerConfig($config);
 
         return $config;
     }
@@ -1948,12 +1948,12 @@ final class ConfigController
     }
 
     /**
-     * Seeds defaults for debug toolbar settings.
+     * Seeds defaults for output profiler settings.
      *
      * @param array<string, mixed> $config Config snapshot being normalized.
      * @return array<string, mixed> Snapshot with debug defaults applied.
      */
-    private function ensureDebugToolbarConfig(array $config): array
+    private function ensureProfilerConfig(array $config): array
     {
         $debug = $config['debug'] ?? null;
         if (!is_array($debug)) {

@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/debug/smoke/debug-toolbar.php
- * No-NPM smoke matrix for core debug-toolbar visibility and injection behavior.
+ * ~/debug/smoke/output-profiler.php
+ * No-NPM smoke matrix for output profiler visibility and injection behavior.
  * Docs: https://raven.lanterns.io
  */
 
@@ -15,7 +15,7 @@ use Raven\Core\Repository\UserRepository;
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
 
-final class DebugToolbarSmokeRunner
+final class OutputProfilerSmokeRunner
 {
     private const RECOVERY_PHRASE = 'abandon ability able about above absent absorb abstract absurd abuse access accident';
 
@@ -101,23 +101,23 @@ final class DebugToolbarSmokeRunner
 
     public function run(): void
     {
-        $this->enableDebugToolbarScopes();
+        $this->enableProfilerScopes();
         $this->createTempSuperUser();
 
         try {
             $guestPanelLogin = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/login', $this->guestCookies);
             $this->assert($guestPanelLogin['status'] === 200, 'Guest GET /' . $this->panelPath . '/login expected 200.');
-            $this->assert(!$this->hasToolbar($guestPanelLogin['body']), 'Guest panel login should not include debug toolbar.');
+            $this->assert(!$this->hasProfiler($guestPanelLogin['body']), 'Guest panel login should not include output profiler.');
             $this->events[] = 'guest_panel_login_toolbar=absent';
 
             $guestRegister = $this->request('/public/index.php', 'GET', '/register', $this->guestCookies);
             $this->assert($guestRegister['status'] === 200, 'Guest GET /register expected 200.');
-            $this->assert(!$this->hasToolbar($guestRegister['body']), 'Guest public register helper should not include debug toolbar.');
+            $this->assert(!$this->hasProfiler($guestRegister['body']), 'Guest public register helper should not include output profiler.');
             $this->events[] = 'guest_register_toolbar=absent';
 
             $guestPublic = $this->request('/public/index.php', 'GET', '/', $this->guestCookies);
             $this->assert($guestPublic['status'] >= 200 && $guestPublic['status'] < 500, 'Guest GET / expected non-fatal status.');
-            $this->assert(!$this->hasToolbar($guestPublic['body']), 'Guest public page should not include debug toolbar.');
+            $this->assert(!$this->hasProfiler($guestPublic['body']), 'Guest public page should not include output profiler.');
             $this->events[] = 'guest_public_toolbar=absent';
 
             $superLoginPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/login', $this->superCookies);
@@ -137,27 +137,27 @@ final class DebugToolbarSmokeRunner
 
             $pendingPanelTwoFactor = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/login/2fa', $this->superCookies);
             $this->assert($pendingPanelTwoFactor['status'] === 200, 'Pending panel GET /' . $this->panelPath . '/login/2fa expected 200.');
-            $this->assert(!$this->hasToolbar($pendingPanelTwoFactor['body']), 'Pending panel 2FA page should not include debug toolbar.');
+            $this->assert(!$this->hasProfiler($pendingPanelTwoFactor['body']), 'Pending panel 2FA page should not include output profiler.');
             $this->events[] = 'panel_login_2fa_toolbar=absent';
 
             $pendingPublicLogin = $this->request('/public/index.php', 'GET', '/login', $this->superCookies);
             $this->assert(in_array($pendingPublicLogin['status'], [200, 302, 303], true), 'Pending public GET /login expected 200 or redirect.');
-            $this->assert(!$this->hasToolbar($pendingPublicLogin['body']), 'Pending public login helper should not include debug toolbar.');
+            $this->assert(!$this->hasProfiler($pendingPublicLogin['body']), 'Pending public login helper should not include output profiler.');
             $this->events[] = 'public_login_toolbar=absent_pending';
 
             $pendingPublicTwoFactor = $this->request('/public/index.php', 'GET', '/login/2fa', $this->superCookies);
             $this->assert($pendingPublicTwoFactor['status'] === 200, 'Pending public GET /login/2fa expected 200.');
-            $this->assert(!$this->hasToolbar($pendingPublicTwoFactor['body']), 'Pending public 2FA page should not include debug toolbar.');
+            $this->assert(!$this->hasProfiler($pendingPublicTwoFactor['body']), 'Pending public 2FA page should not include output profiler.');
             $this->events[] = 'public_login_2fa_toolbar=absent';
 
             $pendingPublicRegister = $this->request('/public/index.php', 'GET', '/register', $this->superCookies);
             $this->assert($pendingPublicRegister['status'] === 200, 'Pending public GET /register expected 200.');
-            $this->assert(!$this->hasToolbar($pendingPublicRegister['body']), 'Pending public register helper should not include debug toolbar.');
+            $this->assert(!$this->hasProfiler($pendingPublicRegister['body']), 'Pending public register helper should not include output profiler.');
             $this->events[] = 'public_register_toolbar=absent_pending';
 
             $pendingPublicHome = $this->request('/public/index.php', 'GET', '/', $this->superCookies);
             $this->assert($pendingPublicHome['status'] >= 200 && $pendingPublicHome['status'] < 500, 'Pending public GET / expected non-fatal status.');
-            $this->assert(!$this->hasToolbar($pendingPublicHome['body']), 'Pending public site should not include debug toolbar.');
+            $this->assert(!$this->hasProfiler($pendingPublicHome['body']), 'Pending public site should not include output profiler.');
             $this->events[] = 'public_home_toolbar=absent_pending';
 
             $twoFactorCsrf = $this->extractCsrf($pendingPanelTwoFactor['body']);
@@ -175,7 +175,7 @@ final class DebugToolbarSmokeRunner
                 $superPreferences['status'] === 200,
                 'Super preferences load expected 200 after login, got ' . $superPreferences['status'] . '.'
             );
-            $this->assert($this->hasToolbar($superPreferences['body']), 'Verified panel page should include toolbar when panel scope is enabled.');
+            $this->assert($this->hasProfiler($superPreferences['body']), 'Verified panel page should include toolbar when panel scope is enabled.');
             $this->events[] = 'super_panel_toolbar=present';
 
             $superPublic = $this->request('/public/index.php', 'GET', '/', $this->superCookies);
@@ -183,17 +183,17 @@ final class DebugToolbarSmokeRunner
             $this->events[] = 'super_public_body_len=' . strlen($superPublic['body']);
             $this->events[] = 'super_public_session=' . ($superPublic['session_id'] !== '' ? $superPublic['session_id'] : '<empty>');
             $this->assert($superPublic['status'] >= 200 && $superPublic['status'] < 500, 'Super GET / expected non-fatal status.');
-            $this->assert($this->hasToolbar($superPublic['body']), 'Verified public page should include toolbar when public scope is enabled.');
+            $this->assert($this->hasProfiler($superPublic['body']), 'Verified public page should include toolbar when public scope is enabled.');
             $this->events[] = 'super_public_toolbar=present';
 
             $verifiedRegister = $this->request('/public/index.php', 'GET', '/register', $this->superCookies);
             $this->assert($verifiedRegister['status'] === 200, 'Verified public GET /register expected 200.');
-            $this->assert(!$this->hasToolbar($verifiedRegister['body']), 'Verified public register helper should not include debug toolbar.');
+            $this->assert(!$this->hasProfiler($verifiedRegister['body']), 'Verified public register helper should not include output profiler.');
             $this->events[] = 'public_register_toolbar=absent_verified';
 
             $routingExport = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/routing/export', $this->superCookies);
             $this->assert($routingExport['status'] === 200, 'GET /' . $this->panelPath . '/routing/export expected 200.');
-            $this->assert(!$this->hasToolbar($routingExport['body']), 'Non-HTML routing export response must not include debug toolbar.');
+            $this->assert(!$this->hasProfiler($routingExport['body']), 'Non-HTML routing export response must not include output profiler.');
             $this->events[] = 'panel_non_html_toolbar=absent';
 
             $this->events[] = 'smoke_result=PASS';
@@ -205,7 +205,7 @@ final class DebugToolbarSmokeRunner
         }
     }
 
-    private function enableDebugToolbarScopes(): void
+    private function enableProfilerScopes(): void
     {
         $raw = file_get_contents($this->configPath);
         if (!is_string($raw) || trim($raw) === '') {
@@ -227,7 +227,7 @@ final class DebugToolbarSmokeRunner
 
         $encoded = "<?php\n\nreturn " . var_export($config, true) . ";\n";
         if (file_put_contents($this->configPath, $encoded) === false) {
-            throw new RuntimeException('Unable to write debug-toolbar smoke settings to private/dat/config.php.');
+            throw new RuntimeException('Unable to write output profiler smoke settings to private/dat/config.php.');
         }
 
         $this->restoreConfig = true;
@@ -427,7 +427,7 @@ final class DebugToolbarSmokeRunner
         return '';
     }
 
-    private function hasToolbar(string $body): bool
+    private function hasProfiler(string $body): bool
     {
         return str_contains($body, 'id="rvnd"') || str_contains($body, 'data-rvn-debugger="1"');
     }
@@ -461,14 +461,14 @@ final class DebugToolbarSmokeRunner
 $runner = null;
 
 try {
-    $runner = new DebugToolbarSmokeRunner(dirname(__DIR__, 2));
+    $runner = new OutputProfilerSmokeRunner(dirname(__DIR__, 2));
     $runner->run();
     foreach ($runner->events() as $event) {
         echo $event . PHP_EOL;
     }
     exit(0);
 } catch (Throwable $e) {
-    if ($runner instanceof DebugToolbarSmokeRunner) {
+    if ($runner instanceof OutputProfilerSmokeRunner) {
         foreach ($runner->events() as $event) {
             fwrite(STDERR, $event . PHP_EOL);
         }

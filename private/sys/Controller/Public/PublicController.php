@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Public;
 
-use Raven\Core\Debug\ToolbarResponseHook;
-use Raven\Core\Debug\ToolbarConfigResolver;
+use Raven\Core\Debug\ProfilerResponseHook;
+use Raven\Core\Debug\ProfilerConfigResolver;
 use Raven\Core\Scheduler;
 use Raven\Core\Routing\Request;
 use Raven\Core\Routing\Router;
@@ -98,7 +98,7 @@ final class PublicController
         $rvn = PublicRuntimeBuilder::build($rvn);
 
         $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-        $debugToolbarSettings = ToolbarConfigResolver::fromConfig($rvn['config']);
+        $profilerSettings = ProfilerConfigResolver::fromConfig($rvn['config']);
         $isPublicAuthHelperPath = static function (string $path) use ($requestPath): bool {
             $normalized = trim($path !== '' ? $path : $requestPath);
             $normalized = (string) parse_url($normalized, PHP_URL_PATH);
@@ -116,7 +116,7 @@ final class PublicController
                 '/register',
             ], true);
         };
-        $canRenderPublicDebugToolbar = static function () use ($rvn, $isPublicAuthHelperPath, $requestPath): bool {
+        $canRenderPublicProfiler = static function () use ($rvn, $isPublicAuthHelperPath, $requestPath): bool {
             if (!isset($rvn['auth']) || $isPublicAuthHelperPath($requestPath)) {
                 return false;
             }
@@ -129,19 +129,19 @@ final class PublicController
             return $rvn['auth']->isTwoFactorVerifiedForUser($userId);
         };
 
-        ToolbarResponseHook::arm(
+        ProfilerResponseHook::arm(
             [
-                'show_benchmarks' => (bool) ($debugToolbarSettings['show_benchmarks'] ?? true),
-                'show_queries' => (bool) ($debugToolbarSettings['show_queries'] ?? true),
-                'show_stack_trace' => (bool) ($debugToolbarSettings['show_stack_trace'] ?? true),
-                'show_request' => (bool) ($debugToolbarSettings['show_request'] ?? true),
-                'show_environment' => (bool) ($debugToolbarSettings['show_environment'] ?? true),
+                'show_benchmarks' => (bool) ($profilerSettings['show_benchmarks'] ?? true),
+                'show_queries' => (bool) ($profilerSettings['show_queries'] ?? true),
+                'show_stack_trace' => (bool) ($profilerSettings['show_stack_trace'] ?? true),
+                'show_request' => (bool) ($profilerSettings['show_request'] ?? true),
+                'show_environment' => (bool) ($profilerSettings['show_environment'] ?? true),
             ],
             'public',
             $requestMethod,
             $requestPath,
-            (bool) ($debugToolbarSettings['show_on_public'] ?? false),
-            $canRenderPublicDebugToolbar
+            (bool) ($profilerSettings['show_on_public'] ?? false),
+            $canRenderPublicProfiler
         );
 
         /** @var callable(): object $publicContentController */

@@ -1302,7 +1302,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
                                 <p class="text-muted mb-0">No configuration fields available.</p>
                             <?php else: ?>
                                 <?php if ($debugVisibilityConfigFields !== []): ?>
-                                    <h3>Toolbar Visibility</h3>
+                                    <h3>Output Profiler Visibility</h3>
                                     <?php foreach ($debugVisibilityConfigFields as $debugField): ?>
                                         <?php $renderConfigField($debugField); ?>
                                     <?php endforeach; ?>
