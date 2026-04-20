@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Parser/ChannelParser.php
- * Category and tag route-prefix configuration helpers.
+ * Channel, page-route, category, and tag configuration helpers.
  * Docs: https://raven.lanterns.io
  */
 
@@ -16,7 +16,7 @@ use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
- * Reads and normalizes category and tag routing configuration from site config.
+ * Reads and normalizes page-route, category, and tag configuration from site config.
  */
 final class ChannelParser
 {
@@ -81,6 +81,54 @@ final class ChannelParser
         }
 
         return $this->normalizeRoutePrefix((string) $this->config->get('tag.prefix', 'tag'), 'tag', true);
+    }
+
+    /**
+     * Returns the global page route mode configured for the site.
+     *
+     * @return string One of `slug` or `id`.
+     */
+    public function globalPageRouteMode(): string
+    {
+        $mode = strtolower(trim((string) $this->config->get('content.mode', 'slug')));
+        return in_array($mode, ['slug', 'id'], true) ? $mode : 'slug';
+    }
+
+    /**
+     * Normalizes a channel route-mode value while preserving `inherit`.
+     *
+     * @param string $value Raw channel route-mode string.
+     * @return string Normalized route-mode key.
+     */
+    public function normalizeChannelRouteMode(string $value): string
+    {
+        return ModeParser::normalizeChannelRouteMode($value);
+    }
+
+    /**
+     * Returns the effective route mode for one channel, resolving `inherit` to the global default.
+     *
+     * @param string $channelValue Per-channel route-mode value from the channel record.
+     * @return string Concrete route-mode key used for lookups and path generation.
+     */
+    public function effectiveChannelRouteMode(string $channelValue): string
+    {
+        $mode = $this->normalizeChannelRouteMode($channelValue);
+        return $mode === 'inherit' ? $this->globalPageRouteMode() : ModeParser::normalizeRouteMode($mode);
+    }
+
+    /**
+     * Resolves the effective word separator for one channel's page routes.
+     *
+     * @param string $channelValue Per-channel separator value from the channel record.
+     * @return string Resolved separator: `-` or `_`.
+     */
+    public function resolveChannelRouteSeparator(string $channelValue): string
+    {
+        return ModeParser::resolveSeparator(
+            $channelValue,
+            (string) $this->config->get('content.separator', '-')
+        );
     }
 
     /**

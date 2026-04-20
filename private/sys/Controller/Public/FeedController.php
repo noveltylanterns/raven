@@ -74,7 +74,7 @@ final class FeedController
      */
     public function category(string $categorySlug, int $pageNumber = 1): void
     {
-        $categoryPrefix = $this->context->routeConfigService()->categoryRoutePrefix();
+        $categoryPrefix = $this->context->channelParser()->categoryRoutePrefix();
         if ($categoryPrefix === '') {
             $this->context->notFound();
             return;
@@ -131,7 +131,7 @@ final class FeedController
      */
     public function tag(string $tagSlug, int $pageNumber = 1): void
     {
-        $tagPrefix = $this->context->routeConfigService()->tagRoutePrefix();
+        $tagPrefix = $this->context->channelParser()->tagRoutePrefix();
         if ($tagPrefix === '') {
             $this->context->notFound();
             return;
@@ -254,13 +254,13 @@ final class FeedController
      */
     private function renderFeed(string $format, ?string $channelSlug = null): void
     {
-        $routeConfig = $this->context->routeConfigService();
-        if (!$routeConfig->feedEnabled()) {
+        $feedParser = $this->context->feedParser();
+        if (!$feedParser->feedEnabled()) {
             $this->context->notFound();
             return;
         }
 
-        $routeSegment = $format === 'atom' ? $routeConfig->atomFeedRoute() : $routeConfig->rssFeedRoute();
+        $routeSegment = $format === 'atom' ? $feedParser->atomFeedRoute() : $feedParser->rssFeedRoute();
         if ($routeSegment === '') {
             $this->context->notFound();
             return;
@@ -268,7 +268,7 @@ final class FeedController
 
         $site = $this->context->siteData();
         $feedChannelSlug = '';
-        $configuredFeedChannels = $routeConfig->feedChannels();
+        $configuredFeedChannels = $feedParser->feedChannels();
         $scopeLabel = '';
         $scopeType = 'global';
         $scopeSlug = '';
@@ -291,10 +291,10 @@ final class FeedController
             $scopeLabel = $this->feedChannelLabel($feedChannelSlug);
             $scopeType = 'channel';
             $scopeSlug = $feedChannelSlug;
-            $pages = $this->pageRepo->listRecentPublished($routeConfig->feedItems(), $feedChannelSlug);
+            $pages = $this->pageRepo->listRecentPublished($feedParser->feedItems(), $feedChannelSlug);
         } else {
             if (in_array('all', $configuredFeedChannels, true)) {
-                $pages = $this->pageRepo->listRecentPublished($routeConfig->feedItems(), null);
+                $pages = $this->pageRepo->listRecentPublished($feedParser->feedItems(), null);
             } else {
                 $selectedFeedChannels = array_values(array_filter(
                     $configuredFeedChannels,
@@ -311,7 +311,7 @@ final class FeedController
                 }
 
                 $pages = $this->pageRepo->listRecentPublishedForChannels(
-                    $routeConfig->feedItems(),
+                    $feedParser->feedItems(),
                     $selectedFeedChannels
                 );
             }
@@ -352,13 +352,13 @@ final class FeedController
      */
     private function renderTaxonomyFeed(string $format, string $taxonomyType, string $taxonomySlug): void
     {
-        $routeConfig = $this->context->routeConfigService();
-        if (!$routeConfig->feedEnabled()) {
+        $feedParser = $this->context->feedParser();
+        if (!$feedParser->feedEnabled()) {
             $this->context->notFound();
             return;
         }
 
-        $routeSegment = $format === 'atom' ? $routeConfig->atomFeedRoute() : $routeConfig->rssFeedRoute();
+        $routeSegment = $format === 'atom' ? $feedParser->atomFeedRoute() : $feedParser->rssFeedRoute();
         if ($routeSegment === '') {
             $this->context->notFound();
             return;
@@ -376,7 +376,7 @@ final class FeedController
         $pages = [];
 
         if ($taxonomyType === 'category') {
-            $categoryPrefix = $routeConfig->categoryRoutePrefix();
+            $categoryPrefix = $this->context->channelParser()->categoryRoutePrefix();
             if ($categoryPrefix === '') {
                 $this->context->notFound();
                 return;
@@ -388,12 +388,12 @@ final class FeedController
                 return;
             }
 
-            $pageResult = $this->pageRepo->listPageByCategorySlug($normalizedSlug, $routeConfig->feedItems(), 0);
+            $pageResult = $this->pageRepo->listPageByCategorySlug($normalizedSlug, $feedParser->feedItems(), 0);
             $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
             $scopeLabel = $this->taxonomyFeedLabel($category, $normalizedSlug);
             $routeSuffix = [$categoryPrefix, $normalizedSlug];
         } elseif ($taxonomyType === 'tag') {
-            $tagPrefix = $routeConfig->tagRoutePrefix();
+            $tagPrefix = $this->context->channelParser()->tagRoutePrefix();
             if ($tagPrefix === '') {
                 $this->context->notFound();
                 return;
@@ -405,7 +405,7 @@ final class FeedController
                 return;
             }
 
-            $pageResult = $this->pageRepo->listPageByTagSlug($normalizedSlug, $routeConfig->feedItems(), 0);
+            $pageResult = $this->pageRepo->listPageByTagSlug($normalizedSlug, $feedParser->feedItems(), 0);
             $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
             $scopeLabel = $this->taxonomyFeedLabel($tag, $normalizedSlug);
             $routeSuffix = [$tagPrefix, $normalizedSlug];
@@ -649,7 +649,7 @@ final class FeedController
                     $slug,
                     $pageId,
                     (string) ($page['created'] ?? ''),
-                    $this->context->routeConfigService()->globalPageRouteMode(),
+                    $this->context->channelParser()->globalPageRouteMode(),
                     'inherit',
                     (string) $this->context->config()->get('content.separator', '-')
                 );
@@ -665,7 +665,7 @@ final class FeedController
                         $slug,
                         $pageId,
                         (string) ($page['created'] ?? ''),
-                        $this->context->routeConfigService()->effectiveChannelRouteMode((string) ($page['route_mode_effective'] ?? 'inherit')),
+                        $this->context->channelParser()->effectiveChannelRouteMode((string) ($page['route_mode_effective'] ?? 'inherit')),
                         (string) ($page['route_separator_effective'] ?? 'inherit'),
                         (string) $this->context->config()->get('content.separator', '-')
                     )

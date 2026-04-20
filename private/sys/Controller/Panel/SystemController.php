@@ -39,7 +39,9 @@ use Raven\Lib\Extension\ExtensionStorageProvisioner;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
-use Raven\Lib\Parser\RouteParser;
+use Raven\Lib\Parser\ChannelParser;
+use Raven\Lib\Parser\FeedParser;
+use Raven\Lib\Parser\GroupParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\Transport\Upload;
@@ -97,7 +99,9 @@ final class SystemController
     private ?ThemeCloneService $themeCloneService = null;
     private ?ThemeFallbackRenderer $publicFallbackRenderer = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
-    private ?RouteParser $routeConfigService = null;
+    private ?ChannelParser $channelParser = null;
+    private ?FeedParser $feedParser = null;
+    private ?GroupParser $groupParser = null;
     private ?ExtensionCatalogService $extensionCatalogService = null;
     private ?PanelRoutingPreviewService $panelRoutingPreviewService = null;
     private ?ThemeCatalogService $themeCatalogService = null;
@@ -1606,7 +1610,7 @@ final class SystemController
      */
     private function globalPageRouteMode(): string
     {
-        return $this->routeConfigService()->globalPageRouteMode();
+        return $this->channelParser()->globalPageRouteMode();
     }
 
     /**
@@ -1614,7 +1618,7 @@ final class SystemController
      */
     private function effectiveChannelRouteMode(string $channelValue): string
     {
-        return $this->routeConfigService()->effectiveChannelRouteMode($channelValue);
+        return $this->channelParser()->effectiveChannelRouteMode($channelValue);
     }
 
     /**
@@ -1643,7 +1647,7 @@ final class SystemController
             return null;
         }
 
-        return match ($this->routeConfigService()->profileSelector()) {
+        return match ($this->groupParser()->profileSelector()) {
             'string' => $this->currentUserString($user),
             'username' => $this->normalizeUserIdentifierValue((string) ($user['username'] ?? '')),
             default => (string) $userId,
@@ -1697,9 +1701,9 @@ final class SystemController
         return $this->routingInventoryBuilder()->buildRows([
             'reserved_prefixes' => $this->reservedPublicPrefixes(),
             'channel_index_template_exists' => $this->channelIndexTemplateExistsForRouting(),
-            'feed_enabled' => $this->routeConfigService()->feedEnabled(),
-            'rss_feed_route' => $this->routeConfigService()->rssFeedRoute(),
-            'atom_feed_route' => $this->routeConfigService()->atomFeedRoute(),
+            'feed_enabled' => $this->feedParser()->feedEnabled(),
+            'rss_feed_route' => $this->feedParser()->rssFeedRoute(),
+            'atom_feed_route' => $this->feedParser()->atomFeedRoute(),
             'category_prefix' => $categoryPrefix,
             'tag_prefix' => $tagPrefix,
             'profile_prefix' => $profilePrefix,
@@ -2397,7 +2401,7 @@ final class SystemController
      */
     private function categoryRoutePrefix(): string
     {
-        return $this->routeConfigService()->categoryRoutePrefix();
+        return $this->channelParser()->categoryRoutePrefix();
     }
 
     /**
@@ -2405,7 +2409,7 @@ final class SystemController
      */
     private function tagRoutePrefix(): string
     {
-        return $this->routeConfigService()->tagRoutePrefix();
+        return $this->channelParser()->tagRoutePrefix();
     }
 
     /**
@@ -2413,7 +2417,7 @@ final class SystemController
      */
     private function profileRoutePrefix(): string
     {
-        return $this->routeConfigService()->profileRoutePrefix();
+        return $this->groupParser()->profileRoutePrefix();
     }
 
     /**
@@ -2421,7 +2425,7 @@ final class SystemController
      */
     private function profileRoutesEnabledForRoutingTable(): bool
     {
-        return $this->routeConfigService()->profileRoutesEnabledForRoutingTable();
+        return $this->groupParser()->profileRoutesEnabledForRoutingTable();
     }
 
     /**
@@ -2429,7 +2433,7 @@ final class SystemController
      */
     private function groupRoutePrefix(): string
     {
-        return $this->routeConfigService()->groupRoutePrefix();
+        return $this->groupParser()->groupRoutePrefix();
     }
 
     /**
@@ -2437,7 +2441,7 @@ final class SystemController
      */
     private function groupRoutesEnabledForRoutingTable(): bool
     {
-        return $this->routeConfigService()->groupRoutesEnabledForRoutingTable();
+        return $this->groupParser()->groupRoutesEnabledForRoutingTable();
     }
 
     /**
@@ -2544,15 +2548,39 @@ final class SystemController
     }
 
     /**
-     * Returns the route-config service on first use.
+     * Returns the channel parser on first use.
      */
-    private function routeConfigService(): RouteParser
+    private function channelParser(): ChannelParser
     {
-        if (!$this->routeConfigService instanceof RouteParser) {
-            $this->routeConfigService = new RouteParser($this->config, $this->input);
+        if (!$this->channelParser instanceof ChannelParser) {
+            $this->channelParser = new ChannelParser($this->config, $this->input);
         }
 
-        return $this->routeConfigService;
+        return $this->channelParser;
+    }
+
+    /**
+     * Returns the feed parser on first use.
+     */
+    private function feedParser(): FeedParser
+    {
+        if (!$this->feedParser instanceof FeedParser) {
+            $this->feedParser = new FeedParser($this->config, $this->input);
+        }
+
+        return $this->feedParser;
+    }
+
+    /**
+     * Returns the user/group parser on first use.
+     */
+    private function groupParser(): GroupParser
+    {
+        if (!$this->groupParser instanceof GroupParser) {
+            $this->groupParser = new GroupParser($this->config, $this->input);
+        }
+
+        return $this->groupParser;
     }
 
     /**

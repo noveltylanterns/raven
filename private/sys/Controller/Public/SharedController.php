@@ -16,6 +16,9 @@ use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Transport\Response;
 use Raven\Lib\Transport\Request;
 use Raven\Lib\Auth\SessionFlash;
+use Raven\Lib\Parser\ChannelParser;
+use Raven\Lib\Parser\FeedParser;
+use Raven\Lib\Parser\GroupParser;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Parser\RouteParser;
 use Raven\Lib\Parser\UserParser;
@@ -45,6 +48,9 @@ final class SharedController
     private bool $captchaScriptIncluded = false;
     private ?Request $requestContextResolver = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
+    private ?ChannelParser $channelParser = null;
+    private ?FeedParser $feedParser = null;
+    private ?GroupParser $groupParser = null;
     private ?UserParser $profileContactService = null;
     private ?RouteParser $routeConfigService = null;
     private ?CaptchaService $captchaService = null;
@@ -161,6 +167,48 @@ final class SharedController
         }
 
         return $this->routeConfigService;
+    }
+
+    /**
+     * Returns the cached channel parser.
+     *
+     * @return ChannelParser Shared channel/page-route parser.
+     */
+    public function channelParser(): ChannelParser
+    {
+        if (!$this->channelParser instanceof ChannelParser) {
+            $this->channelParser = new ChannelParser($this->config, $this->input);
+        }
+
+        return $this->channelParser;
+    }
+
+    /**
+     * Returns the cached feed parser.
+     *
+     * @return FeedParser Shared feed parser.
+     */
+    public function feedParser(): FeedParser
+    {
+        if (!$this->feedParser instanceof FeedParser) {
+            $this->feedParser = new FeedParser($this->config, $this->input);
+        }
+
+        return $this->feedParser;
+    }
+
+    /**
+     * Returns the cached profile/group parser.
+     *
+     * @return GroupParser Shared user/group parser.
+     */
+    public function groupParser(): GroupParser
+    {
+        if (!$this->groupParser instanceof GroupParser) {
+            $this->groupParser = new GroupParser($this->config, $this->input);
+        }
+
+        return $this->groupParser;
     }
 
     /**
@@ -511,7 +559,7 @@ final class SharedController
                 $this->siteContextBuilder(),
                 $this->themeCatalogService(),
                 $this->profileContactService(),
-                $this->routeConfigService()
+                $this->feedParser()
             );
         }
 

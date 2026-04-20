@@ -12,7 +12,9 @@ declare(strict_types=1);
 namespace Raven\Core\Routing\Public;
 
 use Raven\Core\Config;
-use Raven\Lib\Parser\RouteParser;
+use Raven\Lib\Parser\ChannelParser;
+use Raven\Lib\Parser\FeedParser;
+use Raven\Lib\Parser\GroupParser;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -39,16 +41,18 @@ final class PublicRouteConfig
      */
     public static function build(Config $config, InputSanitizer $input): array
     {
-        $routeConfig = new RouteParser($config, $input);
+        $channelParser = new ChannelParser($config, $input);
+        $groupParser = new GroupParser($config, $input);
+        $feedParser = new FeedParser($config, $input);
 
         $panelPath = (string) $config->get('panel.path', 'panel');
-        $categoryPrefix = $routeConfig->categoryRoutePrefix();
-        $tagPrefix = $routeConfig->tagRoutePrefix();
-        $profilePrefix = $routeConfig->profileRoutePrefix();
-        $groupPrefix = $routeConfig->groupRoutePrefix();
-        $feedsEnabled = $routeConfig->feedEnabled();
-        $rssFeedRoute = $routeConfig->rssFeedRoute();
-        $atomFeedRoute = $routeConfig->atomFeedRoute();
+        $categoryPrefix = $channelParser->categoryRoutePrefix();
+        $tagPrefix = $channelParser->tagRoutePrefix();
+        $profilePrefix = $groupParser->profileRoutePrefix();
+        $groupPrefix = $groupParser->groupRoutePrefix();
+        $feedsEnabled = $feedParser->feedEnabled();
+        $rssFeedRoute = $feedParser->rssFeedRoute();
+        $atomFeedRoute = $feedParser->atomFeedRoute();
 
         // Keep the two feed route slugs distinct even when config is edited to collide.
         if ($rssFeedRoute !== '' && $atomFeedRoute !== '' && $rssFeedRoute === $atomFeedRoute) {

@@ -19,7 +19,7 @@ use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\Parser\RouteParser;
+use Raven\Lib\Parser\GroupParser;
 use Raven\Lib\Security\InputSanitizer;
 
 use Raven\Lib\Transport\Redirect;
@@ -32,7 +32,7 @@ final class GroupController
     private SharedController $context;
     private InputSanitizer $input;
     private GroupRepository $groupRepo;
-    private RouteParser $routeConfigService;
+    private GroupParser $groupParser;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private TaxonomyImageService $taxonomyImageService;
@@ -44,7 +44,7 @@ final class GroupController
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param GroupRepository $groupRepo Group repository for panel CRUD.
-     * @param RouteParser $routeConfigService Shared route-configuration helper.
+     * @param GroupParser $groupParser Shared user/group route parser.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor utility methods.
      * @param TaxonomyImageService $taxonomyImageService Shared group image upload/storage pipeline.
@@ -57,7 +57,7 @@ final class GroupController
         SharedController $context,
         InputSanitizer $input,
         GroupRepository $groupRepo,
-        RouteParser $routeConfigService,
+        GroupParser $groupParser,
         EditorTabs $editorTabs,
         Editor $editor,
         TaxonomyImageService $taxonomyImageService,
@@ -68,7 +68,7 @@ final class GroupController
         $this->context = $context;
         $this->input = $input;
         $this->groupRepo = $groupRepo;
-        $this->routeConfigService = $routeConfigService;
+        $this->groupParser = $groupParser;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
         $this->taxonomyImageService = $taxonomyImageService;
@@ -451,7 +451,7 @@ final class GroupController
      */
     private function groupRoutePrefix(): string
     {
-        return $this->routeConfigService->groupRoutePrefix();
+        return $this->groupParser->groupRoutePrefix();
     }
 
     /**
@@ -461,7 +461,7 @@ final class GroupController
      */
     private function groupRoutesEnabledForRoutingTable(): bool
     {
-        return $this->routeConfigService->groupRoutesEnabledForRoutingTable();
+        return $this->groupParser->groupRoutesEnabledForRoutingTable();
     }
 
     /**

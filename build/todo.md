@@ -19,7 +19,9 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	- [ ] Current direction change: canonical read-side helpers are being renamed from `lib/Directory/` to `lib/Parser/` with `*Parser` class names, while temporary `Directory/` aliases remain only for migration safety.
 	- [ ] Missing directory handlers for User.php, Category.php, Tag.php and Page.php.
 	- [ ] lib/Directory/Route.php still has things like "effectiveChannelRouteMode" that should be in lib/Directory/Channel.php.
+		- [ ] In progress: channel route-mode/separator helpers now live in `Parser/ChannelParser`; remaining `RouteParser` wrapper cleanup is still pending.
 	- [ ] Route.php still has feed-related functions that should reside in Feed.php and group functions that should be in Group.php, profile functions that belong in User.php, etc. Route.php should only have things that aren't the domain of our other more-specific Directory/ handlers.
+		- [ ] In progress: most public/panel callers now consume `ChannelParser`, `FeedParser`, and `GroupParser` directly; `RouteParser` remains only as a bridge for migration safety.
 	- [ ] Route.php itself should be pretty small when this is done. At that point, merge Mode.php into Route.php, then do another extraction/optimization pass on the merged Route.php (ie: stuff like channel-only functions get moved to Channel.php, repeat for other Directory/ data types.
 	- [ ] Merge ChannelContext.php into Channel.php
 	- [ ] Rename SetContext.php to Set.php

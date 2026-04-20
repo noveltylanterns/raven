@@ -30,8 +30,8 @@ use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\PageImageManager;
+use Raven\Lib\Parser\ChannelParser;
 use Raven\Lib\Parser\ModeParser;
-use Raven\Lib\Parser\RouteParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\View\Panel\Editor;
@@ -61,7 +61,7 @@ final class ContentController
     private ChannelRepository $channelRepo;
     private PageImageRepository $pageImages;
     private UserRepository $userRepo;
-    private RouteParser $routeConfigService;
+    private ChannelParser $channelParser;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private EditorBlocks $editorBlocks;
@@ -114,7 +114,7 @@ final class ContentController
      * @param callable $tagSetRepoResolver Lazy tag-set repository resolver; resolved only on set-validation flows.
      * @param callable $taxonomyLookupRepoResolver Lazy taxonomy lookup resolver; resolved only on page-editor option-set queries.
      * @param UserRepository $userRepo User repository for author validation and author select options.
-     * @param RouteParser $routeConfigService Route configuration service for route-mode and separator helpers.
+     * @param ChannelParser $channelParser Route parser for channel route-mode and routing-prefix helpers.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor utility methods (body-text editor normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
@@ -137,7 +137,7 @@ final class ContentController
         callable $tagSetRepoResolver,
         callable $taxonomyLookupRepoResolver,
         UserRepository $userRepo,
-        RouteParser $routeConfigService,
+        ChannelParser $channelParser,
         EditorTabs $editorTabs,
         Editor $editor,
         EditorBlocks $editorBlocks,
@@ -158,7 +158,7 @@ final class ContentController
         $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
         $this->taxonomyLookupRepoResolver = Closure::fromCallable($taxonomyLookupRepoResolver);
         $this->userRepo = $userRepo;
-        $this->routeConfigService = $routeConfigService;
+        $this->channelParser = $channelParser;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
         $this->editorBlocks = $editorBlocks;
@@ -296,7 +296,7 @@ final class ContentController
             $channelOption['editor_override'] = $this->editor->normalizeChannelEditorOverride(
                 (string) ($channelOption['editor_override'] ?? 'inherit')
             );
-            $channelOption['route_mode'] = $this->routeConfigService->normalizeChannelRouteMode(
+            $channelOption['route_mode'] = $this->channelParser->normalizeChannelRouteMode(
                 (string) ($channelOption['route_mode'] ?? 'inherit')
             );
             $channelOption['route_separator'] = ModeParser::normalizeChannelSeparator(
@@ -1183,7 +1183,7 @@ final class ContentController
      */
     private function globalPageRouteMode(): string
     {
-        return $this->routeConfigService->globalPageRouteMode();
+        return $this->channelParser->globalPageRouteMode();
     }
 
     // -------------------------------------------------------------------------

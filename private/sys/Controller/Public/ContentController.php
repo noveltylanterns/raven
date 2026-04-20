@@ -183,7 +183,7 @@ final class ContentController
                 return;
             }
 
-            $channelRouteMode = $this->context->routeConfigService()->effectiveChannelRouteMode((string) ($channel['route_mode'] ?? 'inherit'));
+            $channelRouteMode = $this->context->channelParser()->effectiveChannelRouteMode((string) ($channel['route_mode'] ?? 'inherit'));
             $channelWordSeparator = $this->publicChannelPageRouteService()->resolveWordSeparator(
                 (string) ($channel['route_separator'] ?? 'inherit'),
                 (string) $this->context->config()->get('content.separator', '-')
@@ -207,7 +207,7 @@ final class ContentController
                 $lookupSlug = (string) ($lookupTarget['slug'] ?? '');
             }
         } else {
-            $channelRouteMode = $this->context->routeConfigService()->globalPageRouteMode();
+            $channelRouteMode = $this->context->channelParser()->globalPageRouteMode();
             $lookupTarget = $this->publicChannelPageRouteService()->resolveLookupTarget(
                 $requestedSlug,
                 $channelRouteMode,
@@ -680,7 +680,7 @@ final class ContentController
                 new SiteContextBuilder(),
                 $this->themeCatalogService(),
                 $this->profileContactService(),
-                $this->context->routeConfigService()
+                $this->context->feedParser()
             );
         }
 

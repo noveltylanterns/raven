@@ -147,7 +147,8 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Note: `sys/Auth/` may be re-introduced later as a lean internal-only auth package; for now everything lives here.
 - `private/lib/Parser/`
   - Canonical read-only parsing and normalization helpers for routing, config, metadata, and filesystem-backed records.
-  - `ChannelParser`, `FeedParser`, `GroupParser`, `ModeParser`, `PanelParser`, and `RouteParser` own route-prefix, route-mode, separator, and routing-config parsing for the public and panel stacks.
+  - `ChannelParser`, `FeedParser`, `GroupParser`, `ModeParser`, and `PanelParser` are the focused public/panel routing parsers: category/tag prefixes, feed routes, profile/group routes, channel page-route policy, separators, and panel-path normalization all live in their narrow parser classes.
+  - `RouteParser` is now a composed compatibility bridge over the focused parsers and is no longer the primary runtime surface for core callers.
   - `ChannelContextParser` and `SetParser` own the channel/set record normalization policy plus the PHP-file-backed stores for `private/dat/channel/`, `private/dat/category-set/`, and `private/dat/tag-set/`.
   - `DuplicateParser` is the shared `(slug, channel)` uniqueness lookup helper for repositories.
   - `ConfigParser` owns dot-path config reads, scalar coercion, nested-form reads, and config-field stringification.

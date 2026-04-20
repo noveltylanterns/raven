@@ -29,7 +29,7 @@ use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\PanelMediaConfigService;
-use Raven\Lib\Parser\RouteParser;
+use Raven\Lib\Parser\GroupParser;
 use Raven\Lib\Parser\UserParser;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -52,7 +52,7 @@ final class UserController
     private Closure $inviteTokensResolver;
     private ?InviteTokenRepository $inviteTokens = null;
     private SessionFlash $flashList;
-    private RouteParser $routeConfigService;
+    private GroupParser $groupParser;
     private PanelInvitePolicyService $panelInvitePolicyService;
     private LoginIdentifierResolver $loginIdentifierResolver;
     private EditorTabs $editorTabs;
@@ -73,7 +73,7 @@ final class UserController
      * @param UserRepository $userRepo User repository for panel user CRUD.
      * @param callable(): InviteTokenRepository $inviteTokensResolver Lazy invite-token repository resolver.
      * @param SessionFlash $flashList List-style flash store for generated token batches.
-     * @param RouteParser $routeConfigService Shared route-configuration helper.
+     * @param GroupParser $groupParser Shared user/group route parser.
      * @param PanelInvitePolicyService $panelInvitePolicyService Shared invite-form parsing helper.
      * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
@@ -95,7 +95,7 @@ final class UserController
         UserRepository $userRepo,
         callable $inviteTokensResolver,
         SessionFlash $flashList,
-        RouteParser $routeConfigService,
+        GroupParser $groupParser,
         PanelInvitePolicyService $panelInvitePolicyService,
         LoginIdentifierResolver $loginIdentifierResolver,
         EditorTabs $editorTabs,
@@ -115,7 +115,7 @@ final class UserController
         $this->userRepo = $userRepo;
         $this->inviteTokensResolver = Closure::fromCallable($inviteTokensResolver);
         $this->flashList = $flashList;
-        $this->routeConfigService = $routeConfigService;
+        $this->groupParser = $groupParser;
         $this->panelInvitePolicyService = $panelInvitePolicyService;
         $this->loginIdentifierResolver = $loginIdentifierResolver;
         $this->editorTabs = $editorTabs;
@@ -1044,7 +1044,7 @@ final class UserController
      */
     private function registrationMode(): string
     {
-        return $this->routeConfigService->registrationMode();
+        return $this->groupParser->registrationMode();
     }
 
     /**
@@ -1103,7 +1103,7 @@ final class UserController
      */
     private function profileRoutePrefix(): string
     {
-        return $this->routeConfigService->profileRoutePrefix();
+        return $this->groupParser->profileRoutePrefix();
     }
 
     /**
@@ -1113,7 +1113,7 @@ final class UserController
      */
     private function profileRoutesEnabledForRoutingTable(): bool
     {
-        return $this->routeConfigService->profileRoutesEnabledForRoutingTable();
+        return $this->groupParser->profileRoutesEnabledForRoutingTable();
     }
 
     /**
@@ -1141,7 +1141,7 @@ final class UserController
             return null;
         }
 
-        return match ($this->routeConfigService->profileSelector()) {
+        return match ($this->groupParser->profileSelector()) {
             'string' => $this->currentUserString($user),
             'username' => $this->normalizeUserIdentifierValue((string) ($user['username'] ?? '')),
             default => (string) $userId,

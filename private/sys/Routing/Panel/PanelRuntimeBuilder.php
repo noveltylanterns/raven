@@ -44,12 +44,14 @@ use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
 use Raven\Lib\Auth\SessionFlash;
+use Raven\Lib\Parser\ChannelParser;
 use Raven\Lib\Parser\ConfigParser;
+use Raven\Lib\Parser\FeedParser;
+use Raven\Lib\Parser\GroupParser;
 use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\PageImageManager;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Media\Panel\UserMediaPathService;
-use Raven\Lib\Parser\RouteParser;
 use Raven\Lib\Parser\UserParser;
 use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\View\Panel\Editor;
@@ -592,7 +594,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['tag_set'],
                 $taxonomyDomain['taxonomy_lookup'],
                 $contentDomain['user'],
-                new RouteParser($rvn['config'], $rvn['input']),
+                new ChannelParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
                 $rvn['panel_editor_blocks'],
@@ -652,7 +654,8 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['category_enabled'],
                 $taxonomyDomain['tag_enabled'],
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
-                new RouteParser($rvn['config'], $rvn['input']),
+                new ChannelParser($rvn['config'], $rvn['input']),
+                new FeedParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
                 new Upload()
@@ -681,7 +684,7 @@ final class PanelRuntimeBuilder
                 $userDomain['user'],
                 $userDomain['invite_tokens'],
                 new SessionFlash('_raven_flash_list'),
-                new RouteParser($rvn['config'], $rvn['input']),
+                new GroupParser($rvn['config'], $rvn['input']),
                 new PanelInvitePolicyService($rvn['input']),
                 new LoginIdentifierResolver(),
                 $rvn['panel_editor_tabs'],
@@ -712,7 +715,7 @@ final class PanelRuntimeBuilder
                 $requestContextFactory(),
                 $rvn['input'],
                 $groupDomain['group'],
-                new RouteParser($rvn['config'], $rvn['input']),
+                new GroupParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),

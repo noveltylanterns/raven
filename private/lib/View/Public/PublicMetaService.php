@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Raven\Lib\View\Public;
 
 use Raven\Core\Config;
+use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Transport\Request;
-use Raven\Lib\Parser\RouteParser;
 use Raven\Lib\Parser\UserParser;
 use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\View\Panel\ThemeCatalogService;
@@ -20,20 +20,20 @@ final class PublicMetaService
     private SiteContextBuilder $siteContextBuilder;
     private ThemeCatalogService $themeCatalogService;
     private UserParser $profileContactService;
-    private RouteParser $routeConfigService;
+    private FeedParser $feedParser;
 
     public function __construct(
         Request $requestContextResolver,
         SiteContextBuilder $siteContextBuilder,
         ThemeCatalogService $themeCatalogService,
         UserParser $profileContactService,
-        RouteParser $routeConfigService
+        FeedParser $feedParser
     ) {
         $this->requestContextResolver = $requestContextResolver;
         $this->siteContextBuilder = $siteContextBuilder;
         $this->themeCatalogService = $themeCatalogService;
         $this->profileContactService = $profileContactService;
-        $this->routeConfigService = $routeConfigService;
+        $this->feedParser = $feedParser;
     }
 
     /**
@@ -183,16 +183,16 @@ final class PublicMetaService
         $site['feed_rss_url'] = '';
         $site['feed_atom_url'] = '';
 
-        if ($siteUrl === '' || !$this->routeConfigService->feedEnabled()) {
+        if ($siteUrl === '' || !$this->feedParser->feedEnabled()) {
             return $site;
         }
 
-        $rssRoute = $this->routeConfigService->rssFeedRoute();
+        $rssRoute = $this->feedParser->rssFeedRoute();
         if ($rssRoute !== '') {
             $site['feed_rss_url'] = $siteUrl . '/' . ltrim($rssRoute, '/');
         }
 
-        $atomRoute = $this->routeConfigService->atomFeedRoute();
+        $atomRoute = $this->feedParser->atomFeedRoute();
         if ($atomRoute !== '') {
             $site['feed_atom_url'] = $siteUrl . '/' . ltrim($atomRoute, '/');
         }

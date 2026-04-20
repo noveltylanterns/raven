@@ -63,9 +63,9 @@ final class ProfileController
      */
     public function profile(string $username): void
     {
-        $profileMode = $this->context->routeConfigService()->profileMode();
+        $profileMode = $this->context->groupParser()->profileMode();
         $isLoggedIn = $this->context->auth()->isLoggedIn();
-        if ($this->context->routeConfigService()->profileRoutePrefix() === '') {
+        if ($this->context->groupParser()->profileRoutePrefix() === '') {
             $this->context->notFound();
             return;
         }
@@ -110,9 +110,9 @@ final class ProfileController
      */
     public function group(string $groupSlug): void
     {
-        $groupMode = $this->context->routeConfigService()->groupMode();
+        $groupMode = $this->context->groupParser()->groupMode();
         $isLoggedIn = $this->context->auth()->isLoggedIn();
-        if ($this->context->routeConfigService()->groupRoutePrefix() === '') {
+        if ($this->context->groupParser()->groupRoutePrefix() === '') {
             $this->context->notFound();
             return;
         }
@@ -217,7 +217,7 @@ final class ProfileController
      */
     private function findPublicProfileByRouteSegment(string $routeSegment): ?array
     {
-        $selector = $this->context->routeConfigService()->profileSelector();
+        $selector = $this->context->groupParser()->profileSelector();
         if ($selector === 'id') {
             $userId = $this->context->input()->int($routeSegment, 1);
             if ($userId === null) {

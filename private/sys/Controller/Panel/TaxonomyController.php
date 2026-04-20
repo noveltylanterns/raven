@@ -20,8 +20,9 @@ use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
+use Raven\Lib\Parser\ChannelParser;
+use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Parser\ModeParser;
-use Raven\Lib\Parser\RouteParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Parser\SetParser;
 
@@ -55,7 +56,8 @@ final class TaxonomyController
     private bool $categoryEnabled;
     private bool $tagEnabled;
     private TaxonomyImageService $taxonomyImageService;
-    private RouteParser $routeConfigService;
+    private ChannelParser $channelParser;
+    private FeedParser $feedParser;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private Upload $uploadFileSetNormalizer;
@@ -71,7 +73,8 @@ final class TaxonomyController
      * @param bool $categoryEnabled Whether category features are enabled in runtime config.
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Service for taxonomy image uploads and path management.
-     * @param RouteParser $routeConfigService Route configuration reader for channel/category/tag route mode and prefix helpers.
+     * @param ChannelParser $channelParser Route parser for channel/category/tag prefixes and route-mode helpers.
+     * @param FeedParser $feedParser Feed parser for RSS/Atom route settings.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor normalizers (channel editor override, etc.).
      * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
@@ -88,7 +91,8 @@ final class TaxonomyController
         bool $categoryEnabled,
         bool $tagEnabled,
         TaxonomyImageService $taxonomyImageService,
-        RouteParser $routeConfigService,
+        ChannelParser $channelParser,
+        FeedParser $feedParser,
         EditorTabs $editorTabs,
         Editor $editor,
         Upload $uploadFileSetNormalizer
@@ -103,7 +107,8 @@ final class TaxonomyController
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
         $this->taxonomyImageService = $taxonomyImageService;
-        $this->routeConfigService = $routeConfigService;
+        $this->channelParser = $channelParser;
+        $this->feedParser = $feedParser;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
@@ -177,7 +182,7 @@ final class TaxonomyController
             $channel['editor_override'] = $this->editor->normalizeChannelEditorOverride(
                 (string) ($channel['editor_override'] ?? 'inherit')
             );
-            $channel['route_mode'] = $this->routeConfigService->normalizeChannelRouteMode(
+            $channel['route_mode'] = $this->channelParser->normalizeChannelRouteMode(
                 (string) ($channel['route_mode'] ?? 'inherit')
             );
             $channel['route_separator'] = ModeParser::normalizeChannelSeparator(
@@ -189,13 +194,13 @@ final class TaxonomyController
 
         $this->context->renderPanel('panel/channel/edit', [
             'channel' => $channel,
-            'feedsEnabled' => $this->routeConfigService->feedEnabled(),
+            'feedsEnabled' => $this->feedParser->feedEnabled(),
             'categoryEnabled' => $this->categoryEnabled,
             'tagEnabled' => $this->tagEnabled,
             'categorySetOptions' => $this->categorySetRepo()->listOptions(),
             'tagSetOptions' => $this->tagSetRepo()->listOptions(),
-            'rssFeedRoute' => $this->routeConfigService->rssFeedRoute(),
-            'atomFeedRoute' => $this->routeConfigService->atomFeedRoute(),
+            'rssFeedRoute' => $this->feedParser->rssFeedRoute(),
+            'atomFeedRoute' => $this->feedParser->atomFeedRoute(),
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),
@@ -241,13 +246,13 @@ final class TaxonomyController
         $editorOverride = $this->editor->normalizeChannelEditorOverride(
             (string) ($post['editor_override'] ?? 'inherit')
         );
-        $routeMode = $this->routeConfigService->normalizeChannelRouteMode(
+        $routeMode = $this->channelParser->normalizeChannelRouteMode(
             (string) ($post['route_mode'] ?? 'inherit')
         );
         $routeSeparator = ModeParser::normalizeChannelSeparator(
             (string) ($post['route_separator'] ?? 'inherit')
         );
-        $feedsEnabled = $this->routeConfigService->feedEnabled();
+        $feedsEnabled = $this->feedParser->feedEnabled();
         $categorySetSelection = $this->normalizeSubmittedSetSelection(
             $post['category_sets'] ?? [],
             $this->categorySetRepo()->listOptions()
@@ -564,7 +569,7 @@ final class TaxonomyController
         $this->context->renderPanel('panel/category/edit', [
             'category' => $category,
             'setOptions' => $this->categorySetRepo()->listOptions(),
-            'categoryRoutePrefix' => $this->routeConfigService->categoryRoutePrefix(),
+            'categoryRoutePrefix' => $this->channelParser->categoryRoutePrefix(),
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),
@@ -1111,7 +1116,7 @@ final class TaxonomyController
         $this->context->renderPanel('panel/tag/edit', [
             'tag' => $tag,
             'setOptions' => $this->tagSetRepo()->listOptions(),
-            'tagRoutePrefix' => $this->routeConfigService->tagRoutePrefix(),
+            'tagRoutePrefix' => $this->channelParser->tagRoutePrefix(),
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),

@@ -84,7 +84,7 @@ final class AuthController
             'flashError' => $this->context->pullFlash('error'),
             'loginPath' => $this->loginPathWithRedirect($redirectPath),
             'registrationPath' => '/register',
-            'registrationMode' => $this->context->routeConfigService()->registrationMode(),
+            'registrationMode' => $this->context->groupParser()->registrationMode(),
             'loginIdentifierMode' => $loginIdentifierMode,
             'loginIdentifierLabel' => $loginIdentifierMode === 'email' ? 'Email' : 'Username or Email',
             'postLoginRedirectPath' => $redirectPath,
@@ -306,7 +306,7 @@ final class AuthController
      */
     public function register(): void
     {
-        $registrationMode = $this->context->routeConfigService()->registrationMode();
+        $registrationMode = $this->context->groupParser()->registrationMode();
         $loginIdentifierMode = $this->identifierResolver->modeFromConfig($this->context->config());
         $this->context->renderPublic('auth/register', [
             'site' => $this->context->siteData(),
@@ -336,7 +336,7 @@ final class AuthController
             Redirect::redirect('/register');
         }
 
-        $registrationMode = $this->context->routeConfigService()->registrationMode();
+        $registrationMode = $this->context->groupParser()->registrationMode();
         if ($registrationMode === 'closed') {
             $this->context->flash('error', 'Registration is currently closed.');
             Redirect::redirect('/register');
