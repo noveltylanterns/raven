@@ -199,7 +199,7 @@ if ($permalinkBase !== '' && !preg_match('#^https?://#i', $permalinkBase)) {
 $permalinkBase = rtrim($permalinkBase, '/');
 $permalinkPathParts = [];
 $routeSegment = trim(
-    \Raven\Lib\Directory\Mode::buildRouteSegment(
+    \Raven\Lib\Parser\ModeParser::buildRouteSegment(
         new \Raven\Lib\Security\InputSanitizer(),
         $pageSlug,
         $pageId,

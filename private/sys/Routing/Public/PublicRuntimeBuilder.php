@@ -29,7 +29,7 @@ use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Config\ConfigParser;
+use Raven\Lib\Parser\ConfigParser;
 use RuntimeException;
 
 /**

@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Debug;
 
 use Raven\Core\Config;
-use Raven\Lib\Config\ConfigParser;
+use Raven\Lib\Parser\ConfigParser;
 
 /**
  * Shared resolver for debug-toolbar config flags.

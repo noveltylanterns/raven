@@ -20,10 +20,10 @@ use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\Directory\Mode;
-use Raven\Lib\Directory\Route;
+use Raven\Lib\Parser\ModeParser;
+use Raven\Lib\Parser\RouteParser;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Directory\SetContext;
+use Raven\Lib\Parser\SetParser;
 
 use Raven\Lib\Transport\Redirect;
 
@@ -55,7 +55,7 @@ final class TaxonomyController
     private bool $categoryEnabled;
     private bool $tagEnabled;
     private TaxonomyImageService $taxonomyImageService;
-    private Route $routeConfigService;
+    private RouteParser $routeConfigService;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private Upload $uploadFileSetNormalizer;
@@ -71,7 +71,7 @@ final class TaxonomyController
      * @param bool $categoryEnabled Whether category features are enabled in runtime config.
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Service for taxonomy image uploads and path management.
-     * @param Route $routeConfigService Route configuration reader for channel/category/tag route mode and prefix helpers.
+     * @param RouteParser $routeConfigService Route configuration reader for channel/category/tag route mode and prefix helpers.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor normalizers (channel editor override, etc.).
      * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
@@ -88,7 +88,7 @@ final class TaxonomyController
         bool $categoryEnabled,
         bool $tagEnabled,
         TaxonomyImageService $taxonomyImageService,
-        Route $routeConfigService,
+        RouteParser $routeConfigService,
         EditorTabs $editorTabs,
         Editor $editor,
         Upload $uploadFileSetNormalizer
@@ -172,15 +172,15 @@ final class TaxonomyController
 
         if (is_array($channel)) {
             $channel['feed_enabled'] = (bool) ($channel['feed_enabled'] ?? false);
-            $channel['category_sets'] = SetContext::normalizeSelection($channel['category_sets'] ?? [], false);
-            $channel['tag_sets'] = SetContext::normalizeSelection($channel['tag_sets'] ?? [], false);
+            $channel['category_sets'] = SetParser::normalizeSelection($channel['category_sets'] ?? [], false);
+            $channel['tag_sets'] = SetParser::normalizeSelection($channel['tag_sets'] ?? [], false);
             $channel['editor_override'] = $this->editor->normalizeChannelEditorOverride(
                 (string) ($channel['editor_override'] ?? 'inherit')
             );
             $channel['route_mode'] = $this->routeConfigService->normalizeChannelRouteMode(
                 (string) ($channel['route_mode'] ?? 'inherit')
             );
-            $channel['route_separator'] = Mode::normalizeChannelSeparator(
+            $channel['route_separator'] = ModeParser::normalizeChannelSeparator(
                 (string) ($channel['route_separator'] ?? 'inherit')
             );
         }
@@ -244,7 +244,7 @@ final class TaxonomyController
         $routeMode = $this->routeConfigService->normalizeChannelRouteMode(
             (string) ($post['route_mode'] ?? 'inherit')
         );
-        $routeSeparator = Mode::normalizeChannelSeparator(
+        $routeSeparator = ModeParser::normalizeChannelSeparator(
             (string) ($post['route_separator'] ?? 'inherit')
         );
         $feedsEnabled = $this->routeConfigService->feedEnabled();
@@ -995,7 +995,7 @@ final class TaxonomyController
         // Reassign any remaining categories in this set to the default set before deleting.
         $categoryCount = (int) ($this->categoryRepo()->countsBySetId()[$id] ?? 0);
         if ($categoryCount > 0) {
-            $this->categoryRepo()->reassignSetToDefault($id, SetContext::DEFAULT_SET_ID);
+            $this->categoryRepo()->reassignSetToDefault($id, SetParser::DEFAULT_SET_ID);
         }
 
         try {
@@ -1536,7 +1536,7 @@ final class TaxonomyController
         // Reassign any remaining tags in this set to the default set before deleting.
         $tagCount = (int) ($this->tagRepo()->countsBySetId()[$id] ?? 0);
         if ($tagCount > 0) {
-            $this->tagRepo()->reassignSetToDefault($id, SetContext::DEFAULT_SET_ID);
+            $this->tagRepo()->reassignSetToDefault($id, SetParser::DEFAULT_SET_ID);
         }
 
         try {
@@ -1658,15 +1658,15 @@ final class TaxonomyController
             }
         }
 
-        $selection = SetContext::normalizeSelection($submitted, false);
-        if (SetContext::selectionIncludesAll($selection)) {
-            return [SetContext::ALL_SET_ID];
+        $selection = SetParser::normalizeSelection($submitted, false);
+        if (SetParser::selectionIncludesAll($selection)) {
+            return [SetParser::ALL_SET_ID];
         }
 
         $allowedIds = [];
         foreach ($options as $option) {
             $allowedId = (int) ($option['id'] ?? -1);
-            if ($allowedId >= SetContext::DEFAULT_SET_ID) {
+            if ($allowedId >= SetParser::DEFAULT_SET_ID) {
                 $allowedIds[$allowedId] = true;
             }
         }
@@ -1685,7 +1685,7 @@ final class TaxonomyController
 
         ksort($normalized, SORT_NUMERIC);
         if (count($normalized) === count($allowedIds) && $allowedIds !== []) {
-            return [SetContext::ALL_SET_ID];
+            return [SetParser::ALL_SET_ID];
         }
 
         return array_values($normalized);

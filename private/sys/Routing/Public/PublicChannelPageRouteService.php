@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Public;
 
-use Raven\Lib\Directory\Mode;
+use Raven\Lib\Parser\ModeParser;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -19,7 +19,7 @@ use Raven\Lib\Security\InputSanitizer;
  *
  * A thin coordination surface that delegates all route normalization,
  * separator resolution, lookup-target resolution, and canonical segment
- * building to `Raven\Lib\Directory\Mode`, keeping the calling controllers
+ * building to `Raven\Lib\Parser\ModeParser`, keeping the calling controllers
  * decoupled from the policy details.
  */
 final class PublicChannelPageRouteService
@@ -42,7 +42,7 @@ final class PublicChannelPageRouteService
      */
     public function normalizeRouteMode(string $value): string
     {
-        return Mode::normalizeRouteMode($value);
+        return ModeParser::normalizeRouteMode($value);
     }
 
     /**
@@ -54,7 +54,7 @@ final class PublicChannelPageRouteService
      */
     public function resolveWordSeparator(string $channelValue, string $globalSeparator): string
     {
-        return Mode::resolveSeparator($channelValue, $globalSeparator);
+        return ModeParser::resolveSeparator($channelValue, $globalSeparator);
     }
 
     /**
@@ -67,7 +67,7 @@ final class PublicChannelPageRouteService
      */
     public function resolveLookupTarget(string $requestedSlug, string $routeMode, string $wordSeparator): ?array
     {
-        return Mode::resolveLookupTarget($this->input, $requestedSlug, $routeMode, $wordSeparator);
+        return ModeParser::resolveLookupTarget($this->input, $requestedSlug, $routeMode, $wordSeparator);
     }
 
     /**
@@ -89,7 +89,7 @@ final class PublicChannelPageRouteService
         string $wordSeparator,
         string $globalSeparator
     ): string {
-        return Mode::buildRouteSegment(
+        return ModeParser::buildRouteSegment(
             $this->input,
             $slug,
             $pageId,

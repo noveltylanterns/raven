@@ -20,7 +20,7 @@ use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\SessionCookie;
-use Raven\Lib\Config\ConfigParser;
+use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Scheduler\Registry;
 use Raven\Lib\Security\Csrf;

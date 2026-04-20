@@ -30,10 +30,10 @@ use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\PageImageManager;
-use Raven\Lib\Directory\Mode;
-use Raven\Lib\Directory\Route;
+use Raven\Lib\Parser\ModeParser;
+use Raven\Lib\Parser\RouteParser;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Directory\SetContext;
+use Raven\Lib\Parser\SetParser;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorAuthor;
 use Raven\Lib\View\Panel\EditorBlocks;
@@ -61,7 +61,7 @@ final class ContentController
     private ChannelRepository $channelRepo;
     private PageImageRepository $pageImages;
     private UserRepository $userRepo;
-    private Route $routeConfigService;
+    private RouteParser $routeConfigService;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private EditorBlocks $editorBlocks;
@@ -114,7 +114,7 @@ final class ContentController
      * @param callable $tagSetRepoResolver Lazy tag-set repository resolver; resolved only on set-validation flows.
      * @param callable $taxonomyLookupRepoResolver Lazy taxonomy lookup resolver; resolved only on page-editor option-set queries.
      * @param UserRepository $userRepo User repository for author validation and author select options.
-     * @param Route $routeConfigService Route configuration service for route-mode and separator helpers.
+     * @param RouteParser $routeConfigService Route configuration service for route-mode and separator helpers.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor utility methods (body-text editor normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
@@ -137,7 +137,7 @@ final class ContentController
         callable $tagSetRepoResolver,
         callable $taxonomyLookupRepoResolver,
         UserRepository $userRepo,
-        Route $routeConfigService,
+        RouteParser $routeConfigService,
         EditorTabs $editorTabs,
         Editor $editor,
         EditorBlocks $editorBlocks,
@@ -299,7 +299,7 @@ final class ContentController
             $channelOption['route_mode'] = $this->routeConfigService->normalizeChannelRouteMode(
                 (string) ($channelOption['route_mode'] ?? 'inherit')
             );
-            $channelOption['route_separator'] = Mode::normalizeChannelSeparator(
+            $channelOption['route_separator'] = ModeParser::normalizeChannelSeparator(
                 (string) ($channelOption['route_separator'] ?? 'inherit')
             );
         }
@@ -358,7 +358,7 @@ final class ContentController
                 (string) $this->config->get('content.editor', 'tinymce')
             ),
             'routeModeDefault' => $this->globalPageRouteMode(),
-            'routeSeparatorDefault' => Mode::normalizeGlobalSeparator(
+            'routeSeparatorDefault' => ModeParser::normalizeGlobalSeparator(
                 (string) $this->config->get('content.separator', '-')
             ),
             'bodyBlockTypeDefinitions' => $this->pageEditorBodyBlockTypeDefinitions(),
@@ -1122,7 +1122,7 @@ final class ContentController
      */
     private function selectionAllowsAllSets(array $selection): bool
     {
-        return SetContext::selectionIncludesAll($selection);
+        return SetParser::selectionIncludesAll($selection);
     }
 
     /**
@@ -1139,9 +1139,9 @@ final class ContentController
         $isTag = strtolower(trim($kind)) === 'tag';
         $path = $isTag ? 'tag.set' : 'category.set';
         $repo = $isTag ? $this->tagSetRepo() : $this->categorySetRepo();
-        $configuredId = $this->input->int($this->config->get($path, SetContext::DEFAULT_SET_ID), SetContext::DEFAULT_SET_ID);
+        $configuredId = $this->input->int($this->config->get($path, SetParser::DEFAULT_SET_ID), SetParser::DEFAULT_SET_ID);
         if ($configuredId === null || !$repo->existsId($configuredId)) {
-            return SetContext::DEFAULT_SET_ID;
+            return SetParser::DEFAULT_SET_ID;
         }
 
         return $configuredId;
@@ -1165,9 +1165,9 @@ final class ContentController
         }
 
         $field = strtolower(trim($kind)) === 'tag' ? 'tag_sets' : 'category_sets';
-        $selection = SetContext::normalizeSelection($channelRecord[$field] ?? [], false);
+        $selection = SetParser::normalizeSelection($channelRecord[$field] ?? [], false);
         if ($this->selectionAllowsAllSets($selection)) {
-            return [SetContext::ALL_SET_ID];
+            return [SetParser::ALL_SET_ID];
         }
         if ($selection === []) {
             return [$this->configuredDefaultTaxonomySetId($kind)];

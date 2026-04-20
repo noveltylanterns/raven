@@ -29,8 +29,8 @@ use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\PanelMediaConfigService;
-use Raven\Lib\Profile\ProfileContactService;
-use Raven\Lib\Directory\Route;
+use Raven\Lib\Parser\RouteParser;
+use Raven\Lib\Parser\UserParser;
 use Raven\Lib\Security\InputSanitizer;
 
 use Raven\Lib\Transport\Redirect;
@@ -52,14 +52,14 @@ final class UserController
     private Closure $inviteTokensResolver;
     private ?InviteTokenRepository $inviteTokens = null;
     private SessionFlash $flashList;
-    private Route $routeConfigService;
+    private RouteParser $routeConfigService;
     private PanelInvitePolicyService $panelInvitePolicyService;
     private LoginIdentifierResolver $loginIdentifierResolver;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private EditorBlocks $editorBlocks;
     private PanelMediaConfigService $panelMediaConfigService;
-    private ProfileContactService $profileContactService;
+    private UserParser $profileContactService;
     private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
     private AvatarUploadService $avatarUploadService;
     private UserMediaPathService $userMediaPathService;
@@ -73,14 +73,14 @@ final class UserController
      * @param UserRepository $userRepo User repository for panel user CRUD.
      * @param callable(): InviteTokenRepository $inviteTokensResolver Lazy invite-token repository resolver.
      * @param SessionFlash $flashList List-style flash store for generated token batches.
-     * @param Route $routeConfigService Shared route-configuration helper.
+     * @param RouteParser $routeConfigService Shared route-configuration helper.
      * @param PanelInvitePolicyService $panelInvitePolicyService Shared invite-form parsing helper.
      * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
      * @param Editor $editor Shared panel editor utility methods (theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param PanelMediaConfigService $panelMediaConfigService Shared media-limit helper.
-     * @param ProfileContactService $profileContactService Shared profile-contact normalizer.
+     * @param UserParser $profileContactService Shared profile-contact normalizer.
      * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA list normalizer.
      * @param AvatarUploadService $avatarUploadService Shared sanitized avatar/cover upload helper.
      * @param UserMediaPathService $userMediaPathService Shared user-media path resolver.
@@ -95,14 +95,14 @@ final class UserController
         UserRepository $userRepo,
         callable $inviteTokensResolver,
         SessionFlash $flashList,
-        Route $routeConfigService,
+        RouteParser $routeConfigService,
         PanelInvitePolicyService $panelInvitePolicyService,
         LoginIdentifierResolver $loginIdentifierResolver,
         EditorTabs $editorTabs,
         Editor $editor,
         EditorBlocks $editorBlocks,
         PanelMediaConfigService $panelMediaConfigService,
-        ProfileContactService $profileContactService,
+        UserParser $profileContactService,
         PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,
         AvatarUploadService $avatarUploadService,
         UserMediaPathService $userMediaPathService

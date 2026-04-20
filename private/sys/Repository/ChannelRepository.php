@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Directory\ChannelContext;
+use Raven\Lib\Parser\ChannelContextParser;
 use Raven\Lib\Database\TableNameResolver;
 use RuntimeException;
 
@@ -25,7 +25,7 @@ final class ChannelRepository
     private string $driver;
     private string $prefix;
     private string $channelDirectory;
-    private ChannelContext $channelFileStoreService;
+    private ChannelContextParser $channelFileStoreService;
     /** @var array<int, array<string, mixed>>|null */
     private ?array $channelsCache = null;
 
@@ -35,7 +35,7 @@ final class ChannelRepository
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->channelDirectory = $channelDirectory ?? (dirname(__DIR__, 3) . '/dat/channel');
-        $this->channelFileStoreService = new ChannelContext($this->channelDirectory);
+        $this->channelFileStoreService = new ChannelContextParser($this->channelDirectory);
     }
 
     /**
@@ -53,8 +53,8 @@ final class ChannelRepository
         }
 
         usort($channels, static function (array $a, array $b): int {
-            $aIsRoot = ChannelContext::isRootChannelId((int) ($a['id'] ?? -1));
-            $bIsRoot = ChannelContext::isRootChannelId((int) ($b['id'] ?? -1));
+            $aIsRoot = ChannelContextParser::isRootChannelId((int) ($a['id'] ?? -1));
+            $bIsRoot = ChannelContextParser::isRootChannelId((int) ($b['id'] ?? -1));
             if ($aIsRoot !== $bIsRoot) {
                 return $aIsRoot ? -1 : 1;
             }
@@ -207,7 +207,7 @@ final class ChannelRepository
     {
         $rows = [];
         foreach ($this->listRecords() as $channel) {
-            if (ChannelContext::isRootChannelId((int) ($channel['id'] ?? -1))) {
+            if (ChannelContextParser::isRootChannelId((int) ($channel['id'] ?? -1))) {
                 continue;
             }
 
@@ -215,8 +215,8 @@ final class ChannelRepository
                 'id' => (int) ($channel['id'] ?? 0),
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
-                'category_sets' => ChannelContext::normalizeTaxonomySetSelection($channel['category_sets'] ?? [], false),
-                'tag_sets' => ChannelContext::normalizeTaxonomySetSelection($channel['tag_sets'] ?? [], false),
+                'category_sets' => ChannelContextParser::normalizeTaxonomySetSelection($channel['category_sets'] ?? [], false),
+                'tag_sets' => ChannelContextParser::normalizeTaxonomySetSelection($channel['tag_sets'] ?? [], false),
                 'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
                 'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
                 'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),
@@ -249,8 +249,8 @@ final class ChannelRepository
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
                 'feed_enabled' => (bool) ($channel['feed_enabled'] ?? false),
-                'category_sets' => ChannelContext::normalizeTaxonomySetSelection($channel['category_sets'] ?? [], false),
-                'tag_sets' => ChannelContext::normalizeTaxonomySetSelection($channel['tag_sets'] ?? [], false),
+                'category_sets' => ChannelContextParser::normalizeTaxonomySetSelection($channel['category_sets'] ?? [], false),
+                'tag_sets' => ChannelContextParser::normalizeTaxonomySetSelection($channel['tag_sets'] ?? [], false),
                 'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
                 'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
                 'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),
@@ -258,8 +258,8 @@ final class ChannelRepository
         }
 
         usort($rows, static function (array $a, array $b): int {
-            $aIsRoot = ChannelContext::isRootChannelId((int) ($a['id'] ?? -1));
-            $bIsRoot = ChannelContext::isRootChannelId((int) ($b['id'] ?? -1));
+            $aIsRoot = ChannelContextParser::isRootChannelId((int) ($a['id'] ?? -1));
+            $bIsRoot = ChannelContextParser::isRootChannelId((int) ($b['id'] ?? -1));
             if ($aIsRoot !== $bIsRoot) {
                 return $aIsRoot ? -1 : 1;
             }
@@ -290,7 +290,7 @@ final class ChannelRepository
      */
     public function findById(int $id): ?array
     {
-        if ($id < ChannelContext::ROOT_CHANNEL_ID) {
+        if ($id < ChannelContextParser::ROOT_CHANNEL_ID) {
             return null;
         }
 
@@ -355,7 +355,7 @@ final class ChannelRepository
             throw new RuntimeException('Channel name and slug are required.');
         }
 
-        if (ChannelContext::isRootChannelSlug($slug) || ($idProvided && ChannelContext::isRootChannelId($id))) {
+        if (ChannelContextParser::isRootChannelSlug($slug) || ($idProvided && ChannelContextParser::isRootChannelId($id))) {
             throw new RuntimeException('The stock <root> channel is reserved and cannot be edited.');
         }
 
@@ -374,14 +374,14 @@ final class ChannelRepository
         $customFields = is_array($currentRaw['custom_fields'] ?? null) ? $currentRaw['custom_fields'] : [];
         $overrides = is_array($currentRaw['overrides'] ?? null) ? $currentRaw['overrides'] : [];
         $feedEnabled = array_key_exists('feed_enabled', $data)
-            ? ChannelContext::normalizeFeedEnabled($data['feed_enabled'])
-            : ChannelContext::normalizeFeedEnabled($currentRaw['feed_enabled'] ?? false);
+            ? ChannelContextParser::normalizeFeedEnabled($data['feed_enabled'])
+            : ChannelContextParser::normalizeFeedEnabled($currentRaw['feed_enabled'] ?? false);
         $categorySets = array_key_exists('category_sets', $data)
-            ? ChannelContext::normalizeTaxonomySetSelection($data['category_sets'], false)
-            : ChannelContext::normalizeTaxonomySetSelection($currentRaw['category_sets'] ?? [], false);
+            ? ChannelContextParser::normalizeTaxonomySetSelection($data['category_sets'], false)
+            : ChannelContextParser::normalizeTaxonomySetSelection($currentRaw['category_sets'] ?? [], false);
         $tagSets = array_key_exists('tag_sets', $data)
-            ? ChannelContext::normalizeTaxonomySetSelection($data['tag_sets'], false)
-            : ChannelContext::normalizeTaxonomySetSelection($currentRaw['tag_sets'] ?? [], false);
+            ? ChannelContextParser::normalizeTaxonomySetSelection($data['tag_sets'], false)
+            : ChannelContextParser::normalizeTaxonomySetSelection($currentRaw['tag_sets'] ?? [], false);
         $createdAt = trim((string) ($currentRaw['created_at'] ?? ''));
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
@@ -423,7 +423,7 @@ final class ChannelRepository
         $count = 0;
 
         foreach ($this->listRecords() as $record) {
-            $selection = ChannelContext::normalizeTaxonomySetSelection($record[$field] ?? [], false);
+            $selection = ChannelContextParser::normalizeTaxonomySetSelection($record[$field] ?? [], false);
             if (in_array($setId, $selection, true)) {
                 $count++;
             }
@@ -464,14 +464,14 @@ final class ChannelRepository
             'name' => (string) ($record['name'] ?? ''),
             'slug' => $slug,
             'description' => (string) ($record['description'] ?? ''),
-            'feed_enabled' => ChannelContext::normalizeFeedEnabled(
+            'feed_enabled' => ChannelContextParser::normalizeFeedEnabled(
                 $currentRaw['feed_enabled'] ?? ($record['feed_enabled'] ?? false)
             ),
-            'category_sets' => ChannelContext::normalizeTaxonomySetSelection(
+            'category_sets' => ChannelContextParser::normalizeTaxonomySetSelection(
                 $currentRaw['category_sets'] ?? ($record['category_sets'] ?? []),
                 false
             ),
-            'tag_sets' => ChannelContext::normalizeTaxonomySetSelection(
+            'tag_sets' => ChannelContextParser::normalizeTaxonomySetSelection(
                 $currentRaw['tag_sets'] ?? ($record['tag_sets'] ?? []),
                 false
             ),
@@ -502,7 +502,7 @@ final class ChannelRepository
      */
     public function deleteById(int $id): void
     {
-        if (ChannelContext::isRootChannelId($id)) {
+        if (ChannelContextParser::isRootChannelId($id)) {
             throw new RuntimeException('The stock <root> channel cannot be deleted.');
         }
 
@@ -525,7 +525,7 @@ final class ChannelRepository
                 'UPDATE ' . $pages . ' SET channel = :root_channel WHERE channel = :channel_id'
             );
             $detachPages->execute([
-                ':root_channel' => ChannelContext::ROOT_CHANNEL_ID,
+                ':root_channel' => ChannelContextParser::ROOT_CHANNEL_ID,
                 ':channel_id' => $id,
             ]);
 
@@ -533,7 +533,7 @@ final class ChannelRepository
                 'UPDATE ' . $redirects . ' SET channel = :root_channel WHERE channel = :channel_id'
             );
             $detachRedirects->execute([
-                ':root_channel' => ChannelContext::ROOT_CHANNEL_ID,
+                ':root_channel' => ChannelContextParser::ROOT_CHANNEL_ID,
                 ':channel_id' => $id,
             ]);
 
@@ -575,27 +575,27 @@ final class ChannelRepository
 
     private function isValidSlug(string $slug): bool
     {
-        return ChannelContext::isValidSlug($slug);
+        return ChannelContextParser::isValidSlug($slug);
     }
 
     private function normalizeEditorOverride(string $value): string
     {
-        return ChannelContext::normalizeEditorOverride($value);
+        return ChannelContextParser::normalizeEditorOverride($value);
     }
 
     private function normalizeRouteMode(string $value): string
     {
-        return ChannelContext::normalizeRouteMode($value);
+        return ChannelContextParser::normalizeRouteMode($value);
     }
 
     private function normalizeRouteSeparator(string $value): string
     {
-        return ChannelContext::normalizeRouteSeparator($value);
+        return ChannelContextParser::normalizeRouteSeparator($value);
     }
 
     private function normalizeNullablePath(mixed $value): ?string
     {
-        return ChannelContext::normalizeNullablePath($value);
+        return ChannelContextParser::normalizeNullablePath($value);
     }
 
     /**
@@ -628,38 +628,38 @@ final class ChannelRepository
 
     private function normalizeChannelId(mixed $value): ?int
     {
-        return ChannelContext::normalizeChannelId($value);
+        return ChannelContextParser::normalizeChannelId($value);
     }
 
     private function ensureRootChannelRecord(): void
     {
-        $raw = $this->channelFileStoreService->loadRawBySlug(ChannelContext::ROOT_CHANNEL_SLUG);
+        $raw = $this->channelFileStoreService->loadRawBySlug(ChannelContextParser::ROOT_CHANNEL_SLUG);
         $createdAt = trim((string) ($raw['created_at'] ?? ''));
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
         }
 
         $record = [
-            'id' => ChannelContext::ROOT_CHANNEL_ID,
-            'name' => ChannelContext::ROOT_CHANNEL_NAME,
-            'slug' => ChannelContext::ROOT_CHANNEL_SLUG,
+            'id' => ChannelContextParser::ROOT_CHANNEL_ID,
+            'name' => ChannelContextParser::ROOT_CHANNEL_NAME,
+            'slug' => ChannelContextParser::ROOT_CHANNEL_SLUG,
             'description' => trim((string) ($raw['description'] ?? '')),
             'feed_enabled' => false,
-            'editor_override' => ChannelContext::normalizeEditorOverride(
+            'editor_override' => ChannelContextParser::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),
-            'route_mode' => ChannelContext::normalizeRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
-            'route_separator' => ChannelContext::normalizeRouteSeparator(
+            'route_mode' => ChannelContextParser::normalizeRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
+            'route_separator' => ChannelContextParser::normalizeRouteSeparator(
                 (string) ($raw['route_separator'] ?? 'inherit')
             ),
-            'cover_image_path' => ChannelContext::normalizeNullablePath($raw['cover_image_path'] ?? null),
-            'cover_image_sm_path' => ChannelContext::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
-            'cover_image_md_path' => ChannelContext::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
-            'cover_image_lg_path' => ChannelContext::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
-            'preview_image_path' => ChannelContext::normalizeNullablePath($raw['preview_image_path'] ?? null),
-            'preview_image_sm_path' => ChannelContext::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
-            'preview_image_md_path' => ChannelContext::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
-            'preview_image_lg_path' => ChannelContext::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
+            'cover_image_path' => ChannelContextParser::normalizeNullablePath($raw['cover_image_path'] ?? null),
+            'cover_image_sm_path' => ChannelContextParser::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
+            'cover_image_md_path' => ChannelContextParser::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
+            'cover_image_lg_path' => ChannelContextParser::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
+            'preview_image_path' => ChannelContextParser::normalizeNullablePath($raw['preview_image_path'] ?? null),
+            'preview_image_sm_path' => ChannelContextParser::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
+            'preview_image_md_path' => ChannelContextParser::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
+            'preview_image_lg_path' => ChannelContextParser::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
             'custom_fields' => is_array($raw['custom_fields'] ?? null) ? $raw['custom_fields'] : [],
             'overrides' => is_array($raw['overrides'] ?? null) ? $raw['overrides'] : [],
             'created_at' => $createdAt,
@@ -667,8 +667,8 @@ final class ChannelRepository
 
         if ($raw === [] || $this->rootRecordNeedsRewrite($raw)) {
             $this->channelFileStoreService->writeRecordById(
-                ChannelContext::ROOT_CHANNEL_ID,
-                ChannelContext::ROOT_CHANNEL_SLUG,
+                ChannelContextParser::ROOT_CHANNEL_ID,
+                ChannelContextParser::ROOT_CHANNEL_SLUG,
                 $record
             );
         }
@@ -679,15 +679,15 @@ final class ChannelRepository
      */
     private function rootRecordNeedsRewrite(array $raw): bool
     {
-        if (ChannelContext::normalizeChannelId($raw['id'] ?? null) !== ChannelContext::ROOT_CHANNEL_ID) {
+        if (ChannelContextParser::normalizeChannelId($raw['id'] ?? null) !== ChannelContextParser::ROOT_CHANNEL_ID) {
             return true;
         }
 
-        if (!ChannelContext::isRootChannelSlug((string) ($raw['slug'] ?? ''))) {
+        if (!ChannelContextParser::isRootChannelSlug((string) ($raw['slug'] ?? ''))) {
             return true;
         }
 
-        return trim((string) ($raw['name'] ?? '')) !== ChannelContext::ROOT_CHANNEL_NAME;
+        return trim((string) ($raw['name'] ?? '')) !== ChannelContextParser::ROOT_CHANNEL_NAME;
     }
 
     private function persistChannelId(string $slug, int $id): void

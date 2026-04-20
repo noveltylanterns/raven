@@ -31,7 +31,7 @@ use Raven\Lib\Archive\Update as ArchiveUpdate;
 use Raven\Lib\Archive\Upstream;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\Panel\PanelAccess;
-use Raven\Lib\Config\ConfigWriter;
+use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\ExtensionStorageCleaner;
@@ -39,7 +39,7 @@ use Raven\Lib\Extension\ExtensionStorageProvisioner;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
-use Raven\Lib\Directory\Route;
+use Raven\Lib\Parser\RouteParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\Transport\Upload;
@@ -97,7 +97,7 @@ final class SystemController
     private ?ThemeCloneService $themeCloneService = null;
     private ?ThemeFallbackRenderer $publicFallbackRenderer = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
-    private ?Route $routeConfigService = null;
+    private ?RouteParser $routeConfigService = null;
     private ?ExtensionCatalogService $extensionCatalogService = null;
     private ?PanelRoutingPreviewService $panelRoutingPreviewService = null;
     private ?ThemeCatalogService $themeCatalogService = null;
@@ -209,7 +209,7 @@ final class SystemController
         }
 
         try {
-            ConfigWriter::persistValue(
+            ConfigScribe::persistValue(
                 $this->config->path(),
                 $this->config->all(),
                 'update.source',
@@ -373,7 +373,7 @@ final class SystemController
         }
 
         try {
-            ConfigWriter::persistValue($this->config->path(), $this->config->all(), 'site.theme', $themeSlug);
+            ConfigScribe::persistValue($this->config->path(), $this->config->all(), 'site.theme', $themeSlug);
             $this->config = new Config($this->config->path());
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', 'Failed to update active theme: ' . $exception->getMessage());
@@ -529,7 +529,7 @@ final class SystemController
 
         if ($setActive) {
             try {
-                ConfigWriter::persistValue($this->config->path(), $this->config->all(), 'site.theme', $themeSlug);
+                ConfigScribe::persistValue($this->config->path(), $this->config->all(), 'site.theme', $themeSlug);
                 $this->config = new Config($this->config->path());
             } catch (\RuntimeException $exception) {
                 $this->directoryTreeService()->removeTree($themePath);
@@ -2546,10 +2546,10 @@ final class SystemController
     /**
      * Returns the route-config service on first use.
      */
-    private function routeConfigService(): Route
+    private function routeConfigService(): RouteParser
     {
-        if (!$this->routeConfigService instanceof Route) {
-            $this->routeConfigService = new Route($this->config, $this->input);
+        if (!$this->routeConfigService instanceof RouteParser) {
+            $this->routeConfigService = new RouteParser($this->config, $this->input);
         }
 
         return $this->routeConfigService;

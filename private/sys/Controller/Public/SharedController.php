@@ -16,9 +16,9 @@ use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Transport\Response;
 use Raven\Lib\Transport\Request;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Lib\Directory\Panel;
-use Raven\Lib\Profile\ProfileContactService;
-use Raven\Lib\Directory\Route;
+use Raven\Lib\Parser\PanelParser;
+use Raven\Lib\Parser\RouteParser;
+use Raven\Lib\Parser\UserParser;
 use Raven\Lib\Security\CaptchaService;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
@@ -45,8 +45,8 @@ final class SharedController
     private bool $captchaScriptIncluded = false;
     private ?Request $requestContextResolver = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
-    private ?ProfileContactService $profileContactService = null;
-    private ?Route $routeConfigService = null;
+    private ?UserParser $profileContactService = null;
+    private ?RouteParser $routeConfigService = null;
     private ?CaptchaService $captchaService = null;
     private ?ThemeCatalogService $themeCatalogService = null;
     private ?PublicMetaService $publicMetaService = null;
@@ -152,12 +152,12 @@ final class SharedController
     /**
      * Returns route-config helper cached for the current request.
      *
-     * @return Route Shared route-config helper.
+     * @return RouteParser Shared route-config helper.
      */
-    public function routeConfigService(): Route
+    public function routeConfigService(): RouteParser
     {
-        if (!$this->routeConfigService instanceof Route) {
-            $this->routeConfigService = new Route($this->config, $this->input);
+        if (!$this->routeConfigService instanceof RouteParser) {
+            $this->routeConfigService = new RouteParser($this->config, $this->input);
         }
 
         return $this->routeConfigService;
@@ -185,7 +185,7 @@ final class SharedController
      */
     public function panelUrl(string $suffix = ''): string
     {
-        return Panel::fromConfig($this->config, $suffix);
+        return PanelParser::fromConfig($this->config, $suffix);
     }
 
     /**
@@ -487,12 +487,12 @@ final class SharedController
     /**
      * Returns the cached profile-contact service.
      *
-     * @return ProfileContactService Shared profile-contact helper.
+     * @return UserParser Shared profile-contact helper.
      */
-    private function profileContactService(): ProfileContactService
+    private function profileContactService(): UserParser
     {
-        if (!$this->profileContactService instanceof ProfileContactService) {
-            $this->profileContactService = new ProfileContactService($this->input);
+        if (!$this->profileContactService instanceof UserParser) {
+            $this->profileContactService = new UserParser($this->input);
         }
 
         return $this->profileContactService;

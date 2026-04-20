@@ -44,13 +44,13 @@ use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Lib\Config\ConfigParser;
+use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\PageImageManager;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Media\Panel\UserMediaPathService;
-use Raven\Lib\Profile\ProfileContactService;
-use Raven\Lib\Directory\Route;
+use Raven\Lib\Parser\RouteParser;
+use Raven\Lib\Parser\UserParser;
 use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
@@ -592,7 +592,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['tag_set'],
                 $taxonomyDomain['taxonomy_lookup'],
                 $contentDomain['user'],
-                new Route($rvn['config'], $rvn['input']),
+                new RouteParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
                 $rvn['panel_editor_blocks'],
@@ -652,7 +652,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['category_enabled'],
                 $taxonomyDomain['tag_enabled'],
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
-                new Route($rvn['config'], $rvn['input']),
+                new RouteParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
                 new Upload()
@@ -681,14 +681,14 @@ final class PanelRuntimeBuilder
                 $userDomain['user'],
                 $userDomain['invite_tokens'],
                 new SessionFlash('_raven_flash_list'),
-                new Route($rvn['config'], $rvn['input']),
+                new RouteParser($rvn['config'], $rvn['input']),
                 new PanelInvitePolicyService($rvn['input']),
                 new LoginIdentifierResolver(),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
                 $rvn['panel_editor_blocks'],
                 new PanelMediaConfigService($rvn['config']),
-                new ProfileContactService($rvn['input']),
+                new UserParser($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
                 new AvatarUploadService(),
                 new UserMediaPathService()
@@ -712,7 +712,7 @@ final class PanelRuntimeBuilder
                 $requestContextFactory(),
                 $rvn['input'],
                 $groupDomain['group'],
-                new Route($rvn['config'], $rvn['input']),
+                new RouteParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
@@ -752,7 +752,7 @@ final class PanelRuntimeBuilder
                 $rvn['panel_editor'],
                 $rvn['panel_editor_blocks'],
                 new PanelMediaConfigService($rvn['config']),
-                new ProfileContactService($rvn['input']),
+                new UserParser($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
                 new AvatarUploadService(),
                 new UserMediaPathService(),

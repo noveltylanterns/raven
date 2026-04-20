@@ -107,7 +107,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 ### private/sys/
 
 - `private/sys/Config.php`
-  - `Raven\Core\Config` — canonical runtime config reader. Loads `private/dat/config.php` on construct and exposes read-only `all()`, `get()`, and `path()` access. `private/lib/Config/ConfigWriter.php` now owns config mutation and persistence.
+  - `Raven\Core\Config` — canonical runtime config reader. Loads `private/dat/config.php` on construct and exposes read-only `all()`, `get()`, and `path()` access. `private/lib/Parser/ConfigParser.php` owns dot-path/scalar parsing and `private/lib/Scribe/ConfigScribe.php` owns config mutation and persistence.
 - `private/sys/Renderer.php`
   - `Raven\Core\Renderer` — core PHP template renderer. Captures output from isolated template includes, injects named variables, and supports layout/wrapper composition. Used by controllers across both panel and public routes.
 - `private/sys/Logger.php`
@@ -131,7 +131,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Raven-owned request-dispatch primitives, runtime builders, and route registrars. Not for extension use.
   - `Router.php` — `Raven\Core\Routing\Router`, the core dispatcher: registers routes via `add()`, compiles `{param}` patterns to named-capture regex, and resolves requests via `dispatch()`.
   - `Request.php` / `Result.php` — the immutable routing request/result value objects used by the dispatcher.
-  - `Routing/Public/` — `PublicRuntimeBuilder`, controller-aligned public route registrars (including extension-route loading), `PublicRouteConfig`, and `PublicChannelPageRouteService` (wraps `Raven\Lib\Directory\Mode` for public content controllers: lookup-target resolution and canonical segment building).
+  - `Routing/Public/` — `PublicRuntimeBuilder`, controller-aligned public route registrars (including extension-route loading), `PublicRouteConfig`, and `PublicChannelPageRouteService` (wraps `Raven\Lib\Parser\ModeParser` for public content controllers: lookup-target resolution and canonical segment building).
   - `Routing/Panel/` — `PanelRuntimeBuilder`, controller-aligned panel route registrars, extension-route loading, panel theme-asset fast path, and `RoutingInventoryBuilder` (builds the normalized routing inventory row set for the panel routing diagnostics view).
   - Note: the actual public/panel front controllers now live under `private/sys/Controller/Public/PublicController.php` and `private/sys/Controller/Panel/PanelController.php`; `sys/Routing/` now owns only shared routing primitives plus scope-specific builders/registrars.
 
@@ -145,18 +145,16 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `SessionFlash.php` — session-backed flash message store; used by both panel and public routes.
   - `SessionCookie.php` — session cookie configuration policy; applied at bootstrap.
   - Note: `sys/Auth/` may be re-introduced later as a lean internal-only auth package; for now everything lives here.
-- `private/lib/Directory/`
-  - Consolidated route-prefix, route-mode, channel, group, feed, and taxonomy-set helpers that were previously split across `lib/Channel/`, `lib/Routing/`, and `lib/Taxonomy/`.
-  - `ChannelContext` — combined channel record policy, context hydration, and PHP-file store for `private/dat/channel/`.
-  - `SetContext` — combined taxonomy-set normalization policy and PHP-file store for `private/dat/category-set/` and `private/dat/tag-set/`.
-  - `Panel` — shared panel-path and route-prefix normalization helper used by public/panel controllers and directory-aware services.
-  - `Route` — unified route-config reader composed from `Channel`, `Group`, and `Feed` helpers.
-  - `Mode` — static channel route-mode and separator normalization helpers.
-  - `Duplicate` — shared `(slug, channel)` uniqueness lookup helper for repositories.
-- `private/lib/Config/`
-  - Config validation and value-parsing primitives. Pure reusable policy; does not own the runtime config instance.
-  - `ConfigParser` — static config-reading and scalar coercion helpers for dot-path access, nested form reads, and typed normalization (`bool`, `int`, `float`) across core, lib, and extensions.
-  - `ConfigWriter` — canonical nested config writer and config-file persistence helper: dot-path writes, nested segment writes, single-key persistence, full-file `var_export` serialization, atomic write, stat-cache invalidation, and OPcache eviction. `sys/Config` is now read-only and exposes only `all()`, `get()`, and `path()`.
+- `private/lib/Parser/`
+  - Canonical read-only parsing and normalization helpers for routing, config, metadata, and filesystem-backed records.
+  - `ChannelParser`, `FeedParser`, `GroupParser`, `ModeParser`, `PanelParser`, and `RouteParser` own route-prefix, route-mode, separator, and routing-config parsing for the public and panel stacks.
+  - `ChannelContextParser` and `SetParser` own the channel/set record normalization policy plus the PHP-file-backed stores for `private/dat/channel/`, `private/dat/category-set/`, and `private/dat/tag-set/`.
+  - `DuplicateParser` is the shared `(slug, channel)` uniqueness lookup helper for repositories.
+  - `ConfigParser` owns dot-path config reads, scalar coercion, nested-form reads, and config-field stringification.
+  - `UserParser` owns read-only profile-contact normalization and related social metadata parsing.
+- `private/lib/Scribe/`
+  - Canonical write-side helpers that pair with the parser layer.
+  - `ConfigScribe` owns nested config writes, single-key persistence, full-file `var_export` serialization, atomic save, stat-cache invalidation, and OPcache eviction. `sys/Config` remains read-only.
 - `private/lib/Archive/`
   - Reusable archive/package helpers for core and extensions.
   - `Package` — panel/CLI-facing package helper for supported archive checks, export-format metadata, manifest slug reads, temp archive allocation, archive building, and download streaming.
@@ -186,7 +184,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `Extension/Panel/` — panel-only extension management: `ExtensionCatalogService`, `ExtensionPermissionCatalogService`, `ExtensionScaffoldService`.
   - `Extension/Public/` — public-route extension runtime contracts: `EmbeddedFormRuntimeInterface`, `EmbeddedFormRuntimeService`, `EmbeddedShortcodeRuntimeInterface` — the contracts extension authors implement for shortcode/form runtime registration.
 - `private/lib/Transport/`
-  - HTTP-layer helpers for both panel and public routes: `Response` (JSON/common header dispatch), `Request` (request context resolution), `Redirect` (redirect dispatch plus redirect-target validation), `Upload` (upload file-set normalization plus shared HTTP-upload validation, size/error policy, and extension checks).
+  - HTTP-layer helpers for both panel and public routes: `Response` (JSON/common header dispatch), `Request` (request context resolution plus canonical `path()` normalization), `Redirect` (redirect dispatch plus redirect-target validation), `Upload` (upload file-set normalization plus shared HTTP-upload validation, size/error policy, and extension checks).
   - Note: session flash has moved to `lib/Auth/SessionFlash.php`; event logging has moved to `sys/Logger.php`.
 - `private/lib/Media/`
   - Image upload, validation, variant processing, and path management. All media handling is panel-route-only.
@@ -195,12 +193,11 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Security primitives available to core and extensions: CSRF (`Csrf`, `CsrfTokenStoreInterface`), input sanitization (`InputSanitizer`), 2FA (TOTP, WebAuthn, recovery phrase, QR code), captcha, and invite token policy.
 - `private/lib/Extra/`
   - Global helper functions and small shared utility catalogs.
-  - `Helpers.php` — defines `e()` (HTML-escape) and `request_path()` in the `Raven\Lib\Extra` namespace; loaded at bootstrap via `require_once` and imported via `use function` throughout templates, controllers, and extensions.
-  - `Countries.php` — ISO country list lookup used by signup forms, profile fields, and panel reporting.
+  - `Helpers.php` — defines `e()` (HTML-escape) plus a legacy `request_path()` wrapper that now forwards to `Raven\Lib\Transport\Request::path()`.
 - `private/lib/View/`
   - Theme discovery, inheritance, content rendering, and template utilities.
   - `TemplateTagEngine` — core template tag processor used by the public theme renderer.
-  - `SiteContextBuilder`, `BodyBlockPolicy`, `MarkdownRenderer`, `PageBodyBlockCodec`, `PagePersistenceService`, `PageTaxonomyAssignmentService`, `PageTaxonomyQueryService`, and `PublicPageBodyRenderer` now live directly under `View/` as the shared content/view surface.
+  - `SiteContextBuilder`, `BodyBlockPolicy`, `MarkdownRenderer`, `PageBodyBlockCodec`, `PagePersistenceService`, `PageTaxonomyAssignmentService`, `PageTaxonomyQueryService`, `PublicPageBodyRenderer`, and `FormCountries` now live directly under `View/` as the shared content/view surface.
   - `ThemeDiscoveryService`, `ThemeInheritanceResolver`, `ThemeFallbackRenderer` — shared theme infrastructure used by both panel and public contexts.
   - `Pagination.php` — reusable pagination value object and helper; available to both panel and public controllers.
   - `View/Panel/` — panel-only view/theme helpers: `Editor` (shared body-text editor and theme-normalization utilities), `EditorBlocks` (shared repeater-row wrapper class variants for modular editor blocks), `EditorTabs` (shared tab normalization and tab-preserving URL helpers), `EditorAuthor`, `PanelPost`, `PanelMediaConfigService`, `PanelRoutingPreviewService`, `ThemeCatalogService`, `ThemeCloneService`, `ThemeScaffoldService`, `ThemeManifestValidator`.

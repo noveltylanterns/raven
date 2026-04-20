@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core;
 
-use Raven\Lib\Config\ConfigParser;
+use Raven\Lib\Parser\ConfigParser;
 use RuntimeException;
 
 /**
@@ -20,8 +20,8 @@ use RuntimeException;
  * Owns the request-lifecycle config read contract: loading a PHP array file
  * into memory and exposing dot-notation reads for the active request.
  *
- * Nested writes and persistence belong in `Raven\Lib\Config\ConfigWriter`.
- * Scalar coercion and dot-path parsing live in `Raven\Lib\Config\ConfigParser`.
+ * Nested writes and persistence belong in `Raven\Lib\Scribe\ConfigScribe`.
+ * Scalar coercion and dot-path parsing live in `Raven\Lib\Parser\ConfigParser`.
  */
 class Config
 {

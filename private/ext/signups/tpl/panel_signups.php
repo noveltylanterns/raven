@@ -25,7 +25,7 @@ declare(strict_types=1);
 /** @var string $csrfField */
 
 use function Raven\Lib\Extra\e;
-use Raven\Lib\Extra\Countries;
+use Raven\Lib\View\FormCountries;
 
 $formName = (string) ($formData['name'] ?? '');
 $formSlug = (string) ($formData['slug'] ?? '');
@@ -34,7 +34,7 @@ $currentPage = max(1, (int) ($pagination['current'] ?? 1));
 $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
 $totalItems = max(0, (int) ($pagination['total_items'] ?? 0));
 
-$countryLabels = Countries::list(true);
+$countryLabels = FormCountries::list(true);
 
 $basePaginationPath = (string) ($pagination['base_path'] ?? '');
 if ($basePaginationPath === '') {

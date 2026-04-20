@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\View\Panel;
 
 use Raven\Core\Config;
-use Raven\Lib\Directory\Mode;
+use Raven\Lib\Parser\ModeParser;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -60,14 +60,14 @@ final class PanelRoutingPreviewService
         string $channelPageUrlSeparator,
         string $contentSeparator = '-'
     ): string {
-        $routeMode = Mode::normalizeRouteMode($channelPageRouteMode);
+        $routeMode = ModeParser::normalizeRouteMode($channelPageRouteMode);
         $normalizedSlug = $this->input->slug($pageSlug);
-        if (!Mode::usesPageId($routeMode) && ($normalizedSlug === null || $normalizedSlug === '')) {
+        if (!ModeParser::usesPageId($routeMode) && ($normalizedSlug === null || $normalizedSlug === '')) {
             return '/';
         }
 
         $normalizedChannel = $this->input->slug($channelSlug);
-        $routeSegment = Mode::buildRouteSegment(
+        $routeSegment = ModeParser::buildRouteSegment(
             $this->input,
             (string) $normalizedSlug,
             $pageId,
@@ -76,7 +76,7 @@ final class PanelRoutingPreviewService
             $channelPageUrlSeparator,
             $contentSeparator
         );
-        if ($routeSegment === '' && !Mode::usesPageId($routeMode)) {
+        if ($routeSegment === '' && !ModeParser::usesPageId($routeMode)) {
             $routeSegment = $normalizedSlug;
         }
 

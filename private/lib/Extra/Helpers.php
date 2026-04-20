@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extra;
 
+use Raven\Lib\Transport\Request;
+
 /**
  * Escapes text for safe HTML output.
  */
@@ -23,9 +25,10 @@ function e(string $value): string
 
 /**
  * Returns request URI path without query string.
+ *
+ * Legacy wrapper retained while callers migrate to `Raven\Lib\Transport\Request::path()`.
  */
 function request_path(): string
 {
-    $path = (string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-    return $path === '' ? '/' : $path;
+    return Request::path();
 }

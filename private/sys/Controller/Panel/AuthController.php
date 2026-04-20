@@ -20,7 +20,7 @@ use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\LoginUiStateService;
 use Raven\Lib\Transport\Response;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Lib\Directory\Panel;
+use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\SiteContextBuilder;
@@ -307,7 +307,7 @@ final class AuthController
      */
     private function panelUrl(string $suffix): string
     {
-        return Panel::fromConfig($this->config, $suffix);
+        return PanelParser::fromConfig($this->config, $suffix);
     }
 
     /**

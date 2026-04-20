@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Routing\Public;
 
 use Raven\Core\Config;
-use Raven\Lib\Directory\Route;
+use Raven\Lib\Parser\RouteParser;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -39,7 +39,7 @@ final class PublicRouteConfig
      */
     public static function build(Config $config, InputSanitizer $input): array
     {
-        $routeConfig = new Route($config, $input);
+        $routeConfig = new RouteParser($config, $input);
 
         $panelPath = (string) $config->get('panel.path', 'panel');
         $categoryPrefix = $routeConfig->categoryRoutePrefix();

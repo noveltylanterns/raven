@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Transport/Request.php
+ * Request URL, path, scheme, host, and client-network normalization helpers.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Transport;
@@ -10,7 +17,26 @@ namespace Raven\Lib\Transport;
 final class Request
 {
     /**
-     * @param array<string, mixed>|null $server
+     * Returns the current request path without its query string.
+     *
+     * @param array<string, mixed>|null $server Optional server map; defaults to `$_SERVER`.
+     * @return string Normalized absolute request path.
+     */
+    public static function path(?array $server = null): string
+    {
+        $serverMap = $server ?? $_SERVER;
+        $requestUri = (string) ($serverMap['REQUEST_URI'] ?? '/');
+
+        return self::pathFromRequestUri($requestUri);
+    }
+
+    /**
+     * Builds the current absolute request URL from server state plus config fallbacks.
+     *
+     * @param string $configuredDomain Site domain fallback from config.
+     * @param string $configuredProtocol Configured protocol override from config.
+     * @param array<string, mixed>|null $server Optional server map; defaults to `$_SERVER`.
+     * @return string Absolute request URL including query string when present.
      */
     public function currentRequestUrl(string $configuredDomain, string $configuredProtocol = '', ?array $server = null): string
     {
@@ -19,10 +45,7 @@ final class Request
         $host = $this->resolveRequestHost($configuredDomain, $serverMap);
 
         $requestUri = (string) ($serverMap['REQUEST_URI'] ?? '/');
-        $path = (string) parse_url($requestUri, PHP_URL_PATH);
-        if ($path === '' || !str_starts_with($path, '/')) {
-            $path = '/';
-        }
+        $path = self::pathFromRequestUri($requestUri);
 
         $query = (string) parse_url($requestUri, PHP_URL_QUERY);
         $query = str_replace(["\r", "\n", "\0"], '', $query);
@@ -198,5 +221,21 @@ final class Request
         }
 
         return substr($hostname, 0, 255);
+    }
+
+    /**
+     * Normalizes the path component of one raw request URI.
+     *
+     * @param string $requestUri Raw request URI from the web server.
+     * @return string Absolute path with a guaranteed leading slash.
+     */
+    private static function pathFromRequestUri(string $requestUri): string
+    {
+        $path = (string) parse_url($requestUri, PHP_URL_PATH);
+        if ($path === '' || !str_starts_with($path, '/')) {
+            return '/';
+        }
+
+        return $path;
     }
 }

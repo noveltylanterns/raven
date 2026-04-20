@@ -16,7 +16,7 @@ use Raven\Ext\SignupSubmissionRepository;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Extra\Countries;
+use Raven\Lib\View\FormCountries;
 
 use Raven\Lib\Transport\Redirect;
 
@@ -524,7 +524,7 @@ final class SignupPublicFormRuntime implements EmbeddedFormRuntimeInterface
      */
     private function countryOptions(): array
     {
-        return Countries::list(true);
+        return FormCountries::list(true);
     }
 
     /**

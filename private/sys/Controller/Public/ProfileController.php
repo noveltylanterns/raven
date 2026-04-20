@@ -14,7 +14,7 @@ namespace Raven\Core\Controller\Public;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Profile\ProfileContactService;
+use Raven\Lib\Parser\UserParser;
 use Raven\Lib\View\Public\PublicRouteRenderService;
 use Raven\Lib\View\Public\PublicTemplateDecorator;
 
@@ -27,7 +27,7 @@ final class ProfileController
     private GroupRepository $groupRepo;
     private UserRepository $userRepo;
     private LoginIdentifierResolver $loginIdentifierResolver;
-    private ProfileContactService $profileContactService;
+    private UserParser $profileContactService;
     private PublicRouteRenderService $publicRouteRenderService;
     private PublicTemplateDecorator $publicTemplateDecorator;
 
@@ -46,7 +46,7 @@ final class ProfileController
         $this->groupRepo = $groupRepo;
         $this->userRepo = $userRepo;
         $this->loginIdentifierResolver = new LoginIdentifierResolver();
-        $this->profileContactService = new ProfileContactService($context->input());
+        $this->profileContactService = new UserParser($context->input());
         $this->publicRouteRenderService = new PublicRouteRenderService();
         $this->publicTemplateDecorator = new PublicTemplateDecorator(
             $context->config(),

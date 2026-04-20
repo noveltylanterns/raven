@@ -15,11 +15,11 @@ use Closure;
 use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\TaxonomySetRepository;
-use Raven\Lib\Config\ConfigParser;
-use Raven\Lib\Config\ConfigWriter;
-use Raven\Lib\Directory\Mode;
-use Raven\Lib\Profile\ProfileContactService;
+use Raven\Lib\Parser\ConfigParser;
+use Raven\Lib\Parser\ModeParser;
+use Raven\Lib\Parser\UserParser;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
@@ -139,7 +139,7 @@ final class ConfigController
     /** @var Closure(): TaxonomySetRepository */
     private Closure $tagSetRepoResolver;
     private ?TaxonomySetRepository $tagSetRepo = null;
-    private ProfileContactService $profileContacts;
+    private UserParser $profileContacts;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private EditorBlocks $editorBlocks;
@@ -185,7 +185,7 @@ final class ConfigController
         $this->channelRepo = $channelRepo;
         $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
         $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
-        $this->profileContacts = new ProfileContactService($input);
+        $this->profileContacts = new UserParser($input);
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
         $this->editorBlocks = $editorBlocks;
@@ -300,7 +300,7 @@ final class ConfigController
                         $rawValue,
                         $channelRoutingOptions
                     );
-                    ConfigWriter::setNested($nextConfig, $segments, $normalized);
+                    ConfigScribe::setNested($nextConfig, $segments, $normalized);
                     continue;
                 }
 
@@ -311,14 +311,14 @@ final class ConfigController
                     $rawValue,
                     $nextConfig,
                     fn (string $value): string => $this->editor->normalizeBodyTextEditorOption($value),
-                    fn (string $value): string => Mode::normalizeGlobalSeparator($value),
+                    fn (string $value): string => ModeParser::normalizeGlobalSeparator($value),
                     fn (string $theme, bool $allowDefault): ?string => $this->editor->normalizePanelThemeChoice($theme, $allowDefault),
                     $publicThemeOptions,
                     $channelRoutingOptions,
                     $categorySetOptions,
                     $tagSetOptions
                 );
-                ConfigWriter::setNested($nextConfig, $segments, $normalized);
+                ConfigScribe::setNested($nextConfig, $segments, $normalized);
             }
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', $exception->getMessage());
@@ -432,7 +432,7 @@ final class ConfigController
      */
     private function persistConfigSnapshot(array $nextConfig): void
     {
-        ConfigWriter::persist($this->config->path(), $nextConfig);
+        ConfigScribe::persist($this->config->path(), $nextConfig);
         $this->config = new Config($this->config->path());
         $this->publicThemeOptionsCache = null;
     }
@@ -1347,7 +1347,7 @@ final class ConfigController
 
         $content['editor'] = $this->editor->normalizeBodyTextEditorOption((string) ($content['editor'] ?? 'tinymce'));
         $content['mode'] = $this->normalizeGlobalPageRouteMode((string) ($content['mode'] ?? 'slug'));
-        $content['separator'] = Mode::normalizeGlobalSeparator((string) ($content['separator'] ?? '-'));
+        $content['separator'] = ModeParser::normalizeGlobalSeparator((string) ($content['separator'] ?? '-'));
 
         $feed = $config['feed'] ?? null;
         if (!is_array($feed)) {

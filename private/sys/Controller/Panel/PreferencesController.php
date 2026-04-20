@@ -25,7 +25,7 @@ use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\PanelMediaConfigService;
-use Raven\Lib\Profile\ProfileContactService;
+use Raven\Lib\Parser\UserParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\QrCodeService;
 use Raven\Lib\Security\WebAuthnService;
@@ -49,7 +49,7 @@ final class PreferencesController
     private Editor $editor;
     private EditorBlocks $editorBlocks;
     private PanelMediaConfigService $panelMediaConfigService;
-    private ProfileContactService $profileContactService;
+    private UserParser $profileContactService;
     private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
     private AvatarUploadService $avatarUploadService;
     private UserMediaPathService $userMediaPathService;
@@ -65,7 +65,7 @@ final class PreferencesController
      * @param Editor $editor Shared panel editor utility methods (theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param PanelMediaConfigService $panelMediaConfigService Shared media-limit helper.
-     * @param ProfileContactService $profileContactService Shared profile-contact normalizer.
+     * @param UserParser $profileContactService Shared profile-contact normalizer.
      * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA helper set.
      * @param AvatarUploadService $avatarUploadService Shared sanitized avatar/cover upload helper.
      * @param UserMediaPathService $userMediaPathService Shared user-media path resolver.
@@ -82,7 +82,7 @@ final class PreferencesController
         Editor $editor,
         EditorBlocks $editorBlocks,
         PanelMediaConfigService $panelMediaConfigService,
-        ProfileContactService $profileContactService,
+        UserParser $profileContactService,
         PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,
         AvatarUploadService $avatarUploadService,
         UserMediaPathService $userMediaPathService,

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Repository;
 
-use Raven\Lib\Directory\SetContext;
+use Raven\Lib\Parser\SetParser;
 use RuntimeException;
 
 /**
@@ -13,14 +13,14 @@ use RuntimeException;
 final class TaxonomySetRepository
 {
     private string $taxonomyType;
-    private SetContext $fileStore;
+    private SetParser $fileStore;
     /** @var array<int, array<string, mixed>>|null */
     private ?array $cache = null;
 
     public function __construct(string $taxonomyType, string $setDirectory)
     {
         $this->taxonomyType = strtolower(trim($taxonomyType));
-        $this->fileStore = new SetContext($setDirectory, $this->taxonomyType);
+        $this->fileStore = new SetParser($setDirectory, $this->taxonomyType);
     }
 
     /**
@@ -43,7 +43,7 @@ final class TaxonomySetRepository
 
             $setId = (int) ($loaded['id'] ?? -1);
             $raw = is_array($loaded['raw'] ?? null) ? $loaded['raw'] : [];
-            if ($setId < SetContext::DEFAULT_SET_ID || $raw === []) {
+            if ($setId < SetParser::DEFAULT_SET_ID || $raw === []) {
                 continue;
             }
 
@@ -53,7 +53,7 @@ final class TaxonomySetRepository
         usort($rows, static function (array $left, array $right): int {
             $leftId = (int) ($left['id'] ?? 0);
             $rightId = (int) ($right['id'] ?? 0);
-            if ($leftId === SetContext::DEFAULT_SET_ID || $rightId === SetContext::DEFAULT_SET_ID) {
+            if ($leftId === SetParser::DEFAULT_SET_ID || $rightId === SetParser::DEFAULT_SET_ID) {
                 return $leftId <=> $rightId;
             }
 
@@ -80,7 +80,7 @@ final class TaxonomySetRepository
                 'id' => (int) ($row['id'] ?? 0),
                 'name' => (string) ($row['name'] ?? ''),
                 'slug' => (string) ($row['slug'] ?? ''),
-                'is_root' => (int) ($row['id'] ?? -1) === SetContext::DEFAULT_SET_ID,
+                'is_root' => (int) ($row['id'] ?? -1) === SetParser::DEFAULT_SET_ID,
             ];
         }
 
@@ -108,19 +108,19 @@ final class TaxonomySetRepository
 
     public function save(array $data): int
     {
-        $providedId = SetContext::normalizeSetId($data['id'] ?? null);
+        $providedId = SetParser::normalizeSetId($data['id'] ?? null);
         $setId = $providedId ?? $this->fileStore->nextAvailableId();
         $name = trim((string) ($data['name'] ?? ''));
         $description = trim((string) ($data['description'] ?? ''));
-        $slug = SetContext::normalizeSlug((string) ($data['slug'] ?? ''));
+        $slug = SetParser::normalizeSlug((string) ($data['slug'] ?? ''));
 
-        if ($setId === SetContext::DEFAULT_SET_ID) {
-            $name = SetContext::defaultSetName($this->taxonomyType);
-            $slug = SetContext::DEFAULT_SET_SLUG;
-            $description = SetContext::defaultSetDescription($this->taxonomyType);
+        if ($setId === SetParser::DEFAULT_SET_ID) {
+            $name = SetParser::defaultSetName($this->taxonomyType);
+            $slug = SetParser::DEFAULT_SET_SLUG;
+            $description = SetParser::defaultSetDescription($this->taxonomyType);
         }
 
-        if ($name === '' || !SetContext::isValidSlug($slug)) {
+        if ($name === '' || !SetParser::isValidSlug($slug)) {
             throw new RuntimeException('Set name and valid slug are required.');
         }
 
@@ -146,7 +146,7 @@ final class TaxonomySetRepository
             'name' => $name,
             'slug' => $slug,
             'description' => $description,
-            'is_stock' => $setId === SetContext::DEFAULT_SET_ID,
+            'is_stock' => $setId === SetParser::DEFAULT_SET_ID,
             'created_at' => $createdAt,
         ];
 
@@ -157,7 +157,7 @@ final class TaxonomySetRepository
 
     public function deleteById(int $id): void
     {
-        if ($id === SetContext::DEFAULT_SET_ID) {
+        if ($id === SetParser::DEFAULT_SET_ID) {
             throw new RuntimeException('The stock default set cannot be deleted.');
         }
 
@@ -172,20 +172,20 @@ final class TaxonomySetRepository
     private function canonicalizeRecord(int $id, array $raw): array
     {
         $name = trim((string) ($raw['name'] ?? ''));
-        $slug = SetContext::normalizeSlug((string) ($raw['slug'] ?? ''));
+        $slug = SetParser::normalizeSlug((string) ($raw['slug'] ?? ''));
         $description = trim((string) ($raw['description'] ?? ''));
         $createdAt = trim((string) ($raw['created_at'] ?? ''));
 
-        if ($id === SetContext::DEFAULT_SET_ID) {
-            $name = SetContext::defaultSetName($this->taxonomyType);
-            $slug = SetContext::DEFAULT_SET_SLUG;
-            $description = SetContext::defaultSetDescription($this->taxonomyType);
+        if ($id === SetParser::DEFAULT_SET_ID) {
+            $name = SetParser::defaultSetName($this->taxonomyType);
+            $slug = SetParser::DEFAULT_SET_SLUG;
+            $description = SetParser::defaultSetDescription($this->taxonomyType);
         } else {
             if ($name === '') {
                 $name = ucwords(str_replace('-', ' ', $slug !== '' ? $slug : ('set-' . $id)));
             }
             if ($slug === '') {
-                $slug = SetContext::normalizeSlug($name);
+                $slug = SetParser::normalizeSlug($name);
             }
             if ($slug === '') {
                 $slug = 'set-' . $id;
@@ -201,7 +201,7 @@ final class TaxonomySetRepository
             'name' => $name,
             'slug' => $slug,
             'description' => $description,
-            'is_stock' => $id === SetContext::DEFAULT_SET_ID,
+            'is_stock' => $id === SetParser::DEFAULT_SET_ID,
             'created_at' => $createdAt,
         ];
     }
@@ -212,10 +212,10 @@ final class TaxonomySetRepository
     private function rootRecord(): array
     {
         return [
-            'id' => SetContext::DEFAULT_SET_ID,
-            'name' => SetContext::defaultSetName($this->taxonomyType),
-            'slug' => SetContext::DEFAULT_SET_SLUG,
-            'description' => SetContext::defaultSetDescription($this->taxonomyType),
+            'id' => SetParser::DEFAULT_SET_ID,
+            'name' => SetParser::defaultSetName($this->taxonomyType),
+            'slug' => SetParser::DEFAULT_SET_SLUG,
+            'description' => SetParser::defaultSetDescription($this->taxonomyType),
             'is_stock' => true,
             'created_at' => gmdate('Y-m-d H:i:s'),
         ];

@@ -29,12 +29,11 @@ use Raven\Core\Routing\Panel\PanelTaxonomyRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelThemeAssetResponder;
 use Raven\Core\Routing\Panel\PanelUserRouteRegistrar;
 use Raven\Lib\Auth\Panel\PanelAccess;
-use Raven\Lib\Config\ConfigParser;
+use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Extension\Layout;
-use Raven\Lib\Directory\Panel;
+use Raven\Lib\Parser\PanelParser;
 use RuntimeException;
 
-use function Raven\Lib\Extra\request_path;
 
 /**
  * Owns panel-entry orchestration.
@@ -136,8 +135,8 @@ final class PanelController
         /**
          * Normalizes request path into panel-internal path.
          */
-        $requestedPath = request_path();
-        $configuredPanelPrefix = Panel::fromConfig($rvn['config']);
+        $requestedPath = \Raven\Lib\Transport\Request::path();
+        $configuredPanelPrefix = PanelParser::fromConfig($rvn['config']);
 
         $internalPath = $requestedPath;
 
@@ -178,7 +177,7 @@ final class PanelController
          * Builds panel URL with configured prefix.
          */
         $panelUrl = static function (string $suffix = '') use ($rvn): string {
-            return Panel::fromConfig($rvn['config'], $suffix);
+            return PanelParser::fromConfig($rvn['config'], $suffix);
         };
         $shouldInitializeFullPanelRuntime = !$isPanelAuthHelperInternalPath($internalPath);
         $enabledExtensions = [];

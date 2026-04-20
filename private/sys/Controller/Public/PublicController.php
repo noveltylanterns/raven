@@ -200,7 +200,7 @@ final class PublicController
         PublicContentRouteRegistrar::register($router, $publicContentController, $publicRequestContext, $input, $routeConfig);
 
         $method = $requestMethod;
-        $path = request_path();
+        $path = \Raven\Lib\Transport\Request::path();
 
         if (!in_array($method, ['GET', 'POST'], true)) {
             http_response_code(405);

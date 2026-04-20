@@ -14,7 +14,7 @@ namespace Raven\Core\Routing\Panel;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Auth\Panel\PanelSessionGuard;
 use Raven\Lib\Extension\Layout;
-use Raven\Lib\Directory\Panel;
+use Raven\Lib\Parser\PanelParser;
 use Raven\Core\Routing\Router;
 
 /**
@@ -58,7 +58,7 @@ final class PanelExtensionRouteRegistrar
          * @return string Absolute panel-relative URL.
          */
         $panelUrl = static function (string $suffix = '') use ($rvn): string {
-            return Panel::fromConfig($rvn['config'], $suffix);
+            return PanelParser::fromConfig($rvn['config'], $suffix);
         };
 
         /**

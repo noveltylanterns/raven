@@ -19,7 +19,7 @@ use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\Directory\Route;
+use Raven\Lib\Parser\RouteParser;
 use Raven\Lib\Security\InputSanitizer;
 
 use Raven\Lib\Transport\Redirect;
@@ -32,7 +32,7 @@ final class GroupController
     private SharedController $context;
     private InputSanitizer $input;
     private GroupRepository $groupRepo;
-    private Route $routeConfigService;
+    private RouteParser $routeConfigService;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private TaxonomyImageService $taxonomyImageService;
@@ -44,7 +44,7 @@ final class GroupController
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param GroupRepository $groupRepo Group repository for panel CRUD.
-     * @param Route $routeConfigService Shared route-configuration helper.
+     * @param RouteParser $routeConfigService Shared route-configuration helper.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor utility methods.
      * @param TaxonomyImageService $taxonomyImageService Shared group image upload/storage pipeline.
@@ -57,7 +57,7 @@ final class GroupController
         SharedController $context,
         InputSanitizer $input,
         GroupRepository $groupRepo,
-        Route $routeConfigService,
+        RouteParser $routeConfigService,
         EditorTabs $editorTabs,
         Editor $editor,
         TaxonomyImageService $taxonomyImageService,

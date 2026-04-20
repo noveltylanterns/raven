@@ -6,8 +6,8 @@ namespace Raven\Lib\View\Public;
 
 use Raven\Core\Config;
 use Raven\Lib\Transport\Request;
-use Raven\Lib\Profile\ProfileContactService;
-use Raven\Lib\Directory\Route;
+use Raven\Lib\Parser\RouteParser;
+use Raven\Lib\Parser\UserParser;
 use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\View\Panel\ThemeCatalogService;
 
@@ -19,15 +19,15 @@ final class PublicMetaService
     private Request $requestContextResolver;
     private SiteContextBuilder $siteContextBuilder;
     private ThemeCatalogService $themeCatalogService;
-    private ProfileContactService $profileContactService;
-    private Route $routeConfigService;
+    private UserParser $profileContactService;
+    private RouteParser $routeConfigService;
 
     public function __construct(
         Request $requestContextResolver,
         SiteContextBuilder $siteContextBuilder,
         ThemeCatalogService $themeCatalogService,
-        ProfileContactService $profileContactService,
-        Route $routeConfigService
+        UserParser $profileContactService,
+        RouteParser $routeConfigService
     ) {
         $this->requestContextResolver = $requestContextResolver;
         $this->siteContextBuilder = $siteContextBuilder;
