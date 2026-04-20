@@ -20,11 +20,15 @@ use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\Parser\ChannelParser;
-use Raven\Lib\Parser\FeedParser;
-use Raven\Lib\Parser\ModeParser;
+use Raven\Lib\Parser\CategoryDataParser;
+use Raven\Lib\Parser\CategoryRouteParser;
+use Raven\Lib\Parser\ChannelDataParser;
+use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\FeedRouteParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Parser\SetParser;
+use Raven\Lib\Parser\TagDataParser;
+use Raven\Lib\Parser\TagRouteParser;
 
 use Raven\Lib\Transport\Redirect;
 
@@ -43,12 +47,16 @@ final class TaxonomyController
     private ChannelRepository $channelRepo;
     /** @var ?CategoryRepository */
     private ?CategoryRepository $categoryRepo = null;
+    /** @var ?CategoryDataParser */
+    private ?CategoryDataParser $categoryParser = null;
     private Closure $categoryRepoResolver;
     /** @var ?TaxonomySetRepository */
     private ?TaxonomySetRepository $categorySetRepo = null;
     private Closure $categorySetRepoResolver;
     /** @var ?TagRepository */
     private ?TagRepository $tagRepo = null;
+    /** @var ?TagDataParser */
+    private ?TagDataParser $tagParser = null;
     private Closure $tagRepoResolver;
     /** @var ?TaxonomySetRepository */
     private ?TaxonomySetRepository $tagSetRepo = null;
@@ -56,8 +64,8 @@ final class TaxonomyController
     private bool $categoryEnabled;
     private bool $tagEnabled;
     private TaxonomyImageService $taxonomyImageService;
-    private ChannelParser $channelParser;
-    private FeedParser $feedParser;
+    private ChannelDataParser $channelParser;
+    private FeedRouteParser $feedParser;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private Upload $uploadFileSetNormalizer;
@@ -73,8 +81,8 @@ final class TaxonomyController
      * @param bool $categoryEnabled Whether category features are enabled in runtime config.
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Service for taxonomy image uploads and path management.
-     * @param ChannelParser $channelParser Route parser for channel/category/tag prefixes and route-mode helpers.
-     * @param FeedParser $feedParser Feed parser for RSS/Atom route settings.
+     * @param ChannelDataParser $channelParser Channel data reader for repo-backed channel records.
+     * @param FeedRouteParser $feedParser Feed route parser for RSS/Atom route settings.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor normalizers (channel editor override, etc.).
      * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
@@ -91,8 +99,8 @@ final class TaxonomyController
         bool $categoryEnabled,
         bool $tagEnabled,
         TaxonomyImageService $taxonomyImageService,
-        ChannelParser $channelParser,
-        FeedParser $feedParser,
+        ChannelDataParser $channelParser,
+        FeedRouteParser $feedParser,
         EditorTabs $editorTabs,
         Editor $editor,
         Upload $uploadFileSetNormalizer
@@ -132,12 +140,12 @@ final class TaxonomyController
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->channelRepo->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $pageResult = $this->channelParser->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $channelRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->channelRepo->listPageForPanel($perPage, $pagination['offset']);
+            $pageResult = $this->channelParser->listPageForPanel($perPage, $pagination['offset']);
             $channelRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
@@ -167,7 +175,7 @@ final class TaxonomyController
 
         $channel = null;
         if ($id !== null) {
-            $channel = $this->channelRepo->findById($id);
+            $channel = $this->channelParser->findById($id);
 
             if ($channel === null) {
                 $this->context->flash('error', 'Channel not found.');
@@ -182,10 +190,10 @@ final class TaxonomyController
             $channel['editor_override'] = $this->editor->normalizeChannelEditorOverride(
                 (string) ($channel['editor_override'] ?? 'inherit')
             );
-            $channel['route_mode'] = $this->channelParser->normalizeChannelRouteMode(
+            $channel['route_mode'] = ChannelRouteParser::normalizeChannelRouteMode(
                 (string) ($channel['route_mode'] ?? 'inherit')
             );
-            $channel['route_separator'] = ModeParser::normalizeChannelSeparator(
+            $channel['route_separator'] = ChannelRouteParser::normalizeChannelSeparator(
                 (string) ($channel['route_separator'] ?? 'inherit')
             );
         }
@@ -246,10 +254,10 @@ final class TaxonomyController
         $editorOverride = $this->editor->normalizeChannelEditorOverride(
             (string) ($post['editor_override'] ?? 'inherit')
         );
-        $routeMode = $this->channelParser->normalizeChannelRouteMode(
+        $routeMode = ChannelRouteParser::normalizeChannelRouteMode(
             (string) ($post['route_mode'] ?? 'inherit')
         );
-        $routeSeparator = ModeParser::normalizeChannelSeparator(
+        $routeSeparator = ChannelRouteParser::normalizeChannelSeparator(
             (string) ($post['route_separator'] ?? 'inherit')
         );
         $feedsEnabled = $this->feedParser->feedEnabled();
@@ -312,7 +320,7 @@ final class TaxonomyController
         );
 
         // Process optional cover/preview image uploads for the channel record.
-        $currentRecord = $this->channelRepo->findById($savedId);
+        $currentRecord = $this->channelParser->findById($savedId);
         $currentStorage = $this->taxonomyImageService->imageStoragePayloadFromRecord('channels', $currentRecord);
         $currentPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('channels', $savedId, $currentStorage);
         $nextStorage = $currentStorage;
@@ -405,7 +413,7 @@ final class TaxonomyController
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id !== null) {
-            $record = $this->channelRepo->findById($id);
+            $record = $this->channelParser->findById($id);
             // Single-row delete path (row action button).
             try {
                 $this->channelRepo->deleteById($id);
@@ -438,7 +446,7 @@ final class TaxonomyController
         $failedCount = 0;
 
         foreach ($selectedIds as $selectedId) {
-            $record = $this->channelRepo->findById($selectedId);
+            $record = $this->channelParser->findById($selectedId);
             try {
                 // Continue deleting remaining ids even if one operation throws.
                 $this->channelRepo->deleteById($selectedId);
@@ -488,7 +496,7 @@ final class TaxonomyController
             return;
         }
 
-        $categoryCountsBySetId = $this->categoryRepo()->countsBySetId();
+        $categoryCountsBySetId = $this->categoryParser()->countsBySetId();
         $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
         if (
             $selectedSetId !== null
@@ -502,12 +510,12 @@ final class TaxonomyController
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->categoryRepo()->listPageForPanel($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
+        $pageResult = $this->categoryParser()->listPageForPanel($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->categoryRepo()->listPageForPanel($perPage, $pagination['offset'], $selectedSetId);
+            $pageResult = $this->categoryParser()->listPageForPanel($perPage, $pagination['offset'], $selectedSetId);
             $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
@@ -556,7 +564,7 @@ final class TaxonomyController
 
         $category = null;
         if ($id !== null) {
-            $category = $this->categoryRepo()->findById($id);
+            $category = $this->categoryParser()->findById($id);
 
             if ($category === null) {
                 $this->context->flash('error', 'Category not found.');
@@ -569,7 +577,7 @@ final class TaxonomyController
         $this->context->renderPanel('panel/category/edit', [
             'category' => $category,
             'setOptions' => $this->categorySetRepo()->listOptions(),
-            'categoryRoutePrefix' => $this->channelParser->categoryRoutePrefix(),
+            'categoryRoutePrefix' => CategoryRouteParser::categoryRoutePrefix($this->context->config(), $this->input),
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),
@@ -652,7 +660,7 @@ final class TaxonomyController
         );
 
         // Process optional cover/preview/icon image uploads for the category record.
-        $currentRecord = $this->categoryRepo()->findById($savedId);
+        $currentRecord = $this->categoryParser()->findById($savedId);
         $currentStorage = $this->taxonomyImageService->imageStoragePayloadFromRecord('categories', $currentRecord);
         $currentPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('categories', $savedId, $currentStorage);
         $nextStorage = $currentStorage;
@@ -770,7 +778,7 @@ final class TaxonomyController
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id !== null) {
-            $record = $this->categoryRepo()->findById($id);
+            $record = $this->categoryParser()->findById($id);
             // Single-row delete path (row action button).
             try {
                 $this->categoryRepo()->deleteById($id);
@@ -802,7 +810,7 @@ final class TaxonomyController
         $failedCount = 0;
 
         foreach ($selectedIds as $selectedId) {
-            $record = $this->categoryRepo()->findById($selectedId);
+            $record = $this->categoryParser()->findById($selectedId);
             try {
                 // Continue deleting remaining ids even if one operation throws.
                 $this->categoryRepo()->deleteById($selectedId);
@@ -853,7 +861,7 @@ final class TaxonomyController
         }
 
         // Annotate each set row with its category and channel usage counts.
-        $countsBySetId = $this->categoryRepo()->countsBySetId();
+        $countsBySetId = $this->categoryParser()->countsBySetId();
         $setRows = [];
         foreach ($this->categorySetRepo()->listAll() as $setRow) {
             $setId = (int) ($setRow['id'] ?? 0);
@@ -998,7 +1006,7 @@ final class TaxonomyController
         }
 
         // Reassign any remaining categories in this set to the default set before deleting.
-        $categoryCount = (int) ($this->categoryRepo()->countsBySetId()[$id] ?? 0);
+        $categoryCount = (int) ($this->categoryParser()->countsBySetId()[$id] ?? 0);
         if ($categoryCount > 0) {
             $this->categoryRepo()->reassignSetToDefault($id, SetParser::DEFAULT_SET_ID);
         }
@@ -1035,7 +1043,7 @@ final class TaxonomyController
             return;
         }
 
-        $tagCountsBySetId = $this->tagRepo()->countsBySetId();
+        $tagCountsBySetId = $this->tagParser()->countsBySetId();
         $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
         if (
             $selectedSetId !== null
@@ -1049,12 +1057,12 @@ final class TaxonomyController
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->tagRepo()->listPageForPanel($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
+        $pageResult = $this->tagParser()->listPageForPanel($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->tagRepo()->listPageForPanel($perPage, $pagination['offset'], $selectedSetId);
+            $pageResult = $this->tagParser()->listPageForPanel($perPage, $pagination['offset'], $selectedSetId);
             $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
@@ -1103,7 +1111,7 @@ final class TaxonomyController
 
         $tag = null;
         if ($id !== null) {
-            $tag = $this->tagRepo()->findById($id);
+            $tag = $this->tagParser()->findById($id);
 
             if ($tag === null) {
                 $this->context->flash('error', 'Tag not found.');
@@ -1116,7 +1124,7 @@ final class TaxonomyController
         $this->context->renderPanel('panel/tag/edit', [
             'tag' => $tag,
             'setOptions' => $this->tagSetRepo()->listOptions(),
-            'tagRoutePrefix' => $this->channelParser->tagRoutePrefix(),
+            'tagRoutePrefix' => TagRouteParser::tagRoutePrefix($this->context->config(), $this->input),
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),
@@ -1199,7 +1207,7 @@ final class TaxonomyController
         );
 
         // Process optional cover/preview/icon image uploads for the tag record.
-        $currentRecord = $this->tagRepo()->findById($savedId);
+        $currentRecord = $this->tagParser()->findById($savedId);
         $currentStorage = $this->taxonomyImageService->imageStoragePayloadFromRecord('tags', $currentRecord);
         $currentPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('tags', $savedId, $currentStorage);
         $nextStorage = $currentStorage;
@@ -1317,7 +1325,7 @@ final class TaxonomyController
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id !== null) {
-            $record = $this->tagRepo()->findById($id);
+            $record = $this->tagParser()->findById($id);
             // Single-row delete path (row action button).
             try {
                 $this->tagRepo()->deleteById($id);
@@ -1349,7 +1357,7 @@ final class TaxonomyController
         $failedCount = 0;
 
         foreach ($selectedIds as $selectedId) {
-            $record = $this->tagRepo()->findById($selectedId);
+            $record = $this->tagParser()->findById($selectedId);
             try {
                 // Continue deleting remaining ids even if one operation throws.
                 $this->tagRepo()->deleteById($selectedId);
@@ -1400,7 +1408,7 @@ final class TaxonomyController
         }
 
         // Annotate each set row with its tag and channel usage counts.
-        $countsBySetId = $this->tagRepo()->countsBySetId();
+        $countsBySetId = $this->tagParser()->countsBySetId();
         $setRows = [];
         foreach ($this->tagSetRepo()->listAll() as $setRow) {
             $setId = (int) ($setRow['id'] ?? 0);
@@ -1539,7 +1547,7 @@ final class TaxonomyController
         }
 
         // Reassign any remaining tags in this set to the default set before deleting.
-        $tagCount = (int) ($this->tagRepo()->countsBySetId()[$id] ?? 0);
+        $tagCount = (int) ($this->tagParser()->countsBySetId()[$id] ?? 0);
         if ($tagCount > 0) {
             $this->tagRepo()->reassignSetToDefault($id, SetParser::DEFAULT_SET_ID);
         }
@@ -1582,6 +1590,22 @@ final class TaxonomyController
     }
 
     /**
+     * Returns the category parser on first use so read-only category flows route
+     * through the canonical parser surface instead of the repository.
+     *
+     * @return CategoryDataParser Category data parser.
+     */
+    private function categoryParser(): CategoryDataParser
+    {
+        if ($this->categoryParser instanceof CategoryDataParser) {
+            return $this->categoryParser;
+        }
+
+        $this->categoryParser = new CategoryDataParser($this->input, $this->categoryRepo());
+        return $this->categoryParser;
+    }
+
+    /**
      * Returns the category-set repository on first use so non-taxonomy routes
      * do not instantiate file-backed taxonomy set storage.
      *
@@ -1621,6 +1645,22 @@ final class TaxonomyController
 
         $this->tagRepo = $repo;
         return $this->tagRepo;
+    }
+
+    /**
+     * Returns the tag parser on first use so read-only tag flows route through
+     * the canonical parser surface instead of the repository.
+     *
+     * @return TagDataParser Tag data parser.
+     */
+    private function tagParser(): TagDataParser
+    {
+        if ($this->tagParser instanceof TagDataParser) {
+            return $this->tagParser;
+        }
+
+        $this->tagParser = new TagDataParser($this->input, $this->tagRepo());
+        return $this->tagParser;
     }
 
     /**

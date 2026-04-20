@@ -836,7 +836,7 @@ declare(strict_types=1);
 /** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string, directory?: string} $extensionMeta */
 /** @var string $csrfField */
 
-use function Raven\Lib\Extra\e;
+use function Raven\Lib\Security\e;
 
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Extension'));
 $extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));

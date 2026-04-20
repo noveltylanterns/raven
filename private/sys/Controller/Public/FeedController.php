@@ -15,7 +15,10 @@ use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Routing\Public\PublicChannelPageRouteService;
-use Raven\Lib\Parser\PageParser;
+use Raven\Lib\Parser\CategoryRouteParser;
+use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\PageDataParser;
+use Raven\Lib\Parser\TagRouteParser;
 use Raven\Lib\View\Public\PublicTemplateDecorator;
 use Raven\Lib\View\Public\PublicTemplatePipeline;
 use Raven\Lib\View\Public\PublicTemplateResolver;
@@ -28,7 +31,7 @@ final class FeedController
 {
     private SharedController $context;
     private ChannelRepository $channelRepo;
-    private PageParser $pageParser;
+    private PageDataParser $pageParser;
     private TaxonomyLookupRepository $taxonomyLookupRepo;
     private PublicTemplateDecorator $publicTemplateDecorator;
     private PublicChannelPageRouteService $publicChannelPageRouteService;
@@ -51,7 +54,7 @@ final class FeedController
     ) {
         $this->context = $context;
         $this->channelRepo = $channelRepo;
-        $this->pageParser = new PageParser($context->input(), $pageRepo);
+        $this->pageParser = new PageDataParser($context->input(), $pageRepo);
         $this->taxonomyLookupRepo = $taxonomyLookupRepo;
         $this->publicTemplateDecorator = new PublicTemplateDecorator(
             $context->config(),
@@ -75,7 +78,7 @@ final class FeedController
      */
     public function category(string $categorySlug, int $pageNumber = 1): void
     {
-        $categoryPrefix = $this->context->channelParser()->categoryRoutePrefix();
+        $categoryPrefix = CategoryRouteParser::categoryRoutePrefix($this->context->config(), $this->context->input());
         if ($categoryPrefix === '') {
             $this->context->notFound();
             return;
@@ -132,7 +135,7 @@ final class FeedController
      */
     public function tag(string $tagSlug, int $pageNumber = 1): void
     {
-        $tagPrefix = $this->context->channelParser()->tagRoutePrefix();
+        $tagPrefix = TagRouteParser::tagRoutePrefix($this->context->config(), $this->context->input());
         if ($tagPrefix === '') {
             $this->context->notFound();
             return;
@@ -377,7 +380,7 @@ final class FeedController
         $pages = [];
 
         if ($taxonomyType === 'category') {
-            $categoryPrefix = $this->context->channelParser()->categoryRoutePrefix();
+            $categoryPrefix = CategoryRouteParser::categoryRoutePrefix($this->context->config(), $this->context->input());
             if ($categoryPrefix === '') {
                 $this->context->notFound();
                 return;
@@ -394,7 +397,7 @@ final class FeedController
             $scopeLabel = $this->taxonomyFeedLabel($category, $normalizedSlug);
             $routeSuffix = [$categoryPrefix, $normalizedSlug];
         } elseif ($taxonomyType === 'tag') {
-            $tagPrefix = $this->context->channelParser()->tagRoutePrefix();
+            $tagPrefix = TagRouteParser::tagRoutePrefix($this->context->config(), $this->context->input());
             if ($tagPrefix === '') {
                 $this->context->notFound();
                 return;
@@ -650,7 +653,7 @@ final class FeedController
                     $slug,
                     $pageId,
                     (string) ($page['created'] ?? ''),
-                    $this->context->channelParser()->globalPageRouteMode(),
+                    ChannelRouteParser::globalPageRouteMode($this->context->config()),
                     'inherit',
                     (string) $this->context->config()->get('content.separator', '-')
                 );
@@ -666,7 +669,7 @@ final class FeedController
                         $slug,
                         $pageId,
                         (string) ($page['created'] ?? ''),
-                        $this->context->channelParser()->effectiveChannelRouteMode((string) ($page['route_mode_effective'] ?? 'inherit')),
+                        ChannelRouteParser::effectiveChannelRouteMode($this->context->config(), (string) ($page['route_mode_effective'] ?? 'inherit')),
                         (string) ($page['route_separator_effective'] ?? 'inherit'),
                         (string) $this->context->config()->get('content.separator', '-')
                     )

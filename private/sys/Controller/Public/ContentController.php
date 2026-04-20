@@ -24,9 +24,10 @@ use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeService;
 use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
-use Raven\Lib\Parser\PageParser;
+use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\Transport\Redirect;
-use Raven\Lib\Parser\UserParser;
+use Raven\Lib\Parser\UserDataParser;
 use Raven\Core\Routing\Public\PublicChannelPageRouteService;
 use Raven\Lib\View\Public\PublicMetaService;
 use Raven\Lib\View\SiteContextBuilder;
@@ -43,9 +44,9 @@ final class ContentController
     private SharedController $context;
     private ChannelRepository $channelRepo;
     private PageImageRepository $pageImages;
-    private PageParser $pageParser;
+    private PageDataParser $pageParser;
     private RedirectRepository $redirectRepo;
-    private UserParser $userParser;
+    private UserDataParser $userParser;
     private Closure $extensionServicesProvider;
     /** @var array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> */
     private array $embeddedFormRuntimes = [];
@@ -62,7 +63,7 @@ final class ContentController
     private ?BodyBlockPolicy $bodyBlockPolicy = null;
     private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
     private ?EmbeddedFormRuntimeService $embeddedFormRuntimeService = null;
-    private ?UserParser $profileContactService = null;
+    private ?UserDataParser $profileContactService = null;
     private ?PublicChannelPageRouteService $publicChannelPageRouteService = null;
 
     /**
@@ -87,9 +88,9 @@ final class ContentController
         $this->context = $context;
         $this->channelRepo = $channelRepo;
         $this->pageImages = $pageImages;
-        $this->pageParser = new PageParser($context->input(), $pageRepo);
+        $this->pageParser = new PageDataParser($context->input(), $pageRepo);
         $this->redirectRepo = $redirectRepo;
-        $this->userParser = new UserParser($context->input(), $userRepo);
+        $this->userParser = new UserDataParser($context->input(), $userRepo);
         $this->extensionServicesProvider = Closure::fromCallable($extensionServicesProvider);
     }
 
@@ -184,7 +185,7 @@ final class ContentController
                 return;
             }
 
-            $channelRouteMode = $this->context->channelParser()->effectiveChannelRouteMode((string) ($channel['route_mode'] ?? 'inherit'));
+            $channelRouteMode = ChannelRouteParser::effectiveChannelRouteMode($this->context->config(), (string) ($channel['route_mode'] ?? 'inherit'));
             $channelWordSeparator = $this->publicChannelPageRouteService()->resolveWordSeparator(
                 (string) ($channel['route_separator'] ?? 'inherit'),
                 (string) $this->context->config()->get('content.separator', '-')
@@ -208,7 +209,7 @@ final class ContentController
                 $lookupSlug = (string) ($lookupTarget['slug'] ?? '');
             }
         } else {
-            $channelRouteMode = $this->context->channelParser()->globalPageRouteMode();
+            $channelRouteMode = ChannelRouteParser::globalPageRouteMode($this->context->config());
             $lookupTarget = $this->publicChannelPageRouteService()->resolveLookupTarget(
                 $requestedSlug,
                 $channelRouteMode,
@@ -691,12 +692,12 @@ final class ContentController
     /**
      * Returns the shared profile-contact helper.
      *
-     * @return UserParser Shared profile-contact helper.
+     * @return UserDataParser Shared profile-contact helper.
      */
-    private function profileContactService(): UserParser
+    private function profileContactService(): UserDataParser
     {
-        if (!$this->profileContactService instanceof UserParser) {
-            $this->profileContactService = new UserParser($this->context->input());
+        if (!$this->profileContactService instanceof UserDataParser) {
+            $this->profileContactService = new UserDataParser($this->context->input());
         }
 
         return $this->profileContactService;

@@ -102,8 +102,8 @@ final class Raven
         }
     });
 
-    // Load global helper functions.
-    require_once $root . '/private/lib/Extra/Helpers.php';
+    // Load namespaced helper functions that PHP's autoloader cannot discover.
+    require_once $root . '/private/lib/Security/OutputEncoder.php';
 
     $config = new Config($root . '/private/dat/config.php');
 

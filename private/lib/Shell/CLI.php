@@ -19,6 +19,11 @@ use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Extension\ExtensionRegistry;
+use Raven\Lib\Parser\CategoryDataParser;
+use Raven\Lib\Parser\ChannelDataParser;
+use Raven\Lib\Parser\GroupDataParser;
+use Raven\Lib\Parser\RedirectDataParser;
+use Raven\Lib\Parser\TagDataParser;
 use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Scribe\ConfigScribe;
@@ -1023,9 +1028,10 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
             (string) $rvn['driver'],
             (string) $rvn['prefix']
         );
+        $parser = new CategoryDataParser($rvn['input'], $repo);
 
         if ($action === 'list') {
-            $rows = $repo->listAll();
+            $rows = $parser->listAll();
             if ($context->json) {
                 $context->printJson(['ok' => true, 'items' => $rows]);
             } else {
@@ -1042,11 +1048,11 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
             $row = null;
             $idRaw = raven_cli_option($options, 'id', null);
             if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                $row = $repo->findById((int) $idRaw);
+                $row = $parser->findById((int) $idRaw);
             } else {
                 $slugRaw = (string) raven_cli_option($options, 'slug', '');
                 if ($slugRaw !== '') {
-                    $row = raven_cli_find_row_by_slug($repo->listAll(), $slugRaw);
+                    $row = $parser->findBySlug($slugRaw);
                 }
             }
 
@@ -1069,11 +1075,11 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
             if ($action === 'update') {
                 $idRaw = raven_cli_option($options, 'id', null);
                 if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                    $existing = $repo->findById((int) $idRaw);
+                    $existing = $parser->findById((int) $idRaw);
                 } else {
                     $slugRaw = (string) raven_cli_option($options, 'slug', '');
                     if ($slugRaw !== '') {
-                        $existing = raven_cli_find_row_by_slug($repo->listAll(), $slugRaw);
+                        $existing = $parser->findBySlug($slugRaw);
                     }
                 }
 
@@ -1125,11 +1131,11 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
             $idRaw = raven_cli_option($options, 'id', null);
             $row = null;
             if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                $row = $repo->findById((int) $idRaw);
+                $row = $parser->findById((int) $idRaw);
             } else {
                 $slugRaw = (string) raven_cli_option($options, 'slug', '');
                 if ($slugRaw !== '') {
-                    $row = raven_cli_find_row_by_slug($repo->listAll(), $slugRaw);
+                    $row = $parser->findBySlug($slugRaw);
                 }
             }
 
@@ -1183,9 +1189,10 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
             (string) $rvn['driver'],
             (string) $rvn['prefix']
         );
+        $parser = new TagDataParser($rvn['input'], $repo);
 
         if ($action === 'list') {
-            $rows = $repo->listAll();
+            $rows = $parser->listAll();
             if ($context->json) {
                 $context->printJson(['ok' => true, 'items' => $rows]);
             } else {
@@ -1202,11 +1209,11 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
             $row = null;
             $idRaw = raven_cli_option($options, 'id', null);
             if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                $row = $repo->findById((int) $idRaw);
+                $row = $parser->findById((int) $idRaw);
             } else {
                 $slugRaw = (string) raven_cli_option($options, 'slug', '');
                 if ($slugRaw !== '') {
-                    $row = raven_cli_find_row_by_slug($repo->listAll(), $slugRaw);
+                    $row = $parser->findBySlug($slugRaw);
                 }
             }
 
@@ -1229,11 +1236,11 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
             if ($action === 'update') {
                 $idRaw = raven_cli_option($options, 'id', null);
                 if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                    $existing = $repo->findById((int) $idRaw);
+                    $existing = $parser->findById((int) $idRaw);
                 } else {
                     $slugRaw = (string) raven_cli_option($options, 'slug', '');
                     if ($slugRaw !== '') {
-                        $existing = raven_cli_find_row_by_slug($repo->listAll(), $slugRaw);
+                        $existing = $parser->findBySlug($slugRaw);
                     }
                 }
 
@@ -1285,11 +1292,11 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
             $idRaw = raven_cli_option($options, 'id', null);
             $row = null;
             if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                $row = $repo->findById((int) $idRaw);
+                $row = $parser->findById((int) $idRaw);
             } else {
                 $slugRaw = (string) raven_cli_option($options, 'slug', '');
                 if ($slugRaw !== '') {
-                    $row = raven_cli_find_row_by_slug($repo->listAll(), $slugRaw);
+                    $row = $parser->findBySlug($slugRaw);
                 }
             }
 
@@ -1339,9 +1346,10 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
     try {
         $rvn = $context->rvn();
         $repo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+        $parser = new ChannelDataParser($rvn['config'], $rvn['input'], $repo);
 
         if ($action === 'list') {
-            $rows = $repo->listAll();
+            $rows = $parser->listAll();
             if ($context->json) {
                 $context->printJson(['ok' => true, 'items' => $rows]);
             } else {
@@ -1357,11 +1365,11 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
             $row = null;
             $idRaw = raven_cli_option($options, 'id', null);
             if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                $row = $repo->findById((int) $idRaw);
+                $row = $parser->findById((int) $idRaw);
             } else {
                 $slugRaw = (string) raven_cli_option($options, 'slug', '');
                 if ($slugRaw !== '') {
-                    $row = $repo->findBySlug($slugRaw);
+                    $row = $parser->findBySlug($slugRaw);
                 }
             }
 
@@ -1384,11 +1392,11 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
             if ($action === 'update') {
                 $idRaw = raven_cli_option($options, 'id', null);
                 if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                    $existing = $repo->findById((int) $idRaw);
+                    $existing = $parser->findById((int) $idRaw);
                 } else {
                     $slugRaw = (string) raven_cli_option($options, 'slug', '');
                     if ($slugRaw !== '') {
-                        $existing = $repo->findBySlug($slugRaw);
+                        $existing = $parser->findBySlug($slugRaw);
                     }
                 }
 
@@ -1447,11 +1455,11 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
             $row = null;
             $idRaw = raven_cli_option($options, 'id', null);
             if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                $row = $repo->findById((int) $idRaw);
+                $row = $parser->findById((int) $idRaw);
             } else {
                 $slugRaw = (string) raven_cli_option($options, 'slug', '');
                 if ($slugRaw !== '') {
-                    $row = $repo->findBySlug($slugRaw);
+                    $row = $parser->findBySlug($slugRaw);
                 }
             }
 
@@ -1502,6 +1510,7 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
     try {
         $rvn = $context->rvn();
         $repo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $parser = new GroupDataParser($rvn['input'], $repo);
 
         $orderedPermissions = [
             'view_public' => PanelAccess::VIEW_PUBLIC_SITE,
@@ -1547,29 +1556,18 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
             return $names;
         };
 
-        $resolveGroup = static function (array $selectorOptions) use ($repo): ?array {
+        $resolveGroup = static function (array $selectorOptions) use ($parser): ?array {
             $idRaw = raven_cli_option($selectorOptions, 'id', null);
             if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                return $repo->findById((int) $idRaw);
+                return $parser->findById((int) $idRaw);
             }
 
-            $slugRaw = strtolower(trim((string) raven_cli_option($selectorOptions, 'slug', '')));
+            $slugRaw = (string) raven_cli_option($selectorOptions, 'slug', '');
             if ($slugRaw === '') {
                 return null;
             }
 
-            foreach ($repo->listAll() as $row) {
-                if (!is_array($row)) {
-                    continue;
-                }
-
-                $rowSlug = strtolower(trim((string) ($row['slug'] ?? '')));
-                if ($rowSlug === $slugRaw) {
-                    return $row;
-                }
-            }
-
-            return null;
+            return $parser->findBySlug($slugRaw);
         };
 
         $parsePermissionMask = static function (array $sourceOptions, int $defaultMask) use ($permissionAliases, $orderedPermissions): int {
@@ -1625,7 +1623,7 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
         };
 
         if ($action === 'list') {
-            $rows = $repo->listAll();
+            $rows = $parser->listAll();
             $items = [];
             foreach ($rows as $row) {
                 if (!is_array($row)) {
@@ -1713,7 +1711,7 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
                 'permissions' => $permissionMask,
             ]);
 
-            $saved = $repo->findById($id);
+            $saved = $parser->findById($id);
             $savedMask = is_array($saved) ? (int) ($saved['permissions'] ?? 0) : $permissionMask;
             if ($context->json) {
                 $context->printJson([
@@ -1779,36 +1777,25 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
         // RedirectRepository depends on ChannelRepository for channel-slug validation.
         $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
         $repo = new RedirectRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
+        $parser = new RedirectDataParser($rvn['input'], $repo);
 
-        $findRedirect = static function (array $options) use ($repo): ?array {
+        $findRedirect = static function (array $options) use ($parser): ?array {
             $idRaw = raven_cli_option($options, 'id', null);
             if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                return $repo->findById((int) $idRaw);
+                return $parser->findById((int) $idRaw);
             }
 
-            $slug = strtolower(trim((string) raven_cli_option($options, 'slug', '')));
-            $channel = strtolower(trim((string) raven_cli_option($options, 'channel', '')));
+            $slug = (string) raven_cli_option($options, 'slug', '');
+            $channel = (string) raven_cli_option($options, 'channel', '');
             if ($slug === '') {
                 return null;
             }
 
-            foreach ($repo->listAll() as $row) {
-                if (!is_array($row)) {
-                    continue;
-                }
-
-                $rowSlug = strtolower(trim((string) ($row['slug'] ?? '')));
-                $rowChannel = strtolower(trim((string) ($row['channel_slug'] ?? '')));
-                if ($rowSlug === $slug && $rowChannel === $channel) {
-                    return $row;
-                }
-            }
-
-            return null;
+            return $parser->findBySlug($slug, $channel !== '' ? $channel : null);
         };
 
         if ($action === 'list') {
-            $rows = $repo->listAll();
+            $rows = $parser->listAll();
             if ($context->json) {
                 $context->printJson(['ok' => true, 'items' => $rows]);
             } else {

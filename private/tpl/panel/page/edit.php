@@ -43,7 +43,7 @@ declare(strict_types=1);
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
-use function Raven\Lib\Extra\e;
+use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $editorBlocks = ($editorBlocks ?? null) instanceof \Raven\Lib\View\Panel\EditorBlocks
@@ -199,7 +199,7 @@ if ($permalinkBase !== '' && !preg_match('#^https?://#i', $permalinkBase)) {
 $permalinkBase = rtrim($permalinkBase, '/');
 $permalinkPathParts = [];
 $routeSegment = trim(
-    \Raven\Lib\Parser\ModeParser::buildRouteSegment(
+    \Raven\Lib\Parser\PageRouteParser::buildRouteSegment(
         new \Raven\Lib\Security\InputSanitizer(),
         $pageSlug,
         $pageId,

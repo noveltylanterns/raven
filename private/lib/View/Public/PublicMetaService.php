@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Raven\Lib\View\Public;
 
 use Raven\Core\Config;
-use Raven\Lib\Parser\FeedParser;
+use Raven\Lib\Parser\FeedRouteParser;
 use Raven\Lib\Transport\Request;
-use Raven\Lib\Parser\UserParser;
+use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\View\Panel\ThemeCatalogService;
 
@@ -19,15 +19,15 @@ final class PublicMetaService
     private Request $requestContextResolver;
     private SiteContextBuilder $siteContextBuilder;
     private ThemeCatalogService $themeCatalogService;
-    private UserParser $profileContactService;
-    private FeedParser $feedParser;
+    private UserDataParser $profileContactService;
+    private FeedRouteParser $feedParser;
 
     public function __construct(
         Request $requestContextResolver,
         SiteContextBuilder $siteContextBuilder,
         ThemeCatalogService $themeCatalogService,
-        UserParser $profileContactService,
-        FeedParser $feedParser
+        UserDataParser $profileContactService,
+        FeedRouteParser $feedParser
     ) {
         $this->requestContextResolver = $requestContextResolver;
         $this->siteContextBuilder = $siteContextBuilder;

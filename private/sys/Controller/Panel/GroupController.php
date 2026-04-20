@@ -19,7 +19,8 @@ use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\Parser\GroupParser;
+use Raven\Lib\Parser\GroupDataParser;
+use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Security\InputSanitizer;
 
 use Raven\Lib\Transport\Redirect;
@@ -32,7 +33,8 @@ final class GroupController
     private SharedController $context;
     private InputSanitizer $input;
     private GroupRepository $groupRepo;
-    private GroupParser $groupParser;
+    private GroupDataParser $groupDataParser;
+    private GroupRouteParser $groupRouteParser;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private TaxonomyImageService $taxonomyImageService;
@@ -44,7 +46,8 @@ final class GroupController
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param GroupRepository $groupRepo Group repository for panel CRUD.
-     * @param GroupParser $groupParser Shared user/group route parser.
+     * @param GroupDataParser $groupDataParser Group data parser for repo-backed group reads.
+     * @param GroupRouteParser $groupRouteParser Group route parser for routing-policy reads.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor utility methods.
      * @param TaxonomyImageService $taxonomyImageService Shared group image upload/storage pipeline.
@@ -57,7 +60,8 @@ final class GroupController
         SharedController $context,
         InputSanitizer $input,
         GroupRepository $groupRepo,
-        GroupParser $groupParser,
+        GroupDataParser $groupDataParser,
+        GroupRouteParser $groupRouteParser,
         EditorTabs $editorTabs,
         Editor $editor,
         TaxonomyImageService $taxonomyImageService,
@@ -68,7 +72,8 @@ final class GroupController
         $this->context = $context;
         $this->input = $input;
         $this->groupRepo = $groupRepo;
-        $this->groupParser = $groupParser;
+        $this->groupDataParser = $groupDataParser;
+        $this->groupRouteParser = $groupRouteParser;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
         $this->taxonomyImageService = $taxonomyImageService;
@@ -91,12 +96,12 @@ final class GroupController
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->groupRepo->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $pageResult = $this->groupDataParser->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $groupRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->groupRepo->listPageForPanel($perPage, $pagination['offset']);
+            $pageResult = $this->groupDataParser->listPageForPanel($perPage, $pagination['offset']);
             $groupRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
@@ -127,7 +132,7 @@ final class GroupController
 
         $group = null;
         if ($id !== null) {
-            $group = $this->groupRepo->findById($id);
+            $group = $this->groupDataParser->findById($id);
             if ($group === null) {
                 $this->context->flash('error', 'Group not found.');
                 Redirect::redirect($this->context->panelUrl('/group'));
@@ -184,7 +189,7 @@ final class GroupController
             'basic'
         );
         $actorIsAdmin = $this->context->auth()->isAdmin();
-        $existingGroup = $id !== null ? $this->groupRepo->findById($id) : null;
+        $existingGroup = $id !== null ? $this->groupDataParser->findById($id) : null;
         $isExistingStockGroup = is_array($existingGroup) && (int) ($existingGroup['is_stock'] ?? 0) === 1;
         $slugRaw = trim($this->input->text($post['slug'] ?? null, 160));
         $slug = '';
@@ -282,7 +287,7 @@ final class GroupController
             $activeTab,
             'basic'
         );
-        $currentRecord = $this->groupRepo->findById($savedId);
+        $currentRecord = $this->groupDataParser->findById($savedId);
         $currentStorage = $this->taxonomyImageService->imageStoragePayloadFromRecord('groups', $currentRecord);
         $currentPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('groups', $savedId, $currentStorage);
         $nextStorage = $currentStorage;
@@ -451,7 +456,7 @@ final class GroupController
      */
     private function groupRoutePrefix(): string
     {
-        return $this->groupParser->groupRoutePrefix();
+        return $this->groupRouteParser->groupRoutePrefix();
     }
 
     /**
@@ -461,7 +466,7 @@ final class GroupController
      */
     private function groupRoutesEnabledForRoutingTable(): bool
     {
-        return $this->groupParser->groupRoutesEnabledForRoutingTable();
+        return $this->groupRouteParser->groupRoutesEnabledForRoutingTable();
     }
 
     /**

@@ -30,14 +30,14 @@ use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\PageImageManager;
-use Raven\Lib\Parser\CategoryParser;
-use Raven\Lib\Parser\ChannelParser;
-use Raven\Lib\Parser\ModeParser;
-use Raven\Lib\Parser\PageParser;
+use Raven\Lib\Parser\CategoryDataParser;
+use Raven\Lib\Parser\ChannelDataParser;
+use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Parser\SetParser;
-use Raven\Lib\Parser\TagParser;
-use Raven\Lib\Parser\UserParser;
+use Raven\Lib\Parser\TagDataParser;
+use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorAuthor;
 use Raven\Lib\View\Panel\EditorBlocks;
@@ -65,7 +65,7 @@ final class ContentController
     private ChannelRepository $channelRepo;
     private PageImageRepository $pageImages;
     private UserRepository $userRepo;
-    private ChannelParser $channelParser;
+    private ChannelDataParser $channelParser;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private EditorBlocks $editorBlocks;
@@ -74,18 +74,18 @@ final class ContentController
     /** @var Closure(): PageImageManager */
     private Closure $pageImageManagerResolver;
     private ?PageImageManager $pageImageManager = null;
-    private ?PageParser $pageParser = null;
+    private ?PageDataParser $pageParser = null;
     /** @var Closure(): CategoryRepository */
     private Closure $categoryRepoResolver;
     private ?CategoryRepository $categoryRepo = null;
-    private ?CategoryParser $categoryParser = null;
+    private ?CategoryDataParser $categoryParser = null;
     /** @var Closure(): TaxonomySetRepository */
     private Closure $categorySetRepoResolver;
     private ?TaxonomySetRepository $categorySetRepo = null;
     /** @var Closure(): TagRepository */
     private Closure $tagRepoResolver;
     private ?TagRepository $tagRepo = null;
-    private ?TagParser $tagParser = null;
+    private ?TagDataParser $tagParser = null;
     /** @var Closure(): TaxonomySetRepository */
     private Closure $tagSetRepoResolver;
     private ?TaxonomySetRepository $tagSetRepo = null;
@@ -100,7 +100,7 @@ final class ContentController
     private ?PanelPost $panelPostNormalizer = null;
     private ?EditorAuthor $pageAuthorOptionBuilder = null;
     private ?LoginIdentifierResolver $identifierResolver = null;
-    private ?UserParser $userParser = null;
+    private ?UserDataParser $userParser = null;
     private ?ExtensionStateStore $extensionStateStore = null;
     private ?ExtensionPermissionCatalogService $extensionPermissionCatalogService = null;
     private ?ExtensionCatalogService $extensionCatalogService = null;
@@ -122,7 +122,7 @@ final class ContentController
      * @param callable $tagSetRepoResolver Lazy tag-set repository resolver; resolved only on set-validation flows.
      * @param callable $taxonomyLookupRepoResolver Lazy taxonomy lookup resolver; resolved only on page-editor option-set queries.
      * @param UserRepository $userRepo User repository for author validation and author select options.
-     * @param ChannelParser $channelParser Route parser for channel route-mode and routing-prefix helpers.
+     * @param ChannelDataParser $channelParser Channel data reader for channel-scope and slug lookups.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor utility methods (body-text editor normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
@@ -145,7 +145,7 @@ final class ContentController
         callable $tagSetRepoResolver,
         callable $taxonomyLookupRepoResolver,
         UserRepository $userRepo,
-        ChannelParser $channelParser,
+        ChannelDataParser $channelParser,
         EditorTabs $editorTabs,
         Editor $editor,
         EditorBlocks $editorBlocks,
@@ -304,10 +304,10 @@ final class ContentController
             $channelOption['editor_override'] = $this->editor->normalizeChannelEditorOverride(
                 (string) ($channelOption['editor_override'] ?? 'inherit')
             );
-            $channelOption['route_mode'] = $this->channelParser->normalizeChannelRouteMode(
+            $channelOption['route_mode'] = ChannelRouteParser::normalizeChannelRouteMode(
                 (string) ($channelOption['route_mode'] ?? 'inherit')
             );
-            $channelOption['route_separator'] = ModeParser::normalizeChannelSeparator(
+            $channelOption['route_separator'] = ChannelRouteParser::normalizeChannelSeparator(
                 (string) ($channelOption['route_separator'] ?? 'inherit')
             );
         }
@@ -366,7 +366,7 @@ final class ContentController
                 (string) $this->config->get('content.editor', 'tinymce')
             ),
             'routeModeDefault' => $this->globalPageRouteMode(),
-            'routeSeparatorDefault' => ModeParser::normalizeGlobalSeparator(
+            'routeSeparatorDefault' => ChannelRouteParser::normalizeGlobalSeparator(
                 (string) $this->config->get('content.separator', '-')
             ),
             'bodyBlockTypeDefinitions' => $this->pageEditorBodyBlockTypeDefinitions(),
@@ -460,7 +460,7 @@ final class ContentController
         $categoryIds = $categoryEnabled ? $this->categoryParser()->existingIds($categoryIds) : [];
         $tagIds = $tagEnabled ? $this->tagParser()->existingIds($tagIds) : [];
         $channelRecord = $channelSlug !== null && $channelSlug !== ''
-            ? $this->channelRepo->findBySlug($channelSlug)
+            ? $this->channelParser->findBySlug($channelSlug)
             : null;
         $allowedCategorySets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'category');
         $allowedTagSets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'tag');
@@ -836,12 +836,12 @@ final class ContentController
     }
 
     /**
-     * @return CategoryParser
+     * @return CategoryDataParser
      */
-    private function categoryParser(): CategoryParser
+    private function categoryParser(): CategoryDataParser
     {
-        if (!$this->categoryParser instanceof CategoryParser) {
-            $this->categoryParser = new CategoryParser($this->input, $this->categoryRepo());
+        if (!$this->categoryParser instanceof CategoryDataParser) {
+            $this->categoryParser = new CategoryDataParser($this->input, $this->categoryRepo());
         }
 
         return $this->categoryParser;
@@ -890,12 +890,12 @@ final class ContentController
     }
 
     /**
-     * @return TagParser
+     * @return TagDataParser
      */
-    private function tagParser(): TagParser
+    private function tagParser(): TagDataParser
     {
-        if (!$this->tagParser instanceof TagParser) {
-            $this->tagParser = new TagParser($this->input, $this->tagRepo());
+        if (!$this->tagParser instanceof TagDataParser) {
+            $this->tagParser = new TagDataParser($this->input, $this->tagRepo());
         }
 
         return $this->tagParser;
@@ -1215,7 +1215,7 @@ final class ContentController
      */
     private function globalPageRouteMode(): string
     {
-        return $this->channelParser->globalPageRouteMode();
+        return ChannelRouteParser::globalPageRouteMode($this->config);
     }
 
     // -------------------------------------------------------------------------
@@ -1471,24 +1471,24 @@ final class ContentController
     }
 
     /**
-     * @return PageParser
+     * @return PageDataParser
      */
-    private function pageParser(): PageParser
+    private function pageParser(): PageDataParser
     {
-        if (!$this->pageParser instanceof PageParser) {
-            $this->pageParser = new PageParser($this->input, $this->pageRepo);
+        if (!$this->pageParser instanceof PageDataParser) {
+            $this->pageParser = new PageDataParser($this->input, $this->pageRepo);
         }
 
         return $this->pageParser;
     }
 
     /**
-     * @return UserParser
+     * @return UserDataParser
      */
-    private function userParser(): UserParser
+    private function userParser(): UserDataParser
     {
-        if (!$this->userParser instanceof UserParser) {
-            $this->userParser = new UserParser($this->input, $this->userRepo);
+        if (!$this->userParser instanceof UserDataParser) {
+            $this->userParser = new UserDataParser($this->input, $this->userRepo);
         }
 
         return $this->userParser;

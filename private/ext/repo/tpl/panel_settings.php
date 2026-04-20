@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-use function Raven\Lib\Extra\e;
+use function Raven\Lib\Security\e;
 
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Repositories'));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));

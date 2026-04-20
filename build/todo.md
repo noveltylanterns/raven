@@ -16,20 +16,42 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 ### Library Refactor
 Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
 - [ ] Our Directory/ service is going to contain the canonical primitive logic for pulling routes, metadata & table data from all content types. Stray functions like looking for things by id or by slug should be in our Directory/ classes as well. This gives extension authors (and the core/cli) a consistent way to pull routes/data for all of Raven's different content types. However, Directory/ is an utter mess:
-	- [ ] Current direction change: canonical read-side helpers are being renamed from `lib/Directory/` to `lib/Parser/` with `*Parser` class names, while temporary `Directory/` aliases remain only for migration safety.
-	- [ ] Missing directory handlers for User.php, Category.php, Tag.php and Page.php.
-		- [ ] In progress: canonical `UserParser`, `CategoryParser`, `TagParser`, and `PageParser` now exist, legacy `Directory/User|Category|Tag|Page` aliases were added for migration safety, and public content/feed/profile plus panel content/system reads are starting to route through the parser layer instead of calling repositories directly.
-	- [ ] lib/Directory/Route.php still has things like "effectiveChannelRouteMode" that should be in lib/Directory/Channel.php.
-		- [ ] In progress: channel route-mode/separator helpers now live in `Parser/ChannelParser`; remaining `RouteParser` wrapper cleanup is still pending.
-	- [ ] Route.php still has feed-related functions that should reside in Feed.php and group functions that should be in Group.php, profile functions that belong in User.php, etc. Route.php should only have things that aren't the domain of our other more-specific Directory/ handlers.
-		- [ ] In progress: most public/panel callers now consume `ChannelParser`, `FeedParser`, and `GroupParser` directly; `RouteParser` remains only as a bridge for migration safety.
-	- [ ] Route.php itself should be pretty small when this is done. At that point, merge Mode.php into Route.php, then do another extraction/optimization pass on the merged Route.php (ie: stuff like channel-only functions get moved to Channel.php, repeat for other Directory/ data types.
-	- [ ] Merge ChannelContext.php into Channel.php
-	- [ ] Rename SetContext.php to Set.php
-	- [ ] Nothing in Directory/ should be serving views/templates. These are just bare primitives used to pull routes/data that can be universally used by extensions/themes/panel (except in some core-controller-only cases where it maybe faster to call Repository classes directly. everyone else we want on these primitives unless they really know what theyre doing). Route-specific view logic should be moved to sys/Controller/ or lib/View/
+	- [x] Current direction change: canonical read-side helpers are being renamed from `lib/Directory/` to `lib/Parser/` with `*Parser` class names. All `lib/Directory/` alias files deleted; `Raven\Lib\Parser\*` is now the only live namespace.
+	- [x] Missing directory handlers for User.php, Category.php, Tag.php and Page.php.
+		- [x] Canonical `UserParser`, `CategoryParser`, `TagParser`, `PageParser`, and `RedirectParser` exist and all panel/public/CLI reads go through the parser layer. `lib/Directory/` is fully deleted.
+	- [x] `RouteParser` was dead code — `routeConfigService()` on `SharedController` was never called; the live APIs are `channelParser()`, `feedParser()`, `groupParser()`. Removed `RouteParser.php`, dropped the property/method/import from `SharedController`.
+	- [x] `ModeParser` → `RouteParser`: page URL resolution/building (`normalizeSlugForLookup`, `parseDateSlugSegment`, `normalizePageIdForLookup`, `resolveLookupTarget`, `buildRouteSegment`, `datePrefix`, private helpers) moved to `PageParser`; remaining routing policy predicates and separator helpers (`normalizeChannelRouteMode`, `normalizeRouteMode`, `usesPageId`, separator trio) renamed to `RouteParser` — 347 → 110 lines. All callers updated.
+	- [x] ~~Merge `ChannelContextParser` into `ChannelParser`~~ — cancelled. The two classes have genuinely different responsibilities: `ChannelParser` reads channel route-config and repo-backed records; `ChannelContextParser` owns normalization policy, context hydration, and the PHP-file-backed channel store (used heavily by repositories). Different instance deps, different callers. Merging would create a 1000-line class mixing filesystem I/O, DB reads, and config parsing.
+	- [x] Rename SetContext.php to Set.php — done as `Parser/SetParser.php`; `Directory/SetContext.php` alias deleted.
+	- [x] Nothing in Directory/ should be serving views/templates. `lib/Directory/` is deleted; all primitives live in `lib/Parser/`.
 	- [ ] Directory/ handlers should be able to find, read & interpret every repository & table column for each data type.
 	- [ ] All Directory/ handlers should be read-only. For write functions, keep a parallel set of files in lib/Scribe/. Again, Scribe/ handlers should be able to write to just about every attribute of each data type.
 	- [ ] Will the CLI perform better using Directory/Scribe classes, or by directly calling repos like currently? Find out, and orient the CLI around the faster-performing option. Same deal with our panel list & editor routes: Test both options for speed, and align.
+- [x] Split all content-type parsers into `*RouteParser` / `*DataParser` paired classes so the contract is clear from the name alone. Approx 70-file rename across `lib/`, `sys/`, `tpl/`, and `bin/`. Execute in order:
+	#### New files — extract methods from existing classes
+	- [x] `TagRouteParser` — `tagEnabled()` + `tagRoutePrefix()` as static Config-taking methods, extracted from `ChannelParser`
+	- [x] `CategoryRouteParser` — `categoryEnabled()` + `categoryRoutePrefix()` as static Config-taking methods, extracted from `ChannelParser`
+	- [x] `PageRouteParser` — static URL-building methods from `PageParser`: `normalizeSlugForLookup`, `parseDateSlugSegment`, `normalizePageIdForLookup`, `resolveLookupTarget`, `buildRouteSegment`, `datePrefix`, and private helpers
+	- [x] `PageDataParser` — all instance (repo-backed) methods from `PageParser`
+	- [x] `GroupRouteParser` — `profileRoutePrefix`, `profileSelector`, `profileMode`, `profileRoutesEnabledForRoutingTable`, `groupRoutePrefix`, `groupMode`, `groupRoutesEnabledForRoutingTable`, `registrationMode`, `normalizeRoutePrefix` from `GroupParser`
+	- [x] `GroupDataParser` — `listAll`, `listPageForPanel`, `findById`, `findBySlug` from `GroupParser`
+	#### Renames — content stays the same, file + class renamed
+	- [x] `RouteParser` → `ChannelRouteParser` (channel/page routing policy; already has globalPageRouteMode, effectiveChannelRouteMode, resolveChannelSeparator, and the normalizer/separator statics)
+	- [x] `ChannelParser` → `ChannelDataParser` (strip the now-extracted categoryEnabled/tagEnabled/categoryRoutePrefix/tagRoutePrefix methods; keep repo reads and normalizeRoutePrefix)
+	- [x] `TagParser` → `TagDataParser`
+	- [x] `CategoryParser` → `CategoryDataParser`
+	- [x] `FeedParser` → `FeedRouteParser` (purely config-backed — no DB component, so no FeedDataParser)
+	- [x] `UserParser` → `UserDataParser`
+	- [x] `RedirectParser` → `RedirectDataParser`
+	- [x] `DuplicateParser` → `PageDuplicateParser`
+	#### Caller sweep — after all files are in place
+	- [x] Update all `use` statements, type hints, property declarations, and fully-qualified class name references across `private/sys/`, `private/lib/`, `private/tpl/`, `private/bin/`
+	- [x] Update `docs/Filetree.md` to reflect the new parser layout
+	#### Not touched — no route/data split applies
+	- `ConfigParser` — config-key parsing utilities, not a content-type parser
+	- `PanelParser` — panel-specific URL/permission helpers
+	- `SetParser` — taxonomy set selection normalization
+	- `ChannelContextParser` — channel context hydration and normalization policy; distinct from repo reads
 - [ ] lib/View/ is a mess. Each class+function needs to be resorted:
 	- [ ] Panel-only elements (such as the Editor classes) go in lib/View/Panel/
 	- [ ] Public-only elements (such as classes for Public-route themes) go in lib/View/Public/
@@ -41,16 +63,11 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	- [ ] Need lib/View/Panel/Nagivation.php to house all our sidebar & mobilenav logic. Consolidate it all from whereever it is, to that class.
 	- [ ] Need lib/View/Panel/List.php to house a generic universal list wrapper with the search bar & filter options. All list-type pages in the panel should be updated to use this consistent wrapper. Whatever can be universalized from individual templates/controllers, do so and port into List.php. List.php should have NO ROUTE-SPECIFIC LOGIC - that all belongs in views/controllers. All non-extension list-type routes should be using this universal List.php when done, no exceptions.
 - [ ] is lib/COmposer/tualo/easymde.php called from anything BESIDES lib/View/Panel/EditorMDE.php? if so, doublecheck that area for things that need to be extracted and moved into EditorMDE.php
-- [ ] In lib/Extra/Helpers.php, request_path belongs in lib/Transport/Request.php, while the htmlspecialchars function probably belongs in lib/Security/ somewhere.
-	- [ ] In progress: canonical request-path parsing now lives in `lib/Transport/Request.php`; legacy helper wrapper still needs final removal once callers are fully migrated.
-- [ ] Move lib/Extra/Countries.php to lib/View/FormCountries.php, delete empty lib/Extra/ when done.
-	- [ ] In progress: canonical country catalog now lives at `lib/View/FormCountries.php`; legacy alias remains until downstream callers are fully migrated.
-- [ ] Move lib/Config/ConfigParser.php to lib/Parser/ConfigParser.php
-	- [ ] In progress: core call sites are moving to `Raven\Lib\Parser\ConfigParser`; legacy alias remains under `lib/Config/`.
-- [ ] Move lib/Config/ConfigWriter.php to lib/Scribe/ConfigScribe.php, delete empty lib/Config/ when done.
-	- [ ] In progress: canonical write-side config helper now lives at `lib/Scribe/ConfigScribe.php`; legacy alias remains under `lib/Config/`.
-- [ ] Merge lib/Profile/ProfileContactService.php into lib/Parser/UserParser.php, delete empty lib/Profile/ when done.
-	- [ ] In progress: canonical read-side profile-contact parser now lives at `lib/Parser/UserParser.php`; legacy alias remains under `lib/Profile/`.
+- [x] `lib/Extra/Helpers.php` — `request_path()` → `lib/Transport/Request::path()` done; `e()` → `lib/Security/OutputEncoder.php` done; all 53 template/class callers updated to `Raven\Lib\Security\e`; dead `Extra\request_path` import removed from `PublicController`; `lib/Extra/` deleted.
+- [x] Move lib/Extra/Countries.php to lib/View/FormCountries.php — done; `lib/Extra/` deleted.
+- [x] Move lib/Config/ConfigParser.php to lib/Parser/ConfigParser.php — done; `lib/Config/` deleted.
+- [x] Move lib/Config/ConfigWriter.php to lib/Scribe/ConfigScribe.php — done; `lib/Config/` deleted.
+- [x] Merge lib/Profile/ProfileContactService.php into lib/Parser/UserParser.php — done; `lib/Profile/` deleted.
 - [ ] Stop referring to Output Profiler as Debug Toolbar. It's confusing with other toolbars around. Update language, variables, class names, everything relevant so it all standardizes on Output Profiler and/or Profiler. (Note other "Profilers" in lib/sys so we can rename+sort them after.)
 - [ ] Need a lib/View/Panel/Toolbar.php as a universal generic wrapper for the mirrored row of buttons that goes on the top+bottom of most panel pages.
 
@@ -150,10 +167,4 @@ Items below are the remaining classified legacy/compatibility lanes after the cu
 - `DEFER FOR EXTENSION LAYOUT MIGRATION`
 	- `private/Raven.php`
 	- `Raven\Ext\*` autoloading now prefers `private/ext/{slug}/lib/` but still falls back to legacy `src/` roots until external extensions have been rebuilt around the new class layout.
-- `DEFER FOR PARSER/SCRIBE MIGRATION`
-	- `private/lib/Directory/*.php`
-	- Legacy `Raven\Lib\Directory\*` entrypoints now alias to canonical `Raven\Lib\Parser\*Parser` classes while internal and third-party callers finish migrating.
-- `DEFER FOR PARSER/SCRIBE MIGRATION`
-	- `private/lib/Config/ConfigParser.php`, `private/lib/Config/ConfigWriter.php`, `private/lib/Profile/ProfileContactService.php`, `private/lib/Extra/Countries.php`, `private/lib/Extra/Helpers.php`
-	- Legacy entrypoints now alias/forward to `Parser\ConfigParser`, `Scribe\ConfigScribe`, `Parser\UserParser`, `View\FormCountries`, and `Transport\Request::path()` until the old import/function surface can be removed.
 ---

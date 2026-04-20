@@ -15,6 +15,8 @@ use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\SchemaManager;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\UserRepository;
+use Raven\Lib\Parser\UserDataParser;
+use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Escapes text for HTML output.
@@ -751,7 +753,8 @@ if ($isPost) {
             $schema->ensure($rvnDb, $authDb, $driverName, $prefix);
 
             $users = new UserRepository($authDb, $rvnDb, $driverName, $prefix);
-            if ($users->listAll() !== []) {
+            $userParser = new UserDataParser(new InputSanitizer(), $users);
+            if ($userParser->listAll() !== []) {
                 throw new RuntimeException('Installer can only create the initial admin on an empty user database.');
             }
 

@@ -24,7 +24,7 @@
 /** @var int $bioMaxLength */
 /** @var \Raven\Lib\View\Panel\EditorBlocks $editorBlocks */
 
-use function Raven\Lib\Extra\e;
+use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $editorBlocks = ($editorBlocks ?? null) instanceof \Raven\Lib\View\Panel\EditorBlocks

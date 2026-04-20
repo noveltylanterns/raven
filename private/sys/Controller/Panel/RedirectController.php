@@ -13,6 +13,7 @@ namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\RedirectRepository;
+use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Panel\Editor;
@@ -30,6 +31,7 @@ final class RedirectController
     private InputSanitizer $input;
     private ChannelRepository $channelRepo;
     private RedirectRepository $redirectRepo;
+    private RedirectDataParser $redirectParser;
     private Editor $editor;
 
     /**
@@ -37,6 +39,7 @@ final class RedirectController
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param ChannelRepository $channelRepo Channel repository for redirect scope validation.
      * @param RedirectRepository $redirectRepo Redirect repository for redirect CRUD.
+     * @param RedirectDataParser $redirectParser Canonical parser for read-only redirect listings and edit-form reads.
      * @param Editor $editor Shared panel editor utility methods.
      * @return void
      */
@@ -45,12 +48,14 @@ final class RedirectController
         InputSanitizer $input,
         ChannelRepository $channelRepo,
         RedirectRepository $redirectRepo,
+        RedirectDataParser $redirectParser,
         Editor $editor
     ) {
         $this->context = $context;
         $this->input = $input;
         $this->channelRepo = $channelRepo;
         $this->redirectRepo = $redirectRepo;
+        $this->redirectParser = $redirectParser;
         $this->editor = $editor;
     }
 
@@ -68,12 +73,12 @@ final class RedirectController
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->redirectRepo->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
+        $pageResult = $this->redirectParser->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $redirectRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->redirectRepo->listPageForPanel($perPage, $pagination['offset']);
+            $pageResult = $this->redirectParser->listPageForPanel($perPage, $pagination['offset']);
             $redirectRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
@@ -101,7 +106,7 @@ final class RedirectController
             return;
         }
 
-        $editorData = $this->redirectRepo->editFormData($id);
+        $editorData = $this->redirectParser->editFormData($id);
         $redirectRow = is_array($editorData['redirect'] ?? null) ? $editorData['redirect'] : null;
         $channelOptions = is_array($editorData['channel_options'] ?? null) ? $editorData['channel_options'] : [];
 

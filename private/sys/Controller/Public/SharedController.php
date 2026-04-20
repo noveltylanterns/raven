@@ -16,12 +16,10 @@ use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Transport\Response;
 use Raven\Lib\Transport\Request;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Lib\Parser\ChannelParser;
-use Raven\Lib\Parser\FeedParser;
-use Raven\Lib\Parser\GroupParser;
+use Raven\Lib\Parser\FeedRouteParser;
+use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\PanelParser;
-use Raven\Lib\Parser\RouteParser;
-use Raven\Lib\Parser\UserParser;
+use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\CaptchaService;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
@@ -48,11 +46,9 @@ final class SharedController
     private bool $captchaScriptIncluded = false;
     private ?Request $requestContextResolver = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
-    private ?ChannelParser $channelParser = null;
-    private ?FeedParser $feedParser = null;
-    private ?GroupParser $groupParser = null;
-    private ?UserParser $profileContactService = null;
-    private ?RouteParser $routeConfigService = null;
+    private ?FeedRouteParser $feedParser = null;
+    private ?GroupRouteParser $groupParser = null;
+    private ?UserDataParser $profileContactService = null;
     private ?CaptchaService $captchaService = null;
     private ?ThemeCatalogService $themeCatalogService = null;
     private ?PublicMetaService $publicMetaService = null;
@@ -156,56 +152,28 @@ final class SharedController
     }
 
     /**
-     * Returns route-config helper cached for the current request.
+     * Returns the cached feed route parser.
      *
-     * @return RouteParser Shared route-config helper.
+     * @return FeedRouteParser Shared feed routing-policy parser.
      */
-    public function routeConfigService(): RouteParser
+    public function feedParser(): FeedRouteParser
     {
-        if (!$this->routeConfigService instanceof RouteParser) {
-            $this->routeConfigService = new RouteParser($this->config, $this->input);
-        }
-
-        return $this->routeConfigService;
-    }
-
-    /**
-     * Returns the cached channel parser.
-     *
-     * @return ChannelParser Shared channel/page-route parser.
-     */
-    public function channelParser(): ChannelParser
-    {
-        if (!$this->channelParser instanceof ChannelParser) {
-            $this->channelParser = new ChannelParser($this->config, $this->input);
-        }
-
-        return $this->channelParser;
-    }
-
-    /**
-     * Returns the cached feed parser.
-     *
-     * @return FeedParser Shared feed parser.
-     */
-    public function feedParser(): FeedParser
-    {
-        if (!$this->feedParser instanceof FeedParser) {
-            $this->feedParser = new FeedParser($this->config, $this->input);
+        if (!$this->feedParser instanceof FeedRouteParser) {
+            $this->feedParser = new FeedRouteParser($this->config, $this->input);
         }
 
         return $this->feedParser;
     }
 
     /**
-     * Returns the cached profile/group parser.
+     * Returns the cached group/profile route parser.
      *
-     * @return GroupParser Shared user/group parser.
+     * @return GroupRouteParser Shared group/profile routing-policy parser.
      */
-    public function groupParser(): GroupParser
+    public function groupParser(): GroupRouteParser
     {
-        if (!$this->groupParser instanceof GroupParser) {
-            $this->groupParser = new GroupParser($this->config, $this->input);
+        if (!$this->groupParser instanceof GroupRouteParser) {
+            $this->groupParser = new GroupRouteParser($this->config, $this->input);
         }
 
         return $this->groupParser;
@@ -535,12 +503,12 @@ final class SharedController
     /**
      * Returns the cached profile-contact service.
      *
-     * @return UserParser Shared profile-contact helper.
+     * @return UserDataParser Shared profile-contact helper.
      */
-    private function profileContactService(): UserParser
+    private function profileContactService(): UserDataParser
     {
-        if (!$this->profileContactService instanceof UserParser) {
-            $this->profileContactService = new UserParser($this->input);
+        if (!$this->profileContactService instanceof UserDataParser) {
+            $this->profileContactService = new UserDataParser($this->input);
         }
 
         return $this->profileContactService;

@@ -26,8 +26,6 @@ use Raven\Core\Routing\Public\PublicRouteConfig;
 use Raven\Core\Routing\Public\PublicRuntimeBuilder;
 use RuntimeException;
 
-use function Raven\Lib\Extra\request_path;
-
 /**
  * Owns public-entry orchestration.
  *

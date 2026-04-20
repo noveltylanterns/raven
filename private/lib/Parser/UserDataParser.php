@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/UserParser.php
+ * ~/private/lib/Parser/UserDataParser.php
  * Read-only user-profile contact normalization and social metadata helpers.
  * Docs: https://raven.lanterns.io
  */
@@ -18,7 +18,7 @@ use RuntimeException;
 /**
  * Shared profile-contact normalization and repository-backed user read helper.
  */
-final class UserParser
+final class UserDataParser
 {
     private const REQUIRED_OPTION_KEYS = [
         'email' => true,
@@ -31,7 +31,7 @@ final class UserParser
     private ?UserRepository $userRepo;
 
     /**
-     * Prepares the user parser for contact normalization and optional user reads.
+     * Prepares the user data parser for contact normalization and optional user reads.
      *
      * @param InputSanitizer      $input    Shared input sanitizer for contact/profile value normalization.
      * @param UserRepository|null $userRepo Optional user repository used for read-only user/profile lookups.
@@ -43,7 +43,9 @@ final class UserParser
     }
 
     /**
-     * @return array<string, array{label: string, prefix: string}>
+     * Returns all users for read-only listing flows.
+     *
+     * @return array<string, array{label: string, prefix: string}> User rows.
      */
     public function listAll(): array
     {
@@ -51,10 +53,11 @@ final class UserParser
     }
 
     /**
-     * @return array{
-     *   group_rows: array<int, array<string, mixed>>,
-     *   user_rows: array<int, array<string, mixed>>
-     * }
+     * Returns user and group rows needed to build the public profile routing table.
+     *
+     * @param bool $includeGroups Whether to include group rows.
+     * @param bool $includeUsers  Whether to include user rows.
+     * @return array{group_rows: array<int, array<string, mixed>>, user_rows: array<int, array<string, mixed>>} Routing data.
      */
     public function listRoutingData(bool $includeGroups, bool $includeUsers): array
     {
@@ -62,7 +65,28 @@ final class UserParser
     }
 
     /**
-     * @return array<string, mixed>|null
+     * Returns one paginated page of panel user rows plus total count and group options.
+     *
+     * @param int         $limit            Maximum number of rows to return.
+     * @param int         $offset           Zero-based row offset for pagination.
+     * @param string|null $groupNameFilter  Optional group name substring filter.
+     * @return array{rows: array<int, array<string, mixed>>, total: int, group_options: array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>} Paginated rows and total count.
+     */
+    public function listPageForPanel(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
+    {
+        $normalizedFilter = is_string($groupNameFilter) ? strtolower(trim($groupNameFilter)) : '';
+        return $this->userRepo()->listPageForPanel(
+            max(1, $limit),
+            max(0, $offset),
+            $normalizedFilter !== '' ? $normalizedFilter : null
+        );
+    }
+
+    /**
+     * Returns one user row by numeric id.
+     *
+     * @param int $id User id to resolve.
+     * @return array<string, mixed>|null User row, or null when not found.
      */
     public function findById(int $id): ?array
     {
@@ -74,7 +98,21 @@ final class UserParser
     }
 
     /**
-     * @return array<string, mixed>|null
+     * Returns panel edit form data for one user by id, including group option rows.
+     *
+     * @param int|null $id User id in edit mode, or null in create mode.
+     * @return array{user: array<string, mixed>|null, group_options: array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>} Edit data.
+     */
+    public function editFormData(?int $id): array
+    {
+        return $this->userRepo()->editFormData($id);
+    }
+
+    /**
+     * Returns one public user profile row by username.
+     *
+     * @param string $username Username to resolve.
+     * @return array<string, mixed>|null Profile row, or null when not found.
      */
     public function findPublicProfileByUsername(string $username): ?array
     {
@@ -87,7 +125,10 @@ final class UserParser
     }
 
     /**
-     * @return array<string, mixed>|null
+     * Returns one public user profile row by numeric user id.
+     *
+     * @param int $userId User id to resolve.
+     * @return array<string, mixed>|null Profile row, or null when not found.
      */
     public function findPublicProfileById(int $userId): ?array
     {
@@ -99,7 +140,10 @@ final class UserParser
     }
 
     /**
-     * @return array<string, mixed>|null
+     * Returns one public user profile row by an alphanumeric string selector.
+     *
+     * @param string $userString Alphanumeric selector string.
+     * @return array<string, mixed>|null Profile row, or null when not found.
      */
     public function findPublicProfileByString(string $userString): ?array
     {
@@ -112,7 +156,10 @@ final class UserParser
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * Returns all public profile rows belonging to one group.
+     *
+     * @param int $groupId Group id to query.
+     * @return array<int, array<string, mixed>> Profile rows.
      */
     public function listPublicProfilesByGroupId(int $groupId): array
     {
@@ -124,7 +171,9 @@ final class UserParser
     }
 
     /**
-     * @return array<string, array{label: string, prefix: string}>
+     * Returns the built-in contact option definitions.
+     *
+     * @return array<string, array{label: string, prefix: string}> Keyed by option slug.
      */
     public function defaultOptions(): array
     {
@@ -136,6 +185,12 @@ final class UserParser
         ];
     }
 
+    /**
+     * Normalizes a raw contact type slug, mapping legacy aliases to canonical slugs.
+     *
+     * @param string $type Raw contact type string.
+     * @return string      Normalized slug, or '' when invalid.
+     */
     public function normalizeTypeSlug(string $type): string
     {
         $normalized = $this->input->slug($type);
@@ -151,7 +206,9 @@ final class UserParser
     }
 
     /**
-     * @return array<string, array{label: string, prefix: string}>
+     * Returns only the contact options that are always required (email, phone, homepage, x).
+     *
+     * @return array<string, array{label: string, prefix: string}> Required option definitions.
      */
     public function requiredOptions(): array
     {
@@ -159,7 +216,10 @@ final class UserParser
     }
 
     /**
-     * @return array<string, array{label: string, prefix: string}>
+     * Normalizes a raw contact options config array against the built-in defaults.
+     *
+     * @param mixed $raw Raw value from site config.
+     * @return array<string, array{label: string, prefix: string}> Normalized option definitions.
      */
     public function normalizeOptionsConfig(mixed $raw): array
     {
@@ -233,7 +293,10 @@ final class UserParser
     }
 
     /**
-     * @return array<string, array{label: string, prefix: string}>
+     * Normalizes a submitted contact options array from a panel form.
+     *
+     * @param mixed $rawOptions Raw submitted value.
+     * @return array<string, array{label: string, prefix: string}> Normalized option definitions.
      */
     public function normalizeSubmittedOptions(mixed $rawOptions): array
     {
@@ -277,8 +340,11 @@ final class UserParser
     }
 
     /**
-     * @param array<string, array{label: string, prefix: string}> $allowedOptions
-     * @return array<int, array{type: string, value: string}>
+     * Normalizes a submitted profile contact rows array from a panel form.
+     *
+     * @param mixed                                                   $rawProfiles    Raw submitted value.
+     * @param array<string, array{label: string, prefix: string}>     $allowedOptions Allowed option definitions used to validate contact types.
+     * @return array<int, array{type: string, value: string}>                         Normalized contact rows.
      */
     public function normalizeSubmittedProfiles(mixed $rawProfiles, array $allowedOptions): array
     {
@@ -317,9 +383,11 @@ final class UserParser
     }
 
     /**
-     * @param array<string, mixed> $profile
-     * @param array<string, array{label: string, prefix: string}> $options
-     * @return array<string, mixed>
+     * Decorates a profile row with normalized, href-resolved contact entries.
+     *
+     * @param array<string, mixed>                                $profile Profile row to decorate.
+     * @param array<string, array{label: string, prefix: string}> $options Contact option definitions used to build hrefs.
+     * @return array<string, mixed>                                         Profile row with a normalized 'contact' key.
      */
     public function decorateProfileContacts(array $profile, array $options): array
     {
@@ -365,6 +433,15 @@ final class UserParser
         return $profile;
     }
 
+    /**
+     * Resolves a contact field value to an absolute href using the option's URL prefix.
+     *
+     * Returns null when the value cannot be mapped to an allowlisted absolute URL.
+     *
+     * @param string $value     Raw contact field value (e.g. a username, email, or URL).
+     * @param string $urlPrefix Option URL prefix (e.g. 'https://x.com/').
+     * @return string|null      Resolved absolute href, or null when not resolvable.
+     */
     public function resolveProfileContactHref(string $value, string $urlPrefix): ?string
     {
         $value = trim($value);
@@ -392,8 +469,11 @@ final class UserParser
     }
 
     /**
-     * @param array<int, array<string, mixed>> $profiles
-     * @param array<string, array{label: string, prefix: string}> $contactOptions
+     * Extracts an X/Twitter @handle from a profile contact entry for use in meta tags.
+     *
+     * @param array<int, array<string, mixed>>                    $profiles       Profile contact rows.
+     * @param array<string, array{label: string, prefix: string}> $contactOptions Contact option definitions.
+     * @return string                                                              '@handle' string, or '' when none found.
      */
     public function twitterCreatorFromProfiles(array $profiles, array $contactOptions): string
     {
@@ -426,6 +506,13 @@ final class UserParser
         return '';
     }
 
+    /**
+     * Returns whether a contact type slug or URL prefix belongs to X/Twitter.
+     *
+     * @param string $type      Normalized contact type slug.
+     * @param string $urlPrefix Contact option URL prefix.
+     * @return bool             True when the contact type maps to X/Twitter.
+     */
     private function isTwitterProfileContactType(string $type, string $urlPrefix): bool
     {
         if (in_array($type, ['x', 'twitter'], true)) {
@@ -436,6 +523,14 @@ final class UserParser
         return str_contains($prefix, 'x.com') || str_contains($prefix, 'twitter.com');
     }
 
+    /**
+     * Normalizes a raw X/Twitter profile value to a @handle string.
+     *
+     * Accepts full profile URLs (x.com or twitter.com) or bare handles.
+     *
+     * @param string $value Raw value from a contact row.
+     * @return string       '@handle' string, or '' when normalization fails.
+     */
     private function normalizeTwitterCreatorHandle(string $value): string
     {
         $raw = trim(str_replace(["\r", "\n", "\0"], '', $value));
@@ -468,6 +563,12 @@ final class UserParser
         return '@' . $raw;
     }
 
+    /**
+     * Validates an absolute href against the allowlisted scheme list and strips control characters.
+     *
+     * @param string $href Raw absolute href candidate.
+     * @return string|null Cleaned href when the scheme is allowlisted, or null when not.
+     */
     private function allowlistedAbsoluteHref(string $href): ?string
     {
         $candidate = trim(str_replace(["\r", "\n", "\0"], '', $href));
@@ -484,12 +585,15 @@ final class UserParser
     }
 
     /**
-     * @return UserRepository
+     * Returns the injected user repository for repo-backed reads.
+     *
+     * @return UserRepository Repository backing canonical read methods.
+     * @throws RuntimeException When no repository was injected at construction time.
      */
     private function userRepo(): UserRepository
     {
         if (!$this->userRepo instanceof UserRepository) {
-            throw new RuntimeException('UserParser requires a UserRepository for repository-backed reads.');
+            throw new RuntimeException('UserDataParser requires a UserRepository for repository-backed reads.');
         }
 
         return $this->userRepo;

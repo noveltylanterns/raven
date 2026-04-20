@@ -20,7 +20,7 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
-use function Raven\Lib\Extra\e;
+use function Raven\Lib\Security\e;
 use Raven\Lib\Auth\Panel\PanelAccess;
 
 $panelBase = '/' . trim($site['panel_path'], '/');

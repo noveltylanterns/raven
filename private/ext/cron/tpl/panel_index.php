@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-use function Raven\Lib\Extra\e;
+use function Raven\Lib\Security\e;
 
 /** @var \Raven\Lib\View\Panel\EditorBlocks $editorBlocks */
 

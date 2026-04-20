@@ -16,7 +16,7 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Parser\ChannelContextParser;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Parser\DuplicateParser;
+use Raven\Lib\Parser\PageDuplicateParser;
 use RuntimeException;
 
 /**
@@ -454,7 +454,7 @@ final class RedirectRepository
      */
     private function pathExists(string $slug, ?int $channelId, ?int $ignoreId = null): bool
     {
-        return DuplicateParser::exists(
+        return PageDuplicateParser::exists(
             $this->db,
             $this->table('redirects'),
             $slug,

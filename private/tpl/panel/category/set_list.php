@@ -8,7 +8,7 @@ declare(strict_types=1);
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
-use function Raven\Lib\Extra\e;
+use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 ?>

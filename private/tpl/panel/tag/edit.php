@@ -20,7 +20,7 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
-use function Raven\Lib\Extra\e;
+use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 // Shared create/edit derivations keep template branching shallow.

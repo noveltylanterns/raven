@@ -24,7 +24,7 @@ declare(strict_types=1);
 /** @var string|null $flashError */
 /** @var string $csrfField */
 
-use function Raven\Lib\Extra\e;
+use function Raven\Lib\Security\e;
 use Raven\Lib\View\FormCountries;
 
 $formName = (string) ($formData['name'] ?? '');

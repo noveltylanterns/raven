@@ -20,7 +20,7 @@ use Raven\Lib\View\PageTaxonomyAssignmentService;
 use Raven\Lib\View\PageTaxonomyQueryService;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Media\Panel\PageEditorGalleryHydrator;
-use Raven\Lib\Parser\DuplicateParser;
+use Raven\Lib\Parser\PageDuplicateParser;
 use RuntimeException;
 
 /**
@@ -1016,7 +1016,7 @@ final class PageRepository
      */
     private function pathExists(string $slug, ?int $channelId, ?int $excludeId = null): bool
     {
-        return DuplicateParser::exists(
+        return PageDuplicateParser::exists(
             $this->db,
             $this->table('pages'),
             $slug,

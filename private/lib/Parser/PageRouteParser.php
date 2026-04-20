@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/ModeParser.php
- * Channel page-route mode and word-separator policy helpers.
+ * ~/private/lib/Parser/PageRouteParser.php
+ * Static page URL segment resolution and route-segment building helpers.
  * Docs: https://raven.lanterns.io
  */
 
@@ -14,105 +14,19 @@ namespace Raven\Lib\Parser;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
- * Static helpers for normalizing channel route modes, word separators, and page-slug lookups.
+ * Static helpers for resolving and building page URL segments.
  *
- * Replaces the former ChannelRoutePolicy in lib/Routing/.
+ * All methods are stateless; callers pass the sanitizer and route-policy values
+ * directly so this class can be used without constructing a PageDataParser instance.
+ * Route-mode and separator policy is delegated to ChannelRouteParser.
  */
-final class ModeParser
+final class PageRouteParser
 {
-    /**
-     * Normalizes a per-channel route-mode value, preserving 'inherit' as a valid option.
-     *
-     * @param string $value Raw route-mode string from a channel record or config.
-     * @return string       'inherit', or one of the concrete route mode strings from normalizeRouteMode().
-     */
-    public static function normalizeChannelRouteMode(string $value): string
-    {
-        $mode = strtolower(trim($value));
-        if ($mode === '' || $mode === 'inherit') {
-            return 'inherit';
-        }
-
-        return self::normalizeRouteMode($mode);
-    }
-
-    /**
-     * Normalizes a concrete route-mode value (no 'inherit') to one of the accepted strings.
-     *
-     * @param string $value Raw route-mode string.
-     * @return string       One of 'slug', 'date_slug', 'month_slug', 'id', 'date_id', 'month_id'; defaults to 'slug'.
-     */
-    public static function normalizeRouteMode(string $value): string
-    {
-        $mode = strtolower(trim($value));
-        return in_array($mode, ['slug', 'date_slug', 'month_slug', 'id', 'date_id', 'month_id'], true)
-            ? $mode
-            : 'slug';
-    }
-
-    /**
-     * Returns whether a given route mode produces page-id URL segments rather than slugs.
-     *
-     * @param string $routeMode Normalized route mode string.
-     * @return bool             True when the mode uses the numeric page id in the URL.
-     */
-    public static function usesPageId(string $routeMode): bool
-    {
-        $mode = self::normalizeRouteMode($routeMode);
-        return in_array($mode, ['id', 'date_id', 'month_id'], true);
-    }
-
-    /**
-     * Normalizes a per-channel word-separator value, preserving 'inherit'.
-     *
-     * @param string $value Raw separator string from a channel record.
-     * @return string       'inherit', '-', or '_'.
-     */
-    public static function normalizeChannelSeparator(string $value): string
-    {
-        $separator = trim($value);
-        return in_array($separator, ['inherit', '-', '_'], true)
-            ? $separator
-            : 'inherit';
-    }
-
-    /**
-     * Normalizes a global word-separator config value to '-' or '_'.
-     *
-     * @param string $value Raw separator string from site config.
-     * @return string       '-' or '_'; defaults to '-'.
-     */
-    public static function normalizeGlobalSeparator(string $value): string
-    {
-        $separator = trim($value);
-        return in_array($separator, ['-', '_'], true)
-            ? $separator
-            : '-';
-    }
-
-    /**
-     * Resolves the effective word separator by merging per-channel and global values.
-     *
-     * Falls back to the global separator when the channel value is 'inherit'.
-     *
-     * @param string $channelValue Per-channel separator (may be 'inherit').
-     * @param string $globalValue  Site-wide separator fallback.
-     * @return string              Resolved separator: '-' or '_'.
-     */
-    public static function resolveSeparator(string $channelValue, string $globalValue): string
-    {
-        $normalizedChannel = self::normalizeChannelSeparator($channelValue);
-        if ($normalizedChannel !== 'inherit') {
-            return $normalizedChannel;
-        }
-
-        return self::normalizeGlobalSeparator($globalValue);
-    }
-
     /**
      * Normalizes a URL path segment for a slug-based page lookup.
      *
-     * Applies the resolved word separator and the input sanitizer's slug rules.
+     * Converts underscores to hyphens first when the channel uses underscore separators,
+     * then runs the result through the input sanitizer's slug rules.
      *
      * @param InputSanitizer $input         Shared input sanitizer.
      * @param string         $segment       Raw URL path segment.
@@ -131,7 +45,7 @@ final class ModeParser
         }
 
         // When the separator is underscore, convert underscores to hyphens before sanitizing.
-        $resolvedSeparator = self::resolveSeparator($wordSeparator, '-');
+        $resolvedSeparator = ChannelRouteParser::resolveSeparator($wordSeparator, '-');
         if ($resolvedSeparator === '_') {
             $segment = str_replace('_', '-', $segment);
         }
@@ -201,13 +115,13 @@ final class ModeParser
         string $routeMode,
         string $wordSeparator
     ): ?array {
-        $mode = self::normalizeRouteMode($routeMode);
+        $mode = ChannelRouteParser::normalizeRouteMode($routeMode);
         $lookupValue = self::extractLookupValue($segment, $mode);
         if ($lookupValue === null || $lookupValue === '') {
             return null;
         }
 
-        if (self::usesPageId($mode)) {
+        if (ChannelRouteParser::usesPageId($mode)) {
             $id = self::normalizePageIdForLookup($lookupValue);
             return $id === null ? null : ['type' => 'id', 'id' => $id];
         }
@@ -221,14 +135,14 @@ final class ModeParser
     /**
      * Builds a URL route segment for a page given its route mode and separator settings.
      *
-     * @param InputSanitizer $input                 Shared input sanitizer.
-     * @param string         $slug                  Page slug.
-     * @param int            $pageId                Page id (used when mode is id-based).
-     * @param string         $createdAt             Page created-at timestamp string.
-     * @param string         $routeMode             Effective route mode for the channel.
-     * @param string         $channelWordSeparator  Per-channel separator value.
-     * @param string         $globalWordSeparator   Site-wide separator fallback.
-     * @return string                               Assembled route segment, or '' when inputs are invalid.
+     * @param InputSanitizer $input                Shared input sanitizer.
+     * @param string         $slug                 Page slug.
+     * @param int            $pageId               Page id (used when mode is id-based).
+     * @param string         $createdAt            Page created-at timestamp string.
+     * @param string         $routeMode            Effective route mode for the channel.
+     * @param string         $channelWordSeparator Per-channel separator value.
+     * @param string         $globalWordSeparator  Site-wide separator fallback.
+     * @return string                              Assembled route segment, or '' when inputs are invalid.
      */
     public static function buildRouteSegment(
         InputSanitizer $input,
@@ -239,8 +153,8 @@ final class ModeParser
         string $channelWordSeparator,
         string $globalWordSeparator
     ): string {
-        $mode = self::normalizeRouteMode($routeMode);
-        if (self::usesPageId($mode)) {
+        $mode = ChannelRouteParser::normalizeRouteMode($routeMode);
+        if (ChannelRouteParser::usesPageId($mode)) {
             if ($pageId <= 0) {
                 return '';
             }
@@ -252,7 +166,7 @@ final class ModeParser
                 return '';
             }
 
-            $resolvedSeparator = self::resolveSeparator($channelWordSeparator, $globalWordSeparator);
+            $resolvedSeparator = ChannelRouteParser::resolveSeparator($channelWordSeparator, $globalWordSeparator);
             $routeValue = $resolvedSeparator === '_'
                 ? str_replace('-', '_', $normalizedSlug)
                 : $normalizedSlug;
@@ -269,13 +183,13 @@ final class ModeParser
     /**
      * Extracts the date prefix component for a page route segment given a timestamp and route mode.
      *
-     * @param string $createdAt  Page created-at timestamp string; may be empty (falls back to current time).
-     * @param string $routeMode  Route mode controlling prefix format ('date_slug' → 'Y-m-d', 'month_slug' → 'Y-m').
-     * @return string            Date prefix string (e.g. '2024-06-01'), or '' for non-date modes.
+     * @param string $createdAt Page created-at timestamp string; may be empty (falls back to current time).
+     * @param string $routeMode Route mode controlling prefix format ('date_slug' → 'Y-m-d', 'month_slug' → 'Y-m').
+     * @return string           Date prefix string (e.g. '2024-06-01'), or '' for non-date modes.
      */
     public static function datePrefix(string $createdAt, string $routeMode = 'date_slug'): string
     {
-        $mode = self::normalizeRouteMode($routeMode);
+        $mode = ChannelRouteParser::normalizeRouteMode($routeMode);
         $format = match ($mode) {
             'date_slug', 'date_id' => 'Y-m-d',
             'month_slug', 'month_id' => 'Y-m',
@@ -303,10 +217,6 @@ final class ModeParser
         return gmdate($format, $timestamp);
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
-
     /**
      * Extracts the lookup-relevant value from a URL segment by stripping the date prefix when present.
      *
@@ -321,7 +231,7 @@ final class ModeParser
             return null;
         }
 
-        return match (self::normalizeRouteMode($routeMode)) {
+        return match (ChannelRouteParser::normalizeRouteMode($routeMode)) {
             'date_slug', 'date_id' => self::extractPrefixedValue($segment, '/^\d{4}-\d{2}-\d{2}-(.+)$/'),
             'month_slug', 'month_id' => self::extractPrefixedValue($segment, '/^\d{4}-\d{2}-(.+)$/'),
             default => $segment,

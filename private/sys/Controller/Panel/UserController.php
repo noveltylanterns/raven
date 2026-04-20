@@ -29,8 +29,8 @@ use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\PanelMediaConfigService;
-use Raven\Lib\Parser\GroupParser;
-use Raven\Lib\Parser\UserParser;
+use Raven\Lib\Parser\GroupRouteParser;
+use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\InputSanitizer;
 
 use Raven\Lib\Transport\Redirect;
@@ -52,14 +52,15 @@ final class UserController
     private Closure $inviteTokensResolver;
     private ?InviteTokenRepository $inviteTokens = null;
     private SessionFlash $flashList;
-    private GroupParser $groupParser;
+    private GroupRouteParser $groupParser;
     private PanelInvitePolicyService $panelInvitePolicyService;
     private LoginIdentifierResolver $loginIdentifierResolver;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private EditorBlocks $editorBlocks;
     private PanelMediaConfigService $panelMediaConfigService;
-    private UserParser $profileContactService;
+    private UserDataParser $profileContactService;
+    private ?UserDataParser $userParser = null;
     private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
     private AvatarUploadService $avatarUploadService;
     private UserMediaPathService $userMediaPathService;
@@ -73,14 +74,14 @@ final class UserController
      * @param UserRepository $userRepo User repository for panel user CRUD.
      * @param callable(): InviteTokenRepository $inviteTokensResolver Lazy invite-token repository resolver.
      * @param SessionFlash $flashList List-style flash store for generated token batches.
-     * @param GroupParser $groupParser Shared user/group route parser.
+     * @param GroupRouteParser $groupParser Shared group/profile routing-policy parser.
      * @param PanelInvitePolicyService $panelInvitePolicyService Shared invite-form parsing helper.
      * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
      * @param Editor $editor Shared panel editor utility methods (theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param PanelMediaConfigService $panelMediaConfigService Shared media-limit helper.
-     * @param UserParser $profileContactService Shared profile-contact normalizer.
+     * @param UserDataParser $profileContactService Shared profile-contact normalizer.
      * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA list normalizer.
      * @param AvatarUploadService $avatarUploadService Shared sanitized avatar/cover upload helper.
      * @param UserMediaPathService $userMediaPathService Shared user-media path resolver.
@@ -95,14 +96,14 @@ final class UserController
         UserRepository $userRepo,
         callable $inviteTokensResolver,
         SessionFlash $flashList,
-        GroupParser $groupParser,
+        GroupRouteParser $groupParser,
         PanelInvitePolicyService $panelInvitePolicyService,
         LoginIdentifierResolver $loginIdentifierResolver,
         EditorTabs $editorTabs,
         Editor $editor,
         EditorBlocks $editorBlocks,
         PanelMediaConfigService $panelMediaConfigService,
-        UserParser $profileContactService,
+        UserDataParser $profileContactService,
         PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,
         AvatarUploadService $avatarUploadService,
         UserMediaPathService $userMediaPathService
@@ -143,7 +144,7 @@ final class UserController
         $prefilterGroup = strtolower(trim((string) ($this->input->text($_GET['group'] ?? null, 120) ?? '')));
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->userRepo->listPageForPanel(
+        $pageResult = $this->userParser()->listPageForPanel(
             $perPage,
             ($requestedPage - 1) * $perPage,
             $prefilterGroup !== '' ? $prefilterGroup : null
@@ -152,7 +153,7 @@ final class UserController
         $userRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->userRepo->listPageForPanel(
+            $pageResult = $this->userParser()->listPageForPanel(
                 $perPage,
                 $pagination['offset'],
                 $prefilterGroup !== '' ? $prefilterGroup : null
@@ -193,7 +194,7 @@ final class UserController
         }
 
         $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['account', 'permissions', 'profile', 'security'], 'account');
-        $editData = $this->userRepo->editFormData($id);
+        $editData = $this->userParser()->editFormData($id);
         $user = is_array($editData['user'] ?? null) ? $editData['user'] : null;
         if (is_array($user)) {
             $normalizedTheme = $this->editor->normalizePanelThemeChoice((string) ($user['theme'] ?? 'default'), true);
@@ -307,7 +308,7 @@ final class UserController
         $existingTwoFactorMethods = [];
         $canUpdateTwoFactorMethods = false;
         if ($id !== null) {
-            $existingUser = $this->userRepo->findById($id);
+            $existingUser = $this->userParser()->findById($id);
             if ($existingUser === null) {
                 $this->context->flash('error', 'User not found.');
                 Redirect::redirect($this->context->panelUrl('/user'));
@@ -961,7 +962,7 @@ final class UserController
      */
     private function inviteCreatorMap(): array
     {
-        $rows = $this->userRepo->listAll();
+        $rows = $this->userParser()->listAll();
         $map = [];
         foreach ($rows as $row) {
             $userId = (int) ($row['id'] ?? 0);
@@ -1035,6 +1036,21 @@ final class UserController
         }
 
         return $normalized === [] ? null : $normalized;
+    }
+
+    /**
+     * Returns the user parser on first use so read-only panel user flows route
+     * through the canonical parser surface instead of the repository.
+     *
+     * @return UserDataParser User data parser.
+     */
+    private function userParser(): UserDataParser
+    {
+        if (!$this->userParser instanceof UserDataParser) {
+            $this->userParser = new UserDataParser($this->input, $this->userRepo);
+        }
+
+        return $this->userParser;
     }
 
     /**

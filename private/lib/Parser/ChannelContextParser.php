@@ -103,7 +103,7 @@ final class ChannelContextParser
      */
     public static function normalizeRouteMode(string $value): string
     {
-        return ModeParser::normalizeChannelRouteMode($value);
+        return ChannelRouteParser::normalizeChannelRouteMode($value);
     }
 
     /**
@@ -114,7 +114,7 @@ final class ChannelContextParser
      */
     public static function normalizeRouteSeparator(string $value): string
     {
-        return ModeParser::normalizeChannelSeparator($value);
+        return ChannelRouteParser::normalizeChannelSeparator($value);
     }
 
     /**

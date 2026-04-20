@@ -22,7 +22,7 @@ declare(strict_types=1);
 /** @var string $subdir */
 /** @var \Raven\Ext\Smallweb\SmallwebService $svc */
 
-use function Raven\Lib\Extra\e;
+use function Raven\Lib\Security\e;
 
 $isEditMode = is_array($fileData);
 $fileSlug = (string) ($fileData['slug'] ?? '');

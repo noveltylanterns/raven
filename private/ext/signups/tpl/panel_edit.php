@@ -30,7 +30,7 @@ declare(strict_types=1);
 /** @var string $csrfField */
 /** @var \Raven\Lib\View\Panel\EditorBlocks $editorBlocks */
 
-use function Raven\Lib\Extra\e;
+use function Raven\Lib\Security\e;
 
 $editorBlocks = ($editorBlocks ?? null) instanceof \Raven\Lib\View\Panel\EditorBlocks
     ? $editorBlocks

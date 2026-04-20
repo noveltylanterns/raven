@@ -44,15 +44,17 @@ use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Lib\Parser\ChannelParser;
+use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ConfigParser;
-use Raven\Lib\Parser\FeedParser;
-use Raven\Lib\Parser\GroupParser;
+use Raven\Lib\Parser\FeedRouteParser;
+use Raven\Lib\Parser\GroupDataParser;
+use Raven\Lib\Parser\GroupRouteParser;
+use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\PageImageManager;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Media\Panel\UserMediaPathService;
-use Raven\Lib\Parser\UserParser;
+use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
@@ -594,7 +596,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['tag_set'],
                 $taxonomyDomain['taxonomy_lookup'],
                 $contentDomain['user'],
-                new ChannelParser($rvn['config'], $rvn['input']),
+                new ChannelDataParser($rvn['config'], $rvn['input'], $contentDomain['channel']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
                 $rvn['panel_editor_blocks'],
@@ -625,6 +627,7 @@ final class PanelRuntimeBuilder
                 $rvn['input'],
                 $taxonomyDomain['channel'],
                 $taxonomyDomain['redirect'],
+                new RedirectDataParser($rvn['input'], $taxonomyDomain['redirect']),
                 $rvn['panel_editor']
             );
 
@@ -654,8 +657,8 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['category_enabled'],
                 $taxonomyDomain['tag_enabled'],
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
-                new ChannelParser($rvn['config'], $rvn['input']),
-                new FeedParser($rvn['config'], $rvn['input']),
+                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel']),
+                new FeedRouteParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
                 new Upload()
@@ -684,14 +687,14 @@ final class PanelRuntimeBuilder
                 $userDomain['user'],
                 $userDomain['invite_tokens'],
                 new SessionFlash('_raven_flash_list'),
-                new GroupParser($rvn['config'], $rvn['input']),
+                new GroupRouteParser($rvn['config'], $rvn['input']),
                 new PanelInvitePolicyService($rvn['input']),
                 new LoginIdentifierResolver(),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
                 $rvn['panel_editor_blocks'],
                 new PanelMediaConfigService($rvn['config']),
-                new UserParser($rvn['input']),
+                new UserDataParser($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
                 new AvatarUploadService(),
                 new UserMediaPathService()
@@ -715,7 +718,8 @@ final class PanelRuntimeBuilder
                 $requestContextFactory(),
                 $rvn['input'],
                 $groupDomain['group'],
-                new GroupParser($rvn['config'], $rvn['input']),
+                new GroupDataParser($rvn['input'], $groupDomain['group']),
+                new GroupRouteParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
@@ -755,7 +759,7 @@ final class PanelRuntimeBuilder
                 $rvn['panel_editor'],
                 $rvn['panel_editor_blocks'],
                 new PanelMediaConfigService($rvn['config']),
-                new UserParser($rvn['input']),
+                new UserDataParser($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
                 new AvatarUploadService(),
                 new UserMediaPathService(),

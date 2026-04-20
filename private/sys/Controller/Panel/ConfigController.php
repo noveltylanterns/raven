@@ -15,9 +15,10 @@ use Closure;
 use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\TaxonomySetRepository;
+use Raven\Lib\Parser\ChannelDataParser;
+use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\ConfigParser;
-use Raven\Lib\Parser\ModeParser;
-use Raven\Lib\Parser\UserParser;
+use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\View\Panel\Editor;
@@ -133,13 +134,14 @@ final class ConfigController
     private InputSanitizer $input;
     private string $root;
     private ChannelRepository $channelRepo;
+    private ?ChannelDataParser $channelParser = null;
     /** @var Closure(): TaxonomySetRepository */
     private Closure $categorySetRepoResolver;
     private ?TaxonomySetRepository $categorySetRepo = null;
     /** @var Closure(): TaxonomySetRepository */
     private Closure $tagSetRepoResolver;
     private ?TaxonomySetRepository $tagSetRepo = null;
-    private UserParser $profileContacts;
+    private UserDataParser $profileContacts;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private EditorBlocks $editorBlocks;
@@ -185,7 +187,7 @@ final class ConfigController
         $this->channelRepo = $channelRepo;
         $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
         $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
-        $this->profileContacts = new UserParser($input);
+        $this->profileContacts = new UserDataParser($input);
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
         $this->editorBlocks = $editorBlocks;
@@ -311,7 +313,7 @@ final class ConfigController
                     $rawValue,
                     $nextConfig,
                     fn (string $value): string => $this->editor->normalizeBodyTextEditorOption($value),
-                    fn (string $value): string => ModeParser::normalizeGlobalSeparator($value),
+                    fn (string $value): string => ChannelRouteParser::normalizeGlobalSeparator($value),
                     fn (string $theme, bool $allowDefault): ?string => $this->editor->normalizePanelThemeChoice($theme, $allowDefault),
                     $publicThemeOptions,
                     $channelRoutingOptions,
@@ -448,8 +450,22 @@ final class ConfigController
             return $this->channelRoutingOptionsCache;
         }
 
-        $this->channelRoutingOptionsCache = $this->channelRepo->listRoutingOptions();
+        $this->channelRoutingOptionsCache = $this->channelParser()->listRoutingOptions();
         return $this->channelRoutingOptionsCache;
+    }
+
+    /**
+     * Returns the cached channel data parser for channel routing-option lookups.
+     *
+     * @return ChannelDataParser Shared channel data parser.
+     */
+    private function channelParser(): ChannelDataParser
+    {
+        if (!$this->channelParser instanceof ChannelDataParser) {
+            $this->channelParser = new ChannelDataParser($this->config, $this->input, $this->channelRepo);
+        }
+
+        return $this->channelParser;
     }
 
     /**
@@ -1347,7 +1363,7 @@ final class ConfigController
 
         $content['editor'] = $this->editor->normalizeBodyTextEditorOption((string) ($content['editor'] ?? 'tinymce'));
         $content['mode'] = $this->normalizeGlobalPageRouteMode((string) ($content['mode'] ?? 'slug'));
-        $content['separator'] = ModeParser::normalizeGlobalSeparator((string) ($content['separator'] ?? '-'));
+        $content['separator'] = ChannelRouteParser::normalizeGlobalSeparator((string) ($content['separator'] ?? '-'));
 
         $feed = $config['feed'] ?? null;
         if (!is_array($feed)) {

@@ -147,13 +147,16 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Note: `sys/Auth/` may be re-introduced later as a lean internal-only auth package; for now everything lives here.
 - `private/lib/Parser/`
   - Canonical read-only parsing and normalization helpers for routing, config, metadata, and filesystem-backed records.
-  - `ChannelParser`, `FeedParser`, `GroupParser`, `ModeParser`, and `PanelParser` are the focused public/panel routing parsers: category/tag prefixes, feed routes, profile/group routes, channel page-route policy, separators, and panel-path normalization all live in their narrow parser classes.
-  - `RouteParser` is now a composed compatibility bridge over the focused parsers and is no longer the primary runtime surface for core callers.
+  - Content-type parsers are split into `*RouteParser` / `*DataParser` pairs: `*RouteParser` classes hold config-backed routing policy as static methods (taking `Config` and/or `InputSanitizer`); `*DataParser` classes hold repository-backed reads as instance methods with optional repository injection.
+  - `ChannelRouteParser` — channel/page routing policy statics: `globalPageRouteMode`, `effectiveChannelRouteMode`, `resolveChannelSeparator`, `normalizeGlobalSeparator`, and related helpers. `ChannelDataParser` — repo-backed channel reads and record normalization for panel and CLI lookups.
+  - `CategoryRouteParser` — static `categoryEnabled()` and `categoryRoutePrefix()` policy (extracted from the old `ChannelParser`). `CategoryDataParser` — repo-backed category reads for public routing, panel taxonomy editors, and CLI inspection.
+  - `TagRouteParser` — static `tagEnabled()` and `tagRoutePrefix()` policy (extracted from the old `ChannelParser`). `TagDataParser` — repo-backed tag reads for public routing, panel taxonomy editors, and CLI inspection.
+  - `PageRouteParser` — static URL-building policy: `normalizeSlugForLookup`, `parseDateSlugSegment`, `normalizePageIdForLookup`, `resolveLookupTarget`, `buildRouteSegment`, `datePrefix`. `PageDataParser` — repo-backed page reads for public content, feed, and panel list flows.
+  - `GroupRouteParser` — group/profile routing policy: `profileRoutePrefix`, `groupRoutePrefix`, `groupMode`, `groupRoutesEnabledForRoutingTable`, and related config-taking statics. `GroupDataParser` — repo-backed group reads: `listAll`, `listPageForPanel`, `findById`, `findBySlug`.
+  - `FeedRouteParser` — feed routing policy (purely config-backed; no data counterpart). `UserDataParser` — profile-contact normalization plus repository-backed user/profile reads for public profiles, panel user screens, and installer user-database checks. `RedirectDataParser` — repo-backed redirect reads for panel redirect management and CLI inspection.
+  - `PageDuplicateParser` — the `(slug, channel)` uniqueness lookup helper used by `PageRepository` and `RedirectRepository`.
   - `ChannelContextParser` and `SetParser` own the channel/set record normalization policy plus the PHP-file-backed stores for `private/dat/channel/`, `private/dat/category-set/`, and `private/dat/tag-set/`.
-  - `DuplicateParser` is the shared `(slug, channel)` uniqueness lookup helper for repositories.
-  - `ConfigParser` owns dot-path config reads, scalar coercion, nested-form reads, and config-field stringification.
-  - `UserParser` now pairs profile-contact normalization with repository-backed user/profile reads.
-  - `CategoryParser`, `TagParser`, and `PageParser` are the canonical read-side façades over category/tag/page repositories for public routing, panel lists, and other repository-backed lookup flows.
+  - `ConfigParser` owns dot-path config reads, scalar coercion, nested-form reads, and config-field stringification. `PanelParser` owns panel-path normalization and permission helpers. Both are utility parsers with no route/data split.
 - `private/lib/Scribe/`
   - Canonical write-side helpers that pair with the parser layer.
   - `ConfigScribe` owns nested config writes, single-key persistence, full-file `var_export` serialization, atomic save, stat-cache invalidation, and OPcache eviction. `sys/Config` remains read-only.

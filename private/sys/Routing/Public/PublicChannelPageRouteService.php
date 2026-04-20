@@ -11,7 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Public;
 
-use Raven\Lib\Parser\ModeParser;
+use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\PageRouteParser;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -19,8 +20,8 @@ use Raven\Lib\Security\InputSanitizer;
  *
  * A thin coordination surface that delegates all route normalization,
  * separator resolution, lookup-target resolution, and canonical segment
- * building to `Raven\Lib\Parser\ModeParser`, keeping the calling controllers
- * decoupled from the policy details.
+ * building to `Raven\Lib\Parser\ChannelRouteParser` and `Raven\Lib\Parser\PageRouteParser`,
+ * keeping the calling controllers decoupled from the policy details.
  */
 final class PublicChannelPageRouteService
 {
@@ -42,7 +43,7 @@ final class PublicChannelPageRouteService
      */
     public function normalizeRouteMode(string $value): string
     {
-        return ModeParser::normalizeRouteMode($value);
+        return ChannelRouteParser::normalizeRouteMode($value);
     }
 
     /**
@@ -54,7 +55,7 @@ final class PublicChannelPageRouteService
      */
     public function resolveWordSeparator(string $channelValue, string $globalSeparator): string
     {
-        return ModeParser::resolveSeparator($channelValue, $globalSeparator);
+        return ChannelRouteParser::resolveSeparator($channelValue, $globalSeparator);
     }
 
     /**
@@ -67,7 +68,7 @@ final class PublicChannelPageRouteService
      */
     public function resolveLookupTarget(string $requestedSlug, string $routeMode, string $wordSeparator): ?array
     {
-        return ModeParser::resolveLookupTarget($this->input, $requestedSlug, $routeMode, $wordSeparator);
+        return PageRouteParser::resolveLookupTarget($this->input, $requestedSlug, $routeMode, $wordSeparator);
     }
 
     /**
@@ -89,7 +90,7 @@ final class PublicChannelPageRouteService
         string $wordSeparator,
         string $globalSeparator
     ): string {
-        return ModeParser::buildRouteSegment(
+        return PageRouteParser::buildRouteSegment(
             $this->input,
             $slug,
             $pageId,

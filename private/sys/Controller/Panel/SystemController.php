@@ -39,11 +39,15 @@ use Raven\Lib\Extension\ExtensionStorageProvisioner;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
-use Raven\Lib\Parser\ChannelParser;
-use Raven\Lib\Parser\FeedParser;
-use Raven\Lib\Parser\GroupParser;
-use Raven\Lib\Parser\PageParser;
-use Raven\Lib\Parser\UserParser;
+use Raven\Lib\Parser\CategoryRouteParser;
+use Raven\Lib\Parser\ChannelDataParser;
+use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\FeedRouteParser;
+use Raven\Lib\Parser\GroupRouteParser;
+use Raven\Lib\Parser\PageDataParser;
+use Raven\Lib\Parser\RedirectDataParser;
+use Raven\Lib\Parser\TagRouteParser;
+use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\Transport\Upload;
@@ -101,11 +105,12 @@ final class SystemController
     private ?ThemeCloneService $themeCloneService = null;
     private ?ThemeFallbackRenderer $publicFallbackRenderer = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
-    private ?ChannelParser $channelParser = null;
-    private ?FeedParser $feedParser = null;
-    private ?GroupParser $groupParser = null;
-    private ?PageParser $pageParser = null;
-    private ?UserParser $userParser = null;
+    private ?ChannelDataParser $channelParser = null;
+    private ?FeedRouteParser $feedParser = null;
+    private ?GroupRouteParser $groupParser = null;
+    private ?PageDataParser $pageParser = null;
+    private ?RedirectDataParser $redirectParser = null;
+    private ?UserDataParser $userParser = null;
     private ?ExtensionCatalogService $extensionCatalogService = null;
     private ?PanelRoutingPreviewService $panelRoutingPreviewService = null;
     private ?ThemeCatalogService $themeCatalogService = null;
@@ -1579,10 +1584,10 @@ final class SystemController
         $includeTags = trim($tagPrefix) !== '';
         if (!$includeCategories && !$includeTags) {
             return [
-                'channel_options' => $this->channelRepo->listRoutingOptions(),
+                'channel_options' => $this->channelParser()->listRoutingOptions(),
                 'category_options_all' => [],
                 'tag_options_all' => [],
-                'redirect_rows' => $this->redirectRepo->listAll(),
+                'redirect_rows' => $this->redirectParser()->listAll(),
             ];
         }
 
@@ -1611,18 +1616,23 @@ final class SystemController
 
     /**
      * Returns the configured global page route mode.
+     *
+     * @return string 'slug' or 'id'; reflects the `content.mode` config key.
      */
     private function globalPageRouteMode(): string
     {
-        return $this->channelParser()->globalPageRouteMode();
+        return ChannelRouteParser::globalPageRouteMode($this->config);
     }
 
     /**
-     * Returns the effective channel page route mode for one channel row.
+     * Returns the effective page route mode for one channel, resolving `inherit` against site config.
+     *
+     * @param string $channelValue Per-channel route-mode value from the channel record.
+     * @return string Concrete route-mode key used for URL lookups and path generation.
      */
     private function effectiveChannelRouteMode(string $channelValue): string
     {
-        return $this->channelParser()->effectiveChannelRouteMode($channelValue);
+        return ChannelRouteParser::effectiveChannelRouteMode($this->config, $channelValue);
     }
 
     /**
@@ -2405,7 +2415,7 @@ final class SystemController
      */
     private function categoryRoutePrefix(): string
     {
-        return $this->channelParser()->categoryRoutePrefix();
+        return CategoryRouteParser::categoryRoutePrefix($this->config, $this->input);
     }
 
     /**
@@ -2413,7 +2423,7 @@ final class SystemController
      */
     private function tagRoutePrefix(): string
     {
-        return $this->channelParser()->tagRoutePrefix();
+        return TagRouteParser::tagRoutePrefix($this->config, $this->input);
     }
 
     /**
@@ -2552,60 +2562,74 @@ final class SystemController
     }
 
     /**
-     * Returns the channel parser on first use.
+     * Returns the channel data parser on first use.
      */
-    private function channelParser(): ChannelParser
+    private function channelParser(): ChannelDataParser
     {
-        if (!$this->channelParser instanceof ChannelParser) {
-            $this->channelParser = new ChannelParser($this->config, $this->input);
+        if (!$this->channelParser instanceof ChannelDataParser) {
+            $this->channelParser = new ChannelDataParser($this->config, $this->input, $this->channelRepo);
         }
 
         return $this->channelParser;
     }
 
     /**
-     * Returns the feed parser on first use.
+     * Returns the feed route parser on first use.
      */
-    private function feedParser(): FeedParser
+    private function feedParser(): FeedRouteParser
     {
-        if (!$this->feedParser instanceof FeedParser) {
-            $this->feedParser = new FeedParser($this->config, $this->input);
+        if (!$this->feedParser instanceof FeedRouteParser) {
+            $this->feedParser = new FeedRouteParser($this->config, $this->input);
         }
 
         return $this->feedParser;
     }
 
     /**
-     * Returns the user/group parser on first use.
+     * Returns the group route parser on first use.
      */
-    private function groupParser(): GroupParser
+    private function groupParser(): GroupRouteParser
     {
-        if (!$this->groupParser instanceof GroupParser) {
-            $this->groupParser = new GroupParser($this->config, $this->input);
+        if (!$this->groupParser instanceof GroupRouteParser) {
+            $this->groupParser = new GroupRouteParser($this->config, $this->input);
         }
 
         return $this->groupParser;
     }
 
     /**
-     * Returns the page parser on first use for routing inventory reads.
+     * Returns the cached redirect data parser.
+     *
+     * @return RedirectDataParser Shared redirect data parser.
      */
-    private function pageParser(): PageParser
+    private function redirectParser(): RedirectDataParser
     {
-        if (!$this->pageParser instanceof PageParser) {
-            $this->pageParser = new PageParser($this->input, $this->pageRepo);
+        if (!$this->redirectParser instanceof RedirectDataParser) {
+            $this->redirectParser = new RedirectDataParser($this->input, $this->redirectRepo);
+        }
+
+        return $this->redirectParser;
+    }
+
+    /**
+     * Returns the page data parser on first use for routing inventory reads.
+     */
+    private function pageParser(): PageDataParser
+    {
+        if (!$this->pageParser instanceof PageDataParser) {
+            $this->pageParser = new PageDataParser($this->input, $this->pageRepo);
         }
 
         return $this->pageParser;
     }
 
     /**
-     * Returns the user parser on first use for routing inventory reads.
+     * Returns the user data parser on first use for routing inventory reads.
      */
-    private function userParser(): UserParser
+    private function userParser(): UserDataParser
     {
-        if (!$this->userParser instanceof UserParser) {
-            $this->userParser = new UserParser($this->input, $this->userRepo);
+        if (!$this->userParser instanceof UserDataParser) {
+            $this->userParser = new UserDataParser($this->input, $this->userRepo);
         }
 
         return $this->userParser;
