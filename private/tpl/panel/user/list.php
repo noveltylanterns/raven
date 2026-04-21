@@ -23,6 +23,7 @@
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\ListWrapper;
 use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
@@ -54,23 +55,17 @@ foreach ($groupOptions as $groupOption) {
 }
 asort($groupFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
 $pagination = is_array($pagination ?? null) ? $pagination : [];
-$paginationCurrent = max(1, (int) ($pagination['current'] ?? 1));
-$paginationTotalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
-$paginationTotalItems = max(0, (int) ($pagination['total_items'] ?? count($users)));
-$paginationBasePath = (string) ($pagination['base_path'] ?? ($panelBase . '/user'));
-$paginationQuery = is_array($pagination['query'] ?? null) ? $pagination['query'] : [];
-$buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath, $paginationQuery): string {
-    $pageNumber = max(1, $pageNumber);
-    $query = $paginationQuery;
-    if ($pageNumber > 1) {
-        $query['page'] = (string) $pageNumber;
-    } else {
-        unset($query['page']);
-    }
-
-    $queryString = http_build_query($query);
-    return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
-};
+// Build group filter options HTML with client-side pre-selected state.
+$usersGroupOptionsHtml = '<option value=""' . ($prefilterGroup === '' ? ' selected' : '') . '>All Groups</option>';
+foreach ($groupFilterOptions as $groupValue => $groupLabel) {
+    $groupValueE = e((string) $groupValue);
+    $groupLabelE = e((string) $groupLabel);
+    $groupSelected = $prefilterGroup === (string) $groupValue ? ' selected' : '';
+    $usersGroupOptionsHtml .= "<option value=\"{$groupValueE}\"{$groupSelected}>{$groupLabelE}</option>";
+}
+$usersSearchPlaceholder = $showUsernameColumn
+    ? 'Filter by username, display name, email, or groups...'
+    : 'Filter by display name, email, or groups...';
 $userListToolbarItems = [
     '<a class="btn btn-primary" href="' . e($panelBase) . '/user/edit"><i class="bi bi-person-plus me-2" aria-hidden="true"></i>New User</a>',
 ];
@@ -101,202 +96,187 @@ $userListToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' 
     'items' => $userListToolbarItems,
 ]) ?>
 
-<section class="card">
-    <div class="card-body">
-        <?php if ($users === []): ?>
-            <p class="text-muted mb-0">No users found.</p>
-        <?php else: ?>
-            <div class="row g-2 mb-3">
-                <div class="col-12 col-lg-8">
-                    <label class="form-label mb-1" for="<?= e($usersSearchId) ?>">Search</label>
-                    <input
-                        id="<?= e($usersSearchId) ?>"
-                        type="search"
-                        class="form-control form-control-sm"
-                        placeholder="<?= e($showUsernameColumn ? 'Filter by username, display name, email, or groups...' : 'Filter by display name, email, or groups...') ?>"
-                    >
-                </div>
-                <div class="col-12 col-lg-4">
-                    <label class="form-label mb-1" for="<?= e($usersGroupFilterId) ?>">Filter by Group</label>
-                    <select id="<?= e($usersGroupFilterId) ?>" class="form-select form-select-sm">
-                        <option value=""<?= $prefilterGroup === '' ? ' selected' : '' ?>>All Groups</option>
-                        <?php foreach ($groupFilterOptions as $groupValue => $groupLabel): ?>
-                            <option value="<?= e((string) $groupValue) ?>"<?= $prefilterGroup === (string) $groupValue ? ' selected' : '' ?>><?= e((string) $groupLabel) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-            </div>
-            <div class="small text-muted mb-2" id="<?= e($usersCountId) ?>"></div>
-            <div class="table-responsive">
-                <table
-                    id="<?= e($usersTableId) ?>"
-                    class="table table-sm align-middle"
-                    data-rvn-sort-table="1"
-                    data-sort-default-key="<?= e($showUsernameColumn ? 'username' : 'display_name') ?>"
-                    data-sort-default-direction="asc"
-                >
-                    <thead>
-                    <tr>
-                        <th></th>
-                        <th scope="col" data-sort-key="id" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">ID</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="display_name" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Display Name</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <?php if ($showUsernameColumn): ?>
-                        <th scope="col" data-sort-key="username" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Username</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <?php endif; ?>
-                        <th scope="col" data-sort-key="email" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Email</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="groups" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Groups</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" class="text-center">Actions</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($users as $user): ?>
-                        <?php
-                        $userId = (int) ($user['id'] ?? 0);
-                        $username = (string) ($user['username'] ?? '');
-                        $displayName = (string) ($user['name'] ?? '');
-                        $email = (string) ($user['email'] ?? '');
-                        $groupsText = (string) ($user['groups_text'] ?? '');
-                        /** @var mixed $rawGroupEntries */
-                        $rawGroupEntries = $user['group_entries'] ?? [];
-                        $groupEntries = [];
-                        if (is_array($rawGroupEntries)) {
-                            foreach ($rawGroupEntries as $rawGroupEntry) {
-                                if (!is_array($rawGroupEntry)) {
-                                    continue;
-                                }
-
-                                $groupName = trim((string) ($rawGroupEntry['name'] ?? ''));
-                                if ($groupName === '') {
-                                    continue;
-                                }
-
-                                $groupEntries[] = [
-                                    'name' => $groupName,
-                                    'permissions' => (int) ($rawGroupEntry['permissions'] ?? 0),
-                                ];
-                            }
-                        }
-
-                        if ($groupEntries === [] && $groupsText !== '') {
-                            foreach (explode(',', $groupsText) as $groupNamePart) {
-                                $groupName = trim((string) $groupNamePart);
-                                if ($groupName === '') {
-                                    continue;
-                                }
-
-                                $groupEntries[] = [
-                                    'name' => $groupName,
-                                    'permissions' => 0,
-                                ];
-                            }
-                        }
-
-                        $groupTokens = [];
-                        foreach ($groupEntries as $groupEntry) {
-                            $groupToken = strtolower(trim((string) ($groupEntry['name'] ?? '')));
-                            if ($groupToken !== '') {
-                                $groupTokens[$groupToken] = true;
-                            }
-                        }
-                        $groupsFilterValue = '|' . implode('|', array_keys($groupTokens)) . '|';
-                        ?>
-                        <tr
-                            data-rvn-sort-row="1"
-                            data-sort-id="<?= e((string) $userId) ?>"
-                            data-sort-username="<?= e($username) ?>"
-                            data-sort-display-name="<?= e($displayName) ?>"
-                            data-sort-email="<?= e($email) ?>"
-                            data-sort-groups="<?= e($groupsText) ?>"
-                            data-filter-groups="<?= e($groupsFilterValue) ?>"
-                        >
-                            <?php // Row checkboxes post to dedicated bulk-delete form. ?>
-                            <?php // `data-rvn-row-select` hooks into global layout row-highlighting script. ?>
-                            <td>
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    name="selected_ids[]"
-                                    value="<?= $userId ?>"
-                                    form="<?= e($bulkDeleteFormId) ?>"
-                                    data-rvn-row-select="1"
-                                    aria-label="Select user <?= $userId ?>"
-                                >
-                            </td>
-                            <td><?= $userId ?></td>
-                            <td>
-                                <a href="<?= e($panelBase) ?>/user/edit/<?= $userId ?>">
-                                    <?= e($displayName) ?>
-                                </a>
-                            </td>
-                            <?php if ($showUsernameColumn): ?>
-                                <td><?= e($username) ?></td>
-                            <?php endif; ?>
-                            <td><?= e($email) ?></td>
-                            <td>
-                                <?php if ($groupEntries === []): ?>
-                                    <span class="text-muted">&lt;none&gt;</span>
-                                <?php else: ?>
-                                    <div class="d-flex flex-wrap gap-1">
-                                        <?php foreach ($groupEntries as $groupEntry): ?>
-                                            <?php
-                                            $groupName = (string) ($groupEntry['name'] ?? '');
-                                            $groupPermissionMask = (int) ($groupEntry['permissions'] ?? 0);
-                                            $groupBadgeClass = 'text-bg-success';
-                                            if (PanelAccess::canManageConfiguration($groupPermissionMask)) {
-                                                $groupBadgeClass = 'text-bg-danger';
-                                            } elseif (PanelAccess::canLoginPanel($groupPermissionMask)) {
-                                                $groupBadgeClass = 'text-bg-warning';
-                                            }
-                                            ?>
-                                            <span class="badge <?= e($groupBadgeClass) ?>"><?= e($groupName) ?></span>
-                                        <?php endforeach; ?>
-                                    </div>
-                                <?php endif; ?>
-                            </td>
-                            <td class="text-center">
-                                <div class="d-flex justify-content-center gap-2">
-                                    <a
-                                        class="btn btn-primary btn-sm"
-                                        href="<?= e($panelBase) ?>/user/edit/<?= $userId ?>"
-                                        title="Edit"
-                                        aria-label="Edit"
-                                    >
-                                        <i class="bi bi-pencil" aria-hidden="true"></i>
-                                        <span class="visually-hidden">Edit</span>
-                                    </a>
-                                    <form method="post" action="<?= e($panelBase) ?>/user/delete" onsubmit="return confirm('Delete this user?');">
-                                        <?= $csrfField ?>
-                                        <?php // Single-row delete path uses explicit id hidden field. ?>
-                                        <input type="hidden" name="id" value="<?= $userId ?>">
-                                        <button type="submit" class="btn btn-danger btn-sm" title="Delete" aria-label="Delete">
-                                            <i class="bi bi-trash3" aria-hidden="true"></i>
-                                            <span class="visually-hidden">Delete</span>
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-            <p id="<?= e($usersEmptyId) ?>" class="text-muted mb-0 mt-2 d-none">No users match the current filters.</p>
-            <?php if ($paginationTotalItems > 0): ?>
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
-                    <div class="small text-muted">
-                        Page <?= $paginationCurrent ?> of <?= $paginationTotalPages ?> (<?= $paginationTotalItems ?> total)
-                    </div>
-                    <?php if ($paginationTotalPages > 1): ?>
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Users pagination">
-                            <a class="btn btn-outline-secondary<?= $paginationCurrent <= 1 ? ' disabled' : '' ?>" href="<?= e($buildPaginationUrl($paginationCurrent - 1)) ?>">Previous</a>
-                            <a class="btn btn-outline-secondary<?= $paginationCurrent >= $paginationTotalPages ? ' disabled' : '' ?>" href="<?= e($buildPaginationUrl($paginationCurrent + 1)) ?>">Next</a>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            <?php endif; ?>
+<?php ob_start(); ?>
+<table
+    id="<?= e($usersTableId) ?>"
+    class="table table-sm align-middle"
+    data-rvn-sort-table="1"
+    data-sort-default-key="<?= e($showUsernameColumn ? 'username' : 'display_name') ?>"
+    data-sort-default-direction="asc"
+>
+    <thead>
+    <tr>
+        <th></th>
+        <th scope="col" data-sort-key="id" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">ID</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+        <th scope="col" data-sort-key="display_name" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Display Name</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+        <?php if ($showUsernameColumn): ?>
+        <th scope="col" data-sort-key="username" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Username</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
         <?php endif; ?>
-    </div>
-</section>
+        <th scope="col" data-sort-key="email" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Email</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+        <th scope="col" data-sort-key="groups" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Groups</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+        <th scope="col" class="text-center">Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    <?php foreach ($users as $user): ?>
+        <?php
+        $userId = (int) ($user['id'] ?? 0);
+        $username = (string) ($user['username'] ?? '');
+        $displayName = (string) ($user['name'] ?? '');
+        $email = (string) ($user['email'] ?? '');
+        $groupsText = (string) ($user['groups_text'] ?? '');
+        /** @var mixed $rawGroupEntries */
+        $rawGroupEntries = $user['group_entries'] ?? [];
+        $groupEntries = [];
+        if (is_array($rawGroupEntries)) {
+            foreach ($rawGroupEntries as $rawGroupEntry) {
+                if (!is_array($rawGroupEntry)) {
+                    continue;
+                }
+
+                $groupName = trim((string) ($rawGroupEntry['name'] ?? ''));
+                if ($groupName === '') {
+                    continue;
+                }
+
+                $groupEntries[] = [
+                    'name' => $groupName,
+                    'permissions' => (int) ($rawGroupEntry['permissions'] ?? 0),
+                ];
+            }
+        }
+
+        if ($groupEntries === [] && $groupsText !== '') {
+            foreach (explode(',', $groupsText) as $groupNamePart) {
+                $groupName = trim((string) $groupNamePart);
+                if ($groupName === '') {
+                    continue;
+                }
+
+                $groupEntries[] = [
+                    'name' => $groupName,
+                    'permissions' => 0,
+                ];
+            }
+        }
+
+        $groupTokens = [];
+        foreach ($groupEntries as $groupEntry) {
+            $groupToken = strtolower(trim((string) ($groupEntry['name'] ?? '')));
+            if ($groupToken !== '') {
+                $groupTokens[$groupToken] = true;
+            }
+        }
+        $groupsFilterValue = '|' . implode('|', array_keys($groupTokens)) . '|';
+        ?>
+        <tr
+            data-rvn-sort-row="1"
+            data-sort-id="<?= e((string) $userId) ?>"
+            data-sort-username="<?= e($username) ?>"
+            data-sort-display-name="<?= e($displayName) ?>"
+            data-sort-email="<?= e($email) ?>"
+            data-sort-groups="<?= e($groupsText) ?>"
+            data-filter-groups="<?= e($groupsFilterValue) ?>"
+        >
+            <?php // Row checkboxes post to dedicated bulk-delete form. ?>
+            <?php // `data-rvn-row-select` hooks into global layout row-highlighting script. ?>
+            <td>
+                <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="selected_ids[]"
+                    value="<?= $userId ?>"
+                    form="<?= e($bulkDeleteFormId) ?>"
+                    data-rvn-row-select="1"
+                    aria-label="Select user <?= $userId ?>"
+                >
+            </td>
+            <td><?= $userId ?></td>
+            <td>
+                <a href="<?= e($panelBase) ?>/user/edit/<?= $userId ?>">
+                    <?= e($displayName) ?>
+                </a>
+            </td>
+            <?php if ($showUsernameColumn): ?>
+                <td><?= e($username) ?></td>
+            <?php endif; ?>
+            <td><?= e($email) ?></td>
+            <td>
+                <?php if ($groupEntries === []): ?>
+                    <span class="text-muted">&lt;none&gt;</span>
+                <?php else: ?>
+                    <div class="d-flex flex-wrap gap-1">
+                        <?php foreach ($groupEntries as $groupEntry): ?>
+                            <?php
+                            $groupName = (string) ($groupEntry['name'] ?? '');
+                            $groupPermissionMask = (int) ($groupEntry['permissions'] ?? 0);
+                            $groupBadgeClass = 'text-bg-success';
+                            if (PanelAccess::canManageConfiguration($groupPermissionMask)) {
+                                $groupBadgeClass = 'text-bg-danger';
+                            } elseif (PanelAccess::canLoginPanel($groupPermissionMask)) {
+                                $groupBadgeClass = 'text-bg-warning';
+                            }
+                            ?>
+                            <span class="badge <?= e($groupBadgeClass) ?>"><?= e($groupName) ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </td>
+            <td class="text-center">
+                <div class="d-flex justify-content-center gap-2">
+                    <a
+                        class="btn btn-primary btn-sm"
+                        href="<?= e($panelBase) ?>/user/edit/<?= $userId ?>"
+                        title="Edit"
+                        aria-label="Edit"
+                    >
+                        <i class="bi bi-pencil" aria-hidden="true"></i>
+                        <span class="visually-hidden">Edit</span>
+                    </a>
+                    <form method="post" action="<?= e($panelBase) ?>/user/delete" onsubmit="return confirm('Delete this user?');">
+                        <?= $csrfField ?>
+                        <?php // Single-row delete path uses explicit id hidden field. ?>
+                        <input type="hidden" name="id" value="<?= $userId ?>">
+                        <button type="submit" class="btn btn-danger btn-sm" title="Delete" aria-label="Delete">
+                            <i class="bi bi-trash3" aria-hidden="true"></i>
+                            <span class="visually-hidden">Delete</span>
+                        </button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+    <?php endforeach; ?>
+    </tbody>
+</table>
+<?php $usersTableHtml = (string) ob_get_clean(); ?>
+<?= ListWrapper::render([
+    'is_empty'            => $users === [],
+    'empty_message'       => 'No users found.',
+    'search_id'           => $usersSearchId,
+    'search_col'          => 'col-12 col-lg-8',
+    'search_placeholder'  => $usersSearchPlaceholder,
+    'filters'             => [
+        [
+            'id'           => $usersGroupFilterId,
+            'label'        => 'Filter by Group',
+            'col'          => 'col-12 col-lg-4',
+            'options_html' => $usersGroupOptionsHtml,
+        ],
+    ],
+    'count_id'            => $usersCountId,
+    'empty_id'            => $usersEmptyId,
+    'empty_match_message' => 'No users match the current filters.',
+    'table_html'          => $usersTableHtml,
+    'pagination'          => [
+        'current'     => max(1, (int) ($pagination['current'] ?? 1)),
+        'total_pages' => max(1, (int) ($pagination['total_pages'] ?? 1)),
+        'total_items' => max(0, (int) ($pagination['total_items'] ?? count($users))),
+        'base_path'   => (string) ($pagination['base_path'] ?? ($panelBase . '/user')),
+        'query'       => is_array($pagination['query'] ?? null) ? $pagination['query'] : [],
+        'label'       => 'users',
+        'aria_label'  => 'Users pagination',
+    ],
+]) ?>
 
 <?= Toolbar::render([
     'items' => $userListToolbarItems,

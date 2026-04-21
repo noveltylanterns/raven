@@ -2,6 +2,12 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 20, 2026 — library refactor: lib/View/Panel/ListWrapper.php
+
+- **New `lib/View/Panel/ListWrapper.php` added as the canonical panel list-card renderer**: `render(array $config): string` centralizes the outer card shell, search/filter row, count label, table-responsive slot, empty-match message, and pagination controls shared across every core list screen. Route-specific logic (column definitions, row data, filter option generation, client-side JS) stays in calling templates. A private `buildPageUrl()` helper consolidates the pagination-URL closure that was duplicated in every list template.
+- **`table_html` slot pattern**: each list template captures the route-specific `<table>` block via `ob_start()` / `ob_get_clean()` and passes it as a trusted string. Dynamic filter `options_html` strings (including server-side selected state for set/group/channel prefilters) are pre-built in the template before calling `ListWrapper::render()`, keeping the helper free of route-owned data.
+- **All nine core panel list templates migrated to `ListWrapper::render()`**: `group/list`, `category/list`, `tag/list`, `channel/list`, `user/list`, `page/list`, `redirect/list`, `category/set_list`, and `tag/set_list`. The duplicated `$buildPaginationUrl` closure and five extracted pagination variables (`$paginationCurrent`, `$paginationTotalPages`, `$paginationTotalItems`, `$paginationBasePath`, `$paginationQuery`) were removed from every template where they appeared.
+
 ### April 21, 2026 — library refactor: lib/View/Panel/Navigation.php
 
 - **New `lib/View/Panel/Navigation.php` added as the canonical panel navigation renderer**: `renderMobile()` emits the Bootstrap hamburger navbar shown at xs/sm breakpoints; `renderSidebar()` emits the card-wrapped aside shown from md upward; a private `renderGroups()` helper renders the shared Content/Modules/Accounts/Taxonomy/Extensions/System category lists for both surfaces from a single implementation. Both public methods accept the same declarative config array, eliminating the parallel nav trees that previously existed in `wrapper.php`.

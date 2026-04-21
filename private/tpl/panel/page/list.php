@@ -21,6 +21,7 @@
 
 use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\ListWrapper;
 use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
@@ -60,23 +61,21 @@ $prefilterPayload = [
 ];
 $prefilterPayloadJson = (string) json_encode($prefilterPayload, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 $pagination = is_array($pagination ?? null) ? $pagination : [];
-$paginationCurrent = max(1, (int) ($pagination['current'] ?? 1));
-$paginationTotalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
-$paginationTotalItems = max(0, (int) ($pagination['total_items'] ?? count($pages)));
-$paginationBasePath = (string) ($pagination['base_path'] ?? ($panelBase . '/page'));
-$paginationQuery = is_array($pagination['query'] ?? null) ? $pagination['query'] : [];
-$buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath, $paginationQuery): string {
-    $pageNumber = max(1, $pageNumber);
-    $query = $paginationQuery;
-    if ($pageNumber > 1) {
-        $query['page'] = (string) $pageNumber;
-    } else {
-        unset($query['page']);
-    }
-
-    $queryString = http_build_query($query);
-    return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
-};
+// Build status and channel filter options HTML; channel preserves prefilter selected state.
+$pagesStatusOptionsHtml = '<option value="">All Statuses</option>';
+foreach ($pagesStatusOptions as $statusValue) {
+    $statusLower = e(strtolower((string) $statusValue));
+    $statusLabel = e((string) $statusValue);
+    $pagesStatusOptionsHtml .= "<option value=\"{$statusLower}\">{$statusLabel}</option>";
+}
+$pagesChannelOptionsHtml = '<option value=""' . ($prefilterChannel === '' ? ' selected' : '') . '>All Channels</option>';
+foreach ($pagesChannelOptions as $channelValue) {
+    $channelValueLower = strtolower((string) $channelValue);
+    $channelSelected = $prefilterChannel === $channelValueLower ? ' selected' : '';
+    $channelValueLowerE = e($channelValueLower);
+    $channelValueE = e((string) $channelValue);
+    $pagesChannelOptionsHtml .= "<option value=\"{$channelValueLowerE}\"{$channelSelected}>{$channelValueE}</option>";
+}
 $pageListToolbarItems = [
     '<a class="btn btn-primary" href="' . e($panelBase) . '/page/edit"><i class="bi bi-file-earmark-plus me-2" aria-hidden="true"></i>Create Page</a>',
     '<button type="submit" class="btn btn-danger" form="' . e($bulkDeleteFormId) . '" onclick="return confirm(\'Delete selected pages?\');"><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>',
@@ -104,167 +103,148 @@ $pageListToolbarItems = [
     'items' => $pageListToolbarItems,
 ]) ?>
 
-<section class="card">
-    <div class="card-body">
-        <?php // Table contains edit/delete row actions for each page. ?>
-        <?php if ($pages === []): ?>
-            <p class="text-muted mb-0">No pages yet.</p>
-        <?php else: ?>
-            <div class="row g-2 mb-3">
-                <div class="col-12 col-lg-6">
-                    <label class="form-label mb-1" for="<?= e($pagesSearchId) ?>">Search</label>
-                    <input
-                        id="<?= e($pagesSearchId) ?>"
-                        type="search"
-                        class="form-control form-control-sm"
-                        placeholder="Filter by title, slug, channel, or status..."
-                    >
-                </div>
-                <div class="col-12 col-sm-6 col-lg-3">
-                    <label class="form-label mb-1" for="<?= e($pagesStatusSortId) ?>">Sort by Status</label>
-                    <select id="<?= e($pagesStatusSortId) ?>" class="form-select form-select-sm">
-                        <option value="">All Statuses</option>
-                        <?php foreach ($pagesStatusOptions as $statusValue): ?>
-                            <option value="<?= e(strtolower((string) $statusValue)) ?>"><?= e((string) $statusValue) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="col-12 col-sm-6 col-lg-3">
-                    <label class="form-label mb-1" for="<?= e($pagesChannelSortId) ?>">Sort by Channel</label>
-                    <select id="<?= e($pagesChannelSortId) ?>" class="form-select form-select-sm">
-                        <option value=""<?= $prefilterChannel === '' ? ' selected' : '' ?>>All Channels</option>
-                        <?php foreach ($pagesChannelOptions as $channelValue): ?>
-                            <?php $channelValueLower = strtolower((string) $channelValue); ?>
-                            <option value="<?= e($channelValueLower) ?>"<?= $prefilterChannel === $channelValueLower ? ' selected' : '' ?>><?= e((string) $channelValue) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-            </div>
-            <div class="small text-muted mb-2" id="<?= e($pagesCountId) ?>"></div>
-            <div class="table-responsive">
-                <table
-                    id="<?= e($pagesTableId) ?>"
-                    class="table table-sm align-middle"
-                    data-rvn-sort-table="1"
-                    data-sort-default-key="id"
-                    data-sort-default-direction="desc"
+<?php ob_start(); ?>
+<table
+    id="<?= e($pagesTableId) ?>"
+    class="table table-sm align-middle"
+    data-rvn-sort-table="1"
+    data-sort-default-key="id"
+    data-sort-default-direction="desc"
+>
+    <thead>
+    <tr>
+        <th></th>
+        <th scope="col" data-sort-key="id" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">ID</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+        <th scope="col" data-sort-key="title" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Title</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+        <th scope="col" data-sort-key="slug" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Slug</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+        <th scope="col" data-sort-key="channel" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Channel</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+        <th scope="col" data-sort-key="status" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Status</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+        <th scope="col" class="text-center">Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    <?php foreach ($pages as $row): ?>
+        <?php
+        $rowId = (int) ($row['id'] ?? 0);
+        $rowTitle = (string) ($row['title'] ?? '');
+        $rowSlug = (string) ($row['slug'] ?? '');
+        $channelSlug = trim((string) ($row['channel_slug'] ?? ''));
+        $channelLabel = $channelSlug === '' ? '<none>' : $channelSlug;
+        $statusLabel = ($row['status'] ?? '') === 'published' ? 'Published' : 'Draft';
+        $statusBadgeClass = $statusLabel === 'Published' ? 'text-bg-success' : 'text-bg-warning';
+        $rowCategoryIds = [];
+        $rowTagIds = [];
+        /** @var mixed $rawCategoryIds */
+        $rawCategoryIds = $row['category_ids'] ?? [];
+        if (is_array($rawCategoryIds)) {
+            foreach ($rawCategoryIds as $rawCategoryId) {
+                $categoryId = (int) $rawCategoryId;
+                if ($categoryId > 0) {
+                    $rowCategoryIds[$categoryId] = true;
+                }
+            }
+        }
+        /** @var mixed $rawTagIds */
+        $rawTagIds = $row['tag_ids'] ?? [];
+        if (is_array($rawTagIds)) {
+            foreach ($rawTagIds as $rawTagId) {
+                $tagId = (int) $rawTagId;
+                if ($tagId > 0) {
+                    $rowTagIds[$tagId] = true;
+                }
+            }
+        }
+        $rowCategoryFilter = '|' . implode('|', array_keys($rowCategoryIds)) . '|';
+        $rowTagFilter = '|' . implode('|', array_keys($rowTagIds)) . '|';
+        ?>
+        <tr
+            data-rvn-sort-row="1"
+            data-sort-id="<?= e((string) $rowId) ?>"
+            data-sort-title="<?= e($rowTitle) ?>"
+            data-sort-slug="<?= e($rowSlug) ?>"
+            data-sort-channel="<?= e($channelLabel) ?>"
+            data-sort-status="<?= e($statusLabel) ?>"
+            data-filter-categories="<?= e($rowCategoryFilter) ?>"
+            data-filter-tags="<?= e($rowTagFilter) ?>"
+        >
+            <?php // Row checkboxes post to dedicated bulk-delete form. ?>
+            <td>
+                <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="selected_ids[]"
+                    value="<?= $rowId ?>"
+                    form="<?= e($bulkDeleteFormId) ?>"
+                    data-rvn-row-select="1"
+                    aria-label="Select page <?= $rowId ?>"
                 >
-                    <thead>
-                    <tr>
-                        <th></th>
-                        <th scope="col" data-sort-key="id" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">ID</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="title" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Title</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="slug" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Slug</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="channel" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Channel</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="status" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Status</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" class="text-center">Actions</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($pages as $row): ?>
-                        <?php
-                        $rowId = (int) ($row['id'] ?? 0);
-                        $rowTitle = (string) ($row['title'] ?? '');
-                        $rowSlug = (string) ($row['slug'] ?? '');
-                        $channelSlug = trim((string) ($row['channel_slug'] ?? ''));
-                        $channelLabel = $channelSlug === '' ? '<none>' : $channelSlug;
-                        $statusLabel = ($row['status'] ?? '') === 'published' ? 'Published' : 'Draft';
-                        $statusBadgeClass = $statusLabel === 'Published' ? 'text-bg-success' : 'text-bg-warning';
-                        $rowCategoryIds = [];
-                        $rowTagIds = [];
-                        /** @var mixed $rawCategoryIds */
-                        $rawCategoryIds = $row['category_ids'] ?? [];
-                        if (is_array($rawCategoryIds)) {
-                            foreach ($rawCategoryIds as $rawCategoryId) {
-                                $categoryId = (int) $rawCategoryId;
-                                if ($categoryId > 0) {
-                                    $rowCategoryIds[$categoryId] = true;
-                                }
-                            }
-                        }
-                        /** @var mixed $rawTagIds */
-                        $rawTagIds = $row['tag_ids'] ?? [];
-                        if (is_array($rawTagIds)) {
-                            foreach ($rawTagIds as $rawTagId) {
-                                $tagId = (int) $rawTagId;
-                                if ($tagId > 0) {
-                                    $rowTagIds[$tagId] = true;
-                                }
-                            }
-                        }
-                        $rowCategoryFilter = '|' . implode('|', array_keys($rowCategoryIds)) . '|';
-                        $rowTagFilter = '|' . implode('|', array_keys($rowTagIds)) . '|';
-                        ?>
-                        <tr
-                            data-rvn-sort-row="1"
-                            data-sort-id="<?= e((string) $rowId) ?>"
-                            data-sort-title="<?= e($rowTitle) ?>"
-                            data-sort-slug="<?= e($rowSlug) ?>"
-                            data-sort-channel="<?= e($channelLabel) ?>"
-                            data-sort-status="<?= e($statusLabel) ?>"
-                            data-filter-categories="<?= e($rowCategoryFilter) ?>"
-                            data-filter-tags="<?= e($rowTagFilter) ?>"
-                        >
-                            <?php // Row checkboxes post to dedicated bulk-delete form. ?>
-                            <td>
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    name="selected_ids[]"
-                                    value="<?= $rowId ?>"
-                                    form="<?= e($bulkDeleteFormId) ?>"
-                                    data-rvn-row-select="1"
-                                    aria-label="Select page <?= $rowId ?>"
-                                >
-                            </td>
-                            <td><?= $rowId ?></td>
-                            <td>
-                                <a href="<?= e($panelBase) ?>/page/edit/<?= $rowId ?>">
-                                    <?= e($rowTitle) ?>
-                                </a>
-                            </td>
-                            <td><?= e($rowSlug) ?></td>
-                            <td><?= $channelSlug === '' ? '&lt;none&gt;' : e($channelSlug) ?></td>
-                            <td><span class="badge <?= e($statusBadgeClass) ?>"><?= e($statusLabel) ?></span></td>
-                            <td class="text-center">
-                                <div class="d-flex justify-content-center gap-2">
-                                    <a class="btn btn-primary btn-sm" href="<?= e($panelBase) ?>/page/edit/<?= $rowId ?>" title="Edit" aria-label="Edit">
-                                        <i class="bi bi-pencil" aria-hidden="true"></i>
-                                        <span class="visually-hidden">Edit</span>
-                                    </a>
-                                    <?php // CSRF-protected delete action for this page row. ?>
-                                    <form method="post" action="<?= e($panelBase) ?>/page/delete" onsubmit="return confirm('Delete this page?');">
-                                        <?= $csrfField ?>
-                                        <input type="hidden" name="id" value="<?= $rowId ?>">
-                                        <button type="submit" class="btn btn-danger btn-sm" title="Delete" aria-label="Delete">
-                                            <i class="bi bi-trash3" aria-hidden="true"></i>
-                                            <span class="visually-hidden">Delete</span>
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-            <p id="<?= e($pagesEmptyId) ?>" class="text-muted mb-0 mt-2 d-none">No pages match the current filters.</p>
-            <?php if ($paginationTotalItems > 0): ?>
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
-                    <div class="small text-muted">
-                        Page <?= $paginationCurrent ?> of <?= $paginationTotalPages ?> (<?= $paginationTotalItems ?> total)
-                    </div>
-                    <?php if ($paginationTotalPages > 1): ?>
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Pages pagination">
-                            <a class="btn btn-outline-secondary<?= $paginationCurrent <= 1 ? ' disabled' : '' ?>" href="<?= e($buildPaginationUrl($paginationCurrent - 1)) ?>">Previous</a>
-                            <a class="btn btn-outline-secondary<?= $paginationCurrent >= $paginationTotalPages ? ' disabled' : '' ?>" href="<?= e($buildPaginationUrl($paginationCurrent + 1)) ?>">Next</a>
-                        </div>
-                    <?php endif; ?>
+            </td>
+            <td><?= $rowId ?></td>
+            <td>
+                <a href="<?= e($panelBase) ?>/page/edit/<?= $rowId ?>">
+                    <?= e($rowTitle) ?>
+                </a>
+            </td>
+            <td><?= e($rowSlug) ?></td>
+            <td><?= $channelSlug === '' ? '&lt;none&gt;' : e($channelSlug) ?></td>
+            <td><span class="badge <?= e($statusBadgeClass) ?>"><?= e($statusLabel) ?></span></td>
+            <td class="text-center">
+                <div class="d-flex justify-content-center gap-2">
+                    <a class="btn btn-primary btn-sm" href="<?= e($panelBase) ?>/page/edit/<?= $rowId ?>" title="Edit" aria-label="Edit">
+                        <i class="bi bi-pencil" aria-hidden="true"></i>
+                        <span class="visually-hidden">Edit</span>
+                    </a>
+                    <?php // CSRF-protected delete action for this page row. ?>
+                    <form method="post" action="<?= e($panelBase) ?>/page/delete" onsubmit="return confirm('Delete this page?');">
+                        <?= $csrfField ?>
+                        <input type="hidden" name="id" value="<?= $rowId ?>">
+                        <button type="submit" class="btn btn-danger btn-sm" title="Delete" aria-label="Delete">
+                            <i class="bi bi-trash3" aria-hidden="true"></i>
+                            <span class="visually-hidden">Delete</span>
+                        </button>
+                    </form>
                 </div>
-            <?php endif; ?>
-        <?php endif; ?>
-    </div>
-</section>
+            </td>
+        </tr>
+    <?php endforeach; ?>
+    </tbody>
+</table>
+<?php $pagesTableHtml = (string) ob_get_clean(); ?>
+<?= ListWrapper::render([
+    'is_empty'            => $pages === [],
+    'empty_message'       => 'No pages yet.',
+    'search_id'           => $pagesSearchId,
+    'search_col'          => 'col-12 col-lg-6',
+    'search_placeholder'  => 'Filter by title, slug, channel, or status...',
+    'filters'             => [
+        [
+            'id'           => $pagesStatusSortId,
+            'label'        => 'Sort by Status',
+            'col'          => 'col-12 col-sm-6 col-lg-3',
+            'options_html' => $pagesStatusOptionsHtml,
+        ],
+        [
+            'id'           => $pagesChannelSortId,
+            'label'        => 'Sort by Channel',
+            'col'          => 'col-12 col-sm-6 col-lg-3',
+            // Channel filter preserves prefilter selected state; JS in Footer::pushScript clears it on interaction.
+            'options_html' => $pagesChannelOptionsHtml,
+        ],
+    ],
+    'count_id'            => $pagesCountId,
+    'empty_id'            => $pagesEmptyId,
+    'empty_match_message' => 'No pages match the current filters.',
+    'table_html'          => $pagesTableHtml,
+    'pagination'          => [
+        'current'     => max(1, (int) ($pagination['current'] ?? 1)),
+        'total_pages' => max(1, (int) ($pagination['total_pages'] ?? 1)),
+        'total_items' => max(0, (int) ($pagination['total_items'] ?? count($pages))),
+        'base_path'   => (string) ($pagination['base_path'] ?? ($panelBase . '/page')),
+        'query'       => is_array($pagination['query'] ?? null) ? $pagination['query'] : [],
+        'label'       => 'pages',
+        'aria_label'  => 'Pages pagination',
+    ],
+]) ?>
 
 <?= Toolbar::render([
     'items' => $pageListToolbarItems,

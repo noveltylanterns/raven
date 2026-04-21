@@ -20,6 +20,7 @@
 
 use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\ListWrapper;
 use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
@@ -35,23 +36,16 @@ foreach ($setOptions as $setOption) {
     $categorySetNames[(int) ($setOption['id'] ?? 0)] = (string) ($setOption['name'] ?? 'Set');
 }
 $pagination = is_array($pagination ?? null) ? $pagination : [];
-$paginationCurrent = max(1, (int) ($pagination['current'] ?? 1));
-$paginationTotalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
-$paginationTotalItems = max(0, (int) ($pagination['total_items'] ?? count($categoryRows)));
-$paginationBasePath = (string) ($pagination['base_path'] ?? ($panelBase . '/category'));
-$paginationQuery = is_array($pagination['query'] ?? null) ? $pagination['query'] : [];
-$buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath, $paginationQuery): string {
-    $pageNumber = max(1, $pageNumber);
-    $query = $paginationQuery;
-    if ($pageNumber > 1) {
-        $query['page'] = (string) $pageNumber;
-    } else {
-        unset($query['page']);
-    }
-
-    $queryString = http_build_query($query);
-    return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
-};
+// Build set filter options HTML with server-side selected state.
+$categorySetOptionsHtml = '<option value="">All Sets</option>';
+foreach ($setOptions as $setOption) {
+    $setId = (int) ($setOption['id'] ?? 0);
+    $setSlug = (string) ($setOption['slug'] ?? '');
+    $setName = e((string) ($setOption['name'] ?? 'Set'));
+    $setSlugE = e($setSlug);
+    $setSelected = $selectedSetId === $setId ? ' selected' : '';
+    $categorySetOptionsHtml .= "<option value=\"{$setId}\"{$setSelected}>{$setName} ({$setSlugE})</option>";
+}
 $categoryListToolbarItems = [
     '<a class="btn btn-primary" href="' . e($panelBase) . '/category/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Category</a>',
     '<a class="btn btn-secondary" href="' . e($panelBase) . '/category/set"><i class="bi bi-collection me-2" aria-hidden="true"></i>Manage Sets</a>',
@@ -80,149 +74,129 @@ $categoryListToolbarItems = [
     'items' => $categoryListToolbarItems,
 ]) ?>
 
-<section class="card">
-    <div class="card-body">
-        <?php if ($categoryRows === []): ?>
-            <p class="text-muted mb-0">No categories yet.</p>
-        <?php else: ?>
-            <div class="row g-2 mb-3">
-                <div class="col-12 col-md-8">
-                    <label class="form-label mb-1" for="<?= e($categorySearchId) ?>">Search</label>
-                    <input
-                        id="<?= e($categorySearchId) ?>"
-                        type="search"
-                        class="form-control form-control-sm"
-                        placeholder="Filter by ID, title, or slug..."
-                    >
-                </div>
-                <div class="col-12 col-md-4">
-                    <label class="form-label mb-1" for="<?= e($categorySetFilterId) ?>">Set</label>
-                    <select id="<?= e($categorySetFilterId) ?>" class="form-select form-select-sm">
-                        <option value="">All Sets</option>
-                        <?php foreach ($setOptions as $setOption): ?>
-                            <?php
-                            $setId = (int) ($setOption['id'] ?? 0);
-                            $setSlug = (string) ($setOption['slug'] ?? '');
-                            ?>
-                            <option value="<?= $setId ?>"<?= $selectedSetId === $setId ? ' selected' : '' ?>>
-                                <?= e((string) ($setOption['name'] ?? 'Set')) ?> (<?= e($setSlug) ?>)
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-            </div>
-            <div class="small text-muted mb-2" id="<?= e($categoryCountId) ?>"></div>
-            <div class="table-responsive">
-                <table
-                    id="<?= e($categoryTableId) ?>"
-                    class="table table-sm align-middle"
-                    data-rvn-sort-table="1"
-                    data-sort-default-key="title"
-                    data-sort-default-direction="asc"
+<?php ob_start(); ?>
+<table
+    id="<?= e($categoryTableId) ?>"
+    class="table table-sm align-middle"
+    data-rvn-sort-table="1"
+    data-sort-default-key="title"
+    data-sort-default-direction="asc"
+>
+    <thead>
+    <tr>
+        <th></th>
+        <th scope="col" data-sort-key="id" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">ID</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+        <th scope="col" data-sort-key="title" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Title</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+        <th scope="col" data-sort-key="slug" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Slug</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+        <th scope="col" data-sort-key="set" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Set</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+        <th scope="col" data-sort-key="pages" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Pages</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
+        <th scope="col" class="text-center">Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    <?php foreach ($categoryRows as $category): ?>
+        <?php
+        $categoryId = (int) ($category['id'] ?? 0);
+        $categoryName = (string) ($category['name'] ?? '');
+        $categorySlug = (string) ($category['slug'] ?? '');
+        $categorySetId = (int) ($category['set'] ?? 0);
+        $categorySetName = (string) ($categorySetNames[$categorySetId] ?? ('Set #' . $categorySetId));
+        $categoryPageCount = (int) ($category['page_count'] ?? 0);
+        $categoryPagesUrl = $panelBase . '/page?category=' . rawurlencode((string) $categoryId);
+        ?>
+        <tr
+            data-rvn-sort-row="1"
+            data-sort-id="<?= e((string) $categoryId) ?>"
+            data-sort-title="<?= e($categoryName) ?>"
+            data-sort-slug="<?= e($categorySlug) ?>"
+            data-sort-set="<?= e($categorySetName) ?>"
+            data-sort-pages="<?= e((string) $categoryPageCount) ?>"
+        >
+            <?php // Row checkboxes post to dedicated bulk-delete form. ?>
+            <?php // `data-rvn-row-select` hooks into global layout row-highlighting script. ?>
+            <td>
+                <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="selected_ids[]"
+                    value="<?= $categoryId ?>"
+                    form="<?= e($bulkDeleteFormId) ?>"
+                    data-rvn-row-select="1"
+                    aria-label="Select category <?= $categoryId ?>"
                 >
-                    <thead>
-                    <tr>
-                        <th></th>
-                        <th scope="col" data-sort-key="id" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">ID</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="title" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Title</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="slug" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Slug</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="set" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Set</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" data-sort-key="pages" role="button" tabindex="0" aria-sort="none"><span class="raven-routing-sort-label">Pages</span><i class="bi raven-routing-sort-caret ms-1" aria-hidden="true"></i></th>
-                        <th scope="col" class="text-center">Actions</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($categoryRows as $category): ?>
-                        <?php
-                        $categoryId = (int) ($category['id'] ?? 0);
-                        $categoryName = (string) ($category['name'] ?? '');
-                        $categorySlug = (string) ($category['slug'] ?? '');
-                        $categorySetId = (int) ($category['set'] ?? 0);
-                        $categorySetName = (string) ($categorySetNames[$categorySetId] ?? ('Set #' . $categorySetId));
-                        $categoryPageCount = (int) ($category['page_count'] ?? 0);
-                        $categoryPagesUrl = $panelBase . '/page?category=' . rawurlencode((string) $categoryId);
-                        ?>
-                        <tr
-                            data-rvn-sort-row="1"
-                            data-sort-id="<?= e((string) $categoryId) ?>"
-                            data-sort-title="<?= e($categoryName) ?>"
-                            data-sort-slug="<?= e($categorySlug) ?>"
-                            data-sort-set="<?= e($categorySetName) ?>"
-                            data-sort-pages="<?= e((string) $categoryPageCount) ?>"
-                        >
-                            <?php // Row checkboxes post to dedicated bulk-delete form. ?>
-                            <?php // `data-rvn-row-select` hooks into global layout row-highlighting script. ?>
-                            <td>
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    name="selected_ids[]"
-                                    value="<?= $categoryId ?>"
-                                    form="<?= e($bulkDeleteFormId) ?>"
-                                    data-rvn-row-select="1"
-                                    aria-label="Select category <?= $categoryId ?>"
-                                >
-                            </td>
-                            <td><?= $categoryId ?></td>
-                            <td>
-                                <?php // Name is primary affordance and links directly to edit screen. ?>
-                                <a href="<?= e($panelBase) ?>/category/edit/<?= $categoryId ?>">
-                                    <?= e($categoryName) ?>
-                                </a>
-                            </td>
-                            <td><?= e($categorySlug) ?></td>
-                            <td><?= e($categorySetName) ?></td>
-                            <td>
-                                <?php if ($categoryPageCount > 0 && $categoryId > 0): ?>
-                                    <a href="<?= e($categoryPagesUrl) ?>"><?= $categoryPageCount ?></a>
-                                <?php else: ?>
-                                    <?= $categoryPageCount ?>
-                                <?php endif; ?>
-                            </td>
-                            <td class="text-center">
-                                <div class="d-flex justify-content-center gap-2">
-                                    <a
-                                        class="btn btn-primary btn-sm"
-                                        href="<?= e($panelBase) ?>/category/edit/<?= $categoryId ?>"
-                                        title="Edit"
-                                        aria-label="Edit"
-                                    >
-                                        <i class="bi bi-pencil" aria-hidden="true"></i>
-                                        <span class="visually-hidden">Edit</span>
-                                    </a>
-                                    <form method="post" action="<?= e($panelBase) ?>/category/delete" onsubmit="return confirm('Delete this category? Existing page-category links will be removed.');">
-                                        <?= $csrfField ?>
-                                        <?php // Single-row delete path uses explicit id hidden field. ?>
-                                        <input type="hidden" name="id" value="<?= $categoryId ?>">
-                                        <button type="submit" class="btn btn-danger btn-sm" title="Delete" aria-label="Delete">
-                                            <i class="bi bi-trash3" aria-hidden="true"></i>
-                                            <span class="visually-hidden">Delete</span>
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-            <p id="<?= e($categoryEmptyId) ?>" class="text-muted mb-0 mt-2 d-none">No categories match the current filters.</p>
-            <?php if ($paginationTotalItems > 0): ?>
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
-                    <div class="small text-muted">
-                        Page <?= $paginationCurrent ?> of <?= $paginationTotalPages ?> (<?= $paginationTotalItems ?> total)
-                    </div>
-                    <?php if ($paginationTotalPages > 1): ?>
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Categories pagination">
-                            <a class="btn btn-outline-secondary<?= $paginationCurrent <= 1 ? ' disabled' : '' ?>" href="<?= e($buildPaginationUrl($paginationCurrent - 1)) ?>">Previous</a>
-                            <a class="btn btn-outline-secondary<?= $paginationCurrent >= $paginationTotalPages ? ' disabled' : '' ?>" href="<?= e($buildPaginationUrl($paginationCurrent + 1)) ?>">Next</a>
-                        </div>
-                    <?php endif; ?>
+            </td>
+            <td><?= $categoryId ?></td>
+            <td>
+                <?php // Name is primary affordance and links directly to edit screen. ?>
+                <a href="<?= e($panelBase) ?>/category/edit/<?= $categoryId ?>">
+                    <?= e($categoryName) ?>
+                </a>
+            </td>
+            <td><?= e($categorySlug) ?></td>
+            <td><?= e($categorySetName) ?></td>
+            <td>
+                <?php if ($categoryPageCount > 0 && $categoryId > 0): ?>
+                    <a href="<?= e($categoryPagesUrl) ?>"><?= $categoryPageCount ?></a>
+                <?php else: ?>
+                    <?= $categoryPageCount ?>
+                <?php endif; ?>
+            </td>
+            <td class="text-center">
+                <div class="d-flex justify-content-center gap-2">
+                    <a
+                        class="btn btn-primary btn-sm"
+                        href="<?= e($panelBase) ?>/category/edit/<?= $categoryId ?>"
+                        title="Edit"
+                        aria-label="Edit"
+                    >
+                        <i class="bi bi-pencil" aria-hidden="true"></i>
+                        <span class="visually-hidden">Edit</span>
+                    </a>
+                    <form method="post" action="<?= e($panelBase) ?>/category/delete" onsubmit="return confirm('Delete this category? Existing page-category links will be removed.');">
+                        <?= $csrfField ?>
+                        <?php // Single-row delete path uses explicit id hidden field. ?>
+                        <input type="hidden" name="id" value="<?= $categoryId ?>">
+                        <button type="submit" class="btn btn-danger btn-sm" title="Delete" aria-label="Delete">
+                            <i class="bi bi-trash3" aria-hidden="true"></i>
+                            <span class="visually-hidden">Delete</span>
+                        </button>
+                    </form>
                 </div>
-            <?php endif; ?>
-        <?php endif; ?>
-    </div>
-</section>
+            </td>
+        </tr>
+    <?php endforeach; ?>
+    </tbody>
+</table>
+<?php $categoryTableHtml = (string) ob_get_clean(); ?>
+<?= ListWrapper::render([
+    'is_empty'            => $categoryRows === [],
+    'empty_message'       => 'No categories yet.',
+    'search_id'           => $categorySearchId,
+    'search_col'          => 'col-12 col-md-8',
+    'search_placeholder'  => 'Filter by ID, title, or slug...',
+    'filters'             => [
+        [
+            'id'           => $categorySetFilterId,
+            'label'        => 'Set',
+            'col'          => 'col-12 col-md-4',
+            // Set filter navigates to a new URL (server-side pagination) on change; JS in Footer::pushScript handles it.
+            'options_html' => $categorySetOptionsHtml,
+        ],
+    ],
+    'count_id'            => $categoryCountId,
+    'empty_id'            => $categoryEmptyId,
+    'empty_match_message' => 'No categories match the current filters.',
+    'table_html'          => $categoryTableHtml,
+    'pagination'          => [
+        'current'     => max(1, (int) ($pagination['current'] ?? 1)),
+        'total_pages' => max(1, (int) ($pagination['total_pages'] ?? 1)),
+        'total_items' => max(0, (int) ($pagination['total_items'] ?? count($categoryRows))),
+        'base_path'   => (string) ($pagination['base_path'] ?? ($panelBase . '/category')),
+        'query'       => is_array($pagination['query'] ?? null) ? $pagination['query'] : [],
+        'label'       => 'categories',
+        'aria_label'  => 'Categories pagination',
+    ],
+]) ?>
 
 <?= Toolbar::render([
     'items' => $categoryListToolbarItems,

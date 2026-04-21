@@ -9,6 +9,7 @@ declare(strict_types=1);
 /** @var string|null $flashError */
 
 use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\ListWrapper;
 use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
@@ -35,67 +36,64 @@ $tagSetListToolbarItems = [
     'items' => $tagSetListToolbarItems,
 ]) ?>
 
-<section class="card">
-    <div class="card-body">
-        <?php if ($setRows === []): ?>
-            <p class="text-muted mb-0">No tag sets yet.</p>
-        <?php else: ?>
-            <div class="table-responsive">
-                <table class="table table-sm align-middle">
-                    <thead>
-                    <tr>
-                        <th scope="col">ID</th>
-                        <th scope="col">Name</th>
-                        <th scope="col">Slug</th>
-                        <th scope="col">Tags</th>
-                        <th scope="col">Channels</th>
-                        <th scope="col" class="text-center">Actions</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($setRows as $setRow): ?>
-                        <?php
-                        $setId = (int) ($setRow['id'] ?? 0);
-                        $isRoot = !empty($setRow['is_stock']);
-                        $tagCount = (int) ($setRow['tag_count'] ?? 0);
-                        $tagListUrl = $panelBase . '/tag?set=' . rawurlencode((string) $setId);
-                        ?>
-                        <tr>
-                            <td><?= $setId ?></td>
-                            <td><a href="<?= e($panelBase) ?>/tag/set/edit/<?= $setId ?>"><?= e((string) ($setRow['name'] ?? 'Set')) ?></a></td>
-                            <td><code><?= e((string) ($setRow['slug'] ?? '')) ?></code></td>
-                            <td>
-                                <?php if ($tagCount > 0): ?>
-                                    <a href="<?= e($tagListUrl) ?>"><?= $tagCount ?></a>
-                                <?php else: ?>
-                                    <?= $tagCount ?>
-                                <?php endif; ?>
-                            </td>
-                            <td><?= (int) ($setRow['channel_count'] ?? 0) ?></td>
-                            <td class="text-center">
-                                <div class="d-flex justify-content-center gap-2">
-                                    <a class="btn btn-primary btn-sm" href="<?= e($panelBase) ?>/tag/set/edit/<?= $setId ?>" title="Edit" aria-label="Edit">
-                                        <i class="bi bi-pencil" aria-hidden="true"></i>
-                                    </a>
-                                    <?php if (!$isRoot): ?>
-                                        <form method="post" action="<?= e($panelBase) ?>/tag/set/delete" onsubmit="return confirm('Delete this tag set?');">
-                                            <?= $csrfField ?>
-                                            <input type="hidden" name="id" value="<?= $setId ?>">
-                                            <button type="submit" class="btn btn-danger btn-sm" title="Delete" aria-label="Delete">
-                                                <i class="bi bi-trash3" aria-hidden="true"></i>
-                                            </button>
-                                        </form>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
-    </div>
-</section>
+<?php ob_start(); ?>
+<table class="table table-sm align-middle">
+    <thead>
+    <tr>
+        <th scope="col">ID</th>
+        <th scope="col">Name</th>
+        <th scope="col">Slug</th>
+        <th scope="col">Tags</th>
+        <th scope="col">Channels</th>
+        <th scope="col" class="text-center">Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    <?php foreach ($setRows as $setRow): ?>
+        <?php
+        $setId = (int) ($setRow['id'] ?? 0);
+        $isRoot = !empty($setRow['is_stock']);
+        $tagCount = (int) ($setRow['tag_count'] ?? 0);
+        $tagListUrl = $panelBase . '/tag?set=' . rawurlencode((string) $setId);
+        ?>
+        <tr>
+            <td><?= $setId ?></td>
+            <td><a href="<?= e($panelBase) ?>/tag/set/edit/<?= $setId ?>"><?= e((string) ($setRow['name'] ?? 'Set')) ?></a></td>
+            <td><code><?= e((string) ($setRow['slug'] ?? '')) ?></code></td>
+            <td>
+                <?php if ($tagCount > 0): ?>
+                    <a href="<?= e($tagListUrl) ?>"><?= $tagCount ?></a>
+                <?php else: ?>
+                    <?= $tagCount ?>
+                <?php endif; ?>
+            </td>
+            <td><?= (int) ($setRow['channel_count'] ?? 0) ?></td>
+            <td class="text-center">
+                <div class="d-flex justify-content-center gap-2">
+                    <a class="btn btn-primary btn-sm" href="<?= e($panelBase) ?>/tag/set/edit/<?= $setId ?>" title="Edit" aria-label="Edit">
+                        <i class="bi bi-pencil" aria-hidden="true"></i>
+                    </a>
+                    <?php if (!$isRoot): ?>
+                        <form method="post" action="<?= e($panelBase) ?>/tag/set/delete" onsubmit="return confirm('Delete this tag set?');">
+                            <?= $csrfField ?>
+                            <input type="hidden" name="id" value="<?= $setId ?>">
+                            <button type="submit" class="btn btn-danger btn-sm" title="Delete" aria-label="Delete">
+                                <i class="bi bi-trash3" aria-hidden="true"></i>
+                            </button>
+                        </form>
+                    <?php endif; ?>
+                </div>
+            </td>
+        </tr>
+    <?php endforeach; ?>
+    </tbody>
+</table>
+<?php $tagSetTableHtml = (string) ob_get_clean(); ?>
+<?= ListWrapper::render([
+    'is_empty'      => $setRows === [],
+    'empty_message' => 'No tag sets yet.',
+    'table_html'    => $tagSetTableHtml,
+]) ?>
 
 <?= Toolbar::render([
     'items' => $tagSetListToolbarItems,
