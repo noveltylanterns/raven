@@ -36,6 +36,18 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 			- [ ] Decide whether taxonomy-set assignment counts (`countExplicitTaxonomySetAssignments()`) belong on the parser read surface or should stay repository-only until the broader channel write/read split is finished; then update `Panel/TaxonomyController` accordingly.
 			- [ ] After the core controller/runtime rewires are done, audit debug/profiling utilities (`debug/util/profile-panel-lists.php`, `debug/util/profile-public-pages.php`) and any remaining CLI read flows so they follow the same parser-vs-repo rule instead of preserving legacy direct reads by accident.
 	- [ ] Parallel to our new comprehensive Parser classes, we need a complete set of Scribe/ classes that can write virtually every data type.
+- [ ] Clean up after our lib/View/ refactor now that I can make sense of whats going on in there:
+	- [ ] SiteContextBuilder is shared dead weight. We have enough shared controllers and shared bootstraps and shared routers that this file shouldn't even exist. Panel-only things belong in PanelController and public-only things belong in PublicController. Other things belong in other more specific libraries. Everything in here has a better place. Do an audit and work out eliminating the need for this file.
+	- [ ] BodyBlockPolicy & PageBodyBlockCodec: Are these both truly necessary on public+panel routes? Lets rearrange this so theres a View\Panel\PageBlocks and View\Public\PageBlocks. Anything shared between both should probably be flattened into PageRepository, Page*Parser and PageScribe.
+	- [ ] Public\PageBodyRenderer should be split, with Page-wrapper functions becoming Public\Page, and Block-specific functiong going to Public\PageBlocks
+	- [ ] PageTaxonomyQueryService probably should be stored as lib/Parser/TaxonomyDataParser.php, and it needs a parallel set of listing by id's instead of slugs.
+	- [ ] Public\MarkdownRenderer should be Public\PageMarkdown
+	- [ ] Public\ThemeScaffoldService should be Public\ThemeGenerator
+	- [ ] Public\ThemeManifestValidator should be Public\ThemeValidator
+	- [ ] Public\ThemeCatalogService should be Public\ThemeCatalog
+	- [ ] Public\ThemeCloneService should be marged into Public\ThemeGenerator
+	- [ ] Panel\ListWrapper should be Panel\List
+	- [ ] Panel\PagePanelFilterClauseBuilder should be universalized as Panel\ListFilter, with Page-specific logic moving to the Panel\PageController where it belongs.
 - [ ] We need to set more specific boundaries between Parser/Scribe libraries, the Panel controllers, CLI, and the Repos they call.
 	- [ ] TaxonomySetRepository should just be SetRepository
 	- [ ] TaxonomyLookupRepository should probably become lib/Parser/TaxonomyRepoParser
@@ -51,6 +63,7 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	- [ ] All existing sys/Debug/Profiler*.php classes should be renamed to OutputProfiler*.php so theres no confusion between our two profilers.
 	- [ ] Anything for the request profiler can be moved to sys/Debug/RequestProfiler.php and/or RequestProfiler*.php
 	- [ ] Delete empty lib/Diagnostic/ when done.
+- [ ] sys/Routing/Result.php should be Response.php
 - [ ] sys/Controller/TaxonomyController.php is going to have to be split up into CategoryController, ChannelController, etc, etc. We already have SharedController, AuthController and PanelController shared on all routes. Other than that, each top-level panel route should have it's own controller. We don't need more than those three shared controllers. SystemController looks like it will have to be split up too.
 	- [ ] Once the split is wired into place, make sure each Controller is only dealing with the route it was made for. Optimize and flatten useless bullshit entirely.
 	- [ ] ContentController should be called PageController, so it matches what it's called in the Panel.
@@ -59,11 +72,23 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	- [ ] Missing Public/ controllers for Channels, Categories, Tags & Groups.
 	- [ ] ProfileController should be called UserController so it matches everything else.
 	- [ ] FormController is only used on page routes, fold it into PageController.
-
+- [ ] lib/Security/CaptchaService.php should be Captcha.php
+- [ ] lib/Security/TotpService.php should be Totp.php
+- [ ] lib/Security/TotpSecretCipher.php should be TotpCipher.php
+- [ ] lib/Security/QrCodeService.php should be moved to lib/View/Qr.php
+- [ ] lib/Security/InviteTokenPolicy.php should be split into sys/Repository/InviteRepository.php, lib/Parser/InviteParser.php and lib/Scribe/InviteScribe.php.
+	- [ ] This new Parser & Scribe should be able to read+write just about anything pertaining to invite tokens.
+	- [ ] Our CLI & Panel will continue to use InviteRepository, in line with our earlier split.
+	- [ ] InviteRepository handles all shared heavy lifting used by CLI, Invite editor in panel, InviteParser & InviteScribe.
+- [ ] lib/Security/CsrfTokenStoreInferface.php should be CsrfToken.php
+- [ ] lib/Security/PhpSessionTokenStore.php should be SessionToken.php
+- [ ] lib/Security/WebAuthnService.php should be WebAuthn.php
+- [ ] We have four TwoFactor* classes in lib/Security with long names. Is there any reason they need to be split up this much? See if they can be simplified down to three sensibly organized classes with more concise class/function names, considering they're mostly only used on login forms.
 
 
 ### Bugs & Tweaks
-
+- [ ] Avatars should be stored as uploads/user/{uid}/avatar.extension
+- [ ] Cover images should be stored as uploads/user/{uid}/cover.extension
 
 
 ## Long Term
