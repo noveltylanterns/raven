@@ -43,6 +43,7 @@ declare(strict_types=1);
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
+use Raven\Lib\View\Panel\Header;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -276,34 +277,33 @@ if (is_array($rawContentBlocks)) {
     }
 }
 $pageTitle = trim((string) ($page['title'] ?? ''));
-?>
-<header class="card">
-    <div class="card-body">
-        <h1>
-            <?= $page === null ? 'Create New Page' : 'Edit Page: <span class="text-primary">\'' . e($pageTitle !== '' ? $pageTitle : 'Untitled') . '\'</span>' ?>
-        </h1>
-        <?php if ($page === null): ?>
-            <p class="text-muted mb-0">Create or update page content, metadata, and gallery media.</p>
-        <?php endif; ?>
-
-        <?php if ($publishedPermalink !== null): ?>
-            <!-- Published pages show a direct public permalink for quick verification. -->
+$pageHeaderBodyHtml = '';
+if ($publishedPermalink !== null) {
+    $publishedPermalinkEscaped = e($publishedPermalink);
+    $pageHeaderBodyHtml = <<<HTML
             <p class="mb-0 small">
                 <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
                 <a
-                    href="<?= e($publishedPermalink) ?>"
+                    href="{$publishedPermalinkEscaped}"
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="<?= e($publishedPermalink) ?>"
+                    title="{$publishedPermalinkEscaped}"
                     aria-label="Open published URL"
                     style="font-size: 0.88em;"
                 >
-                    <?= e($publishedPermalink) ?>
+                    {$publishedPermalinkEscaped}
                 </a>
             </p>
-        <?php endif; ?>
-    </div>
-</header>
+HTML;
+}
+?>
+<?= Header::render([
+    'title_html' => $page === null
+        ? 'Create New Page'
+        : 'Edit Page: <span class="text-primary">\'' . e($pageTitle !== '' ? $pageTitle : 'Untitled') . '\'</span>',
+    'summary' => $page === null ? 'Create or update page content, metadata, and gallery media.' : '',
+    'body_html' => $pageHeaderBodyHtml,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>

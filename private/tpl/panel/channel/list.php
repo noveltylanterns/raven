@@ -16,6 +16,7 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
+use Raven\Lib\View\Panel\Header;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -43,12 +44,10 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
 };
 ?>
-<header class="card">
-    <div class="card-body">
-        <h1>Channels</h1>
-        <p class="text-muted mb-0">Manage channel taxonomy for URL structure &amp; landing pages.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Channels',
+    'summary_html' => 'Manage channel taxonomy for URL structure &amp; landing pages.',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>

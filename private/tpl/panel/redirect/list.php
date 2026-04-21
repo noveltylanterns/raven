@@ -16,6 +16,7 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
+use Raven\Lib\View\Panel\Header;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -63,12 +64,10 @@ foreach ($redirectRows as $redirectRow) {
 asort($redirectStatusOptions, SORT_NATURAL | SORT_FLAG_CASE);
 asort($redirectChannelOptions, SORT_NATURAL | SORT_FLAG_CASE);
 ?>
-<header class="card">
-    <div class="card-body">
-        <h1>Redirects</h1>
-        <p class="text-muted mb-0">Manage redirect rules, target destinations, and active route behavior.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Redirects',
+    'summary' => 'Manage redirect rules, target destinations, and active route behavior.',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>

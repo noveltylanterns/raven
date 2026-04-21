@@ -20,8 +20,9 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
-use function Raven\Lib\Security\e;
 use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\View\Panel\Header;
+use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $bulkDeleteFormId = 'bulk-users-delete-form';
@@ -69,12 +70,10 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
 };
 ?>
-<header class="card">
-    <div class="card-body">
-        <h1>Users</h1>
-        <p class="text-muted mb-0">Manage user accounts, profile details, and group memberships.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Users',
+    'summary' => 'Manage user accounts, profile details, and group memberships.',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>

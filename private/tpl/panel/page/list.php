@@ -19,6 +19,7 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
+use Raven\Lib\View\Panel\Header;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -75,12 +76,10 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
 };
 ?>
-<header class="card">
-    <div class="card-body">
-        <h1>Pages</h1>
-        <p class="text-muted mb-0">Create, organize, and manage your site pages with publication and channel controls.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Pages',
+    'summary' => 'Create, organize, and manage your site pages with publication and channel controls.',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>

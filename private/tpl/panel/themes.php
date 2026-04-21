@@ -29,6 +29,7 @@ declare(strict_types=1);
  *   inheritance_chain: string
  * }> $themes */
 
+use Raven\Lib\View\Panel\Header;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -36,33 +37,21 @@ $packageArchiveHelp = array_map(
     static fn (string $format): string => '<code>.' . e(ltrim($format, '.')) . '</code>',
     $packageArchiveFormats
 );
+$themeHeaderActions = [
+    '<button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#upload-theme-modal">'
+        . '<i class="bi bi-upload me-2" aria-hidden="true"></i>Upload Theme'
+        . '</button>',
+    '<button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#create-theme-modal">'
+        . '<i class="bi bi-plus-square me-2" aria-hidden="true"></i>Create New Theme'
+        . '</button>',
+];
 ?>
-<header class="card">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1>Theme Manager</h1>
-            <div class="d-flex align-items-center gap-2">
-                <button
-                    type="button"
-                    class="btn btn-primary btn-sm"
-                    data-bs-toggle="modal"
-                    data-bs-target="#upload-theme-modal"
-                >
-                    <i class="bi bi-upload me-2" aria-hidden="true"></i>Upload Theme
-                </button>
-                <button
-                    type="button"
-                    class="btn btn-primary btn-sm"
-                    data-bs-toggle="modal"
-                    data-bs-target="#create-theme-modal"
-                >
-                    <i class="bi bi-plus-square me-2" aria-hidden="true"></i>Create New Theme
-                </button>
-            </div>
-        </div>
-        <p class="text-muted mb-0">Manage installed public themes, switch the active theme, and scaffold new theme folders.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Theme Manager',
+    'summary' => 'Manage installed public themes, switch the active theme, and scaffold new theme folders.',
+    'actions' => $themeHeaderActions,
+    'actions_class' => 'd-flex align-items-center gap-2',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>

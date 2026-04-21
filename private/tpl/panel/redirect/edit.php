@@ -16,6 +16,7 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
+use Raven\Lib\View\Panel\Header;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -42,31 +43,33 @@ if ($redirectRow !== null && $publicBase !== '' && $redirectSlug !== '') {
     $redirectPathParts[] = rawurlencode($redirectSlug);
     $redirectPublicUrl = $publicBase . '/' . implode('/', $redirectPathParts);
 }
-?>
-<header class="card">
-    <div class="card-body">
-        <h1>
-            <?= $redirectRow === null ? 'New Redirect' : 'Edit Redirect: <span class="text-primary">\'' . e($redirectTitle !== '' ? $redirectTitle : 'Untitled') . '\'</span>' ?>
-        </h1>
-        <?php if ($redirectRow === null): ?>
-            <p class="text-muted mb-0">Create or update redirect routes and destination targets.</p>
-        <?php elseif ($redirectPublicUrl !== null): ?>
+$redirectHeaderBodyHtml = '';
+if ($redirectRow !== null && $redirectPublicUrl !== null) {
+    $redirectPublicUrlEscaped = e($redirectPublicUrl);
+    $redirectHeaderBodyHtml = <<<HTML
             <p class="mb-0 small">
                 <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
                 <a
-                    href="<?= e($redirectPublicUrl) ?>"
+                    href="{$redirectPublicUrlEscaped}"
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="<?= e($redirectPublicUrl) ?>"
+                    title="{$redirectPublicUrlEscaped}"
                     aria-label="Open redirect URL"
                     style="font-size: 0.88em;"
                 >
-                    <?= e($redirectPublicUrl) ?>
+                    {$redirectPublicUrlEscaped}
                 </a>
             </p>
-        <?php endif; ?>
-    </div>
-</header>
+HTML;
+}
+?>
+<?= Header::render([
+    'title_html' => $redirectRow === null
+        ? 'New Redirect'
+        : 'Edit Redirect: <span class="text-primary">\'' . e($redirectTitle !== '' ? $redirectTitle : 'Untitled') . '\'</span>',
+    'summary' => $redirectRow === null ? 'Create or update redirect routes and destination targets.' : '',
+    'body_html' => $redirectHeaderBodyHtml,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>

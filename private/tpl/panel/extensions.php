@@ -37,6 +37,7 @@ declare(strict_types=1);
  *   uninstall_block_reason: string
  * }> $extensions */
 
+use Raven\Lib\View\Panel\Header;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -44,6 +45,22 @@ $packageArchiveHelp = array_map(
     static fn (string $format): string => '<code>.' . e(ltrim($format, '.')) . '</code>',
     $packageArchiveFormats
 );
+$extensionHeaderActions = [
+    '<button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#upload-extension-modal">'
+        . '<i class="bi bi-upload me-2" aria-hidden="true"></i>Upload Extension'
+        . '</button>',
+    '<button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#create-extension-modal">'
+        . '<i class="bi bi-plus-square me-2" aria-hidden="true"></i>Create New Extension'
+        . '</button>',
+];
+$extensionHeaderBodyHtml = <<<HTML
+        <h5>Notes:</h5>
+        <p class="text-muted mb-0">
+          - Enabled extensions must be disabled before uninstall.<br>
+          - Uninstalling stock extensions only purges their opted-in data; bundled files stay in place.<br>
+          - Disable unused extensions for performance!
+        </p>
+HTML;
 ?>
 <style>
     body#rvnp #extensions-table thead th[data-sort-key] {
@@ -63,36 +80,14 @@ $packageArchiveHelp = array_map(
     }
 </style>
 
-<header class="card">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1>Extension Manager</h1>
-            <div class="d-flex align-items-center gap-2">
-                <button
-                    type="button"
-                    class="btn btn-primary btn-sm"
-                    data-bs-toggle="modal"
-                    data-bs-target="#upload-extension-modal"
-                >
-                    <i class="bi bi-upload me-2" aria-hidden="true"></i>Upload Extension
-                </button>
-                <button
-                    type="button"
-                    class="btn btn-primary btn-sm"
-                    data-bs-toggle="modal"
-                    data-bs-target="#create-extension-modal"
-                ><i class="bi bi-plus-square me-2" aria-hidden="true"></i>Create New Extension</button>
-            </div>
-        </div>
-        <p class="text-muted mb-2">Use this page to create, upload, enable, and disable Raven extensions.</p>
-        <h5>Notes:</h5>
-        <p class="text-muted mb-0">
-          - Enabled extensions must be disabled before uninstall.<br>
-          - Uninstalling stock extensions only purges their opted-in data; bundled files stay in place.<br>
-          - Disable unused extensions for performance!
-        </p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Extension Manager',
+    'summary' => 'Use this page to create, upload, enable, and disable Raven extensions.',
+    'summary_class' => 'text-muted mb-2',
+    'actions' => $extensionHeaderActions,
+    'actions_class' => 'd-flex align-items-center gap-2',
+    'body_html' => $extensionHeaderBodyHtml,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>

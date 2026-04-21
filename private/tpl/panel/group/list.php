@@ -17,6 +17,7 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
+use Raven\Lib\View\Panel\Header;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -45,12 +46,10 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
 };
 ?>
-<header class="card">
-    <div class="card-body">
-        <h1>Groups</h1>
-        <p class="text-muted mb-0">Manage permission groups, member assignments, and optional group route behavior.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Groups',
+    'summary' => 'Manage permission groups, member assignments, and optional group route behavior.',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
