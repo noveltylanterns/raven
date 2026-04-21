@@ -28,7 +28,7 @@ use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\Transport\Upload;
-use Raven\Lib\View\Public\PublicThemeRegistry;
+use Raven\Lib\View\Theme;
 
 require_once dirname(__DIR__) . '/Archive/Package.php';
 require_once dirname(__DIR__) . '/Archive/Install.php';
@@ -2582,7 +2582,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
             }
 
             $items = [];
-            foreach (PublicThemeRegistry::manifests($themesRoot) as $slug => $manifest) {
+            foreach (Theme::manifests($themesRoot) as $slug => $manifest) {
                 $items[] = [
                     'slug' => (string) $slug,
                     'name' => (string) ($manifest['name'] ?? $slug),
@@ -2621,7 +2621,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 throw new RuntimeException('Theme slug is invalid.');
             }
 
-            $manifests = PublicThemeRegistry::manifests($themesRoot);
+            $manifests = Theme::manifests($themesRoot);
             if (!isset($manifests[$slug])) {
                 throw new RuntimeException('Theme not found or manifest invalid: ' . $slug);
             }
@@ -2674,7 +2674,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 throw new RuntimeException('Clone source cannot be the same as slug.');
             }
 
-            $manifests = PublicThemeRegistry::manifests($themesRoot);
+            $manifests = Theme::manifests($themesRoot);
             if ($parent !== '' && !isset($manifests[$parent])) {
                 throw new RuntimeException('Parent theme was not found: ' . $parent);
             }

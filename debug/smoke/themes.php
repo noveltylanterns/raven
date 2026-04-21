@@ -13,7 +13,7 @@ error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
 
 $root = dirname(__DIR__, 2);
-require_once $root . '/private/lib/Extra/Helpers.php';
+require_once $root . '/private/lib/Security/OutputEncoder.php';
 
 // Keep smoke scripts independent from the full runtime bootstrap while still
 // following the same Core/Lib PSR-4 layout as the live app.
@@ -39,9 +39,8 @@ spl_autoload_register(static function (string $class) use ($root): void {
 });
 
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\Public\PublicTemplatePipeline;
-use Raven\Lib\View\Public\PublicTemplateResolver;
-use Raven\Lib\View\TemplateTagEngine;
+use Raven\Lib\View\Public\ThemeBrace;
+use Raven\Lib\View\Public\ThemeTemplate;
 
 final class ThemeTemplateSmokeRunner
 {
@@ -76,7 +75,7 @@ final class ThemeTemplateSmokeRunner
             throw new RuntimeException('Failed to create template tag cache directory for theme smoke.');
         }
 
-        $engine = new TemplateTagEngine($this->cacheDirectory);
+        $engine = new ThemeBrace($this->cacheDirectory);
         $fixtureFile = $this->root . '/.tmp/theme-tag-smoke-' . $this->runId . '.php';
         $fixtureSource = <<<'PHP'
 escaped_title={page:title}
@@ -144,7 +143,7 @@ PHP;
             ];
 
             $fixtureMtime = @filemtime($fixtureFile);
-            $compiledPath = $this->cacheDirectory . '/tag-template-'
+            $compiledPath = $this->cacheDirectory . '/theme-brace-'
                 . sha1($fixtureFile . '|' . (string) ($fixtureMtime === false ? 0 : (int) $fixtureMtime))
                 . '.php';
 
@@ -200,7 +199,7 @@ PHP;
         }
     }
 
-    private function smokeTemplateRedirects(TemplateTagEngine $engine): void
+    private function smokeTemplateRedirects(ThemeBrace $engine): void
     {
         $root = $this->root . '/.tmp/theme-redirect-smoke-' . $this->runId;
         if (!is_dir($root) && !mkdir($root, 0775, true) && !is_dir($root)) {
@@ -221,7 +220,7 @@ PHP;
                 }
             }
 
-            $pipeline = new PublicTemplatePipeline(new PublicTemplateResolver(new InputSanitizer()));
+            $pipeline = new ThemeTemplate(new InputSanitizer());
             $data = [
                 'redirect' => [
                     '404' => '__RVN_TEMPLATE_REDIRECT__:status/404',
@@ -254,7 +253,7 @@ PHP;
         }
     }
 
-    private function smokeRenderRealTemplates(TemplateTagEngine $engine): void
+    private function smokeRenderRealTemplates(ThemeBrace $engine): void
     {
         $data = [
             'site' => [

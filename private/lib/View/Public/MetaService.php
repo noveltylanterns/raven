@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/View/Public/MetaService.php
+ * Public site metadata payload builder and social-image URL resolver.
+ * Docs: https://raven.lanterns.io
+*/
+
 declare(strict_types=1);
 
 namespace Raven\Lib\View\Public;
@@ -9,12 +16,11 @@ use Raven\Lib\Parser\FeedRouteParser;
 use Raven\Lib\Transport\Request;
 use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\View\SiteContextBuilder;
-use Raven\Lib\View\Panel\ThemeCatalogService;
 
 /**
  * Shared site/public meta payload builder and social-image URL resolver.
  */
-final class PublicMetaService
+final class MetaService
 {
     private Request $requestContextResolver;
     private SiteContextBuilder $siteContextBuilder;
@@ -22,6 +28,14 @@ final class PublicMetaService
     private UserDataParser $profileContactService;
     private FeedRouteParser $feedParser;
 
+    /**
+     * @param Request $requestContextResolver Shared request-context helper.
+     * @param SiteContextBuilder $siteContextBuilder Shared site-context builder.
+     * @param ThemeCatalogService $themeCatalogService Public-theme catalog helper.
+     * @param UserDataParser $profileContactService Profile-contact helper for author social metadata.
+     * @param FeedRouteParser $feedParser Feed-route policy helper for root feed URLs.
+     * @return void
+     */
     public function __construct(
         Request $requestContextResolver,
         SiteContextBuilder $siteContextBuilder,
@@ -37,6 +51,9 @@ final class PublicMetaService
     }
 
     /**
+     * Builds the base site/meta payload for public theme templates.
+     *
+     * @param Config $config Runtime configuration reader.
      * @return array<string, string>
      */
     public function siteData(Config $config): array
@@ -59,6 +76,8 @@ final class PublicMetaService
     }
 
     /**
+     * Applies page-specific meta overrides to one base site payload.
+     *
      * @param array<string, mixed> $page
      * @param array<string, string> $site
      * @param callable(int): string|null $pagePreviewImageUrlResolver
@@ -100,6 +119,8 @@ final class PublicMetaService
     }
 
     /**
+     * Applies taxonomy preview/cover image overrides to one base site payload.
+     *
      * @param array<string, mixed> $taxonomy
      * @param array<string, string> $site
      * @return array<string, string>
@@ -140,6 +161,14 @@ final class PublicMetaService
         return $site;
     }
 
+    /**
+     * Resolves a configured or stored image path into an absolute meta-image URL.
+     *
+     * @param string $value Candidate configured URL or local path.
+     * @param string $configuredDomain Configured site domain for absolute-path expansion.
+     * @param string $configuredProtocol Configured preferred scheme override.
+     * @return string Absolute meta-image URL, or an empty string when unusable.
+     */
     public function absoluteMetaImageUrl(string $value, string $configuredDomain, string $configuredProtocol = ''): string
     {
         $value = trim(str_replace(["\r", "\n", "\0"], '', $value));

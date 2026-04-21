@@ -1,21 +1,37 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/View/Public/ThemeScaffoldService.php
+ * Public-theme scaffold generator for create and duplicate workflows.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\View\Panel;
+namespace Raven\Lib\View\Public;
 
 /**
- * Shared public-theme scaffold generator for panel create workflows.
+ * Shared public-theme scaffold generator for create and duplicate workflows.
  */
 final class ThemeScaffoldService
 {
     /**
+     * Creates the canonical starter file set for one public theme.
+     *
+     * @param string $themePath Absolute destination theme directory.
      * @param array{
      *   slug: string,
      *   name: string,
      *   is_child_theme: bool,
      *   parent_theme: string
-     * } $meta
+     * } $meta Theme manifest metadata for the scaffold.
+     * @param bool $generateAgentsFile Whether to generate local agent-guidance files.
+     * @param bool $generateComposerFile Whether to generate a starter `composer.json`.
+     * @param bool $generatePackageFile Whether to generate a starter `package.json`.
+     * @return void
+     *
+     * @throws \RuntimeException When a scaffold file or directory cannot be created.
      */
     public function createSkeleton(
         string $themePath,
@@ -127,12 +143,15 @@ final class ThemeScaffoldService
     }
 
     /**
+     * Builds the canonical local agent-guidance file content for one theme.
+     *
      * @param array{
      *   slug: string,
      *   name: string,
      *   is_child_theme?: bool,
      *   parent_theme?: string
-     * } $meta
+     * } $meta Theme metadata used to describe the scaffold.
+     * @return string Rendered agent-guidance file body.
      */
     public function agentsFileContent(array $meta): string
     {
@@ -181,10 +200,13 @@ final class ThemeScaffoldService
     }
 
     /**
+     * Builds the starter `composer.json` payload for one public theme.
+     *
      * @param array{
      *   slug: string,
      *   name: string
-     * } $meta
+     * } $meta Theme metadata used in the package manifest.
+     * @return string JSON document content ending with a trailing newline.
      */
     public function composerFileContent(array $meta): string
     {
@@ -220,10 +242,13 @@ final class ThemeScaffoldService
     }
 
     /**
+     * Builds the starter `package.json` payload for one public theme.
+     *
      * @param array{
      *   slug: string,
      *   name: string
-     * } $meta
+     * } $meta Theme metadata used in the package manifest.
+     * @return string JSON document content ending with a trailing newline.
      */
     public function packageFileContent(array $meta): string
     {

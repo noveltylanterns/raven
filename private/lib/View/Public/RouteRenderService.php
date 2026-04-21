@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/View/Public/RouteRenderService.php
+ * Public-route payload decisions for profile and group placeholders.
+ * Docs: https://raven.lanterns.io
+*/
+
 declare(strict_types=1);
 
 namespace Raven\Lib\View\Public;
@@ -7,7 +14,7 @@ namespace Raven\Lib\View\Public;
 /**
  * Shared route-to-template/status rendering decisions for public profile and group controllers.
  */
-final class PublicRouteRenderService
+final class RouteRenderService
 {
     /**
      * Returns the render payload for an unavailable user profile page.

@@ -1,12 +1,19 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/View/Public/ThemeCatalogService.php
+ * Shared catalog, inheritance, and slug-policy helpers for public themes.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\View\Panel;
+namespace Raven\Lib\View\Public;
 
 use Raven\Core\Config;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\Public\PublicThemeRegistry;
+use Raven\Lib\View\Theme;
 
 /**
  * Shared public-theme catalog and slug policy helper.
@@ -31,17 +38,24 @@ final class ThemeCatalogService
         )));
     }
 
+    /**
+     * Returns the filesystem root where public themes are discovered.
+     *
+     * @return string Absolute public-theme root path.
+     */
     public function root(): string
     {
         return $this->themesRoot;
     }
 
     /**
-     * @return array<string, string>
+     * Returns the installed public-theme option map.
+     *
+     * @return array<string, string> Map of theme slug to human-readable name.
      */
     public function options(): array
     {
-        $options = PublicThemeRegistry::options($this->themesRoot);
+        $options = Theme::options($this->themesRoot);
         if ($options === []) {
             return ['raven' => 'Raven Basic'];
         }
@@ -49,6 +63,12 @@ final class ThemeCatalogService
         return $options;
     }
 
+    /**
+     * Resolves the active public-theme slug from runtime config.
+     *
+     * @param Config $config Runtime configuration reader.
+     * @return string Active public-theme slug.
+     */
     public function activeSlugFromConfig(Config $config): string
     {
         $configured = strtolower($this->input->text((string) $config->get('site.theme', 'raven'), 80));
@@ -67,11 +87,14 @@ final class ThemeCatalogService
     }
 
     /**
-     * @return array<int, string>
+     * Returns the child-first inheritance chain for one public theme.
+     *
+     * @param string $themeSlug Theme slug to resolve.
+     * @return array<int, string> Child-first inheritance chain.
      */
     public function inheritanceChain(string $themeSlug): array
     {
-        $chain = PublicThemeRegistry::inheritanceChain($this->themesRoot, $themeSlug);
+        $chain = Theme::inheritanceChain($this->themesRoot, $themeSlug);
         if ($chain === []) {
             return [$themeSlug];
         }
@@ -79,6 +102,12 @@ final class ThemeCatalogService
         return $chain;
     }
 
+    /**
+     * Resolves the theme slug that owns the active stylesheet for one theme chain.
+     *
+     * @param string $themeSlug Active public-theme slug.
+     * @return string Slug of the first theme in the chain that provides `css/style.css`.
+     */
     public function cssSlug(string $themeSlug): string
     {
         foreach ($this->inheritanceChain($themeSlug) as $candidateThemeSlug) {
@@ -92,6 +121,8 @@ final class ThemeCatalogService
     }
 
     /**
+     * Builds the panel-facing inventory row set for installed public themes.
+     *
      * @return array<int, array{
      *   slug: string,
      *   name: string,
@@ -105,7 +136,7 @@ final class ThemeCatalogService
      */
     public function listForPanel(): array
     {
-        $manifests = PublicThemeRegistry::manifests($this->themesRoot);
+        $manifests = Theme::manifests($this->themesRoot);
         $rows = [];
 
         foreach ($manifests as $slug => $manifest) {
@@ -126,6 +157,8 @@ final class ThemeCatalogService
     }
 
     /**
+     * Returns the stock-theme slug list reserved from uninstall/mutation flows.
+     *
      * @return array<int, string>
      */
     public function stockSlugs(): array
@@ -133,17 +166,35 @@ final class ThemeCatalogService
         return $this->stockSlugs;
     }
 
+    /**
+     * Returns whether the given theme slug is one of the protected stock themes.
+     *
+     * @param string $slug Theme slug to inspect.
+     * @return bool True when the slug belongs to the stock-theme set.
+     */
     public function isStockSlug(string $slug): bool
     {
         $normalized = strtolower(trim($slug));
         return in_array($normalized, $this->stockSlugs, true);
     }
 
+    /**
+     * Returns whether a theme slug satisfies Raven's public-theme slug contract.
+     *
+     * @param string $slug Candidate public-theme slug.
+     * @return bool True when the slug is safe for filesystem/runtime use.
+     */
     public function isSafeSlug(string $slug): bool
     {
         return preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $slug) === 1;
     }
 
+    /**
+     * Derives a safe theme slug from one uploaded archive filename.
+     *
+     * @param string $archiveName Uploaded archive filename.
+     * @return string|null Safe derived slug, or null when no valid slug can be derived.
+     */
     public function slugFromArchiveFilename(string $archiveName): ?string
     {
         $base = strtolower($this->input->text((string) pathinfo($archiveName, PATHINFO_FILENAME), 80));
@@ -157,6 +208,13 @@ final class ThemeCatalogService
         return $base;
     }
 
+    /**
+     * Returns the next unused filesystem-safe slug derived from one base theme slug.
+     *
+     * @param string $baseSlug Requested base slug.
+     * @param int $maxAttempts Maximum numbered-copy attempts before giving up.
+     * @return string|null Available slug, or null when no safe free slug was found.
+     */
     public function nextAvailableSlug(string $baseSlug, int $maxAttempts = 250): ?string
     {
         $normalizedBase = strtolower(trim($baseSlug));

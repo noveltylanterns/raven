@@ -24,7 +24,7 @@ use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\View\Panel\ThemeCatalogService;
+use Raven\Lib\View\Public\ThemeCatalogService;
 
 use Raven\Lib\Transport\Redirect;
 

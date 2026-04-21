@@ -24,13 +24,12 @@ use Raven\Lib\Security\CaptchaService;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Error as ViewError;
-use Raven\Lib\View\Public\PublicMetaService;
 use Raven\Lib\View\SiteContextBuilder;
-use Raven\Lib\View\Public\PublicTemplateDecorator;
-use Raven\Lib\View\Public\PublicTemplatePipeline;
-use Raven\Lib\View\Public\PublicTemplateResolver;
-use Raven\Lib\View\Public\TemplateTagEngine;
-use Raven\Lib\View\Panel\ThemeCatalogService;
+use Raven\Lib\View\Public\MetaService;
+use Raven\Lib\View\Public\TemplateDecorator;
+use Raven\Lib\View\Public\ThemeCatalogService;
+use Raven\Lib\View\Public\ThemeBrace;
+use Raven\Lib\View\Public\ThemeTemplate;
 
 /**
  * Holds public-request shared deps and helpers for split public sub-controllers.
@@ -42,7 +41,7 @@ final class SharedController
     private InputSanitizer $input;
     private Csrf $csrf;
     private SessionFlash $flash;
-    private TemplateTagEngine $templateTags;
+    private ThemeBrace $themeBrace;
     private bool $captchaScriptIncluded = false;
     private ?Request $requestContextResolver = null;
     private ?SiteContextBuilder $siteContextBuilder = null;
@@ -51,10 +50,9 @@ final class SharedController
     private ?UserDataParser $profileContactService = null;
     private ?CaptchaService $captchaService = null;
     private ?ThemeCatalogService $themeCatalogService = null;
-    private ?PublicMetaService $publicMetaService = null;
-    private ?PublicTemplateDecorator $publicTemplateDecorator = null;
-    private ?PublicTemplateResolver $publicTemplateResolver = null;
-    private ?PublicTemplatePipeline $publicTemplatePipeline = null;
+    private ?MetaService $metaService = null;
+    private ?TemplateDecorator $templateDecorator = null;
+    private ?ThemeTemplate $themeTemplate = null;
 
     /**
      * @param Config $config Runtime configuration reader.
@@ -74,7 +72,7 @@ final class SharedController
         $this->input = $input;
         $this->csrf = $csrf;
         $this->flash = new SessionFlash('_raven_public_flash');
-        $this->templateTags = new TemplateTagEngine(dirname(__DIR__, 4) . '/.tmp/template_tag_cache');
+        $this->themeBrace = new ThemeBrace(dirname(__DIR__, 4) . '/.tmp/template_tag_cache');
     }
 
     /**
@@ -210,7 +208,7 @@ final class SharedController
      */
     public function siteData(): array
     {
-        return $this->publicMetaService()->siteData($this->config);
+        return $this->metaService()->siteData($this->config);
     }
 
     /**
@@ -222,7 +220,7 @@ final class SharedController
      */
     public function siteDataWithTaxonomyMetaImage(array $taxonomy, ?array $baseSiteData = null): array
     {
-        return $this->publicMetaService()->siteDataWithTaxonomyMetaImage(
+        return $this->metaService()->siteDataWithTaxonomyMetaImage(
             $taxonomy,
             $baseSiteData ?? $this->siteData()
         );
@@ -292,11 +290,11 @@ final class SharedController
     public function renderPublic(string $template, array $data = [], ?string $layout = null): void
     {
         $data = $this->decorateTemplateData($data);
-        $output = $this->publicTemplatePipeline()->renderForThemeChain(
+        $output = $this->themeTemplate()->renderForThemeChain(
             $template,
             $data,
             $layout,
-            fn (string $file, array $payload): string => $this->templateTags->renderFile($file, $payload),
+            fn (string $file, array $payload): string => $this->themeBrace->renderFile($file, $payload),
             $this->publicThemesRoot(),
             $this->currentPublicThemeSlug(),
             dirname(__DIR__, 4) . '/private/tpl'
@@ -321,8 +319,8 @@ final class SharedController
         string $extensionTplRoot = ''
     ): void {
         $data = $this->decorateTemplateData($data);
-        $pipeline = $this->publicTemplatePipeline();
-        $roots = $pipeline->lookupRoots(
+        $themeTemplate = $this->themeTemplate();
+        $roots = $themeTemplate->lookupRoots(
             $this->publicThemesRoot(),
             $this->currentPublicThemeSlug(),
             dirname(__DIR__, 4) . '/private/tpl'
@@ -334,11 +332,11 @@ final class SharedController
             array_splice($roots, count($roots) - 1, 0, [$extensionTplRoot]);
         }
 
-        $output = $pipeline->render(
+        $output = $themeTemplate->render(
             $template,
             $data,
             $layout,
-            fn (string $file, array $payload): string => $this->templateTags->renderFile($file, $payload),
+            fn (string $file, array $payload): string => $this->themeBrace->renderFile($file, $payload),
             ...$roots
         );
 
@@ -381,45 +379,31 @@ final class SharedController
     }
 
     /**
-     * Returns the cached public template pipeline.
+     * Returns the cached public theme-template service.
      *
-     * @return PublicTemplatePipeline Shared public template pipeline.
+     * @return ThemeTemplate Shared theme-template service.
      */
-    private function publicTemplatePipeline(): PublicTemplatePipeline
+    private function themeTemplate(): ThemeTemplate
     {
-        if (!$this->publicTemplatePipeline instanceof PublicTemplatePipeline) {
-            $this->publicTemplatePipeline = new PublicTemplatePipeline($this->publicTemplateResolver());
+        if (!$this->themeTemplate instanceof ThemeTemplate) {
+            $this->themeTemplate = new ThemeTemplate($this->input);
         }
 
-        return $this->publicTemplatePipeline;
+        return $this->themeTemplate;
     }
 
     /**
-     * Returns the cached public template resolver.
+     * Returns the cached theme-template decorator.
      *
-     * @return PublicTemplateResolver Shared public template resolver.
+     * @return TemplateDecorator Shared public-template decorator.
      */
-    private function publicTemplateResolver(): PublicTemplateResolver
+    private function templateDecorator(): TemplateDecorator
     {
-        if (!$this->publicTemplateResolver instanceof PublicTemplateResolver) {
-            $this->publicTemplateResolver = new PublicTemplateResolver($this->input);
+        if (!$this->templateDecorator instanceof TemplateDecorator) {
+            $this->templateDecorator = new TemplateDecorator($this->config, $this->input, dirname(__DIR__, 4));
         }
 
-        return $this->publicTemplateResolver;
-    }
-
-    /**
-     * Returns the cached public template decorator.
-     *
-     * @return PublicTemplateDecorator Shared public template decorator.
-     */
-    private function publicTemplateDecorator(): PublicTemplateDecorator
-    {
-        if (!$this->publicTemplateDecorator instanceof PublicTemplateDecorator) {
-            $this->publicTemplateDecorator = new PublicTemplateDecorator($this->config, $this->input, dirname(__DIR__, 4));
-        }
-
-        return $this->publicTemplateDecorator;
+        return $this->templateDecorator;
     }
 
     /**
@@ -505,12 +489,12 @@ final class SharedController
     /**
      * Returns the cached public meta service.
      *
-     * @return PublicMetaService Shared public-meta helper.
+     * @return MetaService Shared public meta helper.
      */
-    private function publicMetaService(): PublicMetaService
+    private function metaService(): MetaService
     {
-        if (!$this->publicMetaService instanceof PublicMetaService) {
-            $this->publicMetaService = new PublicMetaService(
+        if (!$this->metaService instanceof MetaService) {
+            $this->metaService = new MetaService(
                 $this->requestContextResolver(),
                 $this->siteContextBuilder(),
                 $this->themeCatalogService(),
@@ -519,7 +503,7 @@ final class SharedController
             );
         }
 
-        return $this->publicMetaService;
+        return $this->metaService;
     }
 
     /**
@@ -535,6 +519,6 @@ final class SharedController
             $statusCode = 200;
         }
 
-        return $this->publicTemplateDecorator()->decorateTemplateData($data, $statusCode);
+        return $this->templateDecorator()->decorateTemplateData($data, $statusCode);
     }
 }

@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/View/Public/TemplateDecorator.php
+ * Public-template payload decoration helpers for public views.
+ * Docs: https://raven.lanterns.io
+*/
+
 declare(strict_types=1);
 
 namespace Raven\Lib\View\Public;
@@ -12,13 +19,19 @@ use Raven\Lib\Security\InputSanitizer;
 /**
  * Shared template-facing payload decoration helpers for public views.
  */
-final class PublicTemplateDecorator
+final class TemplateDecorator
 {
     private Config $config;
     private InputSanitizer $input;
     private string $projectRoot;
     private UserMediaPathService $userMediaPathService;
 
+    /**
+     * @param Config $config Runtime configuration reader.
+     * @param InputSanitizer $input Shared request sanitizer.
+     * @param string $projectRoot Absolute project root for media-path resolution.
+     * @return void
+     */
     public function __construct(Config $config, InputSanitizer $input, string $projectRoot)
     {
         $this->config = $config;
@@ -28,6 +41,8 @@ final class PublicTemplateDecorator
     }
 
     /**
+     * Decorates one page-list row set with template-ready URLs.
+     *
      * @param array<int, array<string, mixed>> $pages
      * @return array<int, array<string, mixed>>
      */
@@ -58,6 +73,8 @@ final class PublicTemplateDecorator
     }
 
     /**
+     * Decorates pagination data with template-facing link metadata.
+     *
      * @param array<string, mixed> $pagination
      * @return array<string, mixed>
      */
@@ -67,6 +84,8 @@ final class PublicTemplateDecorator
     }
 
     /**
+     * Normalizes one page payload for public theme templates.
+     *
      * @param array<string, mixed> $page
      * @return array<string, mixed>
      */
@@ -128,6 +147,8 @@ final class PublicTemplateDecorator
     }
 
     /**
+     * Normalizes gallery-image payloads for public theme templates.
+     *
      * @param array<int, array<string, mixed>> $galleryImages
      * @return array<int, array<string, mixed>>
      */
@@ -152,6 +173,8 @@ final class PublicTemplateDecorator
     }
 
     /**
+     * Normalizes one public profile payload for theme templates.
+     *
      * @param array<string, mixed> $profile
      * @return array<string, mixed>
      */
@@ -198,6 +221,8 @@ final class PublicTemplateDecorator
     }
 
     /**
+     * Normalizes one public group-member row set for theme templates.
+     *
      * @param array<int, array<string, mixed>> $members
      * @return array<int, array<string, mixed>>
      */
@@ -231,6 +256,8 @@ final class PublicTemplateDecorator
     }
 
     /**
+     * Normalizes one public group payload for theme templates.
+     *
      * @param array<string, mixed> $group
      * @param array<int, array<string, mixed>> $members
      * @return array<string, mixed>
@@ -243,7 +270,10 @@ final class PublicTemplateDecorator
     }
 
     /**
+     * Finalizes one public render payload into theme-template-ready data.
+     *
      * @param array<string, mixed> $data
+     * @param int $statusCode HTTP status code for the current render.
      * @return array<string, mixed>
      */
     public function decorateTemplateData(array $data, int $statusCode): array

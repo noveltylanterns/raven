@@ -15,8 +15,8 @@ use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Parser\UserDataParser;
-use Raven\Lib\View\Public\PublicRouteRenderService;
-use Raven\Lib\View\Public\PublicTemplateDecorator;
+use Raven\Lib\View\Public\RouteRenderService;
+use Raven\Lib\View\Public\TemplateDecorator;
 
 /**
  * Handles split public profile and group routes.
@@ -27,8 +27,8 @@ final class ProfileController
     private GroupRepository $groupRepo;
     private LoginIdentifierResolver $loginIdentifierResolver;
     private UserDataParser $profileContactService;
-    private PublicRouteRenderService $publicRouteRenderService;
-    private PublicTemplateDecorator $publicTemplateDecorator;
+    private RouteRenderService $routeRenderService;
+    private TemplateDecorator $templateDecorator;
 
     /**
      * @param SharedController $context Shared public request context.
@@ -45,8 +45,8 @@ final class ProfileController
         $this->groupRepo = $groupRepo;
         $this->loginIdentifierResolver = new LoginIdentifierResolver();
         $this->profileContactService = new UserDataParser($context->input(), $userRepo);
-        $this->publicRouteRenderService = new PublicRouteRenderService();
-        $this->publicTemplateDecorator = new PublicTemplateDecorator(
+        $this->routeRenderService = new RouteRenderService();
+        $this->templateDecorator = new TemplateDecorator(
             $context->config(),
             $context->input(),
             dirname(__DIR__, 4)
@@ -85,7 +85,7 @@ final class ProfileController
         }
 
         $profile = $this->decoratePublicProfileContacts($profile);
-        $profile = $this->publicTemplateDecorator->decorateProfileForTemplate($profile);
+        $profile = $this->templateDecorator->decorateProfileForTemplate($profile);
 
         $template = match ($profileMode) {
             'public_full' => 'profile/full',
@@ -139,8 +139,8 @@ final class ProfileController
 
         $group = is_array($groupRouteData['group'] ?? null) ? $groupRouteData['group'] : [];
         $members = is_array($groupRouteData['members'] ?? null) ? $groupRouteData['members'] : [];
-        $members = $this->publicTemplateDecorator->decorateGroupMembersForTemplate($members);
-        $group = $this->publicTemplateDecorator->decorateGroupForTemplate($group, $members);
+        $members = $this->templateDecorator->decorateGroupMembersForTemplate($members);
+        $group = $this->templateDecorator->decorateGroupForTemplate($group, $members);
 
         $template = match ($groupMode) {
             'public_full' => 'group/list',
@@ -165,7 +165,7 @@ final class ProfileController
      */
     private function renderProfileUnavailable(string $error, string $mode): void
     {
-        $payload = $this->publicRouteRenderService->profileUnavailablePayload($error, $mode, $this->context->siteData());
+        $payload = $this->routeRenderService->profileUnavailablePayload($error, $mode, $this->context->siteData());
         http_response_code((int) ($payload['status'] ?? 404));
         $this->context->renderPublic(
             (string) ($payload['template'] ?? 'profile/index'),
@@ -183,7 +183,7 @@ final class ProfileController
      */
     private function renderGroupUnavailable(string $error, string $mode): void
     {
-        $payload = $this->publicRouteRenderService->groupUnavailablePayload($error, $mode, $this->context->siteData());
+        $payload = $this->routeRenderService->groupUnavailablePayload($error, $mode, $this->context->siteData());
         http_response_code((int) ($payload['status'] ?? 404));
         $this->context->renderPublic(
             (string) ($payload['template'] ?? 'group/index'),

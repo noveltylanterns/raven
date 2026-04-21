@@ -1,14 +1,30 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/View/Public/ThemeCloneService.php
+ * Filesystem clone helper for public-theme scaffold and duplicate workflows.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\View\Panel;
+namespace Raven\Lib\View\Public;
 
 /**
- * Handles recursive theme-directory cloning for local scaffold workflows.
+ * Handles recursive public-theme directory cloning for local scaffold workflows.
  */
 final class ThemeCloneService
 {
+    /**
+     * Recursively copies one public-theme directory into a new target directory.
+     *
+     * @param string $sourceDirectory Existing source theme directory.
+     * @param string $targetDirectory Destination directory for the cloned theme.
+     * @return void
+     *
+     * @throws \RuntimeException When the source cannot be resolved or a file operation fails.
+     */
     public function copyDirectoryRecursively(string $sourceDirectory, string $targetDirectory): void
     {
         if (!is_dir($sourceDirectory)) {

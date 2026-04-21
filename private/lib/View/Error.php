@@ -12,8 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\View;
 
 use Raven\Core\Config;
-use Raven\Lib\View\Public\PublicThemeRegistry;
-use Raven\Lib\View\Public\ThemeFallbackRenderer;
+use Raven\Lib\View\Public\ThemeBrace;
 
 /**
  * Renders standard HTTP error responses using the active public theme.
@@ -87,7 +86,7 @@ final class Error
     private function resolveActiveTheme(string $themesRoot): string
     {
         $configured = strtolower(trim((string) $this->config->get('site.theme', 'raven')));
-        $options = PublicThemeRegistry::options($themesRoot);
+        $options = Theme::options($themesRoot);
 
         if (isset($options[$configured])) {
             return $configured;
@@ -110,7 +109,7 @@ final class Error
      */
     private function resolveCssSlug(string $themesRoot, string $activeTheme): string
     {
-        $chain = PublicThemeRegistry::inheritanceChain($themesRoot, $activeTheme);
+        $chain = Theme::inheritanceChain($themesRoot, $activeTheme);
         if ($chain === []) {
             $chain = [$activeTheme];
         }
@@ -139,15 +138,10 @@ final class Error
         http_response_code($status);
 
         $themesRoot = $this->root . '/public/theme';
+        $coreFallbackRoot = $this->root . '/private/tpl';
         $activeTheme = $this->resolveActiveTheme($themesRoot);
-
-        $renderer = new ThemeFallbackRenderer(
-            $themesRoot,
-            $this->root . '/private/tpl',
-            $this->root . '/.tmp/template_tag_cache'
-        );
-
-        $templateFile = $renderer->resolveTemplateFile($template, $activeTheme);
+        $themeBrace = new ThemeBrace($this->root . '/.tmp/template_tag_cache');
+        $templateFile = $this->resolveTemplateFile($template, $themesRoot, $coreFallbackRoot, $activeTheme);
         if ($templateFile === null) {
             header('Content-Type: text/plain; charset=utf-8');
             echo $fallbackText;
@@ -160,14 +154,67 @@ final class Error
             $this->resolveCssSlug($themesRoot, $activeTheme)
         );
 
-        $content = $renderer->renderFile($templateFile, ['site' => $site]);
+        $content = $themeBrace->renderFile($templateFile, ['site' => $site]);
 
-        $layoutFile = $renderer->resolveTemplateFile('wrapper', $activeTheme);
+        $layoutFile = $this->resolveTemplateFile('wrapper', $themesRoot, $coreFallbackRoot, $activeTheme);
         if ($layoutFile === null) {
             echo $content;
             return;
         }
 
-        echo $renderer->renderFile($layoutFile, ['site' => $site, 'content' => $content]);
+        echo $themeBrace->renderFile($layoutFile, ['site' => $site, 'content' => $content]);
+    }
+
+    /**
+     * Resolves one template file from the active theme chain plus the core fallback root.
+     *
+     * @param string $template Relative template path without the `.php` extension.
+     * @param string $themesRoot Absolute path to the public-theme root directory.
+     * @param string $coreFallbackRoot Absolute path to the core template root.
+     * @param string $activeThemeSlug Active public-theme slug.
+     * @return string|null Absolute template file path, or null when no candidate exists.
+     */
+    private function resolveTemplateFile(
+        string $template,
+        string $themesRoot,
+        string $coreFallbackRoot,
+        string $activeThemeSlug
+    ): ?string {
+        $relative = trim($template, '/') . '.php';
+        foreach ($this->templateRoots($themesRoot, $coreFallbackRoot, $activeThemeSlug) as $root) {
+            $candidate = rtrim($root, '/\\') . '/' . $relative;
+            if (is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns the lookup roots used by shared public-theme error rendering.
+     *
+     * @param string $themesRoot Absolute path to the public-theme root directory.
+     * @param string $coreFallbackRoot Absolute path to the core template root.
+     * @param string $activeThemeSlug Active public-theme slug.
+     * @return array<int, string> Theme tpl roots followed by the core fallback root.
+     */
+    private function templateRoots(string $themesRoot, string $coreFallbackRoot, string $activeThemeSlug): array
+    {
+        $roots = [];
+        $chain = Theme::inheritanceChain($themesRoot, $activeThemeSlug);
+        if ($chain === []) {
+            $chain = [$activeThemeSlug];
+        }
+
+        foreach ($chain as $candidateThemeSlug) {
+            $themeViewsRoot = rtrim($themesRoot, '/\\') . '/' . $candidateThemeSlug . '/tpl';
+            if (is_dir($themeViewsRoot)) {
+                $roots[] = $themeViewsRoot;
+            }
+        }
+
+        $roots[] = rtrim($coreFallbackRoot, '/\\');
+        return $roots;
     }
 }

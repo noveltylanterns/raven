@@ -19,10 +19,9 @@ use Raven\Lib\Parser\CategoryRouteParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\Parser\TagRouteParser;
-use Raven\Lib\View\Public\PublicTemplateDecorator;
-use Raven\Lib\View\Public\PublicTemplatePipeline;
-use Raven\Lib\View\Public\PublicTemplateResolver;
-use Raven\Lib\View\Panel\ThemeCatalogService;
+use Raven\Lib\View\Public\TemplateDecorator;
+use Raven\Lib\View\Public\ThemeCatalogService;
+use Raven\Lib\View\Public\ThemeTemplate;
 
 /**
  * Handles split public feed and taxonomy-list routes.
@@ -33,11 +32,10 @@ final class FeedController
     private ChannelRepository $channelRepo;
     private PageDataParser $pageParser;
     private TaxonomyLookupRepository $taxonomyLookupRepo;
-    private PublicTemplateDecorator $publicTemplateDecorator;
+    private TemplateDecorator $templateDecorator;
     private PublicChannelPageRouteService $publicChannelPageRouteService;
     private ThemeCatalogService $themeCatalogService;
-    private ?PublicTemplateResolver $publicTemplateResolver = null;
-    private ?PublicTemplatePipeline $publicTemplatePipeline = null;
+    private ?ThemeTemplate $themeTemplate = null;
 
     /**
      * @param SharedController $context Shared public request context.
@@ -56,7 +54,7 @@ final class FeedController
         $this->channelRepo = $channelRepo;
         $this->pageParser = new PageDataParser($context->input(), $pageRepo);
         $this->taxonomyLookupRepo = $taxonomyLookupRepo;
-        $this->publicTemplateDecorator = new PublicTemplateDecorator(
+        $this->templateDecorator = new TemplateDecorator(
             $context->config(),
             $context->input(),
             dirname(__DIR__, 4)
@@ -104,14 +102,14 @@ final class FeedController
 
         $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pages = $this->decoratePageListPublicPaths($pages);
-        $pages = $this->publicTemplateDecorator->decoratePageListForTemplate($pages);
-        $pagination = $this->publicTemplateDecorator->decoratePaginationForTemplate([
+        $pages = $this->templateDecorator->decoratePageListForTemplate($pages);
+        $pagination = $this->templateDecorator->decoratePaginationForTemplate([
             'current' => $pageNumber,
             'total_pages' => $totalPages,
             'total_items' => $total,
             'base_path' => '/' . $categoryPrefix . '/' . rawurlencode($categorySlug),
         ]);
-        $categoryTemplate = $this->publicTemplatePipeline()->resolveCategoryTemplateNameForThemeChain(
+        $categoryTemplate = $this->themeTemplate()->resolveCategoryTemplateNameForThemeChain(
             $categorySlug,
             $this->publicThemesRoot(),
             $this->currentPublicThemeSlug(),
@@ -161,14 +159,14 @@ final class FeedController
 
         $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pages = $this->decoratePageListPublicPaths($pages);
-        $pages = $this->publicTemplateDecorator->decoratePageListForTemplate($pages);
-        $pagination = $this->publicTemplateDecorator->decoratePaginationForTemplate([
+        $pages = $this->templateDecorator->decoratePageListForTemplate($pages);
+        $pagination = $this->templateDecorator->decoratePaginationForTemplate([
             'current' => $pageNumber,
             'total_pages' => $totalPages,
             'total_items' => $total,
             'base_path' => '/' . $tagPrefix . '/' . rawurlencode($tagSlug),
         ]);
-        $tagTemplate = $this->publicTemplatePipeline()->resolveTagTemplateNameForThemeChain(
+        $tagTemplate = $this->themeTemplate()->resolveTagTemplateNameForThemeChain(
             $tagSlug,
             $this->publicThemesRoot(),
             $this->currentPublicThemeSlug(),
@@ -700,30 +698,16 @@ final class FeedController
     }
 
     /**
-     * Returns the shared public template resolver.
+     * Returns the shared public theme-template service.
      *
-     * @return PublicTemplateResolver Shared public template resolver.
+     * @return ThemeTemplate Shared theme-template service.
      */
-    private function publicTemplateResolver(): PublicTemplateResolver
+    private function themeTemplate(): ThemeTemplate
     {
-        if (!$this->publicTemplateResolver instanceof PublicTemplateResolver) {
-            $this->publicTemplateResolver = new PublicTemplateResolver($this->context->input());
+        if (!$this->themeTemplate instanceof ThemeTemplate) {
+            $this->themeTemplate = new ThemeTemplate($this->context->input());
         }
 
-        return $this->publicTemplateResolver;
-    }
-
-    /**
-     * Returns the shared public template pipeline.
-     *
-     * @return PublicTemplatePipeline Shared public template pipeline.
-     */
-    private function publicTemplatePipeline(): PublicTemplatePipeline
-    {
-        if (!$this->publicTemplatePipeline instanceof PublicTemplatePipeline) {
-            $this->publicTemplatePipeline = new PublicTemplatePipeline($this->publicTemplateResolver());
-        }
-
-        return $this->publicTemplatePipeline;
+        return $this->themeTemplate;
     }
 }

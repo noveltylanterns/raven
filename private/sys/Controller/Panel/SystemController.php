@@ -51,11 +51,11 @@ use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Panel\PanelRoutingPreviewService;
-use Raven\Lib\View\Panel\ThemeCatalogService;
-use Raven\Lib\View\Panel\ThemeCloneService;
-use Raven\Lib\View\Panel\ThemeScaffoldService;
 use Raven\Lib\View\Error as ViewError;
-use Raven\Lib\View\Public\PublicThemeRegistry;
+use Raven\Lib\View\Theme;
+use Raven\Lib\View\Public\ThemeCloneService;
+use Raven\Lib\View\Public\ThemeCatalogService;
+use Raven\Lib\View\Public\ThemeScaffoldService;
 
 use Raven\Lib\Transport\Redirect;
 
@@ -345,7 +345,7 @@ final class SystemController
             'section' => 'themes',
             'themes' => $this->listPublicThemesForPanel(),
             'activeTheme' => $this->activePublicThemeSlug(),
-            'themeOptions' => PublicThemeRegistry::options($this->publicThemesRoot()),
+            'themeOptions' => Theme::options($this->publicThemesRoot()),
             'packageArchiveAcceptAttribute' => $archivePackages->packageAccept(),
             'packageArchiveFormats' => $archivePackages->packageFormatLabels(),
             'exportArchiveFormats' => $archivePackages->exportFormatOptions(),
@@ -437,8 +437,8 @@ final class SystemController
         }
 
         $themesRoot = $this->publicThemesRoot();
-        $themeOptions = PublicThemeRegistry::options($themesRoot);
-        $themeManifests = PublicThemeRegistry::manifests($themesRoot);
+        $themeOptions = Theme::options($themesRoot);
+        $themeManifests = Theme::manifests($themesRoot);
         if ($parentTheme !== '' && !isset($themeOptions[$parentTheme])) {
             $this->context->flash('error', 'Selected parent theme was not found.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -671,7 +671,7 @@ final class SystemController
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        $manifests = PublicThemeRegistry::manifests($themesRoot);
+        $manifests = Theme::manifests($themesRoot);
         if (!isset($manifests[$themeSlug])) {
             $this->directoryTreeService()->removeTree($targetDirectory);
             $this->context->flash('error', 'Theme upload failed: theme.json is missing required/valid metadata.');

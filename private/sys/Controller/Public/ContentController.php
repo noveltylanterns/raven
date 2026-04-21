@@ -19,7 +19,6 @@ use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\View\BodyBlockPolicy;
 use Raven\Lib\View\Public\MarkdownRenderer;
-use Raven\Lib\View\Public\PublicPageBodyRenderer;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeService;
 use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
@@ -29,12 +28,12 @@ use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Parser\UserDataParser;
 use Raven\Core\Routing\Public\PublicChannelPageRouteService;
-use Raven\Lib\View\Public\PublicMetaService;
 use Raven\Lib\View\SiteContextBuilder;
-use Raven\Lib\View\Public\PublicTemplateDecorator;
-use Raven\Lib\View\Public\PublicTemplatePipeline;
-use Raven\Lib\View\Public\PublicTemplateResolver;
-use Raven\Lib\View\Panel\ThemeCatalogService;
+use Raven\Lib\View\Public\MetaService;
+use Raven\Lib\View\Public\PageBodyRenderer;
+use Raven\Lib\View\Public\TemplateDecorator;
+use Raven\Lib\View\Public\ThemeCatalogService;
+use Raven\Lib\View\Public\ThemeTemplate;
 
 /**
  * Handles split public homepage and page-routing routes.
@@ -54,11 +53,10 @@ final class ContentController
     /** @var array<string, array{label: string, editor: string}>|null */
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
     private ?ThemeCatalogService $themeCatalogService = null;
-    private ?PublicTemplateResolver $publicTemplateResolver = null;
-    private ?PublicTemplatePipeline $publicTemplatePipeline = null;
-    private ?PublicMetaService $publicMetaService = null;
-    private ?PublicTemplateDecorator $publicTemplateDecorator = null;
-    private ?PublicPageBodyRenderer $pageBodyRenderer = null;
+    private ?ThemeTemplate $themeTemplate = null;
+    private ?MetaService $metaService = null;
+    private ?TemplateDecorator $templateDecorator = null;
+    private ?PageBodyRenderer $pageBodyRenderer = null;
     private ?MarkdownRenderer $markdownRenderer = null;
     private ?BodyBlockPolicy $bodyBlockPolicy = null;
     private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
@@ -108,7 +106,7 @@ final class ContentController
         }
 
         $page = $this->renderPageContentBlocks($page);
-        $page = $this->publicTemplateDecorator()->decoratePageForTemplate($page);
+        $page = $this->templateDecorator()->decoratePageForTemplate($page);
 
         $this->context->renderPublic('home', [
             'site' => $this->siteDataWithPageMeta($page),
@@ -138,9 +136,9 @@ final class ContentController
         $channel = $result['channel'];
         $page    = $result['page'];
         $page = $this->renderPageContentBlocks($page);
-        $page = $this->publicTemplateDecorator()->decoratePageForTemplate($page);
+        $page = $this->templateDecorator()->decoratePageForTemplate($page);
 
-        $channelTemplate = $this->publicTemplatePipeline()->resolveChannelTemplateNameForThemeChain(
+        $channelTemplate = $this->themeTemplate()->resolveChannelTemplateNameForThemeChain(
             $channelSlug,
             $this->publicThemesRoot(),
             $this->currentPublicThemeSlug(),
@@ -263,8 +261,8 @@ final class ContentController
         }
 
         $page = $this->renderPageContentBlocks($page);
-        $page = $this->publicTemplateDecorator()->decoratePageForTemplate($page);
-        $pageTemplate = $this->publicTemplatePipeline()->resolvePageTemplateNameForThemeChain(
+        $page = $this->templateDecorator()->decoratePageForTemplate($page);
+        $pageTemplate = $this->themeTemplate()->resolvePageTemplateNameForThemeChain(
             $channelSlug,
             $this->publicThemesRoot(),
             $this->currentPublicThemeSlug(),
@@ -290,7 +288,7 @@ final class ContentController
             $this->context->config()->get('user.contact', $this->profileContactService()->defaultOptions())
         );
 
-        return $this->publicMetaService()->siteDataWithPageMeta(
+        return $this->metaService()->siteDataWithPageMeta(
             $page,
             $this->context->siteData(),
             fn (int $pageId): ?string => $this->pageImages->coverImageUrlForPage($pageId),
@@ -383,7 +381,7 @@ final class ContentController
             return '';
         }
 
-        $galleryImages = $this->publicTemplateDecorator()->decorateGalleryImagesForTemplate(
+        $galleryImages = $this->templateDecorator()->decorateGalleryImagesForTemplate(
             $this->pageImages->listReadyForPublicPage($pageId)
         );
         if ($galleryImages === []) {
@@ -604,31 +602,17 @@ final class ContentController
     }
 
     /**
-     * Returns the shared public template pipeline.
+     * Returns the shared public theme-template service.
      *
-     * @return PublicTemplatePipeline Shared public template pipeline.
+     * @return ThemeTemplate Shared theme-template service.
      */
-    private function publicTemplatePipeline(): PublicTemplatePipeline
+    private function themeTemplate(): ThemeTemplate
     {
-        if (!$this->publicTemplatePipeline instanceof PublicTemplatePipeline) {
-            $this->publicTemplatePipeline = new PublicTemplatePipeline($this->publicTemplateResolver());
+        if (!$this->themeTemplate instanceof ThemeTemplate) {
+            $this->themeTemplate = new ThemeTemplate($this->context->input());
         }
 
-        return $this->publicTemplatePipeline;
-    }
-
-    /**
-     * Returns the shared public template resolver.
-     *
-     * @return PublicTemplateResolver Shared public template resolver.
-     */
-    private function publicTemplateResolver(): PublicTemplateResolver
-    {
-        if (!$this->publicTemplateResolver instanceof PublicTemplateResolver) {
-            $this->publicTemplateResolver = new PublicTemplateResolver($this->context->input());
-        }
-
-        return $this->publicTemplateResolver;
+        return $this->themeTemplate;
     }
 
     /**
@@ -670,14 +654,14 @@ final class ContentController
     }
 
     /**
-     * Returns the shared public-meta service.
+     * Returns the shared public meta service.
      *
-     * @return PublicMetaService Shared public-meta service.
+     * @return MetaService Shared public meta service.
      */
-    private function publicMetaService(): PublicMetaService
+    private function metaService(): MetaService
     {
-        if (!$this->publicMetaService instanceof PublicMetaService) {
-            $this->publicMetaService = new PublicMetaService(
+        if (!$this->metaService instanceof MetaService) {
+            $this->metaService = new MetaService(
                 $this->context->requestContextResolver(),
                 new SiteContextBuilder(),
                 $this->themeCatalogService(),
@@ -686,7 +670,7 @@ final class ContentController
             );
         }
 
-        return $this->publicMetaService;
+        return $this->metaService;
     }
 
     /**
@@ -704,32 +688,32 @@ final class ContentController
     }
 
     /**
-     * Returns the shared public template decorator.
+     * Returns the shared public-template decorator.
      *
-     * @return PublicTemplateDecorator Shared public template decorator.
+     * @return TemplateDecorator Shared public-template decorator.
      */
-    private function publicTemplateDecorator(): PublicTemplateDecorator
+    private function templateDecorator(): TemplateDecorator
     {
-        if (!$this->publicTemplateDecorator instanceof PublicTemplateDecorator) {
-            $this->publicTemplateDecorator = new PublicTemplateDecorator(
+        if (!$this->templateDecorator instanceof TemplateDecorator) {
+            $this->templateDecorator = new TemplateDecorator(
                 $this->context->config(),
                 $this->context->input(),
                 dirname(__DIR__, 4)
             );
         }
 
-        return $this->publicTemplateDecorator;
+        return $this->templateDecorator;
     }
 
     /**
      * Returns the shared public page-body renderer.
      *
-     * @return PublicPageBodyRenderer Shared public page-body renderer.
+     * @return PageBodyRenderer Shared public page-body renderer.
      */
-    private function pageBodyRenderer(): PublicPageBodyRenderer
+    private function pageBodyRenderer(): PageBodyRenderer
     {
-        if (!$this->pageBodyRenderer instanceof PublicPageBodyRenderer) {
-            $this->pageBodyRenderer = new PublicPageBodyRenderer(
+        if (!$this->pageBodyRenderer instanceof PageBodyRenderer) {
+            $this->pageBodyRenderer = new PageBodyRenderer(
                 dirname(__DIR__, 4),
                 $this->markdownRenderer()
             );

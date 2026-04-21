@@ -15,6 +15,7 @@ use Raven\Core\Config;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageRouteParser;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\View\Public\ThemeCatalogService;
 
 /**
  * Shared helpers for panel routing-preview derivations.
