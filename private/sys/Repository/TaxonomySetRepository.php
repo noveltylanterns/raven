@@ -1,10 +1,18 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/sys/Repository/TaxonomySetRepository.php
+ * Filesystem-backed category/tag taxonomy set repository.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Core\Repository;
 
 use Raven\Lib\Parser\SetParser;
+use Raven\Lib\Scribe\SetScribe;
 use RuntimeException;
 
 /**
@@ -14,6 +22,7 @@ final class TaxonomySetRepository
 {
     private string $taxonomyType;
     private SetParser $fileStore;
+    private SetScribe $fileScribe;
     /** @var array<int, array<string, mixed>>|null */
     private ?array $cache = null;
 
@@ -21,6 +30,7 @@ final class TaxonomySetRepository
     {
         $this->taxonomyType = strtolower(trim($taxonomyType));
         $this->fileStore = new SetParser($setDirectory, $this->taxonomyType);
+        $this->fileScribe = new SetScribe($setDirectory, $this->taxonomyType);
     }
 
     /**
@@ -32,7 +42,7 @@ final class TaxonomySetRepository
             return $this->cache;
         }
 
-        $this->fileStore->ensureRootRecord($this->rootRecord());
+        $this->fileScribe->ensureRootRecord($this->rootRecord());
 
         $rows = [];
         foreach ($this->fileStore->listSetFilePaths() as $path) {
@@ -150,7 +160,7 @@ final class TaxonomySetRepository
             'created_at' => $createdAt,
         ];
 
-        $this->fileStore->writeRecordById($setId, $record);
+        $this->fileScribe->writeRecordById($setId, $record);
         $this->cache = null;
         return $setId;
     }
@@ -161,7 +171,7 @@ final class TaxonomySetRepository
             throw new RuntimeException('The stock default set cannot be deleted.');
         }
 
-        $this->fileStore->deleteById($id);
+        $this->fileScribe->deleteById($id);
         $this->cache = null;
     }
 

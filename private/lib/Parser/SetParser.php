@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Parser/SetParser.php
- * Taxonomy set record normalization policy and filesystem persistence helpers.
+ * Taxonomy set record normalization policy and filesystem read helpers.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,14 +11,12 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Parser;
 
-use RuntimeException;
-
 /**
- * Combined normalization policy and filesystem store for taxonomy set records.
+ * Combined normalization policy and filesystem reader for taxonomy set records.
  *
  * Static methods carry shared constants and data-normalization rules; instance
- * methods handle reading and writing the PHP-file-backed set store on disk.
- * Consolidates the former TaxonomySetRecordPolicy and TaxonomySetFileStoreService.
+ * methods handle read-side loading of the PHP-file-backed set store on disk.
+ * Writes and storage-layout repair live in `Raven\Lib\Scribe\SetScribe`.
  */
 final class SetParser
 {
@@ -38,7 +36,7 @@ final class SetParser
     private string $taxonomyType;
 
     /**
-     * Prepares the store for a given set directory and taxonomy type.
+     * Prepares the reader for a given set directory and taxonomy type.
      *
      * @param string $setDirectory Absolute path to the directory containing set PHP files.
      * @param string $taxonomyType Taxonomy type label (e.g. 'category', 'tag'); used when generating default-set names.
@@ -203,37 +201,16 @@ final class SetParser
     }
 
     // -------------------------------------------------------------------------
-    // Instance filesystem store (formerly TaxonomySetFileStoreService)
+    // Instance filesystem reads
     // -------------------------------------------------------------------------
 
     /**
-     * Creates the set directory if it does not already exist.
-     *
-     * @throws RuntimeException When the directory cannot be created.
-     */
-    public function ensureDirectory(): void
-    {
-        if (is_dir($this->setDirectory)) {
-            return;
-        }
-
-        if (!@mkdir($this->setDirectory, 0775, true) && !is_dir($this->setDirectory)) {
-            throw new RuntimeException('Failed to initialize taxonomy set directory.');
-        }
-    }
-
-    /**
      * Returns a sorted list of all set file paths in the store directory.
-     *
-     * Normalizes the storage layout before listing so stale/renamed files are
-     * canonicalized first.
      *
      * @return array<int, string> Absolute file paths sorted by set id ascending.
      */
     public function listSetFilePaths(): array
     {
-        $this->ensureDirectory();
-        $this->normalizeStorageLayout();
         $paths = $this->rawSetFilePaths();
         usort($paths, static function (string $left, string $right): int {
             $leftId = self::filenameId($left);
@@ -346,62 +323,6 @@ final class SetParser
     }
 
     /**
-     * Atomically writes a set record to disk, removing any stale duplicate paths for the same id.
-     *
-     * @param int                  $id     Set id to write.
-     * @param array<string, mixed> $record Record data array to persist.
-     * @throws RuntimeException When the file cannot be written or renamed into place.
-     */
-    public function writeRecordById(int $id, array $record): void
-    {
-        $this->ensureDirectory();
-        $slug = $this->recordSlugFromRaw($record, $id, $id === self::DEFAULT_SET_ID ? self::DEFAULT_SET_SLUG : '');
-        $path = $this->pathForRecord($id, $slug);
-        $content = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export($record, true) . ";\n";
-
-        // Write to a temp file first so the final rename is atomic.
-        $tmpPath = $path . '.tmp';
-        if (file_put_contents($tmpPath, $content, LOCK_EX) === false) {
-            throw new RuntimeException('Failed to write taxonomy set file.');
-        }
-
-        if (!@rename($tmpPath, $path)) {
-            @unlink($tmpPath);
-            throw new RuntimeException('Failed to finalize taxonomy set file.');
-        }
-
-        $this->invalidatePhpFileCache($tmpPath);
-        $this->invalidatePhpFileCache($path);
-
-        // Remove any stale files that matched the same id but had a different path.
-        foreach ($this->candidatePathsForId($id) as $candidatePath) {
-            if ($candidatePath === $path || !is_file($candidatePath)) {
-                continue;
-            }
-
-            @unlink($candidatePath);
-            $this->invalidatePhpFileCache($candidatePath);
-        }
-    }
-
-    /**
-     * Deletes all set files on disk that belong to the given set id.
-     *
-     * @param int $id Set id whose files should be removed.
-     */
-    public function deleteById(int $id): void
-    {
-        foreach ($this->candidatePathsForId($id) as $path) {
-            if (!is_file($path)) {
-                continue;
-            }
-
-            @unlink($path);
-            $this->invalidatePhpFileCache($path);
-        }
-    }
-
-    /**
      * Returns the next available set id (one above the current maximum).
      *
      * @return int Next id that does not yet correspond to any stored set file.
@@ -419,40 +340,9 @@ final class SetParser
         return $maxId + 1;
     }
 
-    /**
-     * Ensures the default set record exists, writing it if absent or out of date.
-     *
-     * @param array<string, mixed> $rootRecord Canonical data for the default set.
-     */
-    public function ensureRootRecord(array $rootRecord): void
-    {
-        $this->normalizeStorageLayout();
-        $path = $this->pathForRecord(self::DEFAULT_SET_ID, self::DEFAULT_SET_SLUG);
-        $raw = $this->loadRawById(self::DEFAULT_SET_ID);
-        if (is_file($path) && $raw !== [] && !$this->defaultRecordNeedsRewrite($raw)) {
-            return;
-        }
-
-        $this->writeRecordById(self::DEFAULT_SET_ID, $rootRecord);
-    }
-
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
-
-    /**
-     * Returns whether the persisted default-set record differs from the expected canonical values.
-     *
-     * @param array<string, mixed> $raw Currently stored raw data for the default set.
-     * @return bool                    True when the record must be rewritten to match canonical values.
-     */
-    private function defaultRecordNeedsRewrite(array $raw): bool
-    {
-        return self::normalizeSetId($raw['id'] ?? null) !== self::DEFAULT_SET_ID
-            || trim((string) ($raw['name'] ?? '')) !== self::defaultSetName($this->taxonomyType)
-            || trim((string) ($raw['description'] ?? '')) !== self::defaultSetDescription($this->taxonomyType)
-            || self::normalizeSlug((string) ($raw['slug'] ?? '')) !== self::DEFAULT_SET_SLUG;
-    }
 
     /**
      * Returns all raw file paths in the set directory without sorting or normalization.
@@ -476,7 +366,6 @@ final class SetParser
      */
     private function candidatePathsForId(int $id): array
     {
-        $this->ensureDirectory();
         $normalizedId = max(0, $id);
         $paths = [];
 
@@ -518,7 +407,6 @@ final class SetParser
      */
     private function findPathBySlug(string $slug): ?string
     {
-        $this->ensureDirectory();
         $normalizedSlug = self::normalizeSlug($slug);
         if ($normalizedSlug === '') {
             return null;
@@ -542,49 +430,6 @@ final class SetParser
         }
 
         return null;
-    }
-
-    /**
-     * Ensures all stored set files use canonical filenames and canonical field values.
-     *
-     * Rewrites and renames any file whose stored id, slug, or default-set metadata
-     * differs from what the current policy expects.
-     */
-    private function normalizeStorageLayout(): void
-    {
-        foreach ($this->rawSetFilePaths() as $path) {
-            $raw = $this->loadRawByPath($path);
-            if ($raw === []) {
-                continue;
-            }
-
-            $recordId = $this->recordIdFromRaw($raw, $path);
-            if ($recordId === null) {
-                continue;
-            }
-
-            $recordSlug = $this->recordSlugFromRaw($raw, $recordId, basename($path, '.php'));
-            $canonical = $raw;
-            $canonical['id'] = $recordId;
-            $canonical['slug'] = $recordSlug;
-            if ($recordId === self::DEFAULT_SET_ID) {
-                $canonical['name'] = self::defaultSetName($this->taxonomyType);
-                $canonical['slug'] = self::DEFAULT_SET_SLUG;
-                $canonical['description'] = self::defaultSetDescription($this->taxonomyType);
-            }
-
-            $targetPath = $this->pathForRecord($recordId, (string) $canonical['slug']);
-            $needsRewrite = $path !== $targetPath || $canonical !== $raw;
-            if (!$needsRewrite) {
-                continue;
-            }
-
-            $this->writeRecordById($recordId, $canonical);
-            if ($path !== $targetPath && is_file($path)) {
-                @unlink($path);
-                $this->invalidatePhpFileCache($path);
-            }
-        }
     }
 
     /**
@@ -671,9 +516,10 @@ final class SetParser
     }
 
     /**
-     * Clears the PHP stat cache and OPcache entry for a file path.
+     * Clears the PHP stat cache and OPcache entry for a file path before a read.
      *
      * @param string $path Absolute path to invalidate.
+     * @return void
      */
     private function invalidatePhpFileCache(string $path): void
     {
@@ -687,4 +533,5 @@ final class SetParser
             @opcache_invalidate($normalized, true);
         }
     }
+
 }

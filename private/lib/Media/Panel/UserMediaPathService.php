@@ -1,17 +1,24 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Media/Panel/UserMediaPathService.php
+ * Resolves user-media storage paths and public URLs for avatar and cover images.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Media\Panel;
 
 /**
- * Resolves user-media storage paths and public URLs.
+ * Resolves user-media storage paths and public URLs for avatar and cover images.
  */
 final class UserMediaPathService
 {
     public function avatarStorageDirectory(string $projectRoot): string
     {
-        $directory = rtrim($projectRoot, '/\\') . '/public/uploads/user/avatar';
+        $directory = rtrim($projectRoot, '/\\') . '/public/uploads/avatars';
         if (!is_dir($directory)) {
             @mkdir($directory, 0775, true);
         }
@@ -54,8 +61,8 @@ final class UserMediaPathService
 
         return [
             'filename' => $avatarFilename,
-            'url' => '/uploads/user/avatar/' . rawurlencode($avatarFilename),
-            'thumb_url' => '/uploads/user/avatar/' . rawurlencode($avatarThumbFilename),
+            'url' => '/uploads/avatars/' . rawurlencode($avatarFilename),
+            'thumb_url' => '/uploads/avatars/' . rawurlencode($avatarThumbFilename),
         ];
     }
 

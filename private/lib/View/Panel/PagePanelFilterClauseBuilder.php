@@ -1,8 +1,15 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/View/Panel/PagePanelFilterClauseBuilder.php
+ * Panel page-list SQL-clause builder for repository filter queries.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\View;
+namespace Raven\Lib\View\Panel;
 
 /**
  * Shared SQL-clause builder for panel page-list query filters.
@@ -10,9 +17,20 @@ namespace Raven\Lib\View;
 final class PagePanelFilterClauseBuilder
 {
     /**
-     * @param array<int, string> $where
-     * @param array<string, int|string> $params
-     * @param callable(string): ?int $channelIdBySlug
+     * Appends panel page-list filter clauses and bindings to one query in progress.
+     *
+     * @param array<int, string> $where Mutable WHERE-clause fragment list.
+     * @param array<string, int|string> $params Mutable prepared-statement parameter map.
+     * @param string|null $channelSlug Optional channel slug filter from the panel UI.
+     * @param int|null $categoryId Optional category id filter from the panel UI.
+     * @param int|null $tagId Optional tag id filter from the panel UI.
+     * @param string $pageCategoriesTable Resolved page-category junction table name.
+     * @param string $pageTagsTable Resolved page-tag junction table name.
+     * @param callable(string): ?int $channelIdBySlug Resolver that maps one channel slug to its channel id.
+     * @param string $placeholderPrefix Prefix used to namespace generated SQL placeholders.
+     * @param bool $includeCategoryFilters Whether category filter clauses should be emitted.
+     * @param bool $includeTagFilters Whether tag filter clauses should be emitted.
+     * @return void
      */
     public function append(
         array &$where,

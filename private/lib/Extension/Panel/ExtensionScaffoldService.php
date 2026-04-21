@@ -1,17 +1,28 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Extension/Panel/ExtensionScaffoldService.php
+ * Shared extension scaffold generator for panel and CLI create workflows.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Extension\Panel;
 
 /**
- * Shared extension scaffold generator for panel create workflows.
+ * Shared extension scaffold generator for panel and CLI create workflows.
  */
 final class ExtensionScaffoldService
 {
     /**
      * Creates a minimal extension scaffold on disk.
      *
+     * Generates the manifest/bootstrap/template skeleton for one new extension
+     * so both panel and CLI creation flows follow the same file contract.
+     *
+     * @param string $extensionPath Absolute extension directory path to create.
      * @param array{
      *   directory: string,
      *   name: string,
@@ -21,7 +32,12 @@ final class ExtensionScaffoldService
      *   author: string,
      *   homepage: string,
      *   docs: string
-     * } $meta
+     * } $meta Extension scaffold metadata.
+     * @param bool $generateAgentsFile Whether to generate local agent-guidance files.
+     * @param bool $generateComposerFile Whether to generate a starter `composer.json`.
+     * @return void
+     *
+     * @throws \RuntimeException When one scaffold directory, file, or symlink cannot be created.
      */
     public function createSkeleton(
         string $extensionPath,
@@ -170,7 +186,10 @@ final class ExtensionScaffoldService
      *   author: string,
      *   homepage: string,
      *   docs: string
-     * } $meta
+     * } $meta Extension metadata used for the manifest.
+     * @return string JSON document ending with a trailing newline.
+     *
+     * @throws \RuntimeException When the manifest JSON cannot be encoded.
      */
     private function renderExtensionManifestJson(array $meta): string
     {

@@ -478,47 +478,21 @@ final class SystemController
         try {
             if ($cloneTheme !== '') {
                 $clonePath = $themesRoot . '/' . $cloneTheme;
-                $this->copyDirectoryRecursively($clonePath, $themePath);
-                $this->writePublicThemeManifest(
-                    $themePath . '/theme.json',
+                $this->themeCloneService()->copyDirectoryRecursively($clonePath, $themePath);
+                $this->themeScaffoldService()->finalizeClone(
+                    $themePath,
                     [
+                        'slug' => $themeSlug,
                         'name' => $themeName,
                         'is_child_theme' => $isChildTheme,
                         'parent_theme' => $isChildTheme ? $resolvedParentTheme : '',
-                    ]
+                    ],
+                    $generateAgentsFile,
+                    $generateComposerFile,
+                    $generatePackageFile
                 );
-
-                if ($generateAgentsFile) {
-                    $this->writePublicThemeAgentBundle(
-                        $themePath,
-                        [
-                            'slug' => $themeSlug,
-                            'name' => $themeName,
-                            'is_child_theme' => $isChildTheme,
-                            'parent_theme' => $isChildTheme ? $resolvedParentTheme : '',
-                        ]
-                    );
-                }
-                if ($generateComposerFile) {
-                    $this->writePublicThemeScaffoldFile(
-                        $themePath . '/composer.json',
-                        $this->publicThemeComposerFileContent([
-                            'slug' => $themeSlug,
-                            'name' => $themeName,
-                        ])
-                    );
-                }
-                if ($generatePackageFile) {
-                    $this->writePublicThemeScaffoldFile(
-                        $themePath . '/package.json',
-                        $this->publicThemePackageFileContent([
-                            'slug' => $themeSlug,
-                            'name' => $themeName,
-                        ])
-                    );
-                }
             } else {
-                $this->createPublicThemeSkeleton(
+                $this->themeScaffoldService()->createSkeleton(
                     $themePath,
                     [
                         'slug' => $themeSlug,
@@ -1244,7 +1218,7 @@ final class SystemController
         }
 
         try {
-            $this->createExtensionSkeleton(
+            $this->extensionScaffoldService()->createSkeleton(
                 $extensionPath,
                 [
                     'directory' => $extensionName,
@@ -1902,159 +1876,6 @@ final class SystemController
     }
 
     /**
-     * Creates one minimal public-theme scaffold.
-     *
-     * @param string $themePath Target theme directory path.
-     * @param array{
-     *   slug: string,
-     *   name: string,
-     *   is_child_theme: bool,
-     *   parent_theme: string
-     * } $meta Scaffold metadata.
-     * @param bool $generateAgentsFile Whether to generate a theme-local AGENTS file.
-     * @param bool $generateComposerFile Whether to generate a composer.json file.
-     * @param bool $generatePackageFile Whether to generate a package.json file.
-     * @return void
-     */
-    private function createPublicThemeSkeleton(
-        string $themePath,
-        array $meta,
-        bool $generateAgentsFile = false,
-        bool $generateComposerFile = false,
-        bool $generatePackageFile = false
-    ): void {
-        $this->themeScaffoldService()->createSkeleton(
-            $themePath,
-            $meta,
-            $generateAgentsFile,
-            $generateComposerFile,
-            $generatePackageFile
-        );
-    }
-
-    /**
-     * Returns generated theme-local AGENTS guidance content.
-     *
-     * @param array{
-     *   slug: string,
-     *   name: string,
-     *   is_child_theme?: bool,
-     *   parent_theme?: string
-     * } $meta Theme metadata.
-     * @return string Generated AGENTS file content.
-     */
-    private function publicThemeAgentsFileContent(array $meta): string
-    {
-        return $this->themeScaffoldService()->agentsFileContent($meta);
-    }
-
-    /**
-     * Writes theme-local agent guidance plus compatibility symlinks.
-     *
-     * @param string $themePath Absolute theme directory path.
-     * @param array{
-     *   slug: string,
-     *   name: string,
-     *   is_child_theme?: bool,
-     *   parent_theme?: string
-     * } $meta Theme metadata.
-     * @return void
-     */
-    private function writePublicThemeAgentBundle(string $themePath, array $meta): void
-    {
-        $this->themeScaffoldService()->writeAgentGuidanceBundle($themePath, $meta);
-    }
-
-    /**
-     * Returns generated composer.json content for one public-theme scaffold.
-     *
-     * @param array{
-     *   slug: string,
-     *   name: string
-     * } $meta Theme metadata.
-     * @return string Generated composer.json content.
-     */
-    private function publicThemeComposerFileContent(array $meta): string
-    {
-        return $this->themeScaffoldService()->composerFileContent($meta);
-    }
-
-    /**
-     * Returns generated package.json content for one public-theme scaffold.
-     *
-     * @param array{
-     *   slug: string,
-     *   name: string
-     * } $meta Theme metadata.
-     * @return string Generated package.json content.
-     */
-    private function publicThemePackageFileContent(array $meta): string
-    {
-        return $this->themeScaffoldService()->packageFileContent($meta);
-    }
-
-    /**
-     * Writes theme.json with normalized manifest payload.
-     *
-     * @param string $manifestPath Theme manifest path.
-     * @param array{
-     *   name: string,
-     *   is_child_theme: bool,
-     *   parent_theme: string
-     * } $manifest Theme manifest payload.
-     * @return void
-     */
-    private function writePublicThemeManifest(string $manifestPath, array $manifest): void
-    {
-        $payload = [
-            'name' => (string) $manifest['name'],
-            'is_child_theme' => (bool) $manifest['is_child_theme'],
-            'parent_theme' => (bool) $manifest['is_child_theme'] ? (string) $manifest['parent_theme'] : '',
-        ];
-
-        $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
-        if (!is_string($encoded)) {
-            throw new \RuntimeException('Failed to build theme manifest JSON.');
-        }
-
-        $this->writePublicThemeScaffoldFile($manifestPath, $encoded . "\n");
-    }
-
-    /**
-     * Writes one scaffold file for a public theme.
-     *
-     * @param string $targetPath Target file path.
-     * @param string $content File contents to write.
-     * @return void
-     */
-    private function writePublicThemeScaffoldFile(string $targetPath, string $content): void
-    {
-        $directory = dirname($targetPath);
-        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
-            throw new \RuntimeException('Failed to create directory: ' . $directory);
-        }
-
-        $written = file_put_contents($targetPath, $content, LOCK_EX);
-        if ($written === false) {
-            throw new \RuntimeException('Failed to write file: ' . $targetPath);
-        }
-
-        @chmod($targetPath, 0644);
-    }
-
-    /**
-     * Copies one directory tree recursively for local scaffold cloning.
-     *
-     * @param string $sourceDirectory Source directory path.
-     * @param string $targetDirectory Target directory path.
-     * @return void
-     */
-    private function copyDirectoryRecursively(string $sourceDirectory, string $targetDirectory): void
-    {
-        $this->themeCloneService()->copyDirectoryRecursively($sourceDirectory, $targetDirectory);
-    }
-
-    /**
      * Returns discoverable public themes from `public/theme/{slug}/theme.json`.
      *
      * @return array<string, string> Theme slug to display name map.
@@ -2348,38 +2169,6 @@ final class SystemController
     private function isSafeExtensionDirectoryName(string $name): bool
     {
         return $this->extensionCatalogService()->isSafeExtensionDirectoryName($name);
-    }
-
-    /**
-     * Creates a minimal extension scaffold on disk.
-     *
-     * @param string $extensionPath Target extension directory path.
-     * @param array{
-     *   directory: string,
-     *   name: string,
-     *   version: string,
-     *   description: string,
-     *   type: string,
-     *   author: string,
-     *   homepage: string,
-     *   docs: string
-     * } $meta Extension scaffold metadata.
-     * @param bool $generateAgentsFile Whether to generate a local AGENTS file.
-     * @param bool $generateComposerFile Whether to generate a composer.json file.
-     * @return void
-     */
-    private function createExtensionSkeleton(
-        string $extensionPath,
-        array $meta,
-        bool $generateAgentsFile = false,
-        bool $generateComposerFile = false
-    ): void {
-        $this->extensionScaffoldService()->createSkeleton(
-            $extensionPath,
-            $meta,
-            $generateAgentsFile,
-            $generateComposerFile
-        );
     }
 
     /**

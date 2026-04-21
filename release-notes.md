@@ -2,6 +2,10 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 21, 2026 — bug fix: avatar storage path
+
+- **Avatar storage and URL resolution now point to `uploads/avatars/`**: `AvatarUploadService` and `UserMediaPathService` were both writing to and reading from `public/uploads/user/avatar/`, which is the wrong canonical directory. Both services now use `public/uploads/avatars/` for storage paths and `/uploads/avatars/` for public URLs, matching the actual uploads layout on disk.
+
 ### April 21, 2026 — library refactor: lib/View/Public/ThemeBrace.php
 
 - **Public brace-tag rendering is now consolidated behind `lib/View/Public/ThemeBrace.php`**: the old `TemplateTagEngine`, `TemplateTagCompiler`, and `TemplateTagPathResolver` trio was collapsed into one canonical class that owns brace-tag compilation, cache publication, scoped path resolution, truthiness/comparison helpers, and loop iteration for public templates.
@@ -14,6 +18,11 @@
 - **The remaining public view-data helpers were renamed into the same contract**: `PublicTemplateDecorator` is now `ThemeTemplateDecorator`, `PublicMetaService` is now `ThemeMetaService`, and `PublicRouteRenderService` is now `ThemeRouteRenderService`; `SharedController`, `ContentController`, `FeedController`, and `ProfileController` now use the same `Theme*` naming across template lookup, metadata assembly, payload decoration, and unavailable-route placeholder payloads.
 - **`Theme*` naming is now reserved for the interchangeable public-theme system**: the ordinary public-view helpers were tightened back to directory-scoped primitive names, so `ThemeTemplateDecorator`, `ThemeMetaService`, `ThemeRouteRenderService`, and `PublicPageBodyRenderer` are now `TemplateDecorator`, `MetaService`, `RouteRenderService`, and `PageBodyRenderer`. The real theme stack is now `Theme`, `ThemeCatalogService`, `ThemeTemplate`, `ThemeBrace`, and the manifest/scaffold helpers.
 - **Shared themed-error fallback logic was merged into `lib/View/Error.php`**: the dedicated `ThemeFallbackRenderer` file was removed, and `Error` now resolves theme-chain template roots and renders through `ThemeBrace` directly for both public-route and panel-delegated themed error pages.
+- **Remaining panel-only page helpers were moved out of the shared `View/` root**: `PagePanelFilterClauseBuilder`, `PagePersistenceService`, and `PageTaxonomyAssignmentService` now live under `private/lib/View/Panel/`, and `PageRepository` imports them from the panel namespace. `PageTaxonomyQueryService` stays in the shared root because it still backs public taxonomy listings.
+- **The final `lib/View/` placement audit is now closed out**: `View/Panel/` is limited to panel-only UI/editor and page-write helpers, `View/Public/` is limited to public-route rendering plus the public theme system, and the root `View/` namespace is now just the shared cross-route surface (`Theme`, `Error`, `SiteContextBuilder`, `Pagination`, `BodyBlockPolicy`, `PageBodyBlockCodec`, `PageTaxonomyQueryService`, `FormCountries`).
+- **Parser vs. scribe ownership is tighter for filesystem-backed channel/set records**: `ChannelContextParser` and `SetParser` now stay on the read side (normalization, context hydration, canonical record loading), while new `ChannelScribe` and `SetScribe` own channel/set file writes, deletes, canonical filename repair, and stock-record persistence for the repositories.
+- **Theme scaffold generation is now centralized for both panel and CLI flows**: `ThemeScaffoldService` now owns both fresh-skeleton creation and clone-finalization metadata writes, `ThemeCloneService` remains the one recursive copy helper, the CLI `theme create` command now delegates to those services, and the leftover pass-through theme-scaffold helper methods were removed from `SystemController`.
+- **Extension scaffold creation now hangs directly off the shared scaffold service too**: `SystemController` no longer carries a pass-through extension-scaffold wrapper, the CLI uses an explicit `ExtensionScaffoldService` import instead of an inline FQCN, and `ExtensionScaffoldService` was documented as the shared panel/CLI extension scaffold writer.
 
 ### April 20, 2026 — library refactor: lib/View/Panel/ListWrapper.php
 

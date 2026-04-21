@@ -14,6 +14,7 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Parser\ChannelContextParser;
 use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Scribe\ChannelScribe;
 use RuntimeException;
 
 /**
@@ -25,7 +26,8 @@ final class ChannelRepository
     private string $driver;
     private string $prefix;
     private string $channelDirectory;
-    private ChannelContextParser $channelFileStoreService;
+    private ChannelContextParser $channelFileParser;
+    private ChannelScribe $channelFileScribe;
     /** @var array<int, array<string, mixed>>|null */
     private ?array $channelsCache = null;
 
@@ -35,7 +37,8 @@ final class ChannelRepository
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->channelDirectory = $channelDirectory ?? (dirname(__DIR__, 3) . '/dat/channel');
-        $this->channelFileStoreService = new ChannelContextParser($this->channelDirectory);
+        $this->channelFileParser = new ChannelContextParser($this->channelDirectory);
+        $this->channelFileScribe = new ChannelScribe($this->channelDirectory);
     }
 
     /**
@@ -82,14 +85,15 @@ final class ChannelRepository
         }
 
         $this->ensureRootChannelRecord();
-        $paths = $this->channelFileStoreService->listChannelFilePaths();
+        $this->channelFileScribe->normalizeStorageLayout();
+        $paths = $this->channelFileParser->listChannelFilePaths();
         $records = [];
         $usedIds = [];
         $maxId = 0;
         $pendingRecords = [];
 
         foreach ($paths as $path) {
-            $record = $this->channelFileStoreService->loadRecordFromPath($path);
+            $record = $this->channelFileParser->loadRecordFromPath($path);
             if ($record === null) {
                 continue;
             }
@@ -370,7 +374,7 @@ final class ChannelRepository
             ? (int) ($existingRecord['id'] ?? 0)
             : $this->nextChannelId();
 
-        $currentRaw = $oldSlug !== '' ? $this->channelFileStoreService->loadRawBySlug($oldSlug) : [];
+        $currentRaw = $oldSlug !== '' ? $this->channelFileParser->loadRawBySlug($oldSlug) : [];
         $customFields = is_array($currentRaw['custom_fields'] ?? null) ? $currentRaw['custom_fields'] : [];
         $overrides = is_array($currentRaw['overrides'] ?? null) ? $currentRaw['overrides'] : [];
         $feedEnabled = array_key_exists('feed_enabled', $data)
@@ -411,7 +415,7 @@ final class ChannelRepository
             'created_at' => $createdAt,
         ];
 
-        $this->channelFileStoreService->writeRecordById($channelId, $slug, $record);
+        $this->channelFileScribe->writeRecordById($channelId, $slug, $record);
 
         $this->channelsCache = null;
         return $channelId;
@@ -458,7 +462,7 @@ final class ChannelRepository
             throw new RuntimeException('Channel slug is invalid.');
         }
 
-        $currentRaw = $this->channelFileStoreService->loadRawBySlug($slug);
+        $currentRaw = $this->channelFileParser->loadRawBySlug($slug);
         $raw = [
             'id' => (int) ($record['id'] ?? $id),
             'name' => (string) ($record['name'] ?? ''),
@@ -493,7 +497,7 @@ final class ChannelRepository
                 : gmdate('Y-m-d H:i:s'),
         ];
 
-        $this->channelFileStoreService->writeRecordById((int) ($record['id'] ?? $id), $slug, $raw);
+        $this->channelFileScribe->writeRecordById((int) ($record['id'] ?? $id), $slug, $raw);
         $this->channelsCache = null;
     }
 
@@ -546,7 +550,7 @@ final class ChannelRepository
             throw $exception;
         }
 
-        $this->channelFileStoreService->deleteById($id);
+        $this->channelFileScribe->deleteById($id);
 
         $this->channelsCache = null;
     }
@@ -633,7 +637,7 @@ final class ChannelRepository
 
     private function ensureRootChannelRecord(): void
     {
-        $raw = $this->channelFileStoreService->loadRawBySlug(ChannelContextParser::ROOT_CHANNEL_SLUG);
+        $raw = $this->channelFileParser->loadRawBySlug(ChannelContextParser::ROOT_CHANNEL_SLUG);
         $createdAt = trim((string) ($raw['created_at'] ?? ''));
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
@@ -666,7 +670,7 @@ final class ChannelRepository
         ];
 
         if ($raw === [] || $this->rootRecordNeedsRewrite($raw)) {
-            $this->channelFileStoreService->writeRecordById(
+            $this->channelFileScribe->writeRecordById(
                 ChannelContextParser::ROOT_CHANNEL_ID,
                 ChannelContextParser::ROOT_CHANNEL_SLUG,
                 $record
@@ -693,7 +697,7 @@ final class ChannelRepository
     private function persistChannelId(string $slug, int $id): void
     {
         try {
-            $this->channelFileStoreService->persistChannelId($slug, $id);
+            $this->channelFileScribe->persistChannelId($slug, $id);
         } catch (\Throwable) {
             // Keep repository reads resilient even when id backfill cannot be persisted.
         }

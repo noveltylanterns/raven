@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Media/Panel/AvatarUploadService.php
+ * Sanitizes avatar uploads and generates deterministic thumbnail derivatives.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Media\Panel;
@@ -91,7 +98,7 @@ final class AvatarUploadService
 
     public function storageDirectory(string $projectRoot): string
     {
-        $avatarsDir = rtrim($projectRoot, '/\\') . '/public/uploads/user/avatar';
+        $avatarsDir = rtrim($projectRoot, '/\\') . '/public/uploads/avatars';
         if (!is_dir($avatarsDir)) {
             @mkdir($avatarsDir, 0775, true);
         }
@@ -143,7 +150,7 @@ final class AvatarUploadService
         }
 
         $directories = [
-            rtrim($projectRoot, '/\\') . '/public/uploads/user/avatar',
+            rtrim($projectRoot, '/\\') . '/public/uploads/avatars',
         ];
 
         foreach ($directories as $avatarsDir) {

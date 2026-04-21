@@ -143,6 +143,54 @@ final class ThemeScaffoldService
     }
 
     /**
+     * Refreshes metadata-owned files after cloning an existing theme tree.
+     *
+     * Clone workflows preserve copied templates/assets, then rewrite the files
+     * that declare the new theme identity so the clone no longer advertises the
+     * source theme's manifest/name metadata.
+     *
+     * @param string $themePath Absolute destination theme directory.
+     * @param array{
+     *   slug: string,
+     *   name: string,
+     *   is_child_theme: bool,
+     *   parent_theme: string
+     * } $meta Theme manifest metadata for the cloned theme.
+     * @param bool $generateAgentsFile Whether to generate local agent-guidance files.
+     * @param bool $generateComposerFile Whether to generate a starter `composer.json`.
+     * @param bool $generatePackageFile Whether to generate a starter `package.json`.
+     * @return void
+     *
+     * @throws \RuntimeException When one metadata-owned file cannot be created.
+     */
+    public function finalizeClone(
+        string $themePath,
+        array $meta,
+        bool $generateAgentsFile = false,
+        bool $generateComposerFile = false,
+        bool $generatePackageFile = false
+    ): void {
+        $this->writeThemeManifest(
+            $themePath . '/theme.json',
+            [
+                'name' => $meta['name'],
+                'is_child_theme' => $meta['is_child_theme'],
+                'parent_theme' => $meta['is_child_theme'] ? $meta['parent_theme'] : '',
+            ]
+        );
+
+        if ($generateAgentsFile) {
+            $this->writeAgentGuidanceBundle($themePath, $meta);
+        }
+        if ($generateComposerFile) {
+            $this->writeScaffoldFile($themePath . '/composer.json', $this->composerFileContent($meta));
+        }
+        if ($generatePackageFile) {
+            $this->writeScaffoldFile($themePath . '/package.json', $this->packageFileContent($meta));
+        }
+    }
+
+    /**
      * Builds the canonical local agent-guidance file content for one theme.
      *
      * @param array{
@@ -305,6 +353,15 @@ final class ThemeScaffoldService
         $this->writeScaffoldFile($manifestPath, $encoded . "\n");
     }
 
+    /**
+     * Writes one scaffold-owned file to disk, creating parent directories as needed.
+     *
+     * @param string $targetPath Target file path.
+     * @param string $content File contents to write.
+     * @return void
+     *
+     * @throws \RuntimeException When the parent directory or file cannot be created.
+     */
     private function writeScaffoldFile(string $targetPath, string $content): void
     {
         $directory = dirname($targetPath);

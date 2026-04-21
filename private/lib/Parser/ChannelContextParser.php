@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Parser/ChannelContextParser.php
- * Channel record normalization policy, context hydration helpers, and filesystem persistence.
+ * Channel record normalization policy, context hydration helpers, and filesystem read helpers.
  * Docs: https://raven.lanterns.io
  */
 
@@ -14,11 +14,11 @@ namespace Raven\Lib\Parser;
 use RuntimeException;
 
 /**
- * Combined normalization policy, context hydration, and filesystem store for channel records.
+ * Combined normalization policy, context hydration, and filesystem reader for channel records.
  *
  * Static methods carry shared constants, normalization rules, and context-hydration helpers.
- * Instance methods handle reading and writing the PHP-file-backed channel store on disk.
- * Consolidates the former ChannelRecordPolicy, ChannelContextService, and ChannelFileStoreService.
+ * Instance methods handle read-side loading of the PHP-file-backed channel store on disk.
+ * Writes and storage-layout repair live in `Raven\Lib\Scribe\ChannelScribe`.
  */
 final class ChannelContextParser
 {
@@ -35,7 +35,7 @@ final class ChannelContextParser
     private string $channelDirectory;
 
     /**
-     * Prepares the store for a given channel directory.
+     * Prepares the reader for a given channel directory.
      *
      * @param string $channelDirectory Absolute path to the directory containing channel PHP files.
      */
@@ -291,21 +291,16 @@ final class ChannelContextParser
     }
 
     // -------------------------------------------------------------------------
-    // Instance filesystem store (formerly ChannelFileStoreService)
+    // Instance filesystem reads
     // -------------------------------------------------------------------------
 
     /**
      * Returns a sorted list of all channel file paths in the store directory.
      *
-     * Normalizes the storage layout before listing so stale/renamed files are
-     * canonicalized first.
-     *
      * @return array<int, string> Absolute file paths sorted by channel id ascending.
      */
     public function listChannelFilePaths(): array
     {
-        $this->ensureDirectory();
-        $this->normalizeStorageLayout();
         $paths = $this->rawChannelFilePaths();
         usort($paths, static function (string $left, string $right): int {
             $leftId = self::filenameId($left);
@@ -318,22 +313,6 @@ final class ChannelContextParser
         });
 
         return $paths;
-    }
-
-    /**
-     * Creates the channel directory if it does not already exist.
-     *
-     * @throws RuntimeException When the directory cannot be created.
-     */
-    public function ensureDirectory(): void
-    {
-        if (is_dir($this->channelDirectory)) {
-            return;
-        }
-
-        if (!@mkdir($this->channelDirectory, 0775, true) && !is_dir($this->channelDirectory)) {
-            throw new RuntimeException('Failed to initialize channel directory.');
-        }
     }
 
     /**
@@ -434,89 +413,6 @@ final class ChannelContextParser
         return $this->canonicalizeRecord($channelId, $slug, $raw);
     }
 
-    /**
-     * Atomically writes a channel record to disk, removing any stale duplicate paths for the same id.
-     *
-     * @param int                  $id     Channel id to write.
-     * @param string               $slug   Slug for the canonical filename.
-     * @param array<string, mixed> $record Record data array to persist.
-     * @throws RuntimeException When the file cannot be written or renamed into place.
-     */
-    public function writeRecordById(int $id, string $slug, array $record): void
-    {
-        $this->ensureDirectory();
-        $canonical = $this->canonicalizeRecord($id, $slug, $record);
-        $path = $this->pathForRecord((int) $canonical['id'], (string) $canonical['slug']);
-        $content = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export($canonical, true) . ";\n";
-
-        // Write to a temp file first so the final rename is atomic.
-        $tmpPath = $path . '.tmp';
-        if (file_put_contents($tmpPath, $content, LOCK_EX) === false) {
-            throw new RuntimeException('Failed to write channel file.');
-        }
-
-        if (!@rename($tmpPath, $path)) {
-            @unlink($tmpPath);
-            throw new RuntimeException('Failed to finalize channel file.');
-        }
-
-        $this->invalidatePhpFileCache($tmpPath);
-        $this->invalidatePhpFileCache($path);
-
-        // Remove any stale files that matched the same id but had a different path.
-        foreach ($this->candidatePathsForId((int) $canonical['id']) as $candidatePath) {
-            if ($candidatePath === $path || !is_file($candidatePath)) {
-                continue;
-            }
-
-            @unlink($candidatePath);
-            $this->invalidatePhpFileCache($candidatePath);
-        }
-    }
-
-    /**
-     * Deletes all channel files on disk that belong to the given channel id.
-     *
-     * @param int $id Channel id whose files should be removed.
-     * @throws RuntimeException When a matched file exists but cannot be deleted.
-     */
-    public function deleteById(int $id): void
-    {
-        foreach ($this->candidatePathsForId($id) as $path) {
-            if (!is_file($path)) {
-                continue;
-            }
-
-            if (!@unlink($path)) {
-                throw new RuntimeException('Failed to delete channel file.');
-            }
-            $this->invalidatePhpFileCache($path);
-        }
-    }
-
-    /**
-     * Re-persists a channel file under the correct canonical path after an id change.
-     *
-     * Used during channel-id assignment to rename the file from its temporary slug-only
-     * path to the correct id-prefixed canonical path.
-     *
-     * @param string $slug Channel slug to locate the existing file.
-     * @param int    $id   New channel id to assign.
-     */
-    public function persistChannelId(string $slug, int $id): void
-    {
-        if ($id < self::ROOT_CHANNEL_ID || trim($slug) === '') {
-            return;
-        }
-
-        $raw = $this->loadRawBySlug($slug);
-        if ($raw === []) {
-            return;
-        }
-
-        $this->writeRecordById($id, $slug, $raw);
-    }
-
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
@@ -543,7 +439,6 @@ final class ChannelContextParser
      */
     private function candidatePathsForId(int $id): array
     {
-        $this->ensureDirectory();
         $normalizedId = max(self::ROOT_CHANNEL_ID, $id);
         $paths = [];
 
@@ -585,7 +480,6 @@ final class ChannelContextParser
      */
     private function findPathBySlug(string $slug): ?string
     {
-        $this->ensureDirectory();
         $normalizedSlug = strtolower(trim($slug));
         if (!self::isValidSlug($normalizedSlug)) {
             return null;
@@ -608,40 +502,6 @@ final class ChannelContextParser
         }
 
         return null;
-    }
-
-    /**
-     * Ensures all stored channel files use canonical filenames and canonical field values.
-     *
-     * Rewrites and renames any file whose stored id, slug, or field values differ from
-     * what the current policy expects.
-     */
-    private function normalizeStorageLayout(): void
-    {
-        foreach ($this->rawChannelFilePaths() as $path) {
-            $raw = $this->loadRawByPath($path);
-            if ($raw === []) {
-                continue;
-            }
-
-            $channelId = $this->recordIdFromRaw($raw, $path);
-            if ($channelId === null) {
-                continue;
-            }
-
-            $slug = $this->recordSlugFromRaw($raw, $channelId, basename($path, '.php'));
-            $canonical = $this->canonicalizeRecord($channelId, $slug, $raw);
-            $targetPath = $this->pathForRecord((int) $canonical['id'], (string) $canonical['slug']);
-            if ($path === $targetPath && $canonical === $raw) {
-                continue;
-            }
-
-            $this->writeRecordById((int) $canonical['id'], (string) $canonical['slug'], $canonical);
-            if ($path !== $targetPath && is_file($path)) {
-                @unlink($path);
-                $this->invalidatePhpFileCache($path);
-            }
-        }
     }
 
     /**
@@ -801,9 +661,10 @@ final class ChannelContextParser
     }
 
     /**
-     * Clears the PHP stat cache and OPcache entry for a file path.
+     * Clears the PHP stat cache and OPcache entry for a file path before a read.
      *
      * @param string $path Absolute path to invalidate.
+     * @return void
      */
     private function invalidatePhpFileCache(string $path): void
     {
@@ -817,4 +678,5 @@ final class ChannelContextParser
             @opcache_invalidate($normalized, true);
         }
     }
+
 }

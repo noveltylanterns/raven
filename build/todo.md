@@ -21,11 +21,22 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 		- [x] Canonical `UserParser`, `CategoryParser`, `TagParser`, `PageParser`, and `RedirectParser` exist and all panel/public/CLI reads go through the parser layer. `lib/Directory/` is fully deleted.
 	- [x] `RouteParser` was dead code — `routeConfigService()` on `SharedController` was never called; the live APIs are `channelParser()`, `feedParser()`, `groupParser()`. Removed `RouteParser.php`, dropped the property/method/import from `SharedController`.
 	- [x] `ModeParser` → `RouteParser`: page URL resolution/building (`normalizeSlugForLookup`, `parseDateSlugSegment`, `normalizePageIdForLookup`, `resolveLookupTarget`, `buildRouteSegment`, `datePrefix`, private helpers) moved to `PageParser`; remaining routing policy predicates and separator helpers (`normalizeChannelRouteMode`, `normalizeRouteMode`, `usesPageId`, separator trio) renamed to `RouteParser` — 347 → 110 lines. All callers updated.
-	- [x] ~~Merge `ChannelContextParser` into `ChannelParser`~~ — cancelled. The two classes have genuinely different responsibilities: `ChannelParser` reads channel route-config and repo-backed records; `ChannelContextParser` owns normalization policy, context hydration, and the PHP-file-backed channel store (used heavily by repositories). Different instance deps, different callers. Merging would create a 1000-line class mixing filesystem I/O, DB reads, and config parsing.
+	- [x] ~~Merge `ChannelContextParser` into `ChannelParser`~~ — cancelled. The two classes have genuinely different responsibilities: `ChannelParser` reads channel route-config and repo-backed records; `ChannelContextParser` owns normalization policy, context hydration, and read-side channel-file loading, while `ChannelScribe` now owns the write/delete/repair path. Different instance deps, different callers. Merging would create a 1000-line class mixing filesystem I/O, DB reads, and config parsing.
 	- [x] Rename SetContext.php to Set.php — done as `Parser/SetParser.php`; `Directory/SetContext.php` alias deleted.
 	- [x] Nothing in Directory/ should be serving views/templates. `lib/Directory/` is deleted; all primitives live in `lib/Parser/`.
 	- [ ] Directory/ handlers should be able to find, read & interpret every repository & table column for each data type.
 	- [ ] All Directory/ handlers should be read-only. For write functions, keep a parallel set of files in lib/Scribe/. Again, Scribe/ handlers should be able to write to just about every attribute of each data type.
+		- [x] Channel/set filesystem writes were extracted out of `ChannelContextParser` and `SetParser` into `lib/Scribe/ChannelScribe.php` and `lib/Scribe/SetScribe.php`; the repositories now call scribes for write/delete/repair while the parser classes stay read-side.
+		- [x] Extension/theme scaffold creation now routes through canonical library services instead of controller/CLI-local helpers: `ExtensionScaffoldService`, `ThemeScaffoldService`, and `ThemeCloneService` own the live scaffold/clone file writes.
+		- [ ] Next parser-coverage follow-up batch for channel-backed read flows:
+			- [ ] Expand `ChannelDataParser` to cover the remaining live read-only repository calls that still bypass the parser surface (`listOptions()`, `slugExists()`, and any stable count/lookups we want to treat as canonical reads).
+			- [ ] Add one public-runtime channel-parser seam in `PublicRuntimeBuilder` so split public controllers can depend on `ChannelDataParser` for reads without each controller instantiating its own parser.
+			- [ ] Rewire `Public/ContentController` channel-read lookups (`findBySlug()` in channel/page route resolution) to use `ChannelDataParser` instead of direct `ChannelRepository` reads.
+			- [ ] Rewire `Public/FeedController` channel-read lookups (`findBySlug()` in feed/channel label resolution) to use `ChannelDataParser` instead of direct `ChannelRepository` reads.
+			- [ ] Rewire `Panel/RedirectController` channel existence validation to use parser-owned read helpers instead of `ChannelRepository::slugExists()`.
+			- [ ] Rewire `Panel/ContentController` channel option loading for the page editor to use parser-owned read helpers instead of `ChannelRepository::listOptions()`.
+			- [ ] Decide whether taxonomy-set assignment counts (`countExplicitTaxonomySetAssignments()`) belong on the parser read surface or should stay repository-only until the broader channel write/read split is finished; then update `Panel/TaxonomyController` accordingly.
+			- [ ] After the core controller/runtime rewires are done, audit debug/profiling utilities (`debug/util/profile-panel-lists.php`, `debug/util/profile-public-pages.php`) and any remaining CLI read flows so they follow the same parser-vs-repo rule instead of preserving legacy direct reads by accident.
 	- [ ] Will the CLI perform better using Directory/Scribe classes, or by directly calling repos like currently? Find out, and orient the CLI around the faster-performing option. Same deal with our panel list & editor routes: Test both options for speed, and align.
 - [x] Split all content-type parsers into `*RouteParser` / `*DataParser` paired classes so the contract is clear from the name alone. Approx 70-file rename across `lib/`, `sys/`, `tpl/`, and `bin/`. Execute in order:
 	#### New files — extract methods from existing classes
@@ -50,16 +61,20 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	#### Not touched — no route/data split applies
 	- `ConfigParser` — config-key parsing utilities, not a content-type parser
 	- `PanelParser` — panel-specific URL/permission helpers
-	- `SetParser` — taxonomy set selection normalization
-	- `ChannelContextParser` — channel context hydration and normalization policy; distinct from repo reads
-- [ ] lib/View/ is a mess. Each class+function needs to be resorted:
-	- [ ] Panel-only elements (such as the Editor classes) go in lib/View/Panel/
-	- [ ] Public-only elements (such as classes for Public-route themes) go in lib/View/Public/
-	- [ ] Shared-route elements (such as Pagination) go in lib/View/
+	- `SetParser` — taxonomy set selection normalization plus read-side set-file loading
+	- `ChannelContextParser` — channel context hydration, normalization policy, and read-side channel-file loading; distinct from repo reads
+- [x] lib/View/ is a mess. Each class+function needs to be resorted:
+	- [x] Panel-only elements (such as the Editor classes) go in lib/View/Panel/
+		- [x] Page repository's panel-only list/write helpers were moved under `View/Panel/`: `PagePanelFilterClauseBuilder`, `PagePersistenceService`, and `PageTaxonomyAssignmentService` now live beside the rest of the panel-only content helpers instead of the shared `View/` root.
+	- [x] Public-only elements (such as classes for Public-route themes) go in lib/View/Public/
+		- [x] Final audit: the remaining `View/Public/` surface is now limited to public-route render/runtime helpers (`MarkdownRenderer`, `PageBodyRenderer`, `TemplateDecorator`, `MetaService`, `RouteRenderService`) plus the public theme system (`ThemeBrace`, `ThemeCatalogService`, `ThemeManifestValidator`, `ThemeCloneService`, `ThemeScaffoldService`, `ThemeTemplate`).
+	- [x] Shared-route elements (such as Pagination) go in lib/View/
+		- [x] Final audit: the root `View/` surface is now limited to genuinely shared helpers (`Theme`, `Error`, `SiteContextBuilder`, `Pagination`, `BodyBlockPolicy`, `PageBodyBlockCodec`, `PageTaxonomyQueryService`, and `FormCountries`).
 	- [x] All {} brace-tag functions should be consolidated to a single lib/View/Public/ThemeBrace.php class
 		- [x] `TemplateTagEngine`, `TemplateTagCompiler`, and `TemplateTagPathResolver` were collapsed into canonical `View/Public/ThemeBrace.php`; public renderers/controllers now depend on that single class and the three old helper files are deleted.
 		- [x] Public-theme catalog/manifest helpers moved out of `View/Panel/`: `ThemeCatalogService` and `ThemeManifestValidator` now live in `View/Public/` and the panel/public controllers import them from the public-theme namespace.
 		- [x] Public-theme scaffold helpers moved out of `View/Panel/`: `ThemeCloneService` and `ThemeScaffoldService` now live in `View/Public/`; `SystemController` imports the public-theme scaffold stack from the public namespace.
+		- [x] Theme scaffold creation/clone finalization is now centralized behind `ThemeScaffoldService` and `ThemeCloneService` for both panel and CLI flows; the CLI-local scaffold generator and the panel controller's pass-through helper methods were removed.
 		- [x] Shared public-theme discovery/options/inheritance helpers were consolidated into canonical `View/Theme.php`; panel controllers, CLI theme commands, and public-theme services now call the same shared theme surface instead of `ThemeRegistry`, `ThemeDiscoveryService`, and `ThemeInheritanceResolver`.
 		- [x] Public template lookup/render orchestration was collapsed into canonical `View/Public/ThemeTemplate.php`; `ThemeTemplateResolver` and `ThemeTemplatePipeline` were merged and deleted.
 		- [x] Naming direction tightened: reserve `Theme*` for the interchangeable public-theme system (`Theme`, `ThemeCatalogService`, `ThemeTemplate`, `ThemeBrace`, etc). Ordinary public-view helpers now use directory-scoped primitive names instead: `TemplateDecorator`, `MetaService`, `RouteRenderService`, and `PageBodyRenderer`.
@@ -106,7 +121,7 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 
 
 ### Bugs & Tweaks
-- [ ] User preferences & avatar template display trying to use uploads/user/avatar/ instead of uploads/avatars/
+- [x] User preferences & avatar template display trying to use uploads/user/avatar/ instead of uploads/avatars/
 - [x] PHP Info extension doesnt load: "Extension view template is missing."
 	- [x] Fixed root cause in `private/ext/phpinfo/routes_panel.php`: the extension was resolving `dirname(__DIR__)` and looking for `private/ext/tpl/panel_index.php` instead of its own `private/ext/phpinfo/tpl/panel_index.php`.
 

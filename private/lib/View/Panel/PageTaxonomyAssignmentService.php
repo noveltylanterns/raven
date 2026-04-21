@@ -1,8 +1,15 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/View/Panel/PageTaxonomyAssignmentService.php
+ * Panel page taxonomy assignment writer for categories and tags.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\View;
+namespace Raven\Lib\View\Panel;
 
 use PDO;
 use Raven\Lib\Database\SqlUpsertPolicy;
@@ -14,6 +21,10 @@ final class PageTaxonomyAssignmentService
 {
     private SqlUpsertPolicy $upsertPolicy;
 
+    /**
+     * @param SqlUpsertPolicy|null $upsertPolicy Optional SQL upsert policy override for tests or alternate drivers.
+     * @return void
+     */
     public function __construct(?SqlUpsertPolicy $upsertPolicy = null)
     {
         $this->upsertPolicy = $upsertPolicy ?? new SqlUpsertPolicy();
@@ -21,6 +32,7 @@ final class PageTaxonomyAssignmentService
 
     /**
      * @param array<int> $categoryIds
+     * @return void
      */
     public function replacePageCategories(PDO $db, string $driver, string $pageCategoriesTable, int $pageId, array $categoryIds): void
     {
@@ -29,6 +41,7 @@ final class PageTaxonomyAssignmentService
 
     /**
      * @param array<int> $tagIds
+     * @return void
      */
     public function replacePageTags(PDO $db, string $driver, string $pageTagsTable, int $pageId, array $tagIds): void
     {
@@ -37,6 +50,7 @@ final class PageTaxonomyAssignmentService
 
     /**
      * @param array<int> $ids
+     * @return void
      */
     private function replaceAssignments(
         PDO $db,
@@ -51,6 +65,8 @@ final class PageTaxonomyAssignmentService
         );
         $delete->execute([':page' => $pageId]);
 
+        // A full replace keeps panel saves deterministic: the stored taxonomy
+        // set always mirrors the last submitted checkbox state exactly.
         if ($ids === []) {
             return;
         }

@@ -1,8 +1,15 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/View/Panel/PagePersistenceService.php
+ * Panel page save/delete transaction helpers for page repository writes.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\View;
+namespace Raven\Lib\View\Panel;
 
 use PDO;
 
@@ -28,8 +35,12 @@ final class PagePersistenceService
      *   category_ids: array<int>,
      *   tag_ids: array<int>
      * } $payload
+     * @param bool $categoryEnabled Whether category relations are enabled in config.
+     * @param bool $tagEnabled Whether tag relations are enabled in config.
      * @param callable(int, array<int>): void $replacePageCategories
      * @param callable(int, array<int>): void $replacePageTags
+     * @return int Saved page id.
+     * @throws \Throwable Re-throws database or taxonomy-write failures after rollback.
      */
     public function savePage(
         PDO $db,
@@ -114,6 +125,21 @@ final class PagePersistenceService
         }
     }
 
+    /**
+     * Deletes one page and its related taxonomy/image rows in a single transaction.
+     *
+     * @param PDO $db Live repository database handle.
+     * @param string $pagesTable Resolved pages table name.
+     * @param string $pageCategoriesTable Resolved page-category junction table name.
+     * @param string $pageTagsTable Resolved page-tag junction table name.
+     * @param string $pageImagesTable Resolved page-images table name.
+     * @param string $pageImageVariantsTable Resolved page-image-variants table name.
+     * @param int $id Page id to delete.
+     * @param bool $categoryEnabled Whether category relations are enabled in config.
+     * @param bool $tagEnabled Whether tag relations are enabled in config.
+     * @return void
+     * @throws \Throwable Re-throws database failures after rollback.
+     */
     public function deletePageById(
         PDO $db,
         string $pagesTable,
@@ -128,6 +154,8 @@ final class PagePersistenceService
         $db->beginTransaction();
 
         try {
+            // Delete taxonomy links before removing the page so junction rows
+            // never outlive the content row when one statement fails mid-flight.
             $pageIdParams = [':page' => $id];
 
             foreach ([[$categoryEnabled, $pageCategoriesTable], [$tagEnabled, $pageTagsTable]] as [$enabled, $table]) {
@@ -141,6 +169,8 @@ final class PagePersistenceService
                 $detachTaxonomy->execute($pageIdParams);
             }
 
+            // Variants hang off image ids, so they must be removed before the
+            // owning image rows to keep the transaction FK-safe across drivers.
             $detachImageVariants = $db->prepare(
                 'DELETE FROM ' . $pageImageVariantsTable . '
                  WHERE image IN (
@@ -154,6 +184,8 @@ final class PagePersistenceService
             );
             $detachImages->execute($pageIdParams);
 
+            // The page row is deleted last so every related cleanup step can
+            // still address the owning page id inside the same transaction.
             $delete = $db->prepare('DELETE FROM ' . $pagesTable . ' WHERE id = :id');
             $delete->execute([':id' => $id]);
 

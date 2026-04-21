@@ -18,6 +18,7 @@ use Raven\Core\Repository\TagRepository;
 use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
 use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Parser\CategoryDataParser;
 use Raven\Lib\Parser\ChannelDataParser;
@@ -29,6 +30,8 @@ use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Theme;
+use Raven\Lib\View\Public\ThemeCloneService;
+use Raven\Lib\View\Public\ThemeScaffoldService;
 
 require_once dirname(__DIR__) . '/Archive/Package.php';
 require_once dirname(__DIR__) . '/Archive/Install.php';
@@ -2352,7 +2355,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
             }
 
             try {
-                $scaffold = new \Raven\Lib\Extension\Panel\ExtensionScaffoldService();
+                $scaffold = new ExtensionScaffoldService();
                 $scaffold->createSkeleton($path, [
                     'directory' => $slug,
                     'name' => $name,
@@ -2432,114 +2435,6 @@ function raven_cli_theme_is_stock_slug(string $slug): bool
     return in_array($normalized, ['raven'], true);
 }
 
-/**
- * @param array{
- *   slug: string,
- *   name: string,
- *   is_child_theme: bool,
- *   parent_theme: string
- * } $meta
- * @return array<string, string>
- */
-function raven_cli_theme_scaffold_files(array $meta): array
-{
-    $manifest = [
-        'name' => $meta['name'],
-        'is_child_theme' => $meta['is_child_theme'],
-        'parent_theme' => $meta['is_child_theme'] ? $meta['parent_theme'] : '',
-    ];
-
-    $manifestJson = json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
-    if (!is_string($manifestJson)) {
-        throw new RuntimeException('Failed to encode theme.json payload.');
-    }
-
-    $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
-    $slug = $meta['slug'];
-
-    $wrapper = "<?php\n\n"
-        . "/**\n"
-        . " * RAVEN CMS\n"
-        . " * ~/public/theme/" . $slug . "/tpl/wrapper.php\n"
-        . " * " . $nameForDoc . " theme wrapper template.\n"
-        . " * Docs: https://raven.lanterns.io\n"
-        . " */\n\n"
-        . "declare(strict_types=1);\n\n"
-        . "if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {\n"
-        . "    http_response_code(404);\n"
-        . "    exit;\n"
-        . "}\n"
-        . "\$siteName = trim((string) (\$site['name'] ?? 'Raven CMS'));\n"
-        . "if (\$siteName === '') {\n"
-        . "    \$siteName = 'Raven CMS';\n"
-        . "}\n"
-        . "\$metaTitle = trim((string) (\$meta['title'] ?? ''));\n"
-        . "\$documentTitle = \$metaTitle === '' ? \$siteName : (\$metaTitle . ' [' . \$siteName . ']');\n"
-        . "?>\n"
-        . "<!doctype html>\n"
-        . "<html lang=\"en\">\n"
-        . "<head>\n"
-        . "  <meta charset=\"utf-8\">\n"
-        . "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
-        . "  <title><?= htmlspecialchars(\$documentTitle, ENT_QUOTES, 'UTF-8') ?></title>\n"
-        . "  <meta name=\"description\" content=\"{meta:desc}\">\n"
-        . "  {if site:feed_rss_url}<link rel=\"alternate\" type=\"application/rss+xml\" title=\"RSS Feed\" href=\"{site:feed_rss_url}\">{/if}\n"
-        . "  {if site:feed_atom_url}<link rel=\"alternate\" type=\"application/atom+xml\" title=\"Atom Feed\" href=\"{site:feed_atom_url}\">{/if}\n"
-        . "  <link rel=\"stylesheet\" href=\"{theme:url}/css/style.css\">\n"
-        . "</head>\n"
-        . "<body>\n"
-        . "{raw:content}\n"
-        . "</body>\n"
-        . "</html>\n";
-
-    $home = "<?php\n\n"
-        . "/**\n"
-        . " * RAVEN CMS\n"
-        . " * ~/public/theme/" . $slug . "/tpl/home.php\n"
-        . " * " . $nameForDoc . " homepage template scaffold.\n"
-        . " * Docs: https://raven.lanterns.io\n"
-        . " */\n\n"
-        . "declare(strict_types=1);\n\n"
-        . "if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {\n"
-        . "    http_response_code(404);\n"
-        . "    exit;\n"
-        . "}\n"
-        . "?>\n"
-        . "<section class=\"container py-4\">\n"
-        . "  <h1>{site:name}</h1>\n"
-        . "  {if page:title_show}<h2>{page:title}</h2>{/if}\n"
-        . "  {if page:content}\n"
-        . "  {each page:content}\n"
-        . "  <div{if item:css_id} id=\"{item:css_id}\"{/if} class=\"{item:class}\">{raw:item:html}</div>\n"
-        . "  {/each}\n"
-        . "  {/if}\n"
-        . "</section>\n";
-
-    $css = "/* RAVEN CMS */\n"
-        . "/* ~/public/theme/" . $slug . "/css/style.css */\n"
-        . "/* " . $nameForDoc . " public-theme stylesheet scaffold. */\n\n"
-        . ":root {\n"
-        . "  --rvn-theme-bg: #f6f7fb;\n"
-        . "  --rvn-theme-fg: #1d2433;\n"
-        . "  --rvn-theme-accent: #2f5ee5;\n"
-        . "}\n\n"
-        . "body {\n"
-        . "  background: var(--rvn-theme-bg);\n"
-        . "  color: var(--rvn-theme-fg);\n"
-        . "  font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif;\n"
-        . "}\n\n"
-        . "a {\n"
-        . "  color: var(--rvn-theme-accent);\n"
-        . "}\n";
-
-    return [
-        'theme.json' => $manifestJson . "\n",
-        'css/style.css' => $css,
-        'tpl/wrapper.php' => $wrapper,
-        'tpl/home.php' => $home,
-    ];
-}
-
 function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
 {
     if ($tokens === [] && $context->interactive) {
@@ -2563,6 +2458,8 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
 
     try {
         $root = $context->root;
+        $themeCloneService = new ThemeCloneService();
+        $themeScaffoldService = new ThemeScaffoldService();
 
         $themesRoot = $root . '/public/theme';
         if ($action === 'create' && !is_dir($themesRoot) && !mkdir($themesRoot, 0770, true) && !is_dir($themesRoot)) {
@@ -2703,32 +2600,20 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 }
             }
 
-            $files = raven_cli_theme_scaffold_files([
+            $scaffoldMeta = [
                 'slug' => $slug,
                 'name' => $name,
                 'is_child_theme' => $isChildTheme,
                 'parent_theme' => $isChildTheme ? $resolvedParent : '',
-            ]);
+            ];
+            $createdFiles = ['theme.json', 'css/style.css', 'tpl/wrapper.php', 'tpl/home.php'];
 
             try {
                 if ($clone !== '') {
-                    raven_cli_copy_directory_recursive($themesRoot . '/' . $clone, $target);
-                    if (file_put_contents($target . '/theme.json', (string) ($files['theme.json'] ?? ''), LOCK_EX) === false) {
-                        throw new RuntimeException('Failed to write cloned theme manifest.');
-                    }
-                    @chmod($target . '/theme.json', 0640);
+                    $themeCloneService->copyDirectoryRecursively($themesRoot . '/' . $clone, $target);
+                    $themeScaffoldService->finalizeClone($target, $scaffoldMeta);
                 } else {
-                    foreach ($files as $relativePath => $content) {
-                        $targetFile = $target . '/' . $relativePath;
-                        $targetDir = dirname($targetFile);
-                        if (!is_dir($targetDir) && !mkdir($targetDir, 0770, true) && !is_dir($targetDir)) {
-                            throw new RuntimeException('Failed to create directory: ' . $targetDir);
-                        }
-                        if (file_put_contents($targetFile, $content, LOCK_EX) === false) {
-                            throw new RuntimeException('Failed to write file: ' . $relativePath);
-                        }
-                        @chmod($targetFile, 0640);
-                    }
+                    $themeScaffoldService->createSkeleton($target, $scaffoldMeta);
                 }
             } catch (Throwable $exception) {
                 raven_cli_remove_directory_recursive($target);
@@ -2748,7 +2633,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 $context->printJson([
                     'ok' => true,
                     'slug' => $slug,
-                    'created_files' => $clone !== '' ? [] : array_keys($files),
+                    'created_files' => $clone !== '' ? [] : $createdFiles,
                     'cloned_from' => $clone,
                     'set_default' => $setDefault,
                 ]);
@@ -2756,10 +2641,10 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 if ($clone !== '') {
                     $context->ok('Created theme from clone: ' . $slug . ' (source: ' . $clone . ')');
                     $context->line('  + copied all files from public/theme/' . $clone . '/');
-                    $context->line('  + wrote theme.json with new name/manifest values');
+                    $context->line('  + refreshed theme.json with new name/manifest values');
                 } else {
                     $context->ok('Created theme scaffold: ' . $slug);
-                    foreach (array_keys($files) as $file) {
+                    foreach ($createdFiles as $file) {
                         $context->line('  + ' . $file);
                     }
                 }
