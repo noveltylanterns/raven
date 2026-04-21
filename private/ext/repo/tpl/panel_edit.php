@@ -9,6 +9,9 @@
 
 declare(strict_types=1);
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $formatTimestamp = static function (?string $value): string {
@@ -37,23 +40,30 @@ $repoSourceListId = 'repo-source-rows-list';
 $repoSourceAddButtonId = 'repo-source-rows-add';
 $repoSourceTemplateId = 'repo-source-row-template';
 $repoDeleteFormId = 'repo-delete-form';
+$repoEditHeaderActions = [];
+if ($extensionDocsUrl !== '') {
+    $repoEditHeaderActions[] = '<a href="' . e($extensionDocsUrl) . '" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">'
+        . '<i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation'
+        . '</a>';
+}
+$repoEditToolbarItems = [
+    '<button type="submit" form="repo-settings-form" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Settings</button>',
+    '<form method="post" action="' . e($syncPath) . '" class="d-inline">'
+        . $csrfField
+        . '<button type="submit" class="btn btn-success"><i class="bi bi-arrow-repeat me-2" aria-hidden="true"></i>Resync</button>'
+        . '</form>',
+    '<a href="' . e($indexPath) . '" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Repos</a>',
+    '<button type="submit" form="' . e($repoDeleteFormId) . '" class="btn btn-danger" onclick="return confirm(\'Delete this repository mirror and its stored data?\');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete</button>',
+];
 ?>
-<header class="card mb-3">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1 class="mb-0">
-                <?= e($extensionName !== '' ? $extensionName : 'Repositories') ?>
-            </h1>
-            <?php if ($extensionDocsUrl !== ''): ?>
-                <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                    <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
-                </a>
-            <?php endif; ?>
-        </div>
-        <h5>by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h5>
-        <p class="text-muted mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'Mirror read-only Git repositories into Raven with panel controls and optional public browsing.') ?></p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => $extensionName !== '' ? $extensionName : 'Repositories',
+    'title_class' => 'mb-0',
+    'subheading_html' => 'by ' . e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown'),
+    'summary' => $extensionDescription !== '' ? $extensionDescription : 'Mirror read-only Git repositories into Raven with panel controls and optional public browsing.',
+    'actions' => $repoEditHeaderActions,
+    'card_class' => 'card mb-3',
+]) ?>
 
 <?php if ($flashSuccess !== null && $flashSuccess !== ''): ?>
     <div class="alert alert-success"><?= e($flashSuccess) ?></div>
@@ -81,15 +91,11 @@ $repoDeleteFormId = 'repo-delete-form';
     </div>
 <?php endif; ?>
 
-<div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
-    <button type="submit" form="repo-settings-form" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Settings</button>
-    <form method="post" action="<?= e($syncPath) ?>" class="d-inline">
-        <?= $csrfField ?>
-        <button type="submit" class="btn btn-success"><i class="bi bi-arrow-repeat me-2" aria-hidden="true"></i>Resync</button>
-    </form>
-    <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Repos</a>
-    <button type="submit" form="<?= e($repoDeleteFormId) ?>" class="btn btn-danger" onclick="return confirm('Delete this repository mirror and its stored data?');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete</button>
-</div>
+<?= Toolbar::render([
+    'items' => $repoEditToolbarItems,
+    'tag' => 'div',
+    'class' => 'd-flex flex-wrap justify-content-end gap-2 mb-3',
+]) ?>
 
 <div class="card mb-3">
     <div class="card-body">
@@ -238,14 +244,11 @@ $repoDeleteFormId = 'repo-delete-form';
     <?= $csrfField ?>
 </form>
 
-<div class="d-flex flex-wrap justify-content-end gap-2 mb-3">    <button type="submit" form="repo-settings-form" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Settings</button>
-    <form method="post" action="<?= e($syncPath) ?>" class="d-inline">
-        <?= $csrfField ?>
-        <button type="submit" class="btn btn-success"><i class="bi bi-arrow-repeat me-2" aria-hidden="true"></i>Resync</button>
-    </form>
-    <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Repos</a>
-    <button type="submit" form="<?= e($repoDeleteFormId) ?>" class="btn btn-danger" onclick="return confirm('Delete this repository mirror and its stored data?');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete</button>
-</div>
+<?= Toolbar::render([
+    'items' => $repoEditToolbarItems,
+    'tag' => 'div',
+    'class' => 'd-flex flex-wrap justify-content-end gap-2 mb-3',
+]) ?>
 
 <template id="<?= e($repoSourceTemplateId) ?>">
     <div class="border rounded p-2 mb-2" data-repo-source-row="1">
@@ -270,7 +273,7 @@ $repoDeleteFormId = 'repo-delete-form';
         </div>
     </div>
 </template>
-<script>
+<?php ob_start(); ?>
   (function () {
     var list = document.getElementById('<?= e($repoSourceListId) ?>');
     var addButton = document.getElementById('<?= e($repoSourceAddButtonId) ?>');
@@ -349,4 +352,4 @@ $repoDeleteFormId = 'repo-delete-form';
 
     reindexRows();
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

@@ -9,6 +9,9 @@
 
 declare(strict_types=1);
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $formatTimestamp = static function (?string $value): string {
@@ -31,6 +34,12 @@ $repoFilterId = 'repo-logs-filter-repo';
 $countLabelId = 'repo-logs-filter-count';
 $emptyMessageId = 'repo-logs-filter-empty';
 $globalRepoFilterValue = '__global__';
+$repoLogsHeaderActions = [];
+if ($extensionDocsUrl !== '') {
+    $repoLogsHeaderActions[] = '<a href="' . e($extensionDocsUrl) . '" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">'
+        . '<i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation'
+        . '</a>';
+}
 
 // Derive the live filter options directly from the loaded log rows so this view stays self-contained.
 $levelFilterOptions = [];
@@ -58,23 +67,19 @@ if ($initialRepoFilter !== '' && !isset($repoFilterOptions[$initialRepoFilter]))
 
 asort($levelFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
 asort($repoFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
+$repoLogsToolbarItems = [
+    '<a href="' . e($settingsPath) . '" class="btn btn-primary"><i class="bi bi-gear me-2" aria-hidden="true"></i>Settings</a>',
+    '<a href="' . e($indexPath) . '" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Repos</a>',
+];
 ?>
-<header class="card mb-3">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1 class="mb-0">
-                <?= e($extensionName !== '' ? $extensionName : 'Repositories') ?>
-            </h1>
-            <?php if ($extensionDocsUrl !== ''): ?>
-                <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                    <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
-                </a>
-            <?php endif; ?>
-        </div>
-        <h5>by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h5>
-        <p class="text-muted mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'Mirror Git repositories into Raven with optional public browsing.') ?></p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => $extensionName !== '' ? $extensionName : 'Repositories',
+    'title_class' => 'mb-0',
+    'subheading_html' => 'by ' . e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown'),
+    'summary' => $extensionDescription !== '' ? $extensionDescription : 'Mirror Git repositories into Raven with optional public browsing.',
+    'actions' => $repoLogsHeaderActions,
+    'card_class' => 'card mb-3',
+]) ?>
 
 <?php if ($flashSuccess !== null && $flashSuccess !== ''): ?>
     <div class="alert alert-success"><?= e($flashSuccess) ?></div>
@@ -92,10 +97,11 @@ asort($repoFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
     </div>
 <?php endif; ?>
 
-<div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
-    <a href="<?= e($settingsPath) ?>" class="btn btn-primary"><i class="bi bi-gear me-2" aria-hidden="true"></i>Settings</a>
-    <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Repos</a>
-</div>
+<?= Toolbar::render([
+    'items' => $repoLogsToolbarItems,
+    'tag' => 'div',
+    'class' => 'd-flex flex-wrap justify-content-end gap-2 mb-3',
+]) ?>
 
 <div class="card mb-3">
     <div class="card-body">
@@ -170,12 +176,13 @@ asort($repoFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
     </div>
 </div>
 
-<div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
-    <a href="<?= e($settingsPath) ?>" class="btn btn-primary"><i class="bi bi-gear me-2" aria-hidden="true"></i>Settings</a>
-    <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Repos</a>
-</div>
+<?= Toolbar::render([
+    'items' => $repoLogsToolbarItems,
+    'tag' => 'div',
+    'class' => 'd-flex flex-wrap justify-content-end gap-2 mb-3',
+]) ?>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     var table = document.getElementById('<?= e($logsTableId) ?>');
     var levelFilter = document.getElementById('<?= e($levelFilterId) ?>');
@@ -228,4 +235,4 @@ asort($repoFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
     repoFilter.addEventListener('change', applyFilters);
     applyFilters();
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

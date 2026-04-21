@@ -27,6 +27,8 @@ declare(strict_types=1);
  * } $databaseSummary */
 /** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string} $extensionMeta */
 
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $driver = strtolower((string) ($databaseSummary['driver'] ?? 'sqlite'));
@@ -37,27 +39,24 @@ $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
 $extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lanterns.io'));
 $canLaunchAdminer = $extensionEntrypointExists && $adminerInstalled;
 $adminerPath = trim((string) ($adminerPath ?? ''));
+$databaseHeaderActions = [];
+if ($extensionDocsUrl !== '') {
+    $databaseHeaderActions[] = '<a href="' . e($extensionDocsUrl) . '" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">'
+        . '<i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation'
+        . '</a>';
+}
+$databaseToolbarItems = [];
+if ($canLaunchAdminer && $adminerPath !== '') {
+    $databaseToolbarItems[] = '<a class="btn btn-success" href="' . e($adminerPath) . '">Open Adminer<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i></a>';
+}
 ?>
-<header class="card">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1>
-                <?= e($extensionName !== '' ? $extensionName : 'Database Manager') ?>
-                <?php if ($extensionVersion !== ''): ?>
-                    <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion) ?></small>
-                <?php endif; ?>
-            </h1>
-            <?php if ($extensionDocsUrl !== ''): ?>
-            <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
-            </a>
-            <?php endif; ?>
-        </div>
-
-        <h5>by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h5>
-        <p class="text-muted mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'This page is provided by the Database Manager extension and uses Adminer as a single-page database editor.') ?></p>
-    </div>
-</header>
+<?= Header::render([
+    'title_html' => e($extensionName !== '' ? $extensionName : 'Database Manager')
+        . ($extensionVersion !== '' ? ' <small class="ms-2 text-muted" style="font-size: 0.48em;">v. ' . e($extensionVersion) . '</small>' : ''),
+    'subheading_html' => 'by ' . e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown'),
+    'summary' => $extensionDescription !== '' ? $extensionDescription : 'This page is provided by the Database Manager extension and uses Adminer as a single-page database editor.',
+    'actions' => $databaseHeaderActions,
+]) ?>
 
 <?php if (!$canManageConfiguration): ?>
 <div class="alert alert-danger" role="alert">
@@ -85,9 +84,9 @@ $adminerPath = trim((string) ($adminerPath ?? ''));
     <?php endif; ?>
 
     <?php if ($canLaunchAdminer && $adminerPath !== ''): ?>
-    <nav>
-        <a class="btn btn-success" href="<?= e($adminerPath) ?>">Open Adminer<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i></a>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $databaseToolbarItems,
+    ]) ?>
     <?php endif; ?>
 
     <section class="card">
@@ -166,9 +165,9 @@ $adminerPath = trim((string) ($adminerPath ?? ''));
     </section>
 
     <?php if ($canLaunchAdminer && $adminerPath !== ''): ?>
-    <nav>
-        <a class="btn btn-success" href="<?= e($adminerPath) ?>">Open Adminer<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i></a>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $databaseToolbarItems,
+    ]) ?>
     <?php endif; ?>
 
 <?php endif; ?>

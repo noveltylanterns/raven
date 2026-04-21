@@ -23,6 +23,9 @@ declare(strict_types=1);
 /** @var string|null $flashError */
 /** @var string $csrfField */
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $formName = (string) ($formData['name'] ?? '');
@@ -43,18 +46,25 @@ $submissionsTableId = 'contact-submissions-table';
 $submissionsBodyId = $submissionsTableId . '-body';
 $submissionsCountId = 'contact-submissions-filter-count';
 $submissionsEmptyId = 'contact-submissions-filter-empty';
+$contactSubmissionsHeaderActions = [
+    '<a href="' . e($exportPath) . '" class="btn btn-primary btn-sm"><i class="bi bi-download me-2" aria-hidden="true"></i>Export CSV</a>',
+];
+$contactSubmissionsToolbarItems = [
+    '<a href="' . e($editPath) . '" class="btn btn-primary"><i class="bi bi-pencil me-2" aria-hidden="true"></i>Edit Form</a>',
+    '<a href="' . e($indexPath) . '" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Contact Forms</a>',
+    '<form method="post" action="' . e($clearSubmissionsPath) . '" class="m-0" onsubmit="return confirm(\'Clear all submissions for this contact form?\');">'
+        . $csrfField
+        . '<input type="hidden" name="slug" value="' . e($formSlug) . '">'
+        . '<input type="hidden" name="return_q" value="' . e($searchQuery) . '">'
+        . '<button type="submit" class="btn btn-danger"' . ($totalItems === 0 ? ' disabled' : '') . '><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Clear All</button>'
+        . '</form>',
+];
 ?>
-<header class="card">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1>Submissions for: <span class="text-primary">'<?= e($formName !== '' ? $formName : $formSlug) ?>'</span></h1>
-            <div class="d-flex flex-wrap gap-2">
-                <a href="<?= e($exportPath) ?>" class="btn btn-primary btn-sm"><i class="bi bi-download me-2" aria-hidden="true"></i>Export CSV</a>
-            </div>
-        </div>
-        <p class="text-muted mb-0">Slug <code><?= e($formSlug) ?></code> | Total <strong><?= (int) $totalItems ?></strong></p>
-    </div>
-</header>
+<?= Header::render([
+    'title_html' => 'Submissions for: <span class="text-primary">\'' . e($formName !== '' ? $formName : $formSlug) . '\'</span>',
+    'summary_html' => 'Slug <code>' . e($formSlug) . '</code> | Total <strong>' . (int) $totalItems . '</strong>',
+    'actions' => $contactSubmissionsHeaderActions,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -64,16 +74,9 @@ $submissionsEmptyId = 'contact-submissions-filter-empty';
 <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
-<nav>
-    <a href="<?= e($editPath) ?>" class="btn btn-primary"><i class="bi bi-pencil me-2" aria-hidden="true"></i>Edit Form</a>
-    <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Contact Forms</a>
-    <form method="post" action="<?= e($clearSubmissionsPath) ?>" class="m-0" onsubmit="return confirm('Clear all submissions for this contact form?');">
-        <?= $csrfField ?>
-        <input type="hidden" name="slug" value="<?= e($formSlug) ?>">
-        <input type="hidden" name="return_q" value="<?= e($searchQuery) ?>">
-        <button type="submit" class="btn btn-danger"<?= $totalItems === 0 ? ' disabled' : '' ?>><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Clear All</button>
-    </form>
-</nav>
+<?= Toolbar::render([
+    'items' => $contactSubmissionsToolbarItems,
+]) ?>
 
 <section class="card">
     <div class="card-body">
@@ -264,24 +267,17 @@ $submissionsEmptyId = 'contact-submissions-filter-empty';
     </div>
 </section>
 
-<nav>
-    <a href="<?= e($editPath) ?>" class="btn btn-primary"><i class="bi bi-pencil me-2" aria-hidden="true"></i>Edit Form</a>
-    <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Contact Forms</a>
-    <form method="post" action="<?= e($clearSubmissionsPath) ?>" class="m-0" onsubmit="return confirm('Clear all submissions for this contact form?');">
-        <?= $csrfField ?>
-        <input type="hidden" name="slug" value="<?= e($formSlug) ?>">
-        <input type="hidden" name="return_q" value="<?= e($searchQuery) ?>">
-        <button type="submit" class="btn btn-danger"<?= $totalItems === 0 ? ' disabled' : '' ?>><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Clear All</button>
-    </form>
-</nav>
+<?= Toolbar::render([
+    'items' => $contactSubmissionsToolbarItems,
+]) ?>
 
-<style>
+<?php ob_start(); ?>
   #<?= e($submissionsTableId) ?> tbody tr[data-details-row-for]:hover > td {
     background-color: transparent !important;
   }
-</style>
+<?php Footer::pushStyle((string) ob_get_clean()); ?>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     var table = document.getElementById('<?= e($submissionsTableId) ?>');
     var searchInput = document.getElementById('<?= e($submissionsSearchId) ?>');
@@ -441,4 +437,4 @@ $submissionsEmptyId = 'contact-submissions-filter-empty';
     bindBootstrapCollapseStateSync();
     window.addEventListener('load', bindBootstrapCollapseStateSync);
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

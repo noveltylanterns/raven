@@ -17,6 +17,7 @@
 /** @var string|null $error */
 
 use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -62,6 +63,13 @@ if ($redirectRow !== null && $redirectPublicUrl !== null) {
             </p>
 HTML;
 }
+$redirectEditorToolbarItems = [
+    '<button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Redirect</button>',
+    '<a href="' . e($panelBase) . '/redirect" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Redirects</a>',
+];
+if ($hasPersistedRedirect) {
+    $redirectEditorToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' . e($deleteFormId) . '" onclick="return confirm(\'Delete this redirect?\');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Redirect</button>';
+}
 ?>
 <?= Header::render([
     'title_html' => $redirectRow === null
@@ -90,18 +98,9 @@ HTML;
 <form method="post" action="<?= e($panelBase) ?>/redirect/save">
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $redirectId ?>">
-    <nav>
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Redirect</button>
-        <a href="<?= e($panelBase) ?>/redirect" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Redirects</a>
-        <?php if ($hasPersistedRedirect): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this redirect?');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Redirect</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $redirectEditorToolbarItems,
+    ]) ?>
 
     <section class="card">
         <div class="card-body">
@@ -172,16 +171,7 @@ HTML;
         </div>
     </section>
 
-    <nav>
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Redirect</button>
-        <a href="<?= e($panelBase) ?>/redirect" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Redirects</a>
-        <?php if ($hasPersistedRedirect): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this redirect?');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Redirect</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $redirectEditorToolbarItems,
+    ]) ?>
 </form>

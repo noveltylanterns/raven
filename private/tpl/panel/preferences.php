@@ -24,6 +24,9 @@
 /** @var int $bioMaxLength */
 /** @var \Raven\Lib\View\Panel\EditorBlocks $editorBlocks */
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -131,14 +134,15 @@ $themeLabels = [
     'ice' => 'Ice',
     'midnight' => 'Midnight',
 ];
+$preferencesToolbarItems = [
+    '<button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Preferences</button>',
+];
 ?>
 
-<header class="card">
-    <div class="card-body">
-        <h1>Preferences</h1>
-        <p class="text-muted mb-0">Manage your account details, panel theme, and avatar.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Preferences',
+    'summary' => 'Manage your account details, panel theme, and avatar.',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -334,7 +338,7 @@ $themeLabels = [
         </div>
     </div>
 </div>
-<script>
+<?php ob_start(); ?>
   document.addEventListener('DOMContentLoaded', function () {
     var list = document.getElementById('preferences-two-factor-methods-list');
     var addButton = document.getElementById('preferences-two-factor-add');
@@ -1542,7 +1546,7 @@ $themeLabels = [
 
     reindexRows();
   });
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>
 
 <?php if ($flashError !== null): ?>
 <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
@@ -1550,9 +1554,10 @@ $themeLabels = [
 
 <form method="post" action="<?= e($panelBase) ?>/preferences/save" enctype="multipart/form-data" autocomplete="off">
     <?= $csrfField ?>
-    <nav class="rvnp-editor-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Preferences</button>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $preferencesToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 
     <section class="rvnp-editor-layout" data-rvn-tab-layout="editor">
     <ul class="nav nav-tabs" id="rvnp-editor-tabs" role="tablist">
@@ -2054,9 +2059,10 @@ $themeLabels = [
     </div>
     </section>
 
-    <nav class="rvnp-editor-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Preferences</button>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $preferencesToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 </form>
 
 <template id="preferences-password-fields-template">
@@ -2080,7 +2086,7 @@ $themeLabels = [
     >
 </template>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     var toggleButton = document.getElementById('preferences-password-toggle');
     var fieldsContainer = document.getElementById('preferences-password-fields');
@@ -2125,7 +2131,7 @@ $themeLabels = [
       }
     });
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>
 
 <?php if ($profileContactOptions !== []): ?>
 <template id="preferences-contact-profile-template">

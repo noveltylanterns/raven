@@ -8,16 +8,20 @@ declare(strict_types=1);
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
+$tagSetListToolbarItems = [
+    '<a class="btn btn-primary" href="' . e($panelBase) . '/tag/set/edit"><i class="bi bi-collection me-2" aria-hidden="true"></i>New Tag Set</a>',
+    '<a class="btn btn-secondary" href="' . e($panelBase) . '/tag"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Tags</a>',
+];
 ?>
-<header class="card">
-    <div class="card-body">
-        <h1>Tag Sets</h1>
-        <p class="text-muted mb-0">Manage reusable tag sets that channels can share or isolate.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Tag Sets',
+    'summary' => 'Manage reusable tag sets that channels can share or isolate.',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -27,10 +31,9 @@ $panelBase = '/' . trim($site['panel_path'], '/');
 <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/tag/set/edit"><i class="bi bi-collection me-2" aria-hidden="true"></i>New Tag Set</a>
-    <a class="btn btn-secondary" href="<?= e($panelBase) ?>/tag"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Tags</a>
-</nav>
+<?= Toolbar::render([
+    'items' => $tagSetListToolbarItems,
+]) ?>
 
 <section class="card">
     <div class="card-body">
@@ -94,7 +97,6 @@ $panelBase = '/' . trim($site['panel_path'], '/');
     </div>
 </section>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/tag/set/edit"><i class="bi bi-collection me-2" aria-hidden="true"></i>New Tag Set</a>
-    <a class="btn btn-secondary" href="<?= e($panelBase) ?>/tag"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Tags</a>
-</nav>
+<?= Toolbar::render([
+    'items' => $tagSetListToolbarItems,
+]) ?>

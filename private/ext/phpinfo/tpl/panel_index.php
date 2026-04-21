@@ -17,6 +17,8 @@ declare(strict_types=1);
 /** @var string $phpInfoHtml */
 /** @var string $phpInfoCss */
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
 use function Raven\Lib\Security\e;
 
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'PHP Info'));
@@ -24,30 +26,24 @@ $extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
 $extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lanterns.io'));
+$phpInfoHeaderActions = [];
+if ($extensionDocsUrl !== '') {
+    $phpInfoHeaderActions[] = '<a href="' . e($extensionDocsUrl) . '" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">'
+        . '<i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation'
+        . '</a>';
+}
 ?>
-<header class="card">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1>
-                <?= e($extensionName !== '' ? $extensionName : 'PHP Info') ?>
-                <?php if ($extensionVersion !== ''): ?>
-                    <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion) ?></small>
-                <?php endif; ?>
-            </h1>
-            <?php if ($extensionDocsUrl !== ''): ?>
-            <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
-            </a>
-            <?php endif; ?>
-        </div>
-        <h5>by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h5>
-        <p class="text-muted mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'Runtime diagnostics from phpinfo().') ?></p>
-    </div>
-</header>
+<?= Header::render([
+    'title_html' => e($extensionName !== '' ? $extensionName : 'PHP Info')
+        . ($extensionVersion !== '' ? ' <small class="ms-2 text-muted" style="font-size: 0.48em;">v. ' . e($extensionVersion) . '</small>' : ''),
+    'subheading_html' => 'by ' . e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown'),
+    'summary' => $extensionDescription !== '' ? $extensionDescription : 'Runtime diagnostics from phpinfo().',
+    'actions' => $phpInfoHeaderActions,
+]) ?>
 
 <section class="card">
     <div class="card-body raven-phpinfo-output">
-        <style>
+        <?php ob_start(); ?>
             <?= $phpInfoCss ?>
 
             .raven-phpinfo-output {
@@ -89,7 +85,7 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lant
                 width: 100% !important;
                 max-width: 100% !important;
             }
-        </style>
+        <?php Footer::pushStyle((string) ob_get_clean()); ?>
         <?= $phpInfoHtml ?>
     </div>
 </section>

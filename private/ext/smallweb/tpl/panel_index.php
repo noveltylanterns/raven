@@ -25,7 +25,9 @@ declare(strict_types=1);
 /** @var \Raven\Ext\Smallweb\SmallwebService $svc */
 
 use Raven\Ext\Smallweb\SmallwebService;
-
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Smallweb'));
@@ -52,25 +54,22 @@ $formatSize = static function (int $bytes): string {
     }
     return round($bytes / 1048576, 1) . ' MB';
 };
+$smallwebHeaderActions = [];
+if ($extensionDocsUrl !== '') {
+    $smallwebHeaderActions[] = '<a href="' . e($extensionDocsUrl) . '" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">'
+        . '<i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation'
+        . '</a>';
+}
+$smallwebSettingsToolbarItems = [
+    '<button class="btn btn-primary" type="submit" form="sw-settings-form"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Settings</button>',
+];
 ?>
-<header class="card">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1>
-                <?= e($extensionName !== '' ? $extensionName : 'Smallweb') ?>
-            </h1>
-            <div class="d-flex flex-wrap gap-2">
-                <?php if ($extensionDocsUrl !== ''): ?>
-                    <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                        <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
-                    </a>
-                <?php endif; ?>
-            </div>
-        </div>
-        <h5>by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h5>
-        <p class="text-muted mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'Manage plaintext webroots for finger, gopher, and gemini protocols.') ?></p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => $extensionName !== '' ? $extensionName : 'Smallweb',
+    'subheading_html' => 'by ' . e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown'),
+    'summary' => $extensionDescription !== '' ? $extensionDescription : 'Manage plaintext webroots for finger, gopher, and gemini protocols.',
+    'actions' => $smallwebHeaderActions,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -86,9 +85,9 @@ $formatSize = static function (int $bytes): string {
     <?= $csrfField ?>
 </form>
 
-<nav>
-    <button class="btn btn-primary" type="submit" form="sw-settings-form"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Settings</button>
-</nav>
+<?= Toolbar::render([
+    'items' => $smallwebSettingsToolbarItems,
+]) ?>
 <?php else: ?>
 <?php
     $files = $protocolFiles[$activeTab] ?? [];
@@ -103,21 +102,18 @@ $formatSize = static function (int $bytes): string {
     $mkdirPath = $panelUrl('/smallweb/' . $activeTab . '/mkdir');
     $rmdirPath = $panelUrl('/smallweb/' . $activeTab . '/rmdir');
     $uploadPath = $panelUrl('/smallweb/' . $activeTab . '/upload');
+    $smallwebProtocolToolbarItems = [
+        '<a href="' . e($newPath) . '" class="btn btn-primary"><i class="bi bi-file-earmark-plus me-2" aria-hidden="true"></i>New Page</a>',
+    ];
+    if ($hasDirs) {
+        $smallwebProtocolToolbarItems[] = '<button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#sw-mkdir-modal"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Folder</button>';
+        $smallwebProtocolToolbarItems[] = '<button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#sw-upload-modal"><i class="bi bi-cloud-upload me-2" aria-hidden="true"></i>Upload File</button>';
+    }
 ?>
 
-<nav>
-    <a href="<?= e($newPath) ?>" class="btn btn-primary">
-        <i class="bi bi-file-earmark-plus me-2" aria-hidden="true"></i>New Page
-    </a>
-    <?php if ($hasDirs): ?>
-    <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#sw-mkdir-modal">
-        <i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Folder
-    </button>
-    <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#sw-upload-modal">
-        <i class="bi bi-cloud-upload me-2" aria-hidden="true"></i>Upload File
-    </button>
-    <?php endif; ?>
-</nav>
+<?= Toolbar::render([
+    'items' => $smallwebProtocolToolbarItems,
+]) ?>
 <?php endif; ?>
 
 <section class="rvnp-editor-layout">
@@ -511,10 +507,10 @@ $formatSize = static function (int $bytes): string {
 <?php endif; ?>
 
 <?php if ($activeTab === 'settings'): ?>
-<nav>
-    <button class="btn btn-primary" type="submit" form="sw-settings-form"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Settings</button>
-</nav>
-<script>
+<?= Toolbar::render([
+    'items' => $smallwebSettingsToolbarItems,
+]) ?>
+<?php ob_start(); ?>
 document.querySelectorAll('[id^="protocol_"][id$="_enabled"]').forEach(function(cb) {
     cb.addEventListener('change', function() {
         var proto = this.id.replace('protocol_', '').replace('_enabled', '');
@@ -524,22 +520,12 @@ document.querySelectorAll('[id^="protocol_"][id$="_enabled"]').forEach(function(
         }
     });
 });
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>
 <?php else: ?>
-<nav>
-    <a href="<?= e($newPath) ?>" class="btn btn-primary">
-        <i class="bi bi-file-earmark-plus me-2" aria-hidden="true"></i>New Page
-    </a>
-    <?php if ($hasDirs): ?>
-    <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#sw-mkdir-modal">
-        <i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Folder
-    </button>
-    <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#sw-upload-modal">
-        <i class="bi bi-cloud-upload me-2" aria-hidden="true"></i>Upload File
-    </button>
-    <?php endif; ?>
-</nav>
-<script>
+<?= Toolbar::render([
+    'items' => $smallwebProtocolToolbarItems,
+]) ?>
+<?php ob_start(); ?>
 window.addEventListener('load', function() {
     document.querySelectorAll('.sw-copy-link').forEach(function(btn) {
         var tip = new bootstrap.Tooltip(btn);
@@ -557,5 +543,5 @@ window.addEventListener('load', function() {
         });
     });
 });
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>
 <?php endif; ?>

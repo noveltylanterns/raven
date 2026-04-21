@@ -34,6 +34,9 @@ declare(strict_types=1);
 /** @var string $csrfField */
 /** @var \Raven\Lib\View\Panel\EditorBlocks $editorBlocks */
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $editorBlocks = ($editorBlocks ?? null) instanceof \Raven\Lib\View\Panel\EditorBlocks
@@ -53,24 +56,13 @@ $shortcodeValue = $formSlug !== '' ? '[contact slug="' . $formSlug . '"]' : '';
 $additionalFields = is_array($formData['additional_fields'] ?? null) ? (array) $formData['additional_fields'] : [];
 $customFieldBlockLayout = $editorBlocks->layout('contact');
 $deleteFormId = 'delete-contact-form';
-?>
-<header class="card">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1><?= $isEditMode ? 'Edit Contact Form: <span class="text-primary">\'' . e($formName !== '' ? $formName : $formSlug) . '\'</span>' : 'Create New Contact Form' ?></h1>
-
-            <?php if ($isEditMode): ?>
-            <div class="d-flex gap-2">
-                <a href="<?= e($contactSubmissionsBasePath) ?>/<?= rawurlencode($formSlug) ?>" class="btn btn-primary btn-sm">View Submissions</a>
-            </div>
-            <?php endif; ?>
-        </div>
-
-        <?php if (!$isEditMode): ?>
-        <p class="text-muted mb-0">Create or update contact form fields and delivery settings.</p>
-        <?php endif; ?>
-
-        <?php if ($isEditMode): ?>
+$contactEditHeaderActions = [];
+if ($isEditMode) {
+    $contactEditHeaderActions[] = '<a href="' . e($contactSubmissionsBasePath) . '/' . rawurlencode($formSlug) . '" class="btn btn-primary btn-sm">View Submissions</a>';
+}
+$contactEditHeaderBodyHtml = '';
+if ($isEditMode) {
+    $contactEditHeaderBodyHtml = <<<HTML
         <p class="mb-0 small">
             <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
             <code
@@ -80,11 +72,27 @@ $deleteFormId = 'delete-contact-form';
                 title="Click to copy shortcode"
                 data-bs-toggle="tooltip"
                 data-bs-placement="top"
-            ><?= e($shortcodeValue) ?></code>
+            >{$shortcodeValue}</code>
         </p>
-        <?php endif; ?>
-    </div>
-</header>
+HTML;
+    $contactEditHeaderBodyHtml = str_replace($shortcodeValue, e($shortcodeValue), $contactEditHeaderBodyHtml);
+}
+$contactEditToolbarItems = [
+    '<button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Form</button>',
+    '<a href="' . e($indexPath) . '" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Contact Forms</a>',
+];
+if ($isEditMode) {
+    $contactEditToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' . e($deleteFormId) . '" onclick="return confirm(\'Delete this contact form?\');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Form</button>';
+}
+?>
+<?= Header::render([
+    'title_html' => $isEditMode
+        ? 'Edit Contact Form: <span class="text-primary">\'' . e($formName !== '' ? $formName : $formSlug) . '\'</span>'
+        : 'Create New Contact Form',
+    'summary' => !$isEditMode ? 'Create or update contact form fields and delivery settings.' : '',
+    'actions' => $contactEditHeaderActions,
+    'body_html' => $contactEditHeaderBodyHtml,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -104,18 +112,9 @@ $deleteFormId = 'delete-contact-form';
 <form method="post" action="<?= e($formAction) ?>">
     <?= $csrfField ?>
     <input type="hidden" name="original_slug" value="<?= e($formSlug) ?>">
-    <nav>
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Form</button>
-        <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Contact Forms</a>
-        <?php if ($isEditMode): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this contact form?');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Form</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $contactEditToolbarItems,
+    ]) ?>
 
     <section class="card">
         <div class="card-body">
@@ -352,18 +351,9 @@ $deleteFormId = 'delete-contact-form';
         </div>
     </section>
 
-    <nav>
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Form</button>
-        <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Contact Forms</a>
-        <?php if ($isEditMode): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this contact form?');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Form</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $contactEditToolbarItems,
+    ]) ?>
 </form>
 
 <template id="contact-additional-field-template">
@@ -428,7 +418,7 @@ $deleteFormId = 'delete-contact-form';
     </div>
 </template>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     var slugInput = document.getElementById('contact_form_slug');
     var shortcodeElement = document.getElementById('contact_form_shortcode');
@@ -548,7 +538,7 @@ $deleteFormId = 'delete-contact-form';
     slugInput.addEventListener('input', updateShortcode);
     updateShortcode();
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>
 
 <?php
 $editorBlocksBoot = [

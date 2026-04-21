@@ -20,6 +20,9 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -66,28 +69,39 @@ $categoryPublicUrl = null;
 if ($category !== null && $publicBase !== '' && $categorySlug !== '' && $categoryRoutePrefix !== '') {
     $categoryPublicUrl = $publicBase . '/' . rawurlencode($categoryRoutePrefix) . '/' . rawurlencode($categorySlug);
 }
-?>
-<header class="card">
-    <div class="card-body">
-        <h1><?= $category === null ? 'New Category' : 'Edit Category: <span class="text-primary">\'' . e($categoryName !== '' ? $categoryName : 'Untitled') . '\'</span>' ?></h1>
-        <?php if ($category === null): ?>
-        <p class="text-muted mb-0">Create or update a category and manage its preview/cover media.</p>
-        <?php elseif ($categoryPublicUrl !== null): ?>
+$categoryHeaderBodyHtml = '';
+if ($category !== null && $categoryPublicUrl !== null) {
+    $categoryPublicUrlEscaped = e($categoryPublicUrl);
+    $categoryHeaderBodyHtml = <<<HTML
         <p class="mb-0 small">
             <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
             <a
-              href="<?= e($categoryPublicUrl) ?>"
+              href="{$categoryPublicUrlEscaped}"
               target="_blank"
               rel="noopener noreferrer"
-              title="<?= e($categoryPublicUrl) ?>"
+              title="{$categoryPublicUrlEscaped}"
               aria-label="Open category URL"
               style="font-size: 0.88em;"
-              ><?= e($categoryPublicUrl) ?>
+              >{$categoryPublicUrlEscaped}
             </a>
         </p>
-        <?php endif; ?>
-    </div>
-</header>
+HTML;
+}
+$categoryEditorToolbarItems = [
+    '<button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Category</button>',
+    '<a href="' . e($panelBase) . '/category" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Categories</a>',
+];
+if ($hasPersistedCategory) {
+    $categoryEditorToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' . e($deleteFormId) . '" onclick="return confirm(\'Delete this category? Existing page-category links will be removed.\');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Category</button>';
+}
+?>
+<?= Header::render([
+    'title_html' => $category === null
+        ? 'New Category'
+        : 'Edit Category: <span class="text-primary">\'' . e($categoryName !== '' ? $categoryName : 'Untitled') . '\'</span>',
+    'summary' => $category === null ? 'Create or update a category and manage its preview/cover media.' : '',
+    'body_html' => $categoryHeaderBodyHtml,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -108,18 +122,10 @@ if ($category !== null && $publicBase !== '' && $categorySlug !== '' && $categor
 <form method="post" action="<?= e($panelBase) ?>/category/save" enctype="multipart/form-data">
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $categoryId ?>">
-    <nav class="rvnp-editor-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Category</button>
-        <a href="<?= e($panelBase) ?>/category" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Categories</a>
-        <?php if ($hasPersistedCategory): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this category? Existing page-category links will be removed.');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Category</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $categoryEditorToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 
     <section class="rvnp-editor-layout" data-rvn-tab-layout="editor">
     <ul class="nav nav-tabs" id="rvnp-editor-tabs" role="tablist">
@@ -289,21 +295,13 @@ if ($category !== null && $publicBase !== '' && $categorySlug !== '' && $categor
     </div>
     </section>
 
-    <nav class="rvnp-editor-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Category</button>
-        <a href="<?= e($panelBase) ?>/category" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Categories</a>
-        <?php if ($hasPersistedCategory): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this category? Existing page-category links will be removed.');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Category</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $categoryEditorToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 </form>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     function copyViaLegacyCommand(value) {
       var textArea = document.createElement('textarea');
@@ -386,4 +384,4 @@ if ($category !== null && $publicBase !== '' && $categorySlug !== '' && $categor
       });
     });
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

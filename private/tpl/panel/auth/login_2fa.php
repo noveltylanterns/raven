@@ -25,6 +25,7 @@
 /** @var string $selectedEmailInput */
 /** @var string $panelBaseUrl */
 
+use Raven\Lib\View\Panel\Footer;
 use function Raven\Lib\Security\e;
 
 $panelBase = trim((string) ($panelBaseUrl ?? ''), '/');
@@ -178,7 +179,7 @@ $defaultMethodLabel = static function (string $methodType): string {
                         </div>
                     </form>
 
-                    <script>
+                    <?php ob_start(); ?>
                         (function () {
                             var emailInput = document.getElementById('verification_email');
                             var verifyEmail = document.querySelector('[data-login-2fa-verify-email="1"]');
@@ -201,7 +202,7 @@ $defaultMethodLabel = static function (string $methodType): string {
                             }
                             syncVerifyEmail();
                         })();
-                    </script>
+                    <?php Footer::pushScript((string) ob_get_clean()); ?>
                 <?php else: ?>
                     <form method="post" action="<?= e($panelBase) ?>/login/2fa" novalidate>
                         <?= $csrfField ?>
@@ -283,7 +284,7 @@ $defaultMethodLabel = static function (string $methodType): string {
                     <?php endforeach; ?>
                 </div>
 
-                <script>
+                <?php ob_start(); ?>
                     (function () {
                         var prompt = document.querySelector('[data-rvn-webauthn-prompt="1"]');
                         if (!(prompt instanceof HTMLElement)) {
@@ -439,7 +440,7 @@ $defaultMethodLabel = static function (string $methodType): string {
                             void startWebauthn();
                         }
                     })();
-                </script>
+                <?php Footer::pushScript((string) ob_get_clean()); ?>
             <?php endif; ?>
         </div>
     </div>

@@ -16,7 +16,9 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
+use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -43,6 +45,10 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     $queryString = http_build_query($query);
     return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
 };
+$channelListToolbarItems = [
+    '<a class="btn btn-primary" href="' . e($panelBase) . '/channel/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Channel</a>',
+    '<button type="submit" class="btn btn-danger" form="' . e($bulkDeleteFormId) . '" onclick="return confirm(\'Delete selected channels? Linked pages will be detached.\');"><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>',
+];
 ?>
 <?= Header::render([
     'title' => 'Channels',
@@ -62,15 +68,9 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     <?= $csrfField ?>
 </form>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/channel/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Channel</a>
-    <button
-        type="submit"
-        class="btn btn-danger"
-        form="<?= e($bulkDeleteFormId) ?>"
-        onclick="return confirm('Delete selected channels? Linked pages will be detached.');"
-    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
-</nav>
+<?= Toolbar::render([
+    'items' => $channelListToolbarItems,
+]) ?>
 
 <section class="card">
     <div class="card-body">
@@ -207,17 +207,11 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     </div>
 </section>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/channel/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Channel</a>
-    <button
-        type="submit"
-        class="btn btn-danger"
-        form="<?= e($bulkDeleteFormId) ?>"
-        onclick="return confirm('Delete selected channels? Linked pages will be detached.');"
-    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
-</nav>
+<?= Toolbar::render([
+    'items' => $channelListToolbarItems,
+]) ?>
 
-<script>
+<?php ob_start(); ?>
     document.addEventListener('DOMContentLoaded', function () {
         var table = document.getElementById('<?= e($channelTableId) ?>');
         var searchInput = document.getElementById('<?= e($channelSearchId) ?>');
@@ -267,4 +261,4 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
         searchInput.addEventListener('input', applyFilters);
         applyFilters();
     });
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

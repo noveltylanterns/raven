@@ -28,6 +28,9 @@
 /** @var string $activeTab */
 /** @var \Raven\Lib\View\Panel\EditorBlocks $editorBlocks */
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -1061,14 +1064,16 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
         $renderConfigField($field);
     }
 };
+$configurationToolbarItems = [
+    '<button class="btn btn-primary" type="submit"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Configuration</button>',
+];
 ?>
 
-<header class="card">
-    <div class="card-body">
-        <h1>System Configuration</h1>
-        <p class="text-muted mt-2 mb-0">Manage site, database, debug, media, meta, security, and user/session runtime settings.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'System Configuration',
+    'summary' => 'Manage site, database, debug, media, meta, security, and user/session runtime settings.',
+    'summary_class' => 'text-muted mt-2 mb-0',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -1088,9 +1093,10 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
 <form method="post" action="<?= e($panelBase) ?>/configuration/save">
         <?= $csrfField ?>
         <input type="hidden" name="_config_tab" id="config-active-tab" value="<?= e($activeTab) ?>">
-        <nav class="rvnp-editor-actions">
-            <button class="btn btn-primary" type="submit"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Configuration</button>
-        </nav>
+        <?= Toolbar::render([
+            'items' => $configurationToolbarItems,
+            'class' => 'rvnp-editor-actions',
+        ]) ?>
 
         <section class="rvnp-editor-layout" data-rvn-tab-layout="editor">
         <ul class="nav nav-tabs" id="rvnp-editor-tabs" role="tablist">
@@ -1539,9 +1545,10 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
         </div>
         </section>
 
-    <nav class="rvnp-editor-actions">
-        <button class="btn btn-primary" type="submit"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Configuration</button>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $configurationToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 </form>
 <template id="config-contact-option-template">
     <div class="<?= e($configContactBlockLayout['row_class']) ?>" data-rvn-contact-option-row="1">
@@ -1602,7 +1609,7 @@ $editorBlocksBoot = [
 ];
 require __DIR__ . '/partial/editor_blocks.php';
 ?>
-<script>
+<?php ob_start(); ?>
   // Shows only config fields for the selected DB driver.
   (function () {
     var driverSelect = document.querySelector('[data-rvn-db-driver-select="1"]');
@@ -1789,5 +1796,5 @@ require __DIR__ . '/partial/editor_blocks.php';
     }
     syncActiveTabHiddenFieldFromDom();
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>
 <?php endif; ?>

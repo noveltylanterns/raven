@@ -24,8 +24,11 @@ declare(strict_types=1);
 /** @var string|null $flashError */
 /** @var string $csrfField */
 
-use function Raven\Lib\Security\e;
 use Raven\Lib\View\FormCountries;
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
+use function Raven\Lib\Security\e;
 
 $formName = (string) ($formData['name'] ?? '');
 $formSlug = (string) ($formData['slug'] ?? '');
@@ -48,19 +51,26 @@ $signupsTableId = 'signups-table';
 $signupsBodyId = $signupsTableId . '-body';
 $signupsCountId = 'signups-filter-count';
 $signupsEmptyId = 'signups-filter-empty';
+$signupsSubmissionsHeaderActions = [
+    '<a href="' . e($exportPath) . '" class="btn btn-primary btn-sm"><i class="bi bi-download me-2" aria-hidden="true"></i>Export CSV</a>',
+    '<button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#' . e($importModalId) . '"><i class="bi bi-upload me-2" aria-hidden="true"></i>Import CSV</button>',
+];
+$signupsSubmissionsToolbarItems = [
+    '<a href="' . e($editPath) . '" class="btn btn-primary"><i class="bi bi-pencil me-2" aria-hidden="true"></i>Edit Form</a>',
+    '<a href="' . e($indexPath) . '" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Signup Sheets</a>',
+    '<form method="post" action="' . e($clearSignupsPath) . '" class="m-0" onsubmit="return confirm(\'Clear all submissions for this signup sheet?\');">'
+        . $csrfField
+        . '<input type="hidden" name="slug" value="' . e($formSlug) . '">'
+        . '<input type="hidden" name="return_q" value="' . e($searchQuery) . '">'
+        . '<button type="submit" class="btn btn-danger"' . ($totalItems === 0 ? ' disabled' : '') . '><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Clear All</button>'
+        . '</form>',
+];
 ?>
-<header class="card">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1>Submissions for: <span class="text-primary">'<?= e($formName !== '' ? $formName : $formSlug) ?>'</span></h1>
-            <div class="d-flex flex-wrap gap-2">
-                <a href="<?= e($exportPath) ?>" class="btn btn-primary btn-sm"><i class="bi bi-download me-2" aria-hidden="true"></i>Export CSV</a>
-                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#<?= e($importModalId) ?>"><i class="bi bi-upload me-2" aria-hidden="true"></i>Import CSV</button>
-            </div>
-        </div>
-        <p class="text-muted mb-0">Slug <code><?= e($formSlug) ?></code> | Total <strong><?= (int) $totalItems ?></strong></p>
-    </div>
-</header>
+<?= Header::render([
+    'title_html' => 'Submissions for: <span class="text-primary">\'' . e($formName !== '' ? $formName : $formSlug) . '\'</span>',
+    'summary_html' => 'Slug <code>' . e($formSlug) . '</code> | Total <strong>' . (int) $totalItems . '</strong>',
+    'actions' => $signupsSubmissionsHeaderActions,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -70,16 +80,9 @@ $signupsEmptyId = 'signups-filter-empty';
 <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
-<nav>
-    <a href="<?= e($editPath) ?>" class="btn btn-primary"><i class="bi bi-pencil me-2" aria-hidden="true"></i>Edit Form</a>
-    <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Signup Sheets</a>
-    <form method="post" action="<?= e($clearSignupsPath) ?>" class="m-0" onsubmit="return confirm('Clear all submissions for this signup sheet?');">
-        <?= $csrfField ?>
-        <input type="hidden" name="slug" value="<?= e($formSlug) ?>">
-        <input type="hidden" name="return_q" value="<?= e($searchQuery) ?>">
-        <button type="submit" class="btn btn-danger"<?= $totalItems === 0 ? ' disabled' : '' ?>><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Clear All</button>
-    </form>
-</nav>
+<?= Toolbar::render([
+    'items' => $signupsSubmissionsToolbarItems,
+]) ?>
 
 <section class="card">
     <div class="card-body">
@@ -288,22 +291,15 @@ $signupsEmptyId = 'signups-filter-empty';
     </div>
 </section>
 
-<nav>
-    <a href="<?= e($editPath) ?>" class="btn btn-primary"><i class="bi bi-pencil me-2" aria-hidden="true"></i>Edit Form</a>
-    <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Signup Sheets</a>
-    <form method="post" action="<?= e($clearSignupsPath) ?>" class="m-0" onsubmit="return confirm('Clear all submissions for this signup sheet?');">
-        <?= $csrfField ?>
-        <input type="hidden" name="slug" value="<?= e($formSlug) ?>">
-        <input type="hidden" name="return_q" value="<?= e($searchQuery) ?>">
-        <button type="submit" class="btn btn-danger"<?= $totalItems === 0 ? ' disabled' : '' ?>><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Clear All</button>
-    </form>
-</nav>
+<?= Toolbar::render([
+    'items' => $signupsSubmissionsToolbarItems,
+]) ?>
 
-<style>
+<?php ob_start(); ?>
   #<?= e($signupsTableId) ?> tbody tr[data-details-row-for]:hover > td {
     background-color: transparent !important;
   }
-</style>
+<?php Footer::pushStyle((string) ob_get_clean()); ?>
 
 <div class="modal fade" id="<?= e($importModalId) ?>" tabindex="-1" aria-labelledby="<?= e($importModalId) ?>-label" aria-hidden="true">
     <div class="modal-dialog modal-sm modal-dialog-centered">
@@ -333,7 +329,7 @@ $signupsEmptyId = 'signups-filter-empty';
     </div>
 </div>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     var table = document.getElementById('<?= e($signupsTableId) ?>');
     var searchInput = document.getElementById('<?= e($signupsSearchId) ?>');
@@ -581,4 +577,4 @@ $signupsEmptyId = 'signups-filter-empty';
       });
     }
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

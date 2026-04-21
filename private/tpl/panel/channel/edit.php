@@ -25,6 +25,9 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -80,31 +83,40 @@ if ($rssFeedRoute !== '') {
 if ($atomFeedRoute !== '') {
     $channelFeedRoutes[] = '/' . $atomFeedRoute . '/' . $channelFeedSlug;
 }
-?>
-<header class="card">
-    <div class="card-body">
-        <h1>
-            <?= $channel === null ? 'New Channel' : 'Edit Channel: <span class="text-primary">\'' . e($channelName !== '' ? $channelName : 'Untitled') . '\'</span>' ?>
-        </h1>
-        <?php if ($channel === null): ?>
-            <p class="text-muted mb-0">Create or update a channel and manage its preview/cover media.</p>
-        <?php elseif ($channelPublicUrl !== null): ?>
+$channelHeaderBodyHtml = '';
+if ($channel !== null && $channelPublicUrl !== null) {
+    $channelPublicUrlEscaped = e($channelPublicUrl);
+    $channelHeaderBodyHtml = <<<HTML
             <p class="mb-0 small">
                 <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
                 <a
-                    href="<?= e($channelPublicUrl) ?>"
+                    href="{$channelPublicUrlEscaped}"
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="<?= e($channelPublicUrl) ?>"
+                    title="{$channelPublicUrlEscaped}"
                     aria-label="Open channel URL"
                     style="font-size: 0.88em;"
                 >
-                    <?= e($channelPublicUrl) ?>
+                    {$channelPublicUrlEscaped}
                 </a>
             </p>
-        <?php endif; ?>
-    </div>
-</header>
+HTML;
+}
+$channelEditorToolbarItems = [
+    '<button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Channel</button>',
+    '<a href="' . e($panelBase) . '/channel" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Channels</a>',
+];
+if ($hasPersistedChannel) {
+    $channelEditorToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' . e($deleteFormId) . '" onclick="return confirm(\'Delete this channel? Linked pages will be detached.\');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Channel</button>';
+}
+?>
+<?= Header::render([
+    'title_html' => $channel === null
+        ? 'New Channel'
+        : 'Edit Channel: <span class="text-primary">\'' . e($channelName !== '' ? $channelName : 'Untitled') . '\'</span>',
+    'summary' => $channel === null ? 'Create or update a channel and manage its preview/cover media.' : '',
+    'body_html' => $channelHeaderBodyHtml,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -125,18 +137,10 @@ if ($atomFeedRoute !== '') {
 <form method="post" action="<?= e($panelBase) ?>/channel/save" enctype="multipart/form-data">
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $channelId ?>">
-    <nav class="rvnp-editor-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Channel</button>
-        <a href="<?= e($panelBase) ?>/channel" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Channels</a>
-        <?php if ($hasPersistedChannel): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this channel? Linked pages will be detached.');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Channel</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $channelEditorToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 
     <section class="rvnp-editor-layout" data-rvn-tab-layout="editor">
     <ul class="nav nav-tabs" id="rvnp-editor-tabs" role="tablist">
@@ -505,21 +509,13 @@ if ($atomFeedRoute !== '') {
     </div>
     </section>
 
-    <nav class="rvnp-editor-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Channel</button>
-        <a href="<?= e($panelBase) ?>/channel" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Channels</a>
-        <?php if ($hasPersistedChannel): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this channel? Linked pages will be detached.');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Channel</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $channelEditorToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 </form>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     function initSetSelection(container) {
       if (!(container instanceof HTMLElement)) {
@@ -731,4 +727,4 @@ if ($atomFeedRoute !== '') {
       });
     });
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

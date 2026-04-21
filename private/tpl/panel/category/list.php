@@ -18,6 +18,9 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -49,13 +52,16 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     $queryString = http_build_query($query);
     return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
 };
+$categoryListToolbarItems = [
+    '<a class="btn btn-primary" href="' . e($panelBase) . '/category/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Category</a>',
+    '<a class="btn btn-secondary" href="' . e($panelBase) . '/category/set"><i class="bi bi-collection me-2" aria-hidden="true"></i>Manage Sets</a>',
+    '<button type="submit" class="btn btn-danger" form="' . e($bulkDeleteFormId) . '" onclick="return confirm(\'Delete selected categories? Existing page-category links will be removed.\');"><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>',
+];
 ?>
-<header class="card">
-    <div class="card-body">
-        <h1>Categories</h1>
-        <p class="text-muted mb-0">Manage category taxonomy to organize pages and category landing views.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Categories',
+    'summary' => 'Manage category taxonomy to organize pages and category landing views.',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
     <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -70,16 +76,9 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     <?= $csrfField ?>
 </form>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/category/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Category</a>
-    <a class="btn btn-secondary" href="<?= e($panelBase) ?>/category/set"><i class="bi bi-collection me-2" aria-hidden="true"></i>Manage Sets</a>
-    <button
-        type="submit"
-        class="btn btn-danger"
-        form="<?= e($bulkDeleteFormId) ?>"
-        onclick="return confirm('Delete selected categories? Existing page-category links will be removed.');"
-    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
-</nav>
+<?= Toolbar::render([
+    'items' => $categoryListToolbarItems,
+]) ?>
 
 <section class="card">
     <div class="card-body">
@@ -225,18 +224,11 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     </div>
 </section>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/category/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Category</a>
-    <a class="btn btn-secondary" href="<?= e($panelBase) ?>/category/set"><i class="bi bi-collection me-2" aria-hidden="true"></i>Manage Sets</a>
-    <button
-        type="submit"
-        class="btn btn-danger"
-        form="<?= e($bulkDeleteFormId) ?>"
-        onclick="return confirm('Delete selected categories? Existing page-category links will be removed.');"
-    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
-</nav>
+<?= Toolbar::render([
+    'items' => $categoryListToolbarItems,
+]) ?>
 
-<script>
+<?php ob_start(); ?>
     document.addEventListener('DOMContentLoaded', function () {
         var table = document.getElementById('<?= e($categoryTableId) ?>');
         var searchInput = document.getElementById('<?= e($categorySearchId) ?>');
@@ -300,4 +292,4 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
         searchInput.addEventListener('input', applyFilters);
         applyFilters();
     });
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

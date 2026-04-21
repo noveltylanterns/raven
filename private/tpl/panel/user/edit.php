@@ -32,8 +32,11 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
-use function Raven\Lib\Security\e;
 use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
+use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $editorBlocks = ($editorBlocks ?? null) instanceof \Raven\Lib\View\Panel\EditorBlocks
@@ -201,31 +204,40 @@ $themeLabels = [
     'ice' => 'Ice',
     'midnight' => 'Midnight',
 ];
-?>
-<header class="card">
-    <div class="card-body">
-        <h1>
-            <?= $userRow === null ? 'New User' : 'Edit User: <span class="text-primary">\'' . e($userDisplayName !== '' ? $userDisplayName : ($userName !== '' ? $userName : 'Untitled')) . '\'</span>' ?>
-        </h1>
-        <?php if ($userRow === null): ?>
-            <p class="text-muted mb-0">Create or update user accounts, group membership, theme, and avatar settings.</p>
-        <?php elseif ($userPublicUrl !== null): ?>
+$userHeaderBodyHtml = '';
+if ($userRow !== null && $userPublicUrl !== null) {
+    $userPublicUrlEscaped = e($userPublicUrl);
+    $userHeaderBodyHtml = <<<HTML
             <p class="mb-0 small">
                 <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
                 <a
-                    href="<?= e($userPublicUrl) ?>"
+                    href="{$userPublicUrlEscaped}"
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="<?= e($userPublicUrl) ?>"
+                    title="{$userPublicUrlEscaped}"
                     aria-label="Open user profile URL"
                     style="font-size: 0.88em;"
                 >
-                    <?= e($userPublicUrl) ?>
+                    {$userPublicUrlEscaped}
                 </a>
             </p>
-        <?php endif; ?>
-    </div>
-</header>
+HTML;
+}
+$userEditorToolbarItems = [
+    '<button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save User</button>',
+    '<a href="' . e($panelBase) . '/user" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Users</a>',
+];
+if ($hasPersistedUser) {
+    $userEditorToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' . e($deleteFormId) . '" onclick="return confirm(\'Delete this user?\');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete User</button>';
+}
+?>
+<?= Header::render([
+    'title_html' => $userRow === null
+        ? 'New User'
+        : 'Edit User: <span class="text-primary">\'' . e($userDisplayName !== '' ? $userDisplayName : ($userName !== '' ? $userName : 'Untitled')) . '\'</span>',
+    'summary' => $userRow === null ? 'Create or update user accounts, group membership, theme, and avatar settings.' : '',
+    'body_html' => $userHeaderBodyHtml,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -247,18 +259,10 @@ $themeLabels = [
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $userId ?>">
     <input type="hidden" name="tab" id="user-active-tab" value="<?= e($activeTab) ?>">
-    <nav class="rvnp-editor-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save User</button>
-        <a href="<?= e($panelBase) ?>/user" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Users</a>
-        <?php if ($hasPersistedUser): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this user?');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete User</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $userEditorToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 
     <section class="rvnp-editor-layout" data-rvn-tab-layout="editor">
     <ul class="nav nav-tabs" id="rvnp-editor-tabs" role="tablist">
@@ -634,18 +638,10 @@ $themeLabels = [
     </div>
     </section>
 
-    <nav class="rvnp-editor-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save User</button>
-        <a href="<?= e($panelBase) ?>/user" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Users</a>
-        <?php if ($hasPersistedUser): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this user?');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete User</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $userEditorToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 </form>
 
 <?php if ($userRow !== null): ?>
@@ -670,7 +666,7 @@ $themeLabels = [
     >
 </template>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     var toggleButton = document.getElementById('user-password-toggle');
     var fieldsContainer = document.getElementById('user-password-fields');
@@ -715,7 +711,7 @@ $themeLabels = [
       }
     });
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>
 <?php endif; ?>
 
 <?php if ($profileContactOptions !== []): ?>
@@ -793,7 +789,7 @@ $editorBlocksBoot[] = [
 require dirname(__DIR__) . '/partial/editor_blocks.php';
 ?>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     var activeTabInput = document.getElementById('user-active-tab');
     if (!(activeTabInput instanceof HTMLInputElement)) {
@@ -829,4 +825,4 @@ require dirname(__DIR__) . '/partial/editor_blocks.php';
       activeTabInput.value = tabKeyFromButton(target);
     });
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

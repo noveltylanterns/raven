@@ -8,16 +8,20 @@ declare(strict_types=1);
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
+$categorySetListToolbarItems = [
+    '<a class="btn btn-primary" href="' . e($panelBase) . '/category/set/edit"><i class="bi bi-collection me-2" aria-hidden="true"></i>New Category Set</a>',
+    '<a class="btn btn-secondary" href="' . e($panelBase) . '/category"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Categories</a>',
+];
 ?>
-<header class="card">
-    <div class="card-body">
-        <h1>Category Sets</h1>
-        <p class="text-muted mb-0">Manage reusable category sets that channels can share or isolate.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Category Sets',
+    'summary' => 'Manage reusable category sets that channels can share or isolate.',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -27,10 +31,9 @@ $panelBase = '/' . trim($site['panel_path'], '/');
 <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/category/set/edit"><i class="bi bi-collection me-2" aria-hidden="true"></i>New Category Set</a>
-    <a class="btn btn-secondary" href="<?= e($panelBase) ?>/category"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Categories</a>
-</nav>
+<?= Toolbar::render([
+    'items' => $categorySetListToolbarItems,
+]) ?>
 
 <section class="card">
     <div class="card-body">
@@ -94,7 +97,6 @@ $panelBase = '/' . trim($site['panel_path'], '/');
     </div>
 </section>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/category/set/edit"><i class="bi bi-collection me-2" aria-hidden="true"></i>New Category Set</a>
-    <a class="btn btn-secondary" href="<?= e($panelBase) ?>/category"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Categories</a>
-</nav>
+<?= Toolbar::render([
+    'items' => $categorySetListToolbarItems,
+]) ?>

@@ -20,6 +20,9 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -66,31 +69,40 @@ $tagPublicUrl = null;
 if ($tag !== null && $publicBase !== '' && $tagSlug !== '' && $tagRoutePrefix !== '') {
     $tagPublicUrl = $publicBase . '/' . rawurlencode($tagRoutePrefix) . '/' . rawurlencode($tagSlug);
 }
-?>
-<header class="card">
-    <div class="card-body">
-        <h1>
-            <?= $tag === null ? 'New Tag' : 'Edit Tag: <span class="text-primary">\'' . e($tagName !== '' ? $tagName : 'Untitled') . '\'</span>' ?>
-        </h1>
-        <?php if ($tag === null): ?>
-            <p class="text-muted mb-0">Create or update a tag and manage its preview/cover media.</p>
-        <?php elseif ($tagPublicUrl !== null): ?>
+$tagHeaderBodyHtml = '';
+if ($tag !== null && $tagPublicUrl !== null) {
+    $tagPublicUrlEscaped = e($tagPublicUrl);
+    $tagHeaderBodyHtml = <<<HTML
             <p class="mb-0 small">
                 <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
                 <a
-                    href="<?= e($tagPublicUrl) ?>"
+                    href="{$tagPublicUrlEscaped}"
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="<?= e($tagPublicUrl) ?>"
+                    title="{$tagPublicUrlEscaped}"
                     aria-label="Open tag URL"
                     style="font-size: 0.88em;"
                 >
-                    <?= e($tagPublicUrl) ?>
+                    {$tagPublicUrlEscaped}
                 </a>
             </p>
-        <?php endif; ?>
-    </div>
-</header>
+HTML;
+}
+$tagEditorToolbarItems = [
+    '<button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Tag</button>',
+    '<a href="' . e($panelBase) . '/tag" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Tags</a>',
+];
+if ($hasPersistedTag) {
+    $tagEditorToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' . e($deleteFormId) . '" onclick="return confirm(\'Delete this tag? Existing page-tag links will be removed.\');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Tag</button>';
+}
+?>
+<?= Header::render([
+    'title_html' => $tag === null
+        ? 'New Tag'
+        : 'Edit Tag: <span class="text-primary">\'' . e($tagName !== '' ? $tagName : 'Untitled') . '\'</span>',
+    'summary' => $tag === null ? 'Create or update a tag and manage its preview/cover media.' : '',
+    'body_html' => $tagHeaderBodyHtml,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -111,18 +123,10 @@ if ($tag !== null && $publicBase !== '' && $tagSlug !== '' && $tagRoutePrefix !=
 <form method="post" action="<?= e($panelBase) ?>/tag/save" enctype="multipart/form-data">
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $tagId ?>">
-    <nav class="rvnp-editor-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Tag</button>
-        <a href="<?= e($panelBase) ?>/tag" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Tags</a>
-        <?php if ($hasPersistedTag): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this tag? Existing page-tag links will be removed.');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Tag</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $tagEditorToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 
     <section class="rvnp-editor-layout" data-rvn-tab-layout="editor">
     <ul class="nav nav-tabs" id="rvnp-editor-tabs" role="tablist">
@@ -292,21 +296,13 @@ if ($tag !== null && $publicBase !== '' && $tagSlug !== '' && $tagRoutePrefix !=
     </div>
     </section>
 
-    <nav class="rvnp-editor-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Tag</button>
-        <a href="<?= e($panelBase) ?>/tag" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Tags</a>
-        <?php if ($hasPersistedTag): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this tag? Existing page-tag links will be removed.');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Tag</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $tagEditorToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 </form>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     function copyViaLegacyCommand(value) {
       var textArea = document.createElement('textarea');
@@ -389,4 +385,4 @@ if ($tag !== null && $publicBase !== '' && $tagSlug !== '' && $tagRoutePrefix !=
       });
     });
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

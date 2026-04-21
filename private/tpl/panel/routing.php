@@ -29,6 +29,9 @@ declare(strict_types=1);
  *   is_conflict: bool
  * }> $routeRows */
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -60,14 +63,15 @@ foreach ($routeRows as $row) {
 }
 asort($typeFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
 asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
+$routingToolbarItems = [
+    '<a class="btn btn-primary" href="' . e($panelBase) . '/routing/export"><i class="bi bi-download me-2" aria-hidden="true"></i>Export CSV</a>',
+];
 ?>
 
-<header class="card">
-    <div class="card-body">
-        <h1>Routing Table</h1>
-        <p class="text-muted mb-0">A sortable inventory of all public URI routes and their destinations.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Routing Table',
+    'summary' => 'A sortable inventory of all public URI routes and their destinations.',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -123,11 +127,9 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
 </section>
 
 <?php if ($routeRows !== []): ?>
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/routing/export">
-        <i class="bi bi-download me-2" aria-hidden="true"></i>Export CSV
-    </a>
-</nav>
+<?= Toolbar::render([
+    'items' => $routingToolbarItems,
+]) ?>
 <?php endif; ?>
 
 <section class="card">
@@ -248,14 +250,12 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
 </section>
 
 <?php if ($routeRows !== []): ?>
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/routing/export">
-        <i class="bi bi-download me-2" aria-hidden="true"></i>Export CSV
-    </a>
-</nav>
+<?= Toolbar::render([
+    'items' => $routingToolbarItems,
+]) ?>
 <?php endif; ?>
 
-<script>
+<?php ob_start(); ?>
     (function () {
         var table = document.getElementById('routing-table');
         if (!(table instanceof HTMLTableElement)) {
@@ -600,4 +600,4 @@ asort($statusFilterOptions, SORT_NATURAL | SORT_FLAG_CASE);
         updateConflictsToggleState();
         applyFilters();
     })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

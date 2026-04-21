@@ -24,6 +24,7 @@
 /** @var string|null $pageNavChannel */
 /** @var string|null $pageTitle */
 
+use Raven\Lib\View\Panel\Footer;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -340,9 +341,20 @@ $includePanelLayoutScripts = $section !== 'login';
             line-height: 1.1;
         }
 
-        body#rvnp .rvnp-footer-placeholder {
-            height: 50px;
-            background: transparent;
+        body#rvnp .rvnp-footer {
+            margin-top: 1.5rem;
+            padding: 0.9rem 0 1.25rem;
+            border-top: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        body#rvnp .rvnp-footer a {
+            color: inherit;
+            text-decoration-color: rgba(0, 0, 0, 0.28);
+        }
+
+        body#rvnp .rvnp-footer a:hover,
+        body#rvnp .rvnp-footer a:focus-visible {
+            text-decoration-color: currentColor;
         }
 
         body#rvnp .nav-tabs[data-rvn-tab-group][data-rvn-tab-position="top"],
@@ -779,7 +791,7 @@ $includePanelLayoutScripts = $section !== 'login';
 
         <main id="rvnp-main" class="<?= $showSidebar ? 'col-12 col-md-9 col-lg-9 col-xl-10' : 'col-12 rvnp-login-main' ?>">
             <?= $content ?>
-            <footer class="rvnp-footer-placeholder" aria-hidden="true"></footer>
+            <?= Footer::render() ?>
         </main>
     </div>
 </div>
@@ -1456,5 +1468,6 @@ $includePanelLayoutScripts = $section !== 'login';
     })();
 </script>
 <?php endif; ?>
+<?= Footer::renderDeferredAssets() ?>
 </body>
 </html>

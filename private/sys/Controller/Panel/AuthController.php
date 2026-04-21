@@ -23,6 +23,7 @@ use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\SiteContextBuilder;
 
 use Raven\Lib\Transport\Redirect;
@@ -77,6 +78,7 @@ final class AuthController
         }
 
         $loginIdentifierMode = $this->loginIdentifierMode();
+        Footer::reset();
 
         $this->view->render('panel/auth/login', [
             'site' => $this->siteData(),
@@ -147,6 +149,8 @@ final class AuthController
             $this->loginUiState()->clearAll();
             Redirect::redirect($this->panelUrl('/login'));
         }
+
+        Footer::reset();
 
         $this->view->render('panel/auth/login_2fa', [
             'site' => $this->siteData(),

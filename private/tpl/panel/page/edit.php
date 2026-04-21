@@ -43,7 +43,9 @@ declare(strict_types=1);
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
+use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -296,6 +298,13 @@ if ($publishedPermalink !== null) {
             </p>
 HTML;
 }
+$pageEditorToolbarItems = [
+    '<button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Page</button>',
+    '<a href="' . e($panelBase) . '/page" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Pages</a>',
+];
+if ($hasPersistedPage) {
+    $pageEditorToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' . e($deleteFormId) . '" onclick="return confirm(\'Delete this page?\');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Page</button>';
+}
 ?>
 <?= Header::render([
     'title_html' => $page === null
@@ -324,18 +333,10 @@ HTML;
 <form id="page-edit-form" method="post" action="<?= e($panelBase) ?>/page/save">
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $pageId ?>">
-    <nav class="rvnp-editor-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Page</button>
-        <a href="<?= e($panelBase) ?>/page" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Pages</a>
-        <?php if ($hasPersistedPage): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this page?');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Page</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $pageEditorToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 
     <section class="rvnp-editor-layout" data-rvn-tab-layout="editor">
     <ul class="nav nav-tabs" id="rvnp-editor-tabs" role="tablist">
@@ -975,18 +976,10 @@ HTML;
     </div>
     </section>
 
-    <nav class="rvnp-editor-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Page</button>
-        <a href="<?= e($panelBase) ?>/page" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Pages</a>
-        <?php if ($hasPersistedPage): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this page?');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Page</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $pageEditorToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 </form>
 
 <template id="page-body-block-template">
@@ -1037,7 +1030,10 @@ $editorBlocksBoot = [];
 require __DIR__ . '/../partial/editor_blocks.php';
 ?>
 
-<style>
+<?php
+// Keep editor skin overrides attached to the shared panel footer instead of inline body output.
+ob_start();
+?>
   /* Match TinyMCE frame border/radius with Bootstrap form-control styling. */
   .tox.tox-tinymce {
     border: var(--bs-border-width, 1px) solid var(--raven-border) !important;
@@ -1363,14 +1359,20 @@ require __DIR__ . '/../partial/editor_blocks.php';
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     text-transform: uppercase;
   }
-</style>
+<?php Footer::pushStyle((string) ob_get_clean()); ?>
 
+<?php
+// Keep editor vendor assets grouped with other route-owned footer output.
+ob_start();
+?>
 <!-- TinyMCE loaded locally from Nginx /mce/ mapping (no CDN). -->
 <script src="<?= e($mceScriptUrl ?? '/mce/tinymce.min.js') ?>"></script>
 <!-- Markdown editor assets are loaded locally from Composer install path (no CDN). -->
 <link rel="stylesheet" href="<?= e($mdeCssUrl ?? '/mde/easymde.min.css') ?>">
 <script src="<?= e($mdeScriptUrl ?? '/mde/easymde.min.js') ?>"></script>
-<script>
+<?php Footer::pushHtml((string) ob_get_clean()); ?>
+
+<?php ob_start(); ?>
   // If browser validation fails in a hidden tab, switch to that tab automatically.
   (function () {
     var form = document.getElementById('page-edit-form');
@@ -1423,7 +1425,7 @@ require __DIR__ . '/../partial/editor_blocks.php';
       window.bootstrap.Tab.getOrCreateInstance(mediaTabButton).show();
     }
 
-    // Bootstrap bundle is loaded by layout after this view, so run again on load.
+    // Re-run on load so the redirected media tab still activates after all shared scripts finish booting.
     activateMediaTab();
     window.addEventListener('load', activateMediaTab);
   })();
@@ -3714,4 +3716,4 @@ require __DIR__ . '/../partial/editor_blocks.php';
       });
     }
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

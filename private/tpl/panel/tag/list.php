@@ -18,6 +18,9 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -49,13 +52,16 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     $queryString = http_build_query($query);
     return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
 };
+$tagListToolbarItems = [
+    '<a class="btn btn-primary" href="' . e($panelBase) . '/tag/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Tag</a>',
+    '<a class="btn btn-secondary" href="' . e($panelBase) . '/tag/set"><i class="bi bi-collection me-2" aria-hidden="true"></i>Manage Sets</a>',
+    '<button type="submit" class="btn btn-danger" form="' . e($bulkDeleteFormId) . '" onclick="return confirm(\'Delete selected tags? Existing page-tag links will be removed.\');"><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>',
+];
 ?>
-<header class="card">
-    <div class="card-body">
-        <h1>Tags</h1>
-        <p class="text-muted mb-0">Manage tags used for page labeling, filtering, and public tag index views.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Tags',
+    'summary' => 'Manage tags used for page labeling, filtering, and public tag index views.',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -70,16 +76,9 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     <?= $csrfField ?>
 </form>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/tag/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Tag</a>
-    <a class="btn btn-secondary" href="<?= e($panelBase) ?>/tag/set"><i class="bi bi-collection me-2" aria-hidden="true"></i>Manage Sets</a>
-    <button
-        type="submit"
-        class="btn btn-danger"
-        form="<?= e($bulkDeleteFormId) ?>"
-        onclick="return confirm('Delete selected tags? Existing page-tag links will be removed.');"
-    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
-</nav>
+<?= Toolbar::render([
+    'items' => $tagListToolbarItems,
+]) ?>
 
 <section class="card">
     <div class="card-body">
@@ -225,18 +224,11 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     </div>
 </section>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/tag/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Tag</a>
-    <a class="btn btn-secondary" href="<?= e($panelBase) ?>/tag/set"><i class="bi bi-collection me-2" aria-hidden="true"></i>Manage Sets</a>
-    <button
-        type="submit"
-        class="btn btn-danger"
-        form="<?= e($bulkDeleteFormId) ?>"
-        onclick="return confirm('Delete selected tags? Existing page-tag links will be removed.');"
-    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
-</nav>
+<?= Toolbar::render([
+    'items' => $tagListToolbarItems,
+]) ?>
 
-<script>
+<?php ob_start(); ?>
     document.addEventListener('DOMContentLoaded', function () {
         var table = document.getElementById('<?= e($tagTableId) ?>');
         var searchInput = document.getElementById('<?= e($tagSearchId) ?>');
@@ -300,4 +292,4 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
         searchInput.addEventListener('input', applyFilters);
         applyFilters();
     });
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

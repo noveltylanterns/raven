@@ -17,7 +17,9 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
+use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -45,6 +47,10 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     $queryString = http_build_query($query);
     return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
 };
+$groupListToolbarItems = [
+    '<a class="btn btn-primary" href="' . e($panelBase) . '/group/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Group</a>',
+    '<button type="submit" class="btn btn-danger" form="' . e($bulkDeleteFormId) . '" onclick="return confirm(\'Delete selected groups? Stock groups cannot be deleted.\');"><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>',
+];
 ?>
 <?= Header::render([
     'title' => 'Groups',
@@ -64,15 +70,9 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     <?= $csrfField ?>
 </form>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/group/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Group</a>
-    <button
-        type="submit"
-        class="btn btn-danger"
-        form="<?= e($bulkDeleteFormId) ?>"
-        onclick="return confirm('Delete selected groups? Stock groups cannot be deleted.');"
-    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
-</nav>
+<?= Toolbar::render([
+    'items' => $groupListToolbarItems,
+]) ?>
 
 <section class="card">
     <div class="card-body">
@@ -225,17 +225,11 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     </div>
 </section>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/group/edit"><i class="bi bi-folder-plus me-2" aria-hidden="true"></i>New Group</a>
-    <button
-        type="submit"
-        class="btn btn-danger"
-        form="<?= e($bulkDeleteFormId) ?>"
-        onclick="return confirm('Delete selected groups? Stock groups cannot be deleted.');"
-    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
-</nav>
+<?= Toolbar::render([
+    'items' => $groupListToolbarItems,
+]) ?>
 
-<script>
+<?php ob_start(); ?>
     document.addEventListener('DOMContentLoaded', function () {
         var table = document.getElementById('<?= e($groupsTableId) ?>');
         var searchInput = document.getElementById('<?= e($groupsSearchId) ?>');
@@ -294,4 +288,4 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
         }
         applyFilters();
     });
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

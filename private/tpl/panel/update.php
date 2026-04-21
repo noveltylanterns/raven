@@ -11,6 +11,9 @@ declare(strict_types=1);
 /** @var bool $allowOverwrite */
 /** @var array<string, string> $updateSourceModes */
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -57,18 +60,37 @@ $revisionRows = [
         'remote_meta' => '',
     ],
 ];
+$updateToolbarItems = [
+    '<button type="submit" form="update-system-form" name="update_action" value="check" class="btn btn-primary">Check For Updates</button>',
+    '<button type="submit" form="update-system-form" name="update_action" value="dry_run" class="btn btn-warning">Dry Run</button>',
+    '<button type="submit" form="update-system-form" name="update_action" value="update_now" class="btn btn-danger">Update Now</button>',
+];
 ?>
 
-<header class="card">
-    <div class="card-body">
-        <form id="update-system-form" method="post" action="<?= e($panelBase) ?>/update/action" class="mb-0">
-            <?= $csrfField ?>
-            <div>
-                <h1>Update Raven</h1>
-                <p class="text-muted mb-0">Compare this Raven install against a git source, dry run the overlay, or update the managed package files in place.</p>
-            </div>
+<?= Header::render([
+    'title' => 'Update Raven',
+    'summary' => 'Compare this Raven install against a git source, dry run the overlay, or update the managed package files in place.',
+]) ?>
 
-            <div class="row g-3 mt-2">
+<?= Toolbar::render([
+    'items' => $updateToolbarItems,
+    'class' => 'rvnp-editor-actions',
+]) ?>
+
+<?php if ($flashSuccess !== null): ?>
+<div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
+<?php endif; ?>
+
+<?php if ($flashError !== null): ?>
+<div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
+<?php endif; ?>
+
+<form id="update-system-form" method="post" action="<?= e($panelBase) ?>/update/action" class="mb-0">
+    <?= $csrfField ?>
+    <section class="card">
+        <div class="card-body">
+            <h2 class="mb-3">Source</h2>
+            <div class="row g-3">
                 <div class="col-12 col-lg-4">
                     <label class="form-label" for="update_source_mode">Source</label>
                     <select class="form-select" id="update_source_mode" name="update_source_mode">
@@ -112,23 +134,9 @@ $revisionRows = [
                     </div>
                 </div>
             </div>
-        </form>
-    </div>
-</header>
-
-<nav class="rvnp-editor-actions">
-    <button type="submit" form="update-system-form" name="update_action" value="check" class="btn btn-primary">Check For Updates</button>
-    <button type="submit" form="update-system-form" name="update_action" value="dry_run" class="btn btn-warning">Dry Run</button>
-    <button type="submit" form="update-system-form" name="update_action" value="update_now" class="btn btn-danger">Update Now</button>
-</nav>
-
-<?php if ($flashSuccess !== null): ?>
-<div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
-<?php endif; ?>
-
-<?php if ($flashError !== null): ?>
-<div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
-<?php endif; ?>
+        </div>
+    </section>
+</form>
 
 <section class="card">
     <div class="card-body">
@@ -238,13 +246,12 @@ $revisionRows = [
     </div>
 </section>
 
-<nav class="rvnp-editor-actions">
-    <button type="submit" form="update-system-form" name="update_action" value="check" class="btn btn-primary">Check For Updates</button>
-    <button type="submit" form="update-system-form" name="update_action" value="dry_run" class="btn btn-warning">Dry Run</button>
-    <button type="submit" form="update-system-form" name="update_action" value="update_now" class="btn btn-danger">Update Now</button>
-</nav>
+<?= Toolbar::render([
+    'items' => $updateToolbarItems,
+    'class' => 'rvnp-editor-actions',
+]) ?>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     var sourceMode = document.getElementById('update_source_mode');
     if (!(sourceMode instanceof HTMLSelectElement)) {
@@ -266,4 +273,4 @@ $revisionRows = [
     sourceMode.addEventListener('change', syncSourceFields);
     syncSourceFields();
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

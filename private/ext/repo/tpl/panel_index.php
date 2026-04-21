@@ -9,6 +9,9 @@
 
 declare(strict_types=1);
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $formatTimestamp = static function (?string $value): string {
@@ -26,23 +29,26 @@ $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
 $extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lanterns.io'));
 $repoTableBodyId = 'repo-index-table-body';
 $focusSlug = trim((string) ($focusSlug ?? ''));
+$repoHeaderActions = [];
+if ($extensionDocsUrl !== '') {
+    $repoHeaderActions[] = '<a href="' . e($extensionDocsUrl) . '" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">'
+        . '<i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation'
+        . '</a>';
+}
+$repoIndexToolbarItems = [
+    '<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#repoImportModal"><i class="bi bi-box-arrow-in-down me-2" aria-hidden="true"></i>Import Repo</button>',
+    '<a href="' . e($settingsPath) . '" class="btn btn-primary"><i class="bi bi-gear me-2" aria-hidden="true"></i>Settings</a>',
+    '<a href="' . e($logsPath) . '" class="btn btn-primary"><i class="bi bi-clipboard2-pulse me-2" aria-hidden="true"></i>View Logs</a>',
+];
 ?>
-<header class="card mb-3">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1 class="mb-0">
-                <?= e($extensionName !== '' ? $extensionName : 'Repositories') ?>
-            </h1>
-            <?php if ($extensionDocsUrl !== ''): ?>
-                <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                    <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
-                </a>
-            <?php endif; ?>
-        </div>
-        <h5>by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h5>
-        <p class="text-muted mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'Mirror Git repositories into Raven with optional public browsing.') ?></p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => $extensionName !== '' ? $extensionName : 'Repositories',
+    'title_class' => 'mb-0',
+    'subheading_html' => 'by ' . e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown'),
+    'summary' => $extensionDescription !== '' ? $extensionDescription : 'Mirror Git repositories into Raven with optional public browsing.',
+    'actions' => $repoHeaderActions,
+    'card_class' => 'card mb-3',
+]) ?>
 
 <?php if ($flashSuccess !== null && $flashSuccess !== ''): ?>
     <div class="alert alert-success"><?= e($flashSuccess) ?></div>
@@ -75,11 +81,11 @@ $focusSlug = trim((string) ($focusSlug ?? ''));
     </div>
 <?php endif; ?>
 
-<div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
-    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#repoImportModal"><i class="bi bi-box-arrow-in-down me-2" aria-hidden="true"></i>Import Repo</button>
-    <a href="<?= e($settingsPath) ?>" class="btn btn-primary"><i class="bi bi-gear me-2" aria-hidden="true"></i>Settings</a>
-    <a href="<?= e($logsPath) ?>" class="btn btn-primary"><i class="bi bi-clipboard2-pulse me-2" aria-hidden="true"></i>View Logs</a>
-</div>
+<?= Toolbar::render([
+    'items' => $repoIndexToolbarItems,
+    'tag' => 'div',
+    'class' => 'd-flex flex-wrap justify-content-end gap-2 mb-3',
+]) ?>
 
 <div class="card mb-3">
     <div class="card-body">
@@ -212,11 +218,11 @@ $focusSlug = trim((string) ($focusSlug ?? ''));
     </div>
 </div>
 
-<div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
-    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#repoImportModal"><i class="bi bi-box-arrow-in-down me-2" aria-hidden="true"></i>Import Repo</button>
-    <a href="<?= e($settingsPath) ?>" class="btn btn-primary"><i class="bi bi-gear me-2" aria-hidden="true"></i>Settings</a>
-    <a href="<?= e($logsPath) ?>" class="btn btn-primary"><i class="bi bi-clipboard2-pulse me-2" aria-hidden="true"></i>View Logs</a>
-</div>
+<?= Toolbar::render([
+    'items' => $repoIndexToolbarItems,
+    'tag' => 'div',
+    'class' => 'd-flex flex-wrap justify-content-end gap-2 mb-3',
+]) ?>
 
 <div class="modal fade" id="repoImportModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -276,7 +282,7 @@ $focusSlug = trim((string) ($focusSlug ?? ''));
     </div>
 </div>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     var summaryRows = Array.from(document.querySelectorAll('[data-summary-row="1"]'));
     if (summaryRows.length === 0) {
@@ -374,9 +380,9 @@ $focusSlug = trim((string) ($focusSlug ?? ''));
     bindBootstrapCollapseStateSync();
     window.addEventListener('load', bindBootstrapCollapseStateSync);
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     var sourceInput = document.getElementById('repo_import_source_url');
     var nameInput = document.getElementById('repo_import_label');
@@ -431,9 +437,9 @@ $focusSlug = trim((string) ($focusSlug ?? ''));
     sourceInput.addEventListener('input', syncFromUrl);
     sourceInput.addEventListener('change', syncFromUrl);
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     var focusRow = document.querySelector('[data-import-focus="1"]');
     if (!(focusRow instanceof HTMLElement)) {
@@ -444,4 +450,4 @@ $focusSlug = trim((string) ($focusSlug ?? ''));
       focusRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }, { once: true });
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

@@ -16,7 +16,9 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
+use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -63,6 +65,10 @@ foreach ($redirectRows as $redirectRow) {
 }
 asort($redirectStatusOptions, SORT_NATURAL | SORT_FLAG_CASE);
 asort($redirectChannelOptions, SORT_NATURAL | SORT_FLAG_CASE);
+$redirectListToolbarItems = [
+    '<a class="btn btn-primary" href="' . e($panelBase) . '/redirect/edit"><i class="bi bi-bookmark-plus me-2" aria-hidden="true"></i>New Redirect</a>',
+    '<button type="submit" class="btn btn-danger" form="' . e($bulkDeleteFormId) . '" onclick="return confirm(\'Delete selected redirects?\');"><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>',
+];
 ?>
 <?= Header::render([
     'title' => 'Redirects',
@@ -82,15 +88,9 @@ asort($redirectChannelOptions, SORT_NATURAL | SORT_FLAG_CASE);
     <?= $csrfField ?>
 </form>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/redirect/edit"><i class="bi bi-bookmark-plus me-2" aria-hidden="true"></i>New Redirect</a>
-    <button
-        type="submit"
-        class="btn btn-danger"
-        form="<?= e($bulkDeleteFormId) ?>"
-        onclick="return confirm('Delete selected redirects?');"
-    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
-</nav>
+<?= Toolbar::render([
+    'items' => $redirectListToolbarItems,
+]) ?>
 
 <section class="card">
     <div class="card-body">
@@ -246,17 +246,11 @@ asort($redirectChannelOptions, SORT_NATURAL | SORT_FLAG_CASE);
     </div>
 </section>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/redirect/edit"><i class="bi bi-bookmark-plus me-2" aria-hidden="true"></i>New Redirect</a>
-    <button
-        type="submit"
-        class="btn btn-danger"
-        form="<?= e($bulkDeleteFormId) ?>"
-        onclick="return confirm('Delete selected redirects?');"
-    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
-</nav>
+<?= Toolbar::render([
+    'items' => $redirectListToolbarItems,
+]) ?>
 
-<script>
+<?php ob_start(); ?>
     document.addEventListener('DOMContentLoaded', function () {
         var table = document.getElementById('<?= e($redirectTableId) ?>');
         var searchInput = document.getElementById('<?= e($redirectSearchId) ?>');
@@ -343,4 +337,4 @@ asort($redirectChannelOptions, SORT_NATURAL | SORT_FLAG_CASE);
 
         applyFilters();
     });
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

@@ -37,6 +37,7 @@ declare(strict_types=1);
  *   uninstall_block_reason: string
  * }> $extensions */
 
+use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
 use function Raven\Lib\Security\e;
 
@@ -62,7 +63,7 @@ $extensionHeaderBodyHtml = <<<HTML
         </p>
 HTML;
 ?>
-<style>
+<?php ob_start(); ?>
     body#rvnp #extensions-table thead th[data-sort-key] {
         color: var(--raven-muted);
         cursor: pointer;
@@ -78,7 +79,7 @@ HTML;
     body#rvnp #extensions-table thead th[data-sort-key].is-active-sort .raven-routing-sort-caret {
         opacity: 1;
     }
-</style>
+<?php Footer::pushStyle((string) ob_get_clean()); ?>
 
 <?= Header::render([
     'title' => 'Extension Manager',
@@ -454,7 +455,7 @@ HTML;
     </div>
 </div>
 
-<script>
+<?php ob_start(); ?>
     (function () {
         var table = document.getElementById('extensions-table');
         if (!(table instanceof HTMLTableElement)) {
@@ -565,8 +566,8 @@ HTML;
         });
         sortRowsBy('name', 'asc');
     })();
-</script>
-<script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>
+<?php ob_start(); ?>
     (function () {
         var extensionTypeSelect = document.getElementById('extension_type');
         var generateAgentsCheckbox = document.getElementById('extension_generate_agents');
@@ -632,4 +633,4 @@ HTML;
         }
         renderGeneratedFiles();
     })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

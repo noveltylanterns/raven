@@ -21,7 +21,9 @@
 /** @var string|null $flashError */
 
 use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -69,6 +71,13 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     $queryString = http_build_query($query);
     return $paginationBasePath . ($queryString !== '' ? '?' . $queryString : '');
 };
+$userListToolbarItems = [
+    '<a class="btn btn-primary" href="' . e($panelBase) . '/user/edit"><i class="bi bi-person-plus me-2" aria-hidden="true"></i>New User</a>',
+];
+if ($registrationMode === 'invite') {
+    $userListToolbarItems[] = '<a class="btn btn-secondary" href="' . e($panelBase) . '/user/invites"><i class="bi bi-ticket-perforated me-2" aria-hidden="true"></i>Invite Tokens</a>';
+}
+$userListToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' . e($bulkDeleteFormId) . '" onclick="return confirm(\'Delete selected users? You cannot delete your currently logged-in account.\');"><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>';
 ?>
 <?= Header::render([
     'title' => 'Users',
@@ -88,18 +97,9 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     <?= $csrfField ?>
 </form>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/user/edit"><i class="bi bi-person-plus me-2" aria-hidden="true"></i>New User</a>
-    <?php if ($registrationMode === 'invite'): ?>
-    <a class="btn btn-secondary" href="<?= e($panelBase) ?>/user/invites"><i class="bi bi-ticket-perforated me-2" aria-hidden="true"></i>Invite Tokens</a>
-    <?php endif; ?>
-    <button
-        type="submit"
-        class="btn btn-danger"
-        form="<?= e($bulkDeleteFormId) ?>"
-        onclick="return confirm('Delete selected users? You cannot delete your currently logged-in account.');"
-    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
-</nav>
+<?= Toolbar::render([
+    'items' => $userListToolbarItems,
+]) ?>
 
 <section class="card">
     <div class="card-body">
@@ -298,20 +298,11 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
     </div>
 </section>
 
-<nav>
-    <a class="btn btn-primary" href="<?= e($panelBase) ?>/user/edit"><i class="bi bi-person-plus me-2" aria-hidden="true"></i>New User</a>
-    <?php if ($registrationMode === 'invite'): ?>
-    <a class="btn btn-secondary" href="<?= e($panelBase) ?>/user/invites"><i class="bi bi-ticket-perforated me-2" aria-hidden="true"></i>Invite Tokens</a>
-    <?php endif; ?>
-    <button
-        type="submit"
-        class="btn btn-danger"
-        form="<?= e($bulkDeleteFormId) ?>"
-        onclick="return confirm('Delete selected users? You cannot delete your currently logged-in account.');"
-    ><i class="bi bi-x-square me-2" aria-hidden="true"></i>Delete Selected</button>
-</nav>
+<?= Toolbar::render([
+    'items' => $userListToolbarItems,
+]) ?>
 
-<script>
+<?php ob_start(); ?>
     document.addEventListener('DOMContentLoaded', function () {
         var table = document.getElementById('<?= e($usersTableId) ?>');
         var searchInput = document.getElementById('<?= e($usersSearchId) ?>');
@@ -406,4 +397,4 @@ $buildPaginationUrl = static function (int $pageNumber) use ($paginationBasePath
 
         applyFilters();
     });
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

@@ -9,6 +9,8 @@
 
 declare(strict_types=1);
 
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 /** @var \Raven\Lib\View\Panel\EditorBlocks $editorBlocks */
@@ -45,21 +47,24 @@ $taskListId = 'cron-task-list';
 $taskAddButtonId = 'cron-task-add';
 $taskTemplateId = 'cron-task-template';
 $taskBlockLayout = $editorBlocks->layout('task');
+$cronHeaderActions = [];
+if ($extensionDocsUrl !== '') {
+    $cronHeaderActions[] = '<a href="' . e($extensionDocsUrl) . '" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">'
+        . '<i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation'
+        . '</a>';
+}
+$cronToolbarItems = [
+    '<button type="submit" form="cron-settings-form" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Tasks</button>',
+];
 ?>
-<header class="card mb-3">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1 class="mb-0"><?= e($extensionName !== '' ? $extensionName : 'Scheduled Tasks') ?></h1>
-            <?php if ($extensionDocsUrl !== ''): ?>
-                <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                    <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
-                </a>
-            <?php endif; ?>
-        </div>
-        <h5>by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h5>
-        <p class="text-muted mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'Manage custom jobs that Raven feeds into its built-in scheduler.') ?></p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => $extensionName !== '' ? $extensionName : 'Scheduled Tasks',
+    'title_class' => 'mb-0',
+    'subheading_html' => 'by ' . e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown'),
+    'summary' => $extensionDescription !== '' ? $extensionDescription : 'Manage custom jobs that Raven feeds into its built-in scheduler.',
+    'actions' => $cronHeaderActions,
+    'card_class' => 'card mb-3',
+]) ?>
 
 <?php if ($flashSuccess !== null && $flashSuccess !== ''): ?>
     <div class="alert alert-success"><?= e($flashSuccess) ?></div>
@@ -77,9 +82,11 @@ $taskBlockLayout = $editorBlocks->layout('task');
     </div>
 <?php endif; ?>
 
-<div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
-    <button type="submit" form="cron-settings-form" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Tasks</button>
-</div>
+<?= Toolbar::render([
+    'items' => $cronToolbarItems,
+    'tag' => 'div',
+    'class' => 'd-flex flex-wrap justify-content-end gap-2 mb-3',
+]) ?>
 
 <form id="cron-settings-form" method="post" action="<?= e($savePath) ?>">
     <?= $csrfField ?>
@@ -212,9 +219,11 @@ $taskBlockLayout = $editorBlocks->layout('task');
     </div>
 </form>
 
-<div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
-    <button type="submit" form="cron-settings-form" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Tasks</button>
-</div>
+<?= Toolbar::render([
+    'items' => $cronToolbarItems,
+    'tag' => 'div',
+    'class' => 'd-flex flex-wrap justify-content-end gap-2 mb-3',
+]) ?>
 
 <template id="<?= e($taskTemplateId) ?>">
     <div class="<?= e($taskBlockLayout['row_class']) ?>" data-cron-task-row="1">

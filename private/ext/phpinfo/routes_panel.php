@@ -53,7 +53,10 @@ return static function (Router $router, array $context): void {
         return;
     }
 
-    $extensionRoot = dirname(__DIR__);
+    // Extension-owned templates live under this extension directory, not the parent
+    // `private/ext/` folder. Using `__DIR__` keeps the view lookup aligned with the
+    // bundled extension layout contract.
+    $extensionRoot = __DIR__;
     $viewFile = $extensionRoot . '/tpl/panel_index.php';
     $routePath = '/phpinfo';
     $section = 'phpinfo';

@@ -17,6 +17,8 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -44,12 +46,10 @@ $invitesCountId = 'invites-filter-count';
 $invitesEmptyId = 'invites-filter-empty';
 ?>
 
-<header class="card">
-    <div class="card-body">
-        <h1>Invite Tokens</h1>
-        <p class="text-muted mb-0">Create and manage registration invite tokens for public signups.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Invite Tokens',
+    'summary' => 'Create and manage registration invite tokens for public signups.',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -313,13 +313,13 @@ $invitesEmptyId = 'invites-filter-empty';
     </div>
 </section>
 
-<style>
+<?php ob_start(); ?>
   #<?= e($invitesTableId) ?> tbody tr[data-details-row-for]:hover > td {
     background-color: transparent !important;
   }
-</style>
+<?php Footer::pushStyle((string) ob_get_clean()); ?>
 
-<script>
+<?php ob_start(); ?>
 (function () {
     var typeField = document.getElementById('invite_type');
     var tokenWrap = document.getElementById('invite_token_slug_wrap');
@@ -633,4 +633,4 @@ $invitesEmptyId = 'invites-filter-empty';
         });
     });
 })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

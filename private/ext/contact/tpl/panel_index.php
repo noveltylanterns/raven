@@ -24,6 +24,7 @@ declare(strict_types=1);
 /** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string} $extensionMeta */
 
 use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Contact Forms'));
@@ -37,6 +38,9 @@ if ($extensionDocsUrl !== '') {
         . '<i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation'
         . '</a>';
 }
+$contactIndexToolbarItems = [
+    '<a href="' . e($editBasePath) . '" class="btn btn-primary"><i class="bi bi-envelope-plus me-2" aria-hidden="true"></i>New Contact Form</a>',
+];
 ?>
 <?= Header::render([
     'title_html' => e($extensionName !== '' ? $extensionName : 'Contact Forms')
@@ -55,9 +59,9 @@ if ($extensionDocsUrl !== '') {
 <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
-<nav>
-    <a href="<?= e($editBasePath) ?>" class="btn btn-primary"><i class="bi bi-envelope-plus me-2" aria-hidden="true"></i>New Contact Form</a>
-</nav>
+<?= Toolbar::render([
+    'items' => $contactIndexToolbarItems,
+]) ?>
 
 <section class="card">
     <div class="card-body">
@@ -133,6 +137,6 @@ if ($extensionDocsUrl !== '') {
     </div>
 </section>
 
-<nav>
-    <a href="<?= e($editBasePath) ?>" class="btn btn-primary"><i class="bi bi-envelope-plus me-2" aria-hidden="true"></i>New Contact Form</a>
-</nav>
+<?= Toolbar::render([
+    'items' => $contactIndexToolbarItems,
+]) ?>

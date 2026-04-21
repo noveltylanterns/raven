@@ -20,6 +20,7 @@ use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\View\Pagination;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Security\Csrf;
+use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\SiteContextBuilder;
 
 /**
@@ -177,6 +178,8 @@ final class SharedController
      */
     public function renderPanel(string $template, array $data): void
     {
+        Footer::reset();
+
         $defaults = [
             'site' => $this->siteData(),
             'showSidebar' => true,

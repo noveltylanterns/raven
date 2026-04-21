@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 /** @var array<int, array<string, mixed>>|null $editorBlocksBoot */
 
+use Raven\Lib\View\Panel\Footer;
+
 $editorBlocksBoot = is_array($editorBlocksBoot ?? null) ? array_values($editorBlocksBoot) : [];
 $editorBlocksBootJson = json_encode(
     $editorBlocksBoot,
@@ -20,7 +22,7 @@ if (!is_string($editorBlocksBootJson) || trim($editorBlocksBootJson) === '') {
     $editorBlocksBootJson = '[]';
 }
 ?>
-<style>
+<?php ob_start(); ?>
   body#rvnp .rvn-editor-block {
     border-color: var(--raven-border) !important;
     background: var(--raven-surface-soft);
@@ -42,8 +44,8 @@ if (!is_string($editorBlocksBootJson) || trim($editorBlocksBootJson) === '') {
   body#rvnp .rvn-editor-block--security .form-select[disabled] {
     background-color: var(--raven-surface);
   }
-</style>
-<script>
+<?php Footer::pushStyle((string) ob_get_clean()); ?>
+<?php ob_start(); ?>
   (function () {
     var configs = <?= $editorBlocksBootJson ?>;
     if (!Array.isArray(configs) || configs.length === 0) {
@@ -331,4 +333,4 @@ if (!is_string($editorBlocksBootJson) || trim($editorBlocksBootJson) === '') {
 
     configs.forEach(initRepeater);
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

@@ -23,6 +23,8 @@ declare(strict_types=1);
 /** @var string $csrfField */
 /** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string} $extensionMeta */
 
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Signup Sheets'));
@@ -30,28 +32,23 @@ $extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
 $extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lanterns.io'));
+$signupsIndexHeaderActions = [];
+if ($extensionDocsUrl !== '') {
+    $signupsIndexHeaderActions[] = '<a href="' . e($extensionDocsUrl) . '" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">'
+        . '<i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation'
+        . '</a>';
+}
+$signupsIndexToolbarItems = [
+    '<a href="' . e($editBasePath) . '" class="btn btn-primary"><i class="bi bi-clipboard-plus me-2" aria-hidden="true"></i>New Signup Sheet Form</a>',
+];
 ?>
-<header class="card">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1>
-                <?= e($extensionName !== '' ? $extensionName : 'Signup Sheets') ?>
-                <?php if ($extensionVersion !== ''): ?>
-                    <small class="ms-2 text-muted" style="font-size: 0.48em;">v. <?= e($extensionVersion) ?></small>
-                <?php endif; ?>
-            </h1>
-            <div class="d-flex flex-wrap gap-2">
-                <?php if ($extensionDocsUrl !== ''): ?>
-                <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                    <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
-                </a>
-                <?php endif; ?>
-            </div>
-        </div>
-        <h5>by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h5>
-        <p class="text-muted mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'Configured signup sheet form definitions available to page content integrations.') ?></p>
-    </div>
-</header>
+<?= Header::render([
+    'title_html' => e($extensionName !== '' ? $extensionName : 'Signup Sheets')
+        . ($extensionVersion !== '' ? ' <small class="ms-2 text-muted" style="font-size: 0.48em;">v. ' . e($extensionVersion) . '</small>' : ''),
+    'subheading_html' => 'by ' . e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown'),
+    'summary' => $extensionDescription !== '' ? $extensionDescription : 'Configured signup sheet form definitions available to page content integrations.',
+    'actions' => $signupsIndexHeaderActions,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -61,9 +58,9 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lant
 <div class="alert alert-danger" role="alert"><?= e($flashError) ?></div>
 <?php endif; ?>
 
-<nav>
-    <a href="<?= e($editBasePath) ?>" class="btn btn-primary"><i class="bi bi-clipboard-plus me-2" aria-hidden="true"></i>New Signup Sheet Form</a>
-</nav>
+<?= Toolbar::render([
+    'items' => $signupsIndexToolbarItems,
+]) ?>
 
 <section class="card">
     <div class="card-body">
@@ -139,6 +136,6 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lant
     </div>
 </section>
 
-<nav>
-    <a href="<?= e($editBasePath) ?>" class="btn btn-primary"><i class="bi bi-clipboard-plus me-2" aria-hidden="true"></i>New Signup Sheet Form</a>
-</nav>
+<?= Toolbar::render([
+    'items' => $signupsIndexToolbarItems,
+]) ?>

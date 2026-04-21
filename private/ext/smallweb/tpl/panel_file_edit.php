@@ -22,6 +22,8 @@ declare(strict_types=1);
 /** @var string $subdir */
 /** @var \Raven\Ext\Smallweb\SmallwebService $svc */
 
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $isEditMode = is_array($fileData);
@@ -46,13 +48,10 @@ if ($fileType === '' || !isset($protocolTypes[$fileType])) {
 $protoLabel = $svc->protocolLabel($protocol);
 $backUrl = $panelUrl('/smallweb/' . $protocol);
 $dirQuery = $subdir !== '' ? '?dir=' . rawurlencode($subdir) : '';
-?>
-<header class="card">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1><?= $isEditMode ? 'Edit ' . e($protoLabel) . ' Page: <code style="text-transform:none">' . e($originalFilename) . '</code>' : 'New ' . e($protoLabel) . ' Page' ?></h1>
-        </div>
-        <?php if ($subdir !== ''): ?>
+$smallwebFileHeaderBodyHtml = '';
+if ($subdir !== '') {
+    ob_start();
+    ?>
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb mb-0">
                 <li class="breadcrumb-item"><a href="<?= e($backUrl) ?>"><?= e($protoLabel) ?></a></li>
@@ -64,20 +63,28 @@ $dirQuery = $subdir !== '' ? '?dir=' . rawurlencode($subdir) : '';
                         $isLast = $i === count($crumbParts) - 1;
                 ?>
                 <li class="breadcrumb-item<?= $isLast ? ' active' : '' ?>"<?= $isLast ? ' aria-current="page"' : '' ?>>
-                    <?php if ($isLast): ?>
-                        <code style="text-transform:none"><?= e($part) ?></code>
-                    <?php else: ?>
-                        <code style="text-transform:none"><?= e($part) ?></code>
-                    <?php endif; ?>
+                    <code style="text-transform:none"><?= e($part) ?></code>
                 </li>
                 <?php endforeach; ?>
             </ol>
         </nav>
-        <?php elseif (!$isEditMode): ?>
-        <p class="text-muted mb-0">Create a new page for the <?= e(strtolower($protoLabel)) ?> protocol.</p>
-        <?php endif; ?>
-    </div>
-</header>
+    <?php
+    $smallwebFileHeaderBodyHtml = (string) ob_get_clean();
+}
+$smallwebFileToolbarItems = [
+    '<button class="btn btn-primary" type="submit" form="sw-file-form"><i class="bi bi-floppy me-2" aria-hidden="true"></i>' . e($isEditMode ? 'Save Changes' : 'Create Page') . '</button>',
+    '<a href="' . e($backUrl . $dirQuery) . '" class="btn btn-secondary"><i class="bi bi-arrow-left me-2" aria-hidden="true"></i>Back to ' . e($protoLabel) . ' Pages</a>',
+];
+?>
+<?= Header::render([
+    'title_html' => $isEditMode
+        ? 'Edit ' . e($protoLabel) . ' Page: <code style="text-transform:none">' . e($originalFilename) . '</code>'
+        : 'New ' . e($protoLabel) . ' Page',
+    'summary_html' => ($subdir === '' && !$isEditMode)
+        ? 'Create a new page for the ' . e(strtolower($protoLabel)) . ' protocol.'
+        : '',
+    'body_html' => $smallwebFileHeaderBodyHtml,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -98,14 +105,9 @@ $dirQuery = $subdir !== '' ? '?dir=' . rawurlencode($subdir) : '';
     <?php endif; ?>
 </form>
 
-<nav>
-    <button class="btn btn-primary" type="submit" form="sw-file-form">
-        <i class="bi bi-floppy me-2" aria-hidden="true"></i><?= $isEditMode ? 'Save Changes' : 'Create Page' ?>
-    </button>
-    <a href="<?= e($backUrl . $dirQuery) ?>" class="btn btn-secondary">
-        <i class="bi bi-arrow-left me-2" aria-hidden="true"></i>Back to <?= e($protoLabel) ?> Pages
-    </a>
-</nav>
+<?= Toolbar::render([
+    'items' => $smallwebFileToolbarItems,
+]) ?>
 
 <section class="card">
     <div class="card-body">
@@ -189,11 +191,6 @@ $dirQuery = $subdir !== '' ? '?dir=' . rawurlencode($subdir) : '';
 </section>
 <?php endif; ?>
 
-<nav>
-    <button class="btn btn-primary" type="submit" form="sw-file-form">
-        <i class="bi bi-floppy me-2" aria-hidden="true"></i><?= $isEditMode ? 'Save Changes' : 'Create Page' ?>
-    </button>
-    <a href="<?= e($backUrl . $dirQuery) ?>" class="btn btn-secondary">
-        <i class="bi bi-arrow-left me-2" aria-hidden="true"></i>Back to <?= e($protoLabel) ?> Pages
-    </a>
-</nav>
+<?= Toolbar::render([
+    'items' => $smallwebFileToolbarItems,
+]) ?>

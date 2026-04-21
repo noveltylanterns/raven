@@ -23,6 +23,7 @@ declare(strict_types=1);
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
+use Raven\Lib\View\Panel\Header;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -79,12 +80,10 @@ $hasActiveFilter = $activeSeverity !== '' || $activeSearch !== '';
 $clearFiltersUrl = $panelBase . '/logs';
 ?>
 
-<header class="card">
-    <div class="card-body">
-        <h1>Event Log</h1>
-        <p class="text-muted mb-0">Runtime errors, warnings, and informational events recorded by Raven.</p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => 'Event Log',
+    'summary' => 'Runtime errors, warnings, and informational events recorded by Raven.',
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>

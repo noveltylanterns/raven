@@ -9,29 +9,34 @@
 
 declare(strict_types=1);
 
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $extensionName = trim((string) ($extensionMeta['name'] ?? 'Repositories'));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
 $extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lanterns.io'));
+$repoSettingsHeaderActions = [];
+if ($extensionDocsUrl !== '') {
+    $repoSettingsHeaderActions[] = '<a href="' . e($extensionDocsUrl) . '" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">'
+        . '<i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation'
+        . '</a>';
+}
+$repoSettingsToolbarItems = [
+    '<button type="submit" form="repoSettingsForm" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Settings</button>',
+    '<a href="' . e($logsPath) . '" class="btn btn-primary"><i class="bi bi-clipboard2-pulse me-2" aria-hidden="true"></i>View Logs</a>',
+    '<a href="' . e($indexPath) . '" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Repos</a>',
+];
 ?>
-<header class="card mb-3">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1 class="mb-0">
-                <?= e($extensionName !== '' ? $extensionName : 'Repositories') ?>
-            </h1>
-            <?php if ($extensionDocsUrl !== ''): ?>
-                <a href="<?= e($extensionDocsUrl) ?>" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                    <i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation
-                </a>
-            <?php endif; ?>
-        </div>
-        <h5>by <?= e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown') ?></h5>
-        <p class="text-muted mb-0"><?= e($extensionDescription !== '' ? $extensionDescription : 'Mirror Git repositories into Raven with optional public browsing.') ?></p>
-    </div>
-</header>
+<?= Header::render([
+    'title' => $extensionName !== '' ? $extensionName : 'Repositories',
+    'title_class' => 'mb-0',
+    'subheading_html' => 'by ' . e($extensionAuthor !== '' ? $extensionAuthor : 'Unknown'),
+    'summary' => $extensionDescription !== '' ? $extensionDescription : 'Mirror Git repositories into Raven with optional public browsing.',
+    'actions' => $repoSettingsHeaderActions,
+    'card_class' => 'card mb-3',
+]) ?>
 
 <?php if ($flashSuccess !== null && $flashSuccess !== ''): ?>
     <div class="alert alert-success"><?= e($flashSuccess) ?></div>
@@ -49,11 +54,11 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lant
     </div>
 <?php endif; ?>
 
-<div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
-    <button type="submit" form="repoSettingsForm" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Settings</button>
-    <a href="<?= e($logsPath) ?>" class="btn btn-primary"><i class="bi bi-clipboard2-pulse me-2" aria-hidden="true"></i>View Logs</a>
-    <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Repos</a>
-</div>
+<?= Toolbar::render([
+    'items' => $repoSettingsToolbarItems,
+    'tag' => 'div',
+    'class' => 'd-flex flex-wrap justify-content-end gap-2 mb-3',
+]) ?>
 
 <div class="card mb-3">
     <div class="card-body">
@@ -101,8 +106,8 @@ $extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lant
     </div>
 </div>
 
-<div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
-    <button type="submit" form="repoSettingsForm" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Settings</button>
-    <a href="<?= e($logsPath) ?>" class="btn btn-primary"><i class="bi bi-clipboard2-pulse me-2" aria-hidden="true"></i>View Logs</a>
-    <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Repos</a>
-</div>
+<?= Toolbar::render([
+    'items' => $repoSettingsToolbarItems,
+    'tag' => 'div',
+    'class' => 'd-flex flex-wrap justify-content-end gap-2 mb-3',
+]) ?>

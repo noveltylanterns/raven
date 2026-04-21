@@ -22,8 +22,11 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
-use function Raven\Lib\Security\e;
 use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
+use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
 $canEditConfigurationBit = (bool) ($canEditConfigurationBit ?? false);
@@ -210,31 +213,40 @@ if ($publicBase !== '' && !preg_match('#^https?://#i', $publicBase)) {
 $publicBase = rtrim($publicBase, '/');
 $coverCopyUrl = $coverUrl !== '' && $publicBase !== '' ? $publicBase . $coverUrl : $coverUrl;
 $iconCopyUrl = $iconUrl !== '' && $publicBase !== '' ? $publicBase . $iconUrl : $iconUrl;
-?>
-<header class="card">
-    <div class="card-body">
-        <h1>
-            <?= $group === null ? 'New Group' : 'Edit Group: <span class="text-primary">\'' . e($groupName !== '' ? $groupName : 'Untitled') . '\'</span>' ?>
-        </h1>
-        <?php if ($group === null): ?>
-            <p class="text-muted mb-0">Create or update group permissions and group-level route behavior.</p>
-        <?php elseif ($groupPublicUrl !== null): ?>
+$groupHeaderBodyHtml = '';
+if ($group !== null && $groupPublicUrl !== null) {
+    $groupPublicUrlEscaped = e($groupPublicUrl);
+    $groupHeaderBodyHtml = <<<HTML
             <p class="mb-0 small">
                 <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
                 <a
-                    href="<?= e($groupPublicUrl) ?>"
+                    href="{$groupPublicUrlEscaped}"
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="<?= e($groupPublicUrl) ?>"
+                    title="{$groupPublicUrlEscaped}"
                     aria-label="Open group URL"
                     style="font-size: 0.88em;"
                 >
-                    <?= e($groupPublicUrl) ?>
+                    {$groupPublicUrlEscaped}
                 </a>
             </p>
-        <?php endif; ?>
-    </div>
-</header>
+HTML;
+}
+$groupEditorToolbarItems = [
+    '<button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Group</button>',
+    '<a href="' . e($panelBase) . '/group" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Groups</a>',
+];
+if ($canDeleteGroup) {
+    $groupEditorToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' . e($deleteFormId) . '" onclick="return confirm(\'Delete this group? This cannot be undone.\');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Group</button>';
+}
+?>
+<?= Header::render([
+    'title_html' => $group === null
+        ? 'New Group'
+        : 'Edit Group: <span class="text-primary">\'' . e($groupName !== '' ? $groupName : 'Untitled') . '\'</span>',
+    'summary' => $group === null ? 'Create or update group permissions and group-level route behavior.' : '',
+    'body_html' => $groupHeaderBodyHtml,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -255,18 +267,10 @@ $iconCopyUrl = $iconUrl !== '' && $publicBase !== '' ? $publicBase . $iconUrl : 
 <form method="post" action="<?= e($panelBase) ?>/group/save" enctype="multipart/form-data">
     <?= $csrfField ?>
     <input type="hidden" name="id" value="<?= $groupId ?>">
-    <nav class="rvnp-editor-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Group</button>
-        <a href="<?= e($panelBase) ?>/group" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Groups</a>
-        <?php if ($canDeleteGroup): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this group? This cannot be undone.');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Group</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $groupEditorToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 
     <section class="rvnp-editor-layout" data-rvn-tab-layout="editor">
     <ul class="nav nav-tabs" id="rvnp-editor-tabs" role="tablist">
@@ -647,20 +651,12 @@ $iconCopyUrl = $iconUrl !== '' && $publicBase !== '' ? $publicBase . $iconUrl : 
     </div>
     </section>
 
-    <nav class="rvnp-editor-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Group</button>
-        <a href="<?= e($panelBase) ?>/group" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Groups</a>
-        <?php if ($canDeleteGroup): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this group? This cannot be undone.');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Group</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $groupEditorToolbarItems,
+        'class' => 'rvnp-editor-actions',
+    ]) ?>
 </form>
-<script>
+<?php ob_start(); ?>
   (function () {
     var panelAccessToggle = document.querySelector('input[type="checkbox"][data-rvn-group-panel-login="1"]');
     var viewDisabledToggle = document.querySelector('input[type="checkbox"][data-rvn-group-view-disabled="1"]');
@@ -807,9 +803,9 @@ $iconCopyUrl = $iconUrl !== '' && $publicBase !== '' ? $publicBase . $iconUrl : 
       });
     });
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>
 
-<script>
+<?php ob_start(); ?>
   // Copy-URL handlers for media tab image path buttons.
   (function () {
     function copyViaLegacyCommand(value) {
@@ -893,4 +889,4 @@ $iconCopyUrl = $iconUrl !== '' && $publicBase !== '' ? $publicBase . $iconUrl : 
       });
     });
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>

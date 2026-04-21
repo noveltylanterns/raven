@@ -30,6 +30,9 @@ declare(strict_types=1);
 /** @var string $csrfField */
 /** @var \Raven\Lib\View\Panel\EditorBlocks $editorBlocks */
 
+use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Header;
+use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
 $editorBlocks = ($editorBlocks ?? null) instanceof \Raven\Lib\View\Panel\EditorBlocks
@@ -43,24 +46,13 @@ $shortcodeValue = $formSlug !== '' ? '[signups slug="' . $formSlug . '"]' : '';
 $additionalFields = is_array($formData['additional_fields'] ?? null) ? (array) $formData['additional_fields'] : [];
 $customFieldBlockLayout = $editorBlocks->layout('contact');
 $deleteFormId = 'delete-signups-form';
-?>
-<header class="card">
-    <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between gap-2">
-            <h1><?= $isEditMode ? 'Edit Signup Form: <span class="text-primary">\'' . e($formName !== '' ? $formName : $formSlug) . '\'</span>' : 'Create New Signup Form' ?></h1>
-
-            <?php if ($isEditMode): ?>
-            <div class="d-flex gap-2">
-                <a href="<?= e($signupsBasePath) ?>/<?= rawurlencode($formSlug) ?>" class="btn btn-primary btn-sm">View Submissions</a>
-            </div>
-            <?php endif; ?>
-        </div>
-
-        <?php if (!$isEditMode): ?>
-        <p class="text-muted mb-0">Create or update signup sheet fields and availability.</p>
-        <?php endif; ?>
-
-        <?php if ($isEditMode): ?>
+$signupsEditHeaderActions = [];
+if ($isEditMode) {
+    $signupsEditHeaderActions[] = '<a href="' . e($signupsBasePath) . '/' . rawurlencode($formSlug) . '" class="btn btn-primary btn-sm">View Submissions</a>';
+}
+$signupsEditHeaderBodyHtml = '';
+if ($isEditMode) {
+    $signupsEditHeaderBodyHtml = <<<HTML
         <p class="mb-0 small">
             <i class="bi bi-link-45deg me-1" style="font-size: 1.2em; vertical-align: -0.12em;" aria-hidden="true"></i>
             <code
@@ -70,11 +62,27 @@ $deleteFormId = 'delete-signups-form';
                 title="Click to copy shortcode"
                 data-bs-toggle="tooltip"
                 data-bs-placement="top"
-            ><?= e($shortcodeValue) ?></code>
+            >{$shortcodeValue}</code>
         </p>
-        <?php endif; ?>
-    </div>
-</header>
+HTML;
+    $signupsEditHeaderBodyHtml = str_replace($shortcodeValue, e($shortcodeValue), $signupsEditHeaderBodyHtml);
+}
+$signupsEditToolbarItems = [
+    '<button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Form</button>',
+    '<a href="' . e($indexPath) . '" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Signup Sheets</a>',
+];
+if ($isEditMode) {
+    $signupsEditToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' . e($deleteFormId) . '" onclick="return confirm(\'Delete this signup sheet form?\');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Form</button>';
+}
+?>
+<?= Header::render([
+    'title_html' => $isEditMode
+        ? 'Edit Signup Form: <span class="text-primary">\'' . e($formName !== '' ? $formName : $formSlug) . '\'</span>'
+        : 'Create New Signup Form',
+    'summary' => !$isEditMode ? 'Create or update signup sheet fields and availability.' : '',
+    'actions' => $signupsEditHeaderActions,
+    'body_html' => $signupsEditHeaderBodyHtml,
+]) ?>
 
 <?php if ($flashSuccess !== null): ?>
 <div class="alert alert-success" role="alert"><?= e($flashSuccess) ?></div>
@@ -94,18 +102,9 @@ $deleteFormId = 'delete-signups-form';
 <form method="post" action="<?= e($formAction) ?>">
     <?= $csrfField ?>
     <input type="hidden" name="original_slug" value="<?= e($formSlug) ?>">
-    <nav>
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Form</button>
-        <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Signup Sheets</a>
-        <?php if ($isEditMode): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this signup sheet form?');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Form</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $signupsEditToolbarItems,
+    ]) ?>
 
     <section class="card">
         <div class="card-body">
@@ -284,18 +283,9 @@ $deleteFormId = 'delete-signups-form';
         </div>
     </section>
 
-    <nav>
-        <button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Form</button>
-        <a href="<?= e($indexPath) ?>" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Signup Sheets</a>
-        <?php if ($isEditMode): ?>
-            <button
-                type="submit"
-                class="btn btn-danger"
-                form="<?= e($deleteFormId) ?>"
-                onclick="return confirm('Delete this signup sheet form?');"
-            ><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Form</button>
-        <?php endif; ?>
-    </nav>
+    <?= Toolbar::render([
+        'items' => $signupsEditToolbarItems,
+    ]) ?>
 </form>
 
 <template id="signups-additional-field-template">
@@ -360,7 +350,7 @@ $deleteFormId = 'delete-signups-form';
     </div>
 </template>
 
-<script>
+<?php ob_start(); ?>
   (function () {
     var slugInput = document.getElementById('signups_form_slug');
     var shortcodeElement = document.getElementById('signups_form_shortcode');
@@ -480,7 +470,7 @@ $deleteFormId = 'delete-signups-form';
     slugInput.addEventListener('input', updateShortcode);
     updateShortcode();
   })();
-</script>
+<?php Footer::pushScript((string) ob_get_clean()); ?>
 
 <?php
 $editorBlocksBoot = [
