@@ -83,27 +83,20 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 - [ ] lib/Security/CsrfTokenStoreInferface.php should be CsrfToken.php
 - [ ] lib/Security/PhpSessionTokenStore.php should be SessionToken.php
 - [ ] lib/Security/WebAuthnService.php should be WebAuthn.php
-- [ ] We have four TwoFactor* classes in lib/Security with long names. Is there any reason they need to be split up this much? See if they can be simplified down to three sensibly organized classes with more concise class/function names, considering they're mostly only used on login forms.
+- [ ] We have four TwoFactor* classes in lib/Security with long names, plus LoginTwoFactorFlowService, but four more TwoFactor* classes in lib/Auth/! Is there any reason they need to be split up this much? See if they can be simplified down to a few sensibly organized classes with more concise class/function names, considering they're mostly only used on login forms.
+- [ ] lib/Security/tests/InputSanitizerSmoke.php should be with our other smoke tests, no?
+- [ ] lib/Shell/CLI.php should become sys/Shell.php, delete lib/Shell/ when done.
+- [ ] sys/Scheduler.php should become lib/Scheduler/Cron.php
+
 
 
 ### Bugs & Tweaks
 - [ ] Avatars should be stored as uploads/user/{uid}/avatar.extension
 - [ ] Cover images should be stored as uploads/user/{uid}/cover.extension
+- [ ] ALL docs/ files need to use lowercase filenames from now on.
 
 
 ## Long Term
-
-### Environment Hardening
-Analyze PHP config and note every module/extension not being used by this script
-- [ ] make note of anything that should be disabled in production
-Full aggressive security sweep and pentesting run, including (but not limited to):
-- [ ] no buffer overflows or ways to crash the system
-- [ ] no ability for remote code execution, sql injection, or arbitrary php commands.
-- [ ] no ability for cross-site scripting in environments with poor HTTP header setups
-- [ ] image uploads are sanitized to prevent destructive/illegal payloads.
-- [ ] run an external-facing pentest over the public domain on 443 while observing the software & logs from the inside, to visually confirm nothing is escaping out of forms/urls/requests into our local environment or server runtimes
-- [ ] Make a 'security sweep' checklist for maintenance.md that makes sure things like this are checked/enforced on an ongoing basis.
-
 
 ### Documentation Rewrite
 We need to generate better documentation. This is going to be a whole project.
@@ -114,7 +107,6 @@ We need to generate better documentation. This is going to be a whole project.
 - [ ] EVERY class and EVERY function in sys/lib needs a detailed inline comment describing what it does, it is missing in some of them. The existing ones need to be double-checked for accuracy.
 - [ ] EVERY if/try/foreach in sys/lib needs a quick inline comment describing what it does, it is missing in some of them. The existing ones need to be double-checked for accuracy.
 - [ ] Need more consistently detailed inline comments in `private/Raven.php` & `public/install.php`, it is great in some spots and missing in others.
-- [ ] ALL docs/ files need to use lowercase filenames from now on.
 
 #### Doc Generator Script
 Build a single fast CLI command that auto-generates all reference appendix files from the codebase.
@@ -153,6 +145,18 @@ We've been making this one up as we go along:
 - [ ] Each point release gets its own unique shim or set of shims.
 - [ ] This foundation should enable us to build a stable update platform that can update systems many versions at once, by running through the version-bound-shims in order or release.
 - [ ] release/update versioning still belongs here in the updater plan; keep it separate from local bootstrap schema-state tracking.
+
+
+### Environment Hardening
+Analyze PHP config and note every module/extension not being used by this script
+- [ ] make note of anything that should be disabled in production
+Full aggressive security sweep and pentesting run, including (but not limited to):
+- [ ] no buffer overflows or ways to crash the system
+- [ ] no ability for remote code execution, sql injection, or arbitrary php commands.
+- [ ] no ability for cross-site scripting in environments with poor HTTP header setups
+- [ ] image uploads are sanitized to prevent destructive/illegal payloads.
+- [ ] run an external-facing pentest over the public domain on 443 while observing the software & logs from the inside, to visually confirm nothing is escaping out of forms/urls/requests into our local environment or server runtimes
+- [ ] Make a 'security sweep' checklist for maintenance.md that makes sure things like this are checked/enforced on an ongoing basis.
 
 
 ### Tooling Watchlist
