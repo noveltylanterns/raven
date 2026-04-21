@@ -25,6 +25,7 @@
 /** @var string|null $pageTitle */
 
 use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Navigation;
 use function Raven\Lib\Security\e;
 
 $panelBase = '/' . trim($site['panel_path'], '/');
@@ -294,6 +295,41 @@ if ($section === 'login') {
     $documentTitle = $resolvedPageTitle . ' [' . $baseDocumentTitle . ']';
 }
 $includePanelLayoutScripts = $section !== 'login';
+
+// Assemble the declarative nav config from the resolved variables above so the
+// Navigation helper owns the HTML structure while wrapper.php owns the data.
+$navConfig = [
+    'panel_base'               => $panelBase,
+    'section'                  => $currentSection,
+    'page_nav'                 => $pageNav,
+    'page_nav_channel'         => $pageNavChannel,
+    'welcome_name'             => $welcomeName,
+    'csrf_field'               => $csrfField ?? null,
+    'brand_name'               => $panelBrandName,
+    'brand_logo_url'           => $panelBrandLogoUrl,
+    'show_powered_by'          => $showPoweredByRaven,
+    'show_content'             => $showContentCategory,
+    'show_create_page'         => $showCreatePageLink,
+    'show_create_page_accordion' => $showCreatePageAccordion,
+    'create_page_accordion_open' => $createPageAccordionOpen,
+    'page_create_channel_items'  => $pageCreateChannelItems,
+    'show_list_pages'          => $showListPagesLink,
+    'show_modules'             => $showModulesCategory,
+    'module_items'             => $moduleNavItems,
+    'show_accounts'            => $showAccountsCategory,
+    'show_groups'              => $showGroupsLink,
+    'show_users'               => $showUsersLink,
+    'show_taxonomy'            => $showTaxonomyCategory,
+    'show_categories'          => $showCategoriesLink,
+    'show_channels'            => $showChannelsLink,
+    'show_redirects'           => $showRedirectsLink,
+    'show_routing'             => $showRoutingLink,
+    'show_tags'                => $showTagsLink,
+    'show_extensions'          => $showExtensionsCategory,
+    'extension_items'          => $extensionNavItems,
+    'show_system'              => $showSystemCategory,
+    'system_items'             => $systemNavItems,
+];
 ?>
 <!doctype html>
 <html lang="en">
@@ -459,334 +495,13 @@ $includePanelLayoutScripts = $section !== 'login';
 </head>
 <body id="rvnp" class="theme-<?= e($panelThemeClass) ?><?= $showSidebar ? ' has-sidebar' : '' ?>">
 <?php if ($showSidebar): ?>
-    <!-- Mobile-only header navigation (xs/sm); sidebar appears from md upward. -->
-    <!-- Navigation groups intentionally mirror desktop sidebar so IA remains consistent across breakpoints. -->
-    <nav id="rvnp-mobile" class="navbar navbar-expand-md navbar-dark bg-dark d-md-none">
-        <div class="container-fluid">
-            <a class="navbar-brand rvnp-brand-link" href="<?= e($panelBase) ?>/">
-                <span class="rvnp-brand-lockup">
-                    <img
-                        class="rvnp-brand-logo"
-                        src="<?= e($panelBrandLogoUrl) ?>"
-                        alt=""
-                        aria-hidden="true"
-                        decoding="async"
-                    >
-                    <span class="rvnp-brand-text-wrap">
-                        <span class="rvnp-brand-text"><?= e($panelBrandName) ?></span>
-                        <?php if ($showPoweredByRaven): ?>
-                            <small class="rvnp-brand-powered">Powered by Raven</small>
-                        <?php endif; ?>
-                    </span>
-                </span>
-            </a>
-            <button
-                class="navbar-toggler"
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target="#ravenMobilePanelNav"
-                aria-controls="ravenMobilePanelNav"
-                aria-expanded="false"
-                aria-label="Toggle navigation"
-            >
-                <span class="navbar-toggler-icon"></span>
-            </button>
-
-            <div class="collapse navbar-collapse" id="ravenMobilePanelNav">
-                <div class="w-100 py-2">
-                    <h2 class="h6 text-uppercase text-white-50">Welcome back, <?= e($welcomeName) ?>!</h2>
-                    <ul class="nav nav-pills flex-column gap-1 mb-3">
-                        <li class="nav-item">
-                            <a class="nav-link<?= $section === 'dashboard' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/">Dashboard</a>
-                        </li>
-                        <li class="nav-item"><a class="nav-link<?= $section === 'preferences' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/preferences">Preferences</a></li>
-                        <li class="nav-item">
-                            <!-- Logout remains POST-only with CSRF to avoid accidental/logged URL-triggered sign-outs. -->
-                            <form method="post" action="<?= e($panelBase) ?>/logout" class="m-0">
-                                <?php if ($csrfField !== null): ?>
-                                    <?= $csrfField ?>
-                                <?php endif; ?>
-                                <button type="submit" class="nav-link text-start w-100">Logout</button>
-                            </form>
-                        </li>
-                    </ul>
-
-                    <?php if ($showContentCategory): ?>
-                        <h2 class="h6 text-uppercase text-white-50">Content</h2>
-                        <ul class="nav nav-pills flex-column gap-1 mb-3">
-                            <?php if ($showCreatePageLink): ?>
-                                <li class="nav-item">
-                                    <?php if ($showCreatePageAccordion): ?>
-                                    <details class="rvnp-nav-subaccordion"<?= $createPageAccordionOpen ? ' open' : '' ?>>
-                                        <summary class="rvnp-nav-subsummary<?= $createPageAccordionOpen ? ' active' : '' ?>">Create Page</summary>
-                                        <ul class="nav nav-pills flex-column gap-1 rvnp-nav-sublist">
-                                            <li class="nav-item">
-                                                <a class="nav-link<?= ($section === 'page' && $pageNav === 'create' && $pageNavChannel === '') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/page/edit">
-                                                    In Root
-                                                </a>
-                                            </li>
-                                            <?php foreach ($pageCreateChannelItems as $channelItem): ?>
-                                                <li class="nav-item">
-                                                    <a
-                                                        class="nav-link<?= ($section === 'page' && $pageNav === 'create' && $pageNavChannel === (string) $channelItem['slug']) ? ' active' : '' ?>"
-                                                        href="<?= e($panelBase) ?>/page/edit?channel=<?= e(rawurlencode((string) $channelItem['slug'])) ?>"
-                                                    >
-                                                        In <?= e((string) $channelItem['label']) ?>
-                                                    </a>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        </ul>
-                                    </details>
-                                    <?php else: ?>
-                                        <a class="nav-link<?= ($section === 'page' && $pageNav === 'create') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/page/edit">Create Page</a>
-                                    <?php endif; ?>
-                                </li>
-                            <?php endif; ?>
-                            <?php if ($showListPagesLink): ?>
-                                <li class="nav-item"><a class="nav-link<?= ($section === 'page' && $pageNav === 'list') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/page">List Pages</a></li>
-                            <?php endif; ?>
-                        </ul>
-                    <?php endif; ?>
-
-                    <?php if ($showModulesCategory): ?>
-                        <h2 class="h6 text-uppercase text-white-50">Modules</h2>
-                        <ul class="nav nav-pills flex-column gap-1 mb-3">
-                            <?php foreach ($moduleNavItems as $moduleItem): ?>
-                                <li class="nav-item">
-                                    <a class="nav-link<?= $section === (string) $moduleItem['section'] ? ' active' : '' ?>" href="<?= e((string) $moduleItem['path']) ?>">
-                                        <?= e((string) $moduleItem['label']) ?>
-                                    </a>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
-                    <?php endif; ?>
-
-                    <?php if ($showAccountsCategory): ?>
-                        <h2 class="h6 text-uppercase text-white-50">Accounts</h2>
-                        <ul class="nav nav-pills flex-column gap-1 mb-3">
-                            <?php if ($showGroupsLink): ?>
-                                <li class="nav-item"><a class="nav-link<?= $section === 'group' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/group">Groups</a></li>
-                            <?php endif; ?>
-                            <?php if ($showUsersLink): ?>
-                                <li class="nav-item"><a class="nav-link<?= $section === 'user' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/user">Users</a></li>
-                            <?php endif; ?>
-                        </ul>
-                    <?php endif; ?>
-
-                    <?php if ($showTaxonomyCategory): ?>
-                        <h2 class="h6 text-uppercase text-white-50">Taxonomy</h2>
-                        <ul class="nav nav-pills flex-column gap-1 mb-3">
-                            <?php if ($showCategoriesLink): ?>
-                            <li class="nav-item"><a class="nav-link<?= $section === 'category' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/category">Categories</a></li>
-                            <?php endif; ?>
-                            <?php if ($showChannelsLink): ?>
-                            <li class="nav-item"><a class="nav-link<?= $section === 'channel' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/channel">Channels</a></li>
-                            <?php endif; ?>
-                            <?php if ($showRedirectsLink): ?>
-                            <li class="nav-item"><a class="nav-link<?= $section === 'redirect' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/redirect">Redirects</a></li>
-                            <?php endif; ?>
-                            <?php if ($showRoutingLink): ?>
-                            <li class="nav-item"><a class="nav-link<?= $section === 'routing' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/routing">Routing Table</a></li>
-                            <?php endif; ?>
-                            <?php if ($showTagsLink): ?>
-                            <li class="nav-item"><a class="nav-link<?= $section === 'tag' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/tag">Tags</a></li>
-                            <?php endif; ?>
-                        </ul>
-                    <?php endif; ?>
-
-                    <?php if ($showExtensionsCategory): ?>
-                        <h2 class="h6 text-uppercase text-white-50">Extensions</h2>
-                        <ul class="nav nav-pills flex-column gap-1 mb-3">
-                            <?php foreach ($extensionNavItems as $extensionItem): ?>
-                                <li class="nav-item">
-                                    <a class="nav-link<?= $section === (string) $extensionItem['section'] ? ' active' : '' ?>" href="<?= e((string) $extensionItem['path']) ?>">
-                                        <?= e((string) $extensionItem['label']) ?>
-                                    </a>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
-                    <?php endif; ?>
-
-                    <?php if ($showSystemCategory): ?>
-                        <h2 class="h6 text-uppercase text-white-50">System</h2>
-                        <ul class="nav nav-pills flex-column gap-1 mb-3">
-                            <?php foreach ($systemNavItems as $systemItem): ?>
-                                <li class="nav-item">
-                                    <a class="nav-link<?= $section === (string) $systemItem['section'] ? ' active' : '' ?>" href="<?= e((string) $systemItem['path']) ?>">
-                                        <?= e((string) $systemItem['label']) ?>
-                                    </a>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
-                    <?php endif; ?>
-
-                </div>
-            </div>
-        </div>
-    </nav>
+    <?= Navigation::renderMobile($navConfig) ?>
 <?php endif; ?>
 
 <div class="container-fluid py-3 rvnp-layout">
     <div class="row g-3 rvnp-layout-row">
         <?php if ($showSidebar): ?>
-            <aside id="rvnp-sidebar" class="d-none d-md-block col-md-3 col-lg-3 col-xl-2">
-                <div class="card rvnp-sidebar-card">
-                    <div class="card-body">
-                        <!-- Sidebar brand link replaces the removed top navbar brand. -->
-                        <div class="mb-3 pb-2 border-bottom rvnp-sidebar-brand">
-                            <a class="text-decoration-none fw-semibold fs-5 rvnp-sidebar-brand-link rvnp-brand-link" href="<?= e($panelBase) ?>/">
-                                <span class="rvnp-brand-lockup">
-                                    <img
-                                        class="rvnp-brand-logo"
-                                        src="<?= e($panelBrandLogoUrl) ?>"
-                                        alt=""
-                                        aria-hidden="true"
-                                        decoding="async"
-                                    >
-                                    <span class="rvnp-brand-text-wrap">
-                                        <span class="rvnp-brand-text"><?= e($panelBrandName) ?></span>
-                                        <?php if ($showPoweredByRaven): ?>
-                                            <small class="rvnp-brand-powered">Powered by Raven</small>
-                                        <?php endif; ?>
-                                    </span>
-                                </span>
-                            </a>
-                        </div>
-
-                        <!-- Welcome group contains the dashboard landing link. -->
-                        <h2 class="h6 text-uppercase text-muted">Welcome back, <?= e($welcomeName) ?>!</h2>
-                        <ul class="nav nav-pills flex-column gap-1 mb-3">
-                            <li class="nav-item">
-                                <a class="nav-link<?= $section === 'dashboard' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/">Dashboard</a>
-                            </li>
-                            <li class="nav-item"><a class="nav-link<?= $section === 'preferences' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/preferences">Preferences</a></li>
-                            <li class="nav-item">
-                                <!-- Use POST + CSRF for logout here as well to match mobile behavior. -->
-                                <form method="post" action="<?= e($panelBase) ?>/logout" class="m-0">
-                                    <?php if ($csrfField !== null): ?>
-                                        <?= $csrfField ?>
-                                    <?php endif; ?>
-                                    <button type="submit" class="nav-link text-start w-100">Logout</button>
-                                </form>
-                            </li>
-                        </ul>
-
-                        <?php if ($showContentCategory): ?>
-                            <!-- Content group for publishing entities. -->
-                            <h2 class="h6 text-uppercase text-muted">Content</h2>
-                            <ul class="nav nav-pills flex-column gap-1 mb-3">
-                                <?php if ($showCreatePageLink): ?>
-                                    <li class="nav-item">
-                                        <?php if ($showCreatePageAccordion): ?>
-                                        <details class="rvnp-nav-subaccordion"<?= $createPageAccordionOpen ? ' open' : '' ?>>
-                                            <summary class="rvnp-nav-subsummary<?= $createPageAccordionOpen ? ' active' : '' ?>">Create Page</summary>
-                                            <ul class="nav nav-pills flex-column gap-1 rvnp-nav-sublist">
-                                                <li class="nav-item">
-                                                    <a class="nav-link<?= ($section === 'page' && $pageNav === 'create' && $pageNavChannel === '') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/page/edit">
-                                                        In Root
-                                                    </a>
-                                                </li>
-                                                <?php foreach ($pageCreateChannelItems as $channelItem): ?>
-                                                    <li class="nav-item">
-                                                        <a
-                                                            class="nav-link<?= ($section === 'page' && $pageNav === 'create' && $pageNavChannel === (string) $channelItem['slug']) ? ' active' : '' ?>"
-                                                            href="<?= e($panelBase) ?>/page/edit?channel=<?= e(rawurlencode((string) $channelItem['slug'])) ?>"
-                                                        >
-                                                            In <?= e((string) $channelItem['label']) ?>
-                                                        </a>
-                                                    </li>
-                                                <?php endforeach; ?>
-                                            </ul>
-                                        </details>
-                                        <?php else: ?>
-                                            <a class="nav-link<?= ($section === 'page' && $pageNav === 'create') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/page/edit">Create Page</a>
-                                        <?php endif; ?>
-                                    </li>
-                                <?php endif; ?>
-                                <?php if ($showListPagesLink): ?>
-                                    <li class="nav-item"><a class="nav-link<?= ($section === 'page' && $pageNav === 'list') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/page">List Pages</a></li>
-                                <?php endif; ?>
-                            </ul>
-                        <?php endif; ?>
-
-                        <?php if ($showModulesCategory): ?>
-                            <h2 class="h6 text-uppercase text-muted">Modules</h2>
-                            <ul class="nav nav-pills flex-column gap-1 mb-3">
-                                <?php foreach ($moduleNavItems as $moduleItem): ?>
-                                    <li class="nav-item">
-                                        <a class="nav-link<?= $section === (string) $moduleItem['section'] ? ' active' : '' ?>" href="<?= e((string) $moduleItem['path']) ?>">
-                                            <?= e((string) $moduleItem['label']) ?>
-                                        </a>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        <?php endif; ?>
-
-                        <?php if ($showAccountsCategory): ?>
-                            <!-- Accounts group for user/group access controls. -->
-                            <h2 class="h6 text-uppercase text-muted">Accounts</h2>
-                            <ul class="nav nav-pills flex-column gap-1 mb-3">
-                                <?php if ($showGroupsLink): ?>
-                                    <li class="nav-item"><a class="nav-link<?= $section === 'group' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/group">Groups</a></li>
-                                <?php endif; ?>
-                                <?php if ($showUsersLink): ?>
-                                    <li class="nav-item"><a class="nav-link<?= $section === 'user' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/user">Users</a></li>
-                                <?php endif; ?>
-                            </ul>
-                        <?php endif; ?>
-
-                        <?php if ($showTaxonomyCategory): ?>
-                            <!-- Taxonomy group for content classification entities. -->
-                            <h2 class="h6 text-uppercase text-muted">Taxonomy</h2>
-                            <ul class="nav nav-pills flex-column gap-1 mb-3">
-                                <?php if ($showCategoriesLink): ?>
-                                <li class="nav-item"><a class="nav-link<?= $section === 'category' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/category">Categories</a></li>
-                                <?php endif; ?>
-                                <?php if ($showChannelsLink): ?>
-                                <li class="nav-item"><a class="nav-link<?= $section === 'channel' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/channel">Channels</a></li>
-                                <?php endif; ?>
-                                <?php if ($showRedirectsLink): ?>
-                                <li class="nav-item"><a class="nav-link<?= $section === 'redirect' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/redirect">Redirects</a></li>
-                                <?php endif; ?>
-                                <?php if ($showRoutingLink): ?>
-                                <li class="nav-item"><a class="nav-link<?= $section === 'routing' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/routing">Routing Table</a></li>
-                                <?php endif; ?>
-                                <?php if ($showTagsLink): ?>
-                                <li class="nav-item"><a class="nav-link<?= $section === 'tag' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/tag">Tags</a></li>
-                                <?php endif; ?>
-                            </ul>
-                        <?php endif; ?>
-
-                        <?php if ($showExtensionsCategory): ?>
-                            <h2 class="h6 text-uppercase text-muted">Extensions</h2>
-                            <ul class="nav nav-pills flex-column gap-1 mb-3">
-                                <?php foreach ($extensionNavItems as $extensionItem): ?>
-                                    <li class="nav-item">
-                                        <a class="nav-link<?= $section === (string) $extensionItem['section'] ? ' active' : '' ?>" href="<?= e((string) $extensionItem['path']) ?>">
-                                            <?= e((string) $extensionItem['label']) ?>
-                                        </a>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        <?php endif; ?>
-
-                        <?php if ($showSystemCategory): ?>
-                            <!-- System group for app-level settings and account administration. -->
-                            <h2 class="h6 text-uppercase text-muted">System</h2>
-                            <ul class="nav nav-pills flex-column gap-1 mb-3">
-                                <?php foreach ($systemNavItems as $systemItem): ?>
-                                    <li class="nav-item">
-                                        <a class="nav-link<?= $section === (string) $systemItem['section'] ? ' active' : '' ?>" href="<?= e((string) $systemItem['path']) ?>">
-                                            <?= e((string) $systemItem['label']) ?>
-                                        </a>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        <?php endif; ?>
-
-                    </div>
-                </div>
-            </aside>
+            <?= Navigation::renderSidebar($navConfig) ?>
         <?php endif; ?>
 
         <main id="rvnp-main" class="<?= $showSidebar ? 'col-12 col-md-9 col-lg-9 col-xl-10' : 'col-12 rvnp-login-main' ?>">

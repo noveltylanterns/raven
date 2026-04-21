@@ -2,6 +2,11 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### April 21, 2026 — library refactor: lib/View/Panel/Navigation.php
+
+- **New `lib/View/Panel/Navigation.php` added as the canonical panel navigation renderer**: `renderMobile()` emits the Bootstrap hamburger navbar shown at xs/sm breakpoints; `renderSidebar()` emits the card-wrapped aside shown from md upward; a private `renderGroups()` helper renders the shared Content/Modules/Accounts/Taxonomy/Extensions/System category lists for both surfaces from a single implementation. Both public methods accept the same declarative config array, eliminating the parallel nav trees that previously existed in `wrapper.php`.
+- **`wrapper.php` nav blocks replaced with Navigation helper calls**: the inline mobile nav (~160 lines) and inline desktop sidebar (~160 lines) were removed and replaced with `Navigation::renderMobile($navConfig)` / `Navigation::renderSidebar($navConfig)`. A `$navConfig` assembly block maps the wrapper's resolved data variables to the config contract. Net reduction ~290 lines in wrapper.php.
+
 ### April 20, 2026 — library refactor: lib/View/ reorganization, Error centralisation
 
 - **New `lib/View/Panel/Header.php` added as the canonical panel header-card renderer**: `Header::render(array $config): string` centralizes the repeated `<header class="card"><div class="card-body">...` structure used across panel templates while keeping route-specific decisions in the calling template. The helper supports plain-text or trusted-HTML `title`, `subheading`, and `summary` fields plus optional `actions`, `intro_html`, and `body_html` slots for richer headers such as documentation buttons, public permalinks, and inline notes.
