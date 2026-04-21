@@ -38,32 +38,6 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 			- [ ] Decide whether taxonomy-set assignment counts (`countExplicitTaxonomySetAssignments()`) belong on the parser read surface or should stay repository-only until the broader channel write/read split is finished; then update `Panel/TaxonomyController` accordingly.
 			- [ ] After the core controller/runtime rewires are done, audit debug/profiling utilities (`debug/util/profile-panel-lists.php`, `debug/util/profile-public-pages.php`) and any remaining CLI read flows so they follow the same parser-vs-repo rule instead of preserving legacy direct reads by accident.
 	- [ ] Will the CLI perform better using Directory/Scribe classes, or by directly calling repos like currently? Find out, and orient the CLI around the faster-performing option. Same deal with our panel list & editor routes: Test both options for speed, and align.
-- [x] Split all content-type parsers into `*RouteParser` / `*DataParser` paired classes so the contract is clear from the name alone. Approx 70-file rename across `lib/`, `sys/`, `tpl/`, and `bin/`. Execute in order:
-	#### New files — extract methods from existing classes
-	- [x] `TagRouteParser` — `tagEnabled()` + `tagRoutePrefix()` as static Config-taking methods, extracted from `ChannelParser`
-	- [x] `CategoryRouteParser` — `categoryEnabled()` + `categoryRoutePrefix()` as static Config-taking methods, extracted from `ChannelParser`
-	- [x] `PageRouteParser` — static URL-building methods from `PageParser`: `normalizeSlugForLookup`, `parseDateSlugSegment`, `normalizePageIdForLookup`, `resolveLookupTarget`, `buildRouteSegment`, `datePrefix`, and private helpers
-	- [x] `PageDataParser` — all instance (repo-backed) methods from `PageParser`
-	- [x] `GroupRouteParser` — `profileRoutePrefix`, `profileSelector`, `profileMode`, `profileRoutesEnabledForRoutingTable`, `groupRoutePrefix`, `groupMode`, `groupRoutesEnabledForRoutingTable`, `registrationMode`, `normalizeRoutePrefix` from `GroupParser`
-	- [x] `GroupDataParser` — `listAll`, `listPageForPanel`, `findById`, `findBySlug` from `GroupParser`
-	#### Renames — content stays the same, file + class renamed
-	- [x] `RouteParser` → `ChannelRouteParser` (channel/page routing policy; already has globalPageRouteMode, effectiveChannelRouteMode, resolveChannelSeparator, and the normalizer/separator statics)
-	- [x] `ChannelParser` → `ChannelDataParser` (strip the now-extracted categoryEnabled/tagEnabled/categoryRoutePrefix/tagRoutePrefix methods; keep repo reads and normalizeRoutePrefix)
-	- [x] `TagParser` → `TagDataParser`
-	- [x] `CategoryParser` → `CategoryDataParser`
-	- [x] `FeedParser` → `FeedRouteParser` (purely config-backed — no DB component, so no FeedDataParser)
-	- [x] `UserParser` → `UserDataParser`
-	- [x] `RedirectParser` → `RedirectDataParser`
-	- [x] `DuplicateParser` → `PageDuplicateParser`
-	#### Caller sweep — after all files are in place
-	- [x] Update all `use` statements, type hints, property declarations, and fully-qualified class name references across `private/sys/`, `private/lib/`, `private/tpl/`, `private/bin/`
-	- [x] Update `docs/Filetree.md` to reflect the new parser layout
-	#### Not touched — no route/data split applies
-	- `ConfigParser` — config-key parsing utilities, not a content-type parser
-	- `PanelParser` — panel-specific URL/permission helpers
-	- `SetParser` — taxonomy set selection normalization plus read-side set-file loading
-	- `ChannelContextParser` — channel context hydration, normalization policy, and read-side channel-file loading; distinct from repo reads
-
 
 
 ### Bugs & Tweaks
