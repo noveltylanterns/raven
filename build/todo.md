@@ -43,6 +43,7 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	- [ ] This way our libraries, CLI & panel controllers stay focused & lean.
 	- [ ] Any primitives called by the Repositories can be saved as ChannelRepoParser, SetRepoParser, etc, etc, so the Repositories don't have to call the whole *Parser stack, and so anything else can call those primitives directly without dragging in other stacks.
 	- [ ] This item will need a whole dedicated checklist plan here in itself, but it should be easy with the preceeding work out of the way.
+	- [ ] Doublecheck that all libraries, routers and controllers are behaving so to align with the intention of these boundaries. No more dragging in whole stacks on routes where they are not needed.
 - [ ] Are all three lib/Diagnostic/ classes for the Request Profiler? One of them is just vague "ProfilerOutputInterface". Anything for the request profiler can be moved to sys/Debug/RequestProfiler.php and/or RequestProfiler*.php, and all the existing sys/Debug/Profiler*.php classes should be renamed to OutputProfiler*.php so theres no confusion between our two profilers. Limit all sys/Debug/ class names to three words tops cause right now they're long and make no sense. Delete empty lib/Diagnostic/ when done.
 
 
