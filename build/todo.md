@@ -53,6 +53,8 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	- [ ] ContentController should be called PageController, so it matches what it's called in the Panel.
 	- [ ] A controller should not have to call a whole other controller from a different route. For example, if Channel data has to be read from a Page route, the Page should consult our refactored Channel repository and/or new ChannelRepoParser class. Do a sweep across controllers, repos & routers to make sure they all behave this way so again, we aren't calling in dead weight on Panel routes it is not needed.
 	- [ ] Once all of that is done, repeat this process on the Public controllers.
+	- [ ] Missing Public/ controllers for Channels, Categories, Tags & Groups.
+	- [ ] ProfileController should be called UserController so it matches everything else.
 	- [ ] FormController is only used on page routes, fold it into PageController.
 
 
