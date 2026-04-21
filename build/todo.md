@@ -15,17 +15,15 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 
 ### Library Refactor
 Our lib/ and sys/ folders are sloppy. We need to move things around so it is easier to document and make available to developers. Check each of these as you go in case we lose session:
-- [ ] Our Directory/ service is going to contain the canonical primitive logic for pulling routes, metadata & table data from all content types. Stray functions like looking for things by id or by slug should be in our Directory/ classes as well. This gives extension authors (and the core/cli) a consistent way to pull routes/data for all of Raven's different content types. However, Directory/ is an utter mess:
-	- [x] Current direction change: canonical read-side helpers are being renamed from `lib/Directory/` to `lib/Parser/` with `*Parser` class names. All `lib/Directory/` alias files deleted; `Raven\Lib\Parser\*` is now the only live namespace.
-	- [x] Missing directory handlers for User.php, Category.php, Tag.php and Page.php.
-		- [x] Canonical `UserParser`, `CategoryParser`, `TagParser`, `PageParser`, and `RedirectParser` exist and all panel/public/CLI reads go through the parser layer. `lib/Directory/` is fully deleted.
+- [ ] Our Parser/ service is going to contain the canonical primitive logic for pulling routes, metadata & table data from all content types. Stray functions like looking for things by id or by slug should be in our Parser/ classes as well. This gives extension authors (and the core/cli) a consistent way to pull routes/data for all of Raven's different content types. However, Parser/ is an utter mess:
+	- [x] Missing Parsers for User.php, Category.php, Tag.php and Page.php.
+		- [x] Canonical `UserParser`, `CategoryParser`, `TagParser`, `PageParser`, and `RedirectParser` exist and all panel/public/CLI reads go through the parser layer.
 	- [x] `RouteParser` was dead code — `routeConfigService()` on `SharedController` was never called; the live APIs are `channelParser()`, `feedParser()`, `groupParser()`. Removed `RouteParser.php`, dropped the property/method/import from `SharedController`.
 	- [x] `ModeParser` → `RouteParser`: page URL resolution/building (`normalizeSlugForLookup`, `parseDateSlugSegment`, `normalizePageIdForLookup`, `resolveLookupTarget`, `buildRouteSegment`, `datePrefix`, private helpers) moved to `PageParser`; remaining routing policy predicates and separator helpers (`normalizeChannelRouteMode`, `normalizeRouteMode`, `usesPageId`, separator trio) renamed to `RouteParser` — 347 → 110 lines. All callers updated.
 	- [x] ~~Merge `ChannelContextParser` into `ChannelParser`~~ — cancelled. The two classes have genuinely different responsibilities: `ChannelParser` reads channel route-config and repo-backed records; `ChannelContextParser` owns normalization policy, context hydration, and read-side channel-file loading, while `ChannelScribe` now owns the write/delete/repair path. Different instance deps, different callers. Merging would create a 1000-line class mixing filesystem I/O, DB reads, and config parsing.
-	- [x] Rename SetContext.php to Set.php — done as `Parser/SetParser.php`; `Directory/SetContext.php` alias deleted.
-	- [x] Nothing in Directory/ should be serving views/templates. `lib/Directory/` is deleted; all primitives live in `lib/Parser/`.
-	- [ ] Directory/ handlers should be able to find, read & interpret every repository & table column for each data type.
-	- [ ] All Directory/ handlers should be read-only. For write functions, keep a parallel set of files in lib/Scribe/. Again, Scribe/ handlers should be able to write to just about every attribute of each data type.
+	- [x] Rename SetContext.php to Set.php — done as `Parser/SetParser.php`
+	- [ ] All Parser/ handlers should be able to find, read & interpret every repository & table column for each data type.
+	- [ ] All Parser/ handlers should be read-only. For write functions, keep a parallel set of files in lib/Scribe/. Again, Scribe/ handlers should be able to write to just about every attribute of each data type.
 		- [x] Channel/set filesystem writes were extracted out of `ChannelContextParser` and `SetParser` into `lib/Scribe/ChannelScribe.php` and `lib/Scribe/SetScribe.php`; the repositories now call scribes for write/delete/repair while the parser classes stay read-side.
 		- [x] Extension/theme scaffold creation now routes through canonical library services instead of controller/CLI-local helpers: `ExtensionScaffoldService`, `ThemeScaffoldService`, and `ThemeCloneService` own the live scaffold/clone file writes.
 		- [ ] Next parser-coverage follow-up batch for channel-backed read flows:
@@ -37,7 +35,16 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 			- [ ] Rewire `Panel/ContentController` channel option loading for the page editor to use parser-owned read helpers instead of `ChannelRepository::listOptions()`.
 			- [ ] Decide whether taxonomy-set assignment counts (`countExplicitTaxonomySetAssignments()`) belong on the parser read surface or should stay repository-only until the broader channel write/read split is finished; then update `Panel/TaxonomyController` accordingly.
 			- [ ] After the core controller/runtime rewires are done, audit debug/profiling utilities (`debug/util/profile-panel-lists.php`, `debug/util/profile-public-pages.php`) and any remaining CLI read flows so they follow the same parser-vs-repo rule instead of preserving legacy direct reads by accident.
-	- [ ] Will the CLI perform better using Directory/Scribe classes, or by directly calling repos like currently? Find out, and orient the CLI around the faster-performing option. Same deal with our panel list & editor routes: Test both options for speed, and align.
+	- [ ] Parallel to our new comprehensive Parser classes, we need a complete set of Scribe/ classes that can write virtually every data type.
+- [ ] We need to set more specific boundaries between Parser/Scribe libraries, the Panel controllers, CLI, and the Repos they call.
+	- [ ] For performance & optimization reasons, we will keep doing direct Repository/ connects for internal code, and leave Parser/Scribe around for extension developers & brace tags.
+	- [ ] We need to have Repository/ itself be a comprehensive universal data handler that Parser/Scribe classes, our Panel operations, and the CLI all route through.
+	- [ ] Flatten and optimize accordingly with the Repositories only doing shared heavy lifting.
+	- [ ] This way our libraries, CLI & panel controllers stay focused & lean.
+	- [ ] Any primitives called by the Repositories can be saved as ChannelRepoParser, SetRepoParser, etc, etc, so the Repositories don't have to call the whole *Parser stack, and so anything else can call those primitives directly without dragging in other stacks.
+	- [ ] This item will need a whole dedicated checklist plan here in itself, but it should be easy with the preceeding work out of the way.
+- [ ] Are all three lib/Diagnostic/ classes for the Request Profiler? One of them is just vague "ProfilerOutputInterface". Anything for the request profiler can be moved to sys/Debug/RequestProfiler.php and/or RequestProfiler*.php, and all the existing sys/Debug/Profiler*.php classes should be renamed to OutputProfiler*.php so theres no confusion between our two profilers. Limit all sys/Debug/ class names to three words tops cause right now they're long and make no sense. Delete empty lib/Diagnostic/ when done.
+
 
 
 ### Bugs & Tweaks
