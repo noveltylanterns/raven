@@ -37,6 +37,9 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 			- [ ] After the core controller/runtime rewires are done, audit debug/profiling utilities (`debug/util/profile-panel-lists.php`, `debug/util/profile-public-pages.php`) and any remaining CLI read flows so they follow the same parser-vs-repo rule instead of preserving legacy direct reads by accident.
 	- [ ] Parallel to our new comprehensive Parser classes, we need a complete set of Scribe/ classes that can write virtually every data type.
 - [ ] We need to set more specific boundaries between Parser/Scribe libraries, the Panel controllers, CLI, and the Repos they call.
+	- [ ] TaxonomySetRepository should just be SetRepository
+	- [ ] TaxonomyLookupRepository should probably become lib/Parser/TaxonomyRepoParser
+	- [ ] InviteTokenRepository should just be InviteRepository
 	- [ ] For performance & optimization reasons, we will keep doing direct Repository/ connects for internal code, and the leave Parser/Scribe libraries around for extension developers & brace tags.
 	- [ ] We need to have Repository/ itself be a comprehensive universal data handler that Parser/Scribe classes, our Panel operations, and the CLI all directly route through.
 	- [ ] Flatten and optimize accordingly with the Repositories only doing shared heavy lifting.
@@ -51,7 +54,7 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 - [ ] sys/Controller/TaxonomyController.php is going to have to be split up into CategoryController, ChannelController, etc, etc. We already have SharedController, AuthController and PanelController shared on all routes. Other than that, each top-level panel route should have it's own controller. We don't need more than those three shared controllers. SystemController looks like it will have to be split up too.
 	- [ ] Once the split is wired into place, make sure each Controller is only dealing with the route it was made for. Optimize and flatten useless bullshit entirely.
 	- [ ] ContentController should be called PageController, so it matches what it's called in the Panel.
-	- [ ] A controller should not have to call a whole other controller from a different route. For example, if Channel data has to be read from a Page route, the Page should consult our refactored Channel repository and/or new ChannelRepoParser class. Do a sweep across controllers, repos & routers to make sure they all behave this way so again, we aren't calling in dead weight on Panel routes it is not needed.
+	- [ ] A controller should not have to call a whole other controller from a different route. For example, if Channel data has to be read from a Page route, the Page should consult our refactored Channel repository and/or new ChannelRepoParser class. Do a sweep across controllers, repos & routers to make sure they all behave this way so again, we aren't calling in dead weight on Panel routes it is not needed. A lot of legacy logic still resides around Controllers.
 	- [ ] Once all of that is done, repeat this process on the Public controllers.
 	- [ ] Missing Public/ controllers for Channels, Categories, Tags & Groups.
 	- [ ] ProfileController should be called UserController so it matches everything else.
