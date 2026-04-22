@@ -15,7 +15,7 @@ use Raven\Core\Config;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageRouteParser;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\Public\ThemeCatalogService;
+use Raven\Lib\View\Public\ThemeCatalog;
 
 /**
  * Shared helpers for panel routing-preview derivations.
@@ -24,17 +24,17 @@ final class PanelRoutingPreviewService
 {
     private string $projectRoot;
     private InputSanitizer $input;
-    private ThemeCatalogService $themeCatalog;
+    private ThemeCatalog $themeCatalog;
 
     /**
      * Stores the dependencies used to derive routing-preview values for the panel.
      *
      * @param string $projectRoot Project root used for fallback template checks.
      * @param InputSanitizer $input Shared sanitizer for route-preview slug normalization.
-     * @param ThemeCatalogService $themeCatalog Shared theme catalog for inheritance-aware template checks.
+     * @param ThemeCatalog $themeCatalog Shared theme catalog for inheritance-aware template checks.
      * @return void
      */
-    public function __construct(string $projectRoot, InputSanitizer $input, ThemeCatalogService $themeCatalog)
+    public function __construct(string $projectRoot, InputSanitizer $input, ThemeCatalog $themeCatalog)
     {
         $this->projectRoot = rtrim($projectRoot, '/\\');
         $this->input = $input;

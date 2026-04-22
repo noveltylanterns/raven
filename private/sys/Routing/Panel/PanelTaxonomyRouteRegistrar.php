@@ -23,6 +23,8 @@ final class PanelTaxonomyRouteRegistrar
      * Registers the panel taxonomy route family.
      *
      * @param Router $router Mutable router receiving taxonomy routes.
+     * @param callable(): object $panelChannelController Lazy channel controller factory.
+     * @param callable(): object $panelCategoryController Lazy category controller factory.
      * @param callable(): object $panelTaxonomyController Lazy taxonomy controller factory.
      * @param InputSanitizer $input Shared input normalizer for route params.
      * @param bool $categoryEnabled Whether category routes are enabled for this request.
@@ -32,21 +34,23 @@ final class PanelTaxonomyRouteRegistrar
      */
     public static function register(
         Router $router,
+        callable $panelChannelController,
+        callable $panelCategoryController,
         callable $panelTaxonomyController,
         InputSanitizer $input,
         bool $categoryEnabled,
         bool $tagEnabled,
         callable $renderNotFound
     ): void {
-        $router->add('GET', '/channel', static function () use ($panelTaxonomyController): void {
-            $panelTaxonomyController()->channelList();
+        $router->add('GET', '/channel', static function () use ($panelChannelController): void {
+            $panelChannelController()->channelList();
         });
 
-        $router->add('GET', '/channel/edit', static function () use ($panelTaxonomyController): void {
-            $panelTaxonomyController()->channelEdit(null);
+        $router->add('GET', '/channel/edit', static function () use ($panelChannelController): void {
+            $panelChannelController()->channelEdit(null);
         });
 
-        $router->add('GET', '/channel/edit/{id}', static function (array $params) use ($panelTaxonomyController, $input, $renderNotFound): void {
+        $router->add('GET', '/channel/edit/{id}', static function (array $params) use ($panelChannelController, $input, $renderNotFound): void {
             $id = $input->int($params['id'] ?? null, 1);
 
             if ($id === null) {
@@ -54,27 +58,27 @@ final class PanelTaxonomyRouteRegistrar
                 return;
             }
 
-            $panelTaxonomyController()->channelEdit($id);
+            $panelChannelController()->channelEdit($id);
         });
 
-        $router->add('POST', '/channel/save', static function () use ($panelTaxonomyController): void {
-            $panelTaxonomyController()->channelSave($_POST, $_FILES);
+        $router->add('POST', '/channel/save', static function () use ($panelChannelController): void {
+            $panelChannelController()->channelSave($_POST, $_FILES);
         });
 
-        $router->add('POST', '/channel/delete', static function () use ($panelTaxonomyController): void {
-            $panelTaxonomyController()->channelDelete($_POST);
+        $router->add('POST', '/channel/delete', static function () use ($panelChannelController): void {
+            $panelChannelController()->channelDelete($_POST);
         });
 
         if ($categoryEnabled) {
-            $router->add('GET', '/category', static function () use ($panelTaxonomyController): void {
-                $panelTaxonomyController()->categoryList();
+            $router->add('GET', '/category', static function () use ($panelCategoryController): void {
+                $panelCategoryController()->categoryList();
             });
 
-            $router->add('GET', '/category/edit', static function () use ($panelTaxonomyController): void {
-                $panelTaxonomyController()->categoryEdit(null);
+            $router->add('GET', '/category/edit', static function () use ($panelCategoryController): void {
+                $panelCategoryController()->categoryEdit(null);
             });
 
-            $router->add('GET', '/category/edit/{id}', static function (array $params) use ($panelTaxonomyController, $input, $renderNotFound): void {
+            $router->add('GET', '/category/edit/{id}', static function (array $params) use ($panelCategoryController, $input, $renderNotFound): void {
                 $id = $input->int($params['id'] ?? null, 1);
 
                 if ($id === null) {
@@ -82,26 +86,26 @@ final class PanelTaxonomyRouteRegistrar
                     return;
                 }
 
-                $panelTaxonomyController()->categoryEdit($id);
+                $panelCategoryController()->categoryEdit($id);
             });
 
-            $router->add('POST', '/category/save', static function () use ($panelTaxonomyController): void {
-                $panelTaxonomyController()->categorySave($_POST, $_FILES);
+            $router->add('POST', '/category/save', static function () use ($panelCategoryController): void {
+                $panelCategoryController()->categorySave($_POST, $_FILES);
             });
 
-            $router->add('POST', '/category/delete', static function () use ($panelTaxonomyController): void {
-                $panelTaxonomyController()->categoryDelete($_POST);
+            $router->add('POST', '/category/delete', static function () use ($panelCategoryController): void {
+                $panelCategoryController()->categoryDelete($_POST);
             });
 
-            $router->add('GET', '/category/set', static function () use ($panelTaxonomyController): void {
-                $panelTaxonomyController()->categorySetList();
+            $router->add('GET', '/category/set', static function () use ($panelCategoryController): void {
+                $panelCategoryController()->categorySetList();
             });
 
-            $router->add('GET', '/category/set/edit', static function () use ($panelTaxonomyController): void {
-                $panelTaxonomyController()->categorySetEdit(null);
+            $router->add('GET', '/category/set/edit', static function () use ($panelCategoryController): void {
+                $panelCategoryController()->categorySetEdit(null);
             });
 
-            $router->add('GET', '/category/set/edit/{id}', static function (array $params) use ($panelTaxonomyController, $input, $renderNotFound): void {
+            $router->add('GET', '/category/set/edit/{id}', static function (array $params) use ($panelCategoryController, $input, $renderNotFound): void {
                 $id = $input->int($params['id'] ?? null, 0);
 
                 if ($id === null) {
@@ -109,15 +113,15 @@ final class PanelTaxonomyRouteRegistrar
                     return;
                 }
 
-                $panelTaxonomyController()->categorySetEdit($id);
+                $panelCategoryController()->categorySetEdit($id);
             });
 
-            $router->add('POST', '/category/set/save', static function () use ($panelTaxonomyController): void {
-                $panelTaxonomyController()->categorySetSave($_POST);
+            $router->add('POST', '/category/set/save', static function () use ($panelCategoryController): void {
+                $panelCategoryController()->categorySetSave($_POST);
             });
 
-            $router->add('POST', '/category/set/delete', static function () use ($panelTaxonomyController): void {
-                $panelTaxonomyController()->categorySetDelete($_POST);
+            $router->add('POST', '/category/set/delete', static function () use ($panelCategoryController): void {
+                $panelCategoryController()->categorySetDelete($_POST);
             });
         }
 

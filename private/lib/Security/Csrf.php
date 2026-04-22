@@ -11,14 +11,14 @@ final class Csrf
 {
     private string $tokenKey;
     private int $tokenBytes;
-    private CsrfTokenStoreInterface $store;
+    private CsrfToken $store;
 
     public function __construct(
-        ?CsrfTokenStoreInterface $store = null,
+        ?CsrfToken $store = null,
         string $tokenKey = '_raven_csrf',
         int $tokenBytes = 32
     ) {
-        $this->store = $store ?? new PhpSessionTokenStore();
+        $this->store = $store ?? new SessionToken();
         $this->tokenKey = trim($tokenKey) !== '' ? $tokenKey : '_raven_csrf';
         $this->tokenBytes = max(16, min(128, $tokenBytes));
     }
@@ -57,4 +57,3 @@ final class Csrf
         return hash_equals($this->token(), $submitted);
     }
 }
-

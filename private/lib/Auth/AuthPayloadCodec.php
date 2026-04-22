@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
 
-use Raven\Lib\Security\TotpSecretCipher;
+use Raven\Lib\Security\TotpCipher;
 use Raven\Lib\Security\TwoFactorMethodNormalizer;
 
 /**
@@ -13,15 +13,15 @@ use Raven\Lib\Security\TwoFactorMethodNormalizer;
 final class AuthPayloadCodec
 {
     private ContactProfileNormalizer $contactProfileNormalizer;
-    private TotpSecretCipher $totpSecretCipher;
+    private TotpCipher $totpSecretCipher;
 
     public function __construct(
         ContactProfileNormalizer $contactProfileNormalizer,
-        ?TotpSecretCipher $totpSecretCipher = null
+        ?TotpCipher $totpSecretCipher = null
     )
     {
         $this->contactProfileNormalizer = $contactProfileNormalizer;
-        $this->totpSecretCipher = $totpSecretCipher ?? new TotpSecretCipher();
+        $this->totpSecretCipher = $totpSecretCipher ?? new TotpCipher();
     }
 
     /**

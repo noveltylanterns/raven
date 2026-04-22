@@ -148,8 +148,7 @@ final class Error
             return;
         }
 
-        $site = (new SiteContextBuilder())->publicFallback(
-            $this->config,
+        $site = $this->publicFallbackSiteData(
             $activeTheme,
             $this->resolveCssSlug($themesRoot, $activeTheme)
         );
@@ -216,5 +215,135 @@ final class Error
 
         $roots[] = rtrim($coreFallbackRoot, '/\\');
         return $roots;
+    }
+
+    /**
+     * Builds the minimal public `site` payload needed by themed error templates.
+     *
+     * Error rendering happens outside the normal public controller wrapper flow, so
+     * it assembles the fallback public payload locally instead of depending on a
+     * shared cross-runtime view helper.
+     *
+     * @param string $publicTheme Resolved active public-theme slug.
+     * @param string $publicThemeActive Theme slug that owns the active stylesheet.
+     * @return array<string, string> Template-ready public wrapper payload.
+     */
+    private function publicFallbackSiteData(string $publicTheme, string $publicThemeActive): array
+    {
+        $siteUrl = $this->siteUrlFromConfig();
+
+        return array_merge($this->publicMetaBase($publicTheme, $publicThemeActive), [
+            'url' => $siteUrl,
+            'current_url' => '',
+            'theme_url' => $this->themeUrl($siteUrl, $publicThemeActive),
+            'meta_image' => $this->defaultMetaImageFromConfig(),
+        ]);
+    }
+
+    /**
+     * Builds the shared config-owned public meta keys used by themed error templates.
+     *
+     * @param string $publicTheme Resolved active public-theme slug.
+     * @param string $publicThemeActive Theme slug that owns the active stylesheet.
+     * @return array<string, string> Shared public wrapper payload keys.
+     */
+    private function publicMetaBase(string $publicTheme, string $publicThemeActive): array
+    {
+        return [
+            'name' => (string) $this->config->get('site.name', 'Raven CMS'),
+            'protocol' => $this->siteProtocolFromConfig(),
+            'domain' => (string) $this->config->get('site.domain', 'localhost'),
+            'panel_path' => (string) $this->config->get('panel.path', 'panel'),
+            'apple_touch_icon' => trim((string) $this->config->get('meta.apple_touch_icon', '')),
+            'robots' => trim((string) $this->config->get('meta.robots', 'index,follow')),
+            'twitter_card' => trim((string) $this->config->get('meta.twitter.card', '')),
+            'twitter_site' => trim((string) $this->config->get('meta.twitter.site', '')),
+            'twitter_creator' => trim((string) $this->config->get('meta.twitter.creator', '')),
+            'og_type' => trim((string) $this->config->get('meta.opengraph.type', 'website')),
+            'og_locale' => trim((string) $this->config->get('meta.opengraph.locale', 'en_US')),
+            'theme' => $publicTheme,
+            'theme_active' => $publicThemeActive,
+        ];
+    }
+
+    /**
+     * Returns the configured default social-image value for wrapper fallbacks.
+     *
+     * @return string Configured fallback image URL/path.
+     */
+    private function defaultMetaImageFromConfig(): string
+    {
+        return trim((string) $this->config->get('meta.image', ''));
+    }
+
+    /**
+     * Normalizes the configured site protocol to one HTTP scheme.
+     *
+     * @return string `http` or `https`.
+     */
+    private function siteProtocolFromConfig(): string
+    {
+        $protocol = strtolower(trim((string) $this->config->get('site.protocol', 'https')));
+        return in_array($protocol, ['http', 'https'], true) ? $protocol : 'https';
+    }
+
+    /**
+     * Resolves the configured absolute site URL, preserving any install subdirectory.
+     *
+     * @return string Absolute site base URL derived from config.
+     */
+    private function siteUrlFromConfig(): string
+    {
+        $domain = trim((string) $this->config->get('site.domain', 'localhost'));
+        if ($domain === '') {
+            $domain = 'localhost';
+        }
+
+        $path = '';
+        if (str_contains($domain, '://')) {
+            $parsedHost = trim((string) parse_url($domain, PHP_URL_HOST));
+            $parsedPort = parse_url($domain, PHP_URL_PORT);
+            $parsedPath = (string) parse_url($domain, PHP_URL_PATH);
+            if ($parsedHost !== '') {
+                $domain = $parsedHost . (is_int($parsedPort) && $parsedPort > 0 ? ':' . $parsedPort : '');
+                $path = '/' . trim($parsedPath, '/');
+                $path = $path === '/' ? '' : $path;
+            } else {
+                $domain = 'localhost';
+            }
+        } else {
+            if (str_contains($domain, '/')) {
+                $parts = explode('/', $domain, 2);
+                $domain = (string) ($parts[0] ?? '');
+                $path = '/' . trim((string) ($parts[1] ?? ''), '/');
+                $path = $path === '/' ? '' : $path;
+            }
+
+            // Strip any accidental query/fragment tails before rebuilding the canonical base URL.
+            $domain = preg_replace('/[\/?#].*$/', '', $domain) ?? $domain;
+            $domain = trim($domain);
+            if ($domain === '') {
+                $domain = 'localhost';
+            }
+        }
+
+        return $this->siteProtocolFromConfig() . '://' . $domain . $path;
+    }
+
+    /**
+     * Builds the public theme asset base URL from one resolved site URL.
+     *
+     * @param string $siteUrl Absolute site base URL.
+     * @param string $themeCssSlug Theme slug that owns the active stylesheet.
+     * @return string Absolute theme asset base URL.
+     */
+    private function themeUrl(string $siteUrl, string $themeCssSlug): string
+    {
+        $themeCssSlug = trim($themeCssSlug);
+        if ($themeCssSlug === '') {
+            $themeCssSlug = 'raven';
+        }
+
+        return rtrim($siteUrl, '/') . '/theme/' . rawurlencode($themeCssSlug);
     }
 }

@@ -9,7 +9,7 @@ declare(strict_types=1);
 /** @var string|null $flashError */
 
 use Raven\Lib\View\Panel\Header;
-use Raven\Lib\View\Panel\ListWrapper;
+use Raven\Lib\View\Panel\ListCard;
 use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
@@ -89,7 +89,7 @@ $tagSetListToolbarItems = [
     </tbody>
 </table>
 <?php $tagSetTableHtml = (string) ob_get_clean(); ?>
-<?= ListWrapper::render([
+<?= ListCard::render([
     'is_empty'      => $setRows === [],
     'empty_message' => 'No tag sets yet.',
     'table_html'    => $tagSetTableHtml,

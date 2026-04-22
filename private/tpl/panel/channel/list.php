@@ -18,7 +18,7 @@
 
 use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
-use Raven\Lib\View\Panel\ListWrapper;
+use Raven\Lib\View\Panel\ListCard;
 use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
@@ -156,7 +156,7 @@ $channelListToolbarItems = [
     </tbody>
 </table>
 <?php $channelTableHtml = (string) ob_get_clean(); ?>
-<?= ListWrapper::render([
+<?= ListCard::render([
     'is_empty'            => $channelRows === [],
     'empty_message'       => 'No channels yet.',
     'search_id'           => $channelSearchId,

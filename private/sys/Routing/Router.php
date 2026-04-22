@@ -40,9 +40,9 @@ final class Router
      * Dispatches one normalized route request to the first matching handler.
      *
      * @param Request $request Normalized route request value object.
-     * @return Result Result wrapper containing handled state and params.
+     * @return Response Response wrapper containing handled state and params.
      */
-    public function dispatch(Request $request): Result
+    public function dispatch(Request $request): Response
     {
         $normalizedMethod = $request->method();
         $normalizedPath = $request->path();
@@ -64,10 +64,10 @@ final class Router
             }
 
             $response = ($route['handler'])($params);
-            return Result::handled($params, $response);
+            return Response::handled($params, $response);
         }
 
-        return Result::notHandled();
+        return Response::notHandled();
     }
 
     /**

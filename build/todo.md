@@ -25,33 +25,42 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	- [ ] All Parser/ handlers should be able to find, read & interpret every repository & table column for each data type.
 	- [ ] All Parser/ handlers should be read-only. For write functions, keep a parallel set of files in lib/Scribe/. Again, Scribe/ handlers should be able to write to just about every attribute of each data type.
 		- [x] Channel/set filesystem writes were extracted out of `ChannelContextParser` and `SetParser` into `lib/Scribe/ChannelScribe.php` and `lib/Scribe/SetScribe.php`; the repositories now call scribes for write/delete/repair while the parser classes stay read-side.
-		- [x] Extension/theme scaffold creation now routes through canonical library services instead of controller/CLI-local helpers: `ExtensionScaffoldService`, `ThemeScaffoldService`, and `ThemeCloneService` own the live scaffold/clone file writes.
+		- [x] Extension/theme scaffold creation now routes through canonical library services instead of controller/CLI-local helpers: `ExtensionScaffoldService` and the public `ThemeGenerator` own the live scaffold/clone file writes.
 		- [ ] Next parser-coverage follow-up batch for channel-backed read flows:
-			- [ ] Expand `ChannelDataParser` to cover the remaining live read-only repository calls that still bypass the parser surface (`listOptions()`, `slugExists()`, and any stable count/lookups we want to treat as canonical reads).
-			- [ ] Add one public-runtime channel-parser seam in `PublicRuntimeBuilder` so split public controllers can depend on `ChannelDataParser` for reads without each controller instantiating its own parser.
-			- [ ] Rewire `Public/ContentController` channel-read lookups (`findBySlug()` in channel/page route resolution) to use `ChannelDataParser` instead of direct `ChannelRepository` reads.
-			- [ ] Rewire `Public/FeedController` channel-read lookups (`findBySlug()` in feed/channel label resolution) to use `ChannelDataParser` instead of direct `ChannelRepository` reads.
-			- [ ] Rewire `Panel/RedirectController` channel existence validation to use parser-owned read helpers instead of `ChannelRepository::slugExists()`.
-			- [ ] Rewire `Panel/ContentController` channel option loading for the page editor to use parser-owned read helpers instead of `ChannelRepository::listOptions()`.
-			- [ ] Decide whether taxonomy-set assignment counts (`countExplicitTaxonomySetAssignments()`) belong on the parser read surface or should stay repository-only until the broader channel write/read split is finished; then update `Panel/TaxonomyController` accordingly.
-			- [ ] After the core controller/runtime rewires are done, audit debug/profiling utilities (`debug/util/profile-panel-lists.php`, `debug/util/profile-public-pages.php`) and any remaining CLI read flows so they follow the same parser-vs-repo rule instead of preserving legacy direct reads by accident.
+			- [x] Expand `ChannelDataParser` to cover the remaining live read-only repository calls that still bypass the parser surface (`listOptions()`, `slugExists()`, and any stable count/lookups we want to treat as canonical reads).
+			- [x] Add one public-runtime channel-parser seam in `PublicRuntimeBuilder` so split public controllers can depend on `ChannelDataParser` for reads without each controller instantiating its own parser.
+			- [x] Rewire `Public/ContentController` channel-read lookups (`findBySlug()` in channel/page route resolution) to use `ChannelDataParser` instead of direct `ChannelRepository` reads.
+			- [x] Rewire `Public/FeedController` channel-read lookups (`findBySlug()` in feed/channel label resolution) to use `ChannelDataParser` instead of direct `ChannelRepository` reads.
+			- [x] Rewire `Panel/RedirectController` channel existence validation to use parser-owned read helpers instead of `ChannelRepository::slugExists()`.
+			- [x] Rewire `Panel/ContentController` channel option loading for the page editor to use parser-owned read helpers instead of `ChannelRepository::listOptions()`.
+			- [x] Decide whether taxonomy-set assignment counts (`countExplicitTaxonomySetAssignments()`) belong on the parser read surface or should stay repository-only until the broader channel write/read split is finished; then update `Panel/TaxonomyController` accordingly.
+			- [x] After the core controller/runtime rewires are done, audit debug/profiling utilities (`debug/util/profile-panel-lists.php`, `debug/util/profile-public-pages.php`) and any remaining CLI read flows so they follow the same parser-vs-repo rule instead of preserving legacy direct reads by accident.
 	- [ ] Parallel to our new comprehensive Parser classes, we need a complete set of Scribe/ classes that can write virtually every data type.
 - [ ] Clean up after our lib/View/ refactor now that I can make sense of whats going on in there:
-	- [ ] SiteContextBuilder is shared dead weight. We have enough shared controllers and shared bootstraps and shared routers that this file shouldn't even exist. Panel-only things belong in PanelController and public-only things belong in PublicController. Other things belong in other more specific libraries. Everything in here has a better place. Do an audit and work out eliminating the need for this file.
-	- [ ] BodyBlockPolicy & PageBodyBlockCodec: Are these both truly necessary on public+panel routes? Lets rearrange this so theres a View\Panel\PageBlocks and View\Public\PageBlocks. Anything shared between both should probably be flattened into PageRepository, Page*Parser and PageScribe.
-	- [ ] Public\PageBodyRenderer should be split, with Page-wrapper functions becoming Public\Page, and Block-specific functiong going to Public\PageBlocks
-	- [ ] PageTaxonomyQueryService probably should be stored as lib/Parser/TaxonomyDataParser.php, and it needs a parallel set of listing by id's instead of slugs.
-	- [ ] Public\MarkdownRenderer should be Public\PageMarkdown
-	- [ ] Public\ThemeScaffoldService should be Public\ThemeGenerator
-	- [ ] Public\ThemeManifestValidator should be Public\ThemeValidator
-	- [ ] Public\ThemeCatalogService should be Public\ThemeCatalog
-	- [ ] Public\ThemeCloneService should be marged into Public\ThemeGenerator
-	- [ ] Panel\ListWrapper should be Panel\List
-	- [ ] Panel\PagePanelFilterClauseBuilder should be universalized as Panel\ListFilter, with Page-specific logic moving to the Panel\PageController where it belongs.
+	- [x] SiteContextBuilder is shared dead weight. We have enough shared controllers and shared bootstraps and shared routers that this file shouldn't even exist. Panel-only things belong in PanelController and public-only things belong in PublicController. Other things belong in other more specific libraries. Everything in here has a better place. Do an audit and work out eliminating the need for this file.
+		- [x] `View/SiteContextBuilder` was removed. Panel `site` payload assembly now lives directly in `Panel/SharedController`, `Panel/AuthController`, and the panel runtime bootstrap closure, while public base/fallback meta payload assembly now lives in `View/Public/MetaService` and `View/Error`.
+	- [x] BodyBlockPolicy & PageBodyBlockCodec: Are these both truly necessary on public+panel routes? Lets rearrange this so theres a View\Panel\PageBlocks and View\Public\PageBlocks. Anything shared between both should probably be flattened into PageRepository, Page*Parser and PageScribe.
+		- [x] Shared type/CSS/storage normalization moved into `Parser/PageBlockParser`; panel submit handling now lives in `View/Panel/PageBlocks`, public block rendering now lives in `View/Public/PageBlocks`, and `PageRepository` now reads/writes stored block payloads through the parser layer instead of a shared view codec.
+	- [x] Public\PageBodyRenderer should be split, with Page-wrapper functions becoming Public\Page, and Block-specific functiong going to Public\PageBlocks
+		- [x] `PageBodyRenderer` had no remaining page-wrapper ownership after the earlier page-block split, so its block-rendering logic was folded directly into `View/Public/PageBlocks` and the extra renderer layer was removed instead of adding an empty `Public\Page` helper.
+	- [x] PageTaxonomyQueryService probably should be stored as lib/Parser/TaxonomyDataParser.php, and it needs a parallel set of listing by id's instead of slugs.
+		- [x] `View/PageTaxonomyQueryService` was replaced by `Parser/TaxonomyDataParser`; `PageRepository` now uses the parser-owned taxonomy listing helper and exposes category/tag page listings by both slug and id through the repository plus `PageDataParser`.
+	- [x] Public\MarkdownRenderer should be Public\PageMarkdown
+	- [x] Public\ThemeScaffoldService should be Public\ThemeGenerator
+	- [x] Public\ThemeManifestValidator should be Public\ThemeValidator
+	- [x] Public\ThemeCatalogService should be Public\ThemeCatalog
+	- [x] Public\ThemeCloneService should be marged into Public\ThemeGenerator
+	- [x] Panel\ListWrapper should be Panel\List
+		- [x] `Panel\List` is not a legal PHP class name because `list` is reserved, so the helper was renamed to `Panel\ListCard` instead. All nine core panel list templates now import `ListCard`.
+	- [x] Panel\PagePanelFilterClauseBuilder should be universalized as Panel\ListFilter, with Page-specific logic moving to the Panel\PageController where it belongs.
+		- [x] `View/Panel/PagePanelFilterClauseBuilder` was replaced by `View/Panel/ListFilter`. `Panel/ContentController` now resolves page-list channel slugs to ids before calling the parser/repository path, and `PageRepository` now applies only generic id-based equality/EXISTS filters through the shared helper.
 - [ ] We need to set more specific boundaries between Parser/Scribe libraries, the Panel controllers, CLI, and the Repos they call.
-	- [ ] TaxonomySetRepository should just be SetRepository
-	- [ ] TaxonomyLookupRepository should probably become lib/Parser/TaxonomyRepoParser
-	- [ ] InviteTokenRepository should just be InviteRepository
+	- [x] TaxonomySetRepository should just be SetRepository
+		- [x] `sys/Repository/TaxonomySetRepository` was renamed to `sys/Repository/SetRepository`, and the panel runtime plus panel config/content/system/taxonomy controllers now depend on the shorter repository name for category/tag set reads and writes.
+	- [x] TaxonomyLookupRepository should probably become lib/Parser/TaxonomyRepoParser
+		- [x] `sys/Repository/TaxonomyLookupRepository` was moved to `lib/Parser/TaxonomyRepoParser`. Panel page-editor/routing inventory flows and public taxonomy routes now depend on the parser-owned read helper instead of a `sys/Repository` taxonomy lookup class.
+	- [x] InviteTokenRepository should just be InviteRepository
+		- [x] `sys/Repository/InviteTokenRepository` was renamed to `sys/Repository/InviteRepository`, and the panel/public auth runtime now depends on the shorter repository name for invite-token reads and writes.
 	- [ ] For performance & optimization reasons, we will keep doing direct Repository/ connects for internal code, and the leave Parser/Scribe libraries around for extension developers & brace tags.
 	- [ ] We need to have Repository/ itself be a comprehensive universal data handler that Parser/Scribe classes, our Panel operations, and the CLI all directly route through.
 	- [ ] Flatten and optimize accordingly with the Repositories only doing shared heavy lifting.
@@ -59,12 +68,15 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	- [ ] Any primitives called by the Repositories can be saved as ChannelRepoParser, SetRepoParser, etc, etc, so the Repositories don't have to call the whole *Parser stack, and so anything else can call those primitives directly without dragging in repos or other stacks.
 	- [ ] This item will need a whole dedicated checklist plan here in itself, but it should be easy with the preceeding work out of the way.
 	- [ ] Doublecheck that all libraries, routers and controllers are behaving so to align with the intention of these boundaries. No more dragging in whole stacks on routes where they are not needed.
-- [ ] Are all three lib/Diagnostic/ classes for the Request Profiler? One of them is just vague "ProfilerOutputInterface". Lets move these either way:
-	- [ ] All existing sys/Debug/Profiler*.php classes should be renamed to OutputProfiler*.php so theres no confusion between our two profilers.
-	- [ ] Anything for the request profiler can be moved to sys/Debug/RequestProfiler.php and/or RequestProfiler*.php
-	- [ ] Delete empty lib/Diagnostic/ when done.
-- [ ] sys/Routing/Result.php should be Response.php
+- [x] Are all three lib/Diagnostic/ classes for the Request Profiler? One of them is just vague "ProfilerOutputInterface". Lets move these either way:
+	- [x] All existing sys/Debug/Profiler*.php classes were renamed to OutputProfiler*.php so theres no confusion between our two profilers.
+	- [x] The request-profiler collector, query adapter, and output contract now live together under `sys/Debug/RequestProfiler*.php`.
+	- [x] The empty `lib/Diagnostic/` directory was deleted after the move.
+- [x] sys/Routing/Result.php should be Response.php
+	- [x] `sys/Routing/Result.php` was renamed to `sys/Routing/Response.php`, and `Router::dispatch()` now returns the clearer `Response` value object name.
 - [ ] sys/Controller/TaxonomyController.php is going to have to be split up into CategoryController, ChannelController, etc, etc. We already have SharedController, AuthController and PanelController shared on all routes. Other than that, each top-level panel route should have it's own controller. We don't need more than those three shared controllers. SystemController looks like it will have to be split up too.
+	- [x] Channel routes were extracted to `Panel/ChannelController`; `TaxonomyController` now owns only category/category-set/tag/tag-set routes.
+	- [x] Category routes were extracted to `Panel/CategoryController`; `TaxonomyController` is now narrowed to tag/tag-set routes, and the stale category-set slug-preservation lookup now reads from the correct category set repository.
 	- [ ] Once the split is wired into place, make sure each Controller is only dealing with the route it was made for. Optimize and flatten useless bullshit entirely.
 	- [ ] ContentController should be called PageController, so it matches what it's called in the Panel.
 	- [ ] A controller should not have to call a whole other controller from a different route. For example, if Channel data has to be read from a Page route, the Page should consult our refactored Channel repository and/or new ChannelRepoParser class. Do a sweep across controllers, repos & routers to make sure they all behave this way so again, we aren't calling in dead weight on Panel routes it is not needed. A lot of legacy logic still resides around Controllers.
@@ -72,21 +84,33 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	- [ ] Missing Public/ controllers for Channels, Categories, Tags & Groups.
 	- [ ] ProfileController should be called UserController so it matches everything else.
 	- [ ] FormController is only used on page routes, fold it into PageController.
-- [ ] lib/Security/CaptchaService.php should be Captcha.php
-- [ ] lib/Security/TotpService.php should be Totp.php
-- [ ] lib/Security/TotpSecretCipher.php should be TotpCipher.php
-- [ ] lib/Security/QrCodeService.php should be moved to lib/View/Qr.php
-- [ ] lib/Security/InviteTokenPolicy.php should be split into sys/Repository/InviteRepository.php, lib/Parser/InviteParser.php and lib/Scribe/InviteScribe.php.
-	- [ ] This new Parser & Scribe should be able to read+write just about anything pertaining to invite tokens.
-	- [ ] Our CLI & Panel will continue to use InviteRepository, in line with our earlier split.
-	- [ ] InviteRepository handles all shared heavy lifting used by CLI, Invite editor in panel, InviteParser & InviteScribe.
-- [ ] lib/Security/CsrfTokenStoreInferface.php should be CsrfToken.php
-- [ ] lib/Security/PhpSessionTokenStore.php should be SessionToken.php
-- [ ] lib/Security/WebAuthnService.php should be WebAuthn.php
-- [ ] We have four TwoFactor* classes in lib/Security with long names, plus LoginTwoFactorFlowService, but four more TwoFactor* classes in lib/Auth/! Is there any reason they need to be split up this much? See if they can be simplified down to a few sensibly organized classes with more concise class/function names, considering they're mostly only used on login forms.
-- [ ] lib/Security/tests/InputSanitizerSmoke.php should be with our other smoke tests, no?
-- [ ] lib/Shell/CLI.php should become sys/Shell.php, delete lib/Shell/ when done.
-- [ ] sys/Scheduler.php should become lib/Scheduler/Cron.php
+- [x] lib/Security/CaptchaService.php should be Captcha.php
+	- [x] `CaptchaService` was renamed to `Captcha`, and the remaining public shared-controller captcha helper wiring now imports the shorter security primitive name directly.
+- [x] lib/Security/TotpService.php should be Totp.php
+	- [x] `TotpService` was renamed to `Totp`, and the 2FA method normalizers plus panel/user-profile auth helpers now call the shorter canonical TOTP class directly.
+- [x] lib/Security/TotpSecretCipher.php should be TotpCipher.php
+	- [x] `TotpSecretCipher` was renamed to `TotpCipher`, and `AuthPayloadCodec` now depends on the shorter TOTP secret encryption helper name for persisted 2FA payloads.
+- [x] lib/Security/QrCodeService.php should be moved to lib/View/Qr.php
+	- [x] `Security/QrCodeService` was moved to `View/Qr`, and both the shared 2FA view normalizer plus the panel preferences controller now import the view-owned QR helper directly.
+- [x] lib/Security/InviteTokenPolicy.php should be split into sys/Repository/InviteRepository.php, lib/Parser/InviteParser.php and lib/Scribe/InviteScribe.php.
+	- [x] `InviteTokenPolicy` was removed. Read-side invite normalization, panel-list hydration, and usable-token lookup now live in `Parser/InviteParser`, while token generation plus insert/consume/delete writes now live in `Scribe/InviteScribe`.
+	- [x] This new Parser & Scribe should be able to read+write just about anything pertaining to invite tokens.
+	- [x] Our CLI & Panel will continue to use InviteRepository, in line with our earlier split.
+	- [x] `InviteRepository` now stays as the shared orchestration seam for panel/public callers, and its delete path now correctly reports whether an invite row was actually removed.
+- [x] lib/Security/CsrfTokenStoreInferface.php should be CsrfToken.php
+	- [x] `CsrfTokenStoreInterface` was renamed to `CsrfToken`, and the shared `Csrf` helper now depends on the shorter token-store contract directly.
+- [x] lib/Security/PhpSessionTokenStore.php should be SessionToken.php
+	- [x] `PhpSessionTokenStore` was renamed to `SessionToken`, and `Csrf` now defaults to the shorter session-backed token storage helper.
+- [x] lib/Security/WebAuthnService.php should be WebAuthn.php
+	- [x] `WebAuthnService` was renamed to `WebAuthn`, and both the login challenge flow plus the panel preferences controller now call the shorter WebAuthn helper directly while aliasing the vendor runtime type where needed.
+- [x] We have four TwoFactor* classes in lib/Security with long names, plus LoginTwoFactorFlowService, but four more TwoFactor* classes in lib/Auth/! Is there any reason they need to be split up this much? See if they can be simplified down to a few sensibly organized classes with more concise class/function names, considering they're mostly only used on login forms.
+	- [x] The login-only 2FA orchestration classes were collapsed into shorter auth-side names: `LoginChallengeFlow`, `LoginChallengeState`, `LoginEmailChallenge`, and `LoginEmailDelivery`. The old `Security/TwoFactorChallengeHelper` indirection was folded into `LoginChallengeFlow`, and the tiny `Auth/TwoFactorChallengeVerificationService` shim was removed with its logic inlined back into `AuthService`.
+- [x] lib/Security/tests/InputSanitizerSmoke.php should be with our other smoke tests, no?
+	- [x] The stray library-local smoke script was removed; the canonical InputSanitizer smoke coverage already lives at `debug/smoke/input-sanitizer.php` with the rest of the standalone smoke suite.
+- [x] lib/Shell/CLI.php should become sys/Shell.php, delete lib/Shell/ when done.
+	- [x] The procedural CLI runtime moved to `sys/Shell.php`, all shipped `private/bin/*` entrypoints now require the new path directly, and the old `lib/Shell/` location is no longer the canonical home for command wiring.
+- [x] sys/Scheduler.php should become lib/Scheduler/Cron.php
+	- [x] The fallback web scheduler trigger moved from `sys/Scheduler.php` to `lib/Scheduler/Cron.php`, and the public/panel entry controllers now call `Cron::runIfDue()`.
 
 
 

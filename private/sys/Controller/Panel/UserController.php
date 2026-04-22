@@ -14,7 +14,7 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Config;
 use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\InviteTokenRepository;
+use Raven\Core\Repository\InviteRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\Panel\PanelAccess;
@@ -50,7 +50,7 @@ final class UserController
     private GroupRepository $groupRepo;
     private UserRepository $userRepo;
     private Closure $inviteTokensResolver;
-    private ?InviteTokenRepository $inviteTokens = null;
+    private ?InviteRepository $inviteTokens = null;
     private SessionFlash $flashList;
     private GroupRouteParser $groupParser;
     private PanelInvitePolicyService $panelInvitePolicyService;
@@ -72,7 +72,7 @@ final class UserController
      * @param string $root Project root path for user-media storage helpers.
      * @param GroupRepository $groupRepo Group repository for assignment filters and fallbacks.
      * @param UserRepository $userRepo User repository for panel user CRUD.
-     * @param callable(): InviteTokenRepository $inviteTokensResolver Lazy invite-token repository resolver.
+     * @param callable(): InviteRepository $inviteTokensResolver Lazy invite-token repository resolver.
      * @param SessionFlash $flashList List-style flash store for generated token batches.
      * @param GroupRouteParser $groupParser Shared group/profile routing-policy parser.
      * @param PanelInvitePolicyService $panelInvitePolicyService Shared invite-form parsing helper.
@@ -1283,15 +1283,15 @@ final class UserController
     /**
      * Resolves the invite-token repository only when invite routes are hit.
      *
-     * @return InviteTokenRepository Invite-token repository for panel invite CRUD.
+     * @return InviteRepository Invite-token repository for panel invite CRUD.
      */
-    private function inviteTokens(): InviteTokenRepository
+    private function inviteTokens(): InviteRepository
     {
-        if ($this->inviteTokens instanceof InviteTokenRepository) {
+        if ($this->inviteTokens instanceof InviteRepository) {
             return $this->inviteTokens;
         }
 
-        /** @var callable(): InviteTokenRepository $resolver */
+        /** @var callable(): InviteRepository $resolver */
         $resolver = $this->inviteTokensResolver;
         $this->inviteTokens = $resolver();
         return $this->inviteTokens;

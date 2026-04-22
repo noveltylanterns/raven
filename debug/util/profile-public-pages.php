@@ -13,13 +13,14 @@ use Raven\Core\Controller\Public\ContentController;
 use Raven\Core\Controller\Public\FeedController;
 use Raven\Core\Controller\Public\ProfileController;
 use Raven\Core\Controller\Public\SharedController;
+use Raven\Core\Debug\RequestProfiler;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\PageRepository;
-use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Core\Routing\Public\PublicRuntimeBuilder;
-use Raven\Lib\Diagnostic\RequestProfiler;
+use Raven\Lib\Parser\ChannelDataParser;
+use Raven\Lib\Parser\TaxonomyRepoParser;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
@@ -164,6 +165,7 @@ final class PublicRouteProfilerRunner
         $configSnapshot = $rvn['config']->all();
         // Build repos directly; the shared bootstrap service map was removed.
         $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+        $channelParser = new ChannelDataParser($rvn['config'], $rvn['input'], $channelRepo);
         $categoryEnabled = (bool) ($configSnapshot['category']['enabled'] ?? false);
         $tagEnabled = (bool) ($configSnapshot['tag']['enabled'] ?? false);
         /** @var PageRepository $pages */
@@ -194,11 +196,11 @@ final class PublicRouteProfilerRunner
         $profileRoutesEnabled = $profilePrefix !== '' && in_array($profileMode, ['public_full', 'public_limited', 'private'], true);
         $groupRoutesEnabled = $groupPrefix !== '' && in_array($groupMode, ['public', 'private'], true);
 
-        $channels = $channelRepo->listRoutingOptions();
+        $channels = $channelParser->listRoutingOptions();
         $categories = [];
         $tags = [];
         if ($categoryPrefix !== '' || $tagPrefix !== '') {
-            $taxonomyLookup = new TaxonomyLookupRepository(
+            $taxonomyLookup = new TaxonomyRepoParser(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],

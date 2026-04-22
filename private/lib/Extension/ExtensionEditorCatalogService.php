@@ -1,12 +1,18 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Extension/ExtensionEditorCatalogService.php
+ * Shared extension-provided editor menu and body-block catalog helpers.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
 
 use Raven\Core\Config;
-use Raven\Lib\View\BodyBlockPolicy;
-use Raven\Lib\Extension\ExtensionRegistry;
+use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -16,19 +22,30 @@ final class ExtensionEditorCatalogService
 {
     private string $projectRoot;
     private InputSanitizer $input;
-    private BodyBlockPolicy $bodyBlockPolicy;
+    private PageBlockParser $pageBlockParser;
 
-    public function __construct(string $projectRoot, InputSanitizer $input, BodyBlockPolicy $bodyBlockPolicy)
+    /**
+     * Initializes the extension editor catalog helper.
+     *
+     * @param string $projectRoot Absolute project root used to inspect extension manifests and field providers.
+     * @param InputSanitizer $input Shared sanitizer for human-facing labels and shortcode values.
+     * @param PageBlockParser $pageBlockParser Shared page-block parser for extension-provided body-block definitions.
+     * @return void
+     */
+    public function __construct(string $projectRoot, InputSanitizer $input, PageBlockParser $pageBlockParser)
     {
         $this->projectRoot = rtrim($projectRoot, '/\\');
         $this->input = $input;
-        $this->bodyBlockPolicy = $bodyBlockPolicy;
+        $this->pageBlockParser = $pageBlockParser;
     }
 
     /**
-     * @param array<string, bool> $enabledMap
-     * @param callable(string): array<string, mixed> $manifestReader
-     * @return array<string, array{label: string, editor: string}>
+     * Returns panel-eligible extension body-block definitions.
+     *
+     * @param array<string, bool> $enabledMap Enabled-extension map keyed by slug.
+     * @param string $extensionsBasePath Absolute extension root path.
+     * @param callable(string): array<string, mixed> $manifestReader Callback that returns one extension manifest payload.
+     * @return array<string, array{label: string, editor: string}> Extension body-block definitions keyed by type slug.
      */
     public function panelBodyBlockDefinitions(
         array $enabledMap,
@@ -65,7 +82,7 @@ final class ExtensionEditorCatalogService
                 continue;
             }
 
-            $definitions = $this->bodyBlockPolicy->normalizeExtensionDefinitions(
+            $definitions = $this->pageBlockParser->normalizeExtensionDefinitions(
                 (string) $extensionName,
                 $fields,
                 $definitions
@@ -80,7 +97,9 @@ final class ExtensionEditorCatalogService
     }
 
     /**
-     * @return array<string, array{label: string, editor: string}>
+     * Returns public-route extension body-block definitions.
+     *
+     * @return array<string, array{label: string, editor: string}> Extension body-block definitions keyed by type slug.
      */
     public function publicBodyBlockDefinitions(): array
     {
@@ -105,7 +124,7 @@ final class ExtensionEditorCatalogService
                 continue;
             }
 
-            $definitions = $this->bodyBlockPolicy->normalizeExtensionDefinitions(
+            $definitions = $this->pageBlockParser->normalizeExtensionDefinitions(
                 (string) $extensionName,
                 $fields,
                 $definitions
@@ -120,10 +139,14 @@ final class ExtensionEditorCatalogService
     }
 
     /**
-     * @param array<string, bool> $enabledMap
-     * @param callable(string): array<string, mixed> $manifestReader
-     * @param callable(string): array<int, array<string, mixed>> $formsProvider
-     * @return array<int, array{extension: string, label: string, shortcode: string}>
+     * Returns insertable extension shortcode options for the panel editor.
+     *
+     * @param array<string, bool> $enabledMap Enabled-extension map keyed by slug.
+     * @param string $extensionsBasePath Absolute extension root path.
+     * @param callable(string): array<string, mixed> $manifestReader Callback that returns one extension manifest payload.
+     * @param callable(string): array<int, array<string, mixed>> $formsProvider Callback that returns insertable forms for one extension slug.
+     * @param Config $config Runtime config used when extensions compute shortcode menus.
+     * @return array<int, array{extension: string, label: string, shortcode: string}> Sorted shortcode menu rows.
      */
     public function panelInsertableShortcodes(
         array $enabledMap,

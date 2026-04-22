@@ -7,9 +7,8 @@ namespace Raven\Lib\Auth;
 use Raven\Core\Config;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Security\LoginTwoFactorFlowService;
 use Raven\Lib\Security\TwoFactorMethodKey;
-use Raven\Lib\Security\WebAuthnService;
+use Raven\Lib\Security\WebAuthn;
 
 /**
  * Shared interactive 2FA workflow for panel and public login entrypoints.
@@ -18,16 +17,16 @@ final class LoginChallengeWorkflowService
 {
     private Config $config;
     private InputSanitizer $input;
-    private LoginTwoFactorFlowService $twoFactorFlowService;
+    private LoginChallengeFlow $twoFactorFlowService;
     private LoginWebAuthnChallengeService $loginWebAuthnChallengeService;
-    private TwoFactorEmailDeliveryService $twoFactorEmailDeliveryService;
+    private LoginEmailDelivery $twoFactorEmailDeliveryService;
 
     public function __construct(
         Config $config,
         InputSanitizer $input,
-        LoginTwoFactorFlowService $twoFactorFlowService,
+        LoginChallengeFlow $twoFactorFlowService,
         LoginWebAuthnChallengeService $loginWebAuthnChallengeService,
-        TwoFactorEmailDeliveryService $twoFactorEmailDeliveryService
+        LoginEmailDelivery $twoFactorEmailDeliveryService
     ) {
         $this->config = $config;
         $this->input = $input;
@@ -335,7 +334,7 @@ final class LoginChallengeWorkflowService
 
         $uiState->storeSelectedMethodKey((string) ($context['selected_method_key'] ?? ''));
 
-        $webAuthn = WebAuthnService::createServer(
+        $webAuthn = WebAuthn::createServer(
             (string) $this->config->get('site.name', 'Raven CMS'),
             (string) $this->config->get('site.domain', ''),
             $server
@@ -428,7 +427,7 @@ final class LoginChallengeWorkflowService
             ];
         }
 
-        $webAuthn = WebAuthnService::createServer(
+        $webAuthn = WebAuthn::createServer(
             (string) $this->config->get('site.name', 'Raven CMS'),
             (string) $this->config->get('site.domain', ''),
             $server

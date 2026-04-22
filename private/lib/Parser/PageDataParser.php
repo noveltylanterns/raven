@@ -182,15 +182,15 @@ final class PageDataParser
     /**
      * Returns the total number of pages visible in the panel list, optionally filtered.
      *
-     * @param string|null $channelSlug Optional channel slug filter.
-     * @param int|null    $categoryId  Optional category id filter.
-     * @param int|null    $tagId       Optional tag id filter.
-     * @return int                     Total matching page count.
+     * @param int|null $channelId Optional channel id filter.
+     * @param int|null $categoryId Optional category id filter.
+     * @param int|null $tagId Optional tag id filter.
+     * @return int Total matching page count.
      */
-    public function countForPanel(?string $channelSlug = null, ?int $categoryId = null, ?int $tagId = null): int
+    public function countForPanel(?int $channelId = null, ?int $categoryId = null, ?int $tagId = null): int
     {
         return $this->pageRepo()->countForPanel(
-            $this->normalizeChannelSlug($channelSlug),
+            $this->normalizePositiveId($channelId),
             $this->normalizePositiveId($categoryId),
             $this->normalizePositiveId($tagId)
         );
@@ -199,24 +199,24 @@ final class PageDataParser
     /**
      * Returns one paginated page of panel page rows plus total count.
      *
-     * @param int         $limit       Maximum number of rows to return.
-     * @param int         $offset      Zero-based row offset for pagination.
-     * @param string|null $channelSlug Optional channel slug filter.
-     * @param int|null    $categoryId  Optional category id filter.
-     * @param int|null    $tagId       Optional tag id filter.
+     * @param int $limit Maximum number of rows to return.
+     * @param int $offset Zero-based row offset for pagination.
+     * @param int|null $channelId Optional channel id filter.
+     * @param int|null $categoryId Optional category id filter.
+     * @param int|null $tagId Optional tag id filter.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
     public function listPageForPanel(
         int $limit = 50,
         int $offset = 0,
-        ?string $channelSlug = null,
+        ?int $channelId = null,
         ?int $categoryId = null,
         ?int $tagId = null
     ): array {
         return $this->pageRepo()->listPageForPanel(
             max(1, $limit),
             max(0, $offset),
-            $this->normalizeChannelSlug($channelSlug),
+            $this->normalizePositiveId($channelId),
             $this->normalizePositiveId($categoryId),
             $this->normalizePositiveId($tagId)
         );
@@ -327,6 +327,23 @@ final class PageDataParser
     }
 
     /**
+     * Returns one paginated page of pages assigned to a category id.
+     *
+     * @param int $categoryId Category id to filter by.
+     * @param int $limit Maximum number of rows to return.
+     * @param int $offset Zero-based row offset for pagination.
+     * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
+     */
+    public function listPageByCategoryId(int $categoryId, int $limit, int $offset): array
+    {
+        if ($categoryId < 1) {
+            return ['rows' => [], 'total' => 0];
+        }
+
+        return $this->pageRepo()->listPageByCategoryId($categoryId, max(1, $limit), max(0, $offset));
+    }
+
+    /**
      * Returns one paginated page of pages assigned to a tag slug.
      *
      * @param string $slug   Tag slug to filter by.
@@ -342,6 +359,23 @@ final class PageDataParser
         }
 
         return $this->pageRepo()->listPageByTagSlug($normalizedSlug, max(1, $limit), max(0, $offset));
+    }
+
+    /**
+     * Returns one paginated page of pages assigned to a tag id.
+     *
+     * @param int $tagId Tag id to filter by.
+     * @param int $limit Maximum number of rows to return.
+     * @param int $offset Zero-based row offset for pagination.
+     * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
+     */
+    public function listPageByTagId(int $tagId, int $limit, int $offset): array
+    {
+        if ($tagId < 1) {
+            return ['rows' => [], 'total' => 0];
+        }
+
+        return $this->pageRepo()->listPageByTagId($tagId, max(1, $limit), max(0, $offset));
     }
 
     /**

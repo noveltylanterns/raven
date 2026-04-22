@@ -20,14 +20,13 @@ use Raven\Lib\Parser\FeedRouteParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Parser\UserDataParser;
-use Raven\Lib\Security\CaptchaService;
+use Raven\Lib\Security\Captcha;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Error as ViewError;
-use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\View\Public\MetaService;
 use Raven\Lib\View\Public\TemplateDecorator;
-use Raven\Lib\View\Public\ThemeCatalogService;
+use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\View\Public\ThemeBrace;
 use Raven\Lib\View\Public\ThemeTemplate;
 
@@ -44,12 +43,11 @@ final class SharedController
     private ThemeBrace $themeBrace;
     private bool $captchaScriptIncluded = false;
     private ?Request $requestContextResolver = null;
-    private ?SiteContextBuilder $siteContextBuilder = null;
     private ?FeedRouteParser $feedParser = null;
     private ?GroupRouteParser $groupParser = null;
     private ?UserDataParser $profileContactService = null;
-    private ?CaptchaService $captchaService = null;
-    private ?ThemeCatalogService $themeCatalogService = null;
+    private ?Captcha $captchaService = null;
+    private ?ThemeCatalog $themeCatalogService = null;
     private ?MetaService $metaService = null;
     private ?TemplateDecorator $templateDecorator = null;
     private ?ThemeTemplate $themeTemplate = null;
@@ -409,12 +407,12 @@ final class SharedController
     /**
      * Returns the cached captcha service.
      *
-     * @return CaptchaService Shared captcha service.
+     * @return Captcha Shared captcha helper.
      */
-    private function captchaService(): CaptchaService
+    private function captchaService(): Captcha
     {
-        if (!$this->captchaService instanceof CaptchaService) {
-            $this->captchaService = new CaptchaService($this->config, $this->input);
+        if (!$this->captchaService instanceof Captcha) {
+            $this->captchaService = new Captcha($this->config, $this->input);
         }
 
         return $this->captchaService;
@@ -443,12 +441,12 @@ final class SharedController
     /**
      * Returns the cached theme catalog service.
      *
-     * @return ThemeCatalogService Shared theme catalog service.
+     * @return ThemeCatalog Shared theme catalog service.
      */
-    private function themeCatalogService(): ThemeCatalogService
+    private function themeCatalogService(): ThemeCatalog
     {
-        if (!$this->themeCatalogService instanceof ThemeCatalogService) {
-            $this->themeCatalogService = new ThemeCatalogService(
+        if (!$this->themeCatalogService instanceof ThemeCatalog) {
+            $this->themeCatalogService = new ThemeCatalog(
                 dirname(__DIR__, 4) . '/public/theme',
                 $this->input,
                 ['raven']
@@ -456,20 +454,6 @@ final class SharedController
         }
 
         return $this->themeCatalogService;
-    }
-
-    /**
-     * Returns the cached site-context builder.
-     *
-     * @return SiteContextBuilder Shared site-context builder.
-     */
-    private function siteContextBuilder(): SiteContextBuilder
-    {
-        if (!$this->siteContextBuilder instanceof SiteContextBuilder) {
-            $this->siteContextBuilder = new SiteContextBuilder();
-        }
-
-        return $this->siteContextBuilder;
     }
 
     /**
@@ -496,7 +480,6 @@ final class SharedController
         if (!$this->metaService instanceof MetaService) {
             $this->metaService = new MetaService(
                 $this->requestContextResolver(),
-                $this->siteContextBuilder(),
                 $this->themeCatalogService(),
                 $this->profileContactService(),
                 $this->feedParser()

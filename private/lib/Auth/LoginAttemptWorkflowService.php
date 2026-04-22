@@ -7,7 +7,6 @@ namespace Raven\Lib\Auth;
 use Raven\Core\Config;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Security\LoginTwoFactorFlowService;
 
 /**
  * Shared password-auth workflow for panel and public login entrypoints.
@@ -18,14 +17,14 @@ final class LoginAttemptWorkflowService
     private InputSanitizer $input;
     private LoginIdentifierResolver $identifierResolver;
     private LoginAttemptPolicy $loginAttemptPolicy;
-    private LoginTwoFactorFlowService $twoFactorFlowService;
+    private LoginChallengeFlow $twoFactorFlowService;
 
     public function __construct(
         Config $config,
         InputSanitizer $input,
         LoginIdentifierResolver $identifierResolver,
         LoginAttemptPolicy $loginAttemptPolicy,
-        LoginTwoFactorFlowService $twoFactorFlowService
+        LoginChallengeFlow $twoFactorFlowService
     ) {
         $this->config = $config;
         $this->input = $input;

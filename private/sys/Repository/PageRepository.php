@@ -13,9 +13,9 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Parser\ChannelContextParser;
-use Raven\Lib\View\PageBodyBlockCodec;
-use Raven\Lib\View\PageTaxonomyQueryService;
-use Raven\Lib\View\Panel\PagePanelFilterClauseBuilder;
+use Raven\Lib\Parser\PageBlockParser;
+use Raven\Lib\Parser\TaxonomyDataParser;
+use Raven\Lib\View\Panel\ListFilter;
 use Raven\Lib\View\Panel\PagePersistenceService;
 use Raven\Lib\View\Panel\PageTaxonomyAssignmentService;
 use Raven\Lib\Database\TableNameResolver;
@@ -34,11 +34,11 @@ final class PageRepository
     private ChannelRepository $channelRepo;
     private bool $categoryEnabled;
     private bool $tagEnabled;
-    private PageBodyBlockCodec $bodyBlockCodec;
+    private PageBlockParser $pageBlockParser;
     private PageEditorGalleryHydrator $pageEditorGalleryHydrator;
-    private PagePanelFilterClauseBuilder $panelFilterClauseBuilder;
+    private ListFilter $panelListFilter;
     private PageTaxonomyAssignmentService $pageTaxonomyAssignmentService;
-    private PageTaxonomyQueryService $pageTaxonomyQueryService;
+    private TaxonomyDataParser $taxonomyDataParser;
     private PagePersistenceService $pagePersistenceService;
 
     public function __construct(
@@ -56,11 +56,11 @@ final class PageRepository
         $this->channelRepo = $channelRepo;
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
-        $this->bodyBlockCodec = new PageBodyBlockCodec();
+        $this->pageBlockParser = new PageBlockParser();
         $this->pageEditorGalleryHydrator = new PageEditorGalleryHydrator();
-        $this->panelFilterClauseBuilder = new PagePanelFilterClauseBuilder();
+        $this->panelListFilter = new ListFilter();
         $this->pageTaxonomyAssignmentService = new PageTaxonomyAssignmentService();
-        $this->pageTaxonomyQueryService = new PageTaxonomyQueryService();
+        $this->taxonomyDataParser = new TaxonomyDataParser();
         $this->pagePersistenceService = new PagePersistenceService();
     }
 
@@ -499,8 +499,13 @@ final class PageRepository
 
     /**
      * Returns one total-count for panel page index with optional prefilters.
+     *
+     * @param int|null $channelId Optional channel id filter resolved before repository entry.
+     * @param int|null $categoryId Optional category id filter from the panel UI.
+     * @param int|null $tagId Optional tag id filter from the panel UI.
+     * @return int Total matching page count.
      */
-    public function countForPanel(?string $channelSlug = null, ?int $categoryId = null, ?int $tagId = null): int
+    public function countForPanel(?int $channelId = null, ?int $categoryId = null, ?int $tagId = null): int
     {
         $pages = $this->table('pages');
         $pageCategories = $this->table('page_categories');
@@ -511,7 +516,7 @@ final class PageRepository
         $this->appendPanelFilterClauses(
             $where,
             $params,
-            $channelSlug,
+            $channelId,
             $categoryId,
             $tagId,
             $pageCategories,
@@ -534,12 +539,17 @@ final class PageRepository
     /**
      * Returns paginated page list for panel page index with optional prefilters.
      *
+     * @param int $limit Maximum number of rows to return.
+     * @param int $offset Zero-based row offset for pagination.
+     * @param int|null $channelId Optional channel id filter resolved before repository entry.
+     * @param int|null $categoryId Optional category id filter from the panel UI.
+     * @param int|null $tagId Optional tag id filter from the panel UI.
      * @return array<int, array<string, mixed>>
      */
     public function listForPanel(
         int $limit = 50,
         int $offset = 0,
-        ?string $channelSlug = null,
+        ?int $channelId = null,
         ?int $categoryId = null,
         ?int $tagId = null
     ): array {
@@ -552,7 +562,7 @@ final class PageRepository
         $this->appendPanelFilterClauses(
             $where,
             $params,
-            $channelSlug,
+            $channelId,
             $categoryId,
             $tagId,
             $pageCategories,
@@ -594,12 +604,17 @@ final class PageRepository
     /**
      * Returns one paginated panel page-list page plus total row count.
      *
+     * @param int $limit Maximum number of rows to return.
+     * @param int $offset Zero-based row offset for pagination.
+     * @param int|null $channelId Optional channel id filter resolved before repository entry.
+     * @param int|null $categoryId Optional category id filter from the panel UI.
+     * @param int|null $tagId Optional tag id filter from the panel UI.
      * @return array{rows: array<int, array<string, mixed>>, total: int}
      */
     public function listPageForPanel(
         int $limit = 50,
         int $offset = 0,
-        ?string $channelSlug = null,
+        ?int $channelId = null,
         ?int $categoryId = null,
         ?int $tagId = null
     ): array {
@@ -614,7 +629,7 @@ final class PageRepository
         $this->appendPanelFilterClauses(
             $pageWhere,
             $pageParams,
-            $channelSlug,
+            $channelId,
             $categoryId,
             $tagId,
             $pageCategories,
@@ -629,7 +644,7 @@ final class PageRepository
         $this->appendPanelFilterClauses(
             $countWhere,
             $countParams,
-            $channelSlug,
+            $channelId,
             $categoryId,
             $tagId,
             $pageCategories,
@@ -686,7 +701,7 @@ final class PageRepository
 
         // Offset can target an empty page while rows still exist; recover accurate total.
         if ($resultRows === [] && $safeOffset > 0) {
-            $total = $this->countForPanel($channelSlug, $categoryId, $tagId);
+            $total = $this->countForPanel($channelId, $categoryId, $tagId);
         }
 
         return [
@@ -1213,7 +1228,7 @@ final class PageRepository
 
         $channelsById = $this->channelsByIdMap();
 
-        return $this->pageTaxonomyQueryService->listByCategorySlug(
+        return $this->taxonomyDataParser->listPagesByCategorySlug(
             $this->db,
             $this->table('pages'),
             $this->table('categories'),
@@ -1234,7 +1249,7 @@ final class PageRepository
             return 0;
         }
 
-        return $this->pageTaxonomyQueryService->countByCategorySlug(
+        return $this->taxonomyDataParser->countPagesByCategorySlug(
             $this->db,
             $this->table('pages'),
             $this->table('categories'),
@@ -1256,7 +1271,7 @@ final class PageRepository
 
         $channelsById = $this->channelsByIdMap();
 
-        return $this->pageTaxonomyQueryService->listByTagSlug(
+        return $this->taxonomyDataParser->listPagesByTagSlug(
             $this->db,
             $this->table('pages'),
             $this->table('tags'),
@@ -1277,7 +1292,7 @@ final class PageRepository
             return 0;
         }
 
-        return $this->pageTaxonomyQueryService->countByTagSlug(
+        return $this->taxonomyDataParser->countPagesByTagSlug(
             $this->db,
             $this->table('pages'),
             $this->table('tags'),
@@ -1299,7 +1314,7 @@ final class PageRepository
 
         $channelsById = $this->channelsByIdMap();
 
-        return $this->pageTaxonomyQueryService->listPageByCategorySlug(
+        return $this->taxonomyDataParser->listPageByCategorySlug(
             $this->db,
             $this->table('pages'),
             $this->table('categories'),
@@ -1325,7 +1340,7 @@ final class PageRepository
 
         $channelsById = $this->channelsByIdMap();
 
-        return $this->pageTaxonomyQueryService->listPageByTagSlug(
+        return $this->taxonomyDataParser->listPageByTagSlug(
             $this->db,
             $this->table('pages'),
             $this->table('tags'),
@@ -1335,6 +1350,138 @@ final class PageRepository
             $offset,
             fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById),
             fn (string $taxonomySlug): int => $this->countByTagSlug($taxonomySlug)
+        );
+    }
+
+    /**
+     * Returns paginated pages for one category id ordered newest-first.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listByCategoryId(int $categoryId, int $limit, int $offset): array
+    {
+        if (!$this->categoryEnabled || $categoryId < 1) {
+            return [];
+        }
+
+        $channelsById = $this->channelsByIdMap();
+
+        return $this->taxonomyDataParser->listPagesByCategoryId(
+            $this->db,
+            $this->table('pages'),
+            $this->table('page_categories'),
+            $categoryId,
+            $limit,
+            $offset,
+            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById)
+        );
+    }
+
+    /**
+     * Counts total pages linked to a category id.
+     */
+    public function countByCategoryId(int $categoryId): int
+    {
+        if (!$this->categoryEnabled || $categoryId < 1) {
+            return 0;
+        }
+
+        return $this->taxonomyDataParser->countPagesByCategoryId(
+            $this->db,
+            $this->table('pages'),
+            $this->table('page_categories'),
+            $categoryId
+        );
+    }
+
+    /**
+     * Returns one paginated category-page result with total count by category id.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     */
+    public function listPageByCategoryId(int $categoryId, int $limit, int $offset): array
+    {
+        if (!$this->categoryEnabled || $categoryId < 1) {
+            return ['rows' => [], 'total' => 0];
+        }
+
+        $channelsById = $this->channelsByIdMap();
+
+        return $this->taxonomyDataParser->listPageByCategoryId(
+            $this->db,
+            $this->table('pages'),
+            $this->table('page_categories'),
+            $categoryId,
+            $limit,
+            $offset,
+            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById),
+            fn (int $taxonomyId): int => $this->countByCategoryId($taxonomyId)
+        );
+    }
+
+    /**
+     * Returns paginated pages for one tag id ordered newest-first.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listByTagId(int $tagId, int $limit, int $offset): array
+    {
+        if (!$this->tagEnabled || $tagId < 1) {
+            return [];
+        }
+
+        $channelsById = $this->channelsByIdMap();
+
+        return $this->taxonomyDataParser->listPagesByTagId(
+            $this->db,
+            $this->table('pages'),
+            $this->table('page_tags'),
+            $tagId,
+            $limit,
+            $offset,
+            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById)
+        );
+    }
+
+    /**
+     * Counts total pages linked to a tag id.
+     */
+    public function countByTagId(int $tagId): int
+    {
+        if (!$this->tagEnabled || $tagId < 1) {
+            return 0;
+        }
+
+        return $this->taxonomyDataParser->countPagesByTagId(
+            $this->db,
+            $this->table('pages'),
+            $this->table('page_tags'),
+            $tagId
+        );
+    }
+
+    /**
+     * Returns one paginated tag-page result with total count by tag id.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     */
+    public function listPageByTagId(int $tagId, int $limit, int $offset): array
+    {
+        if (!$this->tagEnabled || $tagId < 1) {
+            return ['rows' => [], 'total' => 0];
+        }
+
+        $channelsById = $this->channelsByIdMap();
+
+        return $this->taxonomyDataParser->listPageByTagId(
+            $this->db,
+            $this->table('pages'),
+            $this->table('page_tags'),
+            $tagId,
+            $limit,
+            $offset,
+            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById),
+            fn (int $taxonomyId): int => $this->countByTagId($taxonomyId)
         );
     }
 
@@ -1364,7 +1511,7 @@ final class PageRepository
      */
     private function normalizeContentBlocks(mixed $raw): array
     {
-        return $this->bodyBlockCodec->normalizeStoredBlocks($raw);
+        return $this->pageBlockParser->normalizeStoredBlocks($raw);
     }
 
     /**
@@ -1374,7 +1521,7 @@ final class PageRepository
      */
     private function encodeContentBlocks(array $blocks): string
     {
-        return $this->bodyBlockCodec->encodeStoredBlocks($blocks);
+        return $this->pageBlockParser->encodeStoredBlocks($blocks);
     }
 
     /**
@@ -1384,7 +1531,7 @@ final class PageRepository
      */
     private function decodeContentBlocks(string $raw): array
     {
-        return $this->bodyBlockCodec->decodeStoredBlocks($raw);
+        return $this->pageBlockParser->decodeStoredBlocks($raw);
     }
 
     /**
@@ -1532,13 +1679,22 @@ final class PageRepository
     /**
      * Appends shared panel-filter SQL clauses for page list/count queries.
      *
-     * @param array<int, string> $where
-     * @param array<string, int|string> $params
+     * @param array<int, string> $where Mutable WHERE-clause fragment list.
+     * @param array<string, int|string> $params Mutable prepared-statement parameter map.
+     * @param int|null $channelId Optional channel id filter resolved before repository entry.
+     * @param int|null $categoryId Optional category id filter from the panel UI.
+     * @param int|null $tagId Optional tag id filter from the panel UI.
+     * @param string $pageCategoriesTable Resolved page-category junction table name.
+     * @param string $pageTagsTable Resolved page-tag junction table name.
+     * @param string $placeholderPrefix Prefix used to namespace generated placeholders.
+     * @param bool $includeCategoryFilters Whether category filter clauses should be emitted.
+     * @param bool $includeTagFilters Whether tag filter clauses should be emitted.
+     * @return void
      */
     private function appendPanelFilterClauses(
         array &$where,
         array &$params,
-        ?string $channelSlug,
+        ?int $channelId,
         ?int $categoryId,
         ?int $tagId,
         string $pageCategoriesTable,
@@ -1547,18 +1703,43 @@ final class PageRepository
         bool $includeCategoryFilters = true,
         bool $includeTagFilters = true
     ): void {
-        $this->panelFilterClauseBuilder->append(
+        $this->panelListFilter->appendIntEquals(
             $where,
             $params,
-            $channelSlug,
-            $categoryId,
-            $tagId,
-            $pageCategoriesTable,
-            $pageTagsTable,
-            fn (string $slug): ?int => $this->channelRepo->idBySlug($slug),
+            'p.channel',
+            $channelId,
             $placeholderPrefix,
-            $includeCategoryFilters,
-            $includeTagFilters
+            'channel'
         );
+
+        if ($includeCategoryFilters) {
+            $this->panelListFilter->appendExistsIntMatch(
+                $where,
+                $params,
+                $pageCategoriesTable,
+                'pc',
+                'pc.page',
+                'p.id',
+                'pc.category',
+                $categoryId,
+                $placeholderPrefix,
+                'category'
+            );
+        }
+
+        if ($includeTagFilters) {
+            $this->panelListFilter->appendExistsIntMatch(
+                $where,
+                $params,
+                $pageTagsTable,
+                'pt',
+                'pt.page',
+                'p.id',
+                'pt.tag',
+                $tagId,
+                $placeholderPrefix,
+                'tag'
+            );
+        }
     }
 }

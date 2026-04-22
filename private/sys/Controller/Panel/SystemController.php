@@ -18,8 +18,7 @@ use Raven\Core\Logger;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\RedirectRepository;
-use Raven\Core\Repository\TaxonomyLookupRepository;
-use Raven\Core\Repository\TaxonomySetRepository;
+use Raven\Core\Repository\SetRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Core\Routing\Panel\RoutingInventoryBuilder;
 use Raven\Lib\Archive\Folder as ArchiveDelete;
@@ -47,17 +46,16 @@ use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Parser\TagRouteParser;
+use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Panel\PanelRoutingPreviewService;
 use Raven\Lib\View\Error as ViewError;
 use Raven\Lib\View\Theme;
-use Raven\Lib\View\Public\ThemeCloneService;
-use Raven\Lib\View\Public\ThemeCatalogService;
-use Raven\Lib\View\Public\ThemeScaffoldService;
-
 use Raven\Lib\Transport\Redirect;
+use Raven\Lib\View\Public\ThemeCatalog;
+use Raven\Lib\View\Public\ThemeGenerator;
 
 /**
  * Handles split panel system-management routes.
@@ -78,15 +76,15 @@ final class SystemController
     private PageRepository $pageRepo;
     private RedirectRepository $redirectRepo;
     private UserRepository $userRepo;
-    /** @var Closure(): TaxonomySetRepository */
+    /** @var Closure(): SetRepository */
     private Closure $categorySetRepoResolver;
-    private ?TaxonomySetRepository $categorySetRepo = null;
-    /** @var Closure(): TaxonomySetRepository */
+    private ?SetRepository $categorySetRepo = null;
+    /** @var Closure(): SetRepository */
     private Closure $tagSetRepoResolver;
-    private ?TaxonomySetRepository $tagSetRepo = null;
-    /** @var Closure(): TaxonomyLookupRepository */
+    private ?SetRepository $tagSetRepo = null;
+    /** @var Closure(): TaxonomyRepoParser */
     private Closure $taxonomyLookupRepoResolver;
-    private ?TaxonomyLookupRepository $taxonomyLookupRepo = null;
+    private ?TaxonomyRepoParser $taxonomyLookupRepo = null;
     /** @var Closure(): Logger */
     private Closure $loggerResolver;
     private ?Logger $logger = null;
@@ -96,12 +94,11 @@ final class SystemController
     private ?ArchivePackage $archivePackages = null;
     private ?ExtensionStateStore $extensionStateStore = null;
     private ?ExtensionScaffoldService $extensionScaffoldService = null;
-    private ?ThemeScaffoldService $themeScaffoldService = null;
+    private ?ThemeGenerator $themeGenerator = null;
     private ?RoutingInventoryBuilder $routingInventoryBuilder = null;
     private ?ExtensionPermissionCatalogService $extensionPermissionCatalogService = null;
     private ?ExtensionStorageProvisioner $extensionStorageProvisioner = null;
     private ?ExtensionBootstrapContractResolver $extensionBootstrapContractResolver = null;
-    private ?ThemeCloneService $themeCloneService = null;
     private ?ChannelDataParser $channelParser = null;
     private ?FeedRouteParser $feedParser = null;
     private ?GroupRouteParser $groupParser = null;
@@ -110,7 +107,7 @@ final class SystemController
     private ?UserDataParser $userParser = null;
     private ?ExtensionCatalogService $extensionCatalogService = null;
     private ?PanelRoutingPreviewService $panelRoutingPreviewService = null;
-    private ?ThemeCatalogService $themeCatalogService = null;
+    private ?ThemeCatalog $themeCatalogService = null;
     private ?ArchiveInstall $packageInstallWorkflowService = null;
     private ?ArchiveDelete $directoryTreeService = null;
     private ?Csv $csvHandler = null;
@@ -127,9 +124,9 @@ final class SystemController
      * @param PageRepository $pageRepo Page repository for routing inventory rows.
      * @param RedirectRepository $redirectRepo Redirect repository for routing inventory rows.
      * @param UserRepository $userRepo User repository for routing inventory rows.
-     * @param callable(): TaxonomySetRepository $categorySetRepoResolver Lazy category-set repository resolver.
-     * @param callable(): TaxonomySetRepository $tagSetRepoResolver Lazy tag-set repository resolver.
-     * @param callable(): TaxonomyLookupRepository $taxonomyLookupRepoResolver Lazy taxonomy lookup resolver.
+     * @param callable(): SetRepository $categorySetRepoResolver Lazy category-set repository resolver.
+     * @param callable(): SetRepository $tagSetRepoResolver Lazy tag-set repository resolver.
+     * @param callable(): TaxonomyRepoParser $taxonomyLookupRepoResolver Lazy taxonomy lookup parser resolver.
      * @param callable(): Logger $loggerResolver Lazy event logger resolver.
      * @param callable(string): array<string, mixed> $extensionServicesFor Lazy per-extension services resolver.
      * @return void
@@ -478,8 +475,8 @@ final class SystemController
         try {
             if ($cloneTheme !== '') {
                 $clonePath = $themesRoot . '/' . $cloneTheme;
-                $this->themeCloneService()->copyDirectoryRecursively($clonePath, $themePath);
-                $this->themeScaffoldService()->finalizeClone(
+                $this->themeGenerator()->copyDirectoryRecursively($clonePath, $themePath);
+                $this->themeGenerator()->finalizeClone(
                     $themePath,
                     [
                         'slug' => $themeSlug,
@@ -492,7 +489,7 @@ final class SystemController
                     $generatePackageFile
                 );
             } else {
-                $this->themeScaffoldService()->createSkeleton(
+                $this->themeGenerator()->createSkeleton(
                     $themePath,
                     [
                         'slug' => $themeSlug,
@@ -1454,16 +1451,16 @@ final class SystemController
     /**
      * Returns the category-set repository on first use.
      *
-     * @return TaxonomySetRepository Category-set repository.
+     * @return SetRepository Category-set repository.
      */
-    private function categorySetRepo(): TaxonomySetRepository
+    private function categorySetRepo(): SetRepository
     {
-        if ($this->categorySetRepo instanceof TaxonomySetRepository) {
+        if ($this->categorySetRepo instanceof SetRepository) {
             return $this->categorySetRepo;
         }
 
         $categorySetRepo = ($this->categorySetRepoResolver)();
-        if (!$categorySetRepo instanceof TaxonomySetRepository) {
+        if (!$categorySetRepo instanceof SetRepository) {
             throw new \RuntimeException('Panel category-set repository resolver returned an invalid value.');
         }
 
@@ -1474,16 +1471,16 @@ final class SystemController
     /**
      * Returns the tag-set repository on first use.
      *
-     * @return TaxonomySetRepository Tag-set repository.
+     * @return SetRepository Tag-set repository.
      */
-    private function tagSetRepo(): TaxonomySetRepository
+    private function tagSetRepo(): SetRepository
     {
-        if ($this->tagSetRepo instanceof TaxonomySetRepository) {
+        if ($this->tagSetRepo instanceof SetRepository) {
             return $this->tagSetRepo;
         }
 
         $tagSetRepo = ($this->tagSetRepoResolver)();
-        if (!$tagSetRepo instanceof TaxonomySetRepository) {
+        if (!$tagSetRepo instanceof SetRepository) {
             throw new \RuntimeException('Panel tag-set repository resolver returned an invalid value.');
         }
 
@@ -1492,19 +1489,19 @@ final class SystemController
     }
 
     /**
-     * Returns the taxonomy lookup repository on first use.
+     * Returns the taxonomy lookup parser on first use.
      *
-     * @return TaxonomyLookupRepository Taxonomy lookup repository.
+     * @return TaxonomyRepoParser Taxonomy lookup parser.
      */
-    private function taxonomyLookupRepo(): TaxonomyLookupRepository
+    private function taxonomyLookupRepo(): TaxonomyRepoParser
     {
-        if ($this->taxonomyLookupRepo instanceof TaxonomyLookupRepository) {
+        if ($this->taxonomyLookupRepo instanceof TaxonomyRepoParser) {
             return $this->taxonomyLookupRepo;
         }
 
         $taxonomyLookupRepo = ($this->taxonomyLookupRepoResolver)();
-        if (!$taxonomyLookupRepo instanceof TaxonomyLookupRepository) {
-            throw new \RuntimeException('Panel taxonomy lookup repository resolver returned an invalid value.');
+        if (!$taxonomyLookupRepo instanceof TaxonomyRepoParser) {
+            throw new \RuntimeException('Panel taxonomy lookup parser resolver returned an invalid value.');
         }
 
         $this->taxonomyLookupRepo = $taxonomyLookupRepo;
@@ -1512,7 +1509,7 @@ final class SystemController
     }
 
     /**
-     * Returns routing-inventory taxonomy data while skipping taxonomy lookup storage
+     * Returns routing-inventory taxonomy data while skipping taxonomy lookup parsing
      * entirely when both category and tag public routes are disabled.
      *
      * @param string $categoryPrefix Effective category route prefix.
@@ -2271,13 +2268,13 @@ final class SystemController
     /**
      * Returns the public-theme scaffold service on first use.
      */
-    private function themeScaffoldService(): ThemeScaffoldService
+    private function themeGenerator(): ThemeGenerator
     {
-        if (!$this->themeScaffoldService instanceof ThemeScaffoldService) {
-            $this->themeScaffoldService = new ThemeScaffoldService();
+        if (!$this->themeGenerator instanceof ThemeGenerator) {
+            $this->themeGenerator = new ThemeGenerator();
         }
 
-        return $this->themeScaffoldService;
+        return $this->themeGenerator;
     }
 
     /**
@@ -2444,10 +2441,10 @@ final class SystemController
     /**
      * Returns the public-theme catalog service on first use.
      */
-    private function themeCatalogService(): ThemeCatalogService
+    private function themeCatalogService(): ThemeCatalog
     {
-        if (!$this->themeCatalogService instanceof ThemeCatalogService) {
-            $this->themeCatalogService = new ThemeCatalogService(
+        if (!$this->themeCatalogService instanceof ThemeCatalog) {
+            $this->themeCatalogService = new ThemeCatalog(
                 $this->root . '/public/theme',
                 $this->input,
                 ['raven']
@@ -2508,26 +2505,10 @@ final class SystemController
     private function panelRoutingPreviewService(): PanelRoutingPreviewService
     {
         if (!$this->panelRoutingPreviewService instanceof PanelRoutingPreviewService) {
-            $this->panelRoutingPreviewService = new PanelRoutingPreviewService(
-                $this->root,
-                $this->input,
-                $this->themeCatalogService()
-            );
+            $this->panelRoutingPreviewService = new PanelRoutingPreviewService($this->root, $this->input, $this->themeCatalogService());
         }
 
         return $this->panelRoutingPreviewService;
-    }
-
-    /**
-     * Returns the theme-clone service on first use.
-     */
-    private function themeCloneService(): ThemeCloneService
-    {
-        if (!$this->themeCloneService instanceof ThemeCloneService) {
-            $this->themeCloneService = new ThemeCloneService();
-        }
-
-        return $this->themeCloneService;
     }
 
     /**

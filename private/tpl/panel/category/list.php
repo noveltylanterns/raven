@@ -20,7 +20,7 @@
 
 use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
-use Raven\Lib\View\Panel\ListWrapper;
+use Raven\Lib\View\Panel\ListCard;
 use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
@@ -168,7 +168,7 @@ $categoryListToolbarItems = [
     </tbody>
 </table>
 <?php $categoryTableHtml = (string) ob_get_clean(); ?>
-<?= ListWrapper::render([
+<?= ListCard::render([
     'is_empty'            => $categoryRows === [],
     'empty_message'       => 'No categories yet.',
     'search_id'           => $categorySearchId,

@@ -14,7 +14,7 @@ final class TwoFactorMethodKey
 
     public static function forTotpSecret(string $secret): string
     {
-        return 'totp:' . sha1(TotpService::normalizeSecret($secret));
+        return 'totp:' . sha1(Totp::normalizeSecret($secret));
     }
 
     public static function forRecoveryPhrase(string $phrase): string

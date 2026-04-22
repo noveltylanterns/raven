@@ -1,0 +1,708 @@
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/sys/Controller/Panel/CategoryController.php
+ * Split panel category controller for category management routes.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+namespace Raven\Core\Controller\Panel;
+
+use Closure;
+use Raven\Core\Repository\CategoryRepository;
+use Raven\Core\Repository\SetRepository;
+use Raven\Lib\Media\Panel\TaxonomyImageService;
+use Raven\Lib\Parser\CategoryDataParser;
+use Raven\Lib\Parser\CategoryRouteParser;
+use Raven\Lib\Parser\ChannelDataParser;
+use Raven\Lib\Parser\SetParser;
+use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Transport\Redirect;
+use Raven\Lib\Transport\Upload;
+use Raven\Lib\View\Panel\EditorTabs;
+
+/**
+ * Handles panel category and category-set management routes.
+ *
+ * Owns category list, create/edit, save, delete, and category-set CRUD.
+ * Channel and tag routes now live in their own controllers, so category
+ * dependencies are only constructed on `/category*` requests.
+ */
+final class CategoryController
+{
+    private SharedController $context;
+    private InputSanitizer $input;
+    /** @var ?CategoryRepository */
+    private ?CategoryRepository $categoryRepo = null;
+    /** @var ?CategoryDataParser */
+    private ?CategoryDataParser $categoryParser = null;
+    private Closure $categoryRepoResolver;
+    /** @var ?SetRepository */
+    private ?SetRepository $categorySetRepo = null;
+    private Closure $categorySetRepoResolver;
+    private bool $categoryEnabled;
+    private TaxonomyImageService $taxonomyImageService;
+    private ChannelDataParser $channelParser;
+    private EditorTabs $editorTabs;
+    private Upload $uploadFileSetNormalizer;
+
+    /**
+     * @param SharedController $context Shared panel request context.
+     * @param InputSanitizer $input Shared request input sanitizer.
+     * @param callable $categoryRepoResolver Lazy category repository resolver; only resolved on category routes.
+     * @param callable $categorySetRepoResolver Lazy category-set repository resolver; resolved for category set routes.
+     * @param bool $categoryEnabled Whether category features are enabled in runtime config.
+     * @param TaxonomyImageService $taxonomyImageService Service for taxonomy image uploads and path management.
+     * @param ChannelDataParser $channelParser Channel data parser for category-set assignment counts.
+     * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
+     * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
+     * @return void
+     */
+    public function __construct(
+        SharedController $context,
+        InputSanitizer $input,
+        callable $categoryRepoResolver,
+        callable $categorySetRepoResolver,
+        bool $categoryEnabled,
+        TaxonomyImageService $taxonomyImageService,
+        ChannelDataParser $channelParser,
+        EditorTabs $editorTabs,
+        Upload $uploadFileSetNormalizer
+    ) {
+        $this->context = $context;
+        $this->input = $input;
+        $this->categoryRepoResolver = Closure::fromCallable($categoryRepoResolver);
+        $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
+        $this->categoryEnabled = $categoryEnabled;
+        $this->taxonomyImageService = $taxonomyImageService;
+        $this->channelParser = $channelParser;
+        $this->editorTabs = $editorTabs;
+        $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
+    }
+
+    /**
+     * Lists categories for Category management section.
+     *
+     * @return void
+     */
+    public function categoryList(): void
+    {
+        $this->context->requirePanelLogin();
+        if (!$this->categoryEnabled) {
+            $this->context->renderPanelNotFound();
+            return;
+        }
+        if (!$this->context->requireRoutePermissionOrForbidden('category', 'view')) {
+            return;
+        }
+
+        $categoryCountsBySetId = $this->categoryParser()->countsBySetId();
+        $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
+        if (
+            $selectedSetId !== null
+            && (
+                !$this->categorySetRepo()->existsId($selectedSetId)
+                || (int) ($categoryCountsBySetId[$selectedSetId] ?? 0) < 1
+            )
+        ) {
+            $selectedSetId = null;
+        }
+
+        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
+        $perPage = 50;
+        $pageResult = $this->categoryParser()->listPageForPanel($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
+        $totalItems = (int) ($pageResult['total'] ?? 0);
+        $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
+        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
+            $pageResult = $this->categoryParser()->listPageForPanel($perPage, $pagination['offset'], $selectedSetId);
+            $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
+        }
+
+        // Only show set filter tabs for sets that actually have categories.
+        $setOptions = [];
+        foreach ($this->categorySetRepo()->listOptions() as $setOption) {
+            $setId = (int) ($setOption['id'] ?? 0);
+            if ((int) ($categoryCountsBySetId[$setId] ?? 0) < 1) {
+                continue;
+            }
+
+            $setOptions[] = $setOption;
+        }
+
+        $this->context->renderPanel('panel/category/list', [
+            'categoryRows' => $categoryRows,
+            'setOptions' => $setOptions,
+            'selectedSetId' => $selectedSetId,
+            'pagination' => $this->context->panelPaginationViewData('/category', $pagination, [
+                'set' => $selectedSetId !== null ? (string) $selectedSetId : '',
+            ]),
+            'csrfField' => $this->context->csrfField(),
+            'flashSuccess' => $this->context->pullFlash('success'),
+            'flashError' => $this->context->pullFlash('error'),
+            'section' => 'category',
+        ]);
+    }
+
+    /**
+     * Shows category create/edit form.
+     *
+     * @param int|null $id Category id in edit mode, or null in create mode.
+     * @return void
+     */
+    public function categoryEdit(?int $id = null): void
+    {
+        $this->context->requirePanelLogin();
+        if (!$this->categoryEnabled) {
+            $this->context->renderPanelNotFound();
+            return;
+        }
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->context->requireRoutePermissionOrForbidden('category', $requiredAction)) {
+            return;
+        }
+
+        $category = null;
+        if ($id !== null) {
+            $category = $this->categoryParser()->findById($id);
+
+            if ($category === null) {
+                $this->context->flash('error', 'Category not found.');
+                Redirect::redirect($this->context->panelUrl('/category'));
+            }
+        }
+
+        $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['basic', 'media'], 'basic');
+
+        $this->context->renderPanel('panel/category/edit', [
+            'category' => $category,
+            'setOptions' => $this->categorySetRepo()->listOptions(),
+            'categoryRoutePrefix' => CategoryRouteParser::categoryRoutePrefix($this->context->config(), $this->input),
+            'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
+            'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
+            'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),
+            'activeTab' => $activeTab,
+            'csrfField' => $this->context->csrfField(),
+            'flashSuccess' => $this->context->pullFlash('success'),
+            'error' => $this->context->pullFlash('error'),
+            'section' => 'category',
+        ]);
+    }
+
+    /**
+     * Saves one category from panel form.
+     *
+     * @param array<string, mixed> $post Submitted form payload.
+     * @param array<string, mixed> $files Uploaded file payload from $_FILES.
+     * @return void
+     */
+    public function categorySave(array $post, array $files = []): void
+    {
+        $this->context->requirePanelLogin();
+        if (!$this->categoryEnabled) {
+            $this->context->renderPanelNotFound();
+            return;
+        }
+        $id = $this->input->int($post['id'] ?? null, 1);
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->context->requireRoutePermissionOrForbidden('category', $requiredAction)) {
+            return;
+        }
+
+        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
+            $this->context->flash('error', 'Invalid CSRF token.');
+            Redirect::redirect($this->context->panelUrl('/category'));
+        }
+
+        $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['basic', 'media'], 'basic');
+        $name = $this->input->text($post['name'] ?? null, 255);
+        $slug = $this->input->slug($post['slug'] ?? null);
+        $setId = $this->input->int($post['set'] ?? null, 1);
+        $description = $this->input->text($post['description'] ?? null, 2000);
+
+        if ($name === '' || $slug === null || $setId === null || !$this->categorySetRepo()->existsId($setId)) {
+            $this->context->flash('error', 'Category name, valid slug, and valid set are required.');
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/category/edit',
+                $id,
+                $activeTab,
+                'basic'
+            ));
+        }
+
+        // Persist one category; uniqueness conflicts are surfaced by repository.
+        try {
+            $savedId = $this->categoryRepo()->save([
+                'id' => $id,
+                'name' => $name,
+                'slug' => $slug,
+                'set' => $setId,
+                'description' => $description,
+            ]);
+        } catch (\Throwable) {
+            $this->context->flash('error', 'Failed to save category. Slug may already exist.');
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/category/edit',
+                $id,
+                $activeTab,
+                'basic'
+            ));
+        }
+
+        $savedEditUrl = $this->editorTabs->panelEditorUrlWithTab(
+            fn (string $suffix): string => $this->context->panelUrl($suffix),
+            '/category/edit',
+            $savedId,
+            $activeTab,
+            'basic'
+        );
+
+        // Process optional cover/preview/icon image uploads for the category record.
+        $currentRecord = $this->categoryParser()->findById($savedId);
+        $currentStorage = $this->taxonomyImageService->imageStoragePayloadFromRecord('categories', $currentRecord);
+        $currentPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('categories', $savedId, $currentStorage);
+        $nextStorage = $currentStorage;
+        $newPathSets = [];
+
+        $coverUploads = $this->uploadFileSetNormalizer->normalize($files['cover_image'] ?? null);
+        $previewUploads = $this->uploadFileSetNormalizer->normalize($files['preview_image'] ?? null);
+        $iconUploads = $this->uploadFileSetNormalizer->normalize($files['icon_image'] ?? null);
+
+        if (count($coverUploads) > 1 || count($previewUploads) > 1 || count($iconUploads) > 1) {
+            $this->context->flash('error', 'Please upload only one image per slot.');
+            Redirect::redirect($savedEditUrl);
+        }
+
+        $removeCover = isset($post['remove_cover_image']) && (string) $post['remove_cover_image'] === '1';
+        $removePreview = isset($post['remove_preview_image']) && (string) $post['remove_preview_image'] === '1';
+        $removeIcon = isset($post['remove_icon_image']) && (string) $post['remove_icon_image'] === '1';
+
+        if ($removeCover) {
+            foreach ($this->taxonomyImageService->imageStorageKeysForSlot('categories', 'cover') as $key) {
+                $nextStorage[$key] = null;
+            }
+        }
+        if ($removePreview) {
+            foreach ($this->taxonomyImageService->imageStorageKeysForSlot('categories', 'preview') as $key) {
+                $nextStorage[$key] = null;
+            }
+        }
+        if ($removeIcon) {
+            foreach ($this->taxonomyImageService->imageStorageKeysForSlot('categories', 'icon') as $key) {
+                $nextStorage[$key] = null;
+            }
+        }
+
+        if (isset($coverUploads[0])) {
+            $coverResult = $this->taxonomyImageService->storeUpload('categories', $savedId, 'cover', $coverUploads[0]);
+            if (!$coverResult['ok']) {
+                $this->taxonomyImageService->cleanupPathSets('categories', $savedId, $newPathSets);
+                $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
+                Redirect::redirect($savedEditUrl);
+            }
+
+            $coverStorage = is_array($coverResult['record'] ?? null) ? $coverResult['record'] : [];
+            $coverPaths = $coverResult['paths'] ?? [];
+            $nextStorage = array_merge($nextStorage, $coverStorage);
+            $newPathSets[] = $coverPaths;
+        }
+
+        if (isset($previewUploads[0])) {
+            $previewResult = $this->taxonomyImageService->storeUpload('categories', $savedId, 'preview', $previewUploads[0]);
+            if (!$previewResult['ok']) {
+                $this->taxonomyImageService->cleanupPathSets('categories', $savedId, $newPathSets);
+                $this->context->flash('error', (string) ($previewResult['error'] ?? 'Failed to upload preview image.'));
+                Redirect::redirect($savedEditUrl);
+            }
+
+            $previewStorage = is_array($previewResult['record'] ?? null) ? $previewResult['record'] : [];
+            $previewPaths = $previewResult['paths'] ?? [];
+            $nextStorage = array_merge($nextStorage, $previewStorage);
+            $newPathSets[] = $previewPaths;
+        }
+
+        if (isset($iconUploads[0])) {
+            $iconResult = $this->taxonomyImageService->storeUpload('categories', $savedId, 'icon', $iconUploads[0]);
+            if (!$iconResult['ok']) {
+                $this->taxonomyImageService->cleanupPathSets('categories', $savedId, $newPathSets);
+                $this->context->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
+                Redirect::redirect($savedEditUrl);
+            }
+
+            $iconStorage = is_array($iconResult['record'] ?? null) ? $iconResult['record'] : [];
+            $iconPaths = $iconResult['paths'] ?? [];
+            $nextStorage = array_merge($nextStorage, $iconStorage);
+            $newPathSets[] = $iconPaths;
+        }
+
+        try {
+            $this->categoryRepo()->updateImageFiles($savedId, $nextStorage);
+        } catch (\Throwable) {
+            // Keep DB and filesystem in sync when image-path persistence fails.
+            $this->taxonomyImageService->cleanupPathSets('categories', $savedId, $newPathSets);
+            $this->context->flash('error', 'Failed to save category image selections.');
+            Redirect::redirect($savedEditUrl);
+        }
+
+        $nextPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('categories', $savedId, $nextStorage);
+        $obsoletePaths = $this->taxonomyImageService->removedPaths($currentPaths, $nextPaths);
+        $this->taxonomyImageService->deleteStoredPaths('categories', $savedId, $obsoletePaths);
+
+        $this->context->flash('success', 'Changes saved.');
+        Redirect::redirect($savedEditUrl);
+    }
+
+    /**
+     * Deletes one category and removes page-category links.
+     *
+     * @param array<string, mixed> $post Submitted form payload.
+     * @return void
+     */
+    public function categoryDelete(array $post): void
+    {
+        $this->context->requirePanelLogin();
+        if (!$this->categoryEnabled) {
+            $this->context->renderPanelNotFound();
+            return;
+        }
+        if (!$this->context->requireRoutePermissionOrForbidden('category', 'delete')) {
+            return;
+        }
+
+        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
+            $this->context->flash('error', 'Invalid CSRF token.');
+            Redirect::redirect($this->context->panelUrl('/category'));
+        }
+
+        $id = $this->input->int($post['id'] ?? null, 1);
+        if ($id !== null) {
+            $record = $this->categoryParser()->findById($id);
+            // Single-row delete path (row action button).
+            try {
+                $this->categoryRepo()->deleteById($id);
+            } catch (\Throwable) {
+                $this->context->flash('error', 'Failed to delete category.');
+                Redirect::redirect($this->context->panelUrl('/category'));
+            }
+
+            if ($record !== null) {
+                $this->taxonomyImageService->deleteStoredPaths(
+                    'categories',
+                    $id,
+                    $this->taxonomyImageService->imagePathsFromRecord('categories', $id, $record)
+                );
+            }
+
+            $this->context->flash('success', 'Category deleted.');
+            Redirect::redirect($this->context->panelUrl('/category'));
+        }
+
+        // Bulk-delete mode is used by the list-level "Delete" buttons.
+        $selectedIds = $this->selectedIdsFromPost($post);
+        if ($selectedIds === []) {
+            $this->context->flash('error', 'No categories selected.');
+            Redirect::redirect($this->context->panelUrl('/category'));
+        }
+
+        $deletedCount = 0;
+        $failedCount = 0;
+
+        foreach ($selectedIds as $selectedId) {
+            $record = $this->categoryParser()->findById($selectedId);
+            try {
+                // Continue deleting remaining ids even if one operation throws.
+                $this->categoryRepo()->deleteById($selectedId);
+                if ($record !== null) {
+                    $this->taxonomyImageService->deleteStoredPaths(
+                        'categories',
+                        $selectedId,
+                        $this->taxonomyImageService->imagePathsFromRecord('categories', $selectedId, $record)
+                    );
+                }
+                $deletedCount++;
+            } catch (\Throwable) {
+                $failedCount++;
+            }
+        }
+
+        if ($deletedCount > 0) {
+            $message = 'Deleted ' . $deletedCount . ' ' . ($deletedCount === 1 ? 'category' : 'categories') . '.';
+            if ($failedCount > 0) {
+                $message .= ' Failed to delete ' . $failedCount . ' selected ' . ($failedCount === 1 ? 'category' : 'categories') . '.';
+            }
+            $this->context->flash('success', $message);
+        } else {
+            $this->context->flash('error', 'Failed to delete selected categories.');
+        }
+
+        Redirect::redirect($this->context->panelUrl('/category'));
+    }
+
+    /**
+     * Lists category-set records for channel-assignment management.
+     *
+     * @return void
+     */
+    public function categorySetList(): void
+    {
+        $this->context->requirePanelLogin();
+        if (!$this->categoryEnabled) {
+            $this->context->renderPanelNotFound();
+            return;
+        }
+        if (!$this->context->requireRoutePermissionOrForbidden('category', 'view')) {
+            return;
+        }
+
+        // Annotate each set row with its category and channel usage counts.
+        $countsBySetId = $this->categoryParser()->countsBySetId();
+        $channelCountsBySetId = $this->channelParser->explicitTaxonomySetCounts('category');
+        $setRows = [];
+        foreach ($this->categorySetRepo()->listAll() as $setRow) {
+            $setId = (int) ($setRow['id'] ?? 0);
+            $setRow['category_count'] = (int) ($countsBySetId[$setId] ?? 0);
+            $setRow['channel_count'] = (int) ($channelCountsBySetId[$setId] ?? 0);
+            $setRows[] = $setRow;
+        }
+
+        $this->context->renderPanel('panel/category/set_list', [
+            'setRows' => $setRows,
+            'csrfField' => $this->context->csrfField(),
+            'flashSuccess' => $this->context->pullFlash('success'),
+            'flashError' => $this->context->pullFlash('error'),
+            'section' => 'category',
+        ]);
+    }
+
+    /**
+     * Shows category-set create/edit form.
+     *
+     * @param int|null $id Category-set id in edit mode, or null in create mode.
+     * @return void
+     */
+    public function categorySetEdit(?int $id = null): void
+    {
+        $this->context->requirePanelLogin();
+        if (!$this->categoryEnabled) {
+            $this->context->renderPanelNotFound();
+            return;
+        }
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->context->requireRoutePermissionOrForbidden('category', $requiredAction)) {
+            return;
+        }
+
+        $set = null;
+        if ($id !== null) {
+            $set = $this->categorySetRepo()->findById($id);
+            if ($set === null) {
+                $this->context->flash('error', 'Category set not found.');
+                Redirect::redirect($this->context->panelUrl('/category/set'));
+            }
+        }
+
+        $this->context->renderPanel('panel/category/set_edit', [
+            'set' => $set,
+            'csrfField' => $this->context->csrfField(),
+            'flashSuccess' => $this->context->pullFlash('success'),
+            'error' => $this->context->pullFlash('error'),
+            'section' => 'category',
+        ]);
+    }
+
+    /**
+     * Saves one category set from panel form.
+     *
+     * @param array<string, mixed> $post Submitted form payload.
+     * @return void
+     */
+    public function categorySetSave(array $post): void
+    {
+        $this->context->requirePanelLogin();
+        if (!$this->categoryEnabled) {
+            $this->context->renderPanelNotFound();
+            return;
+        }
+
+        $id = $this->input->int($post['id'] ?? null, 0);
+        $requiredAction = $id === null ? 'create' : 'edit';
+        if (!$this->context->requireRoutePermissionOrForbidden('category', $requiredAction)) {
+            return;
+        }
+
+        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
+            $this->context->flash('error', 'Invalid CSRF token.');
+            Redirect::redirect($this->context->panelUrl('/category/set'));
+        }
+
+        // Preserve existing slug when edit form does not re-submit the slug field.
+        $existingSet = $id !== null && $id > 0 ? $this->categorySetRepo()->findById($id) : null;
+        $name = $this->input->text($post['name'] ?? null, 255);
+        $slug = $this->input->slug($post['slug'] ?? null);
+        if ($slug === null && is_array($existingSet)) {
+            $persistedSlug = trim((string) ($existingSet['slug'] ?? ''));
+            $slug = $persistedSlug !== '' ? $persistedSlug : null;
+        }
+        $description = $this->input->text($post['description'] ?? null, 2000);
+
+        if ($name === '' || ($id !== 0 && $slug === null)) {
+            $this->context->flash('error', 'Set name and valid slug are required.');
+            Redirect::redirect($this->context->panelUrl('/category/set/edit' . ($id !== null ? '/' . $id : '')));
+        }
+
+        try {
+            $savedId = $this->categorySetRepo()->save([
+                'id' => $id,
+                'name' => $name,
+                'slug' => $slug ?? '',
+                'description' => $description,
+            ]);
+        } catch (\Throwable $exception) {
+            $message = trim($exception->getMessage());
+            $this->context->flash('error', $message !== '' ? $message : 'Failed to save category set.');
+            Redirect::redirect($this->context->panelUrl('/category/set/edit' . ($id !== null ? '/' . $id : '')));
+        }
+
+        $this->context->flash('success', 'Changes saved.');
+        Redirect::redirect($this->context->panelUrl('/category/set/edit/' . $savedId));
+    }
+
+    /**
+     * Deletes one category set when no taxonomies/channels still depend on it.
+     *
+     * @param array<string, mixed> $post Submitted form payload.
+     * @return void
+     */
+    public function categorySetDelete(array $post): void
+    {
+        $this->context->requirePanelLogin();
+        if (!$this->categoryEnabled) {
+            $this->context->renderPanelNotFound();
+            return;
+        }
+        if (!$this->context->requireRoutePermissionOrForbidden('category', 'delete')) {
+            return;
+        }
+
+        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
+            $this->context->flash('error', 'Invalid CSRF token.');
+            Redirect::redirect($this->context->panelUrl('/category/set'));
+        }
+
+        $id = $this->input->int($post['id'] ?? null, 0);
+        if ($id === null) {
+            $this->context->flash('error', 'Category set not found.');
+            Redirect::redirect($this->context->panelUrl('/category/set'));
+        }
+
+        if ($this->channelParser->countExplicitTaxonomySetAssignments('category', $id) > 0) {
+            $this->context->flash('error', 'Cannot delete a category set that is still assigned to one or more channels.');
+            Redirect::redirect($this->context->panelUrl('/category/set'));
+        }
+
+        // Reassign any remaining categories in this set to the default set before deleting.
+        $categoryCount = (int) ($this->categoryParser()->countsBySetId()[$id] ?? 0);
+        if ($categoryCount > 0) {
+            $this->categoryRepo()->reassignSetToDefault($id, SetParser::DEFAULT_SET_ID);
+        }
+
+        try {
+            $this->categorySetRepo()->deleteById($id);
+        } catch (\Throwable $exception) {
+            $message = trim($exception->getMessage());
+            $this->context->flash('error', $message !== '' ? $message : 'Failed to delete category set.');
+            Redirect::redirect($this->context->panelUrl('/category/set'));
+        }
+
+        $this->context->flash('success', $categoryCount > 0 ? 'Category set deleted. ' . $categoryCount . ' ' . ($categoryCount === 1 ? 'category was' : 'categories were') . ' moved to the default set.' : 'Category set deleted.');
+        Redirect::redirect($this->context->panelUrl('/category/set'));
+    }
+
+    /**
+     * Returns the category repository on first use so non-category routes do not
+     * instantiate DB-backed taxonomy storage.
+     *
+     * @return CategoryRepository Category repository.
+     */
+    private function categoryRepo(): CategoryRepository
+    {
+        if ($this->categoryRepo instanceof CategoryRepository) {
+            return $this->categoryRepo;
+        }
+
+        $repo = ($this->categoryRepoResolver)();
+        if (!$repo instanceof CategoryRepository) {
+            throw new \RuntimeException('Panel category repository resolver returned an invalid value.');
+        }
+
+        $this->categoryRepo = $repo;
+        return $this->categoryRepo;
+    }
+
+    /**
+     * Returns the category parser on first use so read-only category flows route
+     * through the canonical parser surface instead of the repository.
+     *
+     * @return CategoryDataParser Category data parser.
+     */
+    private function categoryParser(): CategoryDataParser
+    {
+        if ($this->categoryParser instanceof CategoryDataParser) {
+            return $this->categoryParser;
+        }
+
+        $this->categoryParser = new CategoryDataParser($this->input, $this->categoryRepo());
+        return $this->categoryParser;
+    }
+
+    /**
+     * Returns the category-set repository on first use so non-taxonomy routes
+     * do not instantiate file-backed taxonomy set storage.
+     *
+     * @return SetRepository Category-set repository.
+     */
+    private function categorySetRepo(): SetRepository
+    {
+        if ($this->categorySetRepo instanceof SetRepository) {
+            return $this->categorySetRepo;
+        }
+
+        $repo = ($this->categorySetRepoResolver)();
+        if (!$repo instanceof SetRepository) {
+            throw new \RuntimeException('Panel category-set repository resolver returned an invalid value.');
+        }
+
+        $this->categorySetRepo = $repo;
+        return $this->categorySetRepo;
+    }
+
+    /**
+     * Normalizes selected checkbox ids from one bulk-action form payload.
+     *
+     * @param array<string, mixed> $post Submitted form payload.
+     * @param string $key Form key holding selected ids.
+     * @return array<int, int> Normalized selected ids.
+     */
+    private function selectedIdsFromPost(array $post, string $key = 'selected_ids'): array
+    {
+        $raw = $post[$key] ?? [];
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $selected = [];
+        foreach ($raw as $candidate) {
+            $id = $this->input->int($candidate, 1);
+            if ($id !== null) {
+                $selected[$id] = $id;
+            }
+        }
+
+        return array_values($selected);
+    }
+}

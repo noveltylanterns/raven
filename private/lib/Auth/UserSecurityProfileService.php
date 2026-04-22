@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use Raven\Lib\Security\RecoveryPhrase;
-use Raven\Lib\Security\TotpService;
+use Raven\Lib\Security\Totp;
 use Raven\Lib\Security\TwoFactorMethodKey;
 use Raven\Lib\Security\TwoFactorMethodNormalizer;
 use Raven\Lib\Security\TwoFactorMethodRules;
@@ -136,8 +136,8 @@ final class UserSecurityProfileService
                     continue;
                 }
 
-                $secret = TotpService::normalizeSecret((string) ($method['secret'] ?? ''));
-                if (!TotpService::isValidSecret($secret)) {
+                $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
+                if (!Totp::isValidSecret($secret)) {
                     continue;
                 }
 
@@ -216,8 +216,8 @@ final class UserSecurityProfileService
 
     public function verifyTotpCode(array $methods, string $submittedCode, string $issuer = 'Raven CMS'): bool
     {
-        $submittedCode = TotpService::normalizeCode($submittedCode);
-        if (!TotpService::isValidCode($submittedCode)) {
+        $submittedCode = Totp::normalizeCode($submittedCode);
+        if (!Totp::isValidCode($submittedCode)) {
             return false;
         }
 
@@ -228,12 +228,12 @@ final class UserSecurityProfileService
 
             $type = TwoFactorMethodRules::normalizeType((string) ($method['type'] ?? ''));
             $status = TwoFactorMethodRules::normalizeStatus((string) ($method['status'] ?? ''), $type);
-            $secret = TotpService::normalizeSecret((string) ($method['secret'] ?? ''));
-            if ($type !== 'totp' || $status !== 'confirmed' || !TotpService::isValidSecret($secret)) {
+            $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
+            if ($type !== 'totp' || $status !== 'confirmed' || !Totp::isValidSecret($secret)) {
                 continue;
             }
 
-            if (TotpService::verifyCode($secret, $submittedCode, 1, $issuer)) {
+            if (Totp::verifyCode($secret, $submittedCode, 1, $issuer)) {
                 return true;
             }
         }

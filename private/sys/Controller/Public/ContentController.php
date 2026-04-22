@@ -12,27 +12,26 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Closure;
-use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageImageRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\UserRepository;
-use Raven\Lib\View\BodyBlockPolicy;
-use Raven\Lib\View\Public\MarkdownRenderer;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeService;
 use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
+use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\PageDataParser;
-use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Parser\UserDataParser;
+use Raven\Lib\Transport\Redirect;
 use Raven\Core\Routing\Public\PublicChannelPageRouteService;
-use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\View\Public\MetaService;
-use Raven\Lib\View\Public\PageBodyRenderer;
+use Raven\Lib\View\Public\PageBlocks;
+use Raven\Lib\View\Public\PageMarkdown;
 use Raven\Lib\View\Public\TemplateDecorator;
-use Raven\Lib\View\Public\ThemeCatalogService;
+use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\View\Public\ThemeTemplate;
 
 /**
@@ -41,7 +40,7 @@ use Raven\Lib\View\Public\ThemeTemplate;
 final class ContentController
 {
     private SharedController $context;
-    private ChannelRepository $channelRepo;
+    private ChannelDataParser $channelParser;
     private PageImageRepository $pageImages;
     private PageDataParser $pageParser;
     private RedirectRepository $redirectRepo;
@@ -52,13 +51,13 @@ final class ContentController
     private bool $embeddedFormRuntimesLoaded = false;
     /** @var array<string, array{label: string, editor: string}>|null */
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
-    private ?ThemeCatalogService $themeCatalogService = null;
+    private ?ThemeCatalog $themeCatalogService = null;
     private ?ThemeTemplate $themeTemplate = null;
     private ?MetaService $metaService = null;
     private ?TemplateDecorator $templateDecorator = null;
-    private ?PageBodyRenderer $pageBodyRenderer = null;
-    private ?MarkdownRenderer $markdownRenderer = null;
-    private ?BodyBlockPolicy $bodyBlockPolicy = null;
+    private ?PageMarkdown $pageMarkdown = null;
+    private ?PageBlockParser $pageBlockParser = null;
+    private ?PageBlocks $pageBlocks = null;
     private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
     private ?EmbeddedFormRuntimeService $embeddedFormRuntimeService = null;
     private ?UserDataParser $profileContactService = null;
@@ -66,7 +65,7 @@ final class ContentController
 
     /**
      * @param SharedController $context Shared public request context.
-     * @param ChannelRepository $channelRepo Channel repository for public channel-route lookups.
+     * @param ChannelDataParser $channelParser Channel data parser for public channel-route lookups.
      * @param PageImageRepository $pageImages Page-image repository for gallery rendering and page meta images.
      * @param PageRepository $pageRepo Page repository for homepage, channel, and page lookups.
      * @param RedirectRepository $redirectRepo Redirect repository for public redirect fallbacks.
@@ -76,7 +75,7 @@ final class ContentController
      */
     public function __construct(
         SharedController $context,
-        ChannelRepository $channelRepo,
+        ChannelDataParser $channelParser,
         PageImageRepository $pageImages,
         PageRepository $pageRepo,
         RedirectRepository $redirectRepo,
@@ -84,7 +83,7 @@ final class ContentController
         callable $extensionServicesProvider
     ) {
         $this->context = $context;
-        $this->channelRepo = $channelRepo;
+        $this->channelParser = $channelParser;
         $this->pageImages = $pageImages;
         $this->pageParser = new PageDataParser($context->input(), $pageRepo);
         $this->redirectRepo = $redirectRepo;
@@ -173,7 +172,7 @@ final class ContentController
         $channelWordSeparator = 'inherit';
 
         if ($channelSlug !== null) {
-            $channel = $this->channelRepo->findBySlug($channelSlug);
+            $channel = $this->channelParser->findBySlug($channelSlug);
             if ($channel === null) {
                 if ($this->tryRedirect($requestedSlug, $channelSlug)) {
                     return;
@@ -305,67 +304,12 @@ final class ContentController
      */
     private function renderPageContentBlocks(array $page): array
     {
-        $rawBlocks = $page['content_blocks'] ?? null;
-        if (!is_array($rawBlocks)) {
-            $rawBlocks = [];
-        }
-
-        $renderedBlocks = [];
-        $galleryBlockHtml = null;
-        foreach ($rawBlocks as $block) {
-            $type = 'tinymce';
-            $content = '';
-            $cssId = '';
-            $cssClass = '';
-
-            if (is_array($block)) {
-                $type = $this->normalizePageBodyBlockType((string) ($block['type'] ?? 'tinymce'));
-                $value = $block['content'] ?? '';
-                $cssId = $this->bodyBlockPolicy()->normalizeCssId($block['css_id'] ?? null);
-                $cssClass = $this->bodyBlockPolicy()->normalizeCssClassList($block['css_class'] ?? null);
-                if (!is_scalar($value) && $value !== null) {
-                    continue;
-                }
-
-                $content = (string) ($value ?? '');
-            } else {
-                if (!is_scalar($block) && $block !== null) {
-                    continue;
-                }
-
-                $content = (string) ($block ?? '');
-            }
-
-            if ($this->pageBodyBlockEditorMode($type) === 'gallery') {
-                if (!is_string($galleryBlockHtml)) {
-                    $galleryBlockHtml = $this->renderPageGalleryBlockHtml($page);
-                }
-                if (trim($galleryBlockHtml) === '') {
-                    continue;
-                }
-
-                $renderedBlocks[] = [
-                    'html' => $galleryBlockHtml,
-                    'css_id' => $cssId,
-                    'css_class' => $cssClass,
-                ];
-                continue;
-            }
-
-            $html = $this->renderPageBodyBlockByType($type, $content);
-            if (trim($html) === '') {
-                continue;
-            }
-
-            $renderedBlocks[] = [
-                'html' => $html,
-                'css_id' => $cssId,
-                'css_class' => $cssClass,
-            ];
-        }
-
-        $page['content_blocks'] = $renderedBlocks;
-        return $page;
+        return $this->pageBlocks()->renderPageContentBlocks(
+            $page,
+            $this->pageBodyBlockTypeDefinitions(),
+            fn (): string => $this->renderPageGalleryBlockHtml($page),
+            fn (string $html): string => $this->renderEmbeddedForms($html)
+        );
     }
 
     /**
@@ -429,53 +373,14 @@ final class ContentController
     }
 
     /**
-     * Escapes HTML output for gallery block fragments.
+     * Escapes one gallery HTML fragment for safe output.
      *
-     * @param string $value Raw output value.
-     * @return string Escaped output value.
+     * @param string $value Raw gallery value.
+     * @return string HTML-escaped value.
      */
     private function escapeHtml(string $value): string
     {
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    }
-
-    /**
-     * Renders one public page body block into HTML.
-     *
-     * @param string $type Normalized body-block type key.
-     * @param string $content Raw stored body-block content.
-     * @return string Rendered block HTML.
-     */
-    private function renderPageBodyBlockByType(string $type, string $content): string
-    {
-        $editorMode = $this->pageBodyBlockEditorMode($this->normalizePageBodyBlockType($type));
-        return $this->pageBodyRenderer()->renderByEditorMode(
-            $editorMode,
-            $content,
-            fn (string $html): string => $this->renderEmbeddedForms($html)
-        );
-    }
-
-    /**
-     * Normalizes one page body-block type value.
-     *
-     * @param string $value Raw block type.
-     * @return string Normalized block type.
-     */
-    private function normalizePageBodyBlockType(string $value): string
-    {
-        return $this->bodyBlockPolicy()->normalizeType($value, $this->pageBodyBlockTypeDefinitions());
-    }
-
-    /**
-     * Resolves the editor mode for one public page body-block type.
-     *
-     * @param string $type Normalized block type.
-     * @return string Editor mode key.
-     */
-    private function pageBodyBlockEditorMode(string $type): string
-    {
-        return $this->bodyBlockPolicy()->editorMode($type, $this->pageBodyBlockTypeDefinitions());
     }
 
     /**
@@ -489,17 +394,11 @@ final class ContentController
             return $this->pageBodyBlockTypeDefinitionsCache;
         }
 
-        $definitions = $this->bodyBlockPolicy()->defaultDefinitions();
-        foreach ($this->extensionEditorCatalogService()->publicBodyBlockDefinitions() as $type => $definition) {
-            if (isset($definitions[$type])) {
-                continue;
-            }
+        $this->pageBodyBlockTypeDefinitionsCache = $this->pageBlocks()->mergeTypeDefinitions(
+            $this->extensionEditorCatalogService()->publicBodyBlockDefinitions()
+        );
 
-            $definitions[$type] = $definition;
-        }
-
-        $this->pageBodyBlockTypeDefinitionsCache = $definitions;
-        return $definitions;
+        return $this->pageBodyBlockTypeDefinitionsCache;
     }
 
     /**
@@ -638,12 +537,12 @@ final class ContentController
     /**
      * Returns the shared public theme catalog service.
      *
-     * @return ThemeCatalogService Shared public theme catalog service.
+     * @return ThemeCatalog Shared public theme catalog service.
      */
-    private function themeCatalogService(): ThemeCatalogService
+    private function themeCatalogService(): ThemeCatalog
     {
-        if (!$this->themeCatalogService instanceof ThemeCatalogService) {
-            $this->themeCatalogService = new ThemeCatalogService(
+        if (!$this->themeCatalogService instanceof ThemeCatalog) {
+            $this->themeCatalogService = new ThemeCatalog(
                 dirname(__DIR__, 4) . '/public/theme',
                 $this->context->input(),
                 ['raven']
@@ -663,7 +562,6 @@ final class ContentController
         if (!$this->metaService instanceof MetaService) {
             $this->metaService = new MetaService(
                 $this->context->requestContextResolver(),
-                new SiteContextBuilder(),
                 $this->themeCatalogService(),
                 $this->profileContactService(),
                 $this->context->feedParser()
@@ -706,48 +604,49 @@ final class ContentController
     }
 
     /**
-     * Returns the shared public page-body renderer.
+     * Returns the shared public page Markdown helper.
      *
-     * @return PageBodyRenderer Shared public page-body renderer.
+     * @return PageMarkdown Shared public page Markdown helper.
      */
-    private function pageBodyRenderer(): PageBodyRenderer
+    private function pageMarkdown(): PageMarkdown
     {
-        if (!$this->pageBodyRenderer instanceof PageBodyRenderer) {
-            $this->pageBodyRenderer = new PageBodyRenderer(
+        if (!$this->pageMarkdown instanceof PageMarkdown) {
+            $this->pageMarkdown = new PageMarkdown();
+        }
+
+        return $this->pageMarkdown;
+    }
+
+    /**
+     * Returns the shared page-block parser.
+     *
+     * @return PageBlockParser Shared page-block parser.
+     */
+    private function pageBlockParser(): PageBlockParser
+    {
+        if (!$this->pageBlockParser instanceof PageBlockParser) {
+            $this->pageBlockParser = new PageBlockParser($this->context->input());
+        }
+
+        return $this->pageBlockParser;
+    }
+
+    /**
+     * Returns the shared public page-block helper.
+     *
+     * @return PageBlocks Shared public page-block helper.
+     */
+    private function pageBlocks(): PageBlocks
+    {
+        if (!$this->pageBlocks instanceof PageBlocks) {
+            $this->pageBlocks = new PageBlocks(
                 dirname(__DIR__, 4),
-                $this->markdownRenderer()
+                $this->pageBlockParser(),
+                $this->pageMarkdown()
             );
         }
 
-        return $this->pageBodyRenderer;
-    }
-
-    /**
-     * Returns the shared Markdown renderer.
-     *
-     * @return MarkdownRenderer Shared Markdown renderer.
-     */
-    private function markdownRenderer(): MarkdownRenderer
-    {
-        if (!$this->markdownRenderer instanceof MarkdownRenderer) {
-            $this->markdownRenderer = new MarkdownRenderer();
-        }
-
-        return $this->markdownRenderer;
-    }
-
-    /**
-     * Returns the shared body-block policy.
-     *
-     * @return BodyBlockPolicy Shared body-block policy.
-     */
-    private function bodyBlockPolicy(): BodyBlockPolicy
-    {
-        if (!$this->bodyBlockPolicy instanceof BodyBlockPolicy) {
-            $this->bodyBlockPolicy = new BodyBlockPolicy($this->context->input());
-        }
-
-        return $this->bodyBlockPolicy;
+        return $this->pageBlocks;
     }
 
     /**
@@ -761,7 +660,7 @@ final class ContentController
             $this->extensionEditorCatalogService = new ExtensionEditorCatalogService(
                 dirname(__DIR__, 4),
                 $this->context->input(),
-                $this->bodyBlockPolicy()
+                $this->pageBlockParser()
             );
         }
 

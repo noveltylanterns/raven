@@ -21,7 +21,6 @@ use Raven\Lib\View\Pagination;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\View\Panel\Footer;
-use Raven\Lib\View\SiteContextBuilder;
 
 /**
  * Holds panel-request shared deps and helpers for split panel sub-controllers.
@@ -34,7 +33,6 @@ final class SharedController
     private Csrf $csrf;
     private SessionFlash $flash;
     private PanelSessionGuard $panelSessionGuard;
-    private SiteContextBuilder $siteContextBuilder;
     private bool $categoryEnabled;
     private bool $tagEnabled;
     /** @var callable(): void */
@@ -67,7 +65,6 @@ final class SharedController
         $this->csrf = $csrf;
         $this->flash = $flash;
         $this->panelSessionGuard = new PanelSessionGuard();
-        $this->siteContextBuilder = new SiteContextBuilder();
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
         $this->publicNotFoundRenderer = $publicNotFoundRenderer;
@@ -292,12 +289,15 @@ final class SharedController
      */
     public function siteData(): array
     {
-        return $this->siteContextBuilder->panel(
-            $this->config,
-            $this->categoryEnabled,
-            $this->tagEnabled,
-            true
-        );
+        return [
+            'name' => (string) $this->config->get('site.name', 'Raven CMS'),
+            'panel_path' => (string) $this->config->get('panel.path', 'panel'),
+            'panel_brand_name' => (string) $this->config->get('panel.brand_name', ''),
+            'panel_brand_logo' => (string) $this->config->get('panel.brand_logo', ''),
+            'domain' => (string) $this->config->get('site.domain', 'localhost'),
+            'category_enabled' => $this->categoryEnabled,
+            'tag_enabled' => $this->tagEnabled,
+        ];
     }
 
     /**

@@ -97,6 +97,22 @@ final class ChannelDataParser
     }
 
     /**
+     * Returns whether one normalized channel slug already exists.
+     *
+     * @param string $slug Channel slug to validate.
+     * @return bool True when the slug already belongs to an existing channel row.
+     */
+    public function slugExists(string $slug): bool
+    {
+        $normalizedSlug = $this->input->slug($slug);
+        if ($normalizedSlug === null) {
+            return false;
+        }
+
+        return $this->channelRepo()->slugExists($normalizedSlug);
+    }
+
+    /**
      * Returns one channel id by slug.
      *
      * @param string $slug Channel slug to resolve.
@@ -120,6 +136,62 @@ final class ChannelDataParser
     public function listRoutingOptions(): array
     {
         return $this->channelRepo()->listRoutingOptions();
+    }
+
+    /**
+     * Returns editor-facing channel option rows.
+     *
+     * @return array<int, array<string, mixed>> Channel option rows.
+     */
+    public function listOptions(): array
+    {
+        return $this->channelRepo()->listOptions();
+    }
+
+    /**
+     * Returns how many channels explicitly reference one taxonomy set id.
+     *
+     * @param string $kind Taxonomy kind key (`category` or `tag`).
+     * @param int $setId Taxonomy set id to count.
+     * @return int Number of channels that explicitly select the given set id.
+     */
+    public function countExplicitTaxonomySetAssignments(string $kind, int $setId): int
+    {
+        if ($setId < 1) {
+            return 0;
+        }
+
+        return (int) ($this->explicitTaxonomySetCounts($kind)[$setId] ?? 0);
+    }
+
+    /**
+     * Returns channel assignment counts keyed by taxonomy set id.
+     *
+     * @param string $kind Taxonomy kind key (`category` or `tag`).
+     * @return array<int, int> Channel counts keyed by taxonomy set id.
+     */
+    public function explicitTaxonomySetCounts(string $kind): array
+    {
+        $field = strtolower(trim($kind)) === 'tag' ? 'tag_sets' : 'category_sets';
+        $counts = [];
+
+        foreach ($this->listRoutingOptions() as $channel) {
+            $selection = $channel[$field] ?? [];
+            if (!is_array($selection)) {
+                continue;
+            }
+
+            foreach ($selection as $selectedSetId) {
+                $normalizedSetId = is_int($selectedSetId) ? $selectedSetId : (int) $selectedSetId;
+                if ($normalizedSetId < 1) {
+                    continue;
+                }
+
+                $counts[$normalizedSetId] = (int) ($counts[$normalizedSetId] ?? 0) + 1;
+            }
+        }
+
+        return $counts;
     }
 
     /**

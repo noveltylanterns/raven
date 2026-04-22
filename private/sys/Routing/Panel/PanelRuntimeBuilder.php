@@ -14,6 +14,8 @@ namespace Raven\Core\Routing\Panel;
 use Closure;
 use PDO;
 use Raven\Core\Controller\Panel\AuthController;
+use Raven\Core\Controller\Panel\CategoryController;
+use Raven\Core\Controller\Panel\ChannelController;
 use Raven\Core\Controller\Panel\ConfigController;
 use Raven\Core\Controller\Panel\ContentController;
 use Raven\Core\Controller\Panel\DashboardController;
@@ -27,13 +29,12 @@ use Raven\Core\Controller\Panel\UserController;
 use Raven\Core\Repository\CategoryRepository;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\InviteTokenRepository;
+use Raven\Core\Repository\InviteRepository;
 use Raven\Core\Repository\PageImageRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TagRepository;
-use Raven\Core\Repository\TaxonomyLookupRepository;
-use Raven\Core\Repository\TaxonomySetRepository;
+use Raven\Core\Repository\SetRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Core\Logger;
 use Raven\Core\Renderer;
@@ -50,12 +51,12 @@ use Raven\Lib\Parser\FeedRouteParser;
 use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\RedirectDataParser;
+use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\PageImageManager;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\Parser\UserDataParser;
-use Raven\Lib\View\SiteContextBuilder;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorMCE;
@@ -97,6 +98,8 @@ final class PanelRuntimeBuilder
         }
 
         $authController = null;
+        $categoryController = null;
+        $channelController = null;
         $configController = null;
         $contentController = null;
         $dashboardController = null;
@@ -281,24 +284,24 @@ final class PanelRuntimeBuilder
         /**
          * Builds the file-backed category set repository only for panel taxonomy editors.
          */
-        $categorySetFactory = $memoize(static function () use (&$categorySetRepository, $rvn): TaxonomySetRepository {
-            $categorySetRepository = new TaxonomySetRepository('category', (string) $rvn['root'] . '/private/dat/category-set');
+        $categorySetFactory = $memoize(static function () use (&$categorySetRepository, $rvn): SetRepository {
+            $categorySetRepository = new SetRepository('category', (string) $rvn['root'] . '/private/dat/category-set');
             return $categorySetRepository;
         });
 
         /**
          * Builds the file-backed tag set repository only for panel taxonomy editors.
          */
-        $tagSetFactory = $memoize(static function () use (&$tagSetRepository, $rvn): TaxonomySetRepository {
-            $tagSetRepository = new TaxonomySetRepository('tag', (string) $rvn['root'] . '/private/dat/tag-set');
+        $tagSetFactory = $memoize(static function () use (&$tagSetRepository, $rvn): SetRepository {
+            $tagSetRepository = new SetRepository('tag', (string) $rvn['root'] . '/private/dat/tag-set');
             return $tagSetRepository;
         });
 
         /**
          * Builds invite-token storage only for panel invite management.
          */
-        $inviteTokenFactory = $memoize(static function () use (&$inviteTokenRepository, $rvn, $resolveAuthDb): InviteTokenRepository {
-            $inviteTokenRepository = new InviteTokenRepository(
+        $inviteTokenFactory = $memoize(static function () use (&$inviteTokenRepository, $rvn, $resolveAuthDb): InviteRepository {
+            $inviteTokenRepository = new InviteRepository(
                 $resolveAuthDb(),
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
@@ -357,11 +360,11 @@ final class PanelRuntimeBuilder
         });
 
         /**
-         * Builds taxonomy lookup storage only for routing and page-editor flows
+         * Builds taxonomy lookup parsing only for routing and page-editor flows
          * that need category/tag option lookups beyond channel routing.
          */
-        $taxonomyLookupFactory = $memoize(static function () use (&$taxonomyLookupRepository, $rvn, $channelFactory): TaxonomyLookupRepository {
-            $taxonomyLookupRepository = new TaxonomyLookupRepository(
+        $taxonomyLookupFactory = $memoize(static function () use (&$taxonomyLookupRepository, $rvn, $channelFactory): TaxonomyRepoParser {
+            $taxonomyLookupRepository = new TaxonomyRepoParser(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],
@@ -587,7 +590,6 @@ final class PanelRuntimeBuilder
                 $rvn['config'],
                 $rvn['input'],
                 $contentDomain['page'],
-                $contentDomain['channel'],
                 $contentDomain['page_images'],
                 $contentDomain['page_image_manager'],
                 $taxonomyDomain['category'],
@@ -611,6 +613,64 @@ final class PanelRuntimeBuilder
         };
 
         /**
+         * Builds the split channel controller on first use.
+         * Owns channel list, create/edit, save, and delete routes.
+         */
+        $rvn['panel_channel_controller'] = static function () use (&$channelController, &$rvn, $panelTaxonomyDomain): ChannelController {
+            if ($channelController instanceof ChannelController) {
+                return $channelController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $taxonomyDomain = $panelTaxonomyDomain();
+            $channelController = new ChannelController(
+                $requestContextFactory(),
+                $rvn['input'],
+                $taxonomyDomain['channel'],
+                $taxonomyDomain['category_set'],
+                $taxonomyDomain['tag_set'],
+                $taxonomyDomain['category_enabled'],
+                $taxonomyDomain['tag_enabled'],
+                new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
+                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel']),
+                new FeedRouteParser($rvn['config'], $rvn['input']),
+                $rvn['panel_editor_tabs'],
+                $rvn['panel_editor'],
+                new Upload()
+            );
+
+            return $channelController;
+        };
+
+        /**
+         * Builds the split category controller on first use.
+         * Owns category list, create/edit, save, delete, and category-set routes.
+         */
+        $rvn['panel_category_controller'] = static function () use (&$categoryController, &$rvn, $panelTaxonomyDomain): CategoryController {
+            if ($categoryController instanceof CategoryController) {
+                return $categoryController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $taxonomyDomain = $panelTaxonomyDomain();
+            $categoryController = new CategoryController(
+                $requestContextFactory(),
+                $rvn['input'],
+                $taxonomyDomain['category'],
+                $taxonomyDomain['category_set'],
+                $taxonomyDomain['category_enabled'],
+                new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
+                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel']),
+                $rvn['panel_editor_tabs'],
+                new Upload()
+            );
+
+            return $categoryController;
+        };
+
+        /**
          * Builds the split redirect controller on first use.
          * Redirect CRUD only needs channel validation and redirect storage.
          */
@@ -625,7 +685,7 @@ final class PanelRuntimeBuilder
             $redirectController = new RedirectController(
                 $requestContextFactory(),
                 $rvn['input'],
-                $taxonomyDomain['channel'],
+                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel']),
                 $taxonomyDomain['redirect'],
                 new RedirectDataParser($rvn['input'], $taxonomyDomain['redirect']),
                 $rvn['panel_editor']
@@ -636,7 +696,7 @@ final class PanelRuntimeBuilder
 
         /**
          * Builds the split taxonomy controller on first use.
-         * Owns channel, category, category-set, tag, and tag-set management routes.
+         * Owns tag, tag-set, and shared taxonomy deletion helpers.
          */
         $rvn['panel_taxonomy_controller'] = static function () use (&$taxonomyController, &$rvn, $panelTaxonomyDomain): TaxonomyController {
             if ($taxonomyController instanceof TaxonomyController) {
@@ -649,18 +709,12 @@ final class PanelRuntimeBuilder
             $taxonomyController = new TaxonomyController(
                 $requestContextFactory(),
                 $rvn['input'],
-                $taxonomyDomain['channel'],
-                $taxonomyDomain['category'],
-                $taxonomyDomain['category_set'],
                 $taxonomyDomain['tag'],
                 $taxonomyDomain['tag_set'],
-                $taxonomyDomain['category_enabled'],
                 $taxonomyDomain['tag_enabled'],
                 new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
                 new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel']),
-                new FeedRouteParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
-                $rvn['panel_editor'],
                 new Upload()
             );
 
@@ -849,15 +903,27 @@ final class PanelRuntimeBuilder
                 return $rvn + $panelRuntime;
             }
 
-            $siteContextBuilder = new SiteContextBuilder();
             $contentDomain = $panelContentDomain();
             $taxonomyDomain = $panelTaxonomyDomain();
             $userDomain = $panelUserDomain();
             $panelSystemDomain();
 
             // Panel route files depend on this closure, so populate it only when panel runtime is active.
-            $rvn['panel_site_data'] = static function (bool $includeDomain = true) use ($siteContextBuilder, $rvn, $categoryEnabled, $tagEnabled): array {
-                return $siteContextBuilder->panel($rvn['config'], $categoryEnabled, $tagEnabled, $includeDomain);
+            $rvn['panel_site_data'] = static function (bool $includeDomain = true) use ($rvn, $categoryEnabled, $tagEnabled): array {
+                $site = [
+                    'name' => (string) $rvn['config']->get('site.name', 'Raven CMS'),
+                    'panel_path' => (string) $rvn['config']->get('panel.path', 'panel'),
+                    'panel_brand_name' => (string) $rvn['config']->get('panel.brand_name', ''),
+                    'panel_brand_logo' => (string) $rvn['config']->get('panel.brand_logo', ''),
+                    'category_enabled' => $categoryEnabled,
+                    'tag_enabled' => $tagEnabled,
+                ];
+
+                if ($includeDomain) {
+                    $site['domain'] = (string) $rvn['config']->get('site.domain', 'localhost');
+                }
+
+                return $site;
             };
 
             $enabledExtensionManifests = is_array($rvn['enabled_extension_manifests'] ?? null)

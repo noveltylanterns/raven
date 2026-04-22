@@ -16,8 +16,9 @@ use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\TagRepository;
 use Raven\Core\Repository\UserRepository;
-use Raven\Lib\Config\ConfigParser;
-use Raven\Lib\Diagnostic\RequestProfiler;
+use Raven\Core\Debug\RequestProfiler;
+use Raven\Lib\Parser\ChannelDataParser;
+use Raven\Lib\Parser\ConfigParser;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
@@ -281,6 +282,7 @@ final class PanelListProfilerRunner
         $tagEnabled = $this->featureEnabled($rvn, 'tag.enabled', true);
         // Build repos directly; the shared bootstrap service map was removed.
         $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+        $channelParser = new ChannelDataParser($rvn['config'], $rvn['input'], $channelRepo);
         $pageRepo = new PageRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo, $categoryEnabled, $tagEnabled);
         $redirectRepo = new RedirectRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
         $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
@@ -309,7 +311,7 @@ final class PanelListProfilerRunner
             $routes['tag'] = '/' . $this->panelPath . '/tag';
         }
 
-        $channelOptions = $channelRepo->listOptions();
+        $channelOptions = $channelParser->listOptions();
         if ($channelOptions !== []) {
             $channelSlug = trim((string) ($channelOptions[0]['slug'] ?? ''));
             if ($channelSlug !== '') {
@@ -434,7 +436,7 @@ final class PanelListProfilerRunner
         $tagId = null;
         $groupName = null;
 
-        $channelOptions = $channelRepo->listOptions();
+        $channelOptions = $channelParser->listOptions();
         if ($channelOptions !== []) {
             $value = trim((string) ($channelOptions[0]['slug'] ?? ''));
             if ($value !== '') {
@@ -469,7 +471,7 @@ final class PanelListProfilerRunner
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
                 $pageRepo->taxonomyAssignmentIdsByPage($pageIds);
             },
-            'channel' => static fn () => $channelRepo->listAll(),
+            'channel' => static fn () => $channelParser->listAll(),
             'redirect' => static fn () => $redirectRepo->listAll(),
             'groups' => static fn () => $groupRepo->listAll(),
             'users' => static fn () => $userRepo->listAll(),
@@ -500,9 +502,8 @@ final class PanelListProfilerRunner
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
                 $pageRepo->taxonomyAssignmentIdsByPage($pageIds);
             },
-            'channels' => static function () use ($channelRepo): void {
-                $channelRepo->countForPanel();
-                $channelRepo->listForPanel(50, 0);
+            'channels' => static function () use ($channelParser): void {
+                $channelParser->listPageForPanel(50, 0);
             },
             'redirects' => static function () use ($redirectRepo): void {
                 $redirectRepo->countForPanel();

@@ -11,9 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Public;
 
-use Raven\Core\Debug\ProfilerResponseHook;
-use Raven\Core\Debug\ProfilerConfigResolver;
-use Raven\Core\Scheduler;
+use Raven\Core\Debug\OutputProfilerConfigResolver;
+use Raven\Core\Debug\OutputProfilerResponseHook;
 use Raven\Core\Routing\Request;
 use Raven\Core\Routing\Router;
 use Raven\Core\Routing\Public\PublicAuthRouteRegistrar;
@@ -24,6 +23,7 @@ use Raven\Core\Routing\Public\PublicFormRouteRegistrar;
 use Raven\Core\Routing\Public\PublicProfileRouteRegistrar;
 use Raven\Core\Routing\Public\PublicRouteConfig;
 use Raven\Core\Routing\Public\PublicRuntimeBuilder;
+use Raven\Lib\Scheduler\Cron;
 use RuntimeException;
 
 /**
@@ -98,7 +98,7 @@ final class PublicController
         $rvn = PublicRuntimeBuilder::build($rvn);
 
         $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-        $profilerSettings = ProfilerConfigResolver::fromConfig($rvn['config']);
+        $profilerSettings = OutputProfilerConfigResolver::fromConfig($rvn['config']);
         $isPublicAuthHelperPath = static function (string $path) use ($requestPath): bool {
             $normalized = trim($path !== '' ? $path : $requestPath);
             $normalized = (string) parse_url($normalized, PHP_URL_PATH);
@@ -129,7 +129,7 @@ final class PublicController
             return $rvn['auth']->isTwoFactorVerifiedForUser($userId);
         };
 
-        ProfilerResponseHook::arm(
+        OutputProfilerResponseHook::arm(
             [
                 'show_benchmarks' => (bool) ($profilerSettings['show_benchmarks'] ?? true),
                 'show_queries' => (bool) ($profilerSettings['show_queries'] ?? true),
@@ -221,7 +221,7 @@ final class PublicController
             $publicRequestContext()->notFound();
         }
 
-        Scheduler::runIfDue(
+        Cron::runIfDue(
             $rvn,
             $root,
             $rvn['config']->get('site.scheduler', 'always') === 'always'

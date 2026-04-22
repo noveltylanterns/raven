@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Security\LoginTwoFactorFlowService;
-use Raven\Lib\Security\WebAuthnService;
+use Raven\Lib\Security\WebAuthn;
 
 /**
  * Shared panel/public login WebAuthn challenge context preparation helpers.
@@ -26,7 +25,7 @@ final class LoginWebAuthnChallengeService
      */
     public function prepareOptionsContext(
         AuthService $auth,
-        LoginTwoFactorFlowService $flow,
+        LoginChallengeFlow $flow,
         int $userId,
         array $pendingMethods,
         string $selectedMethodKey
@@ -178,7 +177,7 @@ final class LoginWebAuthnChallengeService
             ];
         }
 
-        if ($requiresUserVerification && !WebAuthnService::authenticatorDataHasUserVerification($authenticatorData)) {
+        if ($requiresUserVerification && !WebAuthn::authenticatorDataHasUserVerification($authenticatorData)) {
             return [
                 'ok' => false,
                 'status' => 400,

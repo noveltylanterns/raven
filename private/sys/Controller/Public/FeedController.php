@@ -11,16 +11,16 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Public;
 
-use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageRepository;
-use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Routing\Public\PublicChannelPageRouteService;
 use Raven\Lib\Parser\CategoryRouteParser;
+use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\Parser\TagRouteParser;
+use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\View\Public\TemplateDecorator;
-use Raven\Lib\View\Public\ThemeCatalogService;
+use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\View\Public\ThemeTemplate;
 
 /**
@@ -29,29 +29,29 @@ use Raven\Lib\View\Public\ThemeTemplate;
 final class FeedController
 {
     private SharedController $context;
-    private ChannelRepository $channelRepo;
+    private ChannelDataParser $channelParser;
     private PageDataParser $pageParser;
-    private TaxonomyLookupRepository $taxonomyLookupRepo;
+    private TaxonomyRepoParser $taxonomyLookupRepo;
     private TemplateDecorator $templateDecorator;
     private PublicChannelPageRouteService $publicChannelPageRouteService;
-    private ThemeCatalogService $themeCatalogService;
+    private ThemeCatalog $themeCatalogService;
     private ?ThemeTemplate $themeTemplate = null;
 
     /**
      * @param SharedController $context Shared public request context.
-     * @param ChannelRepository $channelRepo Channel repository for feed/channel label lookups.
+     * @param ChannelDataParser $channelParser Channel data parser for feed/channel label lookups.
      * @param PageRepository $pageRepo Page repository for feed and taxonomy listing rows.
-     * @param TaxonomyLookupRepository $taxonomyLookupRepo Taxonomy lookup repository for category/tag resolution.
+     * @param TaxonomyRepoParser $taxonomyLookupRepo Taxonomy lookup parser for category/tag resolution.
      * @return void
      */
     public function __construct(
         SharedController $context,
-        ChannelRepository $channelRepo,
+        ChannelDataParser $channelParser,
         PageRepository $pageRepo,
-        TaxonomyLookupRepository $taxonomyLookupRepo
+        TaxonomyRepoParser $taxonomyLookupRepo
     ) {
         $this->context = $context;
-        $this->channelRepo = $channelRepo;
+        $this->channelParser = $channelParser;
         $this->pageParser = new PageDataParser($context->input(), $pageRepo);
         $this->taxonomyLookupRepo = $taxonomyLookupRepo;
         $this->templateDecorator = new TemplateDecorator(
@@ -60,7 +60,7 @@ final class FeedController
             dirname(__DIR__, 4)
         );
         $this->publicChannelPageRouteService = new PublicChannelPageRouteService($context->input());
-        $this->themeCatalogService = new ThemeCatalogService(
+        $this->themeCatalogService = new ThemeCatalog(
             dirname(__DIR__, 4) . '/public/theme',
             $context->input(),
             ['raven']
@@ -283,7 +283,7 @@ final class FeedController
                 return;
             }
 
-            $channel = $this->channelRepo->findBySlug($normalizedChannelSlug);
+            $channel = $this->channelParser->findBySlug($normalizedChannelSlug);
             if (!is_array($channel) || !$this->channelFeedEnabled($channel)) {
                 $this->context->notFound();
                 return;
@@ -567,7 +567,7 @@ final class FeedController
             return 'Root';
         }
 
-        $channel = $this->channelRepo->findBySlug($normalized);
+        $channel = $this->channelParser->findBySlug($normalized);
         if (!is_array($channel)) {
             return $normalized;
         }

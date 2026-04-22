@@ -21,7 +21,7 @@
 
 use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
-use Raven\Lib\View\Panel\ListWrapper;
+use Raven\Lib\View\Panel\ListCard;
 use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
@@ -210,7 +210,7 @@ $pageListToolbarItems = [
     </tbody>
 </table>
 <?php $pagesTableHtml = (string) ob_get_clean(); ?>
-<?= ListWrapper::render([
+<?= ListCard::render([
     'is_empty'            => $pages === [],
     'empty_message'       => 'No pages yet.',
     'search_id'           => $pagesSearchId,

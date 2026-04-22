@@ -3,6 +3,6 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../lib/Shell/CLI.php';
+require_once __DIR__ . '/../sys/Shell.php';
 [$context, $tokens] = raven_cli_bootstrap($argv);
 exit(raven_cli_command_system($context, $tokens));

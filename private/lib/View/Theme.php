@@ -11,14 +11,14 @@ declare(strict_types=1);
 
 namespace Raven\Lib\View;
 
-use Raven\Lib\View\Public\ThemeManifestValidator;
+use Raven\Lib\View\Public\ThemeValidator;
 
 /**
  * Enumerates and resolves installed public themes from `public/theme/{slug}/theme.json`.
  */
 final class Theme
 {
-    private static ?ThemeManifestValidator $validator = null;
+    private static ?ThemeValidator $validator = null;
 
     /**
      * Returns discovered theme manifests keyed by slug.
@@ -146,12 +146,12 @@ final class Theme
     /**
      * Returns the shared public-theme manifest validator.
      *
-     * @return ThemeManifestValidator Shared public-theme manifest validator.
+     * @return ThemeValidator Shared public-theme manifest validator.
      */
-    private static function validator(): ThemeManifestValidator
+    private static function validator(): ThemeValidator
     {
-        if (!self::$validator instanceof ThemeManifestValidator) {
-            self::$validator = new ThemeManifestValidator();
+        if (!self::$validator instanceof ThemeValidator) {
+            self::$validator = new ThemeValidator();
         }
 
         return self::$validator;

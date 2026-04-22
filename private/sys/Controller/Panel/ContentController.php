@@ -14,39 +14,37 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Config;
 use Raven\Core\Repository\CategoryRepository;
-use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\PageImageRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\TagRepository;
-use Raven\Core\Repository\TaxonomyLookupRepository;
-use Raven\Core\Repository\TaxonomySetRepository;
+use Raven\Core\Repository\SetRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\View\BodyBlockPolicy;
-use Raven\Lib\View\PageBodyBlockCodec;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
-use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\PageImageManager;
 use Raven\Lib\Parser\CategoryDataParser;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\PageDataParser;
-use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Parser\TagDataParser;
+use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\Parser\UserDataParser;
+use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorAuthor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorMCE;
 use Raven\Lib\View\Panel\EditorMDE;
-use Raven\Lib\View\Panel\PanelPost;
 use Raven\Lib\View\Panel\EditorTabs;
-
 use Raven\Lib\Transport\Redirect;
+use Raven\Lib\Transport\Upload;
+use Raven\Lib\View\Panel\PageBlocks;
+use Raven\Lib\View\Panel\PanelPost;
 
 /**
  * Handles panel page content management routes.
@@ -62,7 +60,6 @@ final class ContentController
     private Config $config;
     private InputSanitizer $input;
     private PageRepository $pageRepo;
-    private ChannelRepository $channelRepo;
     private PageImageRepository $pageImages;
     private UserRepository $userRepo;
     private ChannelDataParser $channelParser;
@@ -79,23 +76,23 @@ final class ContentController
     private Closure $categoryRepoResolver;
     private ?CategoryRepository $categoryRepo = null;
     private ?CategoryDataParser $categoryParser = null;
-    /** @var Closure(): TaxonomySetRepository */
+    /** @var Closure(): SetRepository */
     private Closure $categorySetRepoResolver;
-    private ?TaxonomySetRepository $categorySetRepo = null;
+    private ?SetRepository $categorySetRepo = null;
     /** @var Closure(): TagRepository */
     private Closure $tagRepoResolver;
     private ?TagRepository $tagRepo = null;
     private ?TagDataParser $tagParser = null;
-    /** @var Closure(): TaxonomySetRepository */
+    /** @var Closure(): SetRepository */
     private Closure $tagSetRepoResolver;
-    private ?TaxonomySetRepository $tagSetRepo = null;
-    /** @var Closure(): TaxonomyLookupRepository */
+    private ?SetRepository $tagSetRepo = null;
+    /** @var Closure(): TaxonomyRepoParser */
     private Closure $taxonomyLookupRepoResolver;
-    private ?TaxonomyLookupRepository $taxonomyLookupRepo = null;
+    private ?TaxonomyRepoParser $taxonomyLookupRepo = null;
     /** @var Closure(string): array<string, mixed> */
     private Closure $extensionServicesFor;
-    private ?BodyBlockPolicy $bodyBlockPolicy = null;
-    private ?PageBodyBlockCodec $pageBodyBlockCodec = null;
+    private ?PageBlockParser $pageBlockParser = null;
+    private ?PageBlocks $pageBlocks = null;
     private ?Upload $uploadFileSetNormalizer = null;
     private ?PanelPost $panelPostNormalizer = null;
     private ?EditorAuthor $pageAuthorOptionBuilder = null;
@@ -113,7 +110,6 @@ final class ContentController
      * @param Config $config Runtime configuration reader for media and content settings.
      * @param InputSanitizer $input Shared input sanitizer for panel request values.
      * @param PageRepository $pageRepo Page repository for content CRUD.
-     * @param ChannelRepository $channelRepo Channel repository for editor option lookups.
      * @param PageImageRepository $pageImages Page-image repository for gallery persistence and page-existence checks.
      * @param callable $pageImageManagerResolver Lazy page-image manager resolver; resolved only on gallery upload/delete routes.
      * @param callable $categoryRepoResolver Lazy category repository resolver; resolved only on taxonomy-aware page routes.
@@ -136,7 +132,6 @@ final class ContentController
         Config $config,
         InputSanitizer $input,
         PageRepository $pageRepo,
-        ChannelRepository $channelRepo,
         PageImageRepository $pageImages,
         callable $pageImageManagerResolver,
         callable $categoryRepoResolver,
@@ -157,7 +152,6 @@ final class ContentController
         $this->config = $config;
         $this->input = $input;
         $this->pageRepo = $pageRepo;
-        $this->channelRepo = $channelRepo;
         $this->pageImages = $pageImages;
         $this->pageImageManagerResolver = Closure::fromCallable($pageImageManagerResolver);
         $this->categoryRepoResolver = Closure::fromCallable($categoryRepoResolver);
@@ -202,21 +196,26 @@ final class ContentController
         }
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->pageParser()->listPageForPanel(
-            $perPage,
-            ($requestedPage - 1) * $perPage,
-            $prefilterChannel !== '' ? $prefilterChannel : null,
-            $prefilterCategoryId > 0 ? $prefilterCategoryId : null,
-            $prefilterTagId > 0 ? $prefilterTagId : null
-        );
+        $prefilterChannelId = $prefilterChannel !== '' ? $this->channelParser->idBySlug($prefilterChannel) : null;
+        // An unknown channel slug should behave like an empty filtered result, not like "all channels".
+        $hasMissingChannelPrefilter = $prefilterChannel !== '' && $prefilterChannelId === null;
+        $pageResult = $hasMissingChannelPrefilter
+            ? ['rows' => [], 'total' => 0]
+            : $this->pageParser()->listPageForPanel(
+                $perPage,
+                ($requestedPage - 1) * $perPage,
+                $prefilterChannelId,
+                $prefilterCategoryId > 0 ? $prefilterCategoryId : null,
+                $prefilterTagId > 0 ? $prefilterTagId : null
+            );
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $pageRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
-        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
+        if (!$hasMissingChannelPrefilter && $totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $pageResult = $this->pageParser()->listPageForPanel(
                 $perPage,
                 $pagination['offset'],
-                $prefilterChannel !== '' ? $prefilterChannel : null,
+                $prefilterChannelId,
                 $prefilterCategoryId > 0 ? $prefilterCategoryId : null,
                 $prefilterTagId > 0 ? $prefilterTagId : null
             );
@@ -851,16 +850,16 @@ final class ContentController
      * Returns the category-set repository on first use so non-taxonomy routes
      * do not instantiate file-backed taxonomy set storage.
      *
-     * @return TaxonomySetRepository Category-set repository.
+     * @return SetRepository Category-set repository.
      */
-    private function categorySetRepo(): TaxonomySetRepository
+    private function categorySetRepo(): SetRepository
     {
-        if ($this->categorySetRepo instanceof TaxonomySetRepository) {
+        if ($this->categorySetRepo instanceof SetRepository) {
             return $this->categorySetRepo;
         }
 
         $categorySetRepo = ($this->categorySetRepoResolver)();
-        if (!$categorySetRepo instanceof TaxonomySetRepository) {
+        if (!$categorySetRepo instanceof SetRepository) {
             throw new \RuntimeException('Content controller category-set repository resolver returned an invalid value.');
         }
 
@@ -905,16 +904,16 @@ final class ContentController
      * Returns the tag-set repository on first use so non-taxonomy routes do not
      * instantiate file-backed taxonomy set storage.
      *
-     * @return TaxonomySetRepository Tag-set repository.
+     * @return SetRepository Tag-set repository.
      */
-    private function tagSetRepo(): TaxonomySetRepository
+    private function tagSetRepo(): SetRepository
     {
-        if ($this->tagSetRepo instanceof TaxonomySetRepository) {
+        if ($this->tagSetRepo instanceof SetRepository) {
             return $this->tagSetRepo;
         }
 
         $tagSetRepo = ($this->tagSetRepoResolver)();
-        if (!$tagSetRepo instanceof TaxonomySetRepository) {
+        if (!$tagSetRepo instanceof SetRepository) {
             throw new \RuntimeException('Content controller tag-set repository resolver returned an invalid value.');
         }
 
@@ -923,20 +922,20 @@ final class ContentController
     }
 
     /**
-     * Returns the taxonomy lookup repository on first use so category/tag
+     * Returns the taxonomy lookup parser on first use so category/tag
      * option lookups stay off requests that do not touch taxonomy-aware UI.
      *
-     * @return TaxonomyLookupRepository Taxonomy lookup repository.
+     * @return TaxonomyRepoParser Taxonomy lookup parser.
      */
-    private function taxonomyLookupRepo(): TaxonomyLookupRepository
+    private function taxonomyLookupRepo(): TaxonomyRepoParser
     {
-        if ($this->taxonomyLookupRepo instanceof TaxonomyLookupRepository) {
+        if ($this->taxonomyLookupRepo instanceof TaxonomyRepoParser) {
             return $this->taxonomyLookupRepo;
         }
 
         $taxonomyLookupRepo = ($this->taxonomyLookupRepoResolver)();
-        if (!$taxonomyLookupRepo instanceof TaxonomyLookupRepository) {
-            throw new \RuntimeException('Content controller taxonomy lookup repository resolver returned an invalid value.');
+        if (!$taxonomyLookupRepo instanceof TaxonomyRepoParser) {
+            throw new \RuntimeException('Content controller taxonomy lookup parser resolver returned an invalid value.');
         }
 
         $this->taxonomyLookupRepo = $taxonomyLookupRepo;
@@ -948,31 +947,31 @@ final class ContentController
     // -------------------------------------------------------------------------
 
     /**
-     * Returns the body-block policy helper on first use.
+     * Returns the shared page-block parser on first use.
      *
-     * @return BodyBlockPolicy Body-block type normalization and definition policy.
+     * @return PageBlockParser Page-block parser for shared type and CSS normalization.
      */
-    private function bodyBlockPolicy(): BodyBlockPolicy
+    private function pageBlockParser(): PageBlockParser
     {
-        if (!$this->bodyBlockPolicy instanceof BodyBlockPolicy) {
-            $this->bodyBlockPolicy = new BodyBlockPolicy($this->input);
+        if (!$this->pageBlockParser instanceof PageBlockParser) {
+            $this->pageBlockParser = new PageBlockParser($this->input);
         }
 
-        return $this->bodyBlockPolicy;
+        return $this->pageBlockParser;
     }
 
     /**
-     * Returns the page body-block codec on first use.
+     * Returns the panel page-block helper on first use.
      *
-     * @return PageBodyBlockCodec Codec for encoding/decoding editor body-block payloads.
+     * @return PageBlocks Panel page-block helper for editor payload normalization.
      */
-    private function pageBodyBlockCodec(): PageBodyBlockCodec
+    private function pageBlocks(): PageBlocks
     {
-        if (!$this->pageBodyBlockCodec instanceof PageBodyBlockCodec) {
-            $this->pageBodyBlockCodec = new PageBodyBlockCodec($this->input, $this->bodyBlockPolicy());
+        if (!$this->pageBlocks instanceof PageBlocks) {
+            $this->pageBlocks = new PageBlocks($this->input, $this->pageBlockParser());
         }
 
-        return $this->pageBodyBlockCodec;
+        return $this->pageBlocks;
     }
 
     /**
@@ -1105,7 +1104,7 @@ final class ContentController
             $this->extensionEditorCatalogService = new ExtensionEditorCatalogService(
                 dirname(__DIR__, 4),
                 $this->input,
-                $this->bodyBlockPolicy()
+                $this->pageBlockParser()
             );
         }
 
@@ -1135,7 +1134,7 @@ final class ContentController
     {
         if (!$categoryEnabled && !$tagEnabled) {
             return [
-                'channel_options' => $this->channelRepo->listOptions(),
+                'channel_options' => $this->channelParser->listOptions(),
                 'category_options_all' => [],
                 'tag_options_all' => [],
                 'category_options_selected' => [],
@@ -1223,28 +1222,6 @@ final class ContentController
     // -------------------------------------------------------------------------
 
     /**
-     * Normalizes one body-block type value against the current type definitions.
-     *
-     * @param string $value Raw block type from editor submission.
-     * @return string Normalized block type slug.
-     */
-    private function normalizeBodyBlockType(string $value): string
-    {
-        return $this->bodyBlockPolicy()->normalizeType($value, $this->pageEditorBodyBlockTypeDefinitions());
-    }
-
-    /**
-     * Returns the editor mode for one body-block type.
-     *
-     * @param string $type Normalized block type slug.
-     * @return string Editor mode for this block type (e.g. 'tinymce', 'plaintext').
-     */
-    private function bodyBlockEditorMode(string $type): string
-    {
-        return $this->bodyBlockPolicy()->editorMode($type, $this->pageEditorBodyBlockTypeDefinitions());
-    }
-
-    /**
      * Returns the page-editor body-block type definitions, including any
      * additional types contributed by enabled extensions.
      *
@@ -1259,19 +1236,11 @@ final class ContentController
             return $this->pageBodyBlockTypeDefinitionsCache;
         }
 
-        $definitions = $this->bodyBlockPolicy()->defaultDefinitions();
+        $this->pageBodyBlockTypeDefinitionsCache = $this->pageBlocks()->mergeTypeDefinitions(
+            $this->extensionProvidedBodyBlocksForEditor($this->loadExtensionStateMap())
+        );
 
-        foreach ($this->extensionProvidedBodyBlocksForEditor($this->loadExtensionStateMap()) as $type => $entry) {
-            // Core definitions take precedence over extension definitions.
-            if (isset($definitions[$type])) {
-                continue;
-            }
-
-            $definitions[$type] = $entry;
-        }
-
-        $this->pageBodyBlockTypeDefinitionsCache = $definitions;
-        return $definitions;
+        return $this->pageBodyBlockTypeDefinitionsCache;
     }
 
     /**
@@ -1282,12 +1251,7 @@ final class ContentController
      */
     private function normalizeContentBlocksInput(mixed $raw): array
     {
-        return $this->pageBodyBlockCodec()->normalizeEditorSubmittedBlocks(
-            $raw,
-            fn (string $value): string => $this->normalizeBodyBlockType($value),
-            fn (string $type): string => $this->bodyBlockEditorMode($type),
-            50
-        );
+        return $this->pageBlocks()->normalizeEditorSubmittedBlocks($raw, $this->pageEditorBodyBlockTypeDefinitions(), 50);
     }
 
     /**
@@ -1298,10 +1262,7 @@ final class ContentController
      */
     private function pageBodyBlocksIncludeGallery(array $blocks): bool
     {
-        return $this->pageBodyBlockCodec()->hasGalleryBlock(
-            $blocks,
-            fn (string $type): string => $this->bodyBlockEditorMode($type)
-        );
+        return $this->pageBlocks()->hasGalleryBlock($blocks, $this->pageEditorBodyBlockTypeDefinitions());
     }
 
     // -------------------------------------------------------------------------

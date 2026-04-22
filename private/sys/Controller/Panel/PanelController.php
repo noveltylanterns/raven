@@ -11,9 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Panel;
 
-use Raven\Core\Debug\ProfilerResponseHook;
-use Raven\Core\Debug\ProfilerConfigResolver;
-use Raven\Core\Scheduler;
+use Raven\Core\Debug\OutputProfilerConfigResolver;
+use Raven\Core\Debug\OutputProfilerResponseHook;
 use Raven\Core\Routing\Request;
 use Raven\Core\Routing\Router;
 use Raven\Core\Routing\Panel\PanelAuthRouteRegistrar;
@@ -32,6 +31,7 @@ use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Extension\Layout;
 use Raven\Lib\Parser\PanelParser;
+use Raven\Lib\Scheduler\Cron;
 use RuntimeException;
 
 
@@ -67,6 +67,20 @@ final class PanelController
             ? $rvn['panel_dashboard_controller']
             : static function (): object {
                 throw new RuntimeException('Panel dashboard controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $panelChannelController */
+        $panelChannelController = is_callable($rvn['panel_channel_controller'] ?? null)
+            ? $rvn['panel_channel_controller']
+            : static function (): object {
+                throw new RuntimeException('Panel channel controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $panelCategoryController */
+        $panelCategoryController = is_callable($rvn['panel_category_controller'] ?? null)
+            ? $rvn['panel_category_controller']
+            : static function (): object {
+                throw new RuntimeException('Panel category controller factory is unavailable.');
             };
 
         /** @var callable(): object $panelTaxonomyController */
@@ -349,7 +363,7 @@ final class PanelController
         PanelAuthRouteRegistrar::register($router, $authController);
         PanelDashboardRouteRegistrar::register($router, $panelDashboardController);
         PanelContentRouteRegistrar::register($router, $panelContentController, $rvn['input'], $renderNotFound);
-        PanelTaxonomyRouteRegistrar::register($router, $panelTaxonomyController, $rvn['input'], $categoryEnabled, $tagEnabled, $renderNotFound);
+        PanelTaxonomyRouteRegistrar::register($router, $panelChannelController, $panelCategoryController, $panelTaxonomyController, $rvn['input'], $categoryEnabled, $tagEnabled, $renderNotFound);
         PanelRedirectRouteRegistrar::register($router, $panelRedirectController, $rvn['input'], $renderNotFound);
         PanelUserRouteRegistrar::register($router, $panelUserController, $rvn['input'], $renderNotFound);
         PanelGroupRouteRegistrar::register($router, $panelGroupController, $rvn['input'], $renderNotFound);
@@ -367,7 +381,7 @@ final class PanelController
         );
 
         $method = $requestMethod;
-        $profilerSettings = ProfilerConfigResolver::fromConfig($rvn['config']);
+        $profilerSettings = OutputProfilerConfigResolver::fromConfig($rvn['config']);
         $canRenderPanelProfiler = static function () use ($rvn, $isPanelAuthHelperInternalPath, $internalPath): bool {
             if (!isset($rvn['auth']) || $isPanelAuthHelperInternalPath($internalPath)) {
                 return false;
@@ -381,7 +395,7 @@ final class PanelController
             return $rvn['auth']->isTwoFactorVerifiedForUser($userId);
         };
 
-        ProfilerResponseHook::arm(
+        OutputProfilerResponseHook::arm(
             [
                 'show_benchmarks' => (bool) ($profilerSettings['show_benchmarks'] ?? true),
                 'show_queries' => (bool) ($profilerSettings['show_queries'] ?? true),
@@ -406,7 +420,7 @@ final class PanelController
             }
         }
 
-        Scheduler::runIfDue(
+        Cron::runIfDue(
             $rvn,
             $root,
             in_array($rvn['config']->get('site.scheduler', 'always'), ['always', 'panel'], true),

@@ -14,7 +14,7 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\TaxonomySetRepository;
+use Raven\Core\Repository\SetRepository;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\ConfigParser;
@@ -24,7 +24,7 @@ use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\View\Public\ThemeCatalogService;
+use Raven\Lib\View\Public\ThemeCatalog;
 
 use Raven\Lib\Transport\Redirect;
 
@@ -135,12 +135,12 @@ final class ConfigController
     private string $root;
     private ChannelRepository $channelRepo;
     private ?ChannelDataParser $channelParser = null;
-    /** @var Closure(): TaxonomySetRepository */
+    /** @var Closure(): SetRepository */
     private Closure $categorySetRepoResolver;
-    private ?TaxonomySetRepository $categorySetRepo = null;
-    /** @var Closure(): TaxonomySetRepository */
+    private ?SetRepository $categorySetRepo = null;
+    /** @var Closure(): SetRepository */
     private Closure $tagSetRepoResolver;
-    private ?TaxonomySetRepository $tagSetRepo = null;
+    private ?SetRepository $tagSetRepo = null;
     private UserDataParser $profileContacts;
     private EditorTabs $editorTabs;
     private Editor $editor;
@@ -153,7 +153,7 @@ final class ConfigController
     private ?array $categorySetOptionsCache = null;
     /** @var array<int, array{id: int, name: string, slug: string, is_root: bool}>|null */
     private ?array $tagSetOptionsCache = null;
-    private ?ThemeCatalogService $themeCatalogService = null;
+    private ?ThemeCatalog $themeCatalogService = null;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -161,8 +161,8 @@ final class ConfigController
      * @param InputSanitizer $input Shared input sanitizer for config forms.
      * @param string $root Project root path for theme catalog lookups.
      * @param ChannelRepository $channelRepo Channel repository for feed-channel options.
-     * @param callable(): TaxonomySetRepository $categorySetRepoResolver Lazy category-set resolver.
-     * @param callable(): TaxonomySetRepository $tagSetRepoResolver Lazy tag-set resolver.
+     * @param callable(): SetRepository $categorySetRepoResolver Lazy category-set resolver.
+     * @param callable(): SetRepository $tagSetRepoResolver Lazy tag-set resolver.
      * @param EditorTabs $editorTabs Shared panel editor-tab normalization and URL builder.
      * @param Editor $editor Shared panel editor utility methods (body-text editor, theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
@@ -374,16 +374,16 @@ final class ConfigController
     /**
      * Returns the category-set repository on first use.
      *
-     * @return TaxonomySetRepository Category-set repository.
+     * @return SetRepository Category-set repository.
      */
-    private function categorySetRepo(): TaxonomySetRepository
+    private function categorySetRepo(): SetRepository
     {
-        if ($this->categorySetRepo instanceof TaxonomySetRepository) {
+        if ($this->categorySetRepo instanceof SetRepository) {
             return $this->categorySetRepo;
         }
 
         $categorySetRepo = ($this->categorySetRepoResolver)();
-        if (!$categorySetRepo instanceof TaxonomySetRepository) {
+        if (!$categorySetRepo instanceof SetRepository) {
             throw new \RuntimeException('Panel category-set repository resolver returned an invalid value.');
         }
 
@@ -394,16 +394,16 @@ final class ConfigController
     /**
      * Returns the tag-set repository on first use.
      *
-     * @return TaxonomySetRepository Tag-set repository.
+     * @return SetRepository Tag-set repository.
      */
-    private function tagSetRepo(): TaxonomySetRepository
+    private function tagSetRepo(): SetRepository
     {
-        if ($this->tagSetRepo instanceof TaxonomySetRepository) {
+        if ($this->tagSetRepo instanceof SetRepository) {
             return $this->tagSetRepo;
         }
 
         $tagSetRepo = ($this->tagSetRepoResolver)();
-        if (!$tagSetRepo instanceof TaxonomySetRepository) {
+        if (!$tagSetRepo instanceof SetRepository) {
             throw new \RuntimeException('Panel tag-set repository resolver returned an invalid value.');
         }
 
@@ -2261,12 +2261,12 @@ final class ConfigController
     /**
      * Returns the public-theme catalog service on first use.
      *
-     * @return ThemeCatalogService Shared public-theme catalog helper.
+     * @return ThemeCatalog Shared public-theme catalog helper.
      */
-    private function themeCatalogService(): ThemeCatalogService
+    private function themeCatalogService(): ThemeCatalog
     {
-        if (!$this->themeCatalogService instanceof ThemeCatalogService) {
-            $this->themeCatalogService = new ThemeCatalogService(
+        if (!$this->themeCatalogService instanceof ThemeCatalog) {
+            $this->themeCatalogService = new ThemeCatalog(
                 $this->root . '/public/theme',
                 $this->input,
                 ['raven']

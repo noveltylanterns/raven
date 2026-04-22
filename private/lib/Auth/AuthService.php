@@ -17,11 +17,10 @@ use Raven\Lib\Auth\AuthGroupMembershipService;
 use Raven\Lib\Auth\AuthIdentityLookupService;
 use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\ContactProfileNormalizer;
+use Raven\Lib\Auth\LoginChallengeState;
+use Raven\Lib\Auth\LoginEmailChallenge;
 use Raven\Lib\Auth\LoginThrottleService;
 use Raven\Lib\Auth\PermissionMaskService;
-use Raven\Lib\Auth\TwoFactorChallengeVerificationService;
-use Raven\Lib\Auth\TwoFactorEmailChallengeService;
-use Raven\Lib\Auth\TwoFactorSessionStateService;
 use Raven\Lib\Auth\UserSecurityProfileService;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Security\TwoFactorMethodNormalizer;
@@ -53,10 +52,9 @@ final class AuthService
     private UserSecurityProfileService $securityProfiles;
     private AuthIdentityLookupService $identityLookup;
     private AuthGroupMembershipService $groupMembership;
-    private TwoFactorSessionStateService $twoFactorSessionState;
+    private LoginChallengeState $twoFactorSessionState;
     private AuthAccessGateService $authAccessGateService;
-    private TwoFactorChallengeVerificationService $twoFactorChallengeVerificationService;
-    private TwoFactorEmailChallengeService $twoFactorEmailChallengeService;
+    private LoginEmailChallenge $loginEmailChallenge;
 
     /**
      * Request-local cache for user preference rows by user id.
@@ -87,10 +85,9 @@ final class AuthService
         $this->securityProfiles = new UserSecurityProfileService();
         $this->identityLookup = new AuthIdentityLookupService($authDb, $driver, $this->prefix);
         $this->groupMembership = new AuthGroupMembershipService($rvnDb, $driver, $prefix);
-        $this->twoFactorSessionState = new TwoFactorSessionStateService();
+        $this->twoFactorSessionState = new LoginChallengeState();
         $this->authAccessGateService = new AuthAccessGateService();
-        $this->twoFactorChallengeVerificationService = new TwoFactorChallengeVerificationService();
-        $this->twoFactorEmailChallengeService = new TwoFactorEmailChallengeService();
+        $this->loginEmailChallenge = new LoginEmailChallenge();
 
         $this->bootstrapDelightAuth();
     }
@@ -312,7 +309,7 @@ final class AuthService
      */
     public function issuePendingEmailCodeChallenge(string $selectedMethodKey, string $submittedEmail = ''): array
     {
-        return $this->twoFactorEmailChallengeService->issueChallenge(
+        return $this->loginEmailChallenge->issueChallenge(
             $this->pendingTwoFactorUserId(),
             $this->pendingTwoFactorMethods(),
             $selectedMethodKey,
@@ -337,12 +334,16 @@ final class AuthService
             return false;
         }
 
-        return $this->twoFactorChallengeVerificationService->verifyPendingTotpCode(
-            $this->userPreferences($pendingUserId),
-            $submittedCode,
-            $this->securityProfiles,
-            'Raven CMS'
-        );
+        $preferences = $this->userPreferences($pendingUserId);
+        if (!is_array($preferences)) {
+            return false;
+        }
+
+        $methods = is_array($preferences['two_factor'] ?? null)
+            ? $preferences['two_factor']
+            : [];
+
+        return $this->securityProfiles->verifyTotpCode($methods, $submittedCode, 'Raven CMS');
     }
 
     /**
@@ -357,16 +358,32 @@ final class AuthService
             return false;
         }
 
-        return $this->twoFactorChallengeVerificationService->verifyPendingRecoveryCode(
-            $this->userPreferences($pendingUserId),
-            $submittedPhrase,
-            $selectedMethodKey,
-            $this->securityProfiles,
-            function (array $methods) use ($pendingUserId): bool {
-                $updated = $this->updateUserTwoFactorMethods($pendingUserId, $methods);
-                return (bool) ($updated['ok'] ?? false);
-            }
-        );
+        $preferences = $this->userPreferences($pendingUserId);
+        if (!is_array($preferences)) {
+            return false;
+        }
+
+        $methods = is_array($preferences['two_factor'] ?? null)
+            ? array_values($preferences['two_factor'])
+            : [];
+        $matched = $this->securityProfiles->matchRecoveryMethod($methods, $submittedPhrase, $selectedMethodKey);
+        if (!is_array($matched)) {
+            return false;
+        }
+
+        if ((bool) ($matched['reusable'] ?? false)) {
+            return true;
+        }
+
+        $matchedIndex = (int) ($matched['index'] ?? -1);
+        if ($matchedIndex < 0 || !array_key_exists($matchedIndex, $methods)) {
+            return false;
+        }
+
+        unset($methods[$matchedIndex]);
+        $updated = $this->updateUserTwoFactorMethods($pendingUserId, array_values($methods));
+
+        return (bool) ($updated['ok'] ?? false);
     }
 
     /**
@@ -377,7 +394,7 @@ final class AuthService
         string $selectedMethodKey = '',
         string $submittedEmail = ''
     ): bool {
-        return $this->twoFactorEmailChallengeService->verifySubmittedCode(
+        return $this->loginEmailChallenge->verifySubmittedCode(
             $this->pendingTwoFactorUserId(),
             $selectedMethodKey,
             $submittedCode,

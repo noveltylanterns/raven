@@ -15,7 +15,6 @@ use Raven\Core\Config;
 use Raven\Lib\Parser\FeedRouteParser;
 use Raven\Lib\Transport\Request;
 use Raven\Lib\Parser\UserDataParser;
-use Raven\Lib\View\SiteContextBuilder;
 
 /**
  * Shared site/public meta payload builder and social-image URL resolver.
@@ -23,28 +22,24 @@ use Raven\Lib\View\SiteContextBuilder;
 final class MetaService
 {
     private Request $requestContextResolver;
-    private SiteContextBuilder $siteContextBuilder;
-    private ThemeCatalogService $themeCatalogService;
+    private ThemeCatalog $themeCatalogService;
     private UserDataParser $profileContactService;
     private FeedRouteParser $feedParser;
 
     /**
      * @param Request $requestContextResolver Shared request-context helper.
-     * @param SiteContextBuilder $siteContextBuilder Shared site-context builder.
-     * @param ThemeCatalogService $themeCatalogService Public-theme catalog helper.
+     * @param ThemeCatalog $themeCatalogService Public-theme catalog helper.
      * @param UserDataParser $profileContactService Profile-contact helper for author social metadata.
      * @param FeedRouteParser $feedParser Feed-route policy helper for root feed URLs.
      * @return void
      */
     public function __construct(
         Request $requestContextResolver,
-        SiteContextBuilder $siteContextBuilder,
-        ThemeCatalogService $themeCatalogService,
+        ThemeCatalog $themeCatalogService,
         UserDataParser $profileContactService,
         FeedRouteParser $feedParser
     ) {
         $this->requestContextResolver = $requestContextResolver;
-        $this->siteContextBuilder = $siteContextBuilder;
         $this->themeCatalogService = $themeCatalogService;
         $this->profileContactService = $profileContactService;
         $this->feedParser = $feedParser;
@@ -62,15 +57,14 @@ final class MetaService
         $configuredProtocol = (string) $config->get('site.protocol', 'https');
         $configuredDomain = (string) $config->get('site.domain', 'localhost');
         $publicThemeActive = $this->themeCatalogService->cssSlug($publicTheme);
+        $siteUrl = $this->requestContextResolver->siteBaseUrl($configuredDomain, $configuredProtocol);
 
-        $site = $this->siteContextBuilder->publicBase(
-            $config,
-            $this->requestContextResolver->siteBaseUrl($configuredDomain, $configuredProtocol),
-            $this->requestContextResolver->currentRequestUrl($configuredDomain, $configuredProtocol),
-            $publicTheme,
-            $publicThemeActive,
-            $this->resolvedConfiguredMetaImageUrl($config, $configuredDomain, $configuredProtocol)
-        );
+        $site = array_merge($this->baseSiteMetaData($config, $publicTheme, $publicThemeActive), [
+            'url' => $siteUrl,
+            'current_url' => $this->requestContextResolver->currentRequestUrl($configuredDomain, $configuredProtocol),
+            'theme_url' => $this->themeUrl($siteUrl, $publicThemeActive),
+            'meta_image' => $this->resolvedConfiguredMetaImageUrl($config, $configuredDomain, $configuredProtocol),
+        ]);
 
         return $this->withRootFeedUrls($site);
     }
@@ -200,6 +194,62 @@ final class MetaService
         $configured = trim((string) $config->get('meta.image', ''));
 
         return $this->absoluteMetaImageUrl($configured, $configuredDomain, $configuredProtocol);
+    }
+
+    /**
+     * Builds the shared config-owned meta keys used by every public template.
+     *
+     * @param Config $config Runtime configuration reader.
+     * @param string $publicTheme Resolved active public-theme slug.
+     * @param string $publicThemeActive Theme slug that owns the active stylesheet.
+     * @return array<string, string> Shared public-theme wrapper payload keys.
+     */
+    private function baseSiteMetaData(Config $config, string $publicTheme, string $publicThemeActive): array
+    {
+        return [
+            'name' => (string) $config->get('site.name', 'Raven CMS'),
+            'protocol' => $this->normalizedConfiguredProtocol($config),
+            'domain' => (string) $config->get('site.domain', 'localhost'),
+            'panel_path' => (string) $config->get('panel.path', 'panel'),
+            'apple_touch_icon' => trim((string) $config->get('meta.apple_touch_icon', '')),
+            'robots' => trim((string) $config->get('meta.robots', 'index,follow')),
+            'twitter_card' => trim((string) $config->get('meta.twitter.card', '')),
+            'twitter_site' => trim((string) $config->get('meta.twitter.site', '')),
+            'twitter_creator' => trim((string) $config->get('meta.twitter.creator', '')),
+            'og_type' => trim((string) $config->get('meta.opengraph.type', 'website')),
+            'og_locale' => trim((string) $config->get('meta.opengraph.locale', 'en_US')),
+            'theme' => $publicTheme,
+            'theme_active' => $publicThemeActive,
+        ];
+    }
+
+    /**
+     * Normalizes the configured site protocol to one HTTP scheme.
+     *
+     * @param Config $config Runtime configuration reader.
+     * @return string `http` or `https`.
+     */
+    private function normalizedConfiguredProtocol(Config $config): string
+    {
+        $protocol = strtolower(trim((string) $config->get('site.protocol', 'https')));
+        return in_array($protocol, ['http', 'https'], true) ? $protocol : 'https';
+    }
+
+    /**
+     * Builds the public theme asset base URL from one resolved site URL.
+     *
+     * @param string $siteUrl Absolute site base URL.
+     * @param string $themeCssSlug Theme slug that owns the active stylesheet.
+     * @return string Absolute theme asset base URL.
+     */
+    private function themeUrl(string $siteUrl, string $themeCssSlug): string
+    {
+        $themeCssSlug = trim($themeCssSlug);
+        if ($themeCssSlug === '') {
+            $themeCssSlug = 'raven';
+        }
+
+        return rtrim($siteUrl, '/') . '/theme/' . rawurlencode($themeCssSlug);
     }
 
     /**

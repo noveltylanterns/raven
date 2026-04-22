@@ -75,10 +75,10 @@ final class Renderer
     {
         extract($data, EXTR_SKIP);
 
-        if (\Raven\Lib\Diagnostic\RequestProfiler::isEnabled()) {
+        if (\Raven\Core\Debug\RequestProfiler::isEnabled()) {
             /** @var array<int, array<string, mixed>> $trace */
             $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 80);
-            \Raven\Lib\Diagnostic\RequestProfiler::captureRenderTrace($trace);
+            \Raven\Core\Debug\RequestProfiler::captureRenderTrace($trace);
         }
 
         // Templates must only execute through Raven renderers, never as direct PHP endpoints.

@@ -13,15 +13,16 @@ namespace Raven\Core\Controller\Public;
 
 use Closure;
 use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\InviteTokenRepository;
+use Raven\Core\Repository\InviteRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginAttemptPolicy;
 use Raven\Lib\Auth\LoginAttemptWorkflowService;
+use Raven\Lib\Auth\LoginChallengeFlow;
 use Raven\Lib\Auth\LoginChallengeWorkflowService;
+use Raven\Lib\Auth\LoginEmailDelivery;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\LoginUiStateService;
 use Raven\Lib\Transport\Redirect;
-use Raven\Lib\Security\LoginTwoFactorFlowService;
 
 /**
  * Handles split public auth routes.
@@ -32,7 +33,7 @@ final class AuthController
     private GroupRepository $groupRepo;
     private UserRepository $userRepo;
     private Closure $inviteTokensResolver;
-    private ?InviteTokenRepository $inviteTokens = null;
+    private ?InviteRepository $inviteTokens = null;
     private LoginIdentifierResolver $identifierResolver;
     private ?LoginUiStateService $loginUiState = null;
     private ?LoginAttemptPolicy $loginAttemptPolicy = null;
@@ -43,7 +44,7 @@ final class AuthController
      * @param SharedController $context Shared public request context.
      * @param GroupRepository $groupRepo Group repository for registration target-group resolution.
      * @param UserRepository $userRepo User repository for registration persistence.
-     * @param callable(): InviteTokenRepository $inviteTokensResolver Lazy invite-token repository resolver.
+     * @param callable(): InviteRepository $inviteTokensResolver Lazy invite-token repository resolver.
      * @return void
      */
     public function __construct(
@@ -458,16 +459,16 @@ final class AuthController
     /**
      * Returns invite-token storage on first use so login-only requests skip it.
      *
-     * @return InviteTokenRepository Invite-token repository for invite-only registration.
+     * @return InviteRepository Invite-token repository for invite-only registration.
      */
-    private function inviteTokens(): InviteTokenRepository
+    private function inviteTokens(): InviteRepository
     {
-        if ($this->inviteTokens instanceof InviteTokenRepository) {
+        if ($this->inviteTokens instanceof InviteRepository) {
             return $this->inviteTokens;
         }
 
         $inviteTokens = ($this->inviteTokensResolver)();
-        if (!$inviteTokens instanceof InviteTokenRepository) {
+        if (!$inviteTokens instanceof InviteRepository) {
             throw new \RuntimeException('Public invite-token repository resolver returned an invalid value.');
         }
 
@@ -536,7 +537,7 @@ final class AuthController
                 $this->context->input(),
                 $this->identifierResolver,
                 $this->loginAttemptPolicy(),
-                new LoginTwoFactorFlowService()
+                new LoginChallengeFlow()
             );
         }
 
@@ -554,9 +555,9 @@ final class AuthController
             $this->loginChallengeWorkflowService = new LoginChallengeWorkflowService(
                 $this->context->config(),
                 $this->context->input(),
-                new LoginTwoFactorFlowService(),
+                new LoginChallengeFlow(),
                 new \Raven\Lib\Auth\LoginWebAuthnChallengeService(),
-                new \Raven\Lib\Auth\TwoFactorEmailDeliveryService()
+                new LoginEmailDelivery()
             );
         }
 

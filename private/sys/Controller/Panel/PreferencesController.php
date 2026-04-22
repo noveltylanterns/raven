@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Panel;
 
-use lbuchs\WebAuthn\WebAuthn;
+use lbuchs\WebAuthn\WebAuthn as VendorWebAuthn;
 use lbuchs\WebAuthn\WebAuthnException;
 use Raven\Core\Config;
 use Raven\Lib\Auth\LoginIdentifierResolver;
@@ -21,14 +21,14 @@ use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
+use Raven\Lib\View\Qr;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\PanelMediaConfigService;
 use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Security\QrCodeService;
-use Raven\Lib\Security\WebAuthnService;
+use Raven\Lib\Security\WebAuthn;
 use Raven\Lib\Transport\Response;
 
 use Raven\Lib\Transport\Redirect;
@@ -441,7 +441,7 @@ final class PreferencesController
             'issuer' => (string) ($payload['issuer'] ?? $this->totpIssuer()),
             'account' => (string) ($payload['account'] ?? 'account@local'),
             'provisioning_uri' => (string) ($payload['provisioning_uri'] ?? ''),
-            'qr_data_uri' => QrCodeService::dataUriSvgBase64((string) ($payload['provisioning_uri'] ?? ''), 220),
+            'qr_data_uri' => Qr::dataUriSvgBase64((string) ($payload['provisioning_uri'] ?? ''), 220),
         ], 200);
     }
 
@@ -789,11 +789,11 @@ final class PreferencesController
     /**
      * Creates the WebAuthn server runtime for current site config.
      *
-     * @return WebAuthn|null WebAuthn server instance, or null when unavailable.
+     * @return VendorWebAuthn|null WebAuthn server instance, or null when unavailable.
      */
-    private function createWebAuthnServer(): ?WebAuthn
+    private function createWebAuthnServer(): ?VendorWebAuthn
     {
-        return WebAuthnService::createServer(
+        return WebAuthn::createServer(
             (string) $this->config->get('site.name', 'Raven CMS'),
             (string) $this->config->get('site.domain', ''),
             $_SERVER

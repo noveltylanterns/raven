@@ -21,15 +21,16 @@ use Raven\Core\Controller\Public\ProfileController as PublicProfileController;
 use Raven\Core\Controller\Public\SharedController;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\InviteTokenRepository;
+use Raven\Core\Repository\InviteRepository;
 use Raven\Core\Repository\PageImageRepository;
 use Raven\Core\Repository\PageRepository;
 use Raven\Core\Repository\RedirectRepository;
-use Raven\Core\Repository\TaxonomyLookupRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
+use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ConfigParser;
+use Raven\Lib\Parser\TaxonomyRepoParser;
 use RuntimeException;
 
 /**
@@ -63,6 +64,7 @@ final class PublicRuntimeBuilder
         $inviteTokens = null;
         $taxonomyLookup = null;
         $channelRepository = null;
+        $channelDataParser = null;
         $groupRepository = null;
         $pageImageRepository = null;
         $pageRepository = null;
@@ -154,6 +156,19 @@ final class PublicRuntimeBuilder
         });
 
         /**
+         * Builds one shared channel parser for public read-side channel lookups.
+         */
+        $channelDataParserFactory = $memoize(static function () use (&$channelDataParser, $rvn, $channelRepositoryFactory): ChannelDataParser {
+            $channelDataParser = new ChannelDataParser(
+                $rvn['config'],
+                $rvn['input'],
+                $channelRepositoryFactory()
+            );
+
+            return $channelDataParser;
+        });
+
+        /**
          * Builds group storage for public auth/profile flows.
          */
         $groupRepositoryFactory = $memoize(static function () use (&$groupRepository, $rvn): GroupRepository {
@@ -226,8 +241,8 @@ final class PublicRuntimeBuilder
         /**
          * Builds invite-token storage only for the registration flows that need it.
          */
-        $inviteTokenRepository = $memoize(static function () use (&$inviteTokens, $rvn, $resolveAuthDb): InviteTokenRepository {
-            $inviteTokens = new InviteTokenRepository(
+        $inviteTokenRepository = $memoize(static function () use (&$inviteTokens, $rvn, $resolveAuthDb): InviteRepository {
+            $inviteTokens = new InviteRepository(
                 $resolveAuthDb(),
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
@@ -237,11 +252,11 @@ final class PublicRuntimeBuilder
         });
 
         /**
-         * Builds taxonomy lookup storage only for public routes that actually
+         * Builds taxonomy lookup parsing only for public routes that actually
          * resolve channel/category/tag slugs.
          */
-        $taxonomyLookupRepository = $memoize(static function () use (&$taxonomyLookup, $rvn, $channelRepositoryFactory): TaxonomyLookupRepository {
-            $taxonomyLookup = new TaxonomyLookupRepository(
+        $taxonomyLookupRepository = $memoize(static function () use (&$taxonomyLookup, $rvn, $channelRepositoryFactory): TaxonomyRepoParser {
+            $taxonomyLookup = new TaxonomyRepoParser(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],
@@ -292,6 +307,7 @@ final class PublicRuntimeBuilder
          * @return array<string, mixed>
          */
         $publicContentDomain = $memoize(static function () use (
+            $channelDataParserFactory,
             $channelRepositoryFactory,
             $pageImageRepositoryFactory,
             $pageRepositoryFactory,
@@ -300,6 +316,7 @@ final class PublicRuntimeBuilder
         ): array {
             return [
                 'channel' => $channelRepositoryFactory(),
+                'channel_parser' => $channelDataParserFactory(),
                 'page_images' => $pageImageRepositoryFactory(),
                 'page' => $pageRepositoryFactory(),
                 'redirect' => $redirectRepositoryFactory(),
@@ -339,6 +356,7 @@ final class PublicRuntimeBuilder
 
         $rvn['public_domain_content'] = $publicContentDomain;
         $rvn['public_domain_feed'] = $publicContentDomain;
+        $rvn['public_channel_parser'] = $channelDataParserFactory;
         $rvn['public_domain_auth'] = $publicAuthDomain;
         $rvn['public_domain_profile'] = $publicAuthDomain;
         $rvn['public_domain_form'] = $publicFormDomain;
@@ -434,7 +452,7 @@ final class PublicRuntimeBuilder
             $contentDomain = $publicContentDomain();
             $publicFeedController = new PublicFeedController(
                 $requestContextFactory(),
-                $contentDomain['channel'],
+                $contentDomain['channel_parser'],
                 $contentDomain['page'],
                 $contentDomain['taxonomy_lookup']()
             );
@@ -457,7 +475,7 @@ final class PublicRuntimeBuilder
             $formDomain = $publicFormDomain();
             $publicContentController = new PublicContentController(
                 $requestContextFactory(),
-                $contentDomain['channel'],
+                $contentDomain['channel_parser'],
                 $contentDomain['page_images'],
                 $contentDomain['page'],
                 $contentDomain['redirect'],

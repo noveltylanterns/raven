@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Security;
 
+use Raven\Lib\View\Qr;
+
 /**
  * Shared 2FA method normalization helpers used by panel and auth flows.
  */
@@ -44,13 +46,13 @@ final class TwoFactorMethodNormalizer
             ];
 
             if ($type === 'totp') {
-                $secret = TotpService::normalizeSecret((string) ($method['secret'] ?? ''));
+                $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
                 if ($secret === '') {
-                    $generated = TotpService::generateSecret($totpIssuer);
+                    $generated = Totp::generateSecret($totpIssuer);
                     $secret = is_string($generated) ? $generated : '';
                 }
 
-                if (!TotpService::isValidSecret($secret)) {
+                if (!Totp::isValidSecret($secret)) {
                     continue;
                 }
 
@@ -58,8 +60,8 @@ final class TwoFactorMethodNormalizer
                 if ($row['status'] !== 'confirmed') {
                     $row['status'] = 'pending';
                 }
-                $verificationCode = TotpService::normalizeCode((string) ($method['verification_code'] ?? ''));
-                if ($verificationCode !== '' && TotpService::verifyCode($secret, $verificationCode, 1, $totpIssuer)) {
+                $verificationCode = Totp::normalizeCode((string) ($method['verification_code'] ?? ''));
+                if ($verificationCode !== '' && Totp::verifyCode($secret, $verificationCode, 1, $totpIssuer)) {
                     $row['status'] = 'confirmed';
                 }
             } elseif ($type === 'recovery') {
@@ -258,8 +260,8 @@ final class TwoFactorMethodNormalizer
             ];
 
             if ($type === 'totp') {
-                $secret = TotpService::normalizeSecret((string) ($method['secret'] ?? ''));
-                if (!TotpService::isValidSecret($secret)) {
+                $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
+                if (!Totp::isValidSecret($secret)) {
                     continue;
                 }
                 $row['secret'] = $secret;
@@ -357,16 +359,16 @@ final class TwoFactorMethodNormalizer
             ];
 
             if ($type === 'totp') {
-                $secret = TotpService::normalizeSecret((string) ($method['secret'] ?? ''));
-                if (!TotpService::isValidSecret($secret)) {
+                $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
+                if (!Totp::isValidSecret($secret)) {
                     continue;
                 }
 
                 $row['secret'] = $secret;
-                $provisioningUri = TotpService::provisioningUri($totpIssuer, $fallbackEmail, $secret);
+                $provisioningUri = Totp::provisioningUri($totpIssuer, $fallbackEmail, $secret);
                 if ($provisioningUri !== '') {
                     $row['provisioning_uri'] = $provisioningUri;
-                    $qrDataUri = QrCodeService::dataUriSvgBase64($provisioningUri, 220);
+                    $qrDataUri = Qr::dataUriSvgBase64($provisioningUri, 220);
                     if ($qrDataUri !== '') {
                         $row['qr_data_uri'] = $qrDataUri;
                     }

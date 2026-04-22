@@ -6,7 +6,7 @@ namespace Raven\Lib\Auth\Panel;
 
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\RecoveryPhrase;
-use Raven\Lib\Security\TotpService;
+use Raven\Lib\Security\Totp;
 use Raven\Lib\Security\TwoFactorMethodNormalizer;
 
 /**
@@ -98,17 +98,17 @@ final class PanelTwoFactorPreferencesService
      */
     public function buildTotpSetupPayload(mixed $submittedSecret, string $accountEmail, string $totpIssuer): array
     {
-        $secret = TotpService::normalizeSecret((string) $submittedSecret);
-        if (!TotpService::isValidSecret($secret)) {
-            $generatedSecret = TotpService::generateSecret($totpIssuer);
+        $secret = Totp::normalizeSecret((string) $submittedSecret);
+        if (!Totp::isValidSecret($secret)) {
+            $generatedSecret = Totp::generateSecret($totpIssuer);
             $secret = is_string($generatedSecret) ? $generatedSecret : '';
         }
 
-        if (!TotpService::isValidSecret($secret)) {
+        if (!Totp::isValidSecret($secret)) {
             return ['ok' => false, 'message' => 'Unable to generate a TOTP secret.'];
         }
 
-        $provisioningUri = TotpService::provisioningUri($totpIssuer, $accountEmail, $secret);
+        $provisioningUri = Totp::provisioningUri($totpIssuer, $accountEmail, $secret);
         if ($provisioningUri === '') {
             return ['ok' => false, 'message' => 'Unable to build TOTP provisioning data.'];
         }

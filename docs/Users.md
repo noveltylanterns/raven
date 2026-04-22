@@ -123,7 +123,7 @@ Group assignment notes:
   - `private/lib/Auth/LoginUiStateService.php`
 - Persistence:
   - `private/sys/Repository/UserRepository.php`
-  - `private/sys/Repository/InviteTokenRepository.php`
+  - `private/sys/Repository/InviteRepository.php`
   - `private/sys/Repository/GroupRepository.php` (group option lookups and role constraints)
 
 ### Panel Routes
@@ -188,7 +188,7 @@ Public routes (declared in `public/index.php`):
   - Requires login + `Manage Users`.
   - Renders invite token admin/list view.
 - `userInvitesCreate(array $post)` / `userInvitesGenerate(array $post)` / `userInvitesDelete(array $post)`
-  - Validate CSRF and mutate invite-token rows through `InviteTokenRepository`.
+  - Validate CSRF and mutate invite-token rows through `InviteRepository`.
 - `Public\AuthController::login()` / `loginSubmit(array $post)` / `loginTwoFactor()` / `loginTwoFactorSubmit(array $post)` / `loginTwoFactorSelect(array $post)`
   - Render and process the public login + login-time 2FA screens.
   - Persist a sanitized post-login redirect target in `LoginUiStateService`.

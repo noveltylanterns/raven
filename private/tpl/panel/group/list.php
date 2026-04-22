@@ -19,7 +19,7 @@
 
 use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
-use Raven\Lib\View\Panel\ListWrapper;
+use Raven\Lib\View\Panel\ListCard;
 use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
@@ -166,7 +166,7 @@ $groupListToolbarItems = [
     </tbody>
 </table>
 <?php $groupsTableHtml = (string) ob_get_clean(); ?>
-<?= ListWrapper::render([
+<?= ListCard::render([
     'is_empty'            => $groups === [],
     'empty_message'       => 'No groups found.',
     'search_id'           => $groupsSearchId,

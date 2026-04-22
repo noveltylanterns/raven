@@ -24,7 +24,6 @@ use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Panel\Footer;
-use Raven\Lib\View\SiteContextBuilder;
 
 use Raven\Lib\Transport\Redirect;
 
@@ -43,7 +42,6 @@ final class AuthController
     private ?LoginUiStateService $loginUiState = null;
     private ?LoginAttemptWorkflowService $loginAttemptWorkflowService = null;
     private ?LoginChallengeWorkflowService $loginChallengeWorkflowService = null;
-    private ?SiteContextBuilder $siteContextBuilder = null;
 
     public function __construct(
         Renderer $view,
@@ -321,16 +319,12 @@ final class AuthController
      */
     private function siteData(): array
     {
-        return $this->siteContextBuilder()->panel($this->config, null, null, false);
-    }
-
-    private function siteContextBuilder(): SiteContextBuilder
-    {
-        if (!$this->siteContextBuilder instanceof SiteContextBuilder) {
-            $this->siteContextBuilder = new SiteContextBuilder();
-        }
-
-        return $this->siteContextBuilder;
+        return [
+            'name' => (string) $this->config->get('site.name', 'Raven CMS'),
+            'panel_path' => (string) $this->config->get('panel.path', 'panel'),
+            'panel_brand_name' => (string) $this->config->get('panel.brand_name', ''),
+            'panel_brand_logo' => (string) $this->config->get('panel.brand_logo', ''),
+        ];
     }
 
     /**
@@ -428,7 +422,7 @@ final class AuthController
                 $this->input,
                 $this->identifierResolver,
                 new \Raven\Lib\Auth\LoginAttemptPolicy($this->config, new \Raven\Lib\Transport\Request()),
-                new \Raven\Lib\Security\LoginTwoFactorFlowService()
+                new \Raven\Lib\Auth\LoginChallengeFlow()
             );
         }
 
@@ -441,9 +435,9 @@ final class AuthController
             $this->loginChallengeWorkflowService = new LoginChallengeWorkflowService(
                 $this->config,
                 $this->input,
-                new \Raven\Lib\Security\LoginTwoFactorFlowService(),
+                new \Raven\Lib\Auth\LoginChallengeFlow(),
                 new \Raven\Lib\Auth\LoginWebAuthnChallengeService(),
-                new \Raven\Lib\Auth\TwoFactorEmailDeliveryService()
+                new \Raven\Lib\Auth\LoginEmailDelivery()
             );
         }
 
