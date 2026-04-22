@@ -16,22 +16,28 @@ use Raven\Core\Debug\OutputProfilerResponseHook;
 use Raven\Core\Routing\Request;
 use Raven\Core\Routing\Router;
 use Raven\Core\Routing\Panel\PanelAuthRouteRegistrar;
+use Raven\Core\Routing\Panel\PanelCategoryRouteRegistrar;
+use Raven\Core\Routing\Panel\PanelChannelRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelContentRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelDashboardRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelExtensionRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelGroupRouteRegistrar;
+use Raven\Core\Routing\Panel\PanelLogRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelPreferencesRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelRedirectRouteRegistrar;
+use Raven\Core\Routing\Panel\PanelRoutingRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelRuntimeBuilder;
 use Raven\Core\Routing\Panel\PanelSystemRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelTaxonomyRouteRegistrar;
+use Raven\Core\Routing\Panel\PanelTagRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelThemeAssetResponder;
+use Raven\Core\Routing\Panel\PanelUpdateRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelUserRouteRegistrar;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Extension\Layout;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Scheduler\Cron;
+use Raven\Lib\View\Error as ViewError;
 use RuntimeException;
 
 
@@ -111,11 +117,11 @@ final class PanelController
                 throw new RuntimeException('Panel group controller factory is unavailable.');
             };
 
-        /** @var callable(): object $panelContentController */
-        $panelContentController = is_callable($rvn['panel_content_controller'] ?? null)
-            ? $rvn['panel_content_controller']
+        /** @var callable(): object $panelPageController */
+        $panelPageController = is_callable($rvn['panel_page_controller'] ?? null)
+            ? $rvn['panel_page_controller']
             : static function (): object {
-                throw new RuntimeException('Panel content controller factory is unavailable.');
+                throw new RuntimeException('Panel page controller factory is unavailable.');
             };
 
         /** @var callable(): object $panelPreferencesController */
@@ -132,11 +138,39 @@ final class PanelController
                 throw new RuntimeException('Panel config controller factory is unavailable.');
             };
 
+        /** @var callable(): object $panelLogsController */
+        $panelLogsController = is_callable($rvn['panel_logs_controller'] ?? null)
+            ? $rvn['panel_logs_controller']
+            : static function (): object {
+                throw new RuntimeException('Panel logs controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $panelRoutingController */
+        $panelRoutingController = is_callable($rvn['panel_routing_controller'] ?? null)
+            ? $rvn['panel_routing_controller']
+            : static function (): object {
+                throw new RuntimeException('Panel routing controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $panelUpdateController */
+        $panelUpdateController = is_callable($rvn['panel_update_controller'] ?? null)
+            ? $rvn['panel_update_controller']
+            : static function (): object {
+                throw new RuntimeException('Panel update controller factory is unavailable.');
+            };
+
         /** @var callable(): object $panelSystemController */
         $panelSystemController = is_callable($rvn['panel_system_controller'] ?? null)
             ? $rvn['panel_system_controller']
             : static function (): object {
                 throw new RuntimeException('Panel system controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $panelRequestContext */
+        $panelRequestContext = is_callable($rvn['panel_request_context'] ?? null)
+            ? $rvn['panel_request_context']
+            : static function (): object {
+                throw new RuntimeException('Panel request context factory is unavailable.');
             };
 
         /** @var callable(): array<string, mixed> $initializePanelRuntime */
@@ -355,18 +389,27 @@ final class PanelController
             $_SESSION['_raven_nav_page_create_channels'] = [];
         }
 
-        $renderNotFound = static function () use ($panelSystemController): void {
-            $panelSystemController()->renderPublicNotFound();
+        $renderNotFound = static function () use ($panelRequestContext): void {
+            $panelRequestContext()->renderPanelNotFound();
+        };
+
+        $renderPublicNotFound = static function () use ($rvn, $root): void {
+            (new ViewError($rvn['config'], $root))->render404();
         };
 
         $router = new Router();
         PanelAuthRouteRegistrar::register($router, $authController);
         PanelDashboardRouteRegistrar::register($router, $panelDashboardController);
-        PanelContentRouteRegistrar::register($router, $panelContentController, $rvn['input'], $renderNotFound);
-        PanelTaxonomyRouteRegistrar::register($router, $panelChannelController, $panelCategoryController, $panelTaxonomyController, $rvn['input'], $categoryEnabled, $tagEnabled, $renderNotFound);
+        PanelContentRouteRegistrar::register($router, $panelPageController, $rvn['input'], $renderNotFound);
+        PanelChannelRouteRegistrar::register($router, $panelChannelController, $rvn['input'], $renderNotFound);
+        PanelCategoryRouteRegistrar::register($router, $panelCategoryController, $rvn['input'], $categoryEnabled, $renderNotFound);
+        PanelTagRouteRegistrar::register($router, $panelTaxonomyController, $rvn['input'], $tagEnabled, $renderNotFound);
         PanelRedirectRouteRegistrar::register($router, $panelRedirectController, $rvn['input'], $renderNotFound);
         PanelUserRouteRegistrar::register($router, $panelUserController, $rvn['input'], $renderNotFound);
         PanelGroupRouteRegistrar::register($router, $panelGroupController, $rvn['input'], $renderNotFound);
+        PanelLogRouteRegistrar::register($router, $panelLogsController);
+        PanelRoutingRouteRegistrar::register($router, $panelRoutingController);
+        PanelUpdateRouteRegistrar::register($router, $panelUpdateController);
         PanelPreferencesRouteRegistrar::register($router, $panelPreferencesController);
         PanelSystemRouteRegistrar::register($router, $panelConfigController, $panelSystemController);
 
@@ -377,7 +420,7 @@ final class PanelController
             $enabledExtensionManifests,
             $extensionPermissionCatalog,
             $internalPath,
-            $panelSystemController
+            $renderPublicNotFound
         );
 
         $method = $requestMethod;
@@ -412,12 +455,7 @@ final class PanelController
 
         $dispatchResult = $router->dispatch(new Request($method, $internalPath));
         if (!$dispatchResult->isHandled()) {
-            if ($shouldInitializeFullPanelRuntime) {
-                $panelSystemController()->renderPublicNotFound();
-            } else {
-                http_response_code(404);
-                echo 'Not Found';
-            }
+            $renderPublicNotFound();
         }
 
         Cron::runIfDue(

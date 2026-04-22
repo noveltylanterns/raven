@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Controller/Public/FeedController.php
- * Split public feed/taxonomy controller for feed and taxonomy-list routes.
+ * Split public feed controller for feed routes.
  * Docs: https://raven.lanterns.io
  */
 
@@ -19,12 +19,9 @@ use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\Parser\TagRouteParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
-use Raven\Lib\View\Public\TemplateDecorator;
-use Raven\Lib\View\Public\ThemeCatalog;
-use Raven\Lib\View\Public\ThemeTemplate;
 
 /**
- * Handles split public feed and taxonomy-list routes.
+ * Handles split public feed routes.
  */
 final class FeedController
 {
@@ -32,10 +29,7 @@ final class FeedController
     private ChannelDataParser $channelParser;
     private PageDataParser $pageParser;
     private TaxonomyRepoParser $taxonomyLookupRepo;
-    private TemplateDecorator $templateDecorator;
     private PublicChannelPageRouteService $publicChannelPageRouteService;
-    private ThemeCatalog $themeCatalogService;
-    private ?ThemeTemplate $themeTemplate = null;
 
     /**
      * @param SharedController $context Shared public request context.
@@ -54,131 +48,7 @@ final class FeedController
         $this->channelParser = $channelParser;
         $this->pageParser = new PageDataParser($context->input(), $pageRepo);
         $this->taxonomyLookupRepo = $taxonomyLookupRepo;
-        $this->templateDecorator = new TemplateDecorator(
-            $context->config(),
-            $context->input(),
-            dirname(__DIR__, 4)
-        );
         $this->publicChannelPageRouteService = new PublicChannelPageRouteService($context->input());
-        $this->themeCatalogService = new ThemeCatalog(
-            dirname(__DIR__, 4) . '/public/theme',
-            $context->input(),
-            ['raven']
-        );
-    }
-
-    /**
-     * Renders category listing route `/{category_prefix}/{category_slug}/{page?}`.
-     *
-     * @param string $categorySlug Normalized category slug.
-     * @param int $pageNumber Requested page number.
-     * @return void
-     */
-    public function category(string $categorySlug, int $pageNumber = 1): void
-    {
-        $categoryPrefix = CategoryRouteParser::categoryRoutePrefix($this->context->config(), $this->context->input());
-        if ($categoryPrefix === '') {
-            $this->context->notFound();
-            return;
-        }
-
-        $category = $this->taxonomyLookupRepo->findCategoryBySlug($categorySlug);
-        if ($category === null) {
-            $this->context->notFound();
-            return;
-        }
-
-        $perPage = max(1, (int) $this->context->config()->get('category.pagination', 10));
-        $pageNumber = max(1, $pageNumber);
-        $offset = ($pageNumber - 1) * $perPage;
-        $pageResult = $this->pageParser->listPageByCategorySlug($categorySlug, $perPage, $offset);
-        $total = (int) ($pageResult['total'] ?? 0);
-        $totalPages = max(1, (int) ceil($total / $perPage));
-
-        if ($total > 0 && $pageNumber > $totalPages) {
-            $this->context->notFound();
-            return;
-        }
-
-        $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pages = $this->decoratePageListPublicPaths($pages);
-        $pages = $this->templateDecorator->decoratePageListForTemplate($pages);
-        $pagination = $this->templateDecorator->decoratePaginationForTemplate([
-            'current' => $pageNumber,
-            'total_pages' => $totalPages,
-            'total_items' => $total,
-            'base_path' => '/' . $categoryPrefix . '/' . rawurlencode($categorySlug),
-        ]);
-        $categoryTemplate = $this->themeTemplate()->resolveCategoryTemplateNameForThemeChain(
-            $categorySlug,
-            $this->publicThemesRoot(),
-            $this->currentPublicThemeSlug(),
-            dirname(__DIR__, 4) . '/private/tpl'
-        );
-
-        $this->context->renderPublic($categoryTemplate, [
-            'site' => $this->context->siteDataWithTaxonomyMetaImage($category),
-            'category' => $category,
-            'pages' => $pages,
-            'pagination' => $pagination,
-        ], 'wrapper');
-    }
-
-    /**
-     * Renders tag listing route `/{tag_prefix}/{tag_slug}/{page?}`.
-     *
-     * @param string $tagSlug Normalized tag slug.
-     * @param int $pageNumber Requested page number.
-     * @return void
-     */
-    public function tag(string $tagSlug, int $pageNumber = 1): void
-    {
-        $tagPrefix = TagRouteParser::tagRoutePrefix($this->context->config(), $this->context->input());
-        if ($tagPrefix === '') {
-            $this->context->notFound();
-            return;
-        }
-
-        $tag = $this->taxonomyLookupRepo->findTagBySlug($tagSlug);
-        if ($tag === null) {
-            $this->context->notFound();
-            return;
-        }
-
-        $perPage = max(1, (int) $this->context->config()->get('tag.pagination', 10));
-        $pageNumber = max(1, $pageNumber);
-        $offset = ($pageNumber - 1) * $perPage;
-        $pageResult = $this->pageParser->listPageByTagSlug($tagSlug, $perPage, $offset);
-        $total = (int) ($pageResult['total'] ?? 0);
-        $totalPages = max(1, (int) ceil($total / $perPage));
-
-        if ($total > 0 && $pageNumber > $totalPages) {
-            $this->context->notFound();
-            return;
-        }
-
-        $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pages = $this->decoratePageListPublicPaths($pages);
-        $pages = $this->templateDecorator->decoratePageListForTemplate($pages);
-        $pagination = $this->templateDecorator->decoratePaginationForTemplate([
-            'current' => $pageNumber,
-            'total_pages' => $totalPages,
-            'total_items' => $total,
-            'base_path' => '/' . $tagPrefix . '/' . rawurlencode($tagSlug),
-        ]);
-        $tagTemplate = $this->themeTemplate()->resolveTagTemplateNameForThemeChain(
-            $tagSlug,
-            $this->publicThemesRoot(),
-            $this->currentPublicThemeSlug(),
-            dirname(__DIR__, 4) . '/private/tpl'
-        );
-
-        $this->context->renderPublic($tagTemplate, [
-            'site' => $this->context->siteDataWithTaxonomyMetaImage($tag),
-            'tag' => $tag,
-            'pages' => $pages,
-            'pagination' => $pagination,
-        ], 'wrapper');
     }
 
     /**
@@ -677,37 +547,4 @@ final class FeedController
         return $pages;
     }
 
-    /**
-     * Returns the current active public theme slug.
-     *
-     * @return string Active public theme slug.
-     */
-    private function currentPublicThemeSlug(): string
-    {
-        return $this->themeCatalogService->activeSlugFromConfig($this->context->config());
-    }
-
-    /**
-     * Returns the public themes filesystem root.
-     *
-     * @return string Absolute public theme root.
-     */
-    private function publicThemesRoot(): string
-    {
-        return $this->themeCatalogService->root();
-    }
-
-    /**
-     * Returns the shared public theme-template service.
-     *
-     * @return ThemeTemplate Shared theme-template service.
-     */
-    private function themeTemplate(): ThemeTemplate
-    {
-        if (!$this->themeTemplate instanceof ThemeTemplate) {
-            $this->themeTemplate = new ThemeTemplate($this->context->input());
-        }
-
-        return $this->themeTemplate;
-    }
 }

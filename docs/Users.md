@@ -114,9 +114,11 @@ Group assignment notes:
 - Public auth controller:
   - `private/sys/Controller/Public/AuthController.php`
 - Public profile controller:
-  - `private/sys/Controller/Public/ProfileController.php`
+  - `private/sys/Controller/Public/UserController.php`
+- Public group controller:
+  - `private/sys/Controller/Public/GroupController.php`
 - Public content controller:
-  - `private/sys/Controller/Public/ContentController.php`
+  - `private/sys/Controller/Public/PageController.php`
 - Shared login workflow:
   - `private/lib/Auth/LoginAttemptWorkflowService.php`
   - `private/lib/Auth/LoginChallengeWorkflowService.php`
@@ -203,11 +205,13 @@ Public routes (declared in `public/index.php`):
   - Requires invite token when mode is `invite`.
   - Keeps duplicate-account and persistence failures user-generic instead of reflecting raw repository exception text.
   - Creates user via `UserRepository::save(...)` and consumes invite token atomically where possible.
-- `Public\ProfileController::profile(string $username)` / `group(string $groupSlug)`
+- `Public\UserController::profile(string $username)`
   - public profile routes use the selector configured by `user.selector`
   - selector mode `id` uses numeric user ids
   - selector mode `username` uses usernames and is only valid when username login mode is enabled
   - selector mode `string` uses each user's generated random alphanumeric `string`
+- `Public\GroupController::group(string $groupSlug)`
+  - public group routes render one group plus its public member list using the configured `group.prefix`.
   - Guest-facing profile/group payloads suppress username output entirely when the install is configured for email login.
 
 ### Data Model And Repository Behavior

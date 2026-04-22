@@ -1,10 +1,18 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Auth/LoginThrottleService.php
+ * Read-side throttle policy and bucket lookup helper for failed logins.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
 
 use PDO;
+use Raven\Lib\Scribe\LoginThrottleScribe;
 
 /**
  * Persistent login-throttle buckets keyed by identifier + client IP.
@@ -12,20 +20,36 @@ use PDO;
 final class LoginThrottleService
 {
     private PDO $rvnDb;
-    private string $driver;
     private string $prefix;
+    private LoginThrottleScribe $loginThrottleScribe;
 
+    /**
+     * Prepares the login-throttle service for read-side bucket policy checks.
+     *
+     * @param PDO $rvnDb App-database connection for throttle bucket reads.
+     * @param string $driver Active PDO driver name used by the paired write-side scribe.
+     * @param string $prefix Configured table prefix before sanitization.
+     * @return void
+     */
     public function __construct(PDO $rvnDb, string $driver, string $prefix)
     {
         $this->rvnDb = $rvnDb;
-        $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
+        $this->loginThrottleScribe = new LoginThrottleScribe($rvnDb, $driver, $this->prefix);
     }
 
+    /**
+     * Returns whether one identifier+IP bucket is currently locked.
+     *
+     * @param string $identifier Submitted login identifier for the bucket key.
+     * @param string $ipAddress Client IP address for the bucket key.
+     * @param int $windowSeconds Active failure-window length in seconds.
+     * @return bool True when the bucket remains locked for the current request.
+     */
     public function isTemporarilyLocked(string $identifier, string $ipAddress, int $windowSeconds): bool
     {
         $windowSeconds = max(1, $windowSeconds);
-        $this->pruneExpiredRows($windowSeconds, $windowSeconds);
+        $this->loginThrottleScribe->pruneExpiredRows($windowSeconds, $windowSeconds);
 
         $normalizedIdentifier = $this->normalizeIdentifier($identifier);
         $normalizedIp = $this->normalizeIp($ipAddress);
@@ -44,12 +68,22 @@ final class LoginThrottleService
 
         $firstFailedAt = (int) ($row['first_failed'] ?? 0);
         if ($firstFailedAt === 0 || ($now - $firstFailedAt) > $windowSeconds) {
-            $this->deleteRow($bucketHash);
+            $this->loginThrottleScribe->deleteRow($bucketHash);
         }
 
         return false;
     }
 
+    /**
+     * Records one failed login attempt into the throttle bucket store.
+     *
+     * @param string $identifier Submitted login identifier for the bucket key.
+     * @param string $ipAddress Client IP address for the bucket key.
+     * @param int $maxAttempts Failure threshold before lockout starts.
+     * @param int $windowSeconds Active failure-window length in seconds.
+     * @param int $lockSeconds Lockout duration in seconds after threshold is reached.
+     * @return void
+     */
     public function recordFailure(
         string $identifier,
         string $ipAddress,
@@ -60,7 +94,7 @@ final class LoginThrottleService
         $maxAttempts = max(1, $maxAttempts);
         $windowSeconds = max(1, $windowSeconds);
         $lockSeconds = max(1, $lockSeconds);
-        $this->pruneExpiredRows($windowSeconds, $lockSeconds);
+        $this->loginThrottleScribe->pruneExpiredRows($windowSeconds, $lockSeconds);
 
         $normalizedIdentifier = $this->normalizeIdentifier($identifier);
         $normalizedIp = $this->normalizeIp($ipAddress);
@@ -81,7 +115,7 @@ final class LoginThrottleService
             ? ($now + $lockSeconds)
             : 0;
 
-        $this->upsertRow(
+        $this->loginThrottleScribe->upsertRow(
             $bucketHash,
             $normalizedIdentifier,
             $normalizedIp,
@@ -92,12 +126,19 @@ final class LoginThrottleService
         );
     }
 
+    /**
+     * Clears one identifier+IP throttle bucket after a successful login.
+     *
+     * @param string $identifier Submitted login identifier for the bucket key.
+     * @param string $ipAddress Client IP address for the bucket key.
+     * @return void
+     */
     public function clearFailures(string $identifier, string $ipAddress): void
     {
         $normalizedIdentifier = $this->normalizeIdentifier($identifier);
         $normalizedIp = $this->normalizeIp($ipAddress);
         $bucketHash = $this->bucketHash($normalizedIdentifier, $normalizedIp);
-        $this->deleteRow($bucketHash);
+        $this->loginThrottleScribe->deleteRow($bucketHash);
     }
 
     /**
@@ -115,94 +156,6 @@ final class LoginThrottleService
         $row = $stmt->fetch();
 
         return is_array($row) ? $row : null;
-    }
-
-    private function upsertRow(
-        string $bucketHash,
-        string $normalizedIdentifier,
-        string $normalizedIp,
-        int $firstFailedAt,
-        int $lastFailedAt,
-        int $failureCount,
-        int $lockedUntil
-    ): void {
-        $table = $this->tableName();
-        $nowText = gmdate('Y-m-d H:i:s');
-        $params = [
-            ':bucket_hash' => $bucketHash,
-            ':user' => $normalizedIdentifier,
-            ':ip_address' => $normalizedIp,
-            ':first_failed' => $firstFailedAt,
-            ':last_failed' => $lastFailedAt,
-            ':failure_count' => $failureCount,
-            ':locked_until' => $lockedUntil,
-            ':created' => $nowText,
-            ':updated' => $nowText,
-        ];
-
-        $sql = 'INSERT INTO ' . $table . ' (
-                    bucket_hash, user, ip_address,
-                    first_failed, last_failed, failure_count, locked_until,
-                    created, updated
-                ) VALUES (
-                    :bucket_hash, :user, :ip_address,
-                    :first_failed, :last_failed, :failure_count, :locked_until,
-                    :created, :updated
-                ) ' . $this->upsertConflictClause();
-
-        $stmt = $this->rvnDb->prepare($sql);
-        $stmt->execute($params);
-    }
-
-    private function upsertConflictClause(): string
-    {
-        if ($this->driver === 'mysql') {
-            return 'ON DUPLICATE KEY UPDATE
-                    user = VALUES(user),
-                    ip_address = VALUES(ip_address),
-                    first_failed = VALUES(first_failed),
-                    last_failed = VALUES(last_failed),
-                    failure_count = VALUES(failure_count),
-                    locked_until = VALUES(locked_until),
-                    updated = VALUES(updated)';
-        }
-
-        return 'ON CONFLICT (bucket_hash) DO UPDATE SET
-                user = excluded.user,
-                ip_address = excluded.ip_address,
-                first_failed = excluded.first_failed,
-                last_failed = excluded.last_failed,
-                failure_count = excluded.failure_count,
-                locked_until = excluded.locked_until,
-                updated = excluded.updated';
-    }
-
-    private function deleteRow(string $bucketHash): void
-    {
-        $stmt = $this->rvnDb->prepare(
-            'DELETE FROM ' . $this->tableName() . '
-             WHERE bucket_hash = :bucket_hash'
-        );
-        $stmt->execute([':bucket_hash' => $bucketHash]);
-    }
-
-    private function pruneExpiredRows(int $windowSeconds, int $lockSeconds): void
-    {
-        $windowSeconds = max(1, $windowSeconds);
-        $lockSeconds = max(1, $lockSeconds);
-        $retentionSeconds = max($windowSeconds, $lockSeconds, 86400);
-        $now = time();
-        $staleBefore = $now - $retentionSeconds;
-
-        $stmt = $this->rvnDb->prepare(
-            'DELETE FROM ' . $this->tableName() . '
-             WHERE locked_until <= :now
-               AND last_failed < :stale_before'
-        );
-        $stmt->execute([
-            ':now' => $now,
-            ':stale_before' => $staleBefore,
-        ]);
     }
 
     private function normalizeIdentifier(string $identifier): string

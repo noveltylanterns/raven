@@ -35,7 +35,7 @@ final class PanelExtensionRouteRegistrar
      * @param array<string, array<string, mixed>> $enabledExtensionManifests Enabled extension manifests keyed by directory.
      * @param array<string, array<string, mixed>> $extensionPermissionCatalog Panel extension permission catalog keyed by directory.
      * @param string $internalPath Normalized panel-internal request path.
-     * @param callable(): object $panelSystemController Lazy system-controller factory used for stock public 404 responses.
+     * @param callable(): void $renderPublicNotFound Renders the stock public 404 response for guest/extension gate failures.
      * @return void
      */
     public static function register(
@@ -45,7 +45,7 @@ final class PanelExtensionRouteRegistrar
         array $enabledExtensionManifests,
         array $extensionPermissionCatalog,
         string $internalPath,
-        callable $panelSystemController
+        callable $renderPublicNotFound
     ): void {
         if ($enabledExtensions === []) {
             return;
@@ -95,16 +95,14 @@ final class PanelExtensionRouteRegistrar
             $panelUrl,
             $syncPanelIdentity,
             $isGuestPanelLoginEntryInternalPath,
-            $panelSystemController
+            $renderPublicNotFound
         ): void {
             (new PanelSessionGuard())->requirePanelLogin(
                 $rvn['auth'],
                 $isGuestPanelLoginEntryInternalPath(),
                 $panelUrl('/login'),
                 $panelUrl('/login/2fa'),
-                static function () use ($panelSystemController): void {
-                    $panelSystemController()->renderPublicNotFound();
-                }
+                $renderPublicNotFound
             );
             $syncPanelIdentity();
         };
@@ -254,10 +252,10 @@ final class PanelExtensionRouteRegistrar
 
             $extensionRequirePanelAccess = $requirePanelLoginForExtension;
             if ($isSystemType) {
-                $extensionRequirePanelAccess = static function () use ($requirePanelLoginForExtension, $rvn, $panelSystemController): void {
+                $extensionRequirePanelAccess = static function () use ($requirePanelLoginForExtension, $rvn, $renderPublicNotFound): void {
                     $requirePanelLoginForExtension();
                     if (!$rvn['auth']->hasPanelPermissionBit(PanelAccess::CONFIGURATION_VIEW)) {
-                        $panelSystemController()->renderPublicNotFound();
+                        $renderPublicNotFound();
                         exit;
                     }
                 };
@@ -266,11 +264,11 @@ final class PanelExtensionRouteRegistrar
                     $requirePanelLoginForExtension,
                     $hasPanelPermissionBit,
                     $requiredPermissionBit,
-                    $panelSystemController
+                    $renderPublicNotFound
                 ): void {
                     $requirePanelLoginForExtension();
                     if ($requiredPermissionBit <= 0 || !$hasPanelPermissionBit($requiredPermissionBit)) {
-                        $panelSystemController()->renderPublicNotFound();
+                        $renderPublicNotFound();
                         exit;
                     }
                 };
@@ -281,7 +279,7 @@ final class PanelExtensionRouteRegistrar
                 $hasPanelPermissionBit,
                 $extensionPermissionBits,
                 $requiredPermissionBit,
-                $panelSystemController
+                $renderPublicNotFound
             ): void {
                 $requirePanelLoginForExtension();
 
@@ -294,7 +292,7 @@ final class PanelExtensionRouteRegistrar
                 }
 
                 if ($targetBit <= 0 || !$hasPanelPermissionBit($targetBit)) {
-                    $panelSystemController()->renderPublicNotFound();
+                    $renderPublicNotFound();
                     exit;
                 }
             };
@@ -305,9 +303,7 @@ final class PanelExtensionRouteRegistrar
                 'requirePanelLogin' => $extensionRequirePanelAccess,
                 'requireExtensionPermission' => $requireExtensionPermission,
                 'currentUserTheme' => $currentUserTheme,
-                'renderPublicNotFound' => static function () use ($panelSystemController): void {
-                    $panelSystemController()->renderPublicNotFound();
-                },
+                'renderPublicNotFound' => $renderPublicNotFound,
                 'extensionServices' => is_callable($rvn['extension_services_for'] ?? null)
                     ? $rvn['extension_services_for']
                     : static fn (?string $extensionDirectory = null): array => [],

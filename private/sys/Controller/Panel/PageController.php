@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Controller/Panel/ContentController.php
- * Panel sub-controller for page content management routes.
+ * ~/private/sys/Controller/Panel/PageController.php
+ * Panel sub-controller for page management routes.
  * Docs: https://raven.lanterns.io
  */
 
@@ -51,10 +51,10 @@ use Raven\Lib\View\Panel\PanelPost;
  *
  * Owns: page list, page create/edit, page save, gallery image upload/delete,
  * and page delete. Extracted from the legacy monolithic PanelController as the
- * content seam — all routes that operate on Page records and their associated
+ * page seam — all routes that operate on Page records and their associated
  * gallery media live here.
  */
-final class ContentController
+final class PageController
 {
     private SharedController $context;
     private Config $config;

@@ -16,7 +16,7 @@ namespace Raven\Lib\View\Panel;
  *
  * Keeps TinyMCE asset URLs and gallery-item payload building out of
  * the shared Editor class and out of the page/edit template so they
- * are only wired up in ContentController, the one controller that
+ * are only wired up in PageController, the one controller that
  * actually serves the TinyMCE editor. No injected dependencies —
  * all methods are stateless.
  */

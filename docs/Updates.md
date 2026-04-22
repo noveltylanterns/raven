@@ -7,6 +7,12 @@ Maintenance note: keep this file updated whenever the panel updater routes, sour
 - `GET /panel/update` automatically checks the configured source on page load.
 - `POST /panel/update/action` persists the selected source configuration and runs one updater action.
 
+## Key Files
+
+- `private/sys/Controller/Panel/UpdateController.php`
+- `private/sys/Routing/Panel/PanelUpdateRouteRegistrar.php`
+- `private/tpl/panel/update.php`
+
 ## Source Selection
 
 Raven persists updater source settings in `update.source.*`:

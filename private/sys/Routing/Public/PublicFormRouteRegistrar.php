@@ -23,19 +23,19 @@ final class PublicFormRouteRegistrar
      * Registers the embedded-form submission route family.
      *
      * @param Router $router Mutable router receiving the form route.
-     * @param callable(): object $publicFormController Lazy public-form controller factory.
+     * @param callable(): object $publicPageController Lazy public-page controller factory.
      * @param callable(): object $publicRequestContext Lazy public request-context factory.
      * @param InputSanitizer $input Shared input normalizer for route payloads.
      * @return void
      */
     public static function register(
         Router $router,
-        callable $publicFormController,
+        callable $publicPageController,
         callable $publicRequestContext,
         InputSanitizer $input
     ): void {
         // This route is extension-agnostic and remains globally available to embedded forms.
-        $router->add('POST', '/forms/submit', static function () use ($publicFormController, $publicRequestContext, $input): void {
+        $router->add('POST', '/forms/submit', static function () use ($publicPageController, $publicRequestContext, $input): void {
             $type = $input->slug((string) ($_POST['_rvn_form_type'] ?? ''));
             $slug = $input->slug((string) ($_POST['_rvn_form_slug'] ?? ''));
             if ($type === null || $slug === null) {
@@ -43,7 +43,7 @@ final class PublicFormRouteRegistrar
                 return;
             }
 
-            $publicFormController()->submitEmbeddedForm($type, $slug);
+            $publicPageController()->submitEmbeddedForm($type, $slug);
         });
     }
 }

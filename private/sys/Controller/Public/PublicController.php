@@ -16,13 +16,17 @@ use Raven\Core\Debug\OutputProfilerResponseHook;
 use Raven\Core\Routing\Request;
 use Raven\Core\Routing\Router;
 use Raven\Core\Routing\Public\PublicAuthRouteRegistrar;
+use Raven\Core\Routing\Public\PublicCategoryRouteRegistrar;
+use Raven\Core\Routing\Public\PublicChannelRouteRegistrar;
 use Raven\Core\Routing\Public\PublicContentRouteRegistrar;
 use Raven\Core\Routing\Public\PublicExtensionRouteRegistrar;
 use Raven\Core\Routing\Public\PublicFeedRouteRegistrar;
 use Raven\Core\Routing\Public\PublicFormRouteRegistrar;
+use Raven\Core\Routing\Public\PublicGroupRouteRegistrar;
 use Raven\Core\Routing\Public\PublicProfileRouteRegistrar;
 use Raven\Core\Routing\Public\PublicRouteConfig;
 use Raven\Core\Routing\Public\PublicRuntimeBuilder;
+use Raven\Core\Routing\Public\PublicTagRouteRegistrar;
 use Raven\Lib\Scheduler\Cron;
 use RuntimeException;
 
@@ -144,11 +148,11 @@ final class PublicController
             $canRenderPublicProfiler
         );
 
-        /** @var callable(): object $publicContentController */
-        $publicContentController = is_callable($rvn['public_content_controller'] ?? null)
-            ? $rvn['public_content_controller']
+        /** @var callable(): object $publicPageController */
+        $publicPageController = is_callable($rvn['public_page_controller'] ?? null)
+            ? $rvn['public_page_controller']
             : static function (): object {
-                throw new RuntimeException('Public content controller factory is unavailable.');
+                throw new RuntimeException('Public page controller factory is unavailable.');
             };
 
         /** @var callable(): object $publicAuthController */
@@ -158,18 +162,32 @@ final class PublicController
                 throw new RuntimeException('Public auth controller factory is unavailable.');
             };
 
-        /** @var callable(): object $publicProfileController */
-        $publicProfileController = is_callable($rvn['public_profile_controller'] ?? null)
-            ? $rvn['public_profile_controller']
+        /** @var callable(): object $publicUserController */
+        $publicUserController = is_callable($rvn['public_user_controller'] ?? null)
+            ? $rvn['public_user_controller']
             : static function (): object {
-                throw new RuntimeException('Public profile controller factory is unavailable.');
+                throw new RuntimeException('Public user controller factory is unavailable.');
             };
 
-        /** @var callable(): object $publicFormController */
-        $publicFormController = is_callable($rvn['public_form_controller'] ?? null)
-            ? $rvn['public_form_controller']
+        /** @var callable(): object $publicCategoryController */
+        $publicCategoryController = is_callable($rvn['public_category_controller'] ?? null)
+            ? $rvn['public_category_controller']
             : static function (): object {
-                throw new RuntimeException('Public form controller factory is unavailable.');
+                throw new RuntimeException('Public category controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $publicChannelController */
+        $publicChannelController = is_callable($rvn['public_channel_controller'] ?? null)
+            ? $rvn['public_channel_controller']
+            : static function (): object {
+                throw new RuntimeException('Public channel controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $publicGroupController */
+        $publicGroupController = is_callable($rvn['public_group_controller'] ?? null)
+            ? $rvn['public_group_controller']
+            : static function (): object {
+                throw new RuntimeException('Public group controller factory is unavailable.');
             };
 
         /** @var callable(): object $publicFeedController */
@@ -177,6 +195,13 @@ final class PublicController
             ? $rvn['public_feed_controller']
             : static function (): object {
                 throw new RuntimeException('Public feed controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $publicTagController */
+        $publicTagController = is_callable($rvn['public_tag_controller'] ?? null)
+            ? $rvn['public_tag_controller']
+            : static function (): object {
+                throw new RuntimeException('Public tag controller factory is unavailable.');
             };
 
         /** @var callable(): object $publicRequestContext */
@@ -191,11 +216,15 @@ final class PublicController
         $router = new Router();
 
         PublicAuthRouteRegistrar::register($router, $publicAuthController);
-        PublicFormRouteRegistrar::register($router, $publicFormController, $publicRequestContext, $input);
+        PublicFormRouteRegistrar::register($router, $publicPageController, $publicRequestContext, $input);
         PublicExtensionRouteRegistrar::register($router, $rvn, $publicRequestContext, $input);
+        PublicCategoryRouteRegistrar::register($router, $publicCategoryController, $publicRequestContext, $input, $routeConfig);
+        PublicChannelRouteRegistrar::register($router, $publicChannelController, $publicRequestContext, $input, $routeConfig);
         PublicFeedRouteRegistrar::register($router, $publicFeedController, $publicRequestContext, $input, $routeConfig);
-        PublicProfileRouteRegistrar::register($router, $publicProfileController, $publicRequestContext, $input, $routeConfig);
-        PublicContentRouteRegistrar::register($router, $publicContentController, $publicRequestContext, $input, $routeConfig);
+        PublicProfileRouteRegistrar::register($router, $publicUserController, $publicRequestContext, $input, $routeConfig);
+        PublicGroupRouteRegistrar::register($router, $publicGroupController, $publicRequestContext, $input, $routeConfig);
+        PublicTagRouteRegistrar::register($router, $publicTagController, $publicRequestContext, $input, $routeConfig);
+        PublicContentRouteRegistrar::register($router, $publicPageController, $publicRequestContext, $input, $routeConfig);
 
         $method = $requestMethod;
         $path = \Raven\Lib\Transport\Request::path();

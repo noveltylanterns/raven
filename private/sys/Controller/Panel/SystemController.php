@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Controller/Panel/SystemController.php
- * Split panel system controller for configuration, routing, update, logs, themes, and extensions.
+ * Split panel system controller for themes and extensions.
  * Docs: https://raven.lanterns.io
  */
 
@@ -14,22 +14,9 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Config;
 use Raven\Core\Database\ConnectionFactory;
-use Raven\Core\Logger;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\PageRepository;
-use Raven\Core\Repository\RedirectRepository;
-use Raven\Core\Repository\SetRepository;
-use Raven\Core\Repository\UserRepository;
-use Raven\Core\Routing\Panel\RoutingInventoryBuilder;
 use Raven\Lib\Archive\Folder as ArchiveDelete;
 use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
-use Raven\Lib\Format\Csv;
-use Raven\Lib\Format\Git;
-use Raven\Lib\Archive\Update as ArchiveUpdate;
-use Raven\Lib\Archive\Upstream;
-use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
 use Raven\Lib\Extension\ExtensionStateStore;
@@ -38,20 +25,8 @@ use Raven\Lib\Extension\ExtensionStorageProvisioner;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
-use Raven\Lib\Parser\CategoryRouteParser;
-use Raven\Lib\Parser\ChannelDataParser;
-use Raven\Lib\Parser\ChannelRouteParser;
-use Raven\Lib\Parser\FeedRouteParser;
-use Raven\Lib\Parser\GroupRouteParser;
-use Raven\Lib\Parser\PageDataParser;
-use Raven\Lib\Parser\RedirectDataParser;
-use Raven\Lib\Parser\TagRouteParser;
-use Raven\Lib\Parser\TaxonomyRepoParser;
-use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Upload;
-use Raven\Lib\View\Panel\PanelRoutingPreviewService;
-use Raven\Lib\View\Error as ViewError;
 use Raven\Lib\View\Theme;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\View\Public\ThemeCatalog;
@@ -60,11 +35,10 @@ use Raven\Lib\View\Public\ThemeGenerator;
 /**
  * Handles split panel system-management routes.
  *
- * Owns the remaining panel administration seam: updater, routing inventory,
- * event logs, public-theme management, extension management, and shared panel
- * fallback rendering. The configuration editor now has its own dedicated
- * `ConfigController`, while shared auth/flash/render state stays centralized in
- * `SharedController`.
+ * Owns the remaining panel administration seam: public-theme management and
+ * extension management. The configuration editor, updater, routing
+ * diagnostics, and event-log routes now live on dedicated split controllers,
+ * while shared auth/flash/render state stays centralized in `SharedController`.
  */
 final class SystemController
 {
@@ -72,62 +46,25 @@ final class SystemController
     private Config $config;
     private InputSanitizer $input;
     private string $root;
-    private ChannelRepository $channelRepo;
-    private PageRepository $pageRepo;
-    private RedirectRepository $redirectRepo;
-    private UserRepository $userRepo;
-    /** @var Closure(): SetRepository */
-    private Closure $categorySetRepoResolver;
-    private ?SetRepository $categorySetRepo = null;
-    /** @var Closure(): SetRepository */
-    private Closure $tagSetRepoResolver;
-    private ?SetRepository $tagSetRepo = null;
-    /** @var Closure(): TaxonomyRepoParser */
-    private Closure $taxonomyLookupRepoResolver;
-    private ?TaxonomyRepoParser $taxonomyLookupRepo = null;
-    /** @var Closure(): Logger */
-    private Closure $loggerResolver;
-    private ?Logger $logger = null;
     /** @var Closure(string): array<string, mixed> */
     private Closure $extensionServicesFor;
-    private LoginIdentifierResolver $identifierResolver;
     private ?ArchivePackage $archivePackages = null;
     private ?ExtensionStateStore $extensionStateStore = null;
     private ?ExtensionScaffoldService $extensionScaffoldService = null;
     private ?ThemeGenerator $themeGenerator = null;
-    private ?RoutingInventoryBuilder $routingInventoryBuilder = null;
     private ?ExtensionPermissionCatalogService $extensionPermissionCatalogService = null;
     private ?ExtensionStorageProvisioner $extensionStorageProvisioner = null;
     private ?ExtensionBootstrapContractResolver $extensionBootstrapContractResolver = null;
-    private ?ChannelDataParser $channelParser = null;
-    private ?FeedRouteParser $feedParser = null;
-    private ?GroupRouteParser $groupParser = null;
-    private ?PageDataParser $pageParser = null;
-    private ?RedirectDataParser $redirectParser = null;
-    private ?UserDataParser $userParser = null;
     private ?ExtensionCatalogService $extensionCatalogService = null;
-    private ?PanelRoutingPreviewService $panelRoutingPreviewService = null;
     private ?ThemeCatalog $themeCatalogService = null;
     private ?ArchiveInstall $packageInstallWorkflowService = null;
     private ?ArchiveDelete $directoryTreeService = null;
-    private ?Csv $csvHandler = null;
-    private ?Git $gitArchiveHandler = null;
-    private ?Upstream $updateSourceResolver = null;
-    private ?ArchiveUpdate $updateWorkflowService = null;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param Config $config Runtime configuration reader.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for filesystem-backed admin workflows.
-     * @param ChannelRepository $channelRepo Channel repository for config and routing views.
-     * @param PageRepository $pageRepo Page repository for routing inventory rows.
-     * @param RedirectRepository $redirectRepo Redirect repository for routing inventory rows.
-     * @param UserRepository $userRepo User repository for routing inventory rows.
-     * @param callable(): SetRepository $categorySetRepoResolver Lazy category-set repository resolver.
-     * @param callable(): SetRepository $tagSetRepoResolver Lazy tag-set repository resolver.
-     * @param callable(): TaxonomyRepoParser $taxonomyLookupRepoResolver Lazy taxonomy lookup parser resolver.
-     * @param callable(): Logger $loggerResolver Lazy event logger resolver.
      * @param callable(string): array<string, mixed> $extensionServicesFor Lazy per-extension services resolver.
      * @return void
      */
@@ -136,189 +73,13 @@ final class SystemController
         Config $config,
         InputSanitizer $input,
         string $root,
-        ChannelRepository $channelRepo,
-        PageRepository $pageRepo,
-        RedirectRepository $redirectRepo,
-        UserRepository $userRepo,
-        callable $categorySetRepoResolver,
-        callable $tagSetRepoResolver,
-        callable $taxonomyLookupRepoResolver,
-        callable $loggerResolver,
         callable $extensionServicesFor
     ) {
         $this->context = $context;
         $this->config = $config;
         $this->input = $input;
         $this->root = rtrim($root, '/\\');
-        $this->channelRepo = $channelRepo;
-        $this->pageRepo = $pageRepo;
-        $this->redirectRepo = $redirectRepo;
-        $this->userRepo = $userRepo;
-        $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
-        $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
-        $this->taxonomyLookupRepoResolver = Closure::fromCallable($taxonomyLookupRepoResolver);
-        $this->loggerResolver = Closure::fromCallable($loggerResolver);
         $this->extensionServicesFor = Closure::fromCallable($extensionServicesFor);
-        $this->identifierResolver = new LoginIdentifierResolver();
-    }
-
-    /**
-     * Renders the updater page with a live source comparison.
-     *
-     * @return void
-     */
-    public function update(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('update', 'view')) {
-            return;
-        }
-
-        $source = $this->updateSourceResolver()->fromConfig($this->config->all());
-        $result = $this->updateWorkflowService()->compare($source);
-        $this->renderUpdatePage($source, $result, null, null, false);
-    }
-
-    /**
-     * Handles update actions and persists the selected updater source config.
-     *
-     * @param array<string, mixed> $post Submitted form payload.
-     * @return void
-     */
-    public function updateAction(array $post): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('update', 'view')) {
-            return;
-        }
-
-        $source = $this->updateSourceResolver()->fromPost(
-            $post,
-            $this->updateSourceResolver()->fromConfig($this->config->all())
-        );
-        $allowOverwrite = ((string) ($post['allow_overwrite'] ?? '')) === '1';
-        $error = null;
-        $success = null;
-
-        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
-            $error = 'Invalid CSRF token.';
-            $result = $this->updateWorkflowService()->compare($source);
-            $this->renderUpdatePage($source, $result, $success, $error, $allowOverwrite);
-            return;
-        }
-
-        $sourceErrors = $this->updateSourceResolver()->validationErrors($source);
-        if ($sourceErrors !== []) {
-            $error = implode(' ', $sourceErrors);
-            $result = $this->updateWorkflowService()->compare($source);
-            $this->renderUpdatePage($source, $result, $success, $error, $allowOverwrite);
-            return;
-        }
-
-        try {
-            ConfigScribe::persistValue(
-                $this->config->path(),
-                $this->config->all(),
-                'update.source',
-                [
-                    'mode' => (string) ($source['mode'] ?? 'github_mirror'),
-                    'github_repo' => (string) ($source['github_repo'] ?? 'noveltylanterns/raven'),
-                    'repo_url' => (string) ($source['repo_url'] ?? ''),
-                ]
-            );
-            $this->config = new Config($this->config->path());
-        } catch (\RuntimeException $exception) {
-            $error = 'Failed to save updater source settings: ' . $exception->getMessage();
-            $result = $this->updateWorkflowService()->compare($source);
-            $this->renderUpdatePage($source, $result, $success, $error, $allowOverwrite);
-            return;
-        }
-
-        $action = strtolower(trim((string) ($post['update_action'] ?? 'check')));
-        if (!in_array($action, ['check', 'dry_run', 'update_now'], true)) {
-            $action = 'check';
-        }
-
-        $result = match ($action) {
-            'dry_run' => $this->updateWorkflowService()->dryRun($source, $allowOverwrite),
-            'update_now' => $this->updateWorkflowService()->update($source, $allowOverwrite),
-            default => $this->updateWorkflowService()->compare($source),
-        };
-
-        if ((bool) ($result['ok'] ?? false)) {
-            $success = trim((string) ($result['message'] ?? ''));
-        } else {
-            $error = trim((string) ($result['message'] ?? 'Update action failed.'));
-        }
-
-        $this->renderUpdatePage($source, $result, $success, $error, $allowOverwrite);
-    }
-
-    /**
-     * Renders the routing inventory page.
-     *
-     * @return void
-     */
-    public function routing(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('routing', 'view')) {
-            return;
-        }
-
-        $routeRows = $this->routingRowsForPanel();
-        $summary = [
-            'total' => count($routeRows),
-            'page' => count(array_filter($routeRows, static fn (array $row): bool => (string) ($row['type_key'] ?? '') === 'page')),
-            'channel' => count(array_filter($routeRows, static fn (array $row): bool => (string) ($row['type_key'] ?? '') === 'channel')),
-            'redirect' => count(array_filter($routeRows, static fn (array $row): bool => (string) ($row['type_key'] ?? '') === 'redirect')),
-            'conflicts' => count(array_filter($routeRows, static fn (array $row): bool => !empty($row['is_conflict']))),
-        ];
-        $initialSearch = $this->input->text(is_string($_GET['search'] ?? null) ? $_GET['search'] : null, 200);
-
-        $this->context->renderPanel('panel/routing', [
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
-            'section' => 'routing',
-            'pageTitle' => 'Routing Table',
-            'routeRows' => $routeRows,
-            'routeSummary' => $summary,
-            'initialSearch' => $initialSearch,
-        ]);
-    }
-
-    /**
-     * Exports routing inventory rows as CSV.
-     *
-     * @return void
-     */
-    public function routingExport(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('routing', 'view')) {
-            return;
-        }
-
-        $rows = $this->routingRowsForPanel();
-        $filename = 'routing-inventory-' . gmdate('Ymd-His') . '.csv';
-        $this->csvHandler()->streamToOutput(
-            $filename,
-            (static function (array $rows): \Generator {
-                foreach ($rows as $row) {
-                    yield [
-                        (string) ($row['type_label'] ?? ''),
-                        (string) ($row['source_label'] ?? ''),
-                        (string) ($row['public_url'] ?? ''),
-                        (string) ($row['target_url'] ?? ''),
-                        (string) ($row['status_label'] ?? ''),
-                        (string) ($row['notes'] ?? ''),
-                        !empty($row['is_conflict']) ? 'Yes' : 'No',
-                    ];
-                }
-            })($rows),
-            ['Type', 'Title', 'Public URL', 'Target URL', 'Status', 'Notes', 'Conflict']
-        );
     }
 
     /**
@@ -1294,129 +1055,6 @@ final class SystemController
     }
 
     /**
-     * Renders the event log viewer.
-     *
-     * @return void
-     */
-    public function logs(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('logs', 'view')) {
-            return;
-        }
-
-        $severity = $this->input->text($_GET['severity'] ?? null, 10) ?? '';
-        $severity = in_array($severity, ['error', 'warn', 'info'], true) ? $severity : '';
-        $search = $this->input->text($_GET['search'] ?? null, 200) ?? '';
-
-        $filters = [];
-        if ($severity !== '') {
-            $filters['severity'] = $severity;
-        }
-        if ($search !== '') {
-            $filters['search'] = $search;
-        }
-
-        $perPage = 50;
-        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $totalItems = $this->logger()->count($filters);
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
-        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $requestedPage = $pagination['current'];
-        }
-
-        $rows = $this->logger()->query($filters, $perPage, $pagination['offset']);
-        $paginationQuery = [];
-        if ($severity !== '') {
-            $paginationQuery['severity'] = $severity;
-        }
-        if ($search !== '') {
-            $paginationQuery['search'] = $search;
-        }
-
-        $this->context->renderPanel('panel/logs', [
-            'rows' => $rows,
-            'filters' => ['severity' => $severity, 'search' => $search],
-            'pagination' => $this->context->panelPaginationViewData('/logs', $pagination, $paginationQuery),
-            'totalItems' => $totalItems,
-            'loggingEnabled' => $this->logger()->isEnabled('error') || $this->logger()->isEnabled('warn') || $this->logger()->isEnabled('info'),
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
-            'section' => 'logs',
-            'pageTitle' => 'Event Log',
-            'canClear' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::CONFIGURATION_DELETE),
-        ]);
-    }
-
-    /**
-     * Exports the event log as CSV.
-     *
-     * @return void
-     */
-    public function logsExport(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('logs', 'view')) {
-            return;
-        }
-
-        $severity = $this->input->text($_GET['severity'] ?? null, 10) ?? '';
-        $severity = in_array($severity, ['error', 'warn', 'info'], true) ? $severity : '';
-        $search = $this->input->text($_GET['search'] ?? null, 200) ?? '';
-
-        $filters = [];
-        if ($severity !== '') {
-            $filters['severity'] = $severity;
-        }
-        if ($search !== '') {
-            $filters['search'] = $search;
-        }
-
-        $rows = $this->logger()->allForExport($filters);
-        $filename = 'event-log-' . gmdate('Ymd-His') . '.csv';
-        $this->csvHandler()->streamToOutput(
-            $filename,
-            (static function (array $rows): \Generator {
-                foreach ($rows as $row) {
-                    yield [
-                        (string) ($row['id'] ?? ''),
-                        (string) ($row['logged_at'] ?? ''),
-                        (string) ($row['severity'] ?? ''),
-                        (string) ($row['channel'] ?? ''),
-                        (string) ($row['message'] ?? ''),
-                        (string) ($row['context'] ?? ''),
-                    ];
-                }
-            })($rows),
-            ['ID', 'Logged At', 'Severity', 'Channel', 'Message', 'Context']
-        );
-    }
-
-    /**
-     * Clears all event log entries.
-     *
-     * @return void
-     */
-    public function logsClear(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('logs', 'delete')) {
-            return;
-        }
-
-        $post = $_POST;
-        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
-            $this->context->flash('error', 'Invalid CSRF token.');
-            Redirect::redirect($this->context->panelUrl('/logs'));
-        }
-
-        $deleted = $this->logger()->clear();
-        $this->context->flash('success', 'Event log cleared (' . $deleted . ' ' . ($deleted === 1 ? 'entry' : 'entries') . ' removed).');
-        Redirect::redirect($this->context->panelUrl('/logs'));
-    }
-
-    /**
      * Returns extension permission metadata for matching directories.
      *
      * @param array<int, string> $directoryFilter Optional directory whitelist.
@@ -1432,344 +1070,6 @@ final class SystemController
         return $this->extensionCatalogService()->panelPermissionMapForDirectories(
             $directoryFilter,
             fn (string $extensionPath): array => $this->readExtensionManifest($extensionPath)
-        );
-    }
-
-    /**
-     * Renders the active public theme's 404 page with wrapper layout.
-     *
-     * Unauthenticated panel access and extension permission failures use the
-     * public 404 view so the panel URL structure is not exposed to guests.
-     *
-     * @return void
-     */
-    public function renderPublicNotFound(): void
-    {
-        (new ViewError($this->config, $this->root))->render404();
-    }
-
-    /**
-     * Returns the category-set repository on first use.
-     *
-     * @return SetRepository Category-set repository.
-     */
-    private function categorySetRepo(): SetRepository
-    {
-        if ($this->categorySetRepo instanceof SetRepository) {
-            return $this->categorySetRepo;
-        }
-
-        $categorySetRepo = ($this->categorySetRepoResolver)();
-        if (!$categorySetRepo instanceof SetRepository) {
-            throw new \RuntimeException('Panel category-set repository resolver returned an invalid value.');
-        }
-
-        $this->categorySetRepo = $categorySetRepo;
-        return $this->categorySetRepo;
-    }
-
-    /**
-     * Returns the tag-set repository on first use.
-     *
-     * @return SetRepository Tag-set repository.
-     */
-    private function tagSetRepo(): SetRepository
-    {
-        if ($this->tagSetRepo instanceof SetRepository) {
-            return $this->tagSetRepo;
-        }
-
-        $tagSetRepo = ($this->tagSetRepoResolver)();
-        if (!$tagSetRepo instanceof SetRepository) {
-            throw new \RuntimeException('Panel tag-set repository resolver returned an invalid value.');
-        }
-
-        $this->tagSetRepo = $tagSetRepo;
-        return $this->tagSetRepo;
-    }
-
-    /**
-     * Returns the taxonomy lookup parser on first use.
-     *
-     * @return TaxonomyRepoParser Taxonomy lookup parser.
-     */
-    private function taxonomyLookupRepo(): TaxonomyRepoParser
-    {
-        if ($this->taxonomyLookupRepo instanceof TaxonomyRepoParser) {
-            return $this->taxonomyLookupRepo;
-        }
-
-        $taxonomyLookupRepo = ($this->taxonomyLookupRepoResolver)();
-        if (!$taxonomyLookupRepo instanceof TaxonomyRepoParser) {
-            throw new \RuntimeException('Panel taxonomy lookup parser resolver returned an invalid value.');
-        }
-
-        $this->taxonomyLookupRepo = $taxonomyLookupRepo;
-        return $this->taxonomyLookupRepo;
-    }
-
-    /**
-     * Returns routing-inventory taxonomy data while skipping taxonomy lookup parsing
-     * entirely when both category and tag public routes are disabled.
-     *
-     * @param string $categoryPrefix Effective category route prefix.
-     * @param string $tagPrefix Effective tag route prefix.
-     * @return array{
-     *   channel_options: array<int, array<string, mixed>>,
-     *   category_options_all: array<int, array<string, mixed>>,
-     *   tag_options_all: array<int, array<string, mixed>>,
-     *   redirect_rows: array<int, array<string, mixed>>
-     * }
-     */
-    private function routingInventoryTaxonomyOptionSets(string $categoryPrefix, string $tagPrefix): array
-    {
-        $includeCategories = trim($categoryPrefix) !== '';
-        $includeTags = trim($tagPrefix) !== '';
-        if (!$includeCategories && !$includeTags) {
-            return [
-                'channel_options' => $this->channelParser()->listRoutingOptions(),
-                'category_options_all' => [],
-                'tag_options_all' => [],
-                'redirect_rows' => $this->redirectParser()->listAll(),
-            ];
-        }
-
-        return $this->taxonomyLookupRepo()->listRoutingInventoryData($includeCategories, $includeTags, true);
-    }
-
-    /**
-     * Returns the event logger on first use.
-     *
-     * @return Logger Event logger service.
-     */
-    private function logger(): Logger
-    {
-        if ($this->logger instanceof Logger) {
-            return $this->logger;
-        }
-
-        $logger = ($this->loggerResolver)();
-        if (!$logger instanceof Logger) {
-            throw new \RuntimeException('Panel event logger resolver returned an invalid value.');
-        }
-
-        $this->logger = $logger;
-        return $this->logger;
-    }
-
-    /**
-     * Returns the configured global page route mode.
-     *
-     * @return string 'slug' or 'id'; reflects the `content.mode` config key.
-     */
-    private function globalPageRouteMode(): string
-    {
-        return ChannelRouteParser::globalPageRouteMode($this->config);
-    }
-
-    /**
-     * Returns the effective page route mode for one channel, resolving `inherit` against site config.
-     *
-     * @param string $channelValue Per-channel route-mode value from the channel record.
-     * @return string Concrete route-mode key used for URL lookups and path generation.
-     */
-    private function effectiveChannelRouteMode(string $channelValue): string
-    {
-        return ChannelRouteParser::effectiveChannelRouteMode($this->config, $channelValue);
-    }
-
-    /**
-     * Normalizes one persisted/user-submitted identifier column value.
-     *
-     * Accepts canonical usernames and email-shaped values.
-     *
-     * @param string $rawValue Raw identifier value.
-     * @return string|null Normalized identifier or null when invalid.
-     */
-    private function normalizeUserIdentifierValue(string $rawValue): ?string
-    {
-        return $this->identifierResolver->normalizeUsernameOrEmail($this->input, $rawValue);
-    }
-
-    /**
-     * Returns one public profile route segment for a user row.
-     *
-     * @param array<string, mixed> $user User row used for routing inventory.
-     * @return string|null Public route segment or null when unavailable.
-     */
-    private function publicProfileRouteSegmentForUser(array $user): ?string
-    {
-        $userId = (int) ($user['id'] ?? 0);
-        if ($userId <= 0) {
-            return null;
-        }
-
-        return match ($this->groupParser()->profileSelector()) {
-            'string' => $this->currentUserString($user),
-            'username' => $this->normalizeUserIdentifierValue((string) ($user['username'] ?? '')),
-            default => (string) $userId,
-        };
-    }
-
-    /**
-     * Returns the current persisted user string when available.
-     *
-     * @param array<string, mixed>|null $user User row or null.
-     * @return string|null Persisted user string.
-     */
-    private function currentUserString(?array $user): ?string
-    {
-        $userString = preg_replace('/[^a-zA-Z0-9]/', '', trim((string) ($user['string'] ?? ''))) ?? '';
-        return $userString !== '' ? $userString : null;
-    }
-
-    /**
-     * Builds panel-visible routing inventory rows for feed/page/channel/category/tag/redirect/user/group.
-     *
-     * @return array<int, array{
-     *   type_key: string,
-     *   type_label: string,
-     *   source_label: string,
-     *   edit_url: string,
-     *   public_url: string,
-     *   target_url: string,
-     *   status_key: string,
-     *   status_label: string,
-     *   notes: string,
-     *   is_conflict: bool
-     * }>
-     */
-    private function routingRowsForPanel(): array
-    {
-        $categoryPrefix = $this->categoryRoutePrefix();
-        $tagPrefix = $this->tagRoutePrefix();
-        $profilePrefix = $this->profileRoutePrefix();
-        $profileRoutesEnabled = $this->profileRoutesEnabledForRoutingTable();
-        $groupPrefix = $this->groupRoutePrefix();
-        $groupRoutesEnabled = $this->groupRoutesEnabledForRoutingTable();
-
-        $groupRoutingEnabled = $groupRoutesEnabled && $groupPrefix !== '';
-        $userRoutingEnabled = $profileRoutesEnabled && $profilePrefix !== '';
-        $routingAuthData = $this->userParser()->listRoutingData($groupRoutingEnabled, $userRoutingEnabled);
-        $routingGroups = is_array($routingAuthData['group_rows'] ?? null) ? $routingAuthData['group_rows'] : [];
-        $routingUsers = is_array($routingAuthData['user_rows'] ?? null) ? $routingAuthData['user_rows'] : [];
-        $taxonomyRoutingOptionSets = $this->routingInventoryTaxonomyOptionSets($categoryPrefix, $tagPrefix);
-
-        return $this->routingInventoryBuilder()->buildRows([
-            'reserved_prefixes' => $this->reservedPublicPrefixes(),
-            'channel_index_template_exists' => $this->channelIndexTemplateExistsForRouting(),
-            'feed_enabled' => $this->feedParser()->feedEnabled(),
-            'rss_feed_route' => $this->feedParser()->rssFeedRoute(),
-            'atom_feed_route' => $this->feedParser()->atomFeedRoute(),
-            'category_prefix' => $categoryPrefix,
-            'tag_prefix' => $tagPrefix,
-            'profile_prefix' => $profilePrefix,
-            'profile_routes_enabled' => $profileRoutesEnabled,
-            'group_prefix' => $groupPrefix,
-            'group_routes_enabled' => $groupRoutesEnabled,
-            'can_edit_configuration' => $this->context->auth()->canManageConfiguration(),
-            'can_edit_pages' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::PAGES_EDIT),
-            'can_edit_channels' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::CHANNELS_EDIT),
-            'can_edit_categories' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::CATEGORIES_EDIT),
-            'can_edit_tags' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::TAGS_EDIT),
-            'can_edit_redirects' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::REDIRECTS_EDIT),
-            'can_edit_users' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::USERS_EDIT),
-            'can_edit_groups' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::GROUPS_EDIT),
-            'routing_groups' => $routingGroups,
-            'routing_users' => $routingUsers,
-            'channel_routing_options' => is_array($taxonomyRoutingOptionSets['channel_options'] ?? null)
-                ? $taxonomyRoutingOptionSets['channel_options']
-                : [],
-            'category_routing_options' => is_array($taxonomyRoutingOptionSets['category_options_all'] ?? null)
-                ? $taxonomyRoutingOptionSets['category_options_all']
-                : [],
-            'tag_routing_options' => is_array($taxonomyRoutingOptionSets['tag_options_all'] ?? null)
-                ? $taxonomyRoutingOptionSets['tag_options_all']
-                : [],
-            'redirect_routing_rows' => is_array($taxonomyRoutingOptionSets['redirect_rows'] ?? null)
-                ? $taxonomyRoutingOptionSets['redirect_rows']
-                : [],
-            'pages_for_routing' => $this->pageParser()->listAllForRouting(),
-            'build_page_url' => fn (
-                string $pageSlug,
-                int $pageId,
-                string $channelSlug,
-                string $publishedAt,
-                string $channelPageRouteMode,
-                string $channelPageUrlSeparator
-            ): string => $this->routingPublicPathForPage(
-                $pageSlug,
-                $pageId,
-                $channelSlug,
-                $publishedAt,
-                $channelPageRouteMode,
-                $channelPageUrlSeparator
-            ),
-            'channel_landing_map_builder' => fn (array $pagesForRouting): array => $this->channelLandingMapFromPagesForRouting($pagesForRouting),
-            'panel_url' => fn (string $suffix): string => $this->context->panelUrl($suffix),
-            'build_user_route_segment' => fn (array $user): ?string => $this->publicProfileRouteSegmentForUser($user),
-            'slugify_group_name' => fn (string $name): string => $this->slugifyGroupName($name),
-        ]);
-    }
-
-    /**
-     * Builds one routing-table public URL path for a page row.
-     */
-    private function routingPublicPathForPage(
-        string $pageSlug,
-        int $pageId,
-        string $channelSlug,
-        string $publishedAt,
-        string $routeModeEffective,
-        string $routeSeparatorEffective
-    ): string {
-        return $this->panelRoutingPreviewService()->routingPublicPathForPage(
-            $pageSlug,
-            $pageId,
-            $channelSlug,
-            $publishedAt,
-            $channelSlug === ''
-                ? $this->globalPageRouteMode()
-                : $this->effectiveChannelRouteMode($routeModeEffective),
-            $routeSeparatorEffective,
-            (string) $this->config->get('content.separator', '-')
-        );
-    }
-
-    /**
-     * Derives one channel -> landing page slug map from routing page rows.
-     *
-     * @param array<int, array<string, mixed>> $pagesForRouting Page rows used for routing inventory.
-     * @return array<string, string> Channel slug to landing page slug map.
-     */
-    private function channelLandingMapFromPagesForRouting(array $pagesForRouting): array
-    {
-        return $this->panelRoutingPreviewService()->channelLandingMapFromPages($pagesForRouting);
-    }
-
-    /**
-     * Returns true when the public channel index template resolves in the active theme chain or core fallback.
-     */
-    private function channelIndexTemplateExistsForRouting(): bool
-    {
-        return $this->panelRoutingPreviewService()->channelIndexTemplateExists($this->config);
-    }
-
-    /**
-     * Returns reserved root/channel slugs blocked by public router prefixes.
-     *
-     * @return array<int, string> Reserved public prefixes.
-     */
-    private function reservedPublicPrefixes(): array
-    {
-        return $this->panelRoutingPreviewService()->reservedPublicPrefixes(
-            (string) $this->config->get('panel.path', 'panel'),
-            [
-                $this->categoryRoutePrefix(),
-                $this->tagRoutePrefix(),
-                $this->profileRoutePrefix(),
-                $this->groupRoutePrefix(),
-            ]
         );
     }
 
@@ -1852,16 +1152,6 @@ final class SystemController
         }
 
         return null;
-    }
-
-    /**
-     * Returns canonical stock public theme slugs protected from deletion.
-     *
-     * @return array<int, string> Stock public theme slugs.
-     */
-    private function stockPublicThemeSlugs(): array
-    {
-        return $this->themeCatalogService()->stockSlugs();
     }
 
     /**
@@ -2143,16 +1433,6 @@ final class SystemController
     }
 
     /**
-     * Returns canonical stock extension directory names protected from deletion.
-     *
-     * @return array<int, string> Stock extension directory names.
-     */
-    private function stockExtensionDirectories(): array
-    {
-        return $this->extensionCatalogService()->stockExtensionDirectories();
-    }
-
-    /**
      * Returns true when one extension directory is part of the stock bundle.
      */
     private function isStockExtensionDirectory(string $directoryName): bool
@@ -2166,67 +1446,6 @@ final class SystemController
     private function isSafeExtensionDirectoryName(string $name): bool
     {
         return $this->extensionCatalogService()->isSafeExtensionDirectoryName($name);
-    }
-
-    /**
-     * Returns the configured public category route prefix.
-     */
-    private function categoryRoutePrefix(): string
-    {
-        return CategoryRouteParser::categoryRoutePrefix($this->config, $this->input);
-    }
-
-    /**
-     * Returns the configured public tag route prefix.
-     */
-    private function tagRoutePrefix(): string
-    {
-        return TagRouteParser::tagRoutePrefix($this->config, $this->input);
-    }
-
-    /**
-     * Returns the configured public profile route prefix.
-     */
-    private function profileRoutePrefix(): string
-    {
-        return $this->groupParser()->profileRoutePrefix();
-    }
-
-    /**
-     * Returns true when public profile URLs are enabled for routing inventory.
-     */
-    private function profileRoutesEnabledForRoutingTable(): bool
-    {
-        return $this->groupParser()->profileRoutesEnabledForRoutingTable();
-    }
-
-    /**
-     * Returns the configured public group route prefix.
-     */
-    private function groupRoutePrefix(): string
-    {
-        return $this->groupParser()->groupRoutePrefix();
-    }
-
-    /**
-     * Returns true when public group URLs are enabled for routing inventory.
-     */
-    private function groupRoutesEnabledForRoutingTable(): bool
-    {
-        return $this->groupParser()->groupRoutesEnabledForRoutingTable();
-    }
-
-    /**
-     * Derives one stable URL slug from a group name.
-     */
-    private function slugifyGroupName(string $groupName): string
-    {
-        $slug = $this->input->slug($groupName);
-        if ($slug === null || $slug === '') {
-            return '';
-        }
-
-        return $slug;
     }
 
     /**
@@ -2306,106 +1525,6 @@ final class SystemController
     }
 
     /**
-     * Returns the CSV archive handler on first use.
-     *
-     * @return Csv Canonical CSV import/export helper.
-     */
-    private function csvHandler(): Csv
-    {
-        if (!$this->csvHandler instanceof Csv) {
-            $this->csvHandler = new Csv();
-        }
-
-        return $this->csvHandler;
-    }
-
-    /**
-     * Returns the channel data parser on first use.
-     */
-    private function channelParser(): ChannelDataParser
-    {
-        if (!$this->channelParser instanceof ChannelDataParser) {
-            $this->channelParser = new ChannelDataParser($this->config, $this->input, $this->channelRepo);
-        }
-
-        return $this->channelParser;
-    }
-
-    /**
-     * Returns the feed route parser on first use.
-     */
-    private function feedParser(): FeedRouteParser
-    {
-        if (!$this->feedParser instanceof FeedRouteParser) {
-            $this->feedParser = new FeedRouteParser($this->config, $this->input);
-        }
-
-        return $this->feedParser;
-    }
-
-    /**
-     * Returns the group route parser on first use.
-     */
-    private function groupParser(): GroupRouteParser
-    {
-        if (!$this->groupParser instanceof GroupRouteParser) {
-            $this->groupParser = new GroupRouteParser($this->config, $this->input);
-        }
-
-        return $this->groupParser;
-    }
-
-    /**
-     * Returns the cached redirect data parser.
-     *
-     * @return RedirectDataParser Shared redirect data parser.
-     */
-    private function redirectParser(): RedirectDataParser
-    {
-        if (!$this->redirectParser instanceof RedirectDataParser) {
-            $this->redirectParser = new RedirectDataParser($this->input, $this->redirectRepo);
-        }
-
-        return $this->redirectParser;
-    }
-
-    /**
-     * Returns the page data parser on first use for routing inventory reads.
-     */
-    private function pageParser(): PageDataParser
-    {
-        if (!$this->pageParser instanceof PageDataParser) {
-            $this->pageParser = new PageDataParser($this->input, $this->pageRepo);
-        }
-
-        return $this->pageParser;
-    }
-
-    /**
-     * Returns the user data parser on first use for routing inventory reads.
-     */
-    private function userParser(): UserDataParser
-    {
-        if (!$this->userParser instanceof UserDataParser) {
-            $this->userParser = new UserDataParser($this->input, $this->userRepo);
-        }
-
-        return $this->userParser;
-    }
-
-    /**
-     * Returns the routing-inventory builder on first use.
-     */
-    private function routingInventoryBuilder(): RoutingInventoryBuilder
-    {
-        if (!$this->routingInventoryBuilder instanceof RoutingInventoryBuilder) {
-            $this->routingInventoryBuilder = new RoutingInventoryBuilder($this->input);
-        }
-
-        return $this->routingInventoryBuilder;
-    }
-
-    /**
      * Returns the extension-permission catalog service on first use.
      */
     private function extensionPermissionCatalogService(): ExtensionPermissionCatalogService
@@ -2452,98 +1571,6 @@ final class SystemController
         }
 
         return $this->themeCatalogService;
-    }
-
-    /**
-     * Returns the canonical Git handler on first use.
-     */
-    private function gitArchiveHandler(): Git
-    {
-        if (!$this->gitArchiveHandler instanceof Git) {
-            $this->gitArchiveHandler = new Git();
-        }
-
-        return $this->gitArchiveHandler;
-    }
-
-    /**
-     * Returns the update-source resolver on first use.
-     *
-     * @return Upstream Lazily initialized update source resolver.
-     */
-    private function updateSourceResolver(): Upstream
-    {
-        if (!$this->updateSourceResolver instanceof Upstream) {
-            $this->updateSourceResolver = new Upstream($this->input);
-        }
-
-        return $this->updateSourceResolver;
-    }
-
-    /**
-     * Returns the update workflow service on first use.
-     *
-     * @return ArchiveUpdate Lazily initialized update workflow service.
-     */
-    private function updateWorkflowService(): ArchiveUpdate
-    {
-        if (!$this->updateWorkflowService instanceof ArchiveUpdate) {
-            $this->updateWorkflowService = new ArchiveUpdate(
-                $this->root,
-                $this->gitArchiveHandler(),
-                $this->stockPublicThemeSlugs(),
-                $this->stockExtensionDirectories()
-            );
-        }
-
-        return $this->updateWorkflowService;
-    }
-
-    /**
-     * Returns the panel routing-preview service on first use.
-     */
-    private function panelRoutingPreviewService(): PanelRoutingPreviewService
-    {
-        if (!$this->panelRoutingPreviewService instanceof PanelRoutingPreviewService) {
-            $this->panelRoutingPreviewService = new PanelRoutingPreviewService($this->root, $this->input, $this->themeCatalogService());
-        }
-
-        return $this->panelRoutingPreviewService;
-    }
-
-    /**
-     * Renders the updater page with the standard panel wrapper.
-     *
-     * @param array<string, mixed> $source Resolved update source settings.
-     * @param array<string, mixed> $result Update comparison or execution result.
-     * @param string|null $flashSuccess Success message to display.
-     * @param string|null $flashError Error message to display.
-     * @param bool $allowOverwrite Whether local overwrite is currently allowed.
-     * @return void
-     */
-    private function renderUpdatePage(
-        array $source,
-        array $result,
-        ?string $flashSuccess,
-        ?string $flashError,
-        bool $allowOverwrite
-    ): void {
-        $this->context->renderPanel('panel/update', [
-            'canManageConfiguration' => $this->context->auth()->canManageConfiguration(),
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $flashSuccess,
-            'flashError' => $flashError,
-            'section' => 'update',
-            'pageTitle' => 'Update Raven',
-            'updateSource' => $source,
-            'updateResult' => $result,
-            'allowOverwrite' => $allowOverwrite,
-            'updateSourceModes' => [
-                'github_mirror' => 'Github Mirror (noveltylanterns/raven)',
-                'github_custom' => 'Custom Github',
-                'repo_custom' => 'Custom Repo',
-            ],
-        ]);
     }
 
 }

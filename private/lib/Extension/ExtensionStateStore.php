@@ -1,10 +1,17 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Extension/ExtensionStateStore.php
+ * Read-side loader and compatibility facade for extension enablement state.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
 
-use Raven\Core\Database\Schema\SchemaEnsureStateStore;
+use Raven\Lib\Scribe\ExtensionStateScribe;
 
 /**
  * Shared persistence service for extension enablement/permission state maps.
@@ -13,25 +20,49 @@ final class ExtensionStateStore
 {
     private string $extensionsBasePath;
     private string $stateBasePath;
+    private ExtensionStateScribe $extensionStateScribe;
 
+    /**
+     * Prepares the extension-state store for one project tree.
+     *
+     * @param string $extensionsBasePath Absolute `private/ext` directory path.
+     * @param string|null $stateBasePath Optional absolute `private/dat/ext` directory path override.
+     * @return void
+     */
     public function __construct(string $extensionsBasePath, ?string $stateBasePath = null)
     {
         $this->extensionsBasePath = rtrim($extensionsBasePath, '/\\');
         $this->stateBasePath = $stateBasePath !== null
             ? rtrim($stateBasePath, '/\\')
             : dirname($this->extensionsBasePath) . '/dat/ext';
+        $this->extensionStateScribe = new ExtensionStateScribe($this->extensionsBasePath, $this->stateBasePath);
     }
 
+    /**
+     * Returns the canonical extension-directory base path.
+     *
+     * @return string Absolute `private/ext` path.
+     */
     public function basePath(): string
     {
         return $this->extensionsBasePath;
     }
 
+    /**
+     * Returns the canonical extension-state file path.
+     *
+     * @return string Absolute `private/dat/ext/.state.php` path.
+     */
     public function stateFilePath(): string
     {
         return $this->stateBasePath . '/.state.php';
     }
 
+    /**
+     * Ensures the extension install base path exists.
+     *
+     * @return void
+     */
     public function ensureDirectory(): void
     {
         if (is_dir($this->extensionsBasePath)) {
@@ -43,15 +74,17 @@ final class ExtensionStateStore
         }
     }
 
+    /**
+     * Ensures the extension-state directory exists.
+     *
+     * Kept as a compatibility forwarder for callers that still ask the store to
+     * provision the write-side state directory explicitly.
+     *
+     * @return void
+     */
     public function ensureStateDirectory(): void
     {
-        if (is_dir($this->stateBasePath)) {
-            return;
-        }
-
-        if (!mkdir($this->stateBasePath, 0775, true) && !is_dir($this->stateBasePath)) {
-            throw new \RuntimeException('Failed to create private/dat/ext directory.');
-        }
+        $this->extensionStateScribe->ensureStateDirectory();
     }
 
     /**
@@ -155,53 +188,12 @@ final class ExtensionStateStore
         if ($permissionBitsMap === []) {
             $permissionBitsMap = $currentState['permission_bits'];
         }
-        $filteredEnabled = $this->normalizeEnabledMap($enabledMap);
-        $filteredPermissions = $this->normalizePermissionMap($permissionMap);
-        $filteredPermissionBits = $this->normalizePermissionBitsMap($permissionBitsMap);
-
-        $export = var_export([
-            'enabled' => $filteredEnabled,
-            'permissions' => $filteredPermissions,
-            'permission_bits' => $filteredPermissionBits,
-        ], true);
-        $content = "<?php\n\n";
-        $content .= "/**\n";
-        $content .= " * RAVEN CMS\n";
-        $content .= " * ~/private/dat/ext/.state.php\n";
-        $content .= " * Persisted extension enablement map and permission settings managed by panel.\n";
-        $content .= " * Docs: https://raven.lanterns.io\n";
-        $content .= " */\n\n";
-        $content .= "declare(strict_types=1);\n\n";
-        $content .= "return " . $export . ";\n";
-
-        $this->ensureStateDirectory();
-        $written = file_put_contents($this->stateFilePath(), $content, LOCK_EX);
-        if ($written === false) {
-            throw new \RuntimeException('Failed to persist extension state.');
-        }
-
-        $statePath = $this->stateFilePath();
-        clearstatcache(true, $statePath);
-        if (function_exists('opcache_invalidate')) {
-            @opcache_invalidate($statePath, true);
-        }
-
-        if ($currentState['enabled'] !== $filteredEnabled) {
-            $this->schemaEnsureStateStore()->invalidate();
-        }
-    }
-
-    /**
-     * Returns the schema ensure marker helper for the current project root.
-     *
-     * Enabling/disabling extensions can change the set of active extension
-     * schema providers, so those transitions must invalidate the schema marker.
-     *
-     * @return SchemaEnsureStateStore Shared schema ensure marker helper.
-     */
-    private function schemaEnsureStateStore(): SchemaEnsureStateStore
-    {
-        return new SchemaEnsureStateStore(dirname($this->extensionsBasePath, 2));
+        $this->extensionStateScribe->saveState(
+            $enabledMap,
+            $permissionMap,
+            $permissionBitsMap,
+            $currentState['enabled']
+        );
     }
 
     private function isSafeExtensionDirectoryName(string $name): bool

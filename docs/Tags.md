@@ -152,6 +152,7 @@ Storage detail:
 ### Public Routing Touchpoints
 
 - Tag listing routes resolve under `/{tag.prefix}/{tag_slug}/{page?}`.
+- Public tag controller: `private/sys/Controller/Public/TagController.php`.
 - If `tag.prefix` is blank, tag routes are disabled.
 - Template priority: `tpl/tag/{tag_slug}.php` then `tpl/tag/index.php`.
 

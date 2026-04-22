@@ -142,9 +142,10 @@ Behavior notes:
   - `private/tpl/panel/page/list.php`
   - `private/tpl/panel/page/edit.php`
 - Panel controller:
-  - `private/sys/Controller/Panel/ContentController.php`
+  - `private/sys/Controller/Panel/PageController.php`
 - Public controller:
-  - `private/sys/Controller/Public/ContentController.php`
+  - `private/sys/Controller/Public/PageController.php`
+  - `private/sys/Controller/Public/ChannelController.php`
 - Page persistence:
   - `private/sys/Repository/PageRepository.php`
 - Gallery persistence:
@@ -173,7 +174,7 @@ Root-scope note:
 - Pages no longer persist with `channel_id = NULL`.
 - Raven now maps root-level pages to the stock `<root>` channel id `0`, while the editor still exposes that as `<none>` so URLs remain rooted at `/slug`.
 
-`ContentController::pageSave()` pipeline:
+`PageController::pageSave()` pipeline:
 
 1. Requires login + `Manage Content` permission.
 2. Validates CSRF.
@@ -230,7 +231,7 @@ Content blocks persistence model:
 
 ### Public Rendering Behavior
 
-Main page rendering path in `ContentController`:
+Main page rendering path in `PageController`:
 
 - homepage: `findHomepage()` with slug priority `home` -> `index`
 - channel landing: `findChannelHomepage()` with same `home` -> `index` priority

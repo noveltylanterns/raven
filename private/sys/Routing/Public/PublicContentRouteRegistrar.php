@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Routing/Public/PublicContentRouteRegistrar.php
- * Public homepage/content-route registration.
+ * Public homepage/page-route registration.
  * Docs: https://raven.lanterns.io
  */
 
@@ -15,15 +15,15 @@ use Raven\Core\Routing\Router;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
- * Registers homepage, channel, and page routes for the public runtime.
+ * Registers homepage and channel-qualified page routes for the public runtime.
  */
 final class PublicContentRouteRegistrar
 {
     /**
-     * Registers the public content route family.
+     * Registers the public page route family.
      *
-     * @param Router $router Mutable router receiving content routes.
-     * @param callable(): object $publicContentController Lazy public-content controller factory.
+     * @param Router $router Mutable router receiving page routes.
+     * @param callable(): object $publicPageController Lazy public-page controller factory.
      * @param callable(): object $publicRequestContext Lazy public request-context factory.
      * @param InputSanitizer $input Shared input normalizer for route params.
      * @param array{reserved_prefixes: array<int, string>} $routeConfig Normalized public route policy.
@@ -31,7 +31,7 @@ final class PublicContentRouteRegistrar
      */
     public static function register(
         Router $router,
-        callable $publicContentController,
+        callable $publicPageController,
         callable $publicRequestContext,
         InputSanitizer $input,
         array $routeConfig
@@ -40,24 +40,12 @@ final class PublicContentRouteRegistrar
             ? array_values($routeConfig['reserved_prefixes'])
             : [];
 
-        $router->add('GET', '/', static function () use ($publicContentController): void {
-            $publicContentController()->home();
-        });
-
-        // Single-segment route: channel landing first, then root page/redirect fallback.
-        $router->add('GET', '/{slug}', static function (array $params) use ($publicContentController, $publicRequestContext, $input, $reservedPrefixes): void {
-            $slug = $input->slug($params['slug'] ?? null);
-
-            if ($slug === null || in_array($slug, $reservedPrefixes, true)) {
-                $publicRequestContext()->notFound();
-                return;
-            }
-
-            $publicContentController()->channel($slug);
+        $router->add('GET', '/', static function () use ($publicPageController): void {
+            $publicPageController()->home();
         });
 
         // Channel + page route for pages assigned to channels.
-        $router->add('GET', '/{channel}/{slug}', static function (array $params) use ($publicContentController, $publicRequestContext, $input, $reservedPrefixes): void {
+        $router->add('GET', '/{channel}/{slug}', static function (array $params) use ($publicPageController, $publicRequestContext, $input, $reservedPrefixes): void {
             $channel = $input->slug($params['channel'] ?? null);
             $slugRaw = strtolower(trim((string) ($params['slug'] ?? '')));
 
@@ -71,7 +59,7 @@ final class PublicContentRouteRegistrar
                 return;
             }
 
-            $publicContentController()->page($slugRaw, $channel);
+            $publicPageController()->page($slugRaw, $channel);
         });
     }
 }

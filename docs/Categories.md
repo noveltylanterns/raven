@@ -152,6 +152,7 @@ Storage detail:
 ### Public Routing Touchpoints
 
 - Category listing routes resolve under `/{category.prefix}/{category_slug}/{page?}`.
+- Public category controller: `private/sys/Controller/Public/CategoryController.php`.
 - If `category.prefix` is blank, category routes are disabled.
 - Template priority: `tpl/category/{category_slug}.php` then `tpl/category/index.php`.
 

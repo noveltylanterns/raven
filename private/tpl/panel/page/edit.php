@@ -225,7 +225,7 @@ if ($selectedStatus === 'published' && $permalinkBase !== '' && $routeSegment !=
 }
 
 // Gallery items for the TinyMCE gallery button are built by EditorMCE::galleryItems()
-// in ContentController and passed in as $tinyMceGalleryItems.
+// in PageController and passed in as $tinyMceGalleryItems.
 $tinyMceGalleryItems = is_array($tinyMceGalleryItems ?? null) ? $tinyMceGalleryItems : [];
 $bodyBlocks = [];
 $rawContentBlocks = $page['content_blocks'] ?? null;

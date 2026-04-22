@@ -17,14 +17,17 @@ use Raven\Core\Controller\Panel\AuthController;
 use Raven\Core\Controller\Panel\CategoryController;
 use Raven\Core\Controller\Panel\ChannelController;
 use Raven\Core\Controller\Panel\ConfigController;
-use Raven\Core\Controller\Panel\ContentController;
 use Raven\Core\Controller\Panel\DashboardController;
 use Raven\Core\Controller\Panel\GroupController;
+use Raven\Core\Controller\Panel\LogsController;
+use Raven\Core\Controller\Panel\PageController;
 use Raven\Core\Controller\Panel\PreferencesController;
 use Raven\Core\Controller\Panel\RedirectController;
+use Raven\Core\Controller\Panel\RoutingController;
 use Raven\Core\Controller\Panel\SharedController;
 use Raven\Core\Controller\Panel\SystemController;
 use Raven\Core\Controller\Panel\TaxonomyController;
+use Raven\Core\Controller\Panel\UpdateController;
 use Raven\Core\Controller\Panel\UserController;
 use Raven\Core\Repository\CategoryRepository;
 use Raven\Core\Repository\ChannelRepository;
@@ -64,6 +67,7 @@ use Raven\Lib\View\Panel\EditorMCE;
 use Raven\Lib\View\Panel\EditorMDE;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\PanelMediaConfigService;
+use Raven\Lib\View\Error as ViewError;
 use Raven\Lib\Transport\Upload;
 use RuntimeException;
 
@@ -102,15 +106,18 @@ final class PanelRuntimeBuilder
         $categoryController = null;
         $channelController = null;
         $configController = null;
-        $contentController = null;
+        $pageController = null;
         $dashboardController = null;
         $groupController = null;
         $preferencesController = null;
         $panelSharedController = null;
         $panelRuntime = null;
         $redirectController = null;
+        $logsController = null;
+        $routingController = null;
         $systemController = null;
         $taxonomyController = null;
+        $updateController = null;
         $userController = null;
         $categorySetRepository = null;
         $tagSetRepository = null;
@@ -137,7 +144,7 @@ final class PanelRuntimeBuilder
         $rvn['panel_editor'] = new Editor();
         $rvn['panel_editor_blocks'] = new EditorBlocks();
         // TinyMCE and EasyMDE helpers are registered here for extension access but
-        // only injected into ContentController, which is the sole controller that
+        // only injected into PageController, which is the sole controller that
         // serves the rich page body editor.
         $rvn['panel_editor_mce'] = new EditorMCE();
         $rvn['panel_editor_mde'] = new EditorMDE();
@@ -472,7 +479,6 @@ final class PanelRuntimeBuilder
                 'tag_set' => $tagSetFactory,
                 'taxonomy_lookup' => $taxonomyLookupFactory,
                 'user' => $userFactory(),
-                'logger' => $loggerFactory,
             ];
         });
 
@@ -481,6 +487,7 @@ final class PanelRuntimeBuilder
         $rvn['panel_domain_user'] = $panelUserDomain;
         $rvn['panel_domain_group'] = $panelUserDomain;
         $rvn['panel_domain_preferences'] = $panelPreferencesDomain;
+        $rvn['panel_domain_logs'] = $loggerFactory;
         $rvn['panel_domain_system'] = $panelSystemDomain;
 
         /**
@@ -526,7 +533,7 @@ final class PanelRuntimeBuilder
         /**
          * Builds the shared request context for split panel sub-controllers.
          */
-        $rvn['panel_request_context'] = static function () use (&$panelSharedController, &$systemController, &$rvn, $categoryEnabled, $tagEnabled, $resolveAuth): SharedController {
+        $rvn['panel_request_context'] = static function () use (&$panelSharedController, &$rvn, $categoryEnabled, $tagEnabled, $resolveAuth): SharedController {
             if ($panelSharedController instanceof SharedController) {
                 return $panelSharedController;
             }
@@ -539,20 +546,8 @@ final class PanelRuntimeBuilder
                 new SessionFlash('_raven_flash'),
                 $categoryEnabled,
                 $tagEnabled,
-                static function () use (&$systemController, &$rvn): void {
-                    if ($systemController instanceof SystemController) {
-                        $systemController->renderPublicNotFound();
-                        return;
-                    }
-
-                    $systemControllerFactory = $rvn['panel_system_controller'] ?? null;
-                    if (is_callable($systemControllerFactory)) {
-                        $systemControllerFactory()->renderPublicNotFound();
-                        return;
-                    }
-
-                    http_response_code(404);
-                    echo 'Not Found';
+                static function () use (&$rvn): void {
+                    (new ViewError($rvn['config'], (string) $rvn['root']))->render404();
                 }
             );
 
@@ -574,19 +569,19 @@ final class PanelRuntimeBuilder
         };
 
         /**
-         * Builds the split content controller on first use.
+         * Builds the split page controller on first use.
          * Owns page list, create/edit, save, gallery upload/delete, and page delete.
          */
-        $rvn['panel_content_controller'] = static function () use (&$contentController, &$rvn, $panelContentDomain, $panelTaxonomyDomain): ContentController {
-            if ($contentController instanceof ContentController) {
-                return $contentController;
+        $rvn['panel_page_controller'] = static function () use (&$pageController, &$rvn, $panelContentDomain, $panelTaxonomyDomain): PageController {
+            if ($pageController instanceof PageController) {
+                return $pageController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $contentDomain = $panelContentDomain();
             $taxonomyDomain = $panelTaxonomyDomain();
-            $contentController = new ContentController(
+            $pageController = new PageController(
                 $requestContextFactory(),
                 $rvn['config'],
                 $rvn['input'],
@@ -610,7 +605,7 @@ final class PanelRuntimeBuilder
                     : static fn (?string $extensionDirectory = null): array => []
             );
 
-            return $contentController;
+            return $pageController;
         };
 
         /**
@@ -829,6 +824,74 @@ final class PanelRuntimeBuilder
         };
 
         /**
+         * Builds the split logs controller on first use.
+         * Owns `/logs*` only.
+         */
+        $rvn['panel_logs_controller'] = static function () use (&$logsController, &$rvn, $loggerFactory): LogsController {
+            if ($logsController instanceof LogsController) {
+                return $logsController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $logsController = new LogsController(
+                $requestContextFactory(),
+                $rvn['input'],
+                $loggerFactory
+            );
+
+            return $logsController;
+        };
+
+        /**
+         * Builds the split routing controller on first use.
+         * Owns `/routing*` only.
+         */
+        $rvn['panel_routing_controller'] = static function () use (&$routingController, &$rvn, $panelSystemDomain): RoutingController {
+            if ($routingController instanceof RoutingController) {
+                return $routingController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $systemDomain = $panelSystemDomain();
+            $routingController = new RoutingController(
+                $requestContextFactory(),
+                $rvn['config'],
+                $rvn['input'],
+                (string) $rvn['root'],
+                $systemDomain['channel'],
+                $systemDomain['page'],
+                $systemDomain['redirect'],
+                $systemDomain['user'],
+                $systemDomain['taxonomy_lookup']
+            );
+
+            return $routingController;
+        };
+
+        /**
+         * Builds the split update controller on first use.
+         * Owns `/update*` only.
+         */
+        $rvn['panel_update_controller'] = static function () use (&$updateController, &$rvn): UpdateController {
+            if ($updateController instanceof UpdateController) {
+                return $updateController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $updateController = new UpdateController(
+                $requestContextFactory(),
+                $rvn['config'],
+                $rvn['input'],
+                (string) $rvn['root']
+            );
+
+            return $updateController;
+        };
+
+        /**
          * Builds the split configuration controller on first use.
          * Owns `/configuration` and `/configuration/save` only.
          */
@@ -858,29 +921,20 @@ final class PanelRuntimeBuilder
 
         /**
          * Builds the split system controller on first use.
-         * Owns update, routing, logs, themes, and extensions.
+         * Owns themes and extensions.
          */
-        $rvn['panel_system_controller'] = static function () use (&$systemController, &$rvn, $panelSystemDomain): SystemController {
+        $rvn['panel_system_controller'] = static function () use (&$systemController, &$rvn): SystemController {
             if ($systemController instanceof SystemController) {
                 return $systemController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
-            $systemDomain = $panelSystemDomain();
             $systemController = new SystemController(
                 $requestContextFactory(),
                 $rvn['config'],
                 $rvn['input'],
                 (string) $rvn['root'],
-                $systemDomain['channel'],
-                $systemDomain['page'],
-                $systemDomain['redirect'],
-                $systemDomain['user'],
-                $systemDomain['category_set'],
-                $systemDomain['tag_set'],
-                $systemDomain['taxonomy_lookup'],
-                $systemDomain['logger'],
                 is_callable($rvn['extension_services_for'] ?? null)
                     ? $rvn['extension_services_for']
                     : static fn (?string $extensionDirectory = null): array => []

@@ -4,7 +4,7 @@
 
 This document explains Raven's Routing Table screen for both panel users and developers/agents.
 
-Maintenance note: keep this file updated whenever Routing Table routes, row-building/conflict logic, export behavior, or Routing Table panel views change (`private/tpl/panel/routing.php`, `SystemController::routing*`, or routing inventory composition helpers).
+Maintenance note: keep this file updated whenever Routing Table routes, row-building/conflict logic, export behavior, or Routing Table panel views change (`private/tpl/panel/routing.php`, `RoutingController::routing*`, or routing inventory composition helpers).
 
 Public-routing note: public entry orchestration now lives in `private/sys/Controller/Public/PublicController.php`, where controller-aligned registrars from `private/sys/Routing/Public/` map stock public route families onto the split handlers under `private/sys/Controller/Public/`. Shared low-level routing primitives live in `private/sys/Routing/`, while scope-specific gating stays in the public/panel front controllers. Keep those files and `public/theme/AGENTS.md` in sync when public route families are added or changed.
 
@@ -78,38 +78,48 @@ Export fields include:
 - Panel view:
   - `private/tpl/panel/routing.php`
 - Panel controller:
-  - `private/sys/Controller/Panel/SystemController.php`
+  - `private/sys/Controller/Panel/RoutingController.php`
 - Public route bootstrap:
   - `private/sys/Controller/Public/PublicController.php`
   - `private/sys/Routing/Public/Public*RouteRegistrar.php`
 - Panel route bootstrap:
   - `private/sys/Controller/Panel/PanelController.php`
   - `private/sys/Routing/Panel/Panel*RouteRegistrar.php`
+  - Channel/category/tag panel routes are now registered through their own `PanelChannelRouteRegistrar.php`, `PanelCategoryRouteRegistrar.php`, and `PanelTagRouteRegistrar.php` files instead of a shared taxonomy registrar bundle.
+  - Event-log routes are now registered through `PanelLogRouteRegistrar.php` instead of riding through the broader system-route registrar.
+  - Routing diagnostics routes are now registered through `PanelRoutingRouteRegistrar.php` instead of riding through the broader system-route registrar.
+  - Updater routes are now registered through `PanelUpdateRouteRegistrar.php` instead of riding through the broader system-route registrar.
   - `private/sys/Debug/ToolbarResponseHook.php`
   - `private/lib/Scheduler/Cron.php`
 - Public auth controller:
   - `private/sys/Controller/Public/AuthController.php`
 - Public profile controller:
-  - `private/sys/Controller/Public/ProfileController.php`
-- Public form controller:
-  - `private/sys/Controller/Public/FormController.php`
-- Public feed/taxonomy controller:
+  - `private/sys/Controller/Public/UserController.php`
+- Public group controller:
+  - `private/sys/Controller/Public/GroupController.php`
+- Public category controller:
+  - `private/sys/Controller/Public/CategoryController.php`
+- Public channel controller:
+  - `private/sys/Controller/Public/ChannelController.php`
+- Public tag controller:
+  - `private/sys/Controller/Public/TagController.php`
+- Public feed controller:
   - `private/sys/Controller/Public/FeedController.php`
 - Public content controller:
-  - `private/sys/Controller/Public/ContentController.php`
+  - `private/sys/Controller/Public/PageController.php`
 - Shared public request context:
   - `private/sys/Controller/Public/SharedController.php`
 
 ### Panel Routes
 
-Declared through `private/sys/Routing/Panel/PanelSystemRouteRegistrar.php` and wired by `private/sys/Controller/Panel/PanelController.php`:
+Declared through `private/sys/Routing/Panel/PanelRoutingRouteRegistrar.php` and wired by `private/sys/Controller/Panel/PanelController.php`:
 
 - `GET /routing` -> routing inventory screen
 - `GET /routing/export` -> CSV export
 
 ### Controller Flow
 
-`SystemController::routing()`:
+`RoutingController::routing()`:
 
 1. Requires panel login.
 2. Requires `Manage Taxonomy`.
@@ -117,7 +127,7 @@ Declared through `private/sys/Routing/Panel/PanelSystemRouteRegistrar.php` and w
 4. Normalizes optional `search` query prefill for the filter UI.
 5. Computes summary counters and renders routing view.
 
-`SystemController::routingExport()`:
+`RoutingController::routingExport()`:
 
 1. Requires panel login + `Manage Taxonomy`.
 2. Rebuilds rows via `routingRowsForPanel()`.

@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Controller/Public/ContentController.php
- * Split public content controller for homepage and page-routing flows.
+ * ~/private/sys/Controller/Public/PageController.php
+ * Split public page controller for homepage, page, and embedded-form flows.
  * Docs: https://raven.lanterns.io
  */
 
@@ -37,7 +37,7 @@ use Raven\Lib\View\Public\ThemeTemplate;
 /**
  * Handles split public homepage and page-routing routes.
  */
-final class ContentController
+final class PageController
 {
     private SharedController $context;
     private ChannelDataParser $channelParser;
@@ -110,48 +110,6 @@ final class ContentController
         $this->context->renderPublic('home', [
             'site' => $this->siteDataWithPageMeta($page),
             'page' => $page,
-        ], 'wrapper');
-    }
-
-    /**
-     * Resolves one channel landing route by channel slug.
-     *
-     * Unpacks the tuple returned by `findChannelHomepage()` to reuse the already-fetched
-     * channel row, avoiding a second DB round-trip for the same row on every channel landing.
-     *
-     * @param string $channelSlug Normalized channel slug.
-     * @return void
-     */
-    public function channel(string $channelSlug): void
-    {
-        // findChannelHomepage() returns null when the channel does not exist, or a
-        // ['channel' => ..., 'page' => ...] tuple — page is null when no homepage exists.
-        $result = $this->pageParser->findChannelHomepage($channelSlug);
-        if ($result === null || $result['page'] === null) {
-            $this->page($channelSlug, null);
-            return;
-        }
-
-        $channel = $result['channel'];
-        $page    = $result['page'];
-        $page = $this->renderPageContentBlocks($page);
-        $page = $this->templateDecorator()->decoratePageForTemplate($page);
-
-        $channelTemplate = $this->themeTemplate()->resolveChannelTemplateNameForThemeChain(
-            $channelSlug,
-            $this->publicThemesRoot(),
-            $this->currentPublicThemeSlug(),
-            dirname(__DIR__, 4) . '/private/tpl'
-        );
-
-        $site = $this->siteDataWithPageMeta($page);
-        // Channel-level cover/preview uploads override page/default meta images on channel landings.
-        $site = $this->context->siteDataWithTaxonomyMetaImage($channel, $site);
-
-        $this->context->renderPublic($channelTemplate, [
-            'site'    => $site,
-            'channel' => $channel,
-            'page'    => $page,
         ], 'wrapper');
     }
 
@@ -273,6 +231,57 @@ final class ContentController
             'channel' => is_array($channel) ? $channel : null,
             'page' => $page,
         ], 'wrapper');
+    }
+
+    /**
+     * Handles one public embedded-form submission request by type + slug.
+     *
+     * Embedded forms are rendered inside page body content, so their submit
+     * path now stays on the same public page controller seam instead of
+     * bouncing through a dedicated one-route controller.
+     *
+     * @param string $type Normalized embedded form type slug.
+     * @param string $formSlug Normalized embedded form slug.
+     * @return void
+     */
+    public function submitEmbeddedForm(string $type, string $formSlug): void
+    {
+        $runtime = $this->embeddedFormRuntimeService()->runtime($type, $this->embeddedFormRuntimes());
+        if ($runtime === null) {
+            $this->context->notFound();
+            return;
+        }
+
+        if (!$this->embeddedFormRuntimeService()->isRuntimeEnabled($runtime)) {
+            $this->context->notFound();
+            return;
+        }
+
+        // Content-only runtimes have no submit handler, so reject submit posts.
+        if (!$runtime instanceof EmbeddedFormRuntimeInterface) {
+            $this->context->notFound();
+            return;
+        }
+
+        $slug = $this->context->input()->slug($formSlug);
+        if ($slug === null) {
+            $this->context->notFound();
+            return;
+        }
+
+        $returnPath = $this->embeddedFormRuntimeService()->sanitizeReturnPath((string) ($_POST['return_path'] ?? '/'));
+
+        try {
+            $runtime->submit($slug, $returnPath, fn (): ?string => $this->context->validatePublicCaptcha());
+        } catch (\Throwable $exception) {
+            error_log(
+                'Raven embedded form submit failed for type "'
+                . $runtime->type()
+                . '": '
+                . $exception->getMessage()
+            );
+            $this->context->notFound();
+        }
     }
 
     /**

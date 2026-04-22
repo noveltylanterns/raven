@@ -14,11 +14,14 @@ namespace Raven\Core\Routing\Public;
 use Closure;
 use PDO;
 use Raven\Core\Controller\Public\AuthController as PublicAuthController;
-use Raven\Core\Controller\Public\ContentController as PublicContentController;
+use Raven\Core\Controller\Public\CategoryController as PublicCategoryController;
+use Raven\Core\Controller\Public\ChannelController as PublicChannelController;
 use Raven\Core\Controller\Public\FeedController as PublicFeedController;
-use Raven\Core\Controller\Public\FormController as PublicFormController;
-use Raven\Core\Controller\Public\ProfileController as PublicProfileController;
+use Raven\Core\Controller\Public\GroupController as PublicGroupController;
+use Raven\Core\Controller\Public\PageController as PublicPageController;
 use Raven\Core\Controller\Public\SharedController;
+use Raven\Core\Controller\Public\TagController as PublicTagController;
+use Raven\Core\Controller\Public\UserController as PublicUserController;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\InviteRepository;
@@ -55,10 +58,13 @@ final class PublicRuntimeBuilder
         }
 
         $publicAuthController = null;
-        $publicContentController = null;
+        $publicPageController = null;
         $publicFeedController = null;
-        $publicFormController = null;
-        $publicProfileController = null;
+        $publicCategoryController = null;
+        $publicChannelController = null;
+        $publicGroupController = null;
+        $publicTagController = null;
+        $publicUserController = null;
         $publicSharedController = null;
         $extensionServices = null;
         $inviteTokens = null;
@@ -355,10 +361,14 @@ final class PublicRuntimeBuilder
         });
 
         $rvn['public_domain_content'] = $publicContentDomain;
+        $rvn['public_domain_channel'] = $publicContentDomain;
         $rvn['public_domain_feed'] = $publicContentDomain;
+        $rvn['public_domain_category'] = $publicContentDomain;
         $rvn['public_channel_parser'] = $channelDataParserFactory;
         $rvn['public_domain_auth'] = $publicAuthDomain;
         $rvn['public_domain_profile'] = $publicAuthDomain;
+        $rvn['public_domain_group'] = $publicAuthDomain;
+        $rvn['public_domain_tag'] = $publicContentDomain;
         $rvn['public_domain_form'] = $publicFormDomain;
 
         /**
@@ -401,46 +411,90 @@ final class PublicRuntimeBuilder
         };
 
         /**
-         * Builds the split public profile controller on first use.
+         * Builds the split public channel controller on first use.
          */
-        $rvn['public_profile_controller'] = static function () use (&$publicProfileController, &$rvn, $publicAuthDomain): PublicProfileController {
-            if ($publicProfileController instanceof PublicProfileController) {
-                return $publicProfileController;
+        $rvn['public_channel_controller'] = static function () use (&$publicChannelController, &$rvn, $publicContentDomain, $publicAuthDomain, $publicFormDomain): PublicChannelController {
+            if ($publicChannelController instanceof PublicChannelController) {
+                return $publicChannelController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['public_request_context'];
+            $contentDomain = $publicContentDomain();
+            $authDomain = $publicAuthDomain();
+            $formDomain = $publicFormDomain();
+            $publicChannelController = new PublicChannelController(
+                $requestContextFactory(),
+                $contentDomain['page_images'],
+                $contentDomain['page'],
+                $contentDomain['redirect'],
+                $authDomain['user'],
+                $formDomain['extension_services']
+            );
+
+            return $publicChannelController;
+        };
+
+        /**
+         * Builds the split public category controller on first use.
+         */
+        $rvn['public_category_controller'] = static function () use (&$publicCategoryController, &$rvn, $publicContentDomain): PublicCategoryController {
+            if ($publicCategoryController instanceof PublicCategoryController) {
+                return $publicCategoryController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['public_request_context'];
+            $contentDomain = $publicContentDomain();
+            $publicCategoryController = new PublicCategoryController(
+                $requestContextFactory(),
+                $contentDomain['page'],
+                $contentDomain['taxonomy_lookup']()
+            );
+
+            return $publicCategoryController;
+        };
+
+        /**
+         * Builds the split public group controller on first use.
+         */
+        $rvn['public_group_controller'] = static function () use (&$publicGroupController, &$rvn, $publicAuthDomain): PublicGroupController {
+            if ($publicGroupController instanceof PublicGroupController) {
+                return $publicGroupController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['public_request_context'];
             $authDomain = $publicAuthDomain();
-            $publicProfileController = new PublicProfileController(
+            $publicGroupController = new PublicGroupController(
                 $requestContextFactory(),
-                $authDomain['group'],
-                $authDomain['user']
+                $authDomain['group']
             );
 
-            return $publicProfileController;
+            return $publicGroupController;
         };
 
         /**
-         * Builds the split public form controller on first use.
+         * Builds the split public user controller on first use.
          */
-        $rvn['public_form_controller'] = static function () use (&$publicFormController, &$rvn, $publicFormDomain): PublicFormController {
-            if ($publicFormController instanceof PublicFormController) {
-                return $publicFormController;
+        $rvn['public_user_controller'] = static function () use (&$publicUserController, &$rvn, $publicAuthDomain): PublicUserController {
+            if ($publicUserController instanceof PublicUserController) {
+                return $publicUserController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['public_request_context'];
-            $formDomain = $publicFormDomain();
-            $publicFormController = new PublicFormController(
+            $authDomain = $publicAuthDomain();
+            $publicUserController = new PublicUserController(
                 $requestContextFactory(),
-                $formDomain['extension_services']
+                $authDomain['user']
             );
 
-            return $publicFormController;
+            return $publicUserController;
         };
 
         /**
-         * Builds the split public feed/taxonomy controller on first use.
+         * Builds the split public feed controller on first use.
          */
         $rvn['public_feed_controller'] = static function () use (&$publicFeedController, &$rvn, $publicContentDomain): PublicFeedController {
             if ($publicFeedController instanceof PublicFeedController) {
@@ -461,11 +515,31 @@ final class PublicRuntimeBuilder
         };
 
         /**
-         * Builds the split public content controller on first use.
+         * Builds the split public tag controller on first use.
          */
-        $rvn['public_content_controller'] = static function () use (&$publicContentController, &$rvn, $publicContentDomain, $publicAuthDomain, $publicFormDomain): PublicContentController {
-            if ($publicContentController instanceof PublicContentController) {
-                return $publicContentController;
+        $rvn['public_tag_controller'] = static function () use (&$publicTagController, &$rvn, $publicContentDomain): PublicTagController {
+            if ($publicTagController instanceof PublicTagController) {
+                return $publicTagController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['public_request_context'];
+            $contentDomain = $publicContentDomain();
+            $publicTagController = new PublicTagController(
+                $requestContextFactory(),
+                $contentDomain['page'],
+                $contentDomain['taxonomy_lookup']()
+            );
+
+            return $publicTagController;
+        };
+
+        /**
+         * Builds the split public page controller on first use.
+         */
+        $rvn['public_page_controller'] = static function () use (&$publicPageController, &$rvn, $publicContentDomain, $publicAuthDomain, $publicFormDomain): PublicPageController {
+            if ($publicPageController instanceof PublicPageController) {
+                return $publicPageController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
@@ -473,7 +547,7 @@ final class PublicRuntimeBuilder
             $contentDomain = $publicContentDomain();
             $authDomain = $publicAuthDomain();
             $formDomain = $publicFormDomain();
-            $publicContentController = new PublicContentController(
+            $publicPageController = new PublicPageController(
                 $requestContextFactory(),
                 $contentDomain['channel_parser'],
                 $contentDomain['page_images'],
@@ -483,7 +557,7 @@ final class PublicRuntimeBuilder
                 $formDomain['extension_services']
             );
 
-            return $publicContentController;
+            return $publicPageController;
         };
 
         $rvn['public_extension_services'] = $extensionServicesProvider;

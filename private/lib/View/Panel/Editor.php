@@ -14,7 +14,7 @@ namespace Raven\Lib\View\Panel;
 /**
  * Provides shared normalization helpers for panel editor forms.
  *
- * Extracted from ContentController, ConfigController, UserController, and
+ * Extracted from PageController, ConfigController, UserController, and
  * PreferencesController, where the same pure normalization logic was duplicated.
  * No injected dependencies — all methods are stateless string normalizers.
  */

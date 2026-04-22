@@ -18,6 +18,7 @@ use Raven\Core\Repository\TagRepository;
 use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
 use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
 use Raven\Lib\Extension\ExtensionRegistry;
 use Raven\Lib\Parser\CategoryDataParser;
@@ -490,61 +491,10 @@ function raven_cli_find_row_by_slug(array $rows, string $slug): ?array
  */
 function raven_cli_extension_state_load(string $root): array
 {
-    $statePath = raven_cli_extension_state_primary_path($root);
-    if (!is_file($statePath)) {
-        return ['enabled' => [], 'permissions' => []];
-    }
-
-    clearstatcache(true, $statePath);
-    if (function_exists('opcache_invalidate')) {
-        @opcache_invalidate($statePath, true);
-    }
-
-    /** @var mixed $loaded */
-    $loaded = require $statePath;
-    if (!is_array($loaded)) {
-        return ['enabled' => [], 'permissions' => []];
-    }
-
-    /** @var mixed $rawEnabled */
-    $rawEnabled = array_key_exists('enabled', $loaded) ? $loaded['enabled'] : $loaded;
-    if (!array_key_exists('enabled', $loaded) && array_key_exists('permissions', $loaded)) {
-        $rawEnabled = [];
-    }
-
-    /** @var mixed $rawPermissions */
-    $rawPermissions = $loaded['permissions'] ?? [];
-
-    $enabled = [];
-    if (is_array($rawEnabled)) {
-        foreach ($rawEnabled as $slug => $flag) {
-            $name = strtolower(trim((string) $slug));
-            if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $name) !== 1) {
-                continue;
-            }
-            if ((bool) $flag) {
-                $enabled[$name] = true;
-            }
-        }
-    }
-
-    $permissions = [];
-    if (is_array($rawPermissions)) {
-        foreach ($rawPermissions as $slug => $bit) {
-            $name = strtolower(trim((string) $slug));
-            if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $name) !== 1) {
-                continue;
-            }
-            $permissions[$name] = (int) $bit;
-        }
-    }
-
-    ksort($enabled);
-    ksort($permissions);
-
+    $stateStore = new ExtensionStateStore(rtrim($root, '/') . '/private/ext');
     return [
-        'enabled' => $enabled,
-        'permissions' => $permissions,
+        'enabled' => $stateStore->loadEnabledMap(),
+        'permissions' => $stateStore->loadPermissionMap(),
     ];
 }
 
@@ -554,63 +504,8 @@ function raven_cli_extension_state_load(string $root): array
  */
 function raven_cli_extension_state_save(string $root, array $enabled, array $permissions): void
 {
-    $statePath = raven_cli_extension_state_primary_path($root);
-
-    $safeEnabled = [];
-    foreach ($enabled as $slug => $flag) {
-        $name = strtolower(trim((string) $slug));
-        if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $name) !== 1) {
-            continue;
-        }
-        if ((bool) $flag) {
-            $safeEnabled[$name] = true;
-        }
-    }
-
-    $safePermissions = [];
-    foreach ($permissions as $slug => $bit) {
-        $name = strtolower(trim((string) $slug));
-        if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $name) !== 1) {
-            continue;
-        }
-        $safePermissions[$name] = (int) $bit;
-    }
-
-    ksort($safeEnabled);
-    ksort($safePermissions);
-
-    $content = "<?php\n\n";
-    $content .= "/**\n";
-    $content .= " * RAVEN CMS\n";
-    $content .= " * ~/private/dat/ext/.state.php\n";
-    $content .= " * Persisted extension enablement map and permission settings managed by panel/CLI.\n";
-    $content .= " * Docs: https://raven.lanterns.io\n";
-    $content .= " */\n\n";
-    $content .= "declare(strict_types=1);\n\n";
-    $content .= 'return ' . var_export([
-        'enabled' => $safeEnabled,
-        'permissions' => $safePermissions,
-    ], true) . ";\n";
-
-    $stateDirectory = dirname($statePath);
-    if (!is_dir($stateDirectory) && !mkdir($stateDirectory, 0775, true) && !is_dir($stateDirectory)) {
-        throw new RuntimeException('Failed to create private/dat/ext directory.');
-    }
-
-    $written = file_put_contents($statePath, $content, LOCK_EX);
-    if ($written === false) {
-        throw new RuntimeException('Failed to persist private/dat/ext/.state.php.');
-    }
-
-    clearstatcache(true, $statePath);
-    if (function_exists('opcache_invalidate')) {
-        @opcache_invalidate($statePath, true);
-    }
-}
-
-function raven_cli_extension_state_primary_path(string $root): string
-{
-    return rtrim($root, '/') . '/private/dat/ext/.state.php';
+    $stateStore = new ExtensionStateStore(rtrim($root, '/') . '/private/ext');
+    $stateStore->saveState($enabled, $permissions);
 }
 
 function raven_cli_remove_directory_recursive(string $directory): void

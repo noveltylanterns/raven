@@ -36,13 +36,15 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 		- [x] Taxonomy/channel/group image filesystem writes now route through `lib/Scribe/TaxonomyImageScribe.php`; panel controllers keep config/path reads on `TaxonomyImageService` while taxonomy image upload, variant generation, and stored-path cleanup moved into the canonical write-side seam.
 		- [x] User avatar/cover filesystem writes now route through `lib/Scribe/UserMediaScribe.php`; panel user/preferences controllers keep URL/template reads on `UserMediaPathService` while upload storage, deterministic filename policy, and old-file cleanup moved into the canonical write-side seam.
 		- [x] Existing-account auth-user profile/security writes now route through `lib/Scribe/AuthProfileScribe.php`; `AuthService` keeps the login/session/read facade while current-user preference updates, password changes, avatar/cover references, and stored 2FA payload persistence moved into the canonical write-side seam.
+		- [x] Login-throttle bucket writes now route through `lib/Scribe/LoginThrottleScribe.php`; `LoginThrottleService` keeps bucket lookup and lockout policy while auth-failure upserts, clears, and stale-row pruning moved into the canonical write-side seam.
+		- [x] Extension state-file writes now route through `lib/Scribe/ExtensionStateScribe.php`; `ExtensionStateStore` keeps the read-side state loading helpers while `.state.php` normalization, serialization, and schema-marker invalidation moved into the canonical write-side seam, and CLI state saves now route through the same library path.
 		- [ ] Next parser-coverage follow-up batch for channel-backed read flows:
 			- [x] Expand `ChannelDataParser` to cover the remaining live read-only repository calls that still bypass the parser surface (`listOptions()`, `slugExists()`, and any stable count/lookups we want to treat as canonical reads).
 			- [x] Add one public-runtime channel-parser seam in `PublicRuntimeBuilder` so split public controllers can depend on `ChannelDataParser` for reads without each controller instantiating its own parser.
-			- [x] Rewire `Public/ContentController` channel-read lookups (`findBySlug()` in channel/page route resolution) to use `ChannelDataParser` instead of direct `ChannelRepository` reads.
+			- [x] Rewire the public page controller channel-read lookups (`findBySlug()` in channel/page route resolution) to use `ChannelDataParser` instead of direct `ChannelRepository` reads.
 			- [x] Rewire `Public/FeedController` channel-read lookups (`findBySlug()` in feed/channel label resolution) to use `ChannelDataParser` instead of direct `ChannelRepository` reads.
 			- [x] Rewire `Panel/RedirectController` channel existence validation to use parser-owned read helpers instead of `ChannelRepository::slugExists()`.
-			- [x] Rewire `Panel/ContentController` channel option loading for the page editor to use parser-owned read helpers instead of `ChannelRepository::listOptions()`.
+			- [x] Rewire the panel page controller channel option loading for the page editor to use parser-owned read helpers instead of `ChannelRepository::listOptions()`.
 			- [x] Decide whether taxonomy-set assignment counts (`countExplicitTaxonomySetAssignments()`) belong on the parser read surface or should stay repository-only until the broader channel write/read split is finished; then update `Panel/TaxonomyController` accordingly.
 			- [x] After the core controller/runtime rewires are done, audit debug/profiling utilities (`debug/util/profile-panel-lists.php`, `debug/util/profile-public-pages.php`) and any remaining CLI read flows so they follow the same parser-vs-repo rule instead of preserving legacy direct reads by accident.
 	- [ ] Parallel to our new comprehensive Parser classes, we need a complete set of Scribe/ classes that can write virtually every data type.
@@ -56,6 +58,8 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 		- [x] Taxonomy/channel/group image uploads and cleanup now have a canonical write surface via `lib/Scribe/TaxonomyImageScribe.php`.
 		- [x] User avatar/cover media files now have a canonical write surface via `lib/Scribe/UserMediaScribe.php`.
 		- [x] Existing-account auth-user profile/security fields now have a canonical write surface via `lib/Scribe/AuthProfileScribe.php`.
+		- [x] Login-throttle bucket rows now have a canonical write surface via `lib/Scribe/LoginThrottleScribe.php`.
+		- [x] Extension enablement/permission state files now have a canonical write surface via `lib/Scribe/ExtensionStateScribe.php`.
 - [ ] Clean up after our lib/View/ refactor now that I can make sense of whats going on in there:
 	- [x] SiteContextBuilder is shared dead weight. We have enough shared controllers and shared bootstraps and shared routers that this file shouldn't even exist. Panel-only things belong in PanelController and public-only things belong in PublicController. Other things belong in other more specific libraries. Everything in here has a better place. Do an audit and work out eliminating the need for this file.
 		- [x] `View/SiteContextBuilder` was removed. Panel `site` payload assembly now lives directly in `Panel/SharedController`, `Panel/AuthController`, and the panel runtime bootstrap closure, while public base/fallback meta payload assembly now lives in `View/Public/MetaService` and `View/Error`.
@@ -73,7 +77,7 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	- [x] Panel\ListWrapper should be Panel\List
 		- [x] `Panel\List` is not a legal PHP class name because `list` is reserved, so the helper was renamed to `Panel\ListCard` instead. All nine core panel list templates now import `ListCard`.
 	- [x] Panel\PagePanelFilterClauseBuilder should be universalized as Panel\ListFilter, with Page-specific logic moving to the Panel\PageController where it belongs.
-		- [x] `View/Panel/PagePanelFilterClauseBuilder` was replaced by `View/Panel/ListFilter`. `Panel/ContentController` now resolves page-list channel slugs to ids before calling the parser/repository path, and `PageRepository` now applies only generic id-based equality/EXISTS filters through the shared helper.
+		- [x] `View/Panel/PagePanelFilterClauseBuilder` was replaced by `View/Panel/ListFilter`. The panel page controller now resolves page-list channel slugs to ids before calling the parser/repository path, and `PageRepository` now applies only generic id-based equality/EXISTS filters through the shared helper.
 - [ ] We need to set more specific boundaries between Parser/Scribe libraries, the Panel controllers, CLI, and the Repos they call.
 	- [x] TaxonomySetRepository should just be SetRepository
 		- [x] `sys/Repository/TaxonomySetRepository` was renamed to `sys/Repository/SetRepository`, and the panel runtime plus panel config/content/system/taxonomy controllers now depend on the shorter repository name for category/tag set reads and writes.
@@ -98,12 +102,24 @@ Our lib/ and sys/ folders are sloppy. We need to move things around so it is eas
 	- [x] Channel routes were extracted to `Panel/ChannelController`; `TaxonomyController` now owns only category/category-set/tag/tag-set routes.
 	- [x] Category routes were extracted to `Panel/CategoryController`; `TaxonomyController` is now narrowed to tag/tag-set routes, and the stale category-set slug-preservation lookup now reads from the correct category set repository.
 	- [ ] Once the split is wired into place, make sure each Controller is only dealing with the route it was made for. Optimize and flatten useless bullshit entirely.
-	- [ ] ContentController should be called PageController, so it matches what it's called in the Panel.
+		- [x] The old bundled `PanelTaxonomyRouteRegistrar` was removed. Panel routing now registers `/channel*`, `/category*`, and `/tag*` through `PanelChannelRouteRegistrar`, `PanelCategoryRouteRegistrar`, and `PanelTagRouteRegistrar`, so the front controller no longer threads three route families through one taxonomy registrar.
+		- [x] Event-log routes were extracted out of `Panel/SystemController` into `Panel/LogsController`, and panel routing now registers `/logs*` through `PanelLogRouteRegistrar` instead of the broader system-route registrar.
+		- [x] Routing diagnostics were extracted out of `Panel/SystemController` into `Panel/RoutingController`, and panel routing now registers `/routing*` through `PanelRoutingRouteRegistrar` instead of the broader system-route registrar.
+		- [x] Updater routes were extracted out of `Panel/SystemController` into `Panel/UpdateController`, and panel routing now registers `/update*` through `PanelUpdateRouteRegistrar` instead of the broader system-route registrar.
+	- [x] ContentController should be called PageController, so it matches what it's called in the Panel.
+		- [x] Both panel and public `ContentController` classes were renamed to `PageController`, and the runtime/controller wiring now resolves `panel_page_controller` / `public_page_controller` for the page-route seam.
 	- [ ] A controller should not have to call a whole other controller from a different route. For example, if Channel data has to be read from a Page route, the Page should consult our refactored Channel repository and/or new ChannelRepoParser class. Do a sweep across controllers, repos & routers to make sure they all behave this way so again, we aren't calling in dead weight on Panel routes it is not needed. A lot of legacy logic still resides around Controllers.
-	- [ ] Once all of that is done, repeat this process on the Public controllers.
-	- [ ] Missing Public/ controllers for Channels, Categories, Tags & Groups.
-	- [ ] ProfileController should be called UserController so it matches everything else.
-	- [ ] FormController is only used on page routes, fold it into PageController.
+		- [x] Panel route registrars and panel extension-route gating no longer drag in `SystemController` just to render stock 404s. Invalid panel-route params now use `panel_request_context()->renderPanelNotFound()`, while guest/extension gate misses render the public 404 directly through `View\Error`.
+	- [x] Once all of that is done, repeat this process on the Public controllers.
+		- [x] Public route families now have dedicated seams instead of riding through mixed controllers: profile routes live on `Public/UserController`, group routes on `Public/GroupController`, category routes on `Public/CategoryController`, tag routes on `Public/TagController`, single-segment channel landings on `Public/ChannelController`, feed/XML routes on `Public/FeedController`, and homepage/channel-qualified page routes on `Public/PageController`.
+	- [x] Missing Public/ controllers for Channels, Categories, Tags & Groups.
+		- [x] Public group routes were extracted out of `Public/UserController` into `Public/GroupController`, and the public front-controller/runtime wiring now resolves a dedicated `public_group_controller` seam plus `PublicGroupRouteRegistrar`.
+		- [x] Public category and tag listing routes were extracted out of `Public/FeedController` into `Public/CategoryController` and `Public/TagController`, and the public front-controller/runtime wiring now resolves dedicated `public_category_controller` / `public_tag_controller` seams plus `PublicCategoryRouteRegistrar` / `PublicTagRouteRegistrar`.
+		- [x] Public single-segment channel landing/root-page routes were extracted out of `Public/PageController` into `Public/ChannelController`, and the public front-controller/runtime wiring now resolves a dedicated `public_channel_controller` seam plus `PublicChannelRouteRegistrar`.
+	- [x] ProfileController should be called UserController so it matches everything else.
+		- [x] The public profile/group route controller is now `Public/UserController`, and the public runtime/front-controller seam now resolves `public_user_controller` instead of `public_profile_controller`.
+	- [x] FormController is only used on page routes, fold it into PageController.
+		- [x] Public embedded-form submission now lives on `Public/PageController`, the standalone `Public/FormController` file was removed, and the public form route registrar now calls the page controller directly.
 - [x] lib/Security/CaptchaService.php should be Captcha.php
 	- [x] `CaptchaService` was renamed to `Captcha`, and the remaining public shared-controller captcha helper wiring now imports the shorter security primitive name directly.
 - [x] lib/Security/TotpService.php should be Totp.php

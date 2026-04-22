@@ -42,6 +42,10 @@ final class Raven
     $root = dirname(__DIR__);
     require_once $root . '/private/lib/Extension/ExtensionRegistry.php';
     require_once $root . '/private/lib/Extension/Layout.php';
+    // ExtensionStateStore instantiates ExtensionStateScribe in its constructor,
+    // which runs inside enabledDirectories() before the spl_autoload_register below.
+    // Require it directly so it is available at that point.
+    require_once $root . '/private/lib/Scribe/ExtensionStateScribe.php';
     $enabledExtensionDirectories = ExtensionRegistry::enabledDirectories($root, true);
 
     // Load per-package handlers instead of the full Composer autoloader.

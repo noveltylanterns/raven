@@ -16,7 +16,7 @@ namespace Raven\Lib\View\Panel;
  *
  * Centralises the primary asset URLs and ordered fallback path lists so that
  * the page/edit template receives them from PHP rather than duplicating the
- * paths as hardcoded JS literals. Only wired up in ContentController, the one
+ * paths as hardcoded JS literals. Only wired up in PageController, the one
  * controller that actually serves the Markdown (EasyMDE) editor. No injected
  * dependencies — all methods are stateless.
  */

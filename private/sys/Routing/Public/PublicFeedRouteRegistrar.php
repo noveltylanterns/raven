@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Routing/Public/PublicFeedRouteRegistrar.php
- * Public feed and taxonomy-route registration.
+ * Public feed-route registration.
  * Docs: https://raven.lanterns.io
  */
 
@@ -15,14 +15,14 @@ use Raven\Core\Routing\Router;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
- * Registers feed, category, and tag public routes.
+ * Registers public feed routes, including taxonomy-scoped feed endpoints.
  */
 final class PublicFeedRouteRegistrar
 {
     /**
-     * Registers the public feed and taxonomy route family.
+     * Registers the public feed route family.
      *
-     * @param Router $router Mutable router receiving feed/taxonomy routes.
+     * @param Router $router Mutable router receiving feed routes.
      * @param callable(): object $publicFeedController Lazy public-feed controller factory.
      * @param callable(): object $publicRequestContext Lazy public request-context factory.
      * @param InputSanitizer $input Shared input normalizer for route params.
@@ -138,56 +138,5 @@ final class PublicFeedRouteRegistrar
             }
         }
 
-        if ($categoryPrefix !== '') {
-            $categoryRouteBase = '/' . $categoryPrefix;
-            $router->add('GET', $categoryRouteBase . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
-                $slug = $input->slug($params['slug'] ?? null);
-
-                if ($slug === null) {
-                    $publicRequestContext()->notFound();
-                    return;
-                }
-
-                $publicFeedController()->category($slug, 1);
-            });
-
-            $router->add('GET', $categoryRouteBase . '/{slug}/{page}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
-                $slug = $input->slug($params['slug'] ?? null);
-                $page = $input->int($params['page'] ?? null, 1);
-
-                if ($slug === null || $page === null) {
-                    $publicRequestContext()->notFound();
-                    return;
-                }
-
-                $publicFeedController()->category($slug, $page);
-            });
-        }
-
-        if ($tagPrefix !== '') {
-            $tagRouteBase = '/' . $tagPrefix;
-            $router->add('GET', $tagRouteBase . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
-                $slug = $input->slug($params['slug'] ?? null);
-
-                if ($slug === null) {
-                    $publicRequestContext()->notFound();
-                    return;
-                }
-
-                $publicFeedController()->tag($slug, 1);
-            });
-
-            $router->add('GET', $tagRouteBase . '/{slug}/{page}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
-                $slug = $input->slug($params['slug'] ?? null);
-                $page = $input->int($params['page'] ?? null, 1);
-
-                if ($slug === null || $page === null) {
-                    $publicRequestContext()->notFound();
-                    return;
-                }
-
-                $publicFeedController()->tag($slug, $page);
-            });
-        }
     }
 }

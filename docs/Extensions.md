@@ -79,7 +79,7 @@ Panel extension routing is generic (`routes_panel.php` contract).
 Public extension runtime is currently not generic:
 
 - Core public request controllers explicitly integrate supported extension behaviors.
-- `Public\SharedController` owns extension-template rendering through the site theme pipeline, and `Public\ContentController` owns the built-in shortcode/content runtime integration points.
+- `Public\SharedController` owns extension-template rendering through the site theme pipeline, and `Public\PageController` owns the built-in shortcode/content runtime integration points.
 - Current built-in integration points are Contact Forms and Signup Sheets shortcodes.
 
 Page Editor shortcode insertion is generic for enabled extensions:

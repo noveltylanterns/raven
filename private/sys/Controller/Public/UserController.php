@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Controller/Public/ProfileController.php
- * Split public profile controller for user and group profile routes.
+ * ~/private/sys/Controller/Public/UserController.php
+ * Split public user controller for public profile routes.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,7 +11,6 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Public;
 
-use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Parser\UserDataParser;
@@ -19,12 +18,11 @@ use Raven\Lib\View\Public\RouteRenderService;
 use Raven\Lib\View\Public\TemplateDecorator;
 
 /**
- * Handles split public profile and group routes.
+ * Handles split public user-profile routes.
  */
-final class ProfileController
+final class UserController
 {
     private SharedController $context;
-    private GroupRepository $groupRepo;
     private LoginIdentifierResolver $loginIdentifierResolver;
     private UserDataParser $profileContactService;
     private RouteRenderService $routeRenderService;
@@ -32,17 +30,14 @@ final class ProfileController
 
     /**
      * @param SharedController $context Shared public request context.
-     * @param GroupRepository $groupRepo Group repository for public group routes.
      * @param UserRepository $userRepo User repository for public profile routes.
      * @return void
      */
     public function __construct(
         SharedController $context,
-        GroupRepository $groupRepo,
         UserRepository $userRepo
     ) {
         $this->context = $context;
-        $this->groupRepo = $groupRepo;
         $this->loginIdentifierResolver = new LoginIdentifierResolver();
         $this->profileContactService = new UserDataParser($context->input(), $userRepo);
         $this->routeRenderService = new RouteRenderService();
@@ -101,62 +96,6 @@ final class ProfileController
     }
 
     /**
-     * Renders one public group route `/{group_prefix}/{group_slug}`.
-     *
-     * @param string $groupSlug Raw group route segment.
-     * @return void
-     */
-    public function group(string $groupSlug): void
-    {
-        $groupMode = $this->context->groupParser()->groupMode();
-        $isLoggedIn = $this->context->auth()->isLoggedIn();
-        if ($this->context->groupParser()->groupRoutePrefix() === '') {
-            $this->context->notFound();
-            return;
-        }
-
-        if ($groupMode === 'disabled') {
-            $this->renderGroupUnavailable('not_found', 'disabled');
-            return;
-        }
-
-        if ($groupMode === 'private' && !$isLoggedIn) {
-            $this->renderGroupUnavailable('permission_denied', 'private');
-            return;
-        }
-
-        $normalizedSlug = $this->context->input()->slug($groupSlug);
-        if ($normalizedSlug === null) {
-            $this->context->notFound();
-            return;
-        }
-
-        $groupRouteData = $this->groupRepo->findPublicRouteDataBySlug($normalizedSlug);
-        if ($groupRouteData === null) {
-            $this->context->notFound();
-            return;
-        }
-
-        $group = is_array($groupRouteData['group'] ?? null) ? $groupRouteData['group'] : [];
-        $members = is_array($groupRouteData['members'] ?? null) ? $groupRouteData['members'] : [];
-        $members = $this->templateDecorator->decorateGroupMembersForTemplate($members);
-        $group = $this->templateDecorator->decorateGroupForTemplate($group, $members);
-
-        $template = match ($groupMode) {
-            'public_full' => 'group/list',
-            'public_limited' => $isLoggedIn ? 'group/list' : 'group/limited',
-            'private' => 'group/list',
-            default => 'group/index',
-        };
-
-        $this->context->renderPublic($template, [
-            'site' => $this->context->siteData(),
-            'group' => $group,
-            'members' => $members,
-        ], 'wrapper');
-    }
-
-    /**
      * Renders profile-disabled/private-denied placeholder with explicit status.
      *
      * @param string $error Public route error key.
@@ -169,24 +108,6 @@ final class ProfileController
         http_response_code((int) ($payload['status'] ?? 404));
         $this->context->renderPublic(
             (string) ($payload['template'] ?? 'profile/index'),
-            is_array($payload['data'] ?? null) ? $payload['data'] : [],
-            (string) ($payload['layout'] ?? 'wrapper')
-        );
-    }
-
-    /**
-     * Renders group-route disabled/private-denied placeholder with explicit status.
-     *
-     * @param string $error Public route error key.
-     * @param string $mode Group visibility mode that triggered the response.
-     * @return void
-     */
-    private function renderGroupUnavailable(string $error, string $mode): void
-    {
-        $payload = $this->routeRenderService->groupUnavailablePayload($error, $mode, $this->context->siteData());
-        http_response_code((int) ($payload['status'] ?? 404));
-        $this->context->renderPublic(
-            (string) ($payload['template'] ?? 'group/index'),
             is_array($payload['data'] ?? null) ? $payload['data'] : [],
             (string) ($payload['layout'] ?? 'wrapper')
         );

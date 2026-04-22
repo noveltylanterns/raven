@@ -14,7 +14,7 @@ namespace Raven\Core\Routing\Panel;
 use Raven\Core\Routing\Router;
 
 /**
- * Registers configuration/system-management routes for the panel runtime.
+ * Registers configuration plus the remaining theme/extension system routes for the panel runtime.
  */
 final class PanelSystemRouteRegistrar
 {
@@ -36,36 +36,8 @@ final class PanelSystemRouteRegistrar
             $panelConfigController()->configuration();
         });
 
-        $router->add('GET', '/update', static function () use ($panelSystemController): void {
-            $panelSystemController()->update();
-        });
-
-        $router->add('POST', '/update/action', static function () use ($panelSystemController): void {
-            $panelSystemController()->updateAction($_POST);
-        });
-
         $router->add('POST', '/configuration/save', static function () use ($panelConfigController): void {
             $panelConfigController()->configurationSave($_POST);
-        });
-
-        $router->add('GET', '/routing', static function () use ($panelSystemController): void {
-            $panelSystemController()->routing();
-        });
-
-        $router->add('GET', '/routing/export', static function () use ($panelSystemController): void {
-            $panelSystemController()->routingExport();
-        });
-
-        $router->add('GET', '/logs', static function () use ($panelSystemController): void {
-            $panelSystemController()->logs();
-        });
-
-        $router->add('GET', '/logs/export', static function () use ($panelSystemController): void {
-            $panelSystemController()->logsExport();
-        });
-
-        $router->add('POST', '/logs/clear', static function () use ($panelSystemController): void {
-            $panelSystemController()->logsClear();
         });
 
         $router->add('GET', '/themes', static function () use ($panelSystemController): void {
