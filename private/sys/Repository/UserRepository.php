@@ -20,9 +20,9 @@ use Raven\Lib\Auth\GroupMembershipWriteService;
 use Raven\Lib\Auth\UserGroupCatalogService;
 use Raven\Lib\Auth\Panel\UserPanelHydrator;
 use Raven\Lib\Auth\Panel\UserPanelQueryService;
-use Raven\Lib\Auth\UserPersistenceService;
 use Raven\Lib\Auth\Public\UserRoutingDataService;
 use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Scribe\UserScribe;
 
 /**
  * Data access for User CRUD and user-group membership assignments.
@@ -38,7 +38,7 @@ final class UserRepository
     private UserGroupCatalogService $userGroupCatalogService;
     private UserPanelQueryService $userPanelQueryService;
     private GroupMembershipWriteService $groupMembershipWriteService;
-    private UserPersistenceService $userPersistenceService;
+    private UserScribe $userScribe;
     private UserRoutingDataService $userRoutingDataService;
 
     public function __construct(PDO $authDb, PDO $rvnDb, string $driver, string $prefix)
@@ -53,7 +53,7 @@ final class UserRepository
         $this->userGroupCatalogService = new UserGroupCatalogService();
         $this->userPanelQueryService = new UserPanelQueryService();
         $this->groupMembershipWriteService = new GroupMembershipWriteService();
-        $this->userPersistenceService = new UserPersistenceService();
+        $this->userScribe = new UserScribe();
         $this->userRoutingDataService = new UserRoutingDataService();
     }
 
@@ -667,7 +667,7 @@ final class UserRepository
         $coverImage = $coverImage !== '' ? $coverImage : null;
         $stringLength = isset($data['string_length']) ? (int) $data['string_length'] : 28;
 
-        return $this->userPersistenceService->saveUser(
+        return $this->userScribe->saveUser(
             $this->authDb,
             $this->rvnDb,
             $this->authTable('users'),
@@ -696,7 +696,7 @@ final class UserRepository
 
     public function userStringById(int $id): ?string
     {
-        return $this->userPersistenceService->userStringById(
+        return $this->userScribe->userStringById(
             $this->authDb,
             $this->authTable('users'),
             $id
@@ -708,7 +708,7 @@ final class UserRepository
      */
     public function deleteById(int $id): void
     {
-        $this->userPersistenceService->deleteUserById(
+        $this->userScribe->deleteUserById(
             $this->authDb,
             $this->rvnDb,
             $this->authTable('users'),
@@ -722,7 +722,7 @@ final class UserRepository
      */
     public function usernameExistsForOtherUser(int $id, string $username): bool
     {
-        return $this->userPersistenceService->usernameExistsForOtherUser(
+        return $this->userScribe->usernameExistsForOtherUser(
             $this->authDb,
             $this->authTable('users'),
             $id,
@@ -735,7 +735,7 @@ final class UserRepository
      */
     public function emailExistsForOtherUser(int $id, string $email): bool
     {
-        return $this->userPersistenceService->emailExistsForOtherUser(
+        return $this->userScribe->emailExistsForOtherUser(
             $this->authDb,
             $this->authTable('users'),
             $id,
@@ -750,7 +750,7 @@ final class UserRepository
      */
     public function groupIdsForUser(int $userId): array
     {
-        return $this->userPersistenceService->groupIdsForUser(
+        return $this->userScribe->groupIdsForUser(
             $this->rvnDb,
             $this->groupTable('user_groups'),
             $userId
@@ -764,7 +764,7 @@ final class UserRepository
      */
     public function setUserGroups(int $userId, array $groupIds): void
     {
-        $this->userPersistenceService->setUserGroups(
+        $this->userScribe->setUserGroups(
             $this->rvnDb,
             $this->groupTable('user_groups'),
             $userId,

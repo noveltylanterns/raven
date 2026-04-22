@@ -13,8 +13,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Media\Panel\PageImageDeletionService;
-use Raven\Lib\Media\Panel\PageImagePrimarySelectionService;
+use Raven\Lib\Scribe\PageImageScribe;
 
 /**
  * Data access for page gallery images and their size variants.
@@ -24,16 +23,14 @@ final class PageImageRepository
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private PageImagePrimarySelectionService $pageImagePrimarySelectionService;
-    private PageImageDeletionService $pageImageDeletionService;
+    private PageImageScribe $pageImageScribe;
 
     public function __construct(PDO $db, string $driver, string $prefix)
     {
         $this->db = $db;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->pageImagePrimarySelectionService = new PageImagePrimarySelectionService();
-        $this->pageImageDeletionService = new PageImageDeletionService();
+        $this->pageImageScribe = new PageImageScribe($db, $driver, $prefix);
     }
 
     /**
@@ -102,134 +99,7 @@ final class PageImageRepository
      */
     public function insertImageWithVariants(array $image, array $variants): int
     {
-        $images = $this->table('page_images');
-        $imageVariants = $this->table('page_image_variants');
-        $now = gmdate('Y-m-d H:i:s');
-
-        $this->db->beginTransaction();
-
-        try {
-            if ($this->driver === 'pgsql') {
-                // PostgreSQL uses RETURNING for reliable primary-key retrieval.
-                $insert = $this->db->prepare(
-                    'INSERT INTO ' . $images . ' (
-                        page, storage_target, original_filename, stored_filename, stored_path,
-                        mime_type, extension, byte_size, width, height, hash,
-                        status, sort_order, include_in_gallery, alt_text, title_text, caption, credit, license,
-                        focal_x, focal_y, created, updated
-                    ) VALUES (
-                        :page, :storage_target, :original_filename, :stored_filename, :stored_path,
-                        :mime_type, :extension, :byte_size, :width, :height, :hash,
-                        :status, :sort_order, :include_in_gallery, :alt_text, :title_text, :caption, :credit, :license,
-                        :focal_x, :focal_y, :created, :updated
-                    )
-                    RETURNING id'
-                );
-                $insert->execute([
-                    ':page' => (int) ($image['page'] ?? 0),
-                    ':storage_target' => (string) ($image['storage_target'] ?? 'local'),
-                    ':original_filename' => (string) ($image['original_filename'] ?? ''),
-                    ':stored_filename' => (string) ($image['stored_filename'] ?? ''),
-                    ':stored_path' => (string) ($image['stored_path'] ?? ''),
-                    ':mime_type' => (string) ($image['mime_type'] ?? ''),
-                    ':extension' => (string) ($image['extension'] ?? ''),
-                    ':byte_size' => (int) ($image['byte_size'] ?? 0),
-                    ':width' => (int) ($image['width'] ?? 0),
-                    ':height' => (int) ($image['height'] ?? 0),
-                    ':hash' => (string) ($image['hash'] ?? ''),
-                    ':status' => (string) ($image['status'] ?? 'ready'),
-                    ':sort_order' => (int) ($image['sort_order'] ?? 1),
-                    ':include_in_gallery' => array_key_exists('include_in_gallery', $image) && empty($image['include_in_gallery']) ? 0 : 1,
-                    ':alt_text' => (string) ($image['alt_text'] ?? ''),
-                    ':title_text' => (string) ($image['title_text'] ?? ''),
-                    ':caption' => (string) ($image['caption'] ?? ''),
-                    ':credit' => (string) ($image['credit'] ?? ''),
-                    ':license' => (string) ($image['license'] ?? ''),
-                    ':focal_x' => $image['focal_x'] === null ? null : (float) $image['focal_x'],
-                    ':focal_y' => $image['focal_y'] === null ? null : (float) $image['focal_y'],
-                    ':created' => $now,
-                    ':updated' => $now,
-                ]);
-
-                $imageId = (int) $insert->fetchColumn();
-            } else {
-                $insert = $this->db->prepare(
-                    'INSERT INTO ' . $images . ' (
-                        page, storage_target, original_filename, stored_filename, stored_path,
-                        mime_type, extension, byte_size, width, height, hash,
-                        status, sort_order, include_in_gallery, alt_text, title_text, caption, credit, license,
-                        focal_x, focal_y, created, updated
-                    ) VALUES (
-                        :page, :storage_target, :original_filename, :stored_filename, :stored_path,
-                        :mime_type, :extension, :byte_size, :width, :height, :hash,
-                        :status, :sort_order, :include_in_gallery, :alt_text, :title_text, :caption, :credit, :license,
-                        :focal_x, :focal_y, :created, :updated
-                    )'
-                );
-                $insert->execute([
-                    ':page' => (int) ($image['page'] ?? 0),
-                    ':storage_target' => (string) ($image['storage_target'] ?? 'local'),
-                    ':original_filename' => (string) ($image['original_filename'] ?? ''),
-                    ':stored_filename' => (string) ($image['stored_filename'] ?? ''),
-                    ':stored_path' => (string) ($image['stored_path'] ?? ''),
-                    ':mime_type' => (string) ($image['mime_type'] ?? ''),
-                    ':extension' => (string) ($image['extension'] ?? ''),
-                    ':byte_size' => (int) ($image['byte_size'] ?? 0),
-                    ':width' => (int) ($image['width'] ?? 0),
-                    ':height' => (int) ($image['height'] ?? 0),
-                    ':hash' => (string) ($image['hash'] ?? ''),
-                    ':status' => (string) ($image['status'] ?? 'ready'),
-                    ':sort_order' => (int) ($image['sort_order'] ?? 1),
-                    ':include_in_gallery' => array_key_exists('include_in_gallery', $image) && empty($image['include_in_gallery']) ? 0 : 1,
-                    ':alt_text' => (string) ($image['alt_text'] ?? ''),
-                    ':title_text' => (string) ($image['title_text'] ?? ''),
-                    ':caption' => (string) ($image['caption'] ?? ''),
-                    ':credit' => (string) ($image['credit'] ?? ''),
-                    ':license' => (string) ($image['license'] ?? ''),
-                    ':focal_x' => $image['focal_x'] === null ? null : (float) $image['focal_x'],
-                    ':focal_y' => $image['focal_y'] === null ? null : (float) $image['focal_y'],
-                    ':created' => $now,
-                    ':updated' => $now,
-                ]);
-
-                $imageId = (int) $this->db->lastInsertId();
-            }
-
-            $insertVariant = $this->db->prepare(
-                'INSERT INTO ' . $imageVariants . ' (
-                    image, variant_key, stored_filename, stored_path,
-                    mime_type, extension, byte_size, width, height, created
-                ) VALUES (
-                    :image_id, :variant_key, :stored_filename, :stored_path,
-                    :mime_type, :extension, :byte_size, :width, :height, :created
-                )'
-            );
-
-            foreach ($variants as $variant) {
-                $insertVariant->execute([
-                    ':image_id' => $imageId,
-                    ':variant_key' => (string) ($variant['variant_key'] ?? ''),
-                    ':stored_filename' => (string) ($variant['stored_filename'] ?? ''),
-                    ':stored_path' => (string) ($variant['stored_path'] ?? ''),
-                    ':mime_type' => (string) ($variant['mime_type'] ?? ''),
-                    ':extension' => (string) ($variant['extension'] ?? ''),
-                    ':byte_size' => (int) ($variant['byte_size'] ?? 0),
-                    ':width' => (int) ($variant['width'] ?? 0),
-                    ':height' => (int) ($variant['height'] ?? 0),
-                    ':created' => $now,
-                ]);
-            }
-
-            $this->db->commit();
-
-            return $imageId;
-        } catch (\Throwable $exception) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-
-            throw $exception;
-        }
+        return $this->pageImageScribe->insertImageWithVariants($image, $variants);
     }
 
     /**
@@ -440,83 +310,7 @@ final class PageImageRepository
      */
     public function updateGalleryForPage(int $pageId, bool $enabled, array $imageUpdates): void
     {
-        $pages = $this->table('pages');
-        $images = $this->table('page_images');
-        $now = gmdate('Y-m-d H:i:s');
-        $imageUpdates = $this->canonicalizePrimarySelections($imageUpdates);
-        $coverImageId = $this->resolvedPrimaryImageId($pageId, $imageUpdates);
-
-        $this->db->beginTransaction();
-
-        try {
-            $updatePage = $this->db->prepare(
-                'UPDATE ' . $pages . '
-                 SET cover_image = :cover_image,
-                     preview_image = :preview_image,
-                     updated = :updated
-                 WHERE id = :id'
-            );
-            $updatePage->execute([
-                ':cover_image' => $coverImageId,
-                ':preview_image' => $coverImageId,
-                ':updated' => $now,
-                ':id' => $pageId,
-            ]);
-
-            if ($imageUpdates !== []) {
-                $updateImage = $this->db->prepare(
-                    'UPDATE ' . $images . '
-                     SET alt_text = :alt_text,
-                         title_text = :title_text,
-                         caption = :caption,
-                         credit = :credit,
-                         license = :license,
-                         focal_x = :focal_x,
-                         focal_y = :focal_y,
-                         sort_order = :sort_order,
-                         include_in_gallery = :include_in_gallery,
-                         updated = :updated
-                     WHERE id = :id
-                       AND page = :page'
-                );
-
-                foreach ($imageUpdates as $imageId => $update) {
-                    $updateImage->execute([
-                        ':alt_text' => (string) ($update['alt_text'] ?? ''),
-                        ':title_text' => (string) ($update['title_text'] ?? ''),
-                        ':caption' => (string) ($update['caption'] ?? ''),
-                        ':credit' => (string) ($update['credit'] ?? ''),
-                        ':license' => (string) ($update['license'] ?? ''),
-                        ':focal_x' => $update['focal_x'],
-                        ':focal_y' => $update['focal_y'],
-                        ':sort_order' => (int) ($update['sort_order'] ?? 1),
-                        ':include_in_gallery' => array_key_exists('include_in_gallery', $update) && empty($update['include_in_gallery']) ? 0 : 1,
-                        ':updated' => $now,
-                        ':id' => (int) $imageId,
-                        ':page' => $pageId,
-                    ]);
-                }
-            }
-
-            $this->db->commit();
-        } catch (\Throwable $exception) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-
-            throw $exception;
-        }
-    }
-
-    /**
-     * Enforces one cover selection across a page update payload.
-     *
-     * @param array<int, array<string, scalar|null>> $imageUpdates
-     * @return array<int, array<string, scalar|null>>
-     */
-    private function canonicalizePrimarySelections(array $imageUpdates): array
-    {
-        return $this->pageImagePrimarySelectionService->canonicalizePayloadSelections($imageUpdates);
+        $this->pageImageScribe->updateGalleryForPage($pageId, $enabled, $imageUpdates);
     }
 
     /**
@@ -526,14 +320,7 @@ final class PageImageRepository
      */
     public function deleteImageForPage(int $pageId, int $imageId): ?array
     {
-        return $this->pageImageDeletionService->deleteImageForPage(
-            $this->db,
-            $this->table('pages'),
-            $this->table('page_images'),
-            $this->table('page_image_variants'),
-            $pageId,
-            $imageId
-        );
+        return $this->pageImageScribe->deleteImageForPage($pageId, $imageId);
     }
 
     /**
@@ -543,13 +330,7 @@ final class PageImageRepository
      */
     public function deleteAllForPage(int $pageId): array
     {
-        return $this->pageImageDeletionService->deleteAllForPage(
-            $this->db,
-            $this->table('pages'),
-            $this->table('page_images'),
-            $this->table('page_image_variants'),
-            $pageId
-        );
+        return $this->pageImageScribe->deleteAllForPage($pageId);
     }
 
     /**
@@ -558,68 +339,6 @@ final class PageImageRepository
     private function publicUrlFromStoredPath(string $storedPath): string
     {
         return '/' . ltrim($storedPath, '/');
-    }
-
-    /**
-     * Returns variant rows for a list of image ids.
-     *
-     * @param array<int> $imageIds
-     * @return array<int, array<string, mixed>>
-     */
-    private function listVariantsByImageIds(array $imageIds, string $variantsTable): array
-    {
-        if ($imageIds === []) {
-            return [];
-        }
-
-        $placeholders = implode(', ', array_fill(0, count($imageIds), '?'));
-        $stmt = $this->db->prepare(
-            'SELECT image AS image_id, variant_key, stored_filename, stored_path,
-                    mime_type, extension, byte_size, width, height
-             FROM ' . $variantsTable . '
-             WHERE image IN (' . $placeholders . ')'
-        );
-        $stmt->execute(array_values($imageIds));
-
-        return $stmt->fetchAll() ?: [];
-    }
-
-    /**
-     * @param array<int, array<string, scalar|null>> $imageUpdates
-     */
-    private function resolvedPrimaryImageId(int $pageId, array $imageUpdates): ?int
-    {
-        $selected = $this->pageImagePrimarySelectionService->selectedImageId($imageUpdates);
-        if ($selected !== null) {
-            return $selected;
-        }
-
-        $pages = $this->table('pages');
-        $images = $this->table('page_images');
-        $stmt = $this->db->prepare(
-            'SELECT p.cover_image
-             FROM ' . $pages . ' p
-             WHERE p.id = :id
-               AND (
-                    p.cover_image IS NULL
-                    OR EXISTS (
-                        SELECT 1
-                        FROM ' . $images . ' i
-                        WHERE i.id = p.cover_image
-                          AND i.page = p.id
-                    )
-               )
-             LIMIT 1'
-        );
-        $stmt->execute([':id' => $pageId]);
-        $value = $stmt->fetchColumn();
-
-        if ($value === false || $value === null) {
-            return null;
-        }
-
-        $imageId = (int) $value;
-        return $imageId > 0 ? $imageId : null;
     }
 
     /**

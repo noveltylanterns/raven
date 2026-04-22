@@ -15,9 +15,8 @@ use PDO;
 use Raven\Lib\Parser\ChannelContextParser;
 use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\TaxonomyDataParser;
+use Raven\Lib\Scribe\PageScribe;
 use Raven\Lib\View\Panel\ListFilter;
-use Raven\Lib\View\Panel\PagePersistenceService;
-use Raven\Lib\View\Panel\PageTaxonomyAssignmentService;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Media\Panel\PageEditorGalleryHydrator;
 use Raven\Lib\Parser\PageDuplicateParser;
@@ -37,9 +36,8 @@ final class PageRepository
     private PageBlockParser $pageBlockParser;
     private PageEditorGalleryHydrator $pageEditorGalleryHydrator;
     private ListFilter $panelListFilter;
-    private PageTaxonomyAssignmentService $pageTaxonomyAssignmentService;
     private TaxonomyDataParser $taxonomyDataParser;
-    private PagePersistenceService $pagePersistenceService;
+    private PageScribe $pageScribe;
 
     public function __construct(
         PDO $db,
@@ -59,9 +57,8 @@ final class PageRepository
         $this->pageBlockParser = new PageBlockParser();
         $this->pageEditorGalleryHydrator = new PageEditorGalleryHydrator();
         $this->panelListFilter = new ListFilter();
-        $this->pageTaxonomyAssignmentService = new PageTaxonomyAssignmentService();
         $this->taxonomyDataParser = new TaxonomyDataParser();
-        $this->pagePersistenceService = new PagePersistenceService();
+        $this->pageScribe = new PageScribe($db, $driver, $prefix, $categoryEnabled, $tagEnabled);
     }
 
     /**
@@ -893,8 +890,6 @@ final class PageRepository
      */
     public function save(array $data): int
     {
-        $pages = $this->table('pages');
-
         $id = isset($data['id']) ? (int) $data['id'] : 0;
         $title = (string) ($data['title'] ?? 'Untitled');
         $slug = (string) ($data['slug'] ?? '');
@@ -934,34 +929,22 @@ final class PageRepository
             throw new \RuntimeException('A page already exists for that slug/channel path.');
         }
 
-        return $this->pagePersistenceService->savePage(
-            $this->db,
-            $pages,
-            [
-                'id' => $id,
-                'title' => $title,
-                'slug' => $slug,
-                'content' => $content,
-                'description' => $description,
-                'display_title' => $displayTitle,
-                'status' => $status,
-                'published' => $publishAt,
-                'expires' => $expireAt,
-                'author' => $author,
-                'channel' => $channelId,
-                'now' => $now,
-                'category_ids' => $categoryIds,
-                'tag_ids' => $tagIds,
-            ],
-            $this->categoryEnabled,
-            $this->tagEnabled,
-            function (int $pageId, array $ids): void {
-                $this->replacePageCategories($pageId, $ids);
-            },
-            function (int $pageId, array $ids): void {
-                $this->replacePageTags($pageId, $ids);
-            }
-        );
+        return $this->pageScribe->save([
+            'id' => $id,
+            'title' => $title,
+            'slug' => $slug,
+            'content' => $content,
+            'description' => $description,
+            'display_title' => $displayTitle,
+            'status' => $status,
+            'published' => $publishAt,
+            'expires' => $expireAt,
+            'author' => $author,
+            'channel' => $channelId,
+            'now' => $now,
+            'category_ids' => $categoryIds,
+            'tag_ids' => $tagIds,
+        ]);
     }
 
     /**
@@ -1202,17 +1185,7 @@ final class PageRepository
      */
     public function deleteById(int $id): void
     {
-        $this->pagePersistenceService->deletePageById(
-            $this->db,
-            $this->table('pages'),
-            $this->table('page_categories'),
-            $this->table('page_tags'),
-            $this->table('page_images'),
-            $this->table('page_image_variants'),
-            $id,
-            $this->categoryEnabled,
-            $this->tagEnabled
-        );
+        $this->pageScribe->deleteById($id);
     }
 
     /**
@@ -1610,38 +1583,6 @@ final class PageRepository
             $slug,
             fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),
             'Selected channel does not exist.'
-        );
-    }
-
-    /**
-     * Replaces all category assignments for one page id.
-     *
-     * @param array<int> $categoryIds
-     */
-    private function replacePageCategories(int $pageId, array $categoryIds): void
-    {
-        $this->pageTaxonomyAssignmentService->replacePageCategories(
-            $this->db,
-            $this->driver,
-            $this->table('page_categories'),
-            $pageId,
-            $categoryIds
-        );
-    }
-
-    /**
-     * Replaces all tag assignments for one page id.
-     *
-     * @param array<int> $tagIds
-     */
-    private function replacePageTags(int $pageId, array $tagIds): void
-    {
-        $this->pageTaxonomyAssignmentService->replacePageTags(
-            $this->db,
-            $this->driver,
-            $this->table('page_tags'),
-            $pageId,
-            $tagIds
         );
     }
 

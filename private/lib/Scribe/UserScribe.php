@@ -1,26 +1,46 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Scribe/UserScribe.php
+ * Write-side persistence helper for auth users and user-group memberships.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth;
+namespace Raven\Lib\Scribe;
 
 use PDO;
+use Raven\Lib\Auth\UserStringService;
 use RuntimeException;
 
 /**
- * Shared user persistence and membership write orchestration.
+ * Owns user mutation writes across the auth and app databases.
+ *
+ * UserRepository keeps the read/list/profile queries, while this class
+ * centralizes create/update/delete persistence, uniqueness checks, user-string
+ * generation, and membership replacement for user writes.
  */
-final class UserPersistenceService
+final class UserScribe
 {
     private UserStringService $userStringService;
 
+    /**
+     * Prepares the user scribe for user write operations.
+     */
     public function __construct()
     {
         $this->userStringService = new UserStringService();
     }
 
     /**
-     * @param callable(int, int): void $attachUserToGroup
+     * Creates or updates one user and replaces its group memberships.
+     *
+     * @param PDO                    $authDb            Auth database connection for the `users` table.
+     * @param PDO                    $rvnDb             App database connection for `user_groups`.
+     * @param string                 $usersTable        Physical users table name.
+     * @param string                 $userGroupsTable   Physical user-groups table name.
      * @param array{
      *   id: int|null,
      *   username: string,
@@ -36,7 +56,10 @@ final class UserPersistenceService
      *   avatar_path: string|null,
      *   cover_image?: string|null,
      *   string_length?: int
-     * } $data
+     * }                          $data              Normalized user payload ready for persistence.
+     * @param callable(int, int): void $attachUserToGroup Callback that inserts one user-group membership idempotently.
+     * @throws RuntimeException When required fields are missing, uniqueness checks fail, or no inserted id can be resolved.
+     * @return int Persisted user id.
      */
     public function saveUser(
         PDO $authDb,
@@ -71,6 +94,7 @@ final class UserPersistenceService
         }
 
         if (($id === null || $id <= 0) && $username === '') {
+            // Legacy create flow falls back to email-as-username when no explicit username was submitted.
             $username = $email;
         }
 
@@ -176,6 +200,16 @@ final class UserPersistenceService
         return $newId;
     }
 
+    /**
+     * Deletes one user row and its user-group memberships.
+     *
+     * @param PDO    $authDb          Auth database connection.
+     * @param PDO    $rvnDb           App database connection.
+     * @param string $usersTable      Physical users table name.
+     * @param string $userGroupsTable Physical user-groups table name.
+     * @param int    $id              User id to delete.
+     * @return void
+     */
     public function deleteUserById(PDO $authDb, PDO $rvnDb, string $usersTable, string $userGroupsTable, int $id): void
     {
         $deleteMemberships = $rvnDb->prepare(
@@ -189,6 +223,15 @@ final class UserPersistenceService
         $deleteUser->execute([':id' => $id]);
     }
 
+    /**
+     * Returns true when another user already owns the given username.
+     *
+     * @param PDO    $authDb     Auth database connection.
+     * @param string $usersTable Physical users table name.
+     * @param int    $id         User id to exclude during edit mode, or `0` in create mode.
+     * @param string $username   Username candidate to test.
+     * @return bool True when another row already uses the username.
+     */
     public function usernameExistsForOtherUser(PDO $authDb, string $usersTable, int $id, string $username): bool
     {
         if (trim($username) === '') {
@@ -215,6 +258,15 @@ final class UserPersistenceService
         return $stmt->fetchColumn() !== false;
     }
 
+    /**
+     * Returns true when another user already owns the given email address.
+     *
+     * @param PDO    $authDb     Auth database connection.
+     * @param string $usersTable Physical users table name.
+     * @param int    $id         User id to exclude during edit mode, or `0` in create mode.
+     * @param string $email      Email candidate to test.
+     * @return bool True when another row already uses the email address.
+     */
     public function emailExistsForOtherUser(PDO $authDb, string $usersTable, int $id, string $email): bool
     {
         if ($id > 0) {
@@ -237,6 +289,15 @@ final class UserPersistenceService
         return $stmt->fetchColumn() !== false;
     }
 
+    /**
+     * Returns true when another user already owns the given alphanumeric user string.
+     *
+     * @param PDO    $authDb     Auth database connection.
+     * @param string $usersTable Physical users table name.
+     * @param int    $id         User id to exclude during edit mode, or `0` in create mode.
+     * @param string $userString User-string candidate to test.
+     * @return bool True when another row already uses the string.
+     */
     public function userStringExistsForOtherUser(PDO $authDb, string $usersTable, int $id, string $userString): bool
     {
         if (trim($userString) === '') {
@@ -263,6 +324,14 @@ final class UserPersistenceService
         return $stmt->fetchColumn() !== false;
     }
 
+    /**
+     * Returns one stored user string by id.
+     *
+     * @param PDO    $authDb     Auth database connection.
+     * @param string $usersTable Physical users table name.
+     * @param int    $id         User id to resolve.
+     * @return string|null Existing user string, or null when missing.
+     */
     public function userStringById(PDO $authDb, string $usersTable, int $id): ?string
     {
         if ($id < 1) {
@@ -287,7 +356,12 @@ final class UserPersistenceService
     }
 
     /**
-     * @return array<int>
+     * Returns the current group ids for one user.
+     *
+     * @param PDO    $rvnDb           App database connection.
+     * @param string $userGroupsTable Physical user-groups table name.
+     * @param int    $userId          User id to resolve.
+     * @return array<int> Sorted assigned group ids.
      */
     public function groupIdsForUser(PDO $rvnDb, string $userGroupsTable, int $userId): array
     {
@@ -305,8 +379,14 @@ final class UserPersistenceService
     }
 
     /**
-     * @param array<int> $groupIds
-     * @param callable(int, int): void $attachUserToGroup
+     * Replaces one user's memberships transactionally.
+     *
+     * @param PDO                    $rvnDb             App database connection.
+     * @param string                 $userGroupsTable   Physical user-groups table name.
+     * @param int                    $userId            User id whose memberships should be replaced.
+     * @param array<int>             $groupIds          Group ids that should remain attached.
+     * @param callable(int, int): void $attachUserToGroup Callback that inserts one user-group membership idempotently.
+     * @return void
      */
     public function setUserGroups(
         PDO $rvnDb,
@@ -340,8 +420,10 @@ final class UserPersistenceService
     }
 
     /**
-     * @param array<int> $groupIds
-     * @return array<int>
+     * Normalizes group ids into unique positive integers.
+     *
+     * @param array<int> $groupIds Raw group ids.
+     * @return array<int> Deduplicated positive integer group ids.
      */
     private function normalizeGroupIds(array $groupIds): array
     {
@@ -358,7 +440,13 @@ final class UserPersistenceService
     }
 
     /**
-     * @param array<string, mixed> $params
+     * Inserts one user row and resolves the inserted id across supported drivers.
+     *
+     * @param PDO                  $authDb     Auth database connection.
+     * @param string               $usersTable Physical users table name.
+     * @param array<string, mixed> $params     Bound insert parameters.
+     * @throws RuntimeException When the inserted id cannot be resolved.
+     * @return int Inserted user id.
      */
     private function insertUserAndReturnId(PDO $authDb, string $usersTable, array $params): int
     {
@@ -384,6 +472,14 @@ final class UserPersistenceService
         return $newId;
     }
 
+    /**
+     * Generates a unique user string for new or repaired user rows.
+     *
+     * @param PDO    $authDb     Auth database connection.
+     * @param string $usersTable Physical users table name.
+     * @param int    $length     Desired string length after normalization.
+     * @return string Unique alphanumeric user string.
+     */
     private function generateUniqueUserString(PDO $authDb, string $usersTable, int $length): string
     {
         return $this->userStringService->generateUnique(

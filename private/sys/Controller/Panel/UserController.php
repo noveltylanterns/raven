@@ -21,7 +21,6 @@ use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Auth\Panel\PanelInvitePolicyService;
 use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
@@ -32,6 +31,7 @@ use Raven\Lib\View\Panel\PanelMediaConfigService;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Scribe\UserMediaScribe;
 
 use Raven\Lib\Transport\Redirect;
 
@@ -62,7 +62,7 @@ final class UserController
     private UserDataParser $profileContactService;
     private ?UserDataParser $userParser = null;
     private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
-    private AvatarUploadService $avatarUploadService;
+    private UserMediaScribe $userMediaScribe;
     private UserMediaPathService $userMediaPathService;
 
     /**
@@ -83,7 +83,7 @@ final class UserController
      * @param PanelMediaConfigService $panelMediaConfigService Shared media-limit helper.
      * @param UserDataParser $profileContactService Shared profile-contact normalizer.
      * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA list normalizer.
-     * @param AvatarUploadService $avatarUploadService Shared sanitized avatar/cover upload helper.
+     * @param UserMediaScribe $userMediaScribe Shared user-media write helper.
      * @param UserMediaPathService $userMediaPathService Shared user-media path resolver.
      * @return void
      */
@@ -105,7 +105,7 @@ final class UserController
         PanelMediaConfigService $panelMediaConfigService,
         UserDataParser $profileContactService,
         PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,
-        AvatarUploadService $avatarUploadService,
+        UserMediaScribe $userMediaScribe,
         UserMediaPathService $userMediaPathService
     ) {
         $this->context = $context;
@@ -125,7 +125,7 @@ final class UserController
         $this->panelMediaConfigService = $panelMediaConfigService;
         $this->profileContactService = $profileContactService;
         $this->panelTwoFactorPreferencesService = $panelTwoFactorPreferencesService;
-        $this->avatarUploadService = $avatarUploadService;
+        $this->userMediaScribe = $userMediaScribe;
         $this->userMediaPathService = $userMediaPathService;
     }
 
@@ -488,7 +488,7 @@ final class UserController
                 Redirect::redirect($editUrl);
             }
 
-            $normalizedExtension = $this->avatarUploadService->normalizeExtension((string) ($result['extension'] ?? ''));
+            $normalizedExtension = $this->userMediaScribe->normalizeExtension((string) ($result['extension'] ?? ''));
             if ($normalizedExtension === null) {
                 $this->context->flash('error', 'Avatar upload format is not supported.');
                 Redirect::redirect($editUrl);
@@ -500,17 +500,14 @@ final class UserController
                     Redirect::redirect($editUrl);
                 }
 
-                $avatarsDir = $this->userMediaPathService->avatarStorageDirectory($this->root);
-                $avatarFilename = $this->userMediaPathService->avatarFilenameForString($currentUserString, $normalizedExtension);
-                $destination = $avatarsDir . '/' . $avatarFilename;
-
-                $storeError = $this->avatarUploadService->storeSanitizedUpload($avatarUpload, $destination);
-                if ($storeError !== null) {
-                    $this->context->flash('error', $storeError);
+                $storeResult = $this->userMediaScribe->storeAvatarUpload($currentUserString, $avatarUpload, $normalizedExtension);
+                if (!(bool) ($storeResult['ok'] ?? false)) {
+                    $this->context->flash('error', (string) ($storeResult['error'] ?? 'Avatar upload failed.'));
                     Redirect::redirect($editUrl);
                 }
 
                 $avatarSet = true;
+                $avatarFilename = (string) ($storeResult['filename'] ?? '');
                 $uploadedAvatarFilename = $avatarFilename;
             } else {
                 $pendingAvatarUpload = $avatarUpload;
@@ -529,7 +526,7 @@ final class UserController
                 Redirect::redirect($editUrl);
             }
 
-            $normalizedExtension = $this->avatarUploadService->normalizeExtension((string) ($coverResult['extension'] ?? ''));
+            $normalizedExtension = $this->userMediaScribe->normalizeExtension((string) ($coverResult['extension'] ?? ''));
             if ($normalizedExtension === null) {
                 $this->context->flash('error', 'Cover image upload format is not supported.');
                 Redirect::redirect($editUrl);
@@ -541,16 +538,13 @@ final class UserController
                     Redirect::redirect($editUrl);
                 }
 
-                $coversDir = $this->userMediaPathService->coverStorageDirectory($this->root);
-                $coverImage = $this->userMediaPathService->coverFilenameForString($currentUserString, $normalizedExtension);
-                $destination = $coversDir . '/' . $coverImage;
-
-                $storeError = $this->avatarUploadService->storeSanitizedImageUpload($coverUpload, $destination);
-                if ($storeError !== null) {
-                    $this->context->flash('error', $storeError);
+                $storeResult = $this->userMediaScribe->storeCoverUpload($currentUserString, $coverUpload, $normalizedExtension);
+                if (!(bool) ($storeResult['ok'] ?? false)) {
+                    $this->context->flash('error', (string) ($storeResult['error'] ?? 'Cover image upload failed.'));
                     Redirect::redirect($editUrl);
                 }
 
+                $coverImage = (string) ($storeResult['filename'] ?? '');
                 $uploadedCoverFilename = $coverImage;
             } else {
                 $pendingCoverUpload = $coverUpload;
@@ -602,29 +596,23 @@ final class UserController
                 }
 
                 if (is_array($pendingAvatarUpload) && is_string($pendingAvatarExtension)) {
-                    $avatarsDir = $this->userMediaPathService->avatarStorageDirectory($this->root);
-                    $avatarFilename = $this->userMediaPathService->avatarFilenameForString($createdUserString, $pendingAvatarExtension);
-                    $destination = $avatarsDir . '/' . $avatarFilename;
-
-                    $storeError = $this->avatarUploadService->storeSanitizedUpload($pendingAvatarUpload, $destination);
-                    if ($storeError !== null) {
-                        throw new \RuntimeException($storeError);
+                    $storeResult = $this->userMediaScribe->storeAvatarUpload($createdUserString, $pendingAvatarUpload, $pendingAvatarExtension);
+                    if (!(bool) ($storeResult['ok'] ?? false)) {
+                        throw new \RuntimeException((string) ($storeResult['error'] ?? 'Avatar upload failed.'));
                     }
 
                     $avatarSet = true;
+                    $avatarFilename = (string) ($storeResult['filename'] ?? '');
                     $uploadedAvatarFilename = $avatarFilename;
                 }
 
                 if (is_array($pendingCoverUpload) && is_string($pendingCoverExtension)) {
-                    $coversDir = $this->userMediaPathService->coverStorageDirectory($this->root);
-                    $coverImage = $this->userMediaPathService->coverFilenameForString($createdUserString, $pendingCoverExtension);
-                    $destination = $coversDir . '/' . $coverImage;
-
-                    $storeError = $this->avatarUploadService->storeSanitizedImageUpload($pendingCoverUpload, $destination);
-                    if ($storeError !== null) {
-                        throw new \RuntimeException($storeError);
+                    $storeResult = $this->userMediaScribe->storeCoverUpload($createdUserString, $pendingCoverUpload, $pendingCoverExtension);
+                    if (!(bool) ($storeResult['ok'] ?? false)) {
+                        throw new \RuntimeException((string) ($storeResult['error'] ?? 'Cover image upload failed.'));
                     }
 
+                    $coverImage = (string) ($storeResult['filename'] ?? '');
                     $uploadedCoverFilename = $coverImage;
                 }
 
@@ -649,10 +637,10 @@ final class UserController
             }
         } catch (\Throwable $exception) {
             if ($uploadedAvatarFilename !== null) {
-                $this->userMediaPathService->deleteAvatarFile($this->root, $uploadedAvatarFilename);
+                $this->userMediaScribe->deleteAvatarFile($uploadedAvatarFilename);
             }
             if ($uploadedCoverFilename !== null) {
-                $this->userMediaPathService->deleteCoverFile($this->root, $uploadedCoverFilename);
+                $this->userMediaScribe->deleteCoverFile($uploadedCoverFilename);
             }
 
             if ($id === null && $createdUserId !== null) {
@@ -691,10 +679,10 @@ final class UserController
         }
 
         if ($avatarSet && is_string($currentAvatarPath) && $currentAvatarPath !== '' && $currentAvatarPath !== $avatarFilename) {
-            $this->userMediaPathService->deleteAvatarFile($this->root, $currentAvatarPath);
+            $this->userMediaScribe->deleteAvatarFile($currentAvatarPath);
         }
         if ($currentCoverImage !== null && $currentCoverImage !== '' && $currentCoverImage !== $coverImage) {
-            $this->userMediaPathService->deleteCoverFile($this->root, $currentCoverImage);
+            $this->userMediaScribe->deleteCoverFile($currentCoverImage);
         }
 
         if ($twoFactorUpdateError !== null) {

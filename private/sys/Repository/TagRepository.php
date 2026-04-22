@@ -16,6 +16,7 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Media\Panel\TaxonomyImagePathResolver;
+use Raven\Lib\Scribe\TaxonomyScribe;
 
 /**
  * Data access for Tag CRUD operations in panel.
@@ -25,12 +26,14 @@ final class TagRepository
     private PDO $db;
     private string $driver;
     private string $prefix;
+    private TaxonomyScribe $tagScribe;
 
     public function __construct(PDO $db, string $driver, string $prefix)
     {
         $this->db = $db;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
+        $this->tagScribe = new TaxonomyScribe($db, $driver, $prefix, 'tag');
     }
 
     /**
@@ -338,53 +341,7 @@ final class TagRepository
      */
     public function save(array $data): int
     {
-        $tags = $this->table('tags');
-
-        $id = $data['id'] ?? null;
-        $name = $data['name'];
-        $slug = $data['slug'];
-        $setId = max(1, (int) ($data['set'] ?? 1));
-        $description = $data['description'];
-        $now = gmdate('Y-m-d H:i:s');
-
-        if ($id !== null && $id > 0) {
-            // Update existing row when an id is present.
-            $stmt = $this->db->prepare(
-                'UPDATE ' . $tags . '
-                 SET name = :name,
-                     slug = :slug,
-                     ' . $this->setColumn() . ' = :set_id,
-                     description = :description,
-                     updated = :updated
-                 WHERE id = :id'
-            );
-            $stmt->execute([
-                ':name' => $name,
-                ':slug' => $slug,
-                ':set_id' => $setId,
-                ':description' => $description,
-                ':updated' => $now,
-                ':id' => $id,
-            ]);
-
-            return $id;
-        }
-
-        // Insert path creates a new tag with creation timestamp.
-        $stmt = $this->db->prepare(
-            'INSERT INTO ' . $tags . ' (name, slug, ' . $this->setColumn() . ', description, created, updated)
-             VALUES (:name, :slug, :set_id, :description, :created_at, :updated)'
-        );
-        $stmt->execute([
-            ':name' => $name,
-            ':slug' => $slug,
-            ':set_id' => $setId,
-            ':description' => $description,
-            ':created_at' => $now,
-            ':updated' => $now,
-        ]);
-
-        return (int) $this->db->lastInsertId();
+        return $this->tagScribe->save($data);
     }
 
     /**
@@ -398,23 +355,7 @@ final class TagRepository
      */
     public function updateImageFiles(int $id, array $files): void
     {
-        $tags = $this->table('tags');
-
-        $stmt = $this->db->prepare(
-            'UPDATE ' . $tags . '
-             SET cover_image = :cover_image,
-                 preview_image = :preview_image,
-                 icon_image = :icon_image,
-                 updated = :updated
-             WHERE id = :id'
-        );
-        $stmt->execute([
-            ':cover_image' => $this->normalizeNullableFilename($files['cover_image'] ?? null),
-            ':preview_image' => $this->normalizeNullableFilename($files['preview_image'] ?? null),
-            ':icon_image' => $this->normalizeNullableFilename($files['icon_image'] ?? null),
-            ':updated' => gmdate('Y-m-d H:i:s'),
-            ':id' => $id,
-        ]);
+        $this->tagScribe->updateImageFiles($id, $files);
     }
 
     /**
@@ -422,17 +363,7 @@ final class TagRepository
      */
     public function reassignSetToDefault(int $fromSetId, int $defaultSetId): void
     {
-        if ($fromSetId === $defaultSetId) {
-            return;
-        }
-
-        $tags = $this->table('tags');
-        $stmt = $this->db->prepare(
-            'UPDATE ' . $tags . '
-             SET ' . $this->setColumn() . ' = :default_set
-             WHERE ' . $this->setColumn() . ' = :from_set'
-        );
-        $stmt->execute([':default_set' => $defaultSetId, ':from_set' => $fromSetId]);
+        $this->tagScribe->reassignSetToDefault($fromSetId, $defaultSetId);
     }
 
     /**
@@ -440,30 +371,7 @@ final class TagRepository
      */
     public function deleteById(int $id): void
     {
-        $tags = $this->table('tags');
-        $pageTags = $this->table('page_tags');
-
-        $this->db->beginTransaction();
-
-        try {
-            // Remove tag links before deleting the tag row.
-            $detach = $this->db->prepare(
-                'DELETE FROM ' . $pageTags . ' WHERE tag = :tag'
-            );
-            $detach->execute([':tag' => $id]);
-
-            $delete = $this->db->prepare('DELETE FROM ' . $tags . ' WHERE id = :id');
-            $delete->execute([':id' => $id]);
-
-            // Commit only after relation cleanup and tag delete both succeed.
-            $this->db->commit();
-        } catch (\Throwable $exception) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-
-            throw $exception;
-        }
+        $this->tagScribe->deleteById($id);
     }
 
     /**
@@ -554,16 +462,6 @@ final class TagRepository
             $row,
             TaxonomyImagePathResolver::pathsFromStoragePayload('tags', $id, $storage)
         );
-    }
-
-    private function normalizeNullableFilename(mixed $value): ?string
-    {
-        $raw = trim((string) $value);
-        if ($raw === '') {
-            return null;
-        }
-
-        return basename(str_replace('\\', '/', $raw));
     }
 
     private function setColumn(?string $alias = null): string

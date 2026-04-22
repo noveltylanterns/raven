@@ -24,6 +24,7 @@ use Raven\Lib\Auth\PermissionMaskService;
 use Raven\Lib\Auth\UserSecurityProfileService;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Security\TwoFactorMethodNormalizer;
+use Raven\Lib\Scribe\AuthProfileScribe;
 use RuntimeException;
 
 /**
@@ -55,6 +56,7 @@ final class AuthService
     private LoginChallengeState $twoFactorSessionState;
     private AuthAccessGateService $authAccessGateService;
     private LoginEmailChallenge $loginEmailChallenge;
+    private AuthProfileScribe $authProfileScribe;
 
     /**
      * Request-local cache for user preference rows by user id.
@@ -88,6 +90,7 @@ final class AuthService
         $this->twoFactorSessionState = new LoginChallengeState();
         $this->authAccessGateService = new AuthAccessGateService();
         $this->loginEmailChallenge = new LoginEmailChallenge();
+        $this->authProfileScribe = new AuthProfileScribe($authDb, $driver, $this->prefix);
 
         $this->bootstrapDelightAuth();
     }
@@ -413,17 +416,8 @@ final class AuthService
         }
 
         $normalized = TwoFactorMethodNormalizer::normalizeStored($methods);
-        $encoded = $this->encodeTwoFactorMethods($normalized);
-
-        $stmt = $this->authDb->prepare(
-            'UPDATE ' . $this->authTable('users') . '
-             SET two_factor = :two_factor
-             WHERE id = :id'
-        );
-        $stmt->execute([
-            ':two_factor' => $encoded,
-            ':id' => $userId,
-        ]);
+        $encoded = $this->authPayloadCodec->encodeTwoFactorMethods($normalized);
+        $this->authProfileScribe->updateTwoFactorMethods($userId, $encoded);
 
         unset($this->userPreferencesCache[$userId]);
         return ['ok' => true, 'errors' => []];
@@ -594,99 +588,25 @@ final class AuthService
             return ['ok' => false, 'errors' => $errors];
         }
 
-        $fields = [
-            'username = :username',
-            'name = :display_name',
-            'email = :email',
-            'bio = :bio',
-            'theme = :theme',
-            'timezone = :timezone',
-            'cover_image = :cover_image',
-            'contact = :contact_profiles',
-            'two_factor = :two_factor_methods',
-        ];
-
-        $params = [
-            ':username' => $username,
-            ':display_name' => $displayName,
-            ':email' => $email,
-            ':bio' => $bio,
-            ':theme' => $theme,
-            ':timezone' => $timezone,
-            ':cover_image' => $coverImage,
-            ':contact_profiles' => $contactProfilesEncoded,
-            ':two_factor_methods' => $twoFactorMethodsEncoded,
-            ':id' => $userId,
-        ];
-
-        if ($password !== null && $password !== '') {
-            $fields[] = 'password = :password';
-            $params[':password'] = password_hash($password, PASSWORD_DEFAULT);
-        }
-
-        if ($setAvatar) {
-            $fields[] = 'avatar = :avatar_path';
-            $params[':avatar_path'] = $avatarPath;
-        }
-
-        $stmt = $this->authDb->prepare(
-            'UPDATE ' . $this->authTable('users') . '
-             SET ' . implode(', ', $fields) . '
-             WHERE id = :id'
-        );
-        $stmt->execute($params);
+        $this->authProfileScribe->updatePreferences($userId, [
+            'username' => $username,
+            'display_name' => $displayName,
+            'email' => $email,
+            'bio' => $bio,
+            'theme' => $theme,
+            'timezone' => $timezone,
+            'password_hash' => ($password !== null && $password !== '')
+                ? password_hash($password, PASSWORD_DEFAULT)
+                : null,
+            'contact_profiles_encoded' => $contactProfilesEncoded,
+            'two_factor_methods_encoded' => $twoFactorMethodsEncoded,
+            'set_avatar' => $setAvatar,
+            'avatar_path' => $avatarPath,
+            'cover_image' => $coverImage,
+        ]);
         unset($this->userPreferencesCache[$userId]);
 
         return ['ok' => true, 'errors' => []];
-    }
-
-    /**
-     * Decodes stored contact-profile JSON into normalized rows.
-     *
-     * @param mixed $raw
-     * @return array<int, array{type: string, value: string}>
-     */
-    private function decodeContactProfiles(mixed $raw): array
-    {
-        return $this->authPayloadCodec->decodeContactProfiles($raw);
-    }
-
-    /**
-     * Encodes normalized contact rows for database storage.
-     *
-     * @param array<int, array{type: string, value: string}> $profiles
-     */
-    private function encodeContactProfiles(array $profiles): ?string
-    {
-        return $this->authPayloadCodec->encodeContactProfiles($profiles);
-    }
-
-    /**
-     * @param mixed $raw
-     * @return array<int, array<string, mixed>>
-     */
-    private function decodeTwoFactorMethods(mixed $raw): array
-    {
-        return $this->authPayloadCodec->decodeTwoFactorMethods($raw);
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $methods
-     */
-    private function encodeTwoFactorMethods(array $methods): ?string
-    {
-        return $this->authPayloadCodec->encodeTwoFactorMethods($methods);
-    }
-
-    /**
-     * Normalizes contact rows into deterministic `{type, value}` entries.
-     *
-     * @param array<int, mixed> $profiles
-     * @return array<int, array{type: string, value: string}>
-     */
-    private function normalizeContactProfiles(array $profiles): array
-    {
-        return $this->authPayloadCodec->normalizeContactProfiles($profiles);
     }
 
     /**

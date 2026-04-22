@@ -15,15 +15,15 @@ use Closure;
 use Raven\Core\Repository\GroupRepository;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
-use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
-use Raven\Lib\View\Panel\Editor;
-use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Security\InputSanitizer;
-
+use Raven\Lib\Scribe\TaxonomyImageScribe;
 use Raven\Lib\Transport\Redirect;
+use Raven\Lib\Transport\Upload;
+use Raven\Lib\View\Panel\Editor;
+use Raven\Lib\View\Panel\EditorTabs;
 
 /**
  * Handles split group-management routes.
@@ -38,6 +38,7 @@ final class GroupController
     private EditorTabs $editorTabs;
     private Editor $editor;
     private TaxonomyImageService $taxonomyImageService;
+    private TaxonomyImageScribe $taxonomyImageScribe;
     private PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog;
     private Upload $uploadFileSetNormalizer;
     private Closure $panelPermissionMapProvider;
@@ -50,7 +51,8 @@ final class GroupController
      * @param GroupRouteParser $groupRouteParser Group route parser for routing-policy reads.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor utility methods.
-     * @param TaxonomyImageService $taxonomyImageService Shared group image upload/storage pipeline.
+     * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
+     * @param TaxonomyImageScribe $taxonomyImageScribe Write-side taxonomy image upload and cleanup helper.
      * @param PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog Shared panel permission-definition catalog.
      * @param Upload $uploadFileSetNormalizer Shared upload payload flattener.
      * @param callable(): array<string, array<string, mixed>> $panelPermissionMapProvider Session-scoped extension permission map provider.
@@ -65,6 +67,7 @@ final class GroupController
         EditorTabs $editorTabs,
         Editor $editor,
         TaxonomyImageService $taxonomyImageService,
+        TaxonomyImageScribe $taxonomyImageScribe,
         PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog,
         Upload $uploadFileSetNormalizer,
         callable $panelPermissionMapProvider
@@ -77,6 +80,7 @@ final class GroupController
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
         $this->taxonomyImageService = $taxonomyImageService;
+        $this->taxonomyImageScribe = $taxonomyImageScribe;
         $this->panelPermissionDefinitionCatalog = $panelPermissionDefinitionCatalog;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
         $this->panelPermissionMapProvider = Closure::fromCallable($panelPermissionMapProvider);
@@ -316,9 +320,9 @@ final class GroupController
         }
 
         if (isset($coverUploads[0])) {
-            $coverResult = $this->taxonomyImageService->storeUpload('groups', $savedId, 'cover', $coverUploads[0]);
+            $coverResult = $this->taxonomyImageScribe->storeUpload('groups', $savedId, 'cover', $coverUploads[0]);
             if (!(bool) ($coverResult['ok'] ?? false)) {
-                $this->taxonomyImageService->cleanupPathSets('groups', $savedId, $newPathSets);
+                $this->taxonomyImageScribe->cleanupPathSets('groups', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -329,9 +333,9 @@ final class GroupController
         }
 
         if (isset($iconUploads[0])) {
-            $iconResult = $this->taxonomyImageService->storeUpload('groups', $savedId, 'icon', $iconUploads[0]);
+            $iconResult = $this->taxonomyImageScribe->storeUpload('groups', $savedId, 'icon', $iconUploads[0]);
             if (!(bool) ($iconResult['ok'] ?? false)) {
-                $this->taxonomyImageService->cleanupPathSets('groups', $savedId, $newPathSets);
+                $this->taxonomyImageScribe->cleanupPathSets('groups', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -344,14 +348,14 @@ final class GroupController
         try {
             $this->groupRepo->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
-            $this->taxonomyImageService->cleanupPathSets('groups', $savedId, $newPathSets);
+            $this->taxonomyImageScribe->cleanupPathSets('groups', $savedId, $newPathSets);
             $this->context->flash('error', 'Failed to save group image selections.');
             Redirect::redirect($savedEditUrl);
         }
 
         $nextPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('groups', $savedId, $nextStorage);
         $obsoletePaths = $this->taxonomyImageService->removedPaths($currentPaths, $nextPaths);
-        $this->taxonomyImageService->deleteStoredPaths('groups', $savedId, $obsoletePaths);
+        $this->taxonomyImageScribe->deleteStoredPaths('groups', $savedId, $obsoletePaths);
 
         $this->context->flash('success', 'Changes saved.');
         Redirect::redirect($savedEditUrl);

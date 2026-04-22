@@ -14,6 +14,7 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Parser\ChannelContextParser;
 use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Scribe\ChannelRecordScribe;
 use Raven\Lib\Scribe\ChannelScribe;
 use RuntimeException;
 
@@ -28,6 +29,7 @@ final class ChannelRepository
     private string $channelDirectory;
     private ChannelContextParser $channelFileParser;
     private ChannelScribe $channelFileScribe;
+    private ChannelRecordScribe $channelRecordScribe;
     /** @var array<int, array<string, mixed>>|null */
     private ?array $channelsCache = null;
 
@@ -39,6 +41,13 @@ final class ChannelRepository
         $this->channelDirectory = $channelDirectory ?? (dirname(__DIR__, 3) . '/dat/channel');
         $this->channelFileParser = new ChannelContextParser($this->channelDirectory);
         $this->channelFileScribe = new ChannelScribe($this->channelDirectory);
+        $this->channelRecordScribe = new ChannelRecordScribe(
+            $db,
+            $driver,
+            $prefix,
+            $this->channelFileParser,
+            $this->channelFileScribe
+        );
     }
 
     /**
@@ -84,7 +93,7 @@ final class ChannelRepository
             return $this->channelsCache;
         }
 
-        $this->ensureRootChannelRecord();
+        $this->channelRecordScribe->ensureRootChannelRecord();
         $this->channelFileScribe->normalizeStorageLayout();
         $paths = $this->channelFileParser->listChannelFilePaths();
         $records = [];
@@ -126,7 +135,7 @@ final class ChannelRepository
             $records[] = $record;
             $slug = (string) ($record['slug'] ?? '');
             if ($slug !== '') {
-                $this->persistChannelId($slug, $id);
+                $this->channelRecordScribe->persistChannelId($slug, $id);
             }
         }
 
@@ -346,77 +355,12 @@ final class ChannelRepository
      */
     public function save(array $data): int
     {
-        $idProvided = array_key_exists('id', $data) && $data['id'] !== null;
-        $id = isset($data['id']) ? (int) $data['id'] : 0;
-        $name = trim((string) ($data['name'] ?? ''));
-        $slug = strtolower(trim((string) ($data['slug'] ?? '')));
-        $description = trim((string) ($data['description'] ?? ''));
-        $editorOverride = $this->normalizeEditorOverride((string) ($data['editor_override'] ?? 'inherit'));
-        $routeMode = $this->normalizeRouteMode((string) ($data['route_mode'] ?? 'inherit'));
-        $routeSeparator = $this->normalizeRouteSeparator((string) ($data['route_separator'] ?? 'inherit'));
-
-        if ($name === '' || !$this->isValidSlug($slug)) {
-            throw new RuntimeException('Channel name and slug are required.');
-        }
-
-        if (ChannelContextParser::isRootChannelSlug($slug) || ($idProvided && ChannelContextParser::isRootChannelId($id))) {
-            throw new RuntimeException('The stock <root> channel is reserved and cannot be edited.');
-        }
-
-        $existingBySlug = $this->findBySlug($slug);
-        if ($existingBySlug !== null && (int) ($existingBySlug['id'] ?? 0) !== $id) {
-            throw new RuntimeException('A channel with that slug already exists.');
-        }
-
-        $existingRecord = $idProvided ? $this->findById($id) : null;
-        $oldSlug = $existingRecord !== null ? (string) ($existingRecord['slug'] ?? '') : '';
-        $channelId = $existingRecord !== null
-            ? (int) ($existingRecord['id'] ?? 0)
-            : $this->nextChannelId();
-
-        $currentRaw = $oldSlug !== '' ? $this->channelFileParser->loadRawBySlug($oldSlug) : [];
-        $customFields = is_array($currentRaw['custom_fields'] ?? null) ? $currentRaw['custom_fields'] : [];
-        $overrides = is_array($currentRaw['overrides'] ?? null) ? $currentRaw['overrides'] : [];
-        $feedEnabled = array_key_exists('feed_enabled', $data)
-            ? ChannelContextParser::normalizeFeedEnabled($data['feed_enabled'])
-            : ChannelContextParser::normalizeFeedEnabled($currentRaw['feed_enabled'] ?? false);
-        $categorySets = array_key_exists('category_sets', $data)
-            ? ChannelContextParser::normalizeTaxonomySetSelection($data['category_sets'], false)
-            : ChannelContextParser::normalizeTaxonomySetSelection($currentRaw['category_sets'] ?? [], false);
-        $tagSets = array_key_exists('tag_sets', $data)
-            ? ChannelContextParser::normalizeTaxonomySetSelection($data['tag_sets'], false)
-            : ChannelContextParser::normalizeTaxonomySetSelection($currentRaw['tag_sets'] ?? [], false);
-        $createdAt = trim((string) ($currentRaw['created_at'] ?? ''));
-        if ($createdAt === '') {
-            $createdAt = gmdate('Y-m-d H:i:s');
-        }
-
-        $record = [
-            'id' => $channelId,
-            'name' => $name,
-            'slug' => $slug,
-            'description' => $description,
-            'feed_enabled' => $feedEnabled,
-            'category_sets' => $categorySets,
-            'tag_sets' => $tagSets,
-            'editor_override' => $editorOverride,
-            'route_mode' => $routeMode,
-            'route_separator' => $routeSeparator,
-            'cover_image_path' => $this->normalizeNullablePath($currentRaw['cover_image_path'] ?? null),
-            'cover_image_sm_path' => $this->normalizeNullablePath($currentRaw['cover_image_sm_path'] ?? null),
-            'cover_image_md_path' => $this->normalizeNullablePath($currentRaw['cover_image_md_path'] ?? null),
-            'cover_image_lg_path' => $this->normalizeNullablePath($currentRaw['cover_image_lg_path'] ?? null),
-            'preview_image_path' => $this->normalizeNullablePath($currentRaw['preview_image_path'] ?? null),
-            'preview_image_sm_path' => $this->normalizeNullablePath($currentRaw['preview_image_sm_path'] ?? null),
-            'preview_image_md_path' => $this->normalizeNullablePath($currentRaw['preview_image_md_path'] ?? null),
-            'preview_image_lg_path' => $this->normalizeNullablePath($currentRaw['preview_image_lg_path'] ?? null),
-            'custom_fields' => $customFields,
-            'overrides' => $overrides,
-            'created_at' => $createdAt,
-        ];
-
-        $this->channelFileScribe->writeRecordById($channelId, $slug, $record);
-
+        $channelId = $this->channelRecordScribe->save(
+            $data,
+            fn (string $slug): ?array => $this->findBySlug($slug),
+            fn (int $id): ?array => $this->findById($id),
+            fn (): int => $this->nextChannelId()
+        );
         $this->channelsCache = null;
         return $channelId;
     }
@@ -452,52 +396,11 @@ final class ChannelRepository
      */
     public function updateImagePaths(int $id, array $paths): void
     {
-        $record = $this->findById($id);
-        if ($record === null) {
-            throw new RuntimeException('Channel not found.');
-        }
-
-        $slug = (string) ($record['slug'] ?? '');
-        if ($slug === '') {
-            throw new RuntimeException('Channel slug is invalid.');
-        }
-
-        $currentRaw = $this->channelFileParser->loadRawBySlug($slug);
-        $raw = [
-            'id' => (int) ($record['id'] ?? $id),
-            'name' => (string) ($record['name'] ?? ''),
-            'slug' => $slug,
-            'description' => (string) ($record['description'] ?? ''),
-            'feed_enabled' => ChannelContextParser::normalizeFeedEnabled(
-                $currentRaw['feed_enabled'] ?? ($record['feed_enabled'] ?? false)
-            ),
-            'category_sets' => ChannelContextParser::normalizeTaxonomySetSelection(
-                $currentRaw['category_sets'] ?? ($record['category_sets'] ?? []),
-                false
-            ),
-            'tag_sets' => ChannelContextParser::normalizeTaxonomySetSelection(
-                $currentRaw['tag_sets'] ?? ($record['tag_sets'] ?? []),
-                false
-            ),
-            'editor_override' => (string) ($record['editor_override'] ?? 'inherit'),
-            'route_mode' => (string) ($record['route_mode'] ?? 'inherit'),
-            'route_separator' => (string) ($record['route_separator'] ?? 'inherit'),
-            'cover_image_path' => $this->normalizeNullablePath($paths['cover_image_path'] ?? null),
-            'cover_image_sm_path' => $this->normalizeNullablePath($paths['cover_image_sm_path'] ?? null),
-            'cover_image_md_path' => $this->normalizeNullablePath($paths['cover_image_md_path'] ?? null),
-            'cover_image_lg_path' => $this->normalizeNullablePath($paths['cover_image_lg_path'] ?? null),
-            'preview_image_path' => $this->normalizeNullablePath($paths['preview_image_path'] ?? null),
-            'preview_image_sm_path' => $this->normalizeNullablePath($paths['preview_image_sm_path'] ?? null),
-            'preview_image_md_path' => $this->normalizeNullablePath($paths['preview_image_md_path'] ?? null),
-            'preview_image_lg_path' => $this->normalizeNullablePath($paths['preview_image_lg_path'] ?? null),
-            'custom_fields' => is_array($currentRaw['custom_fields'] ?? null) ? $currentRaw['custom_fields'] : [],
-            'overrides' => is_array($currentRaw['overrides'] ?? null) ? $currentRaw['overrides'] : [],
-            'created_at' => trim((string) ($currentRaw['created_at'] ?? '')) !== ''
-                ? (string) $currentRaw['created_at']
-                : gmdate('Y-m-d H:i:s'),
-        ];
-
-        $this->channelFileScribe->writeRecordById((int) ($record['id'] ?? $id), $slug, $raw);
+        $this->channelRecordScribe->updateImagePaths(
+            $id,
+            $paths,
+            fn (int $channelId): ?array => $this->findById($channelId)
+        );
         $this->channelsCache = null;
     }
 
@@ -506,52 +409,11 @@ final class ChannelRepository
      */
     public function deleteById(int $id): void
     {
-        if (ChannelContextParser::isRootChannelId($id)) {
-            throw new RuntimeException('The stock <root> channel cannot be deleted.');
-        }
-
-        $record = $this->findById($id);
-        if ($record === null) {
-            return;
-        }
-
-        $pageCounts = $this->pageCountsByChannelId();
-        if (($pageCounts[$id] ?? 0) > 0) {
-            throw new RuntimeException('Cannot delete a channel that has pages assigned to it.');
-        }
-
-        $pages = $this->table('pages');
-        $redirects = $this->table('redirects');
-
-        $this->db->beginTransaction();
-        try {
-            $detachPages = $this->db->prepare(
-                'UPDATE ' . $pages . ' SET channel = :root_channel WHERE channel = :channel_id'
-            );
-            $detachPages->execute([
-                ':root_channel' => ChannelContextParser::ROOT_CHANNEL_ID,
-                ':channel_id' => $id,
-            ]);
-
-            $detachRedirects = $this->db->prepare(
-                'UPDATE ' . $redirects . ' SET channel = :root_channel WHERE channel = :channel_id'
-            );
-            $detachRedirects->execute([
-                ':root_channel' => ChannelContextParser::ROOT_CHANNEL_ID,
-                ':channel_id' => $id,
-            ]);
-
-            $this->db->commit();
-        } catch (\Throwable $exception) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-
-            throw $exception;
-        }
-
-        $this->channelFileScribe->deleteById($id);
-
+        $this->channelRecordScribe->deleteById(
+            $id,
+            fn (int $channelId): ?array => $this->findById($channelId),
+            fn (): array => $this->pageCountsByChannelId()
+        );
         $this->channelsCache = null;
     }
 
@@ -575,31 +437,6 @@ final class ChannelRepository
         }
 
         return $counts;
-    }
-
-    private function isValidSlug(string $slug): bool
-    {
-        return ChannelContextParser::isValidSlug($slug);
-    }
-
-    private function normalizeEditorOverride(string $value): string
-    {
-        return ChannelContextParser::normalizeEditorOverride($value);
-    }
-
-    private function normalizeRouteMode(string $value): string
-    {
-        return ChannelContextParser::normalizeRouteMode($value);
-    }
-
-    private function normalizeRouteSeparator(string $value): string
-    {
-        return ChannelContextParser::normalizeRouteSeparator($value);
-    }
-
-    private function normalizeNullablePath(mixed $value): ?string
-    {
-        return ChannelContextParser::normalizeNullablePath($value);
     }
 
     /**
@@ -633,74 +470,6 @@ final class ChannelRepository
     private function normalizeChannelId(mixed $value): ?int
     {
         return ChannelContextParser::normalizeChannelId($value);
-    }
-
-    private function ensureRootChannelRecord(): void
-    {
-        $raw = $this->channelFileParser->loadRawBySlug(ChannelContextParser::ROOT_CHANNEL_SLUG);
-        $createdAt = trim((string) ($raw['created_at'] ?? ''));
-        if ($createdAt === '') {
-            $createdAt = gmdate('Y-m-d H:i:s');
-        }
-
-        $record = [
-            'id' => ChannelContextParser::ROOT_CHANNEL_ID,
-            'name' => ChannelContextParser::ROOT_CHANNEL_NAME,
-            'slug' => ChannelContextParser::ROOT_CHANNEL_SLUG,
-            'description' => trim((string) ($raw['description'] ?? '')),
-            'feed_enabled' => false,
-            'editor_override' => ChannelContextParser::normalizeEditorOverride(
-                (string) ($raw['editor_override'] ?? 'inherit')
-            ),
-            'route_mode' => ChannelContextParser::normalizeRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
-            'route_separator' => ChannelContextParser::normalizeRouteSeparator(
-                (string) ($raw['route_separator'] ?? 'inherit')
-            ),
-            'cover_image_path' => ChannelContextParser::normalizeNullablePath($raw['cover_image_path'] ?? null),
-            'cover_image_sm_path' => ChannelContextParser::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
-            'cover_image_md_path' => ChannelContextParser::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
-            'cover_image_lg_path' => ChannelContextParser::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
-            'preview_image_path' => ChannelContextParser::normalizeNullablePath($raw['preview_image_path'] ?? null),
-            'preview_image_sm_path' => ChannelContextParser::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
-            'preview_image_md_path' => ChannelContextParser::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
-            'preview_image_lg_path' => ChannelContextParser::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
-            'custom_fields' => is_array($raw['custom_fields'] ?? null) ? $raw['custom_fields'] : [],
-            'overrides' => is_array($raw['overrides'] ?? null) ? $raw['overrides'] : [],
-            'created_at' => $createdAt,
-        ];
-
-        if ($raw === [] || $this->rootRecordNeedsRewrite($raw)) {
-            $this->channelFileScribe->writeRecordById(
-                ChannelContextParser::ROOT_CHANNEL_ID,
-                ChannelContextParser::ROOT_CHANNEL_SLUG,
-                $record
-            );
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $raw
-     */
-    private function rootRecordNeedsRewrite(array $raw): bool
-    {
-        if (ChannelContextParser::normalizeChannelId($raw['id'] ?? null) !== ChannelContextParser::ROOT_CHANNEL_ID) {
-            return true;
-        }
-
-        if (!ChannelContextParser::isRootChannelSlug((string) ($raw['slug'] ?? ''))) {
-            return true;
-        }
-
-        return trim((string) ($raw['name'] ?? '')) !== ChannelContextParser::ROOT_CHANNEL_NAME;
-    }
-
-    private function persistChannelId(string $slug, int $id): void
-    {
-        try {
-            $this->channelFileScribe->persistChannelId($slug, $id);
-        } catch (\Throwable) {
-            // Keep repository reads resilient even when id backfill cannot be persisted.
-        }
     }
 
     /**

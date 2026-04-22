@@ -17,10 +17,10 @@ use Raven\Core\Config;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
-use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
+use Raven\Lib\Scribe\UserMediaScribe;
 use Raven\Lib\View\Qr;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
@@ -51,7 +51,7 @@ final class PreferencesController
     private PanelMediaConfigService $panelMediaConfigService;
     private UserDataParser $profileContactService;
     private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
-    private AvatarUploadService $avatarUploadService;
+    private UserMediaScribe $userMediaScribe;
     private UserMediaPathService $userMediaPathService;
     private PasswordChangePolicy $passwordChangePolicy;
 
@@ -67,7 +67,7 @@ final class PreferencesController
      * @param PanelMediaConfigService $panelMediaConfigService Shared media-limit helper.
      * @param UserDataParser $profileContactService Shared profile-contact normalizer.
      * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA helper set.
-     * @param AvatarUploadService $avatarUploadService Shared sanitized avatar/cover upload helper.
+     * @param UserMediaScribe $userMediaScribe Shared user-media write helper.
      * @param UserMediaPathService $userMediaPathService Shared user-media path resolver.
      * @param PasswordChangePolicy $passwordChangePolicy Shared password validation policy.
      * @return void
@@ -84,7 +84,7 @@ final class PreferencesController
         PanelMediaConfigService $panelMediaConfigService,
         UserDataParser $profileContactService,
         PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,
-        AvatarUploadService $avatarUploadService,
+        UserMediaScribe $userMediaScribe,
         UserMediaPathService $userMediaPathService,
         PasswordChangePolicy $passwordChangePolicy
     ) {
@@ -99,7 +99,7 @@ final class PreferencesController
         $this->panelMediaConfigService = $panelMediaConfigService;
         $this->profileContactService = $profileContactService;
         $this->panelTwoFactorPreferencesService = $panelTwoFactorPreferencesService;
-        $this->avatarUploadService = $avatarUploadService;
+        $this->userMediaScribe = $userMediaScribe;
         $this->userMediaPathService = $userMediaPathService;
         $this->passwordChangePolicy = $passwordChangePolicy;
     }
@@ -289,22 +289,19 @@ final class PreferencesController
             if (!(bool) $result['ok']) {
                 $errors[] = (string) ($result['error'] ?? 'Avatar upload failed.');
             } else {
-                $normalizedExtension = $this->avatarUploadService->normalizeExtension((string) ($result['extension'] ?? ''));
+                $normalizedExtension = $this->userMediaScribe->normalizeExtension((string) ($result['extension'] ?? ''));
                 if ($normalizedExtension === null) {
                     $errors[] = 'Avatar upload format is not supported.';
                 } else {
                     if ($currentUserString === null) {
                         $errors[] = 'User string is missing for this account.';
                     } else {
-                        $avatarsDir = $this->userMediaPathService->avatarStorageDirectory($this->root);
-                        $avatarFilename = $this->userMediaPathService->avatarFilenameForString($currentUserString, $normalizedExtension);
-                        $destination = $avatarsDir . '/' . $avatarFilename;
-
-                        $storeError = $this->avatarUploadService->storeSanitizedUpload($avatarUpload, $destination);
-                        if ($storeError !== null) {
-                            $errors[] = $storeError;
+                        $storeResult = $this->userMediaScribe->storeAvatarUpload($currentUserString, $avatarUpload, $normalizedExtension);
+                        if (!(bool) ($storeResult['ok'] ?? false)) {
+                            $errors[] = (string) ($storeResult['error'] ?? 'Avatar upload failed.');
                         } else {
                             $avatarSet = true;
+                            $avatarFilename = (string) ($storeResult['filename'] ?? '');
                             $uploadedAvatarFilename = $avatarFilename;
                         }
                     }
@@ -322,20 +319,17 @@ final class PreferencesController
             if (!(bool) $result['ok']) {
                 $errors[] = (string) ($result['error'] ?? 'Cover image upload failed.');
             } else {
-                $normalizedExtension = $this->avatarUploadService->normalizeExtension((string) ($result['extension'] ?? ''));
+                $normalizedExtension = $this->userMediaScribe->normalizeExtension((string) ($result['extension'] ?? ''));
                 if ($normalizedExtension === null) {
                     $errors[] = 'Cover image upload format is not supported.';
                 } elseif ($currentUserString === null) {
                     $errors[] = 'User string is missing for this account.';
                 } else {
-                    $coversDir = $this->userMediaPathService->coverStorageDirectory($this->root);
-                    $coverImage = $this->userMediaPathService->coverFilenameForString($currentUserString, $normalizedExtension);
-                    $destination = $coversDir . '/' . $coverImage;
-
-                    $storeError = $this->avatarUploadService->storeSanitizedImageUpload($coverUpload, $destination);
-                    if ($storeError !== null) {
-                        $errors[] = $storeError;
+                    $storeResult = $this->userMediaScribe->storeCoverUpload($currentUserString, $coverUpload, $normalizedExtension);
+                    if (!(bool) ($storeResult['ok'] ?? false)) {
+                        $errors[] = (string) ($storeResult['error'] ?? 'Cover image upload failed.');
                     } else {
+                        $coverImage = (string) ($storeResult['filename'] ?? '');
                         $uploadedCoverFilename = $coverImage;
                     }
                 }
@@ -344,10 +338,10 @@ final class PreferencesController
 
         if ($errors !== []) {
             if ($uploadedAvatarFilename !== null) {
-                $this->userMediaPathService->deleteAvatarFile($this->root, $uploadedAvatarFilename);
+                $this->userMediaScribe->deleteAvatarFile($uploadedAvatarFilename);
             }
             if ($uploadedCoverFilename !== null) {
-                $this->userMediaPathService->deleteCoverFile($this->root, $uploadedCoverFilename);
+                $this->userMediaScribe->deleteCoverFile($uploadedCoverFilename);
             }
 
             $this->context->flash('error', implode(' ', $errors));
@@ -371,10 +365,10 @@ final class PreferencesController
 
         if (!$update['ok']) {
             if ($uploadedAvatarFilename !== null) {
-                $this->userMediaPathService->deleteAvatarFile($this->root, $uploadedAvatarFilename);
+                $this->userMediaScribe->deleteAvatarFile($uploadedAvatarFilename);
             }
             if ($uploadedCoverFilename !== null) {
-                $this->userMediaPathService->deleteCoverFile($this->root, $uploadedCoverFilename);
+                $this->userMediaScribe->deleteCoverFile($uploadedCoverFilename);
             }
 
             $this->context->flash('error', implode(' ', $update['errors']));
@@ -383,10 +377,10 @@ final class PreferencesController
 
         $oldAvatar = $current['avatar'] ?? null;
         if (is_string($oldAvatar) && $oldAvatar !== '' && $oldAvatar !== $avatarFilename && $avatarSet) {
-            $this->userMediaPathService->deleteAvatarFile($this->root, $oldAvatar);
+            $this->userMediaScribe->deleteAvatarFile($oldAvatar);
         }
         if ($currentCoverImage !== null && $currentCoverImage !== '' && $currentCoverImage !== $coverImage) {
-            $this->userMediaPathService->deleteCoverFile($this->root, $currentCoverImage);
+            $this->userMediaScribe->deleteCoverFile($currentCoverImage);
         }
 
         $this->context->auth()->markTwoFactorVerified($userId);

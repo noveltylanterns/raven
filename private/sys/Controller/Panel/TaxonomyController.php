@@ -14,16 +14,16 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Repository\TagRepository;
 use Raven\Core\Repository\SetRepository;
-use Raven\Lib\Transport\Upload;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
-use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\Parser\ChannelDataParser;
-use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Parser\TagDataParser;
 use Raven\Lib\Parser\TagRouteParser;
-
+use Raven\Lib\Scribe\TaxonomyImageScribe;
+use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
+use Raven\Lib\Transport\Upload;
+use Raven\Lib\View\Panel\EditorTabs;
 
 /**
  * Handles panel tag and tag-set management routes.
@@ -45,6 +45,7 @@ final class TaxonomyController
     private Closure $tagSetRepoResolver;
     private bool $tagEnabled;
     private TaxonomyImageService $taxonomyImageService;
+    private TaxonomyImageScribe $taxonomyImageScribe;
     private ChannelDataParser $channelParser;
     private EditorTabs $editorTabs;
     private Upload $uploadFileSetNormalizer;
@@ -55,7 +56,8 @@ final class TaxonomyController
      * @param callable $tagRepoResolver Lazy tag repository resolver; only resolved on tag routes.
      * @param callable $tagSetRepoResolver Lazy tag-set repository resolver; resolved for tag set routes.
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
-     * @param TaxonomyImageService $taxonomyImageService Service for taxonomy image uploads and path management.
+     * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
+     * @param TaxonomyImageScribe $taxonomyImageScribe Write-side taxonomy image upload and cleanup helper.
      * @param ChannelDataParser $channelParser Channel data parser for taxonomy-set assignment counts.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
@@ -68,6 +70,7 @@ final class TaxonomyController
         callable $tagSetRepoResolver,
         bool $tagEnabled,
         TaxonomyImageService $taxonomyImageService,
+        TaxonomyImageScribe $taxonomyImageScribe,
         ChannelDataParser $channelParser,
         EditorTabs $editorTabs,
         Upload $uploadFileSetNormalizer
@@ -78,6 +81,7 @@ final class TaxonomyController
         $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
         $this->tagEnabled = $tagEnabled;
         $this->taxonomyImageService = $taxonomyImageService;
+        $this->taxonomyImageScribe = $taxonomyImageScribe;
         $this->channelParser = $channelParser;
         $this->editorTabs = $editorTabs;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
@@ -303,9 +307,9 @@ final class TaxonomyController
         }
 
         if (isset($coverUploads[0])) {
-            $coverResult = $this->taxonomyImageService->storeUpload('tags', $savedId, 'cover', $coverUploads[0]);
+            $coverResult = $this->taxonomyImageScribe->storeUpload('tags', $savedId, 'cover', $coverUploads[0]);
             if (!$coverResult['ok']) {
-                $this->taxonomyImageService->cleanupPathSets('tags', $savedId, $newPathSets);
+                $this->taxonomyImageScribe->cleanupPathSets('tags', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -317,9 +321,9 @@ final class TaxonomyController
         }
 
         if (isset($previewUploads[0])) {
-            $previewResult = $this->taxonomyImageService->storeUpload('tags', $savedId, 'preview', $previewUploads[0]);
+            $previewResult = $this->taxonomyImageScribe->storeUpload('tags', $savedId, 'preview', $previewUploads[0]);
             if (!$previewResult['ok']) {
-                $this->taxonomyImageService->cleanupPathSets('tags', $savedId, $newPathSets);
+                $this->taxonomyImageScribe->cleanupPathSets('tags', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($previewResult['error'] ?? 'Failed to upload preview image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -331,9 +335,9 @@ final class TaxonomyController
         }
 
         if (isset($iconUploads[0])) {
-            $iconResult = $this->taxonomyImageService->storeUpload('tags', $savedId, 'icon', $iconUploads[0]);
+            $iconResult = $this->taxonomyImageScribe->storeUpload('tags', $savedId, 'icon', $iconUploads[0]);
             if (!$iconResult['ok']) {
-                $this->taxonomyImageService->cleanupPathSets('tags', $savedId, $newPathSets);
+                $this->taxonomyImageScribe->cleanupPathSets('tags', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -348,14 +352,14 @@ final class TaxonomyController
             $this->tagRepo()->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
             // Keep DB and filesystem in sync when image-path persistence fails.
-            $this->taxonomyImageService->cleanupPathSets('tags', $savedId, $newPathSets);
+            $this->taxonomyImageScribe->cleanupPathSets('tags', $savedId, $newPathSets);
             $this->context->flash('error', 'Failed to save tag image selections.');
             Redirect::redirect($savedEditUrl);
         }
 
         $nextPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('tags', $savedId, $nextStorage);
         $obsoletePaths = $this->taxonomyImageService->removedPaths($currentPaths, $nextPaths);
-        $this->taxonomyImageService->deleteStoredPaths('tags', $savedId, $obsoletePaths);
+        $this->taxonomyImageScribe->deleteStoredPaths('tags', $savedId, $obsoletePaths);
 
         $this->context->flash('success', 'Changes saved.');
         Redirect::redirect($savedEditUrl);
@@ -395,7 +399,7 @@ final class TaxonomyController
             }
 
             if ($record !== null) {
-                $this->taxonomyImageService->deleteStoredPaths(
+                $this->taxonomyImageScribe->deleteStoredPaths(
                     'tags',
                     $id,
                     $this->taxonomyImageService->imagePathsFromRecord('tags', $id, $record)
@@ -422,7 +426,7 @@ final class TaxonomyController
                 // Continue deleting remaining ids even if one operation throws.
                 $this->tagRepo()->deleteById($selectedId);
                 if ($record !== null) {
-                    $this->taxonomyImageService->deleteStoredPaths(
+                    $this->taxonomyImageScribe->deleteStoredPaths(
                         'tags',
                         $selectedId,
                         $this->taxonomyImageService->imagePathsFromRecord('tags', $selectedId, $record)

@@ -17,6 +17,7 @@ use Raven\Lib\Auth\Public\GroupPublicRouteService;
 use Raven\Lib\Auth\GroupRolePolicy;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Media\Panel\TaxonomyImagePathResolver;
+use Raven\Lib\Scribe\GroupScribe;
 use RuntimeException;
 
 /**
@@ -33,6 +34,7 @@ final class GroupRepository
     private GroupRolePolicy $rolePolicy;
     private GroupMembershipWriteService $groupMembershipWriteService;
     private GroupPublicRouteService $groupPublicRouteService;
+    private GroupScribe $groupScribe;
 
     public function __construct(PDO $db, string $driver, string $prefix)
     {
@@ -42,6 +44,7 @@ final class GroupRepository
         $this->rolePolicy = new GroupRolePolicy();
         $this->groupMembershipWriteService = new GroupMembershipWriteService();
         $this->groupPublicRouteService = new GroupPublicRouteService();
+        $this->groupScribe = new GroupScribe($db, $driver, $prefix);
     }
 
     /**
@@ -369,109 +372,7 @@ final class GroupRepository
      */
     public function save(array $data): int
     {
-        $groups = $this->table('groups');
-
-        $id = $data['id'] ?? null;
-        $name = trim($data['name']);
-        $description = trim((string) ($data['description'] ?? ''));
-        $slugInput = trim((string) ($data['slug'] ?? ''));
-        $slug = $this->rolePolicy->normalizeSlug($slugInput !== '' ? $slugInput : $name);
-        $mask = (int) ($data['permissions'] ?? 0);
-        $routeEnabled = !empty($data['route']) ? 1 : 0;
-        $now = gmdate('Y-m-d H:i:s');
-
-        if ($id !== null && $id > 0) {
-            $existing = $this->findById($id);
-            if ($existing === null) {
-                throw new RuntimeException('Group not found.');
-            }
-
-            $isStock = $this->rolePolicy->isStockRoleSlug((string) ($existing['slug'] ?? ''));
-            $existingSlug = strtolower(trim((string) ($existing['slug'] ?? '')));
-
-            if ($isStock) {
-                // Stock slugs are immutable while stock display names remain editable.
-                $slug = trim((string) ($existing['slug'] ?? ''));
-            }
-
-            if ($name === '') {
-                throw new RuntimeException('Group name is required.');
-            }
-
-            $roleSlug = $isStock ? $existingSlug : strtolower($slug);
-            $normalizedStockRole = $this->rolePolicy->normalizeStockRoleSettings($roleSlug, $routeEnabled, $mask);
-            $routeEnabled = (int) ($normalizedStockRole['route'] ?? $routeEnabled);
-            $mask = (int) ($normalizedStockRole['permissions'] ?? $mask);
-
-            if ($slug === '') {
-                $slug = $this->rolePolicy->normalizeSlug($name);
-            }
-            if ($slug === '') {
-                throw new RuntimeException('Group slug is required.');
-            }
-            if ($this->slugExistsForOtherGroup($id, $slug)) {
-                throw new RuntimeException('Group slug already exists.');
-            }
-
-            // Update preserves stock flag for stock rows, but always updates permission mask.
-            // Image files are managed separately via updateImageFiles().
-            $stmt = $this->db->prepare(
-                'UPDATE ' . $groups . '
-                 SET name = :name,
-                     slug = :slug,
-                     description = :description,
-                     route = :route,
-                     permissions = :permissions,
-                     updated = :updated
-                 WHERE id = :id'
-            );
-            $stmt->execute([
-                ':name' => $name,
-                ':slug' => $slug,
-                ':description' => $description !== '' ? $description : null,
-                ':route' => $routeEnabled,
-                ':permissions' => $mask,
-                ':updated' => $now,
-                ':id' => $id,
-            ]);
-
-            return $id;
-        }
-
-        if ($name === '') {
-            throw new RuntimeException('Group name is required.');
-        }
-        if ($slug === '') {
-            throw new RuntimeException('Group slug is required.');
-        }
-        if ($this->rolePolicy->isStockRoleSlug($slug)) {
-            throw new RuntimeException('Reserved stock group slugs cannot be reused.');
-        }
-        if ($this->slugExistsForOtherGroup(0, $slug)) {
-            throw new RuntimeException('Group slug already exists.');
-        }
-        $mask = $this->rolePolicy->normalizeMaskForPanelAccess($mask);
-
-        $customGroupId = $this->nextCustomGroupId();
-
-        // Create path is always non-stock; stock groups are schema-managed.
-        // Image files are set separately via updateImageFiles() after creation.
-        $stmt = $this->db->prepare(
-            'INSERT INTO ' . $groups . ' (id, name, slug, description, route, permissions, created, updated)
-             VALUES (:id, :name, :slug, :description, :route, :permissions, :created, :updated)'
-        );
-        $stmt->execute([
-            ':id' => $customGroupId,
-            ':name' => $name,
-            ':slug' => $slug,
-            ':description' => $description !== '' ? $description : null,
-            ':route' => $routeEnabled,
-            ':permissions' => $mask,
-            ':created' => $now,
-            ':updated' => $now,
-        ]);
-
-        return $customGroupId;
+        return $this->groupScribe->save($data);
     }
 
     /**
@@ -485,21 +386,7 @@ final class GroupRepository
      */
     public function updateImageFiles(int $id, array $files): void
     {
-        $groups = $this->table('groups');
-
-        $stmt = $this->db->prepare(
-            'UPDATE ' . $groups . '
-             SET cover_image = :cover_image,
-                 icon_image = :icon_image,
-                 updated = :updated
-             WHERE id = :id'
-        );
-        $stmt->execute([
-            ':cover_image' => $this->normalizeNullableFilename($files['cover_image'] ?? null),
-            ':icon_image' => $this->normalizeNullableFilename($files['icon_image'] ?? null),
-            ':updated' => gmdate('Y-m-d H:i:s'),
-            ':id' => $id,
-        ]);
+        $this->groupScribe->updateImageFiles($id, $files);
     }
 
     /**
@@ -520,44 +407,7 @@ final class GroupRepository
      */
     public function deleteById(int $id): void
     {
-        $groups = $this->table('groups');
-        $userGroups = $this->table('user_groups');
-
-        $group = $this->findById($id);
-        if ($group === null) {
-            throw new RuntimeException('Group not found.');
-        }
-
-        if ($this->rolePolicy->isStockRoleSlug((string) ($group['slug'] ?? ''))) {
-            throw new RuntimeException('Stock groups cannot be deleted.');
-        }
-
-        // Non-empty groups cannot be deleted; users must be moved first.
-        $memberCount = $this->membershipCountForGroup($id);
-        if ($memberCount > 0) {
-            throw new RuntimeException('Cannot delete a group that still has members. Move or remove members first.');
-        }
-
-        $this->db->beginTransaction();
-
-        try {
-            $deleteMemberships = $this->db->prepare(
-                'DELETE FROM ' . $userGroups . ' WHERE "group" = :group_id'
-            );
-            $deleteMemberships->execute([':group_id' => $id]);
-
-            $deleteGroup = $this->db->prepare('DELETE FROM ' . $groups . ' WHERE id = :id');
-            $deleteGroup->execute([':id' => $id]);
-
-            // Commit only after cleanup and deletion both succeed.
-            $this->db->commit();
-        } catch (\Throwable $exception) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-
-            throw $exception;
-        }
+        $this->groupScribe->deleteById($id);
     }
 
     /**
@@ -605,19 +455,6 @@ final class GroupRepository
     }
 
     /**
-     * Returns the number of members in one group.
-     */
-    private function membershipCountForGroup(int $groupId): int
-    {
-        $userGroups = $this->table('user_groups');
-        $stmt = $this->db->prepare(
-            'SELECT COUNT(*) FROM ' . $userGroups . ' WHERE "group" = :group_id'
-        );
-        $stmt->execute([':group_id' => $groupId]);
-        return (int) $stmt->fetchColumn();
-    }
-
-    /**
      * Returns membership count for one user.
      */
     private function membershipCountForUser(int $userId): int
@@ -640,18 +477,6 @@ final class GroupRepository
             $this->table('user_groups'),
             $userId,
             $groupId
-        );
-    }
-
-    /**
-     * Allocates the next custom group id from the reserved custom range.
-     */
-    private function nextCustomGroupId(): int
-    {
-        return $this->groupMembershipWriteService->nextCustomGroupId(
-            $this->db,
-            $this->table('groups'),
-            self::CUSTOM_GROUP_ID_START
         );
     }
 
@@ -681,22 +506,6 @@ final class GroupRepository
         $row['updated'] = (string) ($row['updated'] ?? $row['created'] ?? '');
 
         return $row;
-    }
-
-    private function normalizeNullableFilename(mixed $value): ?string
-    {
-        $raw = trim((string) $value);
-        if ($raw === '') {
-            return null;
-        }
-
-        // Store only the base filename, not a full path, to keep storage portable.
-        $filename = basename(str_replace('\\', '/', $raw));
-        if ($filename === '' || $filename === '.' || $filename === '..') {
-            return null;
-        }
-
-        return $filename;
     }
 
     private function stockRoleSql(string $tableAlias = ''): string

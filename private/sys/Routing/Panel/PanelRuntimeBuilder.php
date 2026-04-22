@@ -52,11 +52,12 @@ use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
-use Raven\Lib\Media\Panel\AvatarUploadService;
 use Raven\Lib\Media\Panel\PageImageManager;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\Parser\UserDataParser;
+use Raven\Lib\Scribe\TaxonomyImageScribe;
+use Raven\Lib\Scribe\UserMediaScribe;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorMCE;
@@ -632,7 +633,8 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['tag_set'],
                 $taxonomyDomain['category_enabled'],
                 $taxonomyDomain['tag_enabled'],
-                new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
+                new TaxonomyImageService($rvn['config']),
+                new TaxonomyImageScribe($rvn['config'], (string) $rvn['root']),
                 new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel']),
                 new FeedRouteParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
@@ -661,7 +663,8 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['category'],
                 $taxonomyDomain['category_set'],
                 $taxonomyDomain['category_enabled'],
-                new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
+                new TaxonomyImageService($rvn['config']),
+                new TaxonomyImageScribe($rvn['config'], (string) $rvn['root']),
                 new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel']),
                 $rvn['panel_editor_tabs'],
                 new Upload()
@@ -712,7 +715,8 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['tag'],
                 $taxonomyDomain['tag_set'],
                 $taxonomyDomain['tag_enabled'],
-                new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
+                new TaxonomyImageService($rvn['config']),
+                new TaxonomyImageScribe($rvn['config'], (string) $rvn['root']),
                 new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel']),
                 $rvn['panel_editor_tabs'],
                 new Upload()
@@ -750,7 +754,7 @@ final class PanelRuntimeBuilder
                 new PanelMediaConfigService($rvn['config']),
                 new UserDataParser($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
-                new AvatarUploadService(),
+                new UserMediaScribe((string) $rvn['root']),
                 new UserMediaPathService()
             );
 
@@ -776,7 +780,8 @@ final class PanelRuntimeBuilder
                 new GroupRouteParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
-                new TaxonomyImageService($rvn['config'], (string) $rvn['root']),
+                new TaxonomyImageService($rvn['config']),
+                new TaxonomyImageScribe($rvn['config'], (string) $rvn['root']),
                 new PanelPermissionDefinitionCatalog(),
                 new Upload(),
                 static function () use (&$rvn): array {
@@ -815,7 +820,7 @@ final class PanelRuntimeBuilder
                 new PanelMediaConfigService($rvn['config']),
                 new UserDataParser($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
-                new AvatarUploadService(),
+                new UserMediaScribe((string) $rvn['root']),
                 new UserMediaPathService(),
                 new PasswordChangePolicy()
             );

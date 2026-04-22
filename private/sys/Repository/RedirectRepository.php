@@ -16,7 +16,7 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Parser\ChannelContextParser;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Parser\PageDuplicateParser;
+use Raven\Lib\Scribe\RedirectScribe;
 use RuntimeException;
 
 /**
@@ -28,6 +28,7 @@ final class RedirectRepository
     private string $driver;
     private string $prefix;
     private ChannelRepository $channelRepo;
+    private RedirectScribe $redirectScribe;
 
     public function __construct(PDO $db, string $driver, string $prefix, ChannelRepository $channelRepo)
     {
@@ -35,6 +36,7 @@ final class RedirectRepository
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->channelRepo = $channelRepo;
+        $this->redirectScribe = new RedirectScribe($db, $driver, $prefix, $channelRepo);
     }
 
     /**
@@ -367,75 +369,7 @@ final class RedirectRepository
      */
     public function save(array $data): int
     {
-        $redirects = $this->table('redirects');
-
-        $id = $data['id'] ?? null;
-        $title = trim((string) ($data['title'] ?? ''));
-        $description = trim((string) ($data['description'] ?? ''));
-        $slug = trim((string) ($data['slug'] ?? ''));
-        $channelSlug = $data['channel_slug'] ?? null;
-        $isActive = (int) ($data['active'] ?? 0) === 1 ? 1 : 0;
-        $targetUrl = trim((string) ($data['target'] ?? ''));
-        $channelId = $this->channelIdBySlug($channelSlug) ?? 0;
-        if (trim((string) ($channelSlug ?? '')) !== '' && $channelId < 1) {
-            throw new RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
-        }
-        $now = gmdate('Y-m-d H:i:s');
-
-        if ($title === '' || $slug === '' || $targetUrl === '') {
-            throw new RuntimeException('Redirect title, slug, and target URL are required.');
-        }
-
-        // Path uniqueness is scoped to (channel, slug) pairs.
-        if ($this->pathExists($slug, $channelId, $id)) {
-            throw new RuntimeException('A redirect already exists for that slug/channel path.');
-        }
-
-        if ($id !== null && $id > 0) {
-            // Update in place when editing an existing redirect.
-            $stmt = $this->db->prepare(
-                'UPDATE ' . $redirects . '
-                 SET title = :title,
-                     description = :description,
-                     slug = :slug,
-                     channel = :channel,
-                     active = :active,
-                     target = :target,
-                     updated = :updated
-                 WHERE id = :id'
-            );
-            $stmt->execute([
-                ':title' => $title,
-                ':description' => $description,
-                ':slug' => $slug,
-                ':channel' => $channelId,
-                ':active' => $isActive,
-                ':target' => $targetUrl,
-                ':updated' => $now,
-                ':id' => $id,
-            ]);
-
-            return $id;
-        }
-
-        // Insert path stores creation/update timestamps together.
-        $stmt = $this->db->prepare(
-            'INSERT INTO ' . $redirects . '
-             (title, description, slug, channel, active, target, created, updated)
-             VALUES (:title, :description, :slug, :channel, :active, :target, :created, :updated)'
-        );
-        $stmt->execute([
-            ':title' => $title,
-            ':description' => $description,
-            ':slug' => $slug,
-            ':channel' => $channelId,
-            ':active' => $isActive,
-            ':target' => $targetUrl,
-            ':created' => $now,
-            ':updated' => $now,
-        ]);
-
-        return (int) $this->db->lastInsertId();
+        return $this->redirectScribe->save($data);
     }
 
     /**
@@ -443,26 +377,7 @@ final class RedirectRepository
      */
     public function deleteById(int $id): void
     {
-        $redirects = $this->table('redirects');
-
-        $stmt = $this->db->prepare('DELETE FROM ' . $redirects . ' WHERE id = :id');
-        $stmt->execute([':id' => $id]);
-    }
-
-    /**
-     * Checks whether another redirect already uses one (channel, slug) path.
-     */
-    private function pathExists(string $slug, ?int $channelId, ?int $ignoreId = null): bool
-    {
-        return PageDuplicateParser::exists(
-            $this->db,
-            $this->table('redirects'),
-            $slug,
-            $channelId,
-            $ignoreId,
-            'ignore_id',
-            'channel'
-        );
+        $this->redirectScribe->deleteById($id);
     }
 
     /**
@@ -489,22 +404,6 @@ final class RedirectRepository
         $row['updated'] = (string) ($row['updated'] ?? '');
 
         return ChannelContextParser::applyBasicChannelContext($row, $channel);
-    }
-
-    /**
-     * Resolves channel id by slug for channel-bound redirects.
-     */
-    private function channelIdBySlug(?string $slug): ?int
-    {
-        if (ChannelContextParser::isRootChannelSlug((string) ($slug ?? ''))) {
-            return 0;
-        }
-
-        return ChannelContextParser::resolveChannelIdBySlug(
-            $slug,
-            fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),
-            'Selected channel does not exist.'
-        );
     }
 
     /**

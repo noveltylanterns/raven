@@ -16,41 +16,17 @@ namespace Raven\Lib\Media\Panel;
  */
 final class UserMediaPathService
 {
-    public function avatarStorageDirectory(string $projectRoot): string
-    {
-        $directory = rtrim($projectRoot, '/\\') . '/public/uploads/avatars';
-        if (!is_dir($directory)) {
-            @mkdir($directory, 0775, true);
-        }
-
-        return $directory;
-    }
-
-    public function coverStorageDirectory(string $projectRoot): string
-    {
-        $directory = rtrim($projectRoot, '/\\') . '/public/uploads/user/cover';
-        if (!is_dir($directory)) {
-            @mkdir($directory, 0775, true);
-        }
-
-        return $directory;
-    }
-
-    public function avatarFilenameForString(string $userString, string $extension): string
-    {
-        return $this->filenameForString($userString, $extension, 'avatar');
-    }
-
-    public function coverFilenameForString(string $userString, string $extension): string
-    {
-        return $this->filenameForString($userString, $extension, 'cover');
-    }
-
     /**
+     * Builds panel/public template data for one stored avatar filename.
+     *
+     * @param string $projectRoot Project root path retained for compatibility with older call sites.
+     * @param string $avatarPath Stored avatar filename or path from the user row.
      * @return array{filename: string, url: string, thumb_url: string}
      */
     public function avatarTemplateData(string $projectRoot, string $avatarPath): array
     {
+        unset($projectRoot);
+
         $avatarFilename = basename(trim($avatarPath));
         if ($avatarFilename === '') {
             return ['filename' => '', 'url' => '', 'thumb_url' => ''];
@@ -66,8 +42,17 @@ final class UserMediaPathService
         ];
     }
 
+    /**
+     * Resolves one stored cover-image value to the public URL used by views.
+     *
+     * @param string $projectRoot Project root path retained for compatibility with older call sites.
+     * @param string $coverValue Stored cover-image filename or URL from the user row.
+     * @return string Public URL or the original absolute URL.
+     */
     public function coverPublicUrl(string $projectRoot, string $coverValue): string
     {
+        unset($projectRoot);
+
         $normalized = trim($coverValue);
         if ($normalized === '') {
             return '';
@@ -81,68 +66,12 @@ final class UserMediaPathService
         return '/uploads/user/cover/' . rawurlencode($filename);
     }
 
-    public function deleteAvatarFile(string $projectRoot, string $filename): void
-    {
-        $safeName = basename($filename);
-        if ($safeName === '' || $safeName === '.' || $safeName === '..') {
-            return;
-        }
-
-        $directories = [
-            $this->avatarStorageDirectory($projectRoot),
-        ];
-        $thumbFilename = $this->thumbnailFilename($safeName);
-
-        foreach ($directories as $directory) {
-            $path = $directory . '/' . $safeName;
-            if (is_file($path)) {
-                @unlink($path);
-            }
-
-            $thumbPath = $directory . '/' . $thumbFilename;
-            if (is_file($thumbPath)) {
-                @unlink($thumbPath);
-            }
-        }
-    }
-
-    public function deleteCoverFile(string $projectRoot, string $coverValue): void
-    {
-        $normalized = trim($coverValue);
-        if ($normalized === '' || preg_match('#^https?://#i', $normalized) === 1) {
-            return;
-        }
-
-        if (str_starts_with($normalized, '/uploads/')) {
-            $relative = ltrim($normalized, '/');
-            if (!str_starts_with($relative, 'uploads/user/cover/')) {
-                return;
-            }
-
-            $absolute = rtrim($projectRoot, '/\\') . '/public/' . $relative;
-            if (is_file($absolute)) {
-                @unlink($absolute);
-            }
-
-            return;
-        }
-
-        $safeName = basename($normalized);
-        if ($safeName === '' || $safeName === '.' || $safeName === '..') {
-            return;
-        }
-
-        $directories = [
-            $this->coverStorageDirectory($projectRoot),
-        ];
-        foreach ($directories as $directory) {
-            $path = $directory . '/' . $safeName;
-            if (is_file($path)) {
-                @unlink($path);
-            }
-        }
-    }
-
+    /**
+     * Builds the thumbnail filename that matches the avatar upload sanitizer.
+     *
+     * @param string $filename Stored avatar filename.
+     * @return string Thumbnail filename for the same avatar.
+     */
     public function thumbnailFilename(string $filename): string
     {
         $base = (string) pathinfo($filename, PATHINFO_FILENAME);
@@ -151,23 +80,5 @@ final class UserMediaPathService
         }
 
         return $base . '_thumb.jpg';
-    }
-
-    private function filenameForString(string $userString, string $extension, string $fallbackBase): string
-    {
-        $base = preg_replace('/[^a-zA-Z0-9]/', '', trim($userString)) ?? '';
-        if ($base === '') {
-            $base = $fallbackBase;
-        }
-
-        $normalizedExtension = strtolower(trim($extension));
-        if ($normalizedExtension === 'jpeg') {
-            $normalizedExtension = 'jpg';
-        }
-        if (!in_array($normalizedExtension, ['jpg', 'png', 'gif'], true)) {
-            $normalizedExtension = 'jpg';
-        }
-
-        return $base . '.' . $normalizedExtension;
     }
 }
