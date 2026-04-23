@@ -416,14 +416,18 @@ final class PageController
         $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['content', 'meta', 'media'], 'content');
         $title = $this->input->text($post['title'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
-        $contentBlocks = $this->normalizeContentBlocksInput($post['content_blocks'] ?? []);
+        $contentBlocks = $this->pageBlocks()->normalizeEditorSubmittedBlocks(
+            $post['content_blocks'] ?? [],
+            $this->pageEditorBodyBlockTypeDefinitions(),
+            50
+        );
         $description = $this->input->text($post['description'] ?? null, 1000);
         $channelSlug = $this->input->slug($post['channel_slug'] ?? null);
         $status = strtolower((string) $this->input->text($post['status'] ?? null, 20));
         $publishAt = $this->input->text($post['published'] ?? null, 32);
         $expireAt = $this->input->text($post['expires'] ?? null, 32);
         $displayTitle = isset($post['display_title']) && (string) $post['display_title'] === '1';
-        $galleryEnabled = $this->pageBodyBlocksIncludeGallery($contentBlocks)
+        $galleryEnabled = $this->pageBlocks()->hasGalleryBlock($contentBlocks, $this->pageEditorBodyBlockTypeDefinitions())
             || (isset($post['gallery_enabled']) && (string) $post['gallery_enabled'] === '1');
         $authorUserId = $this->input->int($post['author_user_id'] ?? null, 1);
         if ($authorUserId !== null && $this->userParser()->findById($authorUserId) === null) {
@@ -1161,28 +1165,6 @@ final class PageController
         );
 
         return $this->pageBodyBlockTypeDefinitionsCache;
-    }
-
-    /**
-     * Normalizes optional repeatable page-editor body blocks from a raw POST payload.
-     *
-     * @param mixed $raw Raw content_blocks value from the editor form POST.
-     * @return array<int, array{type: string, content: string, css_id: string, css_class: string}> Normalized block list.
-     */
-    private function normalizeContentBlocksInput(mixed $raw): array
-    {
-        return $this->pageBlocks()->normalizeEditorSubmittedBlocks($raw, $this->pageEditorBodyBlockTypeDefinitions(), 50);
-    }
-
-    /**
-     * Returns true when at least one body block in the list requests gallery output.
-     *
-     * @param array<int, array{type: string, content: string, css_id: string, css_class: string}> $blocks Normalized block list.
-     * @return bool True when a gallery-type block is present.
-     */
-    private function pageBodyBlocksIncludeGallery(array $blocks): bool
-    {
-        return $this->pageBlocks()->hasGalleryBlock($blocks, $this->pageEditorBodyBlockTypeDefinitions());
     }
 
     // -------------------------------------------------------------------------
