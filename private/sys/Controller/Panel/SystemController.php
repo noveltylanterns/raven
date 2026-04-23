@@ -1076,28 +1076,6 @@ final class SystemController
     }
 
     /**
-     * Returns extension permission metadata for matching directories.
-     *
-     * @param array<int, string> $directoryFilter Optional directory whitelist.
-     * @return array<string, array{
-     *   name: string,
-     *   type: string,
-     *   default_level: string,
-     *   levels: array<int, array{key: string, label: string, bit: int}>
-     * }>
-     */
-    public function extensionPanelPermissionMapForDirectories(array $directoryFilter = []): array
-    {
-        return $this->extensionCatalogService->panelPermissionMapForDirectories(
-            $directoryFilter,
-            fn (string $extensionPath): array => $this->extensionCatalogService->readManifest(
-                $extensionPath,
-                fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
-            )
-        );
-    }
-
-    /**
      * Resolves the next available extension directory name by appending copy suffixes.
      */
     private function nextAvailableExtensionDirectoryName(string $baseName): ?string
