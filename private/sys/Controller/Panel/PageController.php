@@ -447,7 +447,7 @@ final class PageController
         /** @var mixed $galleryImagesRaw */
         $galleryImagesRaw = $post['gallery_images'] ?? [];
 
-        $galleryImageUpdates = $this->normalizeGalleryImageUpdates($galleryImagesRaw);
+        $galleryImageUpdates = $this->panelPostNormalizer()->normalizeGalleryImageUpdates($galleryImagesRaw);
 
         $categoryEnabled = $this->context->categoryEnabled();
         $tagEnabled = $this->context->tagEnabled();
@@ -570,7 +570,7 @@ final class PageController
 
         /** @var mixed $rawUploads */
         $rawUploads = $files['gallery_upload_image'] ?? null;
-        $uploads = $this->normalizeUploadedFileSet($rawUploads);
+        $uploads = $this->uploadFileSetNormalizer()->normalize($rawUploads);
 
         if ($uploads === []) {
             $this->context->flash('error', 'Please select one or more images to upload.');
@@ -657,7 +657,7 @@ final class PageController
 
         $pageId = $this->input->int($post['id'] ?? null, 1);
         $imageId = $this->input->int($post['gallery_delete_image_id'] ?? null, 1);
-        $selectedImageIds = $this->selectedIdsFromPost($post, 'gallery_delete_image_ids');
+        $selectedImageIds = $this->panelPostNormalizer()->selectedIdsFromPost($post, 'gallery_delete_image_ids');
 
         if ($pageId === null) {
             $this->context->flash('error', 'Invalid image delete request.');
@@ -770,7 +770,7 @@ final class PageController
         }
 
         // Bulk-delete mode is used by the list-level "Delete" buttons.
-        $selectedIds = $this->selectedIdsFromPost($post);
+        $selectedIds = $this->panelPostNormalizer()->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->context->flash('error', 'No pages selected.');
             Redirect::redirect($this->context->panelUrl('/page'));
@@ -1295,50 +1295,4 @@ final class PageController
     // POST and file normalization helpers
     // -------------------------------------------------------------------------
 
-    /**
-     * Extracts and normalizes a list of integer ids from a POST key.
-     *
-     * @param array<string, mixed> $post POST payload to extract from.
-     * @param string $key POST key that holds the raw id list.
-     * @return array<int, int> Validated positive integer id list.
-     */
-    private function selectedIdsFromPost(array $post, string $key = 'selected_ids'): array
-    {
-        return $this->panelPostNormalizer()->selectedIdsFromPost($post, $key);
-    }
-
-    /**
-     * Normalizes the Media-tab gallery image metadata payload from the page editor.
-     *
-     * @param mixed $raw Raw gallery_images value from the page editor POST.
-     * @return array<int, array{
-     *   alt_text: string,
-     *   title_text: string,
-     *   caption: string,
-     *   credit: string,
-     *   license: string,
-     *   focal_x: float|null,
-     *   focal_y: float|null,
-     *   sort_order: int,
-     *   is_cover: bool,
-     *   include_in_gallery: bool
-     * }> Normalized gallery image update records.
-     */
-    private function normalizeGalleryImageUpdates(mixed $raw): array
-    {
-        return $this->panelPostNormalizer()->normalizeGalleryImageUpdates($raw);
-    }
-
-    /**
-     * Normalizes one `$_FILES` upload group into a list of upload entry arrays.
-     *
-     * Supports both a single file input and `multiple` file inputs.
-     *
-     * @param mixed $raw Raw $_FILES entry for one upload input.
-     * @return array<int, array<string, mixed>> Normalized upload entry list.
-     */
-    private function normalizeUploadedFileSet(mixed $raw): array
-    {
-        return $this->uploadFileSetNormalizer()->normalize($raw);
-    }
 }
